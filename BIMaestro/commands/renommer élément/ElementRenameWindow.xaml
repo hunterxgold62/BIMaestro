@@ -1,0 +1,77 @@
+﻿<Window x:Class="Modification.ElementRenamerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Organisateur d'Éléments" Height="450" Width="400" WindowStartupLocation="CenterScreen">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- Paramètre -->
+            <RowDefinition Height="Auto"/>
+            <!-- Préfixe -->
+            <RowDefinition Height="Auto"/>
+            <!-- Suffixe -->
+            <RowDefinition Height="Auto"/>
+            <!-- Numéro de départ -->
+            <RowDefinition Height="Auto"/>
+            <!-- Format de numérotation -->
+            <RowDefinition Height="Auto"/>
+            <!-- Hauteur de bande -->
+            <RowDefinition Height="Auto"/>
+            <!-- Options -->
+            <RowDefinition Height="Auto"/>
+            <!-- Boutons -->
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <!-- Labels -->
+            <ColumnDefinition Width="*"/>
+            <!-- Contrôles -->
+        </Grid.ColumnDefinitions>
+
+        <!-- Paramètre à modifier -->
+        <Label Grid.Row="0" Grid.Column="0" Content="Paramètre à modifier :" VerticalAlignment="Center" Margin="0,5"
+               ToolTip="Sélectionnez le paramètre texte que vous souhaitez modifier pour les éléments sélectionnés."/>
+        <ComboBox Grid.Row="0" Grid.Column="1" x:Name="ParameterComboBox" ItemsSource="{Binding AvailableParameters}" SelectedItem="{Binding SelectedParameter}" Margin="0,5" VerticalContentAlignment="Stretch"/>
+
+        <!-- Préfixe -->
+        <Label Grid.Row="1" Grid.Column="0" Content="Préfixe :" VerticalAlignment="Center" Margin="0,5"
+               ToolTip="Entrez le texte qui sera ajouté avant le numéro lors du renommage des éléments."/>
+        <TextBox Grid.Row="1" Grid.Column="1" x:Name="PrefixTextBox" Text="{Binding Prefix, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,5" VerticalContentAlignment="Stretch"/>
+
+        <!-- Suffixe -->
+        <Label Grid.Row="2" Grid.Column="0" Content="Suffixe :" VerticalAlignment="Center" Margin="0,5"
+               ToolTip="Entrez le texte qui sera ajouté après le numéro lors du renommage des éléments."/>
+        <TextBox Grid.Row="2" Grid.Column="1" x:Name="SuffixTextBox" Text="{Binding Suffix, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,5" VerticalContentAlignment="Stretch"/>
+
+        <!-- Numéro de départ -->
+        <Label Grid.Row="3" Grid.Column="0" Content="Numéro de départ :" VerticalAlignment="Center" Margin="0,5"
+               ToolTip="Spécifiez le point de départ pour la numérotation."/>
+        <TextBox Grid.Row="3" Grid.Column="1" x:Name="StartNumberTextBox" Text="{Binding StartNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,5" VerticalContentAlignment="Stretch"/>
+
+        <!-- Format de numérotation -->
+        <Label Grid.Row="4" Grid.Column="0" Content="Format de numérotation :" VerticalAlignment="Center" Margin="0,5"
+               ToolTip="Choisissez le format de numérotation des éléments."/>
+        <ComboBox Grid.Row="4" Grid.Column="1" x:Name="NumberFormatComboBox" ItemsSource="{Binding NumberFormats}" SelectedItem="{Binding SelectedNumberFormat}" Margin="0,5" VerticalContentAlignment="Stretch" />
+
+        <!-- Hauteur de bande -->
+        <Label Grid.Row="5" Grid.Column="0" Content="Hauteur de bande (m) :" VerticalAlignment="Center" Margin="0,5"
+               ToolTip="Spécifiez la hauteur des bandes utilisées pour le tri des éléments. Les éléments sont regroupés par bandes horizontales de cette hauteur et triés de gauche à droite dans chaque bande."/>
+        <TextBox Grid.Row="5" Grid.Column="1" x:Name="BandHeightTextBox" Text="{Binding BandHeight, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,5" VerticalContentAlignment="Stretch"/>
+
+        <!-- Options -->
+        <StackPanel Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Vertical" Margin="0,10,0,0">
+            <CheckBox x:Name="NumberingCheckBox" Content="Activer la numérotation" IsChecked="{Binding IsNumberingEnabled, Mode=TwoWay}" Margin="0,5"
+                      ToolTip="Cochez cette case pour ajouter une numérotation aux éléments. Si elle est décochée, seul le préfixe et le suffixe seront utilisés."/>
+            <CheckBox x:Name="SortByLevelCheckBox" Content="Trier par niveau" IsChecked="{Binding IsSortByLevelEnabled, Mode=TwoWay}" Margin="0,5"
+                      ToolTip="Cochez cette case pour trier les éléments par niveau avant d'appliquer le renommage."/>
+        </StackPanel>
+
+        <!-- Boutons -->
+        <StackPanel Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,20,0,0">
+            <Button Content="Renommer" Padding="5" Width="120" Click="OnRenameClick" Margin="5"
+                    ToolTip="Cliquez pour appliquer le renommage aux éléments sélectionnés."/>
+            <Button Content="Réinitialiser" Padding="5" Width="120" Click="OnResetClick" Margin="5"
+                    ToolTip="Cliquez pour réinitialiser le paramètre sélectionné des éléments (vide le contenu)."/>
+        </StackPanel>
+    </Grid>
+</Window>

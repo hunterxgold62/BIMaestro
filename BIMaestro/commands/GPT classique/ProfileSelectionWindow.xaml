@@ -1,0 +1,16 @@
+﻿<Window x:Class="IA.ProfileSelectionWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Sélection du Profil" Height="200" Width="300"
+        WindowStartupLocation="CenterScreen" ResizeMode="NoResize">
+    <StackPanel Margin="10">
+        <TextBlock Text="Veuillez sélectionner un profil :" FontWeight="Bold" Margin="0,0,0,10"/>
+        <RadioButton x:Name="BasiqueRadio" Content="Basique" IsChecked="True"/>
+        <RadioButton x:Name="PersonnelleRevitRadio" Content="Personnelle Revit"/>
+        <RadioButton x:Name="BIMManagerRadio" Content="BIM Manager"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <Button Content="OK" Width="75" Click="OKButton_Click" Margin="0,0,10,0"/>
+            <Button Content="Annuler" Width="75" Click="CancelButton_Click"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

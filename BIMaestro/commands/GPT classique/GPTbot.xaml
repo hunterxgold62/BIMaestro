@@ -1,0 +1,105 @@
+﻿<Window x:Class="IA.GPTBotWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:IA"
+        Title="GPT Bot" Height="505" Width="500"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize">
+
+
+    <Window.Resources>
+        <!-- Template pour le message de l'utilisateur -->
+        <DataTemplate x:Key="UserMessageTemplate">
+            <StackPanel HorizontalAlignment="Right" Margin="10">
+                <Border Background="#87CEEB" CornerRadius="10" Padding="10" MaxWidth="300" Margin="0,5">
+                    <TextBox Text="{Binding Content}" TextWrapping="Wrap" Foreground="Black" Background="Transparent" 
+                             BorderThickness="0" IsReadOnly="True" IsReadOnlyCaretVisible="True" Cursor="IBeam"/>
+                </Border>
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- Template pour le message du bot -->
+        <DataTemplate x:Key="BotMessageTemplate">
+            <StackPanel HorizontalAlignment="Left" Margin="10">
+                <Border Background="#D3D3D3" CornerRadius="10" Padding="10" MaxWidth="300" Margin="0,5">
+                    <TextBox Text="{Binding Content}" TextWrapping="Wrap" Foreground="Black" Background="Transparent" 
+                             BorderThickness="0" IsReadOnly="True" IsReadOnlyCaretVisible="True" Cursor="IBeam"/>
+                </Border>
+            </StackPanel>
+        </DataTemplate>
+
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Liste des messages -->
+        <ScrollViewer Grid.Row="0" Margin="10" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                      PreviewMouseWheel="ScrollViewer_PreviewMouseWheel">
+            <ListBox x:Name="MessagesListBox" ItemsSource="{Binding}">
+                <ListBox.Resources>
+                    <!-- Utilisation du bon template selon le rôle du message -->
+                    <DataTemplate DataType="{x:Type local:MessageModel}">
+                        <ContentControl Content="{Binding}">
+                            <ContentControl.Style>
+                                <Style TargetType="ContentControl">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Role}" Value="system">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Role}" Value="user">
+                                            <Setter Property="ContentTemplate" Value="{StaticResource UserMessageTemplate}"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Role}" Value="assistant">
+                                            <Setter Property="ContentTemplate" Value="{StaticResource BotMessageTemplate}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ContentControl.Style>
+                        </ContentControl>
+                    </DataTemplate>
+                </ListBox.Resources>
+            </ListBox>
+        </ScrollViewer>
+
+        <!-- Indicateur de chargement -->
+        <ProgressBar x:Name="LoadingIndicator" IsIndeterminate="True" Visibility="Collapsed" Height="20" Margin="10" Grid.Row="1"/>
+
+        <!-- Zone d'entrée utilisateur et boutons -->
+        <DockPanel Grid.Row="1" Margin="10">
+            <TextBox x:Name="InputBox" DockPanel.Dock="Left" Width="300" Height="30" VerticalAlignment="Center" Margin="0,0,10,0"
+                     Padding="5" BorderBrush="#CCCCCC" BorderThickness="1" Background="White"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="ElementButton" Content="Élément" Width="75" Height="30" Click="ElementButton_Click"
+                        Background="#007ACC" Foreground="White" BorderBrush="#005A9E" BorderThickness="1"
+                        Padding="5" Cursor="Hand" IsEnabled="True">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#005A9E"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                <Button x:Name="AskButton" Content="Envoyer" Width="75" Height="30" Click="AskButton_Click"
+                        Background="#007ACC" Foreground="White" BorderBrush="#005A9E" BorderThickness="1"
+                        Padding="5" Cursor="Hand" IsEnabled="True">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#005A9E"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+            </StackPanel>
+        </DockPanel>
+    </Grid>
+</Window>

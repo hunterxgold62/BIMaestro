@@ -1,0 +1,123 @@
+﻿<Window x:Class="IA.CorrectionWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Correction / Reformulation de Texte"
+        Width="600" Height="500"
+        WindowStartupLocation="CenterScreen">
+
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- CheckBox Thème -->
+            <RowDefinition Height="Auto"/>
+            <!-- Label original -->
+            <RowDefinition Height="Auto"/>
+            <!-- TextBox original -->
+            <RowDefinition Height="Auto"/>
+            <!-- Label reformulation -->
+            <RowDefinition Height="*"   />
+            <!-- ListBox des propositions -->
+            <RowDefinition Height="Auto"/>
+            <!-- Label style -->
+            <RowDefinition Height="Auto"/>
+            <!-- ComboBox style -->
+            <RowDefinition Height="Auto"/>
+            <!-- Panel instruction perso -->
+            <RowDefinition Height="Auto"/>
+            <!-- Bouton Reformuler -->
+            <RowDefinition Height="Auto"/>
+            <!-- Boutons OK/Annuler -->
+        </Grid.RowDefinitions>
+
+        <!-- Case à cocher Mode sombre -->
+        <CheckBox x:Name="darkThemeCheckBox"
+                  Grid.Row="0"
+                  Content="Mode sombre"
+                  Margin="0,0,0,10"
+                  VerticalAlignment="Center"
+                  Click="darkThemeCheckBox_Click"/>
+
+        <!-- Texte original -->
+        <TextBlock Grid.Row="1"
+                   Text="Texte original :"
+                   FontWeight="Bold"
+                   Margin="0,0,0,5"/>
+
+        <TextBox Grid.Row="2"
+                 x:Name="originalTextBox"
+                 Height="60"
+                 TextWrapping="Wrap"
+                 IsReadOnly="True"
+                 VerticalScrollBarVisibility="Auto"
+                 Margin="0,0,0,10"/>
+
+        <!-- Label "Texte corrigé / reformulé" -->
+        <TextBlock Grid.Row="3"
+                   Text="Texte corrigé / reformulé :"
+                   FontWeight="Bold"
+                   Margin="0,0,0,5"/>
+
+        <!-- ListBox pour les 3 propositions -->
+        <ListBox Grid.Row="4"
+                 x:Name="proposalsListBox"
+                 SelectionMode="Single"
+                 Margin="0,0,0,10"
+                 MouseDoubleClick="proposalsListBox_MouseDoubleClick"/>
+
+        <!-- Choix du style -->
+        <TextBlock Grid.Row="5"
+                   Text="Style de reformulation :"
+                   FontWeight="Bold"
+                   Margin="0,0,0,5"/>
+
+        <ComboBox Grid.Row="6"
+                  x:Name="styleComboBox"
+                  SelectedIndex="0"
+                  Margin="0,0,0,10">
+            <ComboBoxItem Content="Classique"/>
+            <ComboBoxItem Content="Professionnelle"/>
+            <ComboBoxItem Content="Baratin"/>
+            <ComboBoxItem Content="Cool"/>
+            <ComboBoxItem Content="Personnalisé"/>
+        </ComboBox>
+
+        <!-- Panel pour l'instruction personnalisée -->
+        <StackPanel Grid.Row="7"
+                    x:Name="customInstructionPanel"
+                    Visibility="Collapsed">
+            <TextBlock Text="Instruction personnalisée :"
+                       FontWeight="Bold"
+                       Margin="0,0,0,5"/>
+            <TextBox x:Name="customInstructionTextBox"
+                     Height="60"
+                     TextWrapping="Wrap"
+                     VerticalScrollBarVisibility="Auto"
+                     Margin="0,0,0,10"/>
+        </StackPanel>
+
+        <!-- Bouton Reformuler -->
+        <Button x:Name="rephraseButton"
+                Grid.Row="8"
+                Content="Reformuler (3 propositions)"
+                Width="200"
+                Margin="0,0,0,10"
+                Click="rephraseButton_Click"
+                HorizontalAlignment="Left"/>
+
+        <!-- Boutons OK/Annuler -->
+        <StackPanel Grid.Row="9"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Center">
+            <Button x:Name="okButton"
+                    Content="OK"
+                    Width="100"
+                    Margin="5"
+                    Click="okButton_Click"/>
+            <Button x:Name="cancelButton"
+                    Content="Annuler"
+                    Width="100"
+                    Margin="5"
+                    Click="cancelButton_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

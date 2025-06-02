@@ -1,0 +1,93 @@
+﻿<!-- MenuControl.xaml -->
+<UserControl x:Class="TonNamespace.MenuControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Width="200" Height="300"
+             Opacity="0"
+             Loaded="MenuControl_Loaded">
+    <UserControl.Resources>
+        <!-- Ombre pour l’esthétique -->
+        <DropShadowEffect x:Key="DropShadow" ShadowDepth="0" BlurRadius="10" Color="Black" Opacity="0.5"/>
+
+        <!-- Style commun pour tous les boutons -->
+        <Style TargetType="Button" x:Key="MenuButtonStyle">
+            <Setter Property="Margin" Value="4"/>
+            <Setter Property="Padding" Value="5"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="Gray"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="16"/>
+            <!-- Légère mise à l’échelle pour l’effet de survol -->
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+            <Setter Property="RenderTransform">
+                <Setter.Value>
+                    <ScaleTransform ScaleX="1" ScaleY="1"/>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                CornerRadius="3"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <!-- Survol : fond clair, bord bleu, zoom léger -->
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#F0F0F0"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#007ACC"/>
+                                <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
+                                <Setter Property="RenderTransform">
+                                    <Setter.Value>
+                                        <ScaleTransform ScaleX="1.05" ScaleY="1.05"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                            <!-- Clic : fond plus sombre -->
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#E0E0E0"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Border CornerRadius="5" Padding="10"
+            BorderBrush="Gray" BorderThickness="1"
+            Effect="{StaticResource DropShadow}">
+        <Border.Background>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                <GradientStop Color="White" Offset="0"/>
+                <GradientStop Color="#F8F8F8" Offset="1"/>
+            </LinearGradientBrush>
+        </Border.Background>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- Conteneur des boutons configurés -->
+            <StackPanel x:Name="buttonContainer" Grid.Row="0"/>
+
+            <!-- Bouton d’ajout -->
+            <Button x:Name="btnAddCommand"
+                    Content="+"
+                    Width="30" Height="30"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Bottom"
+                    Margin="0,5,0,0"
+                    Grid.Row="1"
+                    Style="{StaticResource MenuButtonStyle}"
+                    Click="btnAddCommand_Click"/>
+        </Grid>
+    </Border>
+</UserControl>

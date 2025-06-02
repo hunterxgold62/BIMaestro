@@ -1,0 +1,8 @@
+﻿<Window x:Class="MyPluginNamespace.UpdateWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Mises à Jour" Height="600" Width="800">
+    <Grid>
+        <WebBrowser x:Name="WebBrowserControl" Margin="10" />
+    </Grid>
+</Window>

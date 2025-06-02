@@ -1,0 +1,591 @@
+﻿<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{578511FF-FF86-4ED0-ACA1-2E4C5B7EFAAC}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>FirstPlugin</RootNamespace>
+    <AssemblyName>FirstPlugin</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <Deterministic>true</Deterministic>
+    <LangVersion>9.0</LangVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <PreferNativeArm64>false</PreferNativeArm64>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup>
+    <SignAssembly>true</SignAssembly>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspose.Cells">
+      <Version>25.1.2</Version>
+    </PackageReference>
+    <PackageReference Include="ClosedXML">
+      <Version>0.104.2</Version>
+    </PackageReference>
+    <PackageReference Include="DocumentFormat.OpenXml">
+      <Version>3.2.0</Version>
+    </PackageReference>
+    <PackageReference Include="DynamoVisualProgramming.Core">
+      <Version>2.16.4.10216</Version>
+    </PackageReference>
+    <PackageReference Include="EPPlus">
+      <Version>7.5.3</Version>
+    </PackageReference>
+    <PackageReference Include="HtmlAgilityPack">
+      <Version>1.11.72</Version>
+    </PackageReference>
+    <PackageReference Include="Markdown.Xaml">
+      <Version>1.0.0</Version>
+    </PackageReference>
+    <PackageReference Include="Microsoft.AspNetCore.SignalR">
+      <Version>1.2.0</Version>
+    </PackageReference>
+    <PackageReference Include="Microsoft.IO.RecyclableMemoryStream">
+      <Version>3.0.1</Version>
+    </PackageReference>
+    <PackageReference Include="Microsoft.ML">
+      <Version>4.0.1</Version>
+    </PackageReference>
+    <PackageReference Include="Microsoft.ML.DataView">
+      <Version>4.0.1</Version>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Web.WebView2">
+      <Version>1.0.2957.106</Version>
+    </PackageReference>
+    <PackageReference Include="netDxf">
+      <Version>2023.11.10</Version>
+    </PackageReference>
+    <PackageReference Include="NumSharp">
+      <Version>0.30.0</Version>
+    </PackageReference>
+    <PackageReference Include="Occt.NET">
+      <Version>7.8.1.2</Version>
+    </PackageReference>
+    <PackageReference Include="OpenCASCADE.SilverHorn">
+      <Version>7.2.0-alpha</Version>
+    </PackageReference>
+    <PackageReference Include="OpenMcdf">
+      <Version>2.4.1</Version>
+    </PackageReference>
+    <PackageReference Include="Revit.AdWindows.x64">
+      <Version>2023.0.0</Version>
+    </PackageReference>
+    <PackageReference Include="SciSharp.TensorFlow.Redist">
+      <Version>2.16.0</Version>
+    </PackageReference>
+    <PackageReference Include="Syncfusion.DocIO.WPF">
+      <Version>28.1.41</Version>
+    </PackageReference>
+    <PackageReference Include="System.Memory">
+      <Version>4.6.0</Version>
+    </PackageReference>
+    <PackageReference Include="TensorFlow.NET">
+      <Version>0.150.0</Version>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="CloudinaryDotNet, Version=1.26.2.0, Culture=neutral, PublicKeyToken=c8234dc617ae7841, processorArchitecture=MSIL">
+      <HintPath>..\packages\CloudinaryDotNet.1.26.2\lib\net452\CloudinaryDotNet.dll</HintPath>
+    </Reference>
+    <Reference Include="CommonServiceLocator, Version=2.0.7.0, Culture=neutral, PublicKeyToken=489b6accfaf20ef0, processorArchitecture=MSIL">
+      <HintPath>..\packages\CommonServiceLocator.2.0.7\lib\net48\CommonServiceLocator.dll</HintPath>
+    </Reference>
+    <Reference Include="DynamoCoreWpf, Version=2.18.1.5096, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\..\..\..\Program Files\Autodesk\Revit 2023\AddIns\DynamoForRevit\DynamoCoreWpf.dll</HintPath>
+      <Private>False</Private>
+      <EmbedInteropTypes>False</EmbedInteropTypes>
+    </Reference>
+    <Reference Include="DynamoManipulation">
+      <HintPath>..\..\..\..\..\..\Program Files\Autodesk\Revit 2023\AddIns\DynamoForRevit\DynamoManipulation.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="DynamoRevitDS, Version=2.16.4.13894, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\..\..\..\Program Files\Autodesk\Revit 2023\AddIns\DynamoForRevit\Revit\DynamoRevitDS.dll</HintPath>
+      <Private>False</Private>
+      <EmbedInteropTypes>False</EmbedInteropTypes>
+    </Reference>
+    <Reference Include="DynamoRevitVersionSelector">
+      <HintPath>..\..\..\..\..\..\Program Files\Autodesk\Revit 2024\AddIns\DynamoForRevit\Revit\DynamoRevitVersionSelector.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Microsoft.Extensions.Configuration, Version=8.0.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Extensions.Configuration.8.0.0\lib\net462\Microsoft.Extensions.Configuration.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Extensions.Configuration.FileExtensions, Version=8.0.0.1, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Extensions.Configuration.FileExtensions.8.0.1\lib\net462\Microsoft.Extensions.Configuration.FileExtensions.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Extensions.Configuration.Json, Version=8.0.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Extensions.Configuration.Json.8.0.0\lib\net462\Microsoft.Extensions.Configuration.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Extensions.FileProviders.Physical, Version=8.0.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Extensions.FileProviders.Physical.8.0.0\lib\net462\Microsoft.Extensions.FileProviders.Physical.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Extensions.FileSystemGlobbing, Version=8.0.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Extensions.FileSystemGlobbing.8.0.0\lib\net462\Microsoft.Extensions.FileSystemGlobbing.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.VisualBasic" />
+    <Reference Include="Newtonsoft.Json.Bson, Version=1.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>..\packages\Newtonsoft.Json.Bson.1.0.2\lib\net45\Newtonsoft.Json.Bson.dll</HintPath>
+    </Reference>
+    <Reference Include="OfficeOpenXml.Core.ExcelPackage, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\OfficeOpenXml.Core.ExcelPackage.1.0.0\lib\net46\OfficeOpenXml.Core.ExcelPackage.dll</HintPath>
+    </Reference>
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+    <Reference Include="RevitAPI, Version=24.3.10.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\..\..\..\Program Files\Autodesk\Revit 2023\RevitAPI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="RevitAPIUI, Version=24.3.10.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\..\..\..\Program Files\Autodesk\Revit 2023\RevitAPIUI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="RevitServices">
+      <HintPath>..\..\..\..\..\..\Program Files\Autodesk\Revit 2023\AddIns\DynamoForRevit\Revit\RevitServices.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.ComponentModel.Composition" />
+    <Reference Include="System.ComponentModel.DataAnnotations" />
+    <Reference Include="System.configuration" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.IO, Version=4.1.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.IO.4.3.0\lib\net462\System.IO.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.IO.FileSystem.Primitives, Version=4.0.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.IO.FileSystem.Primitives.4.0.1\lib\net46\System.IO.FileSystem.Primitives.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.IO.Packaging, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.IO.Packaging.4.0.0\lib\net46\System.IO.Packaging.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Net.Http, Version=4.1.1.3, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Net.Http.4.3.4\lib\net46\System.Net.Http.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Net.Http.Formatting, Version=6.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.AspNet.WebApi.Client.6.0.0\lib\net45\System.Net.Http.Formatting.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Numerics" />
+    <Reference Include="System.Runtime, Version=4.1.1.1, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Runtime.4.3.1\lib\net462\System.Runtime.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Runtime.InteropServices.RuntimeInformation, Version=4.0.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Runtime.InteropServices.RuntimeInformation.4.3.0\lib\net45\System.Runtime.InteropServices.RuntimeInformation.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Security" />
+    <Reference Include="System.Security.Cryptography.Algorithms, Version=4.2.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Security.Cryptography.Algorithms.4.3.1\lib\net463\System.Security.Cryptography.Algorithms.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Security.Cryptography.Encoding, Version=4.0.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Security.Cryptography.Encoding.4.3.0\lib\net46\System.Security.Cryptography.Encoding.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Security.Cryptography.Pkcs, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Security.Cryptography.Pkcs.8.0.0\lib\net462\System.Security.Cryptography.Pkcs.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Security.Cryptography.Primitives, Version=4.0.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Security.Cryptography.Primitives.4.3.0\lib\net46\System.Security.Cryptography.Primitives.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Security.Cryptography.X509Certificates, Version=4.1.1.2, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Security.Cryptography.X509Certificates.4.3.2\lib\net461\System.Security.Cryptography.X509Certificates.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Text.Encoding.CodePages, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Text.Encoding.CodePages.8.0.0\lib\net462\System.Text.Encoding.CodePages.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Text.Json, Version=8.0.0.4, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Text.Json.8.0.4\lib\net462\System.Text.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Text.RegularExpressions, Version=4.1.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Text.RegularExpressions.4.3.1\lib\net463\System.Text.RegularExpressions.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Threading.Tasks" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xaml" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+    <Reference Include="WindowsBase" />
+    <Reference Include="WindowsFormsIntegration" />
+    <Reference Include="Xceed.Wpf.AvalonDock, Version=4.6.0.0, Culture=neutral, PublicKeyToken=3e4669d2f30244f4, processorArchitecture=MSIL">
+      <HintPath>..\packages\Extended.Wpf.Toolkit.4.6.1\lib\net40\Xceed.Wpf.AvalonDock.dll</HintPath>
+    </Reference>
+    <Reference Include="Xceed.Wpf.AvalonDock.Themes.Aero, Version=4.6.0.0, Culture=neutral, PublicKeyToken=3e4669d2f30244f4, processorArchitecture=MSIL">
+      <HintPath>..\packages\Extended.Wpf.Toolkit.4.6.1\lib\net40\Xceed.Wpf.AvalonDock.Themes.Aero.dll</HintPath>
+    </Reference>
+    <Reference Include="Xceed.Wpf.AvalonDock.Themes.Metro, Version=4.6.0.0, Culture=neutral, PublicKeyToken=3e4669d2f30244f4, processorArchitecture=MSIL">
+      <HintPath>..\packages\Extended.Wpf.Toolkit.4.6.1\lib\net40\Xceed.Wpf.AvalonDock.Themes.Metro.dll</HintPath>
+    </Reference>
+    <Reference Include="Xceed.Wpf.AvalonDock.Themes.VS2010, Version=4.6.0.0, Culture=neutral, PublicKeyToken=3e4669d2f30244f4, processorArchitecture=MSIL">
+      <HintPath>..\packages\Extended.Wpf.Toolkit.4.6.1\lib\net40\Xceed.Wpf.AvalonDock.Themes.VS2010.dll</HintPath>
+    </Reference>
+    <Reference Include="Xceed.Wpf.Toolkit, Version=4.6.0.0, Culture=neutral, PublicKeyToken=3e4669d2f30244f4, processorArchitecture=MSIL">
+      <HintPath>..\packages\Extended.Wpf.Toolkit.4.6.1\lib\net40\Xceed.Wpf.Toolkit.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="app et excel\ApiKeys.cs" />
+    <Compile Include="app et excel\AppUI.cs" />
+    <Compile Include="app et excel\App.cs" />
+    <Compile Include="commands\AnalysePoids\CommandAnalysePoids.cs" />
+    <Compile Include="commands\AnalysePoids\AnalysePoids.xaml.cs">
+      <DependentUpon>AnalysePoids.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\AnalysePoids\EditFamilyRequestHandler.cs" />
+    <Compile Include="commands\AnalysePoids\ProgressWindow.xaml.cs">
+      <DependentUpon>ProgressWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\bride auto\AddFlangesCommand.cs" />
+    <Compile Include="commands\Calcul des canalisations\canalisation V2\PipeSelectionFilterV2.cs" />
+    <Compile Include="commands\Calcul des canalisations\canalisation V2\PipeSystemSelectionWindowV2.xaml.cs">
+      <DependentUpon>PipeSystemSelectionWindowV2.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\capture openia\InverseBooleanConverter.cs" />
+    <Compile Include="commands\changement de texte par IA\CorrectionWindow123.xaml.cs">
+      <DependentUpon>CorrectionWindow123.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\changement de texte par IA\Preferences.cs" />
+    <Compile Include="commands\changement de texte par IA\TextCorrectionCommand.cs" />
+    <Compile Include="commands\changer de couleur de ligne\ColorPicker.xaml.cs">
+      <DependentUpon>ColorPicker.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\changer de couleur de ligne\OverrideColorCommand.cs" />
+    <Compile Include="commands\changer de couleur de ligne\ResetOverridesCommand.cs" />
+    <Compile Include="commands\correction aurto auto\AiGrammarCache.cs" />
+    <Compile Include="commands\correction aurto auto\AiGrammarChecker.cs" />
+    <Compile Include="commands\correction aurto auto\CorrectionItem.cs" />
+    <Compile Include="commands\correction aurto auto\CorrectionResultWindow.xaml.cs">
+      <DependentUpon>CorrectionResultWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\correction aurto auto\ScannedTextItem.cs" />
+    <Compile Include="commands\correction aurto auto\SelectViewsCommand.cs" />
+    <Compile Include="commands\correction aurto auto\ScanService.cs" />
+    <Compile Include="commands\correction aurto auto\SelectViewsWindow.xaml.cs">
+      <DependentUpon>SelectViewsWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\Dossier famille\FamilyBrowserCommand.cs" />
+    <Compile Include="commands\Dossier famille\FamilyBrowserPlugin.xaml.cs">
+      <DependentUpon>FamilyBrowserPlugin.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\Dossier famille\FamilyLoadOption.cs" />
+    <Compile Include="commands\Dossier famille\LoadFamilyHandler.cs" />
+    <Compile Include="Test\Clé d%27accés\ApiLicenseValidator.cs" />
+    <Compile Include="Test\Clé d%27accés\Clé d%27accés.cs" />
+    <Compile Include="Test\Clé d%27accés\Clés d%27accés.xaml.cs">
+      <DependentUpon>Clés d%27accés.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\Dynamo\dynamo.cs" />
+    <Compile Include="commands\Dynamo\ConfigureDynamoWindow.xaml.cs">
+      <DependentUpon>ConfigureDynamoWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\export de nomenclature\ExportScheduleAddin.cs" />
+    <Compile Include="commands\GPT classique\GPTBotWindowCommand.cs" />
+    <Compile Include="commands\menu contextuelle\CommandMenuContextuel.cs" />
+    <Compile Include="commands\menu contextuelle\ExternalEventHandlerGeneric.cs" />
+    <Compile Include="commands\menu contextuelle\CommandSelectionWindow.xaml.cs">
+      <DependentUpon>CommandSelectionWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\menu contextuelle\MenuContextuel.xaml.cs">
+      <DependentUpon>MenuContextuel.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\menu contextuelle\NativeMethods.cs" />
+    <Compile Include="commands\popup\CommandStickmanAnimation.cs" />
+    <Compile Include="commands\popup\StickmanAnimationWindow.xaml.cs">
+      <DependentUpon>StickmanAnimationWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\popup\troll\CommandHearts.cs" />
+    <Compile Include="commands\popup\troll\TrollWindow.xaml.cs">
+      <DependentUpon>TrollWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\premiére commande\sélection d%27élément\FamilyItem.cs" />
+    <Compile Include="commands\premiére commande\sélection d%27élément\FamilySelectionWindow.xaml.cs">
+      <DependentUpon>FamilySelectionWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\premiére commande\sélection d%27élément\HighlightWallsCommand.cs" />
+    <Compile Include="commands\Purge de paramètre de famille\ParameterSelection.cs" />
+    <Compile Include="commands\Purge de paramètre de famille\PurgeParametersCommand.cs" />
+    <Compile Include="commands\page de MAJ en direct\MiseAJourCommand.cs" />
+    <Compile Include="commands\page de MAJ en direct\UpdateWindow.xaml.cs">
+      <DependentUpon>UpdateWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\Purge de paramètre de famille\ParameterSelectionWindow.xaml.cs">
+      <DependentUpon>ParameterSelectionWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\Racourci clavier\LoadShortcutsCommand.cs" />
+    <Compile Include="commands\Réservation auto\AddReservationCommand.cs" />
+    <Compile Include="commands\Réservation auto\ReservationWindow.xaml.cs">
+      <DependentUpon>ReservationWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\traduction paramètre famille\TraduireParametresFamilleOpenAI.cs" />
+    <Compile Include="commands\GPT classique\messagemodel.cs" />
+    <Compile Include="commands\GPT classique\ProfileSelectionWindow.xaml.cs">
+      <DependentUpon>ProfileSelectionWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\GPT classique\test des élément\Elementinfo.cs" />
+    <Compile Include="commands\GPT classique\test des élément\ElementUtilities.cs" />
+    <Compile Include="commands\GPT classique\test des élément\SelectElementsCommand.cs" />
+    <Compile Include="commands\premiére commande\CountWindowsCommand.cs" />
+    <Compile Include="commands\quel peinture\GetPaintedMaterial.cs" />
+    <Compile Include="commands\Ouverture de vue sur plan\Plan dans vue.cs" />
+    <Compile Include="commands\qui est le coupable\MainCommand.cs" />
+    <Compile Include="commands\renommer élément\RenameElementsCommand.cs" />
+    <Compile Include="commands\Vision 3D\vue sur face 3D.cs" />
+    <Compile Include="commands\capture openia\ScreenCapture.cs" />
+    <Compile Include="commands\capture openia\ScreenCaptureCommand.cs" />
+    <Compile Include="commands\capture openia\SelectionWindow.xaml.cs">
+      <DependentUpon>SelectionWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="app et excel\ExcelLogger.cs" />
+    <Compile Include="commands\GPT classique\GPTbot.xaml.cs">
+      <DependentUpon>GPTbot.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\wtf photo\RandomImageWindow.cs" />
+    <Compile Include="les couleurs\Changement auto des couleurs\Bouton de reset tabitem.cs" />
+    <Compile Include="les couleurs\Changement auto des couleurs\ColoringStateManager.cs" />
+    <None Include="les couleurs\Changement auto des couleurs\Changement de mode de couleur via bouton.cs" />
+    <Compile Include="les couleurs\Changement auto des couleurs\Couleur fond d%27images papanoel.cs" />
+    <Compile Include="les couleurs\ancien fonctionnement\Changement de la barre uniquement.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="commands\renommer élément\ElementRenameWindow.xaml.cs">
+      <DependentUpon>ElementRenameWindow.xaml</DependentUpon>
+    </Compile>
+    <None Include="packages.config" />
+    <Page Include="commands\AnalysePoids\AnalysePoids.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\AnalysePoids\ProgressWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\Calcul des canalisations\canalisation V2\PipeSystemSelectionWindowV2.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\changement de texte par IA\CorrectionWindow123.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="commands\changer de couleur de ligne\ColorPicker.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\correction aurto auto\CorrectionResultWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\correction aurto auto\SelectViewsWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\Dossier famille\FamilyBrowserPlugin.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\Dynamo\ConfigureDynamoWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\GPT classique\ProfileSelectionWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\menu contextuelle\CommandSelectionWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\menu contextuelle\MenuContextuel.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\popup\StickmanAnimationWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="commands\popup\troll\TrollWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="commands\premiére commande\sélection d%27élément\FamilySelectionWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\Purge de paramètre de famille\ParameterSelectionWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\renommer élément\ElementRenameWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="commands\GPT classique\GPTbot.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="commands\capture openia\SelectionWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="commands\page de MAJ en direct\UpdateWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="commands\Réservation auto\ReservationWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Test\Clé d%27accés\Clés d%27accés.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\Purge famille32x32.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\Calcule de poid1.png" />
+    <EmbeddedResource Include="Resources\Image IA.png" />
+    <EmbeddedResource Include="Resources\Pallette de couleur anexe .png" />
+    <EmbeddedResource Include="Resources\Peinture et matériaux.png" />
+    <EmbeddedResource Include="Resources\Pour paramètre de famille1.png" />
+    <EmbeddedResource Include="Resources\Qui à fait ça.png" />
+    <EmbeddedResource Include="Resources\safeimagekit-doc.png" />
+    <EmbeddedResource Include="Resources\Safeimagekit-resized-img %281%29.png" />
+    <EmbeddedResource Include="Resources\Safeimagekit-resized-img %284%29.png" />
+    <EmbeddedResource Include="Resources\Safeimagekit-resized-img %285%29.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\Canalisation.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\Canalisation V2 %282%29.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\maison famille %281%29.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\Pére Noel.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\bouton lumiére.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\Element 3D.png" />
+    <EmbeddedResource Include="Resources\safeimagekit-correction de texte IA.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\mini-AutocanalisationV2.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\safeimagekit-Information.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\safeimagekit-Texte maj.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\safeimagekit-bouton reset4.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\Dynamo.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\safeimagekit-Réservation.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\safeimagekit-qfdfsf.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\menu contextuel.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\wtf bouton.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\attention bouton.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <COMReference Include="Microsoft.Office.Core">
+      <Guid>{2DF8D04C-5BFA-101B-BDE5-00AA0044DE52}</Guid>
+      <VersionMajor>2</VersionMajor>
+      <VersionMinor>8</VersionMinor>
+      <Lcid>0</Lcid>
+      <WrapperTool>primary</WrapperTool>
+      <Isolated>False</Isolated>
+      <EmbedInteropTypes>True</EmbedInteropTypes>
+    </COMReference>
+    <COMReference Include="Microsoft.Office.Interop.Excel">
+      <Guid>{00020813-0000-0000-C000-000000000046}</Guid>
+      <VersionMajor>1</VersionMajor>
+      <VersionMinor>9</VersionMinor>
+      <Lcid>0</Lcid>
+      <WrapperTool>primary</WrapperTool>
+      <Isolated>False</Isolated>
+      <EmbedInteropTypes>True</EmbedInteropTypes>
+    </COMReference>
+    <COMReference Include="VBIDE">
+      <Guid>{0002E157-0000-0000-C000-000000000046}</Guid>
+      <VersionMajor>5</VersionMajor>
+      <VersionMinor>3</VersionMinor>
+      <Lcid>0</Lcid>
+      <WrapperTool>primary</WrapperTool>
+      <Isolated>False</Isolated>
+      <EmbedInteropTypes>True</EmbedInteropTypes>
+    </COMReference>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\rvt to excel et pdf.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\réglage.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\dynamo 3.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\dynamo 4.png" />
+    <EmbeddedResource Include="Resources\dynamo 5.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\dynamo 1.png" />
+    <EmbeddedResource Include="Resources\dynamo 2.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Test\automatisation de tuyaux\" />
+    <Folder Include="Test\dwg to revit\" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

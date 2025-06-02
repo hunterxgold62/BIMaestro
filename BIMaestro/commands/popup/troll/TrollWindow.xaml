@@ -1,0 +1,17 @@
+﻿<Window x:Class="MyRevitTroll.TrollWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Troll" 
+        WindowStyle="None"
+        Topmost="True"
+        ShowInTaskbar="False"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        >
+    <Border x:Name="MainBorder" BorderThickness="2" CornerRadius="50" 
+            BorderBrush="Red" Background="Pink" Padding="5">
+        <TextBlock x:Name="MessageTextBlock" Text="Message" Foreground="Red" FontWeight="Bold"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap"/>
+    </Border>
+</Window>

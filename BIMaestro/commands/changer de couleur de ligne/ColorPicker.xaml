@@ -1,0 +1,140 @@
+﻿<Window x:Class="Modification.ColorPickerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:xctk="http://schemas.xceed.com/wpf/xaml/toolkit"
+        Title="Sélectionner la couleur"
+        Height="650" Width="550"
+        WindowStartupLocation="CenterScreen">
+    <Window.Resources>
+        <Style TargetType="GroupBox">
+            <Setter Property="Margin" Value="10"/>
+            <Setter Property="Padding" Value="10"/>
+            <Setter Property="FontSize" Value="14"/>
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="Padding" Value="5,2"/>
+        </Style>
+        <Style TargetType="CheckBox">
+            <Setter Property="Margin" Value="5"/>
+        </Style>
+    </Window.Resources>
+    <Grid>
+        <TabControl>
+
+            <!-- Options générales -->
+            <TabItem Header="Options générales">
+                <StackPanel Margin="10">
+                    <StackPanel Orientation="Horizontal">
+                        <CheckBox x:Name="HalftoneCheckBox"
+                      Content="Appliquer la demi-teinte"/>
+                        <CheckBox x:Name="HideInViewCheckBox"
+                      Content="Masquer dans la vue"
+                      Margin="20,0,0,0"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Label Content="Transparence :" Width="150"/>
+                        <Slider x:Name="TransparencySlider"
+                    Minimum="0" Maximum="100" Value="0"
+                    Width="200" TickFrequency="10"
+                    IsSnapToTickEnabled="True"/>
+                        <TextBlock Text="{Binding ElementName=TransparencySlider, Path=Value, StringFormat=F0}"
+                       Margin="10,0,0,0"/>
+                    </StackPanel>
+                </StackPanel>
+            </TabItem>
+
+            <!-- Couleurs et motifs -->
+            <TabItem Header="Couleurs et Motifs">
+                <StackPanel Margin="10">
+                    <Label Content="Couleur des motifs:"/>
+                    <xctk:ColorPicker x:Name="ColorPickerControl"
+                            SelectedColor="Red"
+                            Width="200" Margin="5"/>
+                    <GroupBox Header="Motifs de surface">
+                        <StackPanel>
+                            <ComboBox x:Name="SurfacePatternComboBox" Margin="5"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <CheckBox x:Name="SurfaceForegroundCheckBox" Content="Premier plan" IsChecked="True"/>
+                                <CheckBox x:Name="SurfaceBackgroundCheckBox" Content="Arrière-plan" IsChecked="False" Margin="20,0,0,0"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </GroupBox>
+                    <GroupBox Header="Motifs de coupe">
+                        <StackPanel>
+                            <ComboBox x:Name="CutPatternComboBox" Margin="5"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <CheckBox x:Name="CutForegroundCheckBox" Content="Premier plan" IsChecked="True"/>
+                                <CheckBox x:Name="CutBackgroundCheckBox" Content="Arrière-plan" IsChecked="False" Margin="20,0,0,0"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </GroupBox>
+                </StackPanel>
+            </TabItem>
+
+            <!-- Lignes et contours -->
+            <TabItem Header="Lignes et Contours">
+                <StackPanel Margin="10">
+                    <CheckBox x:Name="ModifyLineColorCheckBox"
+                    Content="Modifier lignes et contours"/>
+                    <Label Content="Couleur des lignes et contours:"/>
+                    <xctk:ColorPicker x:Name="LineColorPicker"
+                            SelectedColor="Blue"
+                            Width="200" Margin="5"/>
+                    <StackPanel Orientation="Horizontal" Margin="5">
+                        <Label Content="Type de ligne :" VerticalAlignment="Center"/>
+                        <ComboBox x:Name="ProjectionLinePatternComboBox" Width="150" Margin="5">
+                            <ComboBoxItem Content="Continue"/>
+                            <ComboBoxItem Content="Pointillée"/>
+                            <ComboBoxItem Content="Mixte"/>
+                        </ComboBox>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="5">
+                        <Label Content="Épaisseur :" VerticalAlignment="Center"/>
+                        <ComboBox x:Name="ProjectionLineWeightComboBox" Width="100" Margin="5">
+                            <ComboBoxItem Content="1"/>
+                            <ComboBoxItem Content="2"/>
+                            <ComboBoxItem Content="3"/>
+                            <ComboBoxItem Content="4"/>
+                            <ComboBoxItem Content="5"/>
+                            <ComboBoxItem Content="6"/>
+                            <ComboBoxItem Content="7"/>
+                            <ComboBoxItem Content="8"/>
+                            <ComboBoxItem Content="9"/>
+                            <ComboBoxItem Content="10"/>
+                        </ComboBox>
+                    </StackPanel>
+                </StackPanel>
+            </TabItem>
+
+            <!-- Sélection des vues -->
+            <TabItem Header="Sélection des vues">
+                <StackPanel Margin="10">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button x:Name="SelectAllViewsButton"
+                    Content="Tout sélectionner"
+                    Click="SelectAllViewsButton_Click"/>
+                        <Button x:Name="DeselectAllViewsButton"
+                    Content="Tout désélectionner"
+                    Click="DeselectAllViewsButton_Click"/>
+                    </StackPanel>
+                    <TreeView x:Name="ViewsTreeView" Margin="5" Height="510"/>
+                </StackPanel>
+            </TabItem>
+
+        </TabControl>
+
+        <!-- Actions -->
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"
+                VerticalAlignment="Bottom" Margin="10">
+            <Button x:Name="ApplyButton"
+              Content="Appliquer"
+              Click="Apply_Click"
+              Width="100"/>
+            <Button x:Name="ResetButton"
+              Content="Réinitialiser"
+              Click="Reset_Click"
+              Width="100"/>
+        </StackPanel>
+    </Grid>
+</Window>

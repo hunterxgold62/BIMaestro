@@ -1,0 +1,88 @@
+﻿<Window x:Class="Visualisation.FamilySelectionWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Visualisation"
+        Title="Sélection des Familles" 
+        Height="500" Width="400"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        Background="#F9F9F9">
+
+    <!-- Styles globaux -->
+    <Window.Resources>
+        <!-- Style pour le titre principal -->
+        <Style x:Key="TitleTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#007ACC"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+        </Style>
+
+        <!-- Style pour les boutons -->
+        <Style x:Key="StyledButton" TargetType="Button">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Margin" Value="5,0"/>
+            <Setter Property="Width" Value="110"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="Background" Value="#FFDDDDDD"/>
+            <Setter Property="BorderBrush" Value="#888"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Titre -->
+        <TextBlock Grid.Row="0" Text="Sélection des Familles et Sous-Familles" 
+                   Style="{StaticResource TitleTextStyle}"/>
+
+        <!-- Boutons en haut -->
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Grid.Row="0" Margin="0,40,0,0">
+            <Button x:Name="SelectAllViewsButton" 
+                    Style="{StaticResource StyledButton}"
+                    Content="Tout sélectionner" 
+                    Click="SelectAllViewsButton_Click"/>
+            <Button x:Name="DeselectAllViewsButton"
+                    Style="{StaticResource StyledButton}"
+                    Content="Tout désélectionner" 
+                    Click="DeselectAllViewsButton_Click"/>
+        </StackPanel>
+
+        <!-- Arbre familles / sous-familles -->
+        <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" 
+                Background="White" Padding="5" Grid.Row="1">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <TreeView x:Name="FamiliesTreeView">
+                    <TreeView.Resources>
+                        <HierarchicalDataTemplate DataType="{x:Type local:FamilyItem}"
+                                                  ItemsSource="{Binding VisibleSubFamilies}">
+                            <StackPanel Orientation="Horizontal">
+                                <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" 
+                                          Content="{Binding Name}" 
+                                          FontSize="12"/>
+                            </StackPanel>
+                        </HierarchicalDataTemplate>
+                    </TreeView.Resources>
+                </TreeView>
+            </ScrollViewer>
+        </Border>
+
+        <!-- Boutons du bas -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" 
+                    Margin="0,10,0,0">
+            <Button Content="Terminer"
+                    Style="{StaticResource StyledButton}"
+                    Click="FinishButton_Click"/>
+            <Button Content="Annuler"
+                    Style="{StaticResource StyledButton}"
+                    Click="CancelButton_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

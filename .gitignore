@@ -1,0 +1,65 @@
+# Ignorer les fichiers et dossiers générés par Visual Studio
+.vs/
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+mono_crash.*
+
+# Ignorer les résultats de build
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Ignorer les fichiers de cache de l'image Windows
+Thumbs.db
+ehthumbs.db
+
+# Fichier de configuration des dossiers
+Desktop.ini
+
+# Fichiers de la corbeille sur les partages de fichiers
+$RECYCLE.BIN/
+
+# Dossiers de VS Code
+.vscode/
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# Fichiers d'installation Windows
+*.cab
+*.msi
+*.msm
+*.msp
+
+# Raccourcis Windows
+*.lnk
+
+# Ignorer les packages npm
+node_modules/
+
+# Ignorer les fichiers DLL et les fichiers Revit
+*.dll
+*.rvt
+
+# Ignorer le répertoire 'autre'
+/autre/
+
+# Inclure les packages nécessaires
+!/packages/
+
+# Ignorer le dossier personnel de tests (dans BIMaestro)
+/BIMaestro/Test/
