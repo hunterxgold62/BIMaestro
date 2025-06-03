@@ -15,8 +15,7 @@ Il regroupe une suite d’outils modulaires (visualisation, IA, analyse, automat
 - [🧰 Fonctionnalités](#-fonctionnalités)
 - [🖼️ Aperçu du Ruban](#-aperçu-du-ruban)
 - [⚙️ Installation](#️-installation)
--  [✍️ Auteur](#️-Auteur)
-
+- [✍️ Auteur](#️-auteur)
 
 ---
 
@@ -29,43 +28,46 @@ productivité, standardisation, intelligence artificielle et ergonomie au cœur 
 
 ## 🧰 Fonctionnalités
 
-### 🔎 Outils de Visualisation
-- Sélection d’éléments intelligente
-- Peinture de matériaux
-- Ouverture automatique de vues
-- Recentrage 3D
-- Infos contextuelles rapides
+### 🟩 Outils de Visualisation
+- **Sélection d'éléments** intelligente par catégories
+- **Peinture de matériaux** (matériau appliqué + peinture)
+- **Ouvrir la vue du Plan** : navigation directe vers la feuille ou la vue
+- **Réorienter Vue 3D** selon une face sélectionnée
+- **Information d’élément** : matériaux, surface, volume, etc.
+- **Export Nomenclature** : vers Excel ou PDF
 
-### 🛠️ Outils de Modification
-- Auto-réservation (MEP)
-- Changement de couleurs
-- Organisation et regroupement
-- Lancement de scripts Dynamo embarqués
+### 🛠️ Modification
+- **Changer couleur élément** : personnalisation des vues
+- **Organisateur d’Éléments** : renommage intelligent dans le sens de lecture de la vue active
+- **Auto Réservation** : crée des réservations automatiques pour tout objet traversant un mur (pas limité au MEP)
+- **Outils Canalisations** : lancement de scripts Dynamo spécifiques
 
-### 🤖 IA & Assistance
-- Chatbot + élément
-- Correction de texte via IA
-- Lecture OCR de textes Revit (ScanText)
+### 🤖 Outils IA
+- **Chatbot + élément** : assistant IA avec accès aux éléments Revit
+- **Chatbot + screen** : capture d’écran + interaction IA
+- **Correction de texte IA** : correction et reformulation de textes dans Revit
+- **ScanText IA** : analyse complète et correction grammaticale sur toutes les vues/feuilles
 
 ### 📊 Analyse
-- Analyse du poids des familles, DWG, PDF
-- Calcul réseau (canalisations)
-- Traces et audits (qui a modifié quoi ?)
+- **Calcule des canalisations** : longueurs, volumes, accessoires, filtrage, export Excel
+- **Qui a fais ça ??** : identifie les auteurs/modificateurs de vues et éléments
+- **Analyse de Poids** : familles, DWG, PDF triés par taille, nombre d’instances, etc.
 
-### 🧱 Familles
-- Purge de paramètres
-- Navigateur de familles
-- Traduction automatique des paramètres via IA
+### 🧱 Spécifique aux familles
+- **Purge des paramètres** inutiles dans une famille
+- **Navigateur de Familles** avec aperçus et favoris
+- **Traduction de paramètre IA** : via OpenAI, noms traduits automatiquement
 
-### 🎨 Outils divers
-- Application des couleurs Oui/Non
-- Outils internes de test ("papa Noël", menu contextuel, etc.)
+### 🎨 Couleur du projet
+- **couleur Oui/Non** : active la colorisation dynamique du projet
+- **couleur reset** : réinitialise les couleurs personnalisées
+- **papa Noël** : effet visuel décoratif type guirlande colorée
 
 ---
 
 ## 🖼️ Aperçu du Ruban
 
-![Aperçu du ruban BIMaestro](https://github.com/user-attachments/assets/bc24b6fb-2aa7-460f-b45f-a21fab3c5e0d)
+![Aperçu du ruban BIMaestro](https://github.com/user-attachments/assets/186aa385-4e78-4491-9df8-9cb7f3fde479)
 
 > 📷 *Capture du ruban Revit personnalisable de BIMaestro.*
 
@@ -74,11 +76,13 @@ productivité, standardisation, intelligence artificielle et ergonomie au cœur 
 ## ⚙️ Installation
 
 1. Cloner le dépôt :
- https://github.com/hunterxgold62/BIMaestro.git
-2. Ouvrir `BIMaestro.sln` avec Visual Studio 2022+
-3. Compiler en mode **Release**
-4. Copier le fichier `.dll` dans : %AppData%\Autodesk\Revit\Addins\2024\
+   ```bash
+   git clone https://github.com/hunterxgold62/BIMaestro.git
+   
+2. Ouvrir BIMaestro. sin avec Visual Studio 2022+
+3. Compiler en mode Release
+4. Copier le fichier .dll dans : %AppData%\Autodesk\Revit\Addins\2024\
 
 ## ✍️ Auteur
-
-**Paul Lemert** 
+Paul Lemert
+Développeur BIM | Dessinateur projeteur | Automatisation Revit & IA
