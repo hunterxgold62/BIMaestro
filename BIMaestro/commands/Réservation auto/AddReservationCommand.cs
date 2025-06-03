@@ -13,7 +13,7 @@ using Dynamo.Applications;             // Pour DynamoRevit, DynamoRevitCommandDa
 using Dynamo.Applications.Properties;
 #endregion
 
-namespace RevitAddinReservationExample
+namespace Modification
 {
     [Transaction(TransactionMode.Manual)]
     public class ReservationAutoMultiCommand : IExternalCommand

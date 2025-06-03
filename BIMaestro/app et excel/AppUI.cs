@@ -44,8 +44,8 @@ public class AppUI : IExternalApplication
         RibbonPanel panelIA = application.CreateRibbonPanel(tabName, "Outils IA");
         ribbonPanels.Add(panelIA);
 
-        RibbonPanel panelTest = application.CreateRibbonPanel(tabName, "Panneaux réservée au test");
-        ribbonPanels.Add(panelTest);
+        //RibbonPanel panelTest = application.CreateRibbonPanel(tabName, "Panneaux réservés au test");
+        //ribbonPanels.Add(panelTest);
 
         RibbonPanel panelAnalysis = application.CreateRibbonPanel(tabName, "Analyse");
         ribbonPanels.Add(panelAnalysis);
@@ -65,22 +65,22 @@ public class AppUI : IExternalApplication
         AddPushButton(panelVisualization, "OpenSheetFromViewButton", "Ouvrir la vue\ndu Plan", assemblyPath, "Visualisation.OpenSheetFromView", "safeimagekit-doc.png", "Cette commande permet de basculer entre une vue active (plan, coupe ou 3D) et les feuilles qui la contiennent, ou d'ouvrir une vue directement depuis un viewport sélectionné sur une feuille. \n\nElle simplifie la navigation entre les feuilles et les vues associées dans un projet Revit.");
         AddPushButton(panelVisualization, "ReorientViewButton", "Réorienter\nVue 3D", assemblyPath, "Visualisation.ReorientViewCommand", "Element 3D.png", "Permet de réorienter une vue 3D active en fonction de la géométrie d'une face sélectionnée.");
         AddPushButton(panelVisualization, "Information d'élément", "Information\nd'élément", assemblyPath, "IA.SelectElementsCommand", "safeimagekit-Information.png", "Ce module utilitaire fournit des méthodes avancées pour :\r\n\r\n- Identifier les matériaux appliqués aux éléments du modèle.\r\n- Obtenir des paramètres personnalisés liés à la géométrie et aux dimensions.\r\nCalculer la surface au sol et le volume des éléments, avec une distinction basée sur la catégorie (toit, plancher, etc.).");
-        AddPushButton(panelVisualization, "Export Nomenclature", "Export \nNomenclature", assemblyPath, " ExportScheduleAddin.ExportImportScheduleCommand", "rvt to excel et pdf.png", "Exporte les nomenclatures Revit sélectionné en fichier excel ou PDF.");
+        AddPushButton(panelVisualization, "Export Nomenclature", "Export \nNomenclature", assemblyPath, "Visualisation.ExportImportScheduleCommand", "rvt to excel et pdf.png", "Exporte les nomenclatures Revit sélectionné en fichier excel ou PDF.");
 
 
         AddPushButton(panelEditing, "OverrideColor", "Changer couleur\nélément", assemblyPath, "Modification.OverrideColorCommand", "Pallette de couleur anexe .png", "Cette commande permet :  \r\n- De personnaliser les couleurs, motifs et transparence des éléments.  \r\n- D'appliquer des paramètres graphiques à plusieurs vues simultanément.  \r\n- De réinitialiser les modifications si nécessaire.  \r\n\r\nUtilité : Améliorez le rendu et la lisibilité de vos vues.  ");
         AddPushButton(panelEditing, "ElementRenamerButton", "Organisateur\nd'Éléments", assemblyPath, "Modification.RenameElementsCommand", "Safeimagekit-resized-img (4).png", "Cette commande permet :  \r\n- De renommer des éléments sélectionnés dans Revit avec des préfixes, suffixes, ou des numérotations personnalisées.  \r\n- De trier les éléments par niveau ou par emplacement dans la vue active.  \r\n- De réinitialiser les paramètres texte sélectionnés si nécessaire.  \r\n\r\nUtilité :  \r\nFacilite la gestion des noms d'éléments pour une organisation cohérente dans vos projets.");
-        AddPushButton(panelEditing, "ResérvationAuto", "Auto \nRéservation", assemblyPath, "RevitAddinReservationExample.ReservationAutoMultiCommand", "safeimagekit-Réservation.png", "Crée des réservations automatique");
+        AddPushButton(panelEditing, "ResérvationAuto", "Auto \nRéservation", assemblyPath, "Modification.ReservationAutoMultiCommand", "safeimagekit-Réservation.png", "Crée des réservations automatique");
 
         AddSplitButton(panelEditing, "chatbot IA", "Outils Canalisations", assemblyPath,
            new List<(string buttonName, string buttonText, string className, string resourceImageName, string toolTip)>
            {
-                ("dynamo 1", "auto\ndynamo 1", "DynamoRunnerPlugin.RunDynamo1Command", "dynamo 1.png","dynamo 1"),
-                ("dynamo 2", "auto\ndynamo 2", "DynamoRunnerPlugin.RunDynamo2Command", "dynamo 2.png","dynamo 2"),
-                ("dynamo 3", "auto\ndynamo 3", "DynamoRunnerPlugin.RunDynamo3Command", "dynamo 3.png","dynamo 3"),
-                ("dynamo 4", "auto\ndynamo 4", "DynamoRunnerPlugin.RunDynamo4Command", "dynamo 4.png","dynamo 4"),
-                ("dynamo 5", "auto\ndynamo 5", "DynamoRunnerPlugin.RunDynamo5Command", "dynamo 5.png","dynamo 5"),
-                ("dynamo réglage", "auto dynamo\nréglage", "DynamoRunnerPlugin.ConfigureDynamoButtonCommand", "réglage.png","eeeee"),
+                ("dynamo 1", "auto\ndynamo 1", "Modification.RunDynamo1Command", "dynamo 1.png","dynamo 1"),
+                ("dynamo 2", "auto\ndynamo 2", "Modification.RunDynamo2Command", "dynamo 2.png","dynamo 2"),
+                ("dynamo 3", "auto\ndynamo 3", "Modification.RunDynamo3Command", "dynamo 3.png","dynamo 3"),
+                ("dynamo 4", "auto\ndynamo 4", "Modification.RunDynamo4Command", "dynamo 4.png","dynamo 4"),
+                ("dynamo 5", "auto\ndynamo 5", "Modification.RunDynamo5Command", "dynamo 5.png","dynamo 5"),
+                ("dynamo réglage", "auto dynamo\nréglage", "Modification.ConfigureDynamoButtonCommand", "réglage.png","eeeee"),
            });
 
 
@@ -91,7 +91,7 @@ public class AppUI : IExternalApplication
                 ("ScreenCaptureButton", "Chatbot\n+ screen", "IA.ScreenCaptureCommand", "Safeimagekit-resized-img (5).png","Cette commande permet :  \r\n- De capturer des captures d'écran en sélectionnant une zone spécifique.  \r\n- D'enregistrer et gérer les captures dans un répertoire dédié.  \r\n- D'envoyer les captures d'écran et des messages texte à une API IA pour traitement.  \r\n- D'afficher les réponses de l'IA directement dans l'interface.  \r\n\r\nUtilité :  \r\nAutomatisez l'analyse d'images et intégrez des workflows basés sur l'IA pour gagner du temps. ")
             });
         AddPushButton(panelIA, "TextCorrectionButton", "Correction de\ntexte IA", assemblyPath, "IA.TextCorrectionCommand", "safeimagekit-correction de texte IA.png", "Cette commande permet :  \r\n- De corriger les fautes dans les textes sélectionnés dans Revit.  \r\n- De reformuler les textes dans différents styles : professionnel, cool, baratin ou personnalisé.  \r\n- D'interagir avec une interface utilisateur pour accepter, modifier ou ignorer les corrections proposées.  \r\n- D'utiliser une IA avancée (basée sur GPT) pour produire des textes plus clairs et sans erreurs.  \r\n\r\nUtilité :  \r\nAméliorez rapidement la qualité des textes dans vos annotations Revit grâce à une correction automatisée et personnalisable.  ");
-        AddPushButton(panelIA, "ScanText", "ScanText\nIA", assemblyPath, "ScanTextRevit.SelectViewsCommand", "safeimagekit-qfdfsf.png", "Analyse de textes");
+        AddPushButton(panelIA, "ScanText", "ScanText\nIA", assemblyPath, "IA.SelectViewsCommand", "safeimagekit-qfdfsf.png", "Corrige automatiquement les fautes d'orthographe et de grammaire dans les textes visibles sur les vues ou feuilles du projet. \r\nL'IA analyse les textes scannés par chunk et indique les erreurs ligne par ligne avec explication. \r\nLes corrections sont classées en \"Mineur\" (ponctuation, espaces) ou \"Erreur\" (grammaire, orthographe).\r\n");
 
 
        // AddSplitButton(panelTest, "Auto-Canalisation", "Auto-\nCanalisation", assemblyPath,
@@ -110,7 +110,7 @@ public class AppUI : IExternalApplication
 
         ///AddPushButton(panelTest, "popup3", "popup3", assemblyPath, "RandomImageAddin.ShowVirusPopupsCommand", "attention bouton.png", "ouvre une feuille visualisable en temps réels");
 
-        AddPushButton(panelTest, "menu context", "menu context", assemblyPath, "TonNamespace.CommandMenuContextuel", "menu contextuel.png", "ouvre une feuille visualisable en temps réels");
+       // AddPushButton(panelTest, "menu context", "menu context", assemblyPath, "TonNamespace.CommandMenuContextuel", "menu contextuel.png", "ouvre une feuille visualisable en temps réels");
 
         //  AddPushButton(panelTest, "menu conteeext", "menu coneetext", assemblyPath, "MyFlangePlugin.AddFlangesCommand", "menu contextuel.png", "ouvre une feuille visualisable en temps réels");
 

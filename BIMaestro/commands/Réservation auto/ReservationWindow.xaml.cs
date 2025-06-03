@@ -3,7 +3,7 @@ using System.Linq;
 using System.Windows;
 using Autodesk.Revit.DB;
 
-namespace RevitAddinReservationExample
+namespace Modification
 {
     public partial class ExtendedReservationWindow : Window
     {

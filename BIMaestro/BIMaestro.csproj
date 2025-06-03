@@ -269,7 +269,6 @@
     <Compile Include="commands\AnalysePoids\ProgressWindow.xaml.cs">
       <DependentUpon>ProgressWindow.xaml</DependentUpon>
     </Compile>
-    <Compile Include="commands\bride auto\AddFlangesCommand.cs" />
     <Compile Include="commands\Calcul des canalisations\canalisation V2\PipeSelectionFilterV2.cs" />
     <Compile Include="commands\Calcul des canalisations\canalisation V2\PipeSystemSelectionWindowV2.xaml.cs">
       <DependentUpon>PipeSystemSelectionWindowV2.xaml</DependentUpon>
@@ -285,16 +284,16 @@
     </Compile>
     <Compile Include="commands\changer de couleur de ligne\OverrideColorCommand.cs" />
     <Compile Include="commands\changer de couleur de ligne\ResetOverridesCommand.cs" />
-    <Compile Include="commands\correction aurto auto\AiGrammarCache.cs" />
-    <Compile Include="commands\correction aurto auto\AiGrammarChecker.cs" />
-    <Compile Include="commands\correction aurto auto\CorrectionItem.cs" />
-    <Compile Include="commands\correction aurto auto\CorrectionResultWindow.xaml.cs">
+    <Compile Include="commands\correction automatique\AiGrammarCache.cs" />
+    <Compile Include="commands\correction automatique\AiGrammarChecker.cs" />
+    <Compile Include="commands\correction automatique\CorrectionItem.cs" />
+    <Compile Include="commands\correction automatique\CorrectionResultWindow.xaml.cs">
       <DependentUpon>CorrectionResultWindow.xaml</DependentUpon>
     </Compile>
-    <Compile Include="commands\correction aurto auto\ScannedTextItem.cs" />
-    <Compile Include="commands\correction aurto auto\SelectViewsCommand.cs" />
-    <Compile Include="commands\correction aurto auto\ScanService.cs" />
-    <Compile Include="commands\correction aurto auto\SelectViewsWindow.xaml.cs">
+    <Compile Include="commands\correction automatique\ScannedTextItem.cs" />
+    <Compile Include="commands\correction automatique\SelectViewsCommand.cs" />
+    <Compile Include="commands\correction automatique\ScanService.cs" />
+    <Compile Include="commands\correction automatique\SelectViewsWindow.xaml.cs">
       <DependentUpon>SelectViewsWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="commands\Dossier famille\FamilyBrowserCommand.cs" />
@@ -303,6 +302,11 @@
     </Compile>
     <Compile Include="commands\Dossier famille\FamilyLoadOption.cs" />
     <Compile Include="commands\Dossier famille\LoadFamilyHandler.cs" />
+    <Compile Include="Test\automatisation de tuyaux\SelectionHelper.cs" />
+    <Compile Include="Test\automatisation de tuyaux\test avec coude qui marche moyen\ConnectPipes.cs" />
+    <Compile Include="Test\automatisation de tuyaux\V3 avec évitement des obstacles\AutoCanalisationSettingsCommand.cs" />
+    <Compile Include="Test\automatisation de tuyaux\V3 avec évitement des obstacles\ConnectTwoPipesAvoidObstacles.cs" />
+    <Compile Include="Test\bride auto\AddFlangesCommand.cs" />
     <Compile Include="Test\Clé d%27accés\ApiLicenseValidator.cs" />
     <Compile Include="Test\Clé d%27accés\Clé d%27accés.cs" />
     <Compile Include="Test\Clé d%27accés\Clés d%27accés.xaml.cs">
@@ -314,38 +318,25 @@
     </Compile>
     <Compile Include="commands\export de nomenclature\ExportScheduleAddin.cs" />
     <Compile Include="commands\GPT classique\GPTBotWindowCommand.cs" />
-    <Compile Include="commands\menu contextuelle\CommandMenuContextuel.cs" />
-    <Compile Include="commands\menu contextuelle\ExternalEventHandlerGeneric.cs" />
-    <Compile Include="commands\menu contextuelle\CommandSelectionWindow.xaml.cs">
+    <Compile Include="commands\menu contextuel\CommandMenuContextuel.cs" />
+    <Compile Include="commands\menu contextuel\ExternalEventHandlerGeneric.cs" />
+    <Compile Include="commands\menu contextuel\CommandSelectionWindow.xaml.cs">
       <DependentUpon>CommandSelectionWindow.xaml</DependentUpon>
     </Compile>
-    <Compile Include="commands\menu contextuelle\MenuContextuel.xaml.cs">
+    <Compile Include="commands\menu contextuel\MenuContextuel.xaml.cs">
       <DependentUpon>MenuContextuel.xaml</DependentUpon>
     </Compile>
-    <Compile Include="commands\menu contextuelle\NativeMethods.cs" />
-    <Compile Include="commands\popup\CommandStickmanAnimation.cs" />
-    <Compile Include="commands\popup\StickmanAnimationWindow.xaml.cs">
-      <DependentUpon>StickmanAnimationWindow.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="commands\popup\troll\CommandHearts.cs" />
-    <Compile Include="commands\popup\troll\TrollWindow.xaml.cs">
-      <DependentUpon>TrollWindow.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="commands\premiére commande\sélection d%27élément\FamilyItem.cs" />
-    <Compile Include="commands\premiére commande\sélection d%27élément\FamilySelectionWindow.xaml.cs">
+    <Compile Include="commands\menu contextuel\NativeMethods.cs" />
+    <Compile Include="commands\première commande\sélection d%27élément\FamilyItem.cs" />
+    <Compile Include="commands\première commande\sélection d%27élément\FamilySelectionWindow.xaml.cs">
       <DependentUpon>FamilySelectionWindow.xaml</DependentUpon>
     </Compile>
-    <Compile Include="commands\premiére commande\sélection d%27élément\HighlightWallsCommand.cs" />
+    <Compile Include="commands\première commande\sélection d%27élément\HighlightWallsCommand.cs" />
     <Compile Include="commands\Purge de paramètre de famille\ParameterSelection.cs" />
     <Compile Include="commands\Purge de paramètre de famille\PurgeParametersCommand.cs" />
-    <Compile Include="commands\page de MAJ en direct\MiseAJourCommand.cs" />
-    <Compile Include="commands\page de MAJ en direct\UpdateWindow.xaml.cs">
-      <DependentUpon>UpdateWindow.xaml</DependentUpon>
-    </Compile>
     <Compile Include="commands\Purge de paramètre de famille\ParameterSelectionWindow.xaml.cs">
       <DependentUpon>ParameterSelectionWindow.xaml</DependentUpon>
     </Compile>
-    <Compile Include="commands\Racourci clavier\LoadShortcutsCommand.cs" />
     <Compile Include="commands\Réservation auto\AddReservationCommand.cs" />
     <Compile Include="commands\Réservation auto\ReservationWindow.xaml.cs">
       <DependentUpon>ReservationWindow.xaml</DependentUpon>
@@ -358,8 +349,8 @@
     <Compile Include="commands\GPT classique\test des élément\Elementinfo.cs" />
     <Compile Include="commands\GPT classique\test des élément\ElementUtilities.cs" />
     <Compile Include="commands\GPT classique\test des élément\SelectElementsCommand.cs" />
-    <Compile Include="commands\premiére commande\CountWindowsCommand.cs" />
-    <Compile Include="commands\quel peinture\GetPaintedMaterial.cs" />
+    <Compile Include="commands\première commande\CountWindowsCommand.cs" />
+    <Compile Include="commands\quelle peinture\GetPaintedMaterial.cs" />
     <Compile Include="commands\Ouverture de vue sur plan\Plan dans vue.cs" />
     <Compile Include="commands\qui est le coupable\MainCommand.cs" />
     <Compile Include="commands\renommer élément\RenameElementsCommand.cs" />
@@ -373,9 +364,23 @@
     <Compile Include="commands\GPT classique\GPTbot.xaml.cs">
       <DependentUpon>GPTbot.xaml</DependentUpon>
     </Compile>
-    <Compile Include="commands\wtf photo\RandomImageWindow.cs" />
     <Compile Include="les couleurs\Changement auto des couleurs\Bouton de reset tabitem.cs" />
     <Compile Include="les couleurs\Changement auto des couleurs\ColoringStateManager.cs" />
+    <None Include="Test\dwg to revit\ImportDwgWallsCommand.cs" />
+    <Compile Include="Test\page de mise à jour en direct\MiseAJourCommand.cs" />
+    <Compile Include="Test\page de mise à jour en direct\UpdateWindow.xaml.cs">
+      <DependentUpon>UpdateWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Test\popup\CommandStickmanAnimation.cs" />
+    <Compile Include="Test\popup\StickmanAnimationWindow.xaml.cs">
+      <DependentUpon>StickmanAnimationWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Test\popup\troll\CommandHearts.cs" />
+    <Compile Include="Test\popup\troll\TrollWindow.xaml.cs">
+      <DependentUpon>TrollWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Test\racourci clavier\LoadShortcutsCommand.cs" />
+    <Compile Include="Test\wtf photo\RandomImageWindow.cs" />
     <None Include="les couleurs\Changement auto des couleurs\Changement de mode de couleur via bouton.cs" />
     <Compile Include="les couleurs\Changement auto des couleurs\Couleur fond d%27images papanoel.cs" />
     <Compile Include="les couleurs\ancien fonctionnement\Changement de la barre uniquement.cs" />
@@ -404,11 +409,11 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
-    <Page Include="commands\correction aurto auto\CorrectionResultWindow.xaml">
+    <Page Include="commands\correction automatique\CorrectionResultWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
-    <Page Include="commands\correction aurto auto\SelectViewsWindow.xaml">
+    <Page Include="commands\correction automatique\SelectViewsWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
@@ -424,23 +429,15 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
-    <Page Include="commands\menu contextuelle\CommandSelectionWindow.xaml">
+    <Page Include="commands\menu contextuel\CommandSelectionWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
-    <Page Include="commands\menu contextuelle\MenuContextuel.xaml">
+    <Page Include="commands\menu contextuel\MenuContextuel.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
-    <Page Include="commands\popup\StickmanAnimationWindow.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="commands\popup\troll\TrollWindow.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="commands\premiére commande\sélection d%27élément\FamilySelectionWindow.xaml">
+    <Page Include="commands\première commande\sélection d%27élément\FamilySelectionWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
@@ -460,15 +457,23 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="commands\page de MAJ en direct\UpdateWindow.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
     <Page Include="commands\Réservation auto\ReservationWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
     <Page Include="Test\Clé d%27accés\Clés d%27accés.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Test\page de mise à jour en direct\UpdateWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Test\popup\StickmanAnimationWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Test\popup\troll\TrollWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
@@ -583,9 +588,6 @@
     <EmbeddedResource Include="Resources\dynamo 1.png" />
     <EmbeddedResource Include="Resources\dynamo 2.png" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Test\automatisation de tuyaux\" />
-    <Folder Include="Test\dwg to revit\" />
-  </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

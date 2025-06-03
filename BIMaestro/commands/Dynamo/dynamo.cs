@@ -8,7 +8,7 @@ using Autodesk.Revit.DB;
 using Dynamo.Applications;
 using Dynamo.Applications.Properties;
 
-namespace DynamoRunnerPlugin
+namespace Modification
 {
     public static class DynamoSettings
     {

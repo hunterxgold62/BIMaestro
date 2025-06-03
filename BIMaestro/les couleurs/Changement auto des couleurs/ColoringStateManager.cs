@@ -239,7 +239,7 @@ namespace MyRevitPlugin
                 { "Modification",             new SolidColorBrush(Color.FromRgb(230, 255, 230)) },
                 { "Outils IA",                new SolidColorBrush(Color.FromRgb(230, 230, 255)) },
                 { "Couleur du projet",        new SolidColorBrush(Color.FromRgb(230, 230, 230)) },
-                { "Panneaux réservée au test",new SolidColorBrush(Color.FromRgb(255, 255, 230)) },
+                { "Panneaux réservés au test",new SolidColorBrush(Color.FromRgb(255, 255, 230)) },
                 { "Analyse",                  new SolidColorBrush(Color.FromRgb(230, 255, 255)) },
                 { "Spécifique aux familles",  new SolidColorBrush(Color.FromRgb(255, 230, 255)) }
             };
@@ -252,7 +252,7 @@ namespace MyRevitPlugin
             "Modification",
             "Outils IA",
             "Couleur du projet",
-            "Panneaux réservée au test",
+            "Panneaux réservés au test",
             "Spécifique aux familles",
             "Analyse"
         };
@@ -497,7 +497,7 @@ namespace MyRevitPlugin
                 { "Outils IA",                new SolidColorBrush(Color.FromRgb(230, 230, 255)) },
                 { "Analyse",                  new SolidColorBrush(Color.FromRgb(230, 255, 255)) },
                 { "Spécifique aux familles",  new SolidColorBrush(Color.FromRgb(255, 230, 255)) },
-                { "Panneaux réservée au test",new SolidColorBrush(Color.FromRgb(255, 255, 230)) },
+                { "Panneaux réservés au test",new SolidColorBrush(Color.FromRgb(255, 255, 230)) },
                 { "Couleur du projet",        new SolidColorBrush(Color.FromRgb(230, 230, 230)) }
             };
 

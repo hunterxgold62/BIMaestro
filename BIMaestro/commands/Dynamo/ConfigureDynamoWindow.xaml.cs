@@ -2,7 +2,7 @@
 using System.Windows.Controls; // pour SelectionChangedEventArgs
 using Microsoft.Win32;
 
-namespace DynamoRunnerPlugin
+namespace Modification
 {
     public partial class ConfigureDynamoWindow : Window
     {

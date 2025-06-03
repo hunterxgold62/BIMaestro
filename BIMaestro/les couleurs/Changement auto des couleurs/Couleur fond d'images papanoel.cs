@@ -29,7 +29,7 @@ namespace MyRevitPlugin
             "Modification",
             "Outils IA",
             "Couleur du projet",
-            "Panneaux réservée au test",
+            "Panneaux réservés au test",
             "Analyse",
             "Spécifique aux familles"
         };

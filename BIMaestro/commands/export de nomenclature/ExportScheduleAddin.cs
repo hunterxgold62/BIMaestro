@@ -11,7 +11,7 @@ using System.Runtime.InteropServices;     // Pour Marshal.ReleaseComObject
 using Excel = Microsoft.Office.Interop.Excel;
 using Microsoft.Win32;                    // Pour OpenFileDialog
 
-namespace ExportScheduleAddin
+namespace Visualisation
 {
     [Transaction(TransactionMode.Manual)]
     public class ExportImportScheduleCommand : IExternalCommand
