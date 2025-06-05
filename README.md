@@ -79,7 +79,7 @@ productivité, standardisation, intelligence artificielle et ergonomie au cœur 
    ```bash
    git clone https://github.com/hunterxgold62/BIMaestro.git
    
-2. Ouvrir BIMaestro. sin avec Visual Studio 2022+
+2. Ouvrir BIMaestro.sln avec Visual Studio 2022+
 3. Compiler en mode Release
 4. Copier le fichier .dll dans : %AppData%\Autodesk\Revit\Addins\2024\
 
