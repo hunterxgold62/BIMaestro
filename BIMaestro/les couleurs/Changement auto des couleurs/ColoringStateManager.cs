@@ -268,7 +268,7 @@ namespace MyRevitPlugin
 
         public static void ApplyColorings(IntPtr mainWindowHandle)
         {
-            if (ColoringStateManager.IsColoringActive) return;
+            if (!ColoringStateManager.IsColoringActive) return;
             ApplyTabItemColoring(mainWindowHandle);
             ApplyPapanoelColoring(mainWindowHandle);
         }

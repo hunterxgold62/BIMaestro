@@ -57,7 +57,7 @@ public static class ExcelLogger
     }
 
     /// <summary>
-    /// Crée le fichier Excel et la feuille "Activity Log" avec des en-têtes.
+    /// Crée le fichier Excel et la feuille "Historique_Temps_Revit" avec des en-têtes.
     /// </summary>
     private static void CreateExcelFile()
     {

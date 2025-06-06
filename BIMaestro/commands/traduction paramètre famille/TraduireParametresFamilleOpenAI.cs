@@ -15,7 +15,6 @@ namespace MonPluginRevit
     public class TraduireParametresFamilleOpenAI : IExternalCommand
     {
         public static string apiKey = ApiKeys.OpenAIKey;
-        private readonly object openAIApiKey;
 
         public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
         {
@@ -108,7 +107,7 @@ namespace MonPluginRevit
                 using (HttpClient client = new HttpClient())
                 {
                     client.Timeout = TimeSpan.FromSeconds(10);
-                    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {openAIApiKey}");
+                    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
 
                     var requestData = new
                     {

@@ -24,7 +24,7 @@ public class AppUI : IExternalApplication
 
     public static void CreateRibbonUI(UIControlledApplication application)
     {
-        string tabName = "Plug-Analyse";
+        string tabName = "BIMaestro";
         try
         {
             application.CreateRibbonTab(tabName);
@@ -91,7 +91,7 @@ public class AppUI : IExternalApplication
                 ("ScreenCaptureButton", "Chatbot\n+ screen", "IA.ScreenCaptureCommand", "Safeimagekit-resized-img (5).png","Cette commande permet :  \r\n- De capturer des captures d'écran en sélectionnant une zone spécifique.  \r\n- D'enregistrer et gérer les captures dans un répertoire dédié.  \r\n- D'envoyer les captures d'écran et des messages texte à une API IA pour traitement.  \r\n- D'afficher les réponses de l'IA directement dans l'interface.  \r\n\r\nUtilité :  \r\nAutomatisez l'analyse d'images et intégrez des workflows basés sur l'IA pour gagner du temps. ")
             });
         AddPushButton(panelIA, "TextCorrectionButton", "Correction de\ntexte IA", assemblyPath, "IA.TextCorrectionCommand", "safeimagekit-correction de texte IA.png", "Cette commande permet :  \r\n- De corriger les fautes dans les textes sélectionnés dans Revit.  \r\n- De reformuler les textes dans différents styles : professionnel, cool, baratin ou personnalisé.  \r\n- D'interagir avec une interface utilisateur pour accepter, modifier ou ignorer les corrections proposées.  \r\n- D'utiliser une IA avancée (basée sur GPT) pour produire des textes plus clairs et sans erreurs.  \r\n\r\nUtilité :  \r\nAméliorez rapidement la qualité des textes dans vos annotations Revit grâce à une correction automatisée et personnalisable.  ");
-        AddPushButton(panelIA, "ScanText", "ScanText\nIA", assemblyPath, "IA.SelectViewsCommand", "safeimagekit-qfdfsf.png", "Corrige automatiquement les fautes d'orthographe et de grammaire dans les textes visibles sur les vues ou feuilles du projet. \r\nL'IA analyse les textes scannés par chunk et indique les erreurs ligne par ligne avec explication. \r\nLes corrections sont classées en \"Mineur\" (ponctuation, espaces) ou \"Erreur\" (grammaire, orthographe).\r\n");
+        AddPushButton(panelIA, "ScanText", "ScanText\nIA", assemblyPath, "ScanTextRevit.SelectViewsCommand", "safeimagekit-qfdfsf.png", "Corrige automatiquement les fautes d'orthographe et de grammaire dans les textes visibles sur les vues ou feuilles du projet. \r\nL'IA analyse les textes scannés par chunk et indique les erreurs ligne par ligne avec explication. \r\nLes corrections sont classées en \"Mineur\" (ponctuation, espaces) ou \"Erreur\" (grammaire, orthographe).\r\n");
 
 
        // AddSplitButton(panelTest, "Auto-Canalisation", "Auto-\nCanalisation", assemblyPath,
@@ -119,16 +119,16 @@ public class AppUI : IExternalApplication
         AddSplitButton(panelCouleur, "Changement de couleur", "couleur\nOui/Non", assemblyPath,
             new List<(string buttonName, string buttonText, string className, string resourceImageName, string toolTip)>
             {
-                ("couleur de projet", "couleur\nOui/Non", "MyRevitPlugin.ToggleCombinedColoringCommand", "bouton lumiére.png",""),
+                ("couleur de projet", "couleur\nOui/Non", "MyRevitPlugin.ToggleCombinedColoringCommand", "bouton lumière.png",""),
                 ("couleur de maquette", "couleur reset", "MyRevitPlugin.ResetTabItemRandomColorsCommand", "safeimagekit-bouton reset4.png","")
             });        
-        AddPushButton(panelCouleur, "papa Noël", "papa Noël", assemblyPath, "MyRevitPlugin.PapanoelCommand", "Pére Noel.png", "Fait aparaitre des couleurs comme des guirelandes \n Double clic pour revenir à la normal.\n\n Attention désactiver <couleur Oui/Non> avant activation.");
+        AddPushButton(panelCouleur, "papa Noël", "papa Noël", assemblyPath, "MyRevitPlugin.PapanoelCommand", "Père Noël.png", "Fait apparaître des couleurs comme des guirlandes\nDouble clic pour revenir à la normale.\n\nAttention désactiver <couleur Oui/Non> avant activation.");
 
 
 
 
         AddPushButton(panelAnalysis, "PipeLengthByDiameterV2", "Calcule des\ncanalisations", assemblyPath, "MyRevitPluginV2.PipeLengthByDiameterCommandV2", "Canalisation.png", "Description :\r\n- Calcule les longueurs des canalisations et gaines par diamètre (DN ou dimensions).\r\n- Compte les accessoires de type coudes et tés par diamètre.\r\n- Estime les volumes d'eau par diamètre intérieur.\r\n- Intègre un filtre par type de système pour une analyse précise.\r\n- Permet d'inclure ou non les gaines dans les calculs.\r\n- Exporte les résultats sous forme de tableau Excel détaillé.\r\n\r\nUtilité :\r\nOptimisez votre gestion des systèmes MEP en obtenant rapidement une analyse précise des longueurs, volumes et accessoires, avec possibilité d'exportation.");
-        AddPushButton(panelAnalysis, "Qui a fais ça ?", "Qui a fais ça ??", assemblyPath, "MyRevitPlugin.MainCommand", "Qui à fait ça.png", "Description :\r\n- **Créateur de la vue active** : Identifie qui a créé et modifié la vue actuellement affichée.\r\n- **Créateur des éléments sélectionnés** : Récupère les informations de création et de modification pour un élément sélectionné.\r\n- **Dernière synchronisation** : Affiche l'utilisateur ayant effectué la dernière synchronisation du modèle.\r\n\r\nUtilité :\r\nFacilitez le suivi des responsabilités et identifiez rapidement les auteurs ou éditeurs des éléments et des vues dans un environnement collaboratif partagé.");
+        AddPushButton(panelAnalysis, "Qui a fait ça ?", "Qui a fait ça ??", assemblyPath, "MyRevitPlugin.MainCommand", "Qui à fait ça.png", "Description :\r\n- **Créateur de la vue active** : Identifie qui a créé et modifié la vue actuellement affichée.\r\n- **Créateur des éléments sélectionnés** : Récupère les informations de création et de modification pour un élément sélectionné.\r\n- **Dernière synchronisation** : Affiche l'utilisateur ayant effectué la dernière synchronisation du modèle.\r\n\r\nUtilité :\r\nFacilitez le suivi des responsabilités et identifiez rapidement les auteurs ou éditeurs des éléments et des vues dans un environnement collaboratif partagé.");
         AddPushButton(panelAnalysis, "AnalysePoidsButton", "Analyse de \nPoids", assemblyPath, "AnalysePoidsPlugin.CommandAnalysePoids", "Calcule de poid1.png", "Fonctionnalités principales :\r\n1. **Analyse des Familles** :\r\n   - Taille de chaque famille (Mo).\r\n   - Nombre d'instances pour chaque famille.\r\n   - Classement par taille décroissante.\r\n\r\n2. **Analyse des Imports CAO** :\r\n   - Taille des imports (Mo).\r\n   - Types d'éléments analysés : Imports CAO, Lien Revit/IFC.\r\n\r\n3. **Export des Résultats** :\r\n   - Export vers un fichier Excel (RevitLogs/TailleFamilleRevit).\r\n   - Organisation claire par nom, type, taille et nombre d'instances.\r\n\r\nUtilité :\r\n- Identifier les éléments volumineux dans votre projet.\r\n- Optimiser la performance du modèle en réduisant les familles et les imports inutiles.");
 
 
@@ -145,7 +145,7 @@ public class AppUI : IExternalApplication
         };
 
         var assembly = Assembly.GetExecutingAssembly();
-        string resourcePath = $"FirstPlugin.Resources.{resourceImageName}";
+        string resourcePath = $"BIMaestro.Resources.{resourceImageName}";
 
         using (Stream stream = assembly.GetManifestResourceStream(resourcePath))
         {
@@ -179,7 +179,7 @@ public class AppUI : IExternalApplication
             };
 
             var assembly = Assembly.GetExecutingAssembly();
-            string resourcePath = $"FirstPlugin.Resources.{resourceImageName}";
+            string resourcePath = $"BIMaestro.Resources.{resourceImageName}";
 
             using (Stream stream = assembly.GetManifestResourceStream(resourcePath))
             {

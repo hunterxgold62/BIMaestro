@@ -6,8 +6,8 @@
     <ProjectGuid>{578511FF-FF86-4ED0-ACA1-2E4C5B7EFAAC}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>FirstPlugin</RootNamespace>
-    <AssemblyName>FirstPlugin</AssemblyName>
+    <RootNamespace>BIMaestro</RootNamespace>
+    <AssemblyName>BIMaestro</AssemblyName>
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
@@ -381,7 +381,6 @@
     </Compile>
     <Compile Include="Test\racourci clavier\LoadShortcutsCommand.cs" />
     <Compile Include="Test\wtf photo\RandomImageWindow.cs" />
-    <None Include="les couleurs\Changement auto des couleurs\Changement de mode de couleur via bouton.cs" />
     <Compile Include="les couleurs\Changement auto des couleurs\Couleur fond d%27images papanoel.cs" />
     <Compile Include="les couleurs\ancien fonctionnement\Changement de la barre uniquement.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -503,10 +502,10 @@
     <EmbeddedResource Include="Resources\maison famille %281%29.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\Pére Noel.png" />
+    <EmbeddedResource Include="Resources\Père Noël.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\bouton lumiére.png" />
+    <EmbeddedResource Include="Resources\bouton lumière.png" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Resources\Element 3D.png" />
