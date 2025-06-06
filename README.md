@@ -75,13 +75,15 @@ productivité, standardisation, intelligence artificielle et ergonomie au cœur 
 
 ## ⚙️ Installation
 
+> 🚧 Ce plugin fonctionne également sous Revit 2025. Toutefois, les fonctionnalités **Information d’élément**, **Chatbot + élément** et **Purge des paramètres** n'y sont pas encore disponibles.
+
 1. Cloner le dépôt :
    ```bash
    git clone https://github.com/hunterxgold62/BIMaestro.git
    
-2. Ouvrir BIMaestro. sin avec Visual Studio 2022+
+2. Ouvrir BIMaestro. sln avec Visual Studio 2022+
 3. Compiler en mode Release
-4. Copier le fichier .dll dans : %AppData%\Autodesk\Revit\Addins\2024\
+4. Copier le fichier .dll dans : %AppData%\Autodesk\Revit\Addins\2023\  (ou 2024/25)
 
 ## ✍️ Auteur
 Paul Lemert
