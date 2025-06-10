@@ -19,6 +19,7 @@ namespace MyRevitPlugin
         private static Random _rnd = new Random();
         private static bool _isRunning = false; // Contrôle d'exécution
         private static Task _colorChangeTask;
+        private static CancellationTokenSource _cts;
         private static int _clickCount = 0;
         private static readonly int DoubleClickThreshold = 300; // Temps pour le double-clic en ms
         private static DateTime _lastClickTime = DateTime.MinValue;
@@ -50,8 +51,10 @@ namespace MyRevitPlugin
 
             if ((currentTime - _lastClickTime).TotalMilliseconds <= DoubleClickThreshold && _clickCount >= 2)
             {
-                // Double-clic détecté
+                // Double-clic détecté : on arrête la boucle et on réinitialise
                 _clickCount = 0;
+                _isRunning = false;
+                _cts?.Cancel();
                 ResetTargetedBorders(mainWindow);
                 return Result.Succeeded;
             }
@@ -69,8 +72,14 @@ namespace MyRevitPlugin
 
                     if (_isRunning)
                     {
-                        // Démarrer le changement des couleurs
-                        _colorChangeTask = Task.Run(() => ChangeColorsLoop(mainWindow));
+                        // Démarrer le changement des couleurs avec annulation
+                        _cts = new CancellationTokenSource();
+                        _colorChangeTask = Task.Run(() => ChangeColorsLoop(mainWindow, _cts.Token));
+                    }
+                    else
+                    {
+                        // Arrêt demandé
+                        _cts?.Cancel();
                     }
                 }
             });
@@ -78,9 +87,9 @@ namespace MyRevitPlugin
             return Result.Succeeded;
         }
 
-        private void ChangeColorsLoop(Window mainWindow)
+        private void ChangeColorsLoop(Window mainWindow, CancellationToken token)
         {
-            while (_isRunning)
+            while (!token.IsCancellationRequested)
             {
                 Thread.Sleep(500); // Pause de 0.5 seconde
 
@@ -134,6 +143,9 @@ namespace MyRevitPlugin
 
         private void ResetTargetedBorders(Window mainWindow)
         {
+            // S'assurer que la boucle de changement de couleur est arrêtée
+            _isRunning = false;
+            _cts?.Cancel();
             var borders = FindChildrenByType<Border>(mainWindow);
 
             foreach (var border in borders)

@@ -44,8 +44,8 @@ public class AppUI : IExternalApplication
         RibbonPanel panelIA = application.CreateRibbonPanel(tabName, "Outils IA");
         ribbonPanels.Add(panelIA);
 
-        //RibbonPanel panelTest = application.CreateRibbonPanel(tabName, "Panneaux réservés au test");
-        //ribbonPanels.Add(panelTest);
+        RibbonPanel panelTest = application.CreateRibbonPanel(tabName, "Panneaux réservés au test");
+        ribbonPanels.Add(panelTest);
 
         RibbonPanel panelAnalysis = application.CreateRibbonPanel(tabName, "Analyse");
         ribbonPanels.Add(panelAnalysis);
@@ -55,7 +55,7 @@ public class AppUI : IExternalApplication
 
 
         RibbonPanel panelCouleur = application.CreateRibbonPanel(tabName, "Couleur du projet");
-        ribbonPanels.Add(panelFamille);
+        ribbonPanels.Add(panelCouleur);
 
         string assemblyPath = Assembly.GetExecutingAssembly().Location;
 
@@ -104,13 +104,13 @@ public class AppUI : IExternalApplication
 
        // AddPushButton(panelTest, "text maj", "text maj", assemblyPath, "MiseAJourCommand", "safeimagekit-Texte maj.png", "ouvre une feuille visualisable en temps réels");
        
-       // AddPushButton(panelTest, "popup", "popup", assemblyPath, "MyRevitTroll.CommandStickmanAnimation", "safeimagekit-Texte maj.png", "ouvre une feuille visualisable en temps réels");
+        AddPushButton(panelTest, "export excel", "export excel", assemblyPath, "MonPluginRevit.ExportScheduleToExcel", "safeimagekit-Texte maj.png", "ouvre une feuille visualisable en temps réels");
 
-       /// AddPushButton(panelTest, "popup2", "popup2", assemblyPath, "MyRevitTroll.CommandHeartsParam", "wtf bouton.png", "ouvre une feuille visualisable en temps réels");
+         AddPushButton(panelTest, "import excel", "import excel", assemblyPath, "MonPluginRevit.ImportScheduleFromExcel", "wtf bouton.png", "ouvre une feuille visualisable en temps réels");
 
         ///AddPushButton(panelTest, "popup3", "popup3", assemblyPath, "RandomImageAddin.ShowVirusPopupsCommand", "attention bouton.png", "ouvre une feuille visualisable en temps réels");
 
-       // AddPushButton(panelTest, "menu context", "menu context", assemblyPath, "TonNamespace.CommandMenuContextuel", "menu contextuel.png", "ouvre une feuille visualisable en temps réels");
+        // AddPushButton(panelTest, "menu context", "menu context", assemblyPath, "TonNamespace.CommandMenuContextuel", "menu contextuel.png", "ouvre une feuille visualisable en temps réels");
 
         //  AddPushButton(panelTest, "menu conteeext", "menu coneetext", assemblyPath, "MyFlangePlugin.AddFlangesCommand", "menu contextuel.png", "ouvre une feuille visualisable en temps réels");
 

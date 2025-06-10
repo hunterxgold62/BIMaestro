@@ -367,6 +367,8 @@
     <Compile Include="les couleurs\Changement auto des couleurs\Bouton de reset tabitem.cs" />
     <Compile Include="les couleurs\Changement auto des couleurs\ColoringStateManager.cs" />
     <None Include="Test\dwg to revit\ImportDwgWallsCommand.cs" />
+    <Compile Include="Test\export import excel\ExportScheduleToExcel.cs" />
+    <Compile Include="Test\export import excel\ImportScheduleFromExcel.cs" />
     <Compile Include="Test\page de mise à jour en direct\MiseAJourCommand.cs" />
     <Compile Include="Test\page de mise à jour en direct\UpdateWindow.xaml.cs">
       <DependentUpon>UpdateWindow.xaml</DependentUpon>

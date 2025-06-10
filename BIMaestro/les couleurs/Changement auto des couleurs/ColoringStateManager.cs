@@ -1,14 +1,18 @@
 ﻿using System;
+using System.IO;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Automation;
+using System.Windows.Threading;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.Attributes;
-using System.IO;
-using System.Collections.Generic;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Interop;
-using System.Windows.Media;
 using Color = System.Windows.Media.Color;
 
 namespace MyRevitPlugin
@@ -28,22 +32,14 @@ namespace MyRevitPlugin
 
                 if (!_waitingForDoubleClick)
                 {
-                    // 1er clic => on attend un possible second clic
                     _waitingForDoubleClick = true;
-
                     _singleClickTimer = new Timer(SingleClickAction, commandData, DoubleClickThresholdMs, Timeout.Infinite);
                 }
                 else
                 {
-                    // 2e clic => double clic => switch mode
                     _waitingForDoubleClick = false;
-
-                    if (_singleClickTimer != null)
-                    {
-                        _singleClickTimer.Dispose();
-                        _singleClickTimer = null;
-                    }
-
+                    _singleClickTimer?.Dispose();
+                    _singleClickTimer = null;
                     DoDoubleClick(commandData);
                 }
 
@@ -56,78 +52,53 @@ namespace MyRevitPlugin
             }
         }
 
-        /// <summary>
-        /// Se déclenche après DoubleClickThresholdMs si aucun second clic n'a eu lieu
-        /// => on fait l'action simple clic (toggle on/off).
-        /// </summary>
         private void SingleClickAction(object state)
         {
             _waitingForDoubleClick = false;
-
             if (state is ExternalCommandData cdata)
-            {
                 DoSingleClick(cdata);
-            }
         }
 
         private void DoSingleClick(ExternalCommandData commandData)
         {
             try
             {
-                // Toggle on/off
                 ColoringStateManager.ToggleColoring();
-
-                IntPtr mainWindowHandle = commandData.Application.MainWindowHandle;
-                CombinedColoringApplication.ResetColorings(mainWindowHandle);
-                PartialColoringHelper.ResetPartialColoring(mainWindowHandle);
+                IntPtr h = commandData.Application.MainWindowHandle;
+                CombinedColoringApplication.ResetColorings(h);
+                PartialColoringHelper.ResetPartialColoring(h);
 
                 if (ColoringStateManager.IsColoringActive)
                 {
-                    CombinedColoringApplication.ApplyTabItemColoring(mainWindowHandle);
+                    CombinedColoringApplication.ApplyTabItemColoring(h);
                     if (ColoringStateManager.IsFullMode)
-                    {
-                        CombinedColoringApplication.ApplyPapanoelColoring(mainWindowHandle);
-                    }
+                        CombinedColoringApplication.ApplyPapanoelColoring(h);
                     else
-                    {
-                        PartialColoringHelper.ApplyPartialColoring(mainWindowHandle);
-                    }
+                        PartialColoringHelper.ApplyPartialColoring(h);
                 }
             }
-            catch
-            {
-                // Éviter de faire planter Revit
-            }
+            catch { }
         }
 
         private void DoDoubleClick(ExternalCommandData commandData)
         {
             try
             {
-                IntPtr mainWindowHandle = commandData.Application.MainWindowHandle;
-                // Switch de mode
+                IntPtr h = commandData.Application.MainWindowHandle;
                 ColoringStateManager.SwitchMode();
-
-                CombinedColoringApplication.ResetColorings(mainWindowHandle);
-                PartialColoringHelper.ResetPartialColoring(mainWindowHandle);
+                CombinedColoringApplication.ResetColorings(h);
+                PartialColoringHelper.ResetPartialColoring(h);
 
                 if (ColoringStateManager.IsColoringActive)
                 {
-                    CombinedColoringApplication.ApplyTabItemColoring(mainWindowHandle);
+                    CombinedColoringApplication.ApplyTabItemColoring(h);
                     if (ColoringStateManager.IsFullMode)
-                    {
-                        CombinedColoringApplication.ApplyPapanoelColoring(mainWindowHandle);
-                    }
+                        CombinedColoringApplication.ApplyPapanoelColoring(h);
                     else
-                    {
-                        PartialColoringHelper.ApplyPartialColoring(mainWindowHandle);
-                    }
+                        PartialColoringHelper.ApplyPartialColoring(h);
                 }
             }
-            catch
-            {
-                // Éviter de faire planter Revit
-            }
+            catch { }
         }
     }
 
@@ -148,11 +119,9 @@ namespace MyRevitPlugin
             try
             {
                 EnsureDirectoryExists();
-
                 if (File.Exists(persistenceFilePath))
                 {
-                    string state = File.ReadAllText(persistenceFilePath).Trim();
-                    var parts = state.Split('-');
+                    var parts = File.ReadAllText(persistenceFilePath).Trim().Split('-');
                     if (parts.Length == 2)
                     {
                         IsColoringActive = parts[0].Equals("Active", StringComparison.OrdinalIgnoreCase);
@@ -160,7 +129,6 @@ namespace MyRevitPlugin
                     }
                     else
                     {
-                        // Valeurs par défaut si le fichier n'a pas le bon format
                         IsColoringActive = true;
                         IsFullMode = true;
                         SaveState();
@@ -168,17 +136,14 @@ namespace MyRevitPlugin
                 }
                 else
                 {
-                    // Valeurs par défaut si le fichier n'existe pas
                     IsColoringActive = true;
                     IsFullMode = true;
                     SaveState();
                 }
             }
-            catch (Exception ex)
+            catch
             {
-                // Affiche une erreur et applique des valeurs par défaut
-                TaskDialog.Show("Erreur de Chargement",
-                    $"Impossible de charger l'état de coloration : {ex.Message}");
+                TaskDialog.Show("Erreur de Chargement", "Impossible de charger l'état, valeurs par défaut appliquées.");
                 IsColoringActive = true;
                 IsFullMode = true;
             }
@@ -189,15 +154,13 @@ namespace MyRevitPlugin
             try
             {
                 EnsureDirectoryExists();
-
-                string activePart = IsColoringActive ? "Active" : "Inactive";
-                string modePart = IsFullMode ? "Full" : "Partial";
-                File.WriteAllText(persistenceFilePath, $"{activePart}-{modePart}");
+                string a = IsColoringActive ? "Active" : "Inactive";
+                string m = IsFullMode ? "Full" : "Partial";
+                File.WriteAllText(persistenceFilePath, $"{a}-{m}");
             }
-            catch (Exception ex)
+            catch
             {
-                TaskDialog.Show("Erreur de Sauvegarde",
-                    $"Impossible de sauvegarder l'état de coloration : {ex.Message}");
+                TaskDialog.Show("Erreur de Sauvegarde", "Impossible de sauvegarder l'état.");
             }
         }
 
@@ -215,22 +178,28 @@ namespace MyRevitPlugin
 
         private static void EnsureDirectoryExists()
         {
-            string directory = Path.GetDirectoryName(persistenceFilePath);
-            if (!Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
+            var dir = Path.GetDirectoryName(persistenceFilePath);
+            if (!Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
         }
     }
 
     // -----------------------------------------------------------------------
-    //   2) Coloration Complète : TabItems + "Papanoel"
+    //   2) Coloration Complète : TabItems + BIMaestro (watcher) + "Papanoel"
     // -----------------------------------------------------------------------
     public static class CombinedColoringApplication
     {
-        // Dictionnaire pour stocker les couleurs "flash" attribuées aux projets
         private static Dictionary<string, SolidColorBrush> _projectTabColors = new Dictionary<string, SolidColorBrush>();
         private static readonly Random _random = new Random();
+
+        // Pour BIMaestro
+        private static FrameworkElement _bimButton;
+        private static List<Border> _bimBorders;
+        private static DispatcherTimer _bimWatcher;
+
+        private static readonly SolidColorBrush _pastelBrush = new SolidColorBrush(Color.FromRgb(242, 255, 242));
+        private static readonly SolidColorBrush _whiteBrush = Brushes.White;
+        private static readonly SolidColorBrush _hoverBrush = new SolidColorBrush(Color.FromArgb(100, 255, 255, 255));
 
         private static readonly Dictionary<string, SolidColorBrush> predefinedKeywordColors =
             new Dictionary<string, SolidColorBrush>
@@ -244,27 +213,14 @@ namespace MyRevitPlugin
                 { "Spécifique aux familles",  new SolidColorBrush(Color.FromRgb(255, 230, 255)) }
             };
 
-        // Liste de mots-clés dans l'ordre où on les teste;
-        // On place "Analyse" en dernier pour qu'elle soit appliquée après tout le reste
         private static readonly List<string> _targetKeywords = new List<string>
         {
-            "Outils de Visualisation",
-            "Modification",
-            "Outils IA",
-            "Couleur du projet",
-            "Panneaux réservés au test",
-            "Spécifique aux familles",
-            "Analyse"
+            "Outils de Visualisation", "Modification", "Outils IA",
+            "Couleur du projet", "Panneaux réservés au test",
+            "Spécifique aux familles", "Analyse"
         };
 
-        /// <summary>
-        /// Réinitialise le dictionnaire des couleurs de projets.
-        /// Ainsi, lors du prochain appel d'ApplyTabItemColoring, une nouvelle couleur aléatoire sera générée.
-        /// </summary>
-        public static void ResetRandomColors()
-        {
-            _projectTabColors.Clear();
-        }
+        public static void ResetRandomColors() => _projectTabColors.Clear();
 
         public static void ApplyColorings(IntPtr mainWindowHandle)
         {
@@ -277,220 +233,224 @@ namespace MyRevitPlugin
         {
             ResetTabItemColoring(mainWindowHandle);
             ResetPapanoelColoring(mainWindowHandle);
+            ResetBIMaestroTab();  // stop watcher + clear
         }
 
-        /// <summary>
-        /// Coloration flashy des onglets (TabItems) + texte en noir
-        /// </summary>
         public static void ApplyTabItemColoring(IntPtr mainWindowHandle)
         {
-            var mainWindow = GetMainWindow(mainWindowHandle);
-            if (mainWindow == null) return;
+            var wnd = GetMainWindow(mainWindowHandle);
+            if (wnd == null) return;
 
-            var tabItems = FindChildrenByType<TabItem>(mainWindow);
-            foreach (var tabItem in tabItems)
+            // 1) projets flashy
+            foreach (var tab in FindChildrenByType<TabItem>(wnd))
             {
-                var toolTip = tabItem.ToolTip as string;
-                if (string.IsNullOrEmpty(toolTip)) continue;
+                var tip = tab.ToolTip as string;
+                if (string.IsNullOrEmpty(tip)) continue;
+                var proj = ExtractProjectName(tip);
+                if (string.IsNullOrEmpty(proj)) continue;
 
-                string projectName = ExtractProjectName(toolTip);
-                if (string.IsNullOrEmpty(projectName)) continue;
+                var brush = GetFlashyProjectColor(proj, out var borderBrush);
+                tab.Background = brush;
+                tab.BorderBrush = borderBrush;
+                ColorTextBlocks(tab, Brushes.Black);
+            }
 
-                SolidColorBrush borderBrush;
-                SolidColorBrush projectBrush = GetFlashyProjectColor(projectName, out borderBrush);
+            // 2) BIMaestro : repérage + démarrage du watcher
+            if (_bimWatcher == null)
+            {
+                var buttons = FindVisualByTypeName(wnd, "RibbonTabButton");
+                _bimButton = buttons.FirstOrDefault(b => AutomationProperties.GetName(b) == "BIMaestro");
+                if (_bimButton != null)
+                {
+                    _bimBorders = FindChildrenByType<Border>(_bimButton);
+                    // d’emblée, fond pastel
+                    foreach (var b in _bimBorders)
+                        b.Background = _pastelBrush;
 
-                tabItem.Background = projectBrush;
-                tabItem.BorderBrush = borderBrush;
-
-                // Mettre le texte en noir
-                ColorTextBlocks(tabItem, Brushes.Black);
+                    // timer WPF sur le même thread UI
+                    _bimWatcher = new DispatcherTimer(DispatcherPriority.Render)
+                    {
+                        Interval = TimeSpan.FromMilliseconds(100)
+                    };
+                    _bimWatcher.Tick += (_, __) => UpdateBIMaestroBackground();
+                    _bimWatcher.Start();
+                }
             }
         }
 
-        private static SolidColorBrush GetFlashyProjectColor(string projectName, out SolidColorBrush borderBrush)
+        private static void UpdateBIMaestroBackground()
         {
-            if (_projectTabColors.TryGetValue(projectName, out SolidColorBrush existingBrush))
-            {
-                borderBrush = DarkenColor(existingBrush.Color, 0.7);
-                return existingBrush;
-            }
+            if (_bimButton == null || !ColoringStateManager.IsColoringActive) return;
 
-            Color randomColor = GenerateRandomFlashyColor();
-            var newBrush = new SolidColorBrush(randomColor);
-            _projectTabColors[projectName] = newBrush;
+            bool isSelected = false;
+            // Revit RibbonTabButton a souvent une propriété IsSelected ou IsChecked
+            var pi = _bimButton.GetType().GetProperty("IsSelected")
+                  ?? _bimButton.GetType().GetProperty("IsChecked");
+            if (pi != null && (bool?)pi.GetValue(_bimButton) == true)
+                isSelected = true;
 
-            borderBrush = DarkenColor(randomColor, 0.7);
-            return newBrush;
+            Brush target;
+            if (isSelected)
+                target = _whiteBrush;
+            else if (_bimButton.IsMouseOver)
+                target = _hoverBrush;
+            else
+                target = _pastelBrush;
+
+            foreach (var b in _bimBorders)
+                b.Background = target;
         }
 
-        /// <summary>
-        /// Couleur flashy = R, G, B dans [180..256].
-        /// </summary>
-        private static Color GenerateRandomFlashyColor()
-        {
-            byte r = (byte)(_random.Next(180, 256));
-            byte g = (byte)(_random.Next(180, 256));
-            byte b = (byte)(_random.Next(180, 256));
-            return Color.FromRgb(r, g, b);
-        }
-
-        /// <summary>
-        /// Reset tab item + clear la couleur du texte
-        /// </summary>
         private static void ResetTabItemColoring(IntPtr mainWindowHandle)
         {
-            var mainWindow = GetMainWindow(mainWindowHandle);
-            if (mainWindow == null) return;
-
-            var tabItems = FindChildrenByType<TabItem>(mainWindow);
-            foreach (var tabItem in tabItems)
+            var wnd = GetMainWindow(mainWindowHandle);
+            if (wnd == null) return;
+            foreach (var t in FindChildrenByType<TabItem>(wnd))
             {
-                tabItem.ClearValue(TabItem.BackgroundProperty);
-                tabItem.ClearValue(TabItem.BorderBrushProperty);
-
-                // Rétablir la couleur d'origine du texte
-                ClearTextBlocks(tabItem);
+                t.ClearValue(TabItem.BackgroundProperty);
+                t.ClearValue(TabItem.BorderBrushProperty);
+                ClearTextBlocks(t);
             }
         }
 
-        /// <summary>
-        /// Coloration "Papanoel" => pastel + texte en noir
-        /// (Boucle originale avec break; => on s’arrête au premier mot-clé trouvé)
-        /// </summary>
+        private static void ResetBIMaestroTab()
+        {
+            if (_bimWatcher != null)
+            {
+                _bimWatcher.Stop();
+                _bimWatcher = null;
+            }
+            if (_bimBorders != null)
+            {
+                foreach (var b in _bimBorders)
+                    b.ClearValue(Border.BackgroundProperty);
+            }
+            _bimButton = null;
+            _bimBorders = null;
+        }
+
         public static void ApplyPapanoelColoring(IntPtr mainWindowHandle)
         {
-            var mainWindow = GetMainWindow(mainWindowHandle);
-            if (mainWindow == null) return;
-
-            var borders = FindChildrenByType<Border>(mainWindow);
-            foreach (var border in borders)
+            var wnd = GetMainWindow(mainWindowHandle);
+            if (wnd == null) return;
+            foreach (var border in FindChildrenByType<Border>(wnd))
             {
                 var dc = border.DataContext;
                 if (dc == null) continue;
+                var prop = dc.GetType().GetProperty("Cookie");
+                var val = prop?.GetValue(dc)?.ToString();
+                if (string.IsNullOrEmpty(val)) continue;
 
-                var cookieProp = dc.GetType().GetProperty("Cookie");
-                if (cookieProp == null) continue;
-
-                var cookieValue = cookieProp.GetValue(dc);
-                if (cookieValue == null) continue;
-
-                string cookieStr = cookieValue.ToString();
-
-                foreach (var keyword in _targetKeywords)
+                foreach (var kw in _targetKeywords)
                 {
-                    if (cookieStr.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0)
+                    if (val.IndexOf(kw, StringComparison.OrdinalIgnoreCase) >= 0 &&
+                        predefinedKeywordColors.TryGetValue(kw, out var brush))
                     {
-                        if (predefinedKeywordColors.TryGetValue(keyword, out SolidColorBrush brush))
-                        {
-                            border.Background = brush;
-                            var darkerBrush = DarkenColor(brush.Color, 0.7);
-                            border.BorderBrush = darkerBrush;
-                            border.BorderThickness = new Thickness(1);
-
-                            // Texte en noir
-                            ColorTextBlocks(border, Brushes.Black);
-                        }
-
-                        // On quitte la boucle dès qu'on a trouvé un mot-clé
+                        border.Background = brush;
+                        border.BorderBrush = DarkenColor(brush.Color, 0.7);
+                        border.BorderThickness = new Thickness(1);
+                        ColorTextBlocks(border, Brushes.Black);
                         break;
                     }
                 }
             }
         }
 
-        /// <summary>
-        /// Reset papanoel => ClearValue + clear text color
-        /// </summary>
         private static void ResetPapanoelColoring(IntPtr mainWindowHandle)
         {
-            var mainWindow = GetMainWindow(mainWindowHandle);
-            if (mainWindow == null) return;
-
-            var borders = FindChildrenByType<Border>(mainWindow);
-            foreach (var border in borders)
+            var wnd = GetMainWindow(mainWindowHandle);
+            if (wnd == null) return;
+            foreach (var b in FindChildrenByType<Border>(wnd))
             {
-                border.ClearValue(Border.BackgroundProperty);
-                border.ClearValue(Border.BorderBrushProperty);
-                border.ClearValue(Border.BorderThicknessProperty);
-
-                // Restaurer la couleur d'origine du texte
-                ClearTextBlocks(border);
+                b.ClearValue(Border.BackgroundProperty);
+                b.ClearValue(Border.BorderBrushProperty);
+                b.ClearValue(Border.BorderThicknessProperty);
+                ClearTextBlocks(b);
             }
         }
 
-        // --------------------------------------------------------------------
-        // Outils communs
-        // --------------------------------------------------------------------
-        private static Window GetMainWindow(IntPtr mainWindowHandle)
+        // —— utilitaires ——
+        private static Window GetMainWindow(IntPtr handle)
         {
-            HwndSource hwndSource = HwndSource.FromHwnd(mainWindowHandle);
-            return hwndSource?.RootVisual as Window;
+            var src = HwndSource.FromHwnd(handle);
+            return src?.RootVisual as Window;
         }
 
-        private static SolidColorBrush DarkenColor(Color color, double factor)
+        private static SolidColorBrush GetFlashyProjectColor(string name, out SolidColorBrush borderBrush)
         {
-            byte r = (byte)Math.Max(color.R * factor, 0);
-            byte g = (byte)Math.Max(color.G * factor, 0);
-            byte b = (byte)Math.Max(color.B * factor, 0);
-            return new SolidColorBrush(Color.FromRgb(r, g, b));
-        }
-
-        private static string ExtractProjectName(string toolTipText)
-        {
-            int index = toolTipText.IndexOf(" - ");
-            if (index > 0)
+            if (_projectTabColors.TryGetValue(name, out var existing))
             {
-                return toolTipText.Substring(0, index).Trim();
+                borderBrush = DarkenColor(existing.Color, 0.7);
+                return existing;
             }
-            return toolTipText;
+            var c = Color.FromRgb((byte)_random.Next(180, 256),
+                                      (byte)_random.Next(180, 256),
+                                      (byte)_random.Next(180, 256));
+            var brush = new SolidColorBrush(c);
+            _projectTabColors[name] = brush;
+            borderBrush = DarkenColor(c, 0.7);
+            return brush;
+        }
+
+        private static string ExtractProjectName(string tt)
+        {
+            var idx = tt.IndexOf(" - ");
+            return idx > 0 ? tt.Substring(0, idx).Trim() : tt;
         }
 
         private static List<T> FindChildrenByType<T>(DependencyObject parent) where T : DependencyObject
         {
-            var found = new List<T>();
-            if (parent == null) return found;
-
-            int childCount = VisualTreeHelper.GetChildrenCount(parent);
-            for (int i = 0; i < childCount; i++)
+            var list = new List<T>();
+            if (parent == null) return list;
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
             {
-                var child = VisualTreeHelper.GetChild(parent, i);
-                if (child is T typedChild)
-                {
-                    found.Add(typedChild);
-                }
-                found.AddRange(FindChildrenByType<T>(child));
+                var c = VisualTreeHelper.GetChild(parent, i);
+                if (c is T t) list.Add(t);
+                list.AddRange(FindChildrenByType<T>(c));
             }
-            return found;
+            return list;
         }
 
-        // Méthode pour colorer tous les TextBlocks
+        private static List<FrameworkElement> FindVisualByTypeName(DependencyObject parent, string typeName)
+        {
+            var res = new List<FrameworkElement>();
+            if (parent == null) return res;
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+            {
+                var c = VisualTreeHelper.GetChild(parent, i);
+                if (c is FrameworkElement fe && fe.GetType().Name.Equals(typeName, StringComparison.OrdinalIgnoreCase))
+                    res.Add(fe);
+                res.AddRange(FindVisualByTypeName(c, typeName));
+            }
+            return res;
+        }
+
         private static void ColorTextBlocks(DependencyObject parent, Brush color)
         {
-            var textBlocks = FindChildrenByType<TextBlock>(parent);
-            foreach (var tb in textBlocks)
-            {
+            foreach (var tb in FindChildrenByType<TextBlock>(parent))
                 tb.Foreground = color;
-            }
         }
 
-        // Méthode pour restaurer la couleur d'origine des TextBlocks
         private static void ClearTextBlocks(DependencyObject parent)
         {
-            var textBlocks = FindChildrenByType<TextBlock>(parent);
-            foreach (var tb in textBlocks)
-            {
+            foreach (var tb in FindChildrenByType<TextBlock>(parent))
                 tb.ClearValue(TextBlock.ForegroundProperty);
-            }
         }
+
+        private static SolidColorBrush DarkenColor(Color c, double f) =>
+            new SolidColorBrush(Color.FromRgb(
+                (byte)(c.R * f),
+                (byte)(c.G * f),
+                (byte)(c.B * f)));
     }
 
     // -----------------------------------------------------------------------
-    //   3) Coloration Partielle : Recherche "PanelTitleBar" + Titre
+    //   3) Coloration Partielle : DockablePane “PanelTitleBar”
     // -----------------------------------------------------------------------
     public static class PartialColoringHelper
     {
-        private static readonly Dictionary<string, SolidColorBrush> partialTitles
-            = new Dictionary<string, SolidColorBrush>
+        private static readonly Dictionary<string, SolidColorBrush> partialTitles =
+            new Dictionary<string, SolidColorBrush>
             {
                 { "Outils de Visualisation",   new SolidColorBrush(Color.FromRgb(255, 230, 230)) },
                 { "Modification",             new SolidColorBrush(Color.FromRgb(230, 255, 230)) },
@@ -503,46 +463,25 @@ namespace MyRevitPlugin
 
         public static void ApplyPartialColoring(IntPtr mainWindowHandle)
         {
-            if (!ColoringStateManager.IsColoringActive) return;
-            if (ColoringStateManager.IsFullMode) return;
+            if (!ColoringStateManager.IsColoringActive || ColoringStateManager.IsFullMode) return;
+            var wnd = GetMainWindow(mainWindowHandle);
+            if (wnd == null) return;
 
-            Window mainWindow = GetMainWindow(mainWindowHandle);
-            if (mainWindow == null) return;
-
-            var allPanelTitleBars = FindVisualByTypeName(mainWindow, "PanelTitleBar");
-
-            foreach (var ptb in allPanelTitleBars)
+            var panels = FindVisualByTypeName(wnd, "PanelTitleBar");
+            foreach (var ptb in panels)
             {
-                var titleProp = ptb.GetType().GetProperty("Title");
-                if (titleProp == null) continue;
-
-                var titleValue = titleProp.GetValue(ptb);
-                if (titleValue == null) continue;
-
-                string titleStr = titleValue.ToString();
-
-                if (partialTitles.TryGetValue(titleStr, out SolidColorBrush colorBrush))
+                var prop = ptb.GetType().GetProperty("Title");
+                if (prop == null) continue;
+                var title = prop.GetValue(ptb)?.ToString();
+                if (title != null && partialTitles.TryGetValue(title, out var brush))
                 {
-                    Border borderToColor = null;
-                    var allBorders = FindChildrenByType<Border>(ptb);
-                    if (allBorders.Count > 0)
+                    var b = FindChildrenByType<Border>(ptb).FirstOrDefault() as Border ?? (ptb as Border);
+                    if (b != null)
                     {
-                        borderToColor = allBorders[0];
-                    }
-                    if (borderToColor == null && ptb is Border borderSelf)
-                    {
-                        borderToColor = borderSelf;
-                    }
-
-                    if (borderToColor != null)
-                    {
-                        borderToColor.Background = colorBrush;
-                        var darkerBrush = DarkenColor(colorBrush.Color, 0.7);
-                        borderToColor.BorderBrush = darkerBrush;
-                        borderToColor.BorderThickness = new Thickness(1);
-
-                        // Texte en noir
-                        ColorTextBlocks(borderToColor, Brushes.Black);
+                        b.Background = brush;
+                        b.BorderBrush = DarkenColor(brush.Color, 0.7);
+                        b.BorderThickness = new Thickness(1);
+                        ColorTextBlocks(b, Brushes.Black);
                     }
                 }
             }
@@ -550,115 +489,78 @@ namespace MyRevitPlugin
 
         public static void ResetPartialColoring(IntPtr mainWindowHandle)
         {
-            Window mainWindow = GetMainWindow(mainWindowHandle);
-            if (mainWindow == null) return;
-
-            var allPanelTitleBars = FindVisualByTypeName(mainWindow, "PanelTitleBar");
-            foreach (var ptb in allPanelTitleBars)
+            var wnd = GetMainWindow(mainWindowHandle);
+            if (wnd == null) return;
+            var panels = FindVisualByTypeName(wnd, "PanelTitleBar");
+            foreach (var ptb in panels)
             {
-                var titleProp = ptb.GetType().GetProperty("Title");
-                if (titleProp == null) continue;
-
-                var titleValue = titleProp.GetValue(ptb);
-                if (titleValue == null) continue;
-
-                string titleStr = titleValue.ToString();
-                if (partialTitles.ContainsKey(titleStr))
+                var prop = ptb.GetType().GetProperty("Title");
+                if (prop == null) continue;
+                var title = prop.GetValue(ptb)?.ToString();
+                if (title != null && partialTitles.ContainsKey(title))
                 {
-                    var allBorders = FindChildrenByType<Border>(ptb);
-                    Border borderToReset = allBorders.Count > 0 ? allBorders[0] : null;
-
-                    if (borderToReset == null && ptb is Border borderSelf)
+                    var b = FindChildrenByType<Border>(ptb).FirstOrDefault() as Border ?? (ptb as Border);
+                    if (b != null)
                     {
-                        borderToReset = borderSelf;
-                    }
-
-                    if (borderToReset != null)
-                    {
-                        borderToReset.ClearValue(Border.BackgroundProperty);
-                        borderToReset.ClearValue(Border.BorderBrushProperty);
-                        borderToReset.ClearValue(Border.BorderThicknessProperty);
-
-                        // ClearValue => restaurer la couleur d'origine
-                        ClearTextBlocks(borderToReset);
+                        b.ClearValue(Border.BackgroundProperty);
+                        b.ClearValue(Border.BorderBrushProperty);
+                        b.ClearValue(Border.BorderThicknessProperty);
+                        ClearTextBlocks(b);
                     }
                 }
             }
         }
 
-        // --------------------------------------------------------------------
-        // Outils communs
-        // --------------------------------------------------------------------
-        private static Window GetMainWindow(IntPtr mainWindowHandle)
+        // utilitaires...
+        private static Window GetMainWindow(IntPtr handle)
         {
-            HwndSource hwndSource = HwndSource.FromHwnd(mainWindowHandle);
-            return hwndSource?.RootVisual as Window;
+            var src = HwndSource.FromHwnd(handle);
+            return src?.RootVisual as Window;
         }
 
         private static List<FrameworkElement> FindVisualByTypeName(DependencyObject parent, string typeName)
         {
-            var result = new List<FrameworkElement>();
-            if (parent == null) return result;
-
-            int count = VisualTreeHelper.GetChildrenCount(parent);
-            for (int i = 0; i < count; i++)
+            var res = new List<FrameworkElement>();
+            if (parent == null) return res;
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
             {
-                var child = VisualTreeHelper.GetChild(parent, i);
-                if (child != null)
-                {
-                    if (child.GetType().Name.Equals(typeName, StringComparison.OrdinalIgnoreCase)
-                        && child is FrameworkElement fe)
-                    {
-                        result.Add(fe);
-                    }
-                    result.AddRange(FindVisualByTypeName(child, typeName));
-                }
+                var c = VisualTreeHelper.GetChild(parent, i);
+                if (c is FrameworkElement fe && fe.GetType().Name.Equals(typeName, StringComparison.OrdinalIgnoreCase))
+                    res.Add(fe);
+                res.AddRange(FindVisualByTypeName(c, typeName));
             }
-            return result;
+            return res;
         }
 
-        private static List<T> FindChildrenByType<T>(DependencyObject parent) where T : DependencyObject
+        private static List<T> FindChildrenByType<T>(DependencyObject p) where T : DependencyObject
         {
-            var found = new List<T>();
-            if (parent == null) return found;
-
-            int childCount = VisualTreeHelper.GetChildrenCount(parent);
-            for (int i = 0; i < childCount; i++)
+            var list = new List<T>();
+            if (p == null) return list;
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(p); i++)
             {
-                var child = VisualTreeHelper.GetChild(parent, i);
-                if (child is T typedChild)
-                {
-                    found.Add(typedChild);
-                }
-                found.AddRange(FindChildrenByType<T>(child));
+                var c = VisualTreeHelper.GetChild(p, i);
+                if (c is T t) list.Add(t);
+                list.AddRange(FindChildrenByType<T>(c));
             }
-            return found;
+            return list;
         }
 
-        private static void ColorTextBlocks(DependencyObject parent, Brush color)
+        private static void ColorTextBlocks(DependencyObject p, Brush color)
         {
-            var textBlocks = FindChildrenByType<TextBlock>(parent);
-            foreach (var tb in textBlocks)
-            {
+            foreach (var tb in FindChildrenByType<TextBlock>(p))
                 tb.Foreground = color;
-            }
         }
 
-        private static void ClearTextBlocks(DependencyObject parent)
+        private static void ClearTextBlocks(DependencyObject p)
         {
-            var textBlocks = FindChildrenByType<TextBlock>(parent);
-            foreach (var tb in textBlocks)
-            {
+            foreach (var tb in FindChildrenByType<TextBlock>(p))
                 tb.ClearValue(TextBlock.ForegroundProperty);
-            }
         }
 
-        private static SolidColorBrush DarkenColor(Color color, double factor)
-        {
-            byte r = (byte)(color.R * factor);
-            byte g = (byte)(color.G * factor);
-            byte b = (byte)(color.B * factor);
-            return new SolidColorBrush(Color.FromRgb(r, g, b));
-        }
+        private static SolidColorBrush DarkenColor(Color c, double f) =>
+            new SolidColorBrush(Color.FromRgb(
+                (byte)(c.R * f),
+                (byte)(c.G * f),
+                (byte)(c.B * f)));
     }
 }
