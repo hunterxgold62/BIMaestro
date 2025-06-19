@@ -44,8 +44,8 @@ public class AppUI : IExternalApplication
         RibbonPanel panelIA = application.CreateRibbonPanel(tabName, "Outils IA");
         ribbonPanels.Add(panelIA);
 
-        RibbonPanel panelTest = application.CreateRibbonPanel(tabName, "Panneaux réservés au test");
-        ribbonPanels.Add(panelTest);
+       // RibbonPanel panelTest = application.CreateRibbonPanel(tabName, "Panneaux réservés au test");
+        //ribbonPanels.Add(panelTest);
 
         RibbonPanel panelAnalysis = application.CreateRibbonPanel(tabName, "Analyse");
         ribbonPanels.Add(panelAnalysis);
@@ -65,7 +65,8 @@ public class AppUI : IExternalApplication
         AddPushButton(panelVisualization, "OpenSheetFromViewButton", "Ouvrir la vue\ndu Plan", assemblyPath, "Visualisation.OpenSheetFromView", "safeimagekit-doc.png", "Cette commande permet de basculer entre une vue active (plan, coupe ou 3D) et les feuilles qui la contiennent, ou d'ouvrir une vue directement depuis un viewport sélectionné sur une feuille. \n\nElle simplifie la navigation entre les feuilles et les vues associées dans un projet Revit.");
         AddPushButton(panelVisualization, "ReorientViewButton", "Réorienter\nVue 3D", assemblyPath, "Visualisation.ReorientViewCommand", "Element 3D.png", "Permet de réorienter une vue 3D active en fonction de la géométrie d'une face sélectionnée.");
         AddPushButton(panelVisualization, "Information d'élément", "Information\nd'élément", assemblyPath, "IA.SelectElementsCommand", "safeimagekit-Information.png", "Ce module utilitaire fournit des méthodes avancées pour :\r\n\r\n- Identifier les matériaux appliqués aux éléments du modèle.\r\n- Obtenir des paramètres personnalisés liés à la géométrie et aux dimensions.\r\nCalculer la surface au sol et le volume des éléments, avec une distinction basée sur la catégorie (toit, plancher, etc.).");
-        AddPushButton(panelVisualization, "Export Nomenclature", "Export \nNomenclature", assemblyPath, "Visualisation.ExportImportScheduleCommand", "rvt to excel et pdf.png", "Exporte les nomenclatures Revit sélectionné en fichier excel ou PDF.");
+        AddPushButton(panelVisualization, "Export Nomenclature", "Export \nNomenclature", assemblyPath, "Visualisation.ExportScheduleCommand", "rvt to excel et pdf.png", "Exporte les nomenclatures Revit sélectionné en fichier excel ou PDF.");
+        AddPushButton(panelVisualization, "ExportDwgBatch", "Export \nDWG", assemblyPath, "MonPluginRevit.ExportSheetsCommand", "export DWG.png", "Exporte automatiquement plusieurs vues ou feuilles en DWG, en nommant chaque fichier selon le projet et la vue.");
 
 
         AddPushButton(panelEditing, "OverrideColor", "Changer couleur\nélément", assemblyPath, "Modification.OverrideColorCommand", "Pallette de couleur anexe .png", "Cette commande permet :  \r\n- De personnaliser les couleurs, motifs et transparence des éléments.  \r\n- D'appliquer des paramètres graphiques à plusieurs vues simultanément.  \r\n- De réinitialiser les modifications si nécessaire.  \r\n\r\nUtilité : Améliorez le rendu et la lisibilité de vos vues.  ");
@@ -94,19 +95,21 @@ public class AppUI : IExternalApplication
         AddPushButton(panelIA, "ScanText", "ScanText\nIA", assemblyPath, "ScanTextRevit.SelectViewsCommand", "safeimagekit-qfdfsf.png", "Corrige automatiquement les fautes d'orthographe et de grammaire dans les textes visibles sur les vues ou feuilles du projet. \r\nL'IA analyse les textes scannés par chunk et indique les erreurs ligne par ligne avec explication. \r\nLes corrections sont classées en \"Mineur\" (ponctuation, espaces) ou \"Erreur\" (grammaire, orthographe).\r\n");
 
 
-       // AddSplitButton(panelTest, "Auto-Canalisation", "Auto-\nCanalisation", assemblyPath,
-          // new List<(string buttonName, string buttonText, string className, string resourceImageName, string toolTip)>
-          // {
-          //      ("Auto-Canalisation", "Auto-\nCanalisation", "RevitAddin.UltimatePipeConnector", "mini-AutocanalisationV2.png","Permet la liaision la plus simple et rapide entre 2 canalisations"),
-          //      ("Auto-Canalisation avec obstacle", "Auto-Canalisation\n avec obstacle", "RevitAddin.ConnectTwoPipesAvoidDupConnection", "mini-AutocanalisationV2.png","Permet la liaison la plus simple et rapide entre 2 canalisations en fonction d'un ou plusieurs obstacles sélectionnés")
-          // });
+
+
+        // AddSplitButton(panelTest, "Auto-Canalisation", "Auto-\nCanalisation", assemblyPath,
+        // new List<(string buttonName, string buttonText, string className, string resourceImageName, string toolTip)>
+        // {
+        //      ("Auto-Canalisation", "Auto-\nCanalisation", "RevitAddin.UltimatePipeConnector", "mini-AutocanalisationV2.png","Permet la liaision la plus simple et rapide entre 2 canalisations"),
+        //      ("Auto-Canalisation avec obstacle", "Auto-Canalisation\n avec obstacle", "RevitAddin.ConnectTwoPipesAvoidDupConnection", "mini-AutocanalisationV2.png","Permet la liaison la plus simple et rapide entre 2 canalisations en fonction d'un ou plusieurs obstacles sélectionnés")
+        // });
         //AddPushButton(panelTest, "Auto-CanalisationV3", "Auto-\nCanalisationV3", assemblyPath, "RevitAddin.AutoCanalisationSettingsCommand", "mini-AutocanalisationV2.png", "Paramètre Auto-Canalisation avec obstacle");
 
-       // AddPushButton(panelTest, "text maj", "text maj", assemblyPath, "MiseAJourCommand", "safeimagekit-Texte maj.png", "ouvre une feuille visualisable en temps réels");
-       
-        AddPushButton(panelTest, "export excel", "export excel", assemblyPath, "MonPluginRevit.ExportScheduleToExcel", "safeimagekit-Texte maj.png", "ouvre une feuille visualisable en temps réels");
+        // AddPushButton(panelTest, "text maj", "text maj", assemblyPath, "MiseAJourCommand", "safeimagekit-Texte maj.png", "ouvre une feuille visualisable en temps réels");
 
-         AddPushButton(panelTest, "import excel", "import excel", assemblyPath, "MonPluginRevit.ImportScheduleFromExcel", "wtf bouton.png", "ouvre une feuille visualisable en temps réels");
+        // AddPushButton(panelTest, "export excel", "export excel", assemblyPath, "MonPluginRevit.ExportScheduleToExcel", "safeimagekit-Texte maj.png", "ouvre une feuille visualisable en temps réels");
+
+        //AddPushButton(panelTest, "import excel", "import excel", assemblyPath, "MonPluginRevit.ImportScheduleFromExcel", "wtf bouton.png", "ouvre une feuille visualisable en temps réels");
 
         ///AddPushButton(panelTest, "popup3", "popup3", assemblyPath, "RandomImageAddin.ShowVirusPopupsCommand", "attention bouton.png", "ouvre une feuille visualisable en temps réels");
 

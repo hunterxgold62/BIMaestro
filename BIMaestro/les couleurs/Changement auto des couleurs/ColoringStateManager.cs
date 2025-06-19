@@ -241,6 +241,12 @@ namespace MyRevitPlugin
             var wnd = GetMainWindow(mainWindowHandle);
             if (wnd == null) return;
 
+            // Si le watcher actuel n'est plus lié à la fenêtre active,
+            // on le réinitialise pour retrouver le bouton BIMaestro.
+            if (_bimWatcher != null && (_bimButton == null || Window.GetWindow(_bimButton) != wnd))
+            {
+                ResetBIMaestroTab();
+            }
             // 1) projets flashy
             foreach (var tab in FindChildrenByType<TabItem>(wnd))
             {

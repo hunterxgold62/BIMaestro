@@ -302,6 +302,17 @@
     </Compile>
     <Compile Include="commands\Dossier famille\FamilyLoadOption.cs" />
     <Compile Include="commands\Dossier famille\LoadFamilyHandler.cs" />
+    <None Include="commands\export dwg\ExportSheetsCommand.cs" />
+    <None Include="commands\export dwg\ExportSheetsWindow.xaml.cs">
+      <DependentUpon>ExportSheetsWindow.xaml</DependentUpon>
+    </None>
+    <Compile Include="commands\export dgw asynchrone\ExportSheetsCommand2.cs" />
+    <Compile Include="commands\export dgw asynchrone\ExportTaskCommand.cs" />
+    <Compile Include="commands\export dgw asynchrone\ExportWindow2.xaml.cs">
+      <DependentUpon>ExportWindow2.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\export dgw asynchrone\JournalHelper.cs" />
+    <Compile Include="commands\export dgw asynchrone\TaskDefinition.cs" />
     <Compile Include="Test\automatisation de tuyaux\SelectionHelper.cs" />
     <Compile Include="Test\automatisation de tuyaux\test avec coude qui marche moyen\ConnectPipes.cs" />
     <Compile Include="Test\automatisation de tuyaux\V3 avec évitement des obstacles\AutoCanalisationSettingsCommand.cs" />
@@ -423,6 +434,14 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Include="commands\Dynamo\ConfigureDynamoWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <None Include="commands\export dwg\ExportSheetsWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </None>
+    <Page Include="commands\export dgw asynchrone\ExportWindow2.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
@@ -589,6 +608,8 @@
     <EmbeddedResource Include="Resources\dynamo 1.png" />
     <EmbeddedResource Include="Resources\dynamo 2.png" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\export DWG.png" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

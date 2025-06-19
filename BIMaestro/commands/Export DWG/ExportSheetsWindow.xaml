@@ -1,0 +1,46 @@
+﻿<Window x:Class="MonPluginRevit.ExportWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Export DWG par feuille" Height="180" Width="480"
+        WindowStartupLocation="CenterScreen">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- 1) Choix du jeu de feuilles -->
+        <TextBlock Text="Jeu de feuilles :" Grid.Row="0" VerticalAlignment="Center"/>
+        <ComboBox x:Name="SheetSetComboBox"
+                  IsEditable="True"
+                  IsTextSearchEnabled="True"
+                  Grid.Row="0"
+                  Margin="120,0,0,0"
+                  Width="300"/>
+
+        <!-- 2) Choix du dossier d’export -->
+        <TextBlock Text="Dossier d’export :" Grid.Row="1" VerticalAlignment="Center" Margin="0,10,0,0"/>
+        <StackPanel Orientation="Horizontal" Grid.Row="1" Margin="120,10,0,0">
+            <TextBox x:Name="FolderTextBox" Width="240" IsReadOnly="True"/>
+            <Button Content="Parcourir…" Margin="5,0,0,0"
+                    Click="BrowseButton_Click"/>
+        </StackPanel>
+
+        <!-- 3) Boutons -->
+        <StackPanel Orientation="Horizontal"
+                    Grid.Row="2"
+                    HorizontalAlignment="Right"
+                    Margin="0,20,0,0">
+            <Button x:Name="CancelButton"
+                    Content="Annuler"
+                    Width="75"
+                    Margin="0,0,10,0"
+                    Click="CancelButton_Click"/>
+            <Button x:Name="ExportButton"
+                    Content="Exporter"
+                    Width="100"
+                    Click="ExportButton_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

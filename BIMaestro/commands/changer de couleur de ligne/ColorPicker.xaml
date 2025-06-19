@@ -27,19 +27,19 @@
                 <StackPanel Margin="10">
                     <StackPanel Orientation="Horizontal">
                         <CheckBox x:Name="HalftoneCheckBox"
-                      Content="Appliquer la demi-teinte"/>
+                                  Content="Appliquer la demi-teinte"/>
                         <CheckBox x:Name="HideInViewCheckBox"
-                      Content="Masquer dans la vue"
-                      Margin="20,0,0,0"/>
+                                  Content="Masquer dans la vue"
+                                  Margin="20,0,0,0"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <Label Content="Transparence :" Width="150"/>
                         <Slider x:Name="TransparencySlider"
-                    Minimum="0" Maximum="100" Value="0"
-                    Width="200" TickFrequency="10"
-                    IsSnapToTickEnabled="True"/>
+                                Minimum="0" Maximum="100" Value="0"
+                                Width="200" TickFrequency="10"
+                                IsSnapToTickEnabled="True"/>
                         <TextBlock Text="{Binding ElementName=TransparencySlider, Path=Value, StringFormat=F0}"
-                       Margin="10,0,0,0"/>
+                                   Margin="10,0,0,0"/>
                     </StackPanel>
                 </StackPanel>
             </TabItem>
@@ -49,8 +49,8 @@
                 <StackPanel Margin="10">
                     <Label Content="Couleur des motifs:"/>
                     <xctk:ColorPicker x:Name="ColorPickerControl"
-                            SelectedColor="Red"
-                            Width="200" Margin="5"/>
+                                      SelectedColor="Red"
+                                      Width="200" Margin="5"/>
                     <GroupBox Header="Motifs de surface">
                         <StackPanel>
                             <ComboBox x:Name="SurfacePatternComboBox" Margin="5"/>
@@ -76,18 +76,14 @@
             <TabItem Header="Lignes et Contours">
                 <StackPanel Margin="10">
                     <CheckBox x:Name="ModifyLineColorCheckBox"
-                    Content="Modifier lignes et contours"/>
+                              Content="Modifier lignes et contours"/>
                     <Label Content="Couleur des lignes et contours:"/>
                     <xctk:ColorPicker x:Name="LineColorPicker"
-                            SelectedColor="Blue"
-                            Width="200" Margin="5"/>
+                                      SelectedColor="Blue"
+                                      Width="200" Margin="5"/>
                     <StackPanel Orientation="Horizontal" Margin="5">
                         <Label Content="Type de ligne :" VerticalAlignment="Center"/>
-                        <ComboBox x:Name="ProjectionLinePatternComboBox" Width="150" Margin="5">
-                            <ComboBoxItem Content="Continue"/>
-                            <ComboBoxItem Content="Pointillée"/>
-                            <ComboBoxItem Content="Mixte"/>
-                        </ComboBox>
+                        <ComboBox x:Name="ProjectionLinePatternComboBox" Width="150" Margin="5"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="5">
                         <Label Content="Épaisseur :" VerticalAlignment="Center"/>
@@ -112,13 +108,13 @@
                 <StackPanel Margin="10">
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                         <Button x:Name="SelectAllViewsButton"
-                    Content="Tout sélectionner"
-                    Click="SelectAllViewsButton_Click"/>
+                                Content="Tout sélectionner"
+                                Click="SelectAllViewsButton_Click"/>
                         <Button x:Name="DeselectAllViewsButton"
-                    Content="Tout désélectionner"
-                    Click="DeselectAllViewsButton_Click"/>
+                                Content="Tout désélectionner"
+                                Click="DeselectAllViewsButton_Click"/>
                     </StackPanel>
-                    <TreeView x:Name="ViewsTreeView" Margin="5" Height="510"/>
+                    <TreeView x:Name="ViewsTreeView" Margin="5" Height="450"/>
                 </StackPanel>
             </TabItem>
 
@@ -126,15 +122,15 @@
 
         <!-- Actions -->
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"
-                VerticalAlignment="Bottom" Margin="10">
+                    VerticalAlignment="Bottom" Margin="10">
             <Button x:Name="ApplyButton"
-              Content="Appliquer"
-              Click="Apply_Click"
-              Width="100"/>
+                    Content="Appliquer"
+                    Click="Apply_Click"
+                    Width="100"/>
             <Button x:Name="ResetButton"
-              Content="Réinitialiser"
-              Click="Reset_Click"
-              Width="100"/>
+                    Content="Réinitialiser"
+                    Click="Reset_Click"
+                    Width="100"/>
         </StackPanel>
     </Grid>
 </Window>

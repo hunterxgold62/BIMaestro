@@ -1,9 +1,8 @@
-﻿using Autodesk.Revit.Attributes;
+﻿using System;
+using System.Collections.Generic;
+using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
-using System;
-using System.Linq;
-using System.Collections.Generic;
 
 namespace Modification
 {
@@ -15,28 +14,21 @@ namespace Modification
             var uiapp = commandData.Application;
             var uidoc = uiapp.ActiveUIDocument;
             var doc = uidoc.Document;
+            var selIds = uidoc.Selection.GetElementIds();
 
-            // 1) Vérifier la sélection d’éléments
-            var selectedIds = uidoc.Selection.GetElementIds();
-            if (selectedIds.Count == 0)
+            if (selIds.Count == 0)
             {
                 TaskDialog.Show("Erreur", "Veuillez sélectionner au moins un élément avant d’appliquer une opération.");
                 return Result.Failed;
             }
 
-            // 2) Ouvrir la fenêtre de réglages
             var picker = new ColorPickerWindow(uiapp);
-            bool? result = picker.ShowDialog();
-            if (result != true)
-                return Result.Cancelled;
+            bool? ok = picker.ShowDialog();
+            if (ok != true) return Result.Cancelled;
+            if (picker.IsResetRequested) return Result.Succeeded;
 
-            // 3) Si le reset a été demandé, on termine ici
-            if (picker.IsResetRequested)
-                return Result.Succeeded;
-
-            // 4) Sinon, on applique les overrides classiques
             var views = picker.SelectedViews;
-            if (views == null || views.Count == 0)
+            if (views.Count == 0)
             {
                 TaskDialog.Show("Erreur", "Aucune vue sélectionnée.");
                 return Result.Cancelled;
@@ -49,9 +41,8 @@ namespace Modification
                 tx.Start();
                 foreach (var view in views)
                 {
-                    foreach (var id in selectedIds)
+                    foreach (var id in selIds)
                     {
-                        if (id == ElementId.InvalidElementId) continue;
                         try
                         {
                             if (picker.HideInView)
@@ -59,7 +50,14 @@ namespace Modification
                             else
                                 view.SetElementOverrides(id, ogs);
                         }
-                        catch { /* on ignore les vues non supportées */ }
+                        catch (Autodesk.Revit.Exceptions.InvalidOperationException)
+                        {
+                            // ignore vues non supportées
+                        }
+                        catch
+                        {
+                            // ignore autres erreurs
+                        }
                     }
                 }
                 tx.Commit();
