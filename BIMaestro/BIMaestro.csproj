@@ -302,10 +302,6 @@
     </Compile>
     <Compile Include="commands\Dossier famille\FamilyLoadOption.cs" />
     <Compile Include="commands\Dossier famille\LoadFamilyHandler.cs" />
-    <None Include="commands\export dwg\ExportSheetsCommand.cs" />
-    <None Include="commands\export dwg\ExportSheetsWindow.xaml.cs">
-      <DependentUpon>ExportSheetsWindow.xaml</DependentUpon>
-    </None>
     <Compile Include="commands\export dgw asynchrone\ExportSheetsCommand2.cs" />
     <Compile Include="commands\export dgw asynchrone\ExportTaskCommand.cs" />
     <Compile Include="commands\export dgw asynchrone\ExportWindow2.xaml.cs">
@@ -378,6 +374,10 @@
     <Compile Include="les couleurs\Changement auto des couleurs\Bouton de reset tabitem.cs" />
     <Compile Include="les couleurs\Changement auto des couleurs\ColoringStateManager.cs" />
     <None Include="Test\dwg to revit\ImportDwgWallsCommand.cs" />
+    <None Include="Test\export dwg\ExportSheetsCommand.cs" />
+    <None Include="Test\export dwg\ExportSheetsWindow.xaml.cs">
+      <DependentUpon>ExportSheetsWindow.xaml</DependentUpon>
+    </None>
     <Compile Include="Test\export import excel\ExportScheduleToExcel.cs" />
     <Compile Include="Test\export import excel\ImportScheduleFromExcel.cs" />
     <Compile Include="Test\page de mise à jour en direct\MiseAJourCommand.cs" />
@@ -437,10 +437,6 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
-    <None Include="commands\export dwg\ExportSheetsWindow.xaml">
-      <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
-    </None>
     <Page Include="commands\export dgw asynchrone\ExportWindow2.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -485,6 +481,10 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <None Include="Test\export dwg\ExportSheetsWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </None>
     <Page Include="Test\page de mise à jour en direct\UpdateWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -611,5 +611,6 @@
   <ItemGroup>
     <EmbeddedResource Include="Resources\export DWG.png" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

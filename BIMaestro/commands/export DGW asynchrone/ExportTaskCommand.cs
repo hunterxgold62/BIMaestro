@@ -35,9 +35,11 @@ namespace MonPluginRevit
 
             Log("=== Début ExportTaskCommand ===");
 
-            // 3) Localise le fichier de journal (.txt) le plus récent dans ce dossier
+            // 3) Localise le fichier de journal (.jrn ou .txt) le plus récent
             string journalFile = Directory
-                .GetFiles(folder, "*.txt")
+                .EnumerateFiles(folder)
+                .Where(f => f.EndsWith(".jrn", StringComparison.OrdinalIgnoreCase) ||
+                            f.EndsWith(".txt", StringComparison.OrdinalIgnoreCase))
                 .OrderByDescending(f => File.GetLastWriteTime(f))
                 .FirstOrDefault();
             if (journalFile == null)
