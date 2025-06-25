@@ -28,6 +28,7 @@ public class App : IExternalApplication
     private static readonly string logDirectory =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs");
 
+
     public Result OnStartup(UIControlledApplication application)
     {
         try

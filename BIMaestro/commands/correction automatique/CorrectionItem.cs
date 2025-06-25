@@ -21,5 +21,10 @@
         /// Identifiant de l'élément Revit source.
         /// </summary>
         public string ElementId { get; set; }
+
+        /// <summary>
+        /// Identifiant de la vue ou feuille où se trouve le texte.
+        /// </summary>
+        public string ViewId { get; set; }
     }
 }

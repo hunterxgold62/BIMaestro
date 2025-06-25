@@ -10,9 +10,8 @@ namespace MonPluginRevit
                               ref string message,
                               Autodesk.Revit.DB.ElementSet elements)
         {
-            // Lance la fenêtre maître
             var wnd = new ExportWindow(commandData);
-            wnd.ShowDialog();
+            wnd.ShowDialog();  // Fenêtre modale pour rester dans le contexte Revit
             return Result.Succeeded;
         }
     }

@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using Autodesk.Revit.UI;
+using System.Text.RegularExpressions;
 using Autodesk.Revit.DB;
 using System.IO;
 using Newtonsoft.Json;
@@ -24,7 +25,7 @@ namespace ScanTextRevit
         // Filtre courant : "", "Erreur" ou "Mineur"
         private string _currentCategoryFilter = "";
 
-        // Préférences (mode sombre)
+        // Préférences (mode sombre et autres options)
         private Preferences _preferences;
 
         // Chemin de sauvegarde des préférences
@@ -88,6 +89,7 @@ namespace ScanTextRevit
                 string uniqueKey = $"{c.ElementId}||{c.OriginalText}||{c.CorrectedText}";
                 if (!_allResults[key].Any(existing => $"{existing.ElementId}||{existing.OriginalText}||{existing.CorrectedText}" == uniqueKey))
                 {
+                    c.ViewId = ExtractIdFromKey(key);
                     _allResults[key].Add(c);
                 }
             }
@@ -117,6 +119,56 @@ namespace ScanTextRevit
         private void RefreshDisplay()
         {
             CorrectionsPanel.Children.Clear();
+            if (_currentCategoryFilter == "Repetition")
+            {
+                var groups = new Dictionary<string, Dictionary<string, CorrectionItem>>();
+                foreach (var kvp in _allResults)
+                {
+                    foreach (var item in kvp.Value)
+                    {
+                        string norm = (item.OriginalText ?? string.Empty).Trim().ToLowerInvariant();
+                        if (!groups.ContainsKey(norm))
+                            groups[norm] = new Dictionary<string, CorrectionItem>();
+                        groups[norm][kvp.Key] = item;
+                    }
+                }
+                foreach (var g in groups.Values)
+                {
+                    if (g.Count < 2)
+                        continue;
+                    var first = g.First();
+                    AddHeader(first.Key);
+                    AddCard(first.Value, g.Count, g);
+                }
+                return;
+            }
+
+            if (_preferences.HideDuplicates)
+            {
+                var groups = new Dictionary<string, Dictionary<string, CorrectionItem>>();
+                foreach (var kvp in _allResults)
+                {
+                    foreach (var item in kvp.Value)
+                    {
+                        if (!string.IsNullOrEmpty(_currentCategoryFilter) &&
+                            !item.Category.Equals(_currentCategoryFilter, StringComparison.OrdinalIgnoreCase))
+                            continue;
+
+                        string norm = (item.OriginalText ?? string.Empty).Trim().ToLowerInvariant();
+                        if (!groups.ContainsKey(norm))
+                            groups[norm] = new Dictionary<string, CorrectionItem>();
+                        if (!groups[norm].ContainsKey(kvp.Key))
+                            groups[norm][kvp.Key] = item;
+                    }
+                }
+                foreach (var g in groups.Values)
+                {
+                    var first = g.First();
+                    AddHeader(first.Key);
+                    AddCard(first.Value, g.Count, g);
+                }
+                return;
+            }
 
             foreach (var kvp in _allResults)
             {
@@ -149,7 +201,7 @@ namespace ScanTextRevit
             CorrectionsPanel.Children.Add(header);
         }
 
-        private void AddCard(CorrectionItem item)
+        private void AddCard(CorrectionItem item, int repetitionCount = 0, Dictionary<string, CorrectionItem> repetitions = null)
         {
             bool isDark = _preferences.DarkMode;
 
@@ -194,9 +246,14 @@ namespace ScanTextRevit
             {
                 correctedColor = Colors.Orange;
             }
+            string correctedLabel = "Texte corrigé : " + item.CorrectedText;
+            if (repetitionCount > 1)
+            {
+                correctedLabel += $" (x{repetitionCount})";
+            }
             TextBlock correctedText = new TextBlock
             {
-                Text = "Texte corrigé : " + item.CorrectedText,
+                Text = correctedLabel,
                 FontSize = 13,
                 FontWeight = FontWeights.Bold,
                 TextWrapping = TextWrapping.Wrap,
@@ -223,7 +280,7 @@ namespace ScanTextRevit
             // Bouton "Afficher"
             Button showButton = new Button
             {
-                Content = "Afficher",
+                Content = repetitions != null && repetitions.Count > 1 ? "Afficher ▼" : "Afficher",
                 Margin = new Thickness(10, 0, 0, 0),
                 Padding = new Thickness(5, 2, 5, 2),
                 Cursor = Cursors.Hand,
@@ -231,7 +288,24 @@ namespace ScanTextRevit
                 BorderThickness = new Thickness(1),
                 BorderBrush = isDark ? new SolidColorBrush(Color.FromRgb(120, 120, 120)) : new SolidColorBrush(Colors.Black)
             };
-            if (int.TryParse(item.ElementId?.Trim(), out int dummy))
+            if (repetitions != null && repetitions.Count > 1)
+            {
+                ContextMenu menu = new ContextMenu();
+                foreach (var kvp in repetitions)
+                {
+                    MenuItem mi = new MenuItem { Header = kvp.Key };
+                    var corr = kvp.Value;
+                    mi.Click += (s, e) => ShowElementInView(corr);
+                    menu.Items.Add(mi);
+                }
+                showButton.Click += (s, e) =>
+                {
+                    menu.PlacementTarget = showButton;
+                    menu.IsOpen = true;
+                };
+                showButton.IsEnabled = true;
+            }
+            else if (int.TryParse(item.ElementId?.Trim(), out int dummy))
             {
                 showButton.Click += (s, e) => ShowElement(item.ElementId);
                 showButton.IsEnabled = true;
@@ -239,7 +313,6 @@ namespace ScanTextRevit
             else
             {
                 showButton.IsEnabled = false;
-                // En mode sombre, pour un bouton désactivé, on force une couleur visible
                 if (isDark)
                 {
                     showButton.Foreground = new SolidColorBrush(Colors.LightGray);
@@ -323,7 +396,33 @@ namespace ScanTextRevit
                 MessageBox.Show("Erreur lors de l'affichage de l'élément : " + ex.Message, "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+        private void ShowElementInView(CorrectionItem item)
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(item.ViewId) && int.TryParse(item.ViewId, out int vId))
+                {
+                    View view = UiDoc.Document.GetElement(new ElementId(vId)) as View;
+                    if (view != null && !view.Id.Equals(UiDoc.ActiveView.Id))
+                    {
+                        UiDoc.RequestViewChange(view);
+                    }
+                }
+                ShowElement(item.ElementId);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Erreur lors de l'affichage de l'élément : " + ex.Message, "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
 
+        private string ExtractIdFromKey(string key)
+        {
+            if (string.IsNullOrWhiteSpace(key)) return "";
+            var m = Regex.Match(key, @"Id\s*(\d+)");
+            if (m.Success) return m.Groups[1].Value;
+            return "";
+        }
 
 
         // Gestion des Préférences
@@ -347,6 +446,8 @@ namespace ScanTextRevit
                 _preferences = new Preferences();
             }
             DarkModeCheckBox.IsChecked = _preferences.DarkMode;
+            HideDuplicatesCheckBox.IsChecked = _preferences.HideDuplicates;
+
         }
 
         private void SavePreferences()
@@ -393,13 +494,18 @@ namespace ScanTextRevit
             _currentCategoryFilter = "Mineur";
             RefreshDisplay();
         }
+  private void RepetitionFilterButton_Click(object sender, RoutedEventArgs e)
+        {
+            _currentCategoryFilter = "Repetition";
+            RefreshDisplay();
+        }
 
         private void ShowAllFilterButton_Click(object sender, RoutedEventArgs e)
         {
             _currentCategoryFilter = "";
             RefreshDisplay();
         }
-
+      
         private void DarkModeCheckBox_Checked(object sender, RoutedEventArgs e)
         {
             _preferences.DarkMode = true;
@@ -415,11 +521,26 @@ namespace ScanTextRevit
             SavePreferences();
             RefreshDisplay();
         }
+
+        private void HideDuplicatesCheckBox_Checked(object sender, RoutedEventArgs e)
+        {
+            _preferences.HideDuplicates = true;
+            SavePreferences();
+            RefreshDisplay();
+        }
+
+        private void HideDuplicatesCheckBox_Unchecked(object sender, RoutedEventArgs e)
+        {
+            _preferences.HideDuplicates = false;
+            SavePreferences();
+            RefreshDisplay();
+        }
     }
 
     // Classe de préférences unique
     public class Preferences
     {
         public bool DarkMode { get; set; } = false;
+        public bool HideDuplicates { get; set; } = false;
     }
 }
