@@ -36,26 +36,8 @@
     <SignAssembly>true</SignAssembly>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Aspose.Cells">
-      <Version>25.1.2</Version>
-    </PackageReference>
-    <PackageReference Include="ClosedXML">
-      <Version>0.104.2</Version>
-    </PackageReference>
-    <PackageReference Include="CustomSelectFileDlg">
-      <Version>1.0.0</Version>
-    </PackageReference>
-    <PackageReference Include="DocumentFormat.OpenXml">
-      <Version>3.2.0</Version>
-    </PackageReference>
-    <PackageReference Include="DynamoVisualProgramming.Core">
-      <Version>2.16.4.10216</Version>
-    </PackageReference>
     <PackageReference Include="EPPlus">
       <Version>7.5.3</Version>
-    </PackageReference>
-    <PackageReference Include="HtmlAgilityPack">
-      <Version>1.11.72</Version>
     </PackageReference>
     <PackageReference Include="Markdown.Xaml">
       <Version>1.0.0</Version>
@@ -66,50 +48,11 @@
     <PackageReference Include="Microsoft-WindowsAPICodePack-Shell">
       <Version>1.1.5</Version>
     </PackageReference>
-    <PackageReference Include="Microsoft.AspNetCore.SignalR">
-      <Version>1.2.0</Version>
+    <PackageReference Include="Newtonsoft.Json">
+      <Version>13.0.3</Version>
     </PackageReference>
-    <PackageReference Include="Microsoft.IO.RecyclableMemoryStream">
-      <Version>3.0.1</Version>
-    </PackageReference>
-    <PackageReference Include="Microsoft.ML">
-      <Version>4.0.1</Version>
-    </PackageReference>
-    <PackageReference Include="Microsoft.ML.DataView">
-      <Version>4.0.1</Version>
-    </PackageReference>
-    <PackageReference Include="Microsoft.Web.WebView2">
-      <Version>1.0.2957.106</Version>
-    </PackageReference>
-    <PackageReference Include="netDxf">
-      <Version>2023.11.10</Version>
-    </PackageReference>
-    <PackageReference Include="NumSharp">
-      <Version>0.30.0</Version>
-    </PackageReference>
-    <PackageReference Include="Occt.NET">
-      <Version>7.8.1.2</Version>
-    </PackageReference>
-    <PackageReference Include="OpenCASCADE.SilverHorn">
-      <Version>7.2.0-alpha</Version>
-    </PackageReference>
-    <PackageReference Include="OpenMcdf">
-      <Version>2.4.1</Version>
-    </PackageReference>
-    <PackageReference Include="Revit.AdWindows.x64">
-      <Version>2023.0.0</Version>
-    </PackageReference>
-    <PackageReference Include="SciSharp.TensorFlow.Redist">
-      <Version>2.16.0</Version>
-    </PackageReference>
-    <PackageReference Include="Syncfusion.DocIO.WPF">
-      <Version>28.1.41</Version>
-    </PackageReference>
-    <PackageReference Include="System.Memory">
-      <Version>4.6.0</Version>
-    </PackageReference>
-    <PackageReference Include="TensorFlow.NET">
-      <Version>0.150.0</Version>
+    <PackageReference Include="System.Text.Json">
+      <Version>9.0.6</Version>
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
@@ -315,16 +258,16 @@
     <Compile Include="commands\export dwg\ExportSheetsWindow.xaml.cs">
       <DependentUpon>ExportSheetsWindow.xaml</DependentUpon>
     </Compile>
-    <Compile Include="Test\automatisation de tuyaux\SelectionHelper.cs" />
-    <Compile Include="Test\automatisation de tuyaux\test avec coude qui marche moyen\ConnectPipes.cs" />
-    <Compile Include="Test\automatisation de tuyaux\V3 avec évitement des obstacles\AutoCanalisationSettingsCommand.cs" />
-    <Compile Include="Test\automatisation de tuyaux\V3 avec évitement des obstacles\ConnectTwoPipesAvoidObstacles.cs" />
-    <Compile Include="Test\bride auto\AddFlangesCommand.cs" />
-    <Compile Include="Test\Clé d%27accés\ApiLicenseValidator.cs" />
-    <Compile Include="Test\Clé d%27accés\Clé d%27accés.cs" />
-    <Compile Include="Test\Clé d%27accés\Clés d%27accés.xaml.cs">
+    <None Include="Test\automatisation de tuyaux\SelectionHelper.cs" />
+    <None Include="Test\automatisation de tuyaux\test avec coude qui marche moyen\ConnectPipes.cs" />
+    <None Include="Test\automatisation de tuyaux\V3 avec évitement des obstacles\AutoCanalisationSettingsCommand.cs" />
+    <None Include="Test\automatisation de tuyaux\V3 avec évitement des obstacles\ConnectTwoPipesAvoidObstacles.cs" />
+    <None Include="Test\bride auto\AddFlangesCommand.cs" />
+    <None Include="Test\Clé d%27accés\ApiLicenseValidator.cs" />
+    <None Include="Test\Clé d%27accés\Clé d%27accés.cs" />
+    <None Include="Test\Clé d%27accés\Clés d%27accés.xaml.cs">
       <DependentUpon>Clés d%27accés.xaml</DependentUpon>
-    </Compile>
+    </None>
     <Compile Include="commands\Dynamo\dynamo.cs" />
     <Compile Include="commands\Dynamo\ConfigureDynamoWindow.xaml.cs">
       <DependentUpon>ConfigureDynamoWindow.xaml</DependentUpon>
@@ -366,7 +309,7 @@
     <Compile Include="commands\quelle peinture\GetPaintedMaterial.cs" />
     <Compile Include="commands\Ouverture de vue sur plan\Plan dans vue.cs" />
     <Compile Include="commands\qui est le coupable\MainCommand.cs" />
-    <Compile Include="commands\renommer élément\RenameElementsCommand.cs" />
+    <Compile Include="commands\renuméroté élément\RenameElementsCommand.cs" />
     <Compile Include="commands\Vision 3D\vue sur face 3D.cs" />
     <Compile Include="commands\capture openia\ScreenCapture.cs" />
     <Compile Include="commands\capture openia\ScreenCaptureCommand.cs" />
@@ -388,26 +331,26 @@
     </None>
     <None Include="Test\export dgw asynchrone\JournalHelper.cs" />
     <None Include="Test\export dgw asynchrone\TaskDefinition.cs" />
-    <Compile Include="Test\export import excel\ExportScheduleToExcel.cs" />
-    <Compile Include="Test\export import excel\ImportScheduleFromExcel.cs" />
-    <Compile Include="Test\page de mise à jour en direct\MiseAJourCommand.cs" />
-    <Compile Include="Test\page de mise à jour en direct\UpdateWindow.xaml.cs">
+    <None Include="Test\export import excel\ExportScheduleToExcel.cs" />
+    <None Include="Test\export import excel\ImportScheduleFromExcel.cs" />
+    <None Include="Test\page de mise à jour en direct\MiseAJourCommand.cs" />
+    <None Include="Test\page de mise à jour en direct\UpdateWindow.xaml.cs">
       <DependentUpon>UpdateWindow.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="Test\popup\CommandStickmanAnimation.cs" />
-    <Compile Include="Test\popup\StickmanAnimationWindow.xaml.cs">
+    </None>
+    <None Include="Test\popup\CommandStickmanAnimation.cs" />
+    <None Include="Test\popup\StickmanAnimationWindow.xaml.cs">
       <DependentUpon>StickmanAnimationWindow.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="Test\popup\troll\CommandHearts.cs" />
-    <Compile Include="Test\popup\troll\TrollWindow.xaml.cs">
+    </None>
+    <None Include="Test\popup\troll\CommandHearts.cs" />
+    <None Include="Test\popup\troll\TrollWindow.xaml.cs">
       <DependentUpon>TrollWindow.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="Test\racourci clavier\LoadShortcutsCommand.cs" />
-    <Compile Include="Test\wtf photo\RandomImageWindow.cs" />
+    </None>
+    <None Include="Test\racourci clavier\LoadShortcutsCommand.cs" />
+    <None Include="Test\wtf photo\RandomImageWindow.cs" />
     <Compile Include="les couleurs\Changement auto des couleurs\Couleur fond d%27images papanoel.cs" />
     <Compile Include="les couleurs\ancien fonctionnement\Changement de la barre uniquement.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="commands\renommer élément\ElementRenameWindow.xaml.cs">
+    <Compile Include="commands\renuméroté élément\ElementRenameWindow.xaml.cs">
       <DependentUpon>ElementRenameWindow.xaml</DependentUpon>
     </Compile>
     <Page Include="commands\AnalysePoids\AnalysePoids.xaml">
@@ -470,7 +413,7 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
-    <Page Include="commands\renommer élément\ElementRenameWindow.xaml">
+    <Page Include="commands\renuméroté élément\ElementRenameWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -486,26 +429,26 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
-    <Page Include="Test\Clé d%27accés\Clés d%27accés.xaml">
+    <None Include="Test\Clé d%27accés\Clés d%27accés.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
-    </Page>
+    </None>
     <None Include="Test\export dgw asynchrone\ExportWindow2.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </None>
-    <Page Include="Test\page de mise à jour en direct\UpdateWindow.xaml">
+    <None Include="Test\page de mise à jour en direct\UpdateWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
-    </Page>
-    <Page Include="Test\popup\StickmanAnimationWindow.xaml">
+    </None>
+    <None Include="Test\popup\StickmanAnimationWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
-    </Page>
-    <Page Include="Test\popup\troll\TrollWindow.xaml">
+    </None>
+    <None Include="Test\popup\troll\TrollWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
-    </Page>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Resources\Purge famille32x32.png" />
@@ -620,6 +563,8 @@
   <ItemGroup>
     <EmbeddedResource Include="Resources\export DWG.png" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\Organisateur d%27éléments.png" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

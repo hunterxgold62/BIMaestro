@@ -18,8 +18,7 @@ using System.Windows;
 using System.Windows.Interop;
 using Autodesk.Revit.DB.Plumbing;
 using Autodesk.Revit.DB.Mechanical;
-using DocumentFormat.OpenXml.Spreadsheet;
-using DocumentFormat.OpenXml.Wordprocessing;
+
 
 namespace MyRevitPluginV2
 {

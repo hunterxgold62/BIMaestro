@@ -145,27 +145,55 @@ namespace ScanTextRevit
 
             if (_preferences.HideDuplicates)
             {
-                var groups = new Dictionary<string, Dictionary<string, CorrectionItem>>();
+                // Regrouper toutes les occurrences par texte pour connaître les répétitions
+                var groupsByText = new Dictionary<string, Dictionary<string, CorrectionItem>>();
                 foreach (var kvp in _allResults)
                 {
-                    foreach (var item in kvp.Value)
-                    {
-                        if (!string.IsNullOrEmpty(_currentCategoryFilter) &&
-                            !item.Category.Equals(_currentCategoryFilter, StringComparison.OrdinalIgnoreCase))
-                            continue;
+                    var filtered = string.IsNullOrEmpty(_currentCategoryFilter)
+                        ? kvp.Value
+                        : kvp.Value.Where(c => c.Category.Equals(_currentCategoryFilter, StringComparison.OrdinalIgnoreCase)).ToList();
 
+                    foreach (var item in filtered)
+                    {
                         string norm = (item.OriginalText ?? string.Empty).Trim().ToLowerInvariant();
-                        if (!groups.ContainsKey(norm))
-                            groups[norm] = new Dictionary<string, CorrectionItem>();
-                        if (!groups[norm].ContainsKey(kvp.Key))
-                            groups[norm][kvp.Key] = item;
+                        if (!groupsByText.TryGetValue(norm, out var reps))
+                        {
+                            reps = new Dictionary<string, CorrectionItem>();
+                            groupsByText[norm] = reps;
+                        }
+                        if (!reps.ContainsKey(kvp.Key))
+                            reps[kvp.Key] = item;
                     }
                 }
-                foreach (var g in groups.Values)
+
+                // Affichage : seul le premier groupe pour un texte affiche la carte, mais le menu indique les autres vues/feuilles
+                foreach (var kvp in _allResults)
                 {
-                    var first = g.First();
-                    AddHeader(first.Key);
-                    AddCard(first.Value, g.Count, g);
+                    string groupKey = kvp.Key;
+                    var filtered = string.IsNullOrEmpty(_currentCategoryFilter)
+                        ? kvp.Value
+                        : kvp.Value.Where(c => c.Category.Equals(_currentCategoryFilter, StringComparison.OrdinalIgnoreCase)).ToList();
+
+                    var toShow = new List<(CorrectionItem item, Dictionary<string, CorrectionItem> reps)>();
+                    foreach (var item in filtered)
+                    {
+                        string norm = (item.OriginalText ?? string.Empty).Trim().ToLowerInvariant();
+                        var reps = groupsByText[norm];
+                        string firstGroup = reps.Keys.First();
+                        if (firstGroup == groupKey)
+                        {
+                            toShow.Add((item, reps));
+                        }
+                    }
+
+                    if (toShow.Count > 0)
+                    {
+                        AddHeader(groupKey);
+                        foreach (var pair in toShow)
+                        {
+                            AddCard(pair.item, pair.reps.Count, pair.reps);
+                        }
+                    }
                 }
                 return;
             }

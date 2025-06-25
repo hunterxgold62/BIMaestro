@@ -235,8 +235,23 @@ namespace Modification
                     }
                     else
                     {
-                        // Ignorer les éléments sans position géométrique
-                        continue;
+                        // Utiliser le centre de la BoundingBox lorsque Location est indisponible (ex. portes de mur rideau)
+                        BoundingBoxXYZ bb = element.get_BoundingBox(null);
+                        if (bb != null)
+                        {
+                            XYZ center = (bb.Min + bb.Max) / 2;
+                            XYZ transformedLocation = worldToViewTransform.OfPoint(center);
+                            elementLocations.Add(new ElementLocation
+                            {
+                                Element = element,
+                                Location = transformedLocation
+                            });
+                        }
+                        else
+                        {
+                            // Ignorer les éléments sans position géométrique
+                            continue;
+                        }
                     }
                 }
             }
@@ -328,14 +343,20 @@ namespace Modification
             }
             else
             {
-                // Parcourir les paramètres pour trouver 'Niveau'
-                foreach (Parameter param in element.Parameters)
+                // Utiliser un paramètre intégré pour récupérer le niveau
+                Parameter levelParam = element.get_Parameter(BuiltInParameter.LEVEL_PARAM);
+                if (levelParam == null)
                 {
-                    if (param.Definition.Name == "Niveau" && param.HasValue)
-                    {
-                        levelId = param.AsElementId();
-                        break;
-                    }
+                    levelParam = element.get_Parameter(BuiltInParameter.SCHEDULE_LEVEL_PARAM);
+                }
+                if (levelParam == null)
+                {
+                    levelParam = element.get_Parameter(BuiltInParameter.FAMILY_LEVEL_PARAM);
+                }
+
+                if (levelParam != null && levelParam.HasValue)
+                {
+                    levelId = levelParam.AsElementId();
                 }
             }
 
