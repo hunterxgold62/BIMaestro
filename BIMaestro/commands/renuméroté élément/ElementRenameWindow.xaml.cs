@@ -102,19 +102,6 @@ namespace Modification
             }
         }
 
-        private bool _isNumberingEnabled;
-        public bool IsNumberingEnabled
-        {
-            get { return _isNumberingEnabled; }
-            set
-            {
-                if (_isNumberingEnabled != value)
-                {
-                    _isNumberingEnabled = value;
-                    OnPropertyChanged(nameof(IsNumberingEnabled));
-                }
-            }
-        }
 
         private bool _isSortByLevelEnabled;
         public bool IsSortByLevelEnabled
@@ -159,6 +146,7 @@ namespace Modification
         }
 
         public bool IsReset { get; private set; } // Propriété pour savoir si l'utilisateur veut réinitialiser
+        public bool IsNumberingEnabled { get; internal set; }
 
         public ElementRenamerWindow(List<string> parameters)
         {
@@ -172,10 +160,8 @@ namespace Modification
             }
 
             // Initialiser la liste des formats de numérotation
-            NumberFormats = new List<string> { "1,2,3...", "A,B,C...", "001,002,003..." };
-
+            NumberFormats = new List<string> { "1,2,3...", "A,B,C...", "001,002,003...", "0001,0002,0003..." };
             // Valeurs par défaut
-            IsNumberingEnabled = true;
             IsSortByLevelEnabled = false;
             SelectedNumberFormat = NumberFormats[0]; // "1,2,3..." par défaut
             StartNumber = "1";
@@ -206,7 +192,14 @@ namespace Modification
             else if (SelectedNumberFormat == "001,002,003...")
             {
                 StartNumber = "001";
+
             }
+
+            else if (SelectedNumberFormat == "0001,0002,0003...")
+            {
+                StartNumber = "0001";
+            }
+
             else if (SelectedNumberFormat == "A,B,C...")
             {
                 StartNumber = "A";

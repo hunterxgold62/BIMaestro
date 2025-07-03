@@ -46,6 +46,8 @@ public class App : IExternalApplication
                 WpfApp = System.Windows.Application.Current;
             }
 
+            
+
             documentSessions = new Dictionary<string, WorkSession>();
             ColoringStateManager.LoadState();
 

@@ -277,12 +277,26 @@ namespace AnalysePoidsPlugin
             foreach (var grp in groupedLinks)
             {
                 string name = grp.Key;
-                var ext = grp.First().GetType()
-                              .GetMethod("GetExternalFileReference")
-                              .Invoke(grp.First(), null) as ExternalFileReference;
-                string path = ext != null
-                    ? ModelPathUtils.ConvertModelPathToUserVisiblePath(ext.GetAbsolutePath())
-                    : "";
+
+                // La réflexion sur GetExternalFileReference peut échouer selon les versions
+                // de Revit ou le type de lien. On sécurise l'appel pour éviter toute
+                // TargetInvocationException qui bloquerait l'ouverture de la fenêtre WPF.
+                string path = string.Empty;
+                try
+                {
+                    var method = grp.First().GetType().GetMethod("GetExternalFileReference");
+                    if (method != null)
+                    {
+                        var ext = method.Invoke(grp.First(), null) as ExternalFileReference;
+                        if (ext != null)
+                            path = ModelPathUtils.ConvertModelPathToUserVisiblePath(ext.GetAbsolutePath());
+                    }
+                }
+                catch
+                {
+                    // On ignore l'erreur et on comptera sur l'index de fichiers pour retrouver le chemin
+                    path = string.Empty;
+                }
                 double mo = (!string.IsNullOrEmpty(path) && File.Exists(path))
                             ? new FileInfo(path).Length / 1024.0 / 1024.0 : 0;
 

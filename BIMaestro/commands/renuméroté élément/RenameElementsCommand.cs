@@ -129,25 +129,26 @@ namespace Modification
                                 {
                                     string numberString = "";
 
-                                    if (renamerWindow.IsNumberingEnabled)
+                                    if (isNumeric)
                                     {
-                                        if (isNumeric)
+                                        if (renamerWindow.SelectedNumberFormat == "0001,0002,0003...")
                                         {
-                                            if (renamerWindow.SelectedNumberFormat == "001,002,003...")
-                                            {
-                                                numberString = currentNumber.ToString("D3");
-                                            }
-                                            else
-                                            {
-                                                numberString = currentNumber.ToString();
-                                            }
-                                            currentNumber++;
+                                            numberString = currentNumber.ToString("D4");
                                         }
-                                        else if (isAlphabetic)
+                                        else if (renamerWindow.SelectedNumberFormat == "001,002,003...")
                                         {
-                                            numberString = NumberToLetters(currentNumber);
-                                            currentNumber++;
+                                            numberString = currentNumber.ToString("D3");
                                         }
+                                        else
+                                        {
+                                            numberString = currentNumber.ToString();
+                                        }
+                                        currentNumber++;
+                                    }
+                                    else if (isAlphabetic)
+                                    {
+                                        numberString = NumberToLetters(currentNumber);
+                                        currentNumber++;
                                     }
 
                                     string newValue = prefix + numberString + suffix;
@@ -157,6 +158,7 @@ namespace Modification
                         }
 
                         tx.Commit();
+                    
                     }
                     catch (Exception ex)
                     {
