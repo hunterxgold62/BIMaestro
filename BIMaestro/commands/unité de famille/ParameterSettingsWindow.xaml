@@ -1,0 +1,79 @@
+﻿<Window x:Class="YourNamespace.ParameterSettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Unités"
+        Height="450" Width="600"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanMinimize"
+        FontFamily="Segoe UI" FontSize="12">
+
+    <!-- Définition des styles utilisés par ce Window -->
+    <Window.Resources>
+        <!-- Style pour centrer le texte dans la colonne Décimales -->
+        <Style x:Key="CenterTextStyle" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+    </Window.Resources>
+
+    <DockPanel Margin="8">
+        <!-- DataGrid principal -->
+        <DataGrid x:Name="dgPrefs"
+              ItemsSource="{Binding Preferences}"
+              AutoGenerateColumns="False"
+              CanUserAddRows="False"
+              HeadersVisibility="Column"
+              GridLinesVisibility="None"
+              RowHeight="28"
+              ColumnHeaderHeight="30"
+              AlternatingRowBackground="{x:Null}"
+              DockPanel.Dock="Top"
+              Margin="0,0,0,8">
+            <DataGrid.Columns>
+                <!-- Colonne Unités -->
+                <DataGridTextColumn Header="Unités"
+                            Binding="{Binding SpecType}"
+                            IsReadOnly="True"
+                            Width="2*"/>
+                <!-- Colonne Format (combo) -->
+                <DataGridTemplateColumn Header="Format" Width="3*">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <ComboBox ItemsSource="{Binding UnitOptions}"
+                        SelectedItem="{Binding SelectedUnit, Mode=TwoWay}"
+                        VerticalAlignment="Center"
+                        Padding="2"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <!-- Colonne Décimales, texte centré via le style -->
+                <DataGridTextColumn Header="Décimales"
+                            Binding="{Binding Accuracy, Mode=TwoWay, StringFormat=N3}"
+                            Width="*"
+                            ElementStyle="{StaticResource CenterTextStyle}"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- Regroupement des chiffres/symboles -->
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+            <TextBlock Text="Regroup. des chiffres/symboles :"
+                 VerticalAlignment="Center"
+                 FontWeight="SemiBold"/>
+            <ComboBox ItemsSource="{Binding GroupingOptions}"
+                SelectedItem="{Binding SelectedGrouping, Mode=TwoWay}"
+                Width="240" Margin="8,0,0,0"/>
+        </StackPanel>
+
+        <!-- Boutons du bas -->
+        <StackPanel Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                DockPanel.Dock="Bottom"
+                Margin="0,8,0,0">
+            <Button Content="OK" Width="80" Margin="4,0"
+              Click="OnSaveClick"/>
+            <Button Content="Annuler" Width="80" Margin="4,0"
+              Click="OnCancelClick"/>
+            <Button Content="Aide" Width="80" Margin="4,0"
+              Click="OnHelpClick"/>
+        </StackPanel>
+    </DockPanel>
+</Window>

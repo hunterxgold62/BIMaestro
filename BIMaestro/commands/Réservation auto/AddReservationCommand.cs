@@ -60,6 +60,8 @@ namespace Modification
                 bool multiEnabled = window.MultiEnabled;
                 var objType = window.SelectedObjectType;
                 var symbol = window.SelectedReservationSymbol;
+                bool reservationsCreated = false;
+                bool userCancelled = false;
 
                 if (symbol == null)
                 {
@@ -114,6 +116,7 @@ namespace Modification
                                 catch
                                 {
                                     trans.RollBack();
+                                    userCancelled = true;
                                     break;
                                 }
 
@@ -133,6 +136,7 @@ namespace Modification
                                 catch
                                 {
                                     trans.RollBack();
+                                    userCancelled = true;
                                     break;
                                 }
 
@@ -140,6 +144,7 @@ namespace Modification
                                 if (wall == null)
                                 {
                                     trans.RollBack();
+                                    userCancelled = true;
                                     TaskDialog.Show("Erreur", "Veuillez sélectionner un mur valide.");
                                     break;
                                 }
@@ -155,6 +160,7 @@ namespace Modification
                                     doc, wall, symbol, pipes, normeEnabled, level);
 
                                 trans.Commit();
+                                userCancelled = true;
                             }
                             else
                             {
@@ -186,7 +192,10 @@ namespace Modification
                                     if (tdErr.Show() == TaskDialogResult.Yes)
                                         continue;
                                     else
+                                    {
+                                        userCancelled = true;
                                         break;
+                                    }
                                 }
 
                                 // 2) Sélection du mur
@@ -216,7 +225,10 @@ namespace Modification
                                     if (tdErr.Show() == TaskDialogResult.Yes)
                                         continue;
                                     else
+                                    {
+                                        userCancelled = true;
                                         break;
+                                    }
                                 }
 
                                 // 3) Intersection de bounding boxes
@@ -234,7 +246,10 @@ namespace Modification
                                     if (tdErr.Show() == TaskDialogResult.Yes)
                                         continue;
                                     else
+                                    {
+                                        userCancelled = true;
                                         break;
+                                    }
                                 }
 
                                 var bbIntersect = IntersectBoundingBoxes(bbWall, bbElem);
@@ -250,7 +265,10 @@ namespace Modification
                                     if (tdErr.Show() == TaskDialogResult.Yes)
                                         continue;
                                     else
+                                    {
+                                        userCancelled = true;
                                         break;
+                                    }
                                 }
 
                                 // 4) Centre et niveau
@@ -290,6 +308,8 @@ namespace Modification
                                 {
                                     Parameter pH = fiRes.LookupParameter("Hauteur");
                                     Parameter pL = fiRes.LookupParameter("Largeur");
+                                    Parameter pHCom = fiRes.LookupParameter("COM_Hauteur");
+                                    Parameter pLCom = fiRes.LookupParameter("COM_Largeur");
 
                                     if (objType == ExtendedReservationWindow.ObjectType.Canalisation
                                      || objType == ExtendedReservationWindow.ObjectType.Gaine)
@@ -299,7 +319,9 @@ namespace Modification
                                             d = RoundToNearest50mm(d);
 
                                         if (pH != null && !pH.IsReadOnly) pH.Set(d);
+                                        if (pHCom != null && !pHCom.IsReadOnly) pHCom.Set(d);
                                         if (pL != null && !pL.IsReadOnly) pL.Set(d);
+                                        if (pLCom != null && !pLCom.IsReadOnly) pLCom.Set(d);
                                     }
                                     else
                                     {
@@ -311,11 +333,14 @@ namespace Modification
                                             h = RoundToNearest10cm(h);
                                         }
                                         if (pL != null && !pL.IsReadOnly) pL.Set(w);
+                                        if (pLCom != null && !pLCom.IsReadOnly) pLCom.Set(w);
                                         if (pH != null && !pH.IsReadOnly) pH.Set(h);
+                                        if (pHCom != null && !pHCom.IsReadOnly) pHCom.Set(h);
                                     }
                                 }
 
                                 trans.Commit();
+                                reservationsCreated = true;
                             }
                         }
 
@@ -426,14 +451,18 @@ namespace Modification
                             pDiam.Set(finalDiam);
                     }
                     else
-                    {
-                        Parameter pH = fiRes.LookupParameter("Hauteur");
-                        Parameter pL = fiRes.LookupParameter("Largeur");
-                        if (pH != null && !pH.IsReadOnly) pH.Set(finalDiam);
-                        if (pL != null && !pL.IsReadOnly) pL.Set(finalDiam);
-                    }
+                                    {
+                                        Parameter pH = fiRes.LookupParameter("Hauteur");
+                                        Parameter pL = fiRes.LookupParameter("Largeur");
+                                        Parameter pHCom = fiRes.LookupParameter("COM_Hauteur");
+                                        Parameter pLCom = fiRes.LookupParameter("COM_Largeur");
+                                        if (pH != null && !pH.IsReadOnly) pH.Set(finalDiam);
+                                        if (pHCom != null && !pHCom.IsReadOnly) pHCom.Set(finalDiam);
+                                        if (pL != null && !pL.IsReadOnly) pL.Set(finalDiam);
+                                        if (pLCom != null && !pLCom.IsReadOnly) pLCom.Set(finalDiam);
+                                    }
 
-                    countCreated++;
+                                    countCreated++;
                 }
             }
         }
@@ -478,34 +507,42 @@ namespace Modification
                         pDiamRes.Set(finalDiam);
                 }
                 else
-                {
-                    Parameter pH = fiRes.LookupParameter("Hauteur");
-                    Parameter pL = fiRes.LookupParameter("Largeur");
-                    if (normeEnabled)
-                    {
-                        double newW = RoundToNearest10cm(w);
-                        double newH = RoundToNearest10cm(h);
-                        if (pL != null && !pL.IsReadOnly) pL.Set(newW);
-                        if (pH != null && !pH.IsReadOnly) pH.Set(newH);
-                    }
-                    else
-                    {
-                        if (pL != null && !pL.IsReadOnly) pL.Set(w);
-                        if (pH != null && !pH.IsReadOnly) pH.Set(h);
-                    }
-                }
+                                {
+                                    Parameter pH = fiRes.LookupParameter("Hauteur");
+                                    Parameter pL = fiRes.LookupParameter("Largeur");
+                                    Parameter pHCom = fiRes.LookupParameter("COM_Hauteur");
+                                    Parameter pLCom = fiRes.LookupParameter("COM_Largeur");
+                                    if (normeEnabled)
+                                    {
+                                        double newW = RoundToNearest10cm(w);
+                                        double newH = RoundToNearest10cm(h);
+                                        if (pL != null && !pL.IsReadOnly) pL.Set(newW);
+                                        if (pLCom != null && !pLCom.IsReadOnly) pLCom.Set(newW);
+                                        if (pH != null && !pH.IsReadOnly) pH.Set(newH);
+                                        if (pHCom != null && !pHCom.IsReadOnly) pHCom.Set(newH);
+                                    }
+                                    else
+                                    {
+                                        if (pL != null && !pL.IsReadOnly) pL.Set(w);
+                                        if (pLCom != null && !pLCom.IsReadOnly) pLCom.Set(w);
+                                        if (pH != null && !pH.IsReadOnly) pH.Set(h);
+                                        if (pHCom != null && !pHCom.IsReadOnly) pHCom.Set(h);
+                                    }
+                                }
                 countCreated++;
             }
         }
 
         trans.Commit();
-        TaskDialog.Show("Réservations créées",
+                        if (countCreated > 0) reservationsCreated = true;
+                        TaskDialog.Show("Réservations créées",
             $"Nombre total de réservations placées : {countCreated}");
     }
 }
 
                 // 4) Exécution du script Dynamo (si coché)
-                if (dynamoAutoEnabled)
+                if (dynamoAutoEnabled && !userCancelled)
+                    if (dynamoAutoEnabled)
                 {
                     string journalDynamoPath = @"P:\0-Boîte à outils Revit\1-Dynamo\CML_Arases réservations_par niveau_V24.dyn";
                     if (!File.Exists(journalDynamoPath))
@@ -654,8 +691,12 @@ namespace Modification
             // 10) Affectation aux paramètres famille
             var pW = fi.LookupParameter("Largeur");
             var pH = fi.LookupParameter("Hauteur");
+            var pWCom = fi.LookupParameter("COM_Largeur");
+            var pHCom = fi.LookupParameter("COM_Hauteur");
             if (pW != null && !pW.IsReadOnly) pW.Set(widthRaw);
+            if (pWCom != null && !pWCom.IsReadOnly) pWCom.Set(widthRaw);
             if (pH != null && !pH.IsReadOnly) pH.Set(heightRaw);
+            if (pHCom != null && !pHCom.IsReadOnly) pHCom.Set(heightRaw);
         }
 
 

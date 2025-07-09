@@ -260,6 +260,20 @@
     <Compile Include="commands\export dwg\ExportSheetsWindow.xaml.cs">
       <DependentUpon>ExportSheetsWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="commands\export import excel\ExcelScheduleCommand.cs" />
+    <Compile Include="commands\purge\CleanupWindow.xaml.cs">
+      <DependentUpon>CleanupWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\purge\CombinedCleanupCommand.cs" />
+    <Compile Include="commands\purge\DeleteUnplacedViewsCommand.cs" />
+    <Compile Include="commands\purge\DeleteUnusedFamiliesCommand.cs" />
+    <Compile Include="commands\purge\DeleteUnusedSchedulesCommand.cs" />
+    <Compile Include="commands\purge\sup de famille forte.cs" />
+    <Compile Include="commands\unité de famille\ParameterSettingsCommand.cs" />
+    <Compile Include="commands\unité de famille\UpdateProjectUnitsCommand.cs" />
+    <Compile Include="commands\unité de famille\ParameterSettingsWindow.xaml.cs">
+      <DependentUpon>ParameterSettingsWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Themes\app.xaml.cs">
       <DependentUpon>app.xaml</DependentUpon>
     </Compile>
@@ -339,8 +353,6 @@
     </None>
     <None Include="Test\export dgw asynchrone\JournalHelper.cs" />
     <None Include="Test\export dgw asynchrone\TaskDefinition.cs" />
-    <None Include="Test\export import excel\ExportScheduleToExcel.cs" />
-    <None Include="Test\export import excel\ImportScheduleFromExcel.cs" />
     <None Include="Test\page de mise à jour en direct\MiseAJourCommand.cs" />
     <None Include="Test\page de mise à jour en direct\UpdateWindow.xaml.cs">
       <DependentUpon>UpdateWindow.xaml</DependentUpon>
@@ -421,6 +433,10 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <Page Include="commands\purge\CleanupWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="commands\renuméroté élément\ElementRenameWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -457,6 +473,10 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </None>
+    <Page Include="commands\unité de famille\ParameterSettingsWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="Themes\app.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -598,6 +618,11 @@
   <ItemGroup>
     <EmbeddedResource Include="Resources\Organisateur d%27éléments.png" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\export import Excel.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\purge.png" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
