@@ -46,13 +46,15 @@ namespace Modification
         // Dès que l'utilisateur change type ou famille, on active/désactive "Multi"
         private void OnCriteriaChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
-            bool isCanal = (comboObjectType.SelectedItem as string) == "Canalisation";
+            var typeSel = comboObjectType.SelectedItem as string;
+            bool isCanal = typeSel == "Canalisation";
+            bool isAutre = typeSel == "Autre";
             var fam = comboFamily.SelectedItem as FamilySymbol;
             bool isRect = fam != null &&
                           (fam.Name.IndexOf("rect", System.StringComparison.OrdinalIgnoreCase) >= 0
                         || fam.Family.Name.IndexOf("rect", System.StringComparison.OrdinalIgnoreCase) >= 0);
 
-            chkMulti.IsEnabled = isCanal && isRect;
+            chkMulti.IsEnabled = (isCanal || isAutre) && isRect;
             if (!chkMulti.IsEnabled)
                 chkMulti.IsChecked = false;
         }

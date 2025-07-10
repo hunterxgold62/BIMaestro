@@ -269,11 +269,8 @@
     <Compile Include="commands\purge\DeleteUnusedFamiliesCommand.cs" />
     <Compile Include="commands\purge\DeleteUnusedSchedulesCommand.cs" />
     <Compile Include="commands\purge\sup de famille forte.cs" />
-    <Compile Include="commands\unité de famille\ParameterSettingsCommand.cs" />
+    <Compile Include="commands\unité de famille\ExportProjectUnitsCommand.cs" />
     <Compile Include="commands\unité de famille\UpdateProjectUnitsCommand.cs" />
-    <Compile Include="commands\unité de famille\ParameterSettingsWindow.xaml.cs">
-      <DependentUpon>ParameterSettingsWindow.xaml</DependentUpon>
-    </Compile>
     <Compile Include="Themes\app.xaml.cs">
       <DependentUpon>app.xaml</DependentUpon>
     </Compile>
@@ -473,10 +470,6 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </None>
-    <Page Include="commands\unité de famille\ParameterSettingsWindow.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
     <Page Include="Themes\app.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>

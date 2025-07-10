@@ -1,9 +1,8 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
-using System.Collections.Generic;
 using System.Drawing;
-using System.Globalization;
+using System.Text.RegularExpressions;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
@@ -22,9 +21,10 @@ namespace MyRevitAddin
                               ref string message,
                               ElementSet elements)
         {
-            var uiDoc = cmdData.Application.ActiveUIDocument;
-            var doc = uiDoc.Document;
+            UIDocument uiDoc = cmdData.Application.ActiveUIDocument;
+            Document doc = uiDoc.Document;
 
+            // Choix Export ou Import
             var dlg = new TaskDialog("Excel Nomenclature")
             {
                 MainInstruction = "Que voulez-vous faire ?",
@@ -32,10 +32,11 @@ namespace MyRevitAddin
             };
             dlg.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Exporter une nomenclature");
             dlg.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, "Importer depuis Excel");
+            var res = dlg.Show();
 
-            if (dlg.Show() == TaskDialogResult.CommandLink1)
+            if (res == TaskDialogResult.CommandLink1)
                 ExportSchedule(doc);
-            else
+            else if (res == TaskDialogResult.CommandLink2)
                 ImportSchedule(cmdData.Application, doc);
 
             return Result.Succeeded;
@@ -43,182 +44,148 @@ namespace MyRevitAddin
 
         private void ExportSchedule(Document doc)
         {
-            // 1) Sélection de la vue Schedule
+            // 1) Liste des vues nomenclatures
             var schedules = new FilteredElementCollector(doc)
                 .OfClass(typeof(ViewSchedule))
                 .Cast<ViewSchedule>()
                 .ToList();
 
-            if (!schedules.Any())
-            {
-                TaskDialog.Show("Erreur", "Aucune nomenclature trouvée.");
-                return;
-            }
-
-            var combo = new WF.ComboBox
-            {
-                DropDownStyle = WF.ComboBoxStyle.DropDownList,
-                Width = 300
-            };
+            // 2) Sélection de la nomenclature
+            var combo = new WF.ComboBox { DropDownStyle = WF.ComboBoxStyle.DropDownList, Width = 300 };
             schedules.ForEach(vs => combo.Items.Add(vs.Name));
             combo.SelectedIndex = 0;
-
             using (var form = new WF.Form { Text = "Sélectionnez une nomenclature", Width = 350, Height = 120 })
             {
                 form.Controls.Add(combo);
-                var ok = new WF.Button
-                {
-                    Text = "OK",
-                    DialogResult = WF.DialogResult.OK,
-                    Dock = WF.DockStyle.Bottom
-                };
+                var ok = new WF.Button { Text = "OK", DialogResult = WF.DialogResult.OK, Dock = WF.DockStyle.Bottom };
                 form.Controls.Add(ok);
                 form.AcceptButton = ok;
                 if (form.ShowDialog() != WF.DialogResult.OK)
                     return;
             }
 
-            var vsel = schedules.First(vs => vs.Name == combo.SelectedItem.ToString());
+            var vsel = schedules.First(x => x.Name == combo.SelectedItem.ToString());
             var def = vsel.Definition;
 
-            // 2) Collecte + filtre natifs
-            var collector = new FilteredElementCollector(doc, vsel.Id)
+            // 3) Ajout du champ ElementId si nécessaire
+            var schedFields = def.GetSchedulableFields();
+            var idField = schedFields
+                .FirstOrDefault(sf => sf.ParameterId.IntegerValue == (int)BuiltInParameter.ID_PARAM);
+            bool hasId = def.GetFieldOrder()
+                .Any(fid => def.GetField(fid).ParameterId.IntegerValue == (int)BuiltInParameter.ID_PARAM);
+            if (idField != null && !hasId)
+            {
+                using (var trx = new Transaction(doc, "Ajout Champ ElementId"))
+                {
+                    trx.Start();
+                    def.AddField(idField);
+                    trx.Commit();
+                }
+                doc.Regenerate();
+                vsel = doc.GetElement(vsel.Id) as ViewSchedule;
+                def = vsel.Definition;
+            }
+
+            // 4) Collecte des éléments de la nomenclature
+            var items = new FilteredElementCollector(doc, vsel.Id)
                 .WhereElementIsNotElementType()
                 .Cast<Element>()
                 .ToList();
 
-            // On garde une copie pour l'ordre original
-            var originalList = collector.ToList();
-            var originalIndex = originalList
-                .Select((e, i) => new { id = e.Id.IntegerValue, idx = i })
-                .ToDictionary(x => x.id, x => x.idx);
+            // 5) Ordre des champs
+            var fieldOrder = def.GetFieldOrder().ToList();
 
-            // 3) Tri multi-niveau selon Tri/Regroupement
-            var elems = originalList;
-            IOrderedEnumerable<Element> ordered = null;
-            int sortCount = def.GetSortGroupFieldCount();
-
-            for (int i = 0; i < sortCount; i++)
-            {
-                var sgf = def.GetSortGroupField(i);
-                var fld = def.GetField(sgf.FieldId);
-                bool asc = sgf.SortOrder == ScheduleSortOrder.Ascending;
-
-                Func<Element, IComparable> key = e =>
-                    GetSortableAdvanced(e.LookupParameter(fld.ColumnHeading));
-
-                if (ordered == null)
-                    ordered = asc
-                        ? elems.OrderBy(key)
-                        : elems.OrderByDescending(key);
-                else
-                    ordered = asc
-                        ? ordered.ThenBy(key)
-                        : ordered.ThenByDescending(key);
-            }
-
-            if (ordered != null)
-            {
-                // 4) Critère de retour à l'ordre original Revit
-                ordered = ordered.ThenBy(e =>
-                    originalIndex.TryGetValue(e.Id.IntegerValue, out var idx) ? idx : int.MaxValue);
-                elems = ordered.ToList();
-            }
-
-            // 5) SaveFileDialog
+            // 6) Sélection du fichier
             var sfd = new WF.SaveFileDialog
             {
-                Filter = "Fichier Excel (*.xlsx)|*.xlsx",
+                Filter = "Excel (*.xlsx)|*.xlsx",
                 FileName = vsel.Name + ".xlsx"
             };
-            if (sfd.ShowDialog() != WF.DialogResult.OK) return;
+            if (sfd.ShowDialog() != WF.DialogResult.OK)
+                return;
 
-            // 6) Export EPPlus
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
-            var fi = new FileInfo(sfd.FileName);
-            if (fi.Exists) fi.Delete();
+            var fileInfo = new FileInfo(sfd.FileName);
+            if (fileInfo.Exists) fileInfo.Delete();
 
-            using (var pkg = new ExcelPackage(fi))
+            // 7) Export via EPPlus
+            using (var pkg = new ExcelPackage(fileInfo))
             {
                 var ws = pkg.Workbook.Worksheets.Add(vsel.Name);
+
+                // Police et taille
                 ws.Cells.Style.Font.Name = "Calibri";
                 ws.Cells.Style.Font.Size = 11;
 
-                // 6a) En-têtes
+                // En-têtes
                 ws.Cells[1, 1].Value = "Element Id";
                 ws.Cells[1, 1].Style.Font.Bold = true;
                 ws.Cells[1, 1].Style.Fill.PatternType = ExcelFillStyle.Solid;
                 ws.Cells[1, 1].Style.Fill.BackgroundColor.SetColor(Color.LightGray);
+                ws.Cells[1, 1].Style.Font.Color.SetColor(Color.Black);
 
-                var fieldOrder = def.GetFieldOrder().ToList();
                 for (int c = 0; c < fieldOrder.Count; c++)
                 {
-                    var fld = def.GetField(fieldOrder[c]);
+                    var heading = def.GetField(fieldOrder[c]).ColumnHeading;
                     var cell = ws.Cells[1, c + 2];
-                    cell.Value = fld.ColumnHeading;
+                    cell.Value = heading;
                     cell.Style.Font.Bold = true;
                     cell.Style.Fill.PatternType = ExcelFillStyle.Solid;
-                    cell.Style.Fill.BackgroundColor.SetColor(Color.LightGray);
+                    bool modifiable = items.Any() &&
+                                      items.First().LookupParameter(heading) is Parameter p && !p.IsReadOnly;
+                    cell.Style.Fill.BackgroundColor.SetColor(modifiable ? Color.LightGreen : Color.LightCoral);
+                    cell.Style.Font.Color.SetColor(Color.Black);
                 }
 
-                // 6b) Lignes
-                for (int r = 0; r < elems.Count; r++)
+                // Gel des volets
+                ws.View.FreezePanes(2, 1);
+
+                // Données + zébrure
+                for (int r = 0; r < items.Count; r++)
                 {
-                    var e = elems[r];
-                    ws.Cells[r + 2, 1].Value = e.Id.IntegerValue;
+                    var el = items[r];
+                    int row = r + 2;
+                    var stripe = (r % 2 == 0) ? Color.White : Color.FromArgb(242, 242, 242);
+
+                    ws.Cells[row, 1].Value = el.Id.IntegerValue;
+                    ws.Cells[row, 1, row, fieldOrder.Count + 1]
+                      .Style.Fill.PatternType = ExcelFillStyle.Solid;
+                    ws.Cells[row, 1, row, fieldOrder.Count + 1]
+                      .Style.Fill.BackgroundColor.SetColor(stripe);
 
                     for (int c = 0; c < fieldOrder.Count; c++)
                     {
-                        var fld = def.GetField(fieldOrder[c]);
-                        var prm = e.LookupParameter(fld.ColumnHeading);
-                        object val = "";
-
-                        if (prm != null)
+                        var name = def.GetField(fieldOrder[c]).ColumnHeading;
+                        var param = el.LookupParameter(name);
+                        object val = null;
+                        if (param != null)
                         {
-                            switch (prm.StorageType)
+                            switch (param.StorageType)
                             {
-                                case StorageType.Double:
-                                    double raw = prm.AsDouble();
-                                    var fmt = fld.GetFormatOptions();
-                                    var activeFmt = fmt.UseDefault
-                                        ? doc.GetUnits().GetFormatOptions(fld.GetSpecTypeId())
-                                        : fmt;
-                                    double conv = UnitUtils.ConvertFromInternalUnits(
-                                        raw, activeFmt.GetUnitTypeId());
-                                    val = Math.Round(conv, 3);
-                                    break;
-                                case StorageType.Integer:
-                                    val = prm.AsInteger();
-                                    break;
-                                case StorageType.String:
-                                    val = prm.AsString();
-                                    break;
-                                case StorageType.ElementId:
-                                    val = prm.AsElementId().IntegerValue;
-                                    break;
+                                case StorageType.Double: val = param.AsDouble(); break;
+                                case StorageType.Integer: val = param.AsInteger(); break;
+                                case StorageType.String: val = param.AsString(); break;
+                                case StorageType.ElementId: val = param.AsElementId().IntegerValue; break;
                             }
                         }
-
-                        ws.Cells[r + 2, c + 2].Value = val;
+                        ws.Cells[row, c + 2].Value = val;
                     }
-
-                    // Zebra striping
-                    var bg = (r % 2 == 0)
-                        ? Color.White
-                        : Color.FromArgb(242, 242, 242);
-                    ws.Cells[r + 2, 1, r + 2, fieldOrder.Count + 1]
-                      .Style.Fill.PatternType = ExcelFillStyle.Solid;
-                    ws.Cells[r + 2, 1, r + 2, fieldOrder.Count + 1]
-                      .Style.Fill.BackgroundColor.SetColor(bg);
                 }
 
-                // 6c) Mise en forme Tableau
+                // Masquer ID
+                ws.Column(1).Hidden = true;
+
+                // Tableau structuré
+                int totalCols = 1 + fieldOrder.Count;
+                var range = ws.Cells[1, 1, items.Count + 1, totalCols];
+                string tblName = Regex.Replace(vsel.Name, @"\W+", "_");
+                if (!char.IsLetter(tblName, 0)) tblName = "tbl" + tblName;
+                var tblEp = ws.Tables.Add(range, tblName);
+                tblEp.ShowHeader = true;
+                tblEp.TableStyle = TableStyles.Light1;
+
+                // Ajustement colonnes
                 ws.Cells[ws.Dimension.Address].AutoFitColumns();
-                var range = ws.Cells[1, 1, elems.Count + 1, fieldOrder.Count + 1];
-                var tableName = vsel.Name.Replace(" ", "_");
-                var table = ws.Tables.Add(range, tableName);
-                table.ShowHeader = true;
-                table.TableStyle = TableStyles.Light1;
 
                 pkg.Save();
             }
@@ -228,21 +195,22 @@ namespace MyRevitAddin
 
         private void ImportSchedule(UIApplication uiApp, Document doc)
         {
-            var ofd = new WF.OpenFileDialog { Filter = "Fichier Excel (*.xlsx)|*.xlsx" };
+            var ofd = new WF.OpenFileDialog { Filter = "Excel (*.xlsx)|*.xlsx" };
             if (ofd.ShowDialog() != WF.DialogResult.OK) return;
 
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
             using (var pkg = new ExcelPackage(new FileInfo(ofd.FileName)))
             {
                 var ws = pkg.Workbook.Worksheets.First();
-                int rows = ws.Dimension.End.Row, cols = ws.Dimension.End.Column;
-                var headers = Enumerable.Range(1, cols)
-                                        .Select(i => ws.Cells[1, i].Text)
-                                        .ToArray();
+                int rows = ws.Dimension.End.Row;
+                int cols = ws.Dimension.End.Column;
+                var hdrs = Enumerable.Range(1, cols)
+                                     .Select(c => ws.Cells[1, c].Text)
+                                     .ToArray();
 
-                using (var tx = new Transaction(doc, "Import Excel → Revit"))
+                using (var trx = new Transaction(doc, "Import Excel → Revit"))
                 {
-                    tx.Start();
+                    trx.Start();
                     for (int r = 2; r <= rows; r++)
                     {
                         if (!int.TryParse(ws.Cells[r, 1].Text, out int id)) continue;
@@ -251,7 +219,7 @@ namespace MyRevitAddin
 
                         for (int c = 2; c <= cols; c++)
                         {
-                            var param = e.LookupParameter(headers[c - 1]);
+                            var param = e.LookupParameter(hdrs[c - 1]);
                             if (param == null || param.IsReadOnly) continue;
                             var txt = ws.Cells[r, c].Text;
                             switch (param.StorageType)
@@ -271,36 +239,11 @@ namespace MyRevitAddin
                             }
                         }
                     }
-                    tx.Commit();
+                    trx.Commit();
                 }
             }
 
             TaskDialog.Show("Import terminé", "Les données ont été importées dans Revit.");
-        }
-
-        /// <summary>
-        /// Tri « intelligent » : convertit d’abord la valeur en double si possible,
-        /// sinon retourne la chaîne brute (pour un tri numérique correct).
-        /// </summary>
-        private IComparable GetSortableAdvanced(Parameter prm)
-        {
-            if (prm == null) return null!;
-            switch (prm.StorageType)
-            {
-                case StorageType.Double:
-                    return prm.AsDouble();
-                case StorageType.Integer:
-                    return prm.AsInteger();
-                case StorageType.String:
-                    var s = prm.AsString() ?? "";
-                    if (double.TryParse(s, NumberStyles.Any, CultureInfo.CurrentCulture, out var d))
-                        return d;
-                    return s;
-                case StorageType.ElementId:
-                    return prm.AsElementId().IntegerValue;
-                default:
-                    return prm.AsString() ?? "";
-            }
         }
     }
 }

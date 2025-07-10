@@ -99,19 +99,27 @@ namespace Modification
                             trans.Start();
                             if (!symbol.IsActive) symbol.Activate();
 
-                            // --- MULTI-SÉLECTION pour canalisations rectangulaires ---
-                            if (multiEnabled
-                                && objType == ExtendedReservationWindow.ObjectType.Canalisation
-                                && isRectangulaire)
+                            // --- MULTI-SÉLECTION pour canalisations ou autres éléments rectangulaires ---
+                            if (multiEnabled && isRectangulaire &&
+                                (objType == ExtendedReservationWindow.ObjectType.Canalisation ||
+                                 objType == ExtendedReservationWindow.ObjectType.Autre))
                             {
-                                // Sélection multiple de tuyaux
-                                IList<Reference> pipeRefs;
+                                IList<Reference> elemRefs;
                                 try
                                 {
-                                    pipeRefs = uiDoc.Selection.PickObjects(
-                                        ObjectType.Element,
-                                        new PipeSelectionFilter(),
-                                        "Sélectionnez plusieurs canalisations (CTRL+clic)");
+                                    if (objType == ExtendedReservationWindow.ObjectType.Canalisation)
+                                    {
+                                        elemRefs = uiDoc.Selection.PickObjects(
+                                            ObjectType.Element,
+                                            new PipeSelectionFilter(),
+                                            "Sélectionnez plusieurs canalisations (CTRL+clic)");
+                                    }
+                                    else
+                                    {
+                                        elemRefs = uiDoc.Selection.PickObjects(
+                                            ObjectType.Element,
+                                            "Sélectionnez plusieurs éléments (CTRL+clic)");
+                                    }
                                 }
                                 catch
                                 {
@@ -120,9 +128,10 @@ namespace Modification
                                     break;
                                 }
 
-                                var pipes = pipeRefs
+                                // Liste des éléments sélectionnés
+                                var elementsSel = elemRefs
                                     .Select(r => doc.GetElement(r))
-                                    .OfType<Pipe>()
+                                    .Where(el => el != null)
                                     .ToList();
 
                                 // Sélection du mur
@@ -155,9 +164,17 @@ namespace Modification
                                                   .Cast<Level>()
                                                   .FirstOrDefault();
 
-                                // Création de la résa multi-tuyaux selon la méthode Dynamo
-                                CreateRectangularReservationFromPipes(
-                                    doc, wall, symbol, pipes, normeEnabled, level);
+                                if (objType == ExtendedReservationWindow.ObjectType.Canalisation)
+                                {
+                                    var pipes = elementsSel.OfType<Pipe>().ToList();
+                                    CreateRectangularReservationFromPipes(
+                                        doc, wall, symbol, pipes, normeEnabled, level);
+                                }
+                                else
+                                {
+                                    CreateRectangularReservationFromElements(
+                                        doc, wall, symbol, elementsSel, normeEnabled, level);
+                                }
 
                                 trans.Commit();
                                 userCancelled = true;
@@ -689,6 +706,88 @@ namespace Modification
             }
 
             // 10) Affectation aux paramètres famille
+            var pW = fi.LookupParameter("Largeur");
+            var pH = fi.LookupParameter("Hauteur");
+            var pWCom = fi.LookupParameter("COM_Largeur");
+            var pHCom = fi.LookupParameter("COM_Hauteur");
+            if (pW != null && !pW.IsReadOnly) pW.Set(widthRaw);
+            if (pWCom != null && !pWCom.IsReadOnly) pWCom.Set(widthRaw);
+            if (pH != null && !pH.IsReadOnly) pH.Set(heightRaw);
+            if (pHCom != null && !pHCom.IsReadOnly) pHCom.Set(heightRaw);
+        }
+
+        /// <summary>
+        /// Crée une réservation rectangulaire pour plusieurs éléments génériques.
+        /// Les bounding boxes sont découpées par celle du mur puis fusionnées.
+        /// </summary>
+        private void CreateRectangularReservationFromElements(
+            Document doc,
+            Wall wall,
+            FamilySymbol symbol,
+            List<Element> elements,
+            bool normeEnabled,
+            Level level)
+        {
+            if (!symbol.IsActive) symbol.Activate();
+
+            BoundingBoxXYZ bbWall = wall.get_BoundingBox(null);
+            if (bbWall == null) return;
+
+            var clippedBbs = elements
+                .Select(e => e.get_BoundingBox(null))
+                .Where(bb => bb != null)
+                .Select(bb => IntersectBoundingBoxes(bb, bbWall))
+                .Where(bb => bb != null)
+                .ToList();
+            if (!clippedBbs.Any()) return;
+
+            double minX = clippedBbs.Min(bb => bb.Min.X);
+            double minY = clippedBbs.Min(bb => bb.Min.Y);
+            double minZ = clippedBbs.Min(bb => bb.Min.Z);
+            double maxX = clippedBbs.Max(bb => bb.Max.X);
+            double maxY = clippedBbs.Max(bb => bb.Max.Y);
+            double maxZ = clippedBbs.Max(bb => bb.Max.Z);
+
+            var bbAll = new BoundingBoxXYZ
+            {
+                Min = new XYZ(minX, minY, minZ),
+                Max = new XYZ(maxX, maxY, maxZ)
+            };
+
+            XYZ centroid = (bbAll.Min + bbAll.Max) * 0.5;
+            FamilyInstance fi = doc.Create.NewFamilyInstance(
+                centroid,
+                symbol,
+                wall,
+                level,
+                Autodesk.Revit.DB.Structure.StructuralType.NonStructural);
+
+            var locCurve = wall.Location as LocationCurve;
+            if (locCurve == null) return;
+            var line = locCurve.Curve as Line;
+            if (line == null) return;
+            XYZ wallDir = line.Direction.Normalize();
+
+            var corners = new List<XYZ>
+            {
+                new XYZ(minX, minY, minZ),
+                new XYZ(minX, maxY, minZ),
+                new XYZ(maxX, minY, minZ),
+                new XYZ(maxX, maxY, minZ)
+            };
+            var projs = corners.Select(c => c.DotProduct(wallDir)).ToList();
+            double minProj = projs.Min();
+            double maxProj = projs.Max();
+
+            double widthRaw = (maxProj - minProj) + OVERSIZE_FT;
+            double heightRaw = (maxZ - minZ) + OVERSIZE_FT;
+
+            if (normeEnabled)
+            {
+                widthRaw = RoundToNearest50mm(widthRaw);
+                heightRaw = RoundToNearest50mm(heightRaw);
+            }
+
             var pW = fi.LookupParameter("Largeur");
             var pH = fi.LookupParameter("Hauteur");
             var pWCom = fi.LookupParameter("COM_Largeur");
