@@ -10,7 +10,7 @@ using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using MessageBox = System.Windows.MessageBox;
 
-namespace MonPluginRevit
+namespace Visualisation
 {
     public partial class ExportWindow : Window
     {

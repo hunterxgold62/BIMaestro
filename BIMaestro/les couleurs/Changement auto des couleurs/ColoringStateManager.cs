@@ -15,7 +15,7 @@ using Autodesk.Revit.DB;
 using Autodesk.Revit.Attributes;
 using Color = System.Windows.Media.Color;
 
-namespace MyRevitPlugin
+namespace Couleur
 {
     [Transaction(TransactionMode.Manual)]
     public class ToggleCombinedColoringCommand : IExternalCommand

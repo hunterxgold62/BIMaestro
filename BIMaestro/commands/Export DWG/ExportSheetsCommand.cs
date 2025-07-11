@@ -1,7 +1,7 @@
 ﻿using Autodesk.Revit.UI;
 using Autodesk.Revit.Attributes;
 
-namespace MonPluginRevit
+namespace Visualisation
 {
     [Transaction(TransactionMode.Manual)]
     public class ExportSheetsCommand : IExternalCommand

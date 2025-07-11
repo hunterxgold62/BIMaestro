@@ -11,7 +11,7 @@ using Newtonsoft.Json;
 using System.Windows.Threading;
 using System.Windows.Interop;
 
-namespace AnalysePoidsPlugin
+namespace Analyse
 {
     [Transaction(TransactionMode.Manual)]
     public class CommandAnalysePoids : IExternalCommand

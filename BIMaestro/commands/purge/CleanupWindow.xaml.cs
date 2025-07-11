@@ -1,8 +1,8 @@
 ﻿// UI/CleanupWindow.xaml.cs
 using System.Windows;
 
-namespace MyRevitAddin.UI
-{
+namespace Modification
+{ 
     public partial class CleanupWindow : Window
     {
         public bool DeleteViews => ViewsCheckbox.IsChecked == true;

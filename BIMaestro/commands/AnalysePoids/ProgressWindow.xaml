@@ -1,4 +1,4 @@
-﻿<Window x:Class="AnalysePoidsPlugin.ProgressWindow"
+﻿<Window x:Class="Analyse.ProgressWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Analyse en cours" Height="150" Width="500"

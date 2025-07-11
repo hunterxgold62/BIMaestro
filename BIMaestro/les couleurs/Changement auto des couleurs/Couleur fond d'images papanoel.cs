@@ -11,7 +11,7 @@ using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 
-namespace MyRevitPlugin
+namespace Couleur
 {
     [Transaction(TransactionMode.Manual)]
     public class PapanoelCommand : IExternalCommand

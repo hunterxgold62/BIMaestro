@@ -8,7 +8,7 @@ using System.Collections.ObjectModel;
 using System.Reflection;
 using System.Windows;
 
-namespace MyRevitPlugin
+namespace Famille
 {
     [Transaction(TransactionMode.Manual)]
     public class PurgeFamilyParametersCommand : IExternalCommand

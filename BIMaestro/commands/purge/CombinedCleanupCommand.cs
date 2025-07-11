@@ -2,9 +2,8 @@
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
-using MyRevitAddin.UI;
 
-namespace MyRevitAddin.Commands
+namespace Modification
 {
     [Transaction(TransactionMode.Manual)]
     public class CombinedCleanupCommand : IExternalCommand

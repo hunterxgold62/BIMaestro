@@ -2,7 +2,7 @@
 using System.Linq;
 using System.Windows;
 
-namespace MyRevitPlugin
+namespace Famille
 {
     public partial class ParameterSelectionWindow : Window
     {

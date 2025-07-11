@@ -12,7 +12,7 @@ using OfficeOpenXml.Table;
 using WF = System.Windows.Forms;
 using Color = System.Drawing.Color;
 
-namespace MyRevitAddin
+namespace Modification
 {
     [Transaction(TransactionMode.Manual)]
     public class ExcelScheduleCommand : IExternalCommand
@@ -24,7 +24,6 @@ namespace MyRevitAddin
             UIDocument uiDoc = cmdData.Application.ActiveUIDocument;
             Document doc = uiDoc.Document;
 
-            // Choix Export ou Import
             var dlg = new TaskDialog("Excel Nomenclature")
             {
                 MainInstruction = "Que voulez-vous faire ?",
@@ -44,13 +43,11 @@ namespace MyRevitAddin
 
         private void ExportSchedule(Document doc)
         {
-            // 1) Liste des vues nomenclatures
             var schedules = new FilteredElementCollector(doc)
                 .OfClass(typeof(ViewSchedule))
                 .Cast<ViewSchedule>()
                 .ToList();
 
-            // 2) Sélection de la nomenclature
             var combo = new WF.ComboBox { DropDownStyle = WF.ComboBoxStyle.DropDownList, Width = 300 };
             schedules.ForEach(vs => combo.Items.Add(vs.Name));
             combo.SelectedIndex = 0;
@@ -67,12 +64,9 @@ namespace MyRevitAddin
             var vsel = schedules.First(x => x.Name == combo.SelectedItem.ToString());
             var def = vsel.Definition;
 
-            // 3) Ajout du champ ElementId si nécessaire
             var schedFields = def.GetSchedulableFields();
-            var idField = schedFields
-                .FirstOrDefault(sf => sf.ParameterId.IntegerValue == (int)BuiltInParameter.ID_PARAM);
-            bool hasId = def.GetFieldOrder()
-                .Any(fid => def.GetField(fid).ParameterId.IntegerValue == (int)BuiltInParameter.ID_PARAM);
+            var idField = schedFields.FirstOrDefault(sf => sf.ParameterId.IntegerValue == (int)BuiltInParameter.ID_PARAM);
+            bool hasId = def.GetFieldOrder().Any(fid => def.GetField(fid).ParameterId.IntegerValue == (int)BuiltInParameter.ID_PARAM);
             if (idField != null && !hasId)
             {
                 using (var trx = new Transaction(doc, "Ajout Champ ElementId"))
@@ -86,111 +80,154 @@ namespace MyRevitAddin
                 def = vsel.Definition;
             }
 
-            // 4) Collecte des éléments de la nomenclature
             var items = new FilteredElementCollector(doc, vsel.Id)
                 .WhereElementIsNotElementType()
                 .Cast<Element>()
                 .ToList();
 
-            // 5) Ordre des champs
+            var sortFields = def.GetSortGroupFields().ToList();
+            IOrderedEnumerable<Element> ordered = null;
+            foreach (var sf in sortFields)
+            {
+                var fieldDef = def.GetField(sf.FieldId);
+                var pid = fieldDef.ParameterId;
+                Func<Element, IComparable> keySelector = el =>
+                {
+                    var p = GetElementParameter(el, doc, pid);
+                    if (p == null)
+                    {
+                        switch (p?.StorageType ?? StorageType.String)
+                        {
+                            case StorageType.Double: return double.MaxValue;
+                            case StorageType.Integer: return int.MaxValue;
+                            default: return "~~";
+                        }
+                    }
+                    switch (p.StorageType)
+                    {
+                        case StorageType.Double:
+                            return p.AsDouble();
+                        case StorageType.Integer:
+                            return p.AsInteger();
+                        case StorageType.String:
+                            var txt = p.AsValueString();
+                            if (double.TryParse(txt, out double d)) return d;
+                            return txt;
+                        case StorageType.ElementId:
+                            return p.AsElementId().IntegerValue;
+                        default:
+                            return p.AsValueString();
+                    }
+                };
+
+                bool asc = sf.SortOrder == ScheduleSortOrder.Ascending;
+                if (ordered == null)
+                    ordered = asc ? items.OrderBy(keySelector) : items.OrderByDescending(keySelector);
+                else
+                    ordered = asc ? ordered.ThenBy(keySelector) : ordered.ThenByDescending(keySelector);
+            }
+            if (ordered != null)
+                items = ordered.ToList();
+
             var fieldOrder = def.GetFieldOrder().ToList();
 
-            // 6) Sélection du fichier
-            var sfd = new WF.SaveFileDialog
-            {
-                Filter = "Excel (*.xlsx)|*.xlsx",
-                FileName = vsel.Name + ".xlsx"
-            };
-            if (sfd.ShowDialog() != WF.DialogResult.OK)
-                return;
+            var sfd = new WF.SaveFileDialog { Filter = "Excel (*.xlsx)|*.xlsx", FileName = vsel.Name + ".xlsx" };
+            if (sfd.ShowDialog() != WF.DialogResult.OK) return;
 
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
             var fileInfo = new FileInfo(sfd.FileName);
             if (fileInfo.Exists) fileInfo.Delete();
 
-            // 7) Export via EPPlus
             using (var pkg = new ExcelPackage(fileInfo))
             {
                 var ws = pkg.Workbook.Worksheets.Add(vsel.Name);
-
-                // Police et taille
                 ws.Cells.Style.Font.Name = "Calibri";
                 ws.Cells.Style.Font.Size = 11;
 
-                // En-têtes
                 ws.Cells[1, 1].Value = "Element Id";
                 ws.Cells[1, 1].Style.Font.Bold = true;
                 ws.Cells[1, 1].Style.Fill.PatternType = ExcelFillStyle.Solid;
                 ws.Cells[1, 1].Style.Fill.BackgroundColor.SetColor(Color.LightGray);
                 ws.Cells[1, 1].Style.Font.Color.SetColor(Color.Black);
-
                 for (int c = 0; c < fieldOrder.Count; c++)
                 {
-                    var heading = def.GetField(fieldOrder[c]).ColumnHeading;
+                    var fld = def.GetField(fieldOrder[c]);
+                    var head = fld.ColumnHeading;
                     var cell = ws.Cells[1, c + 2];
-                    cell.Value = heading;
+                    cell.Value = head;
                     cell.Style.Font.Bold = true;
                     cell.Style.Fill.PatternType = ExcelFillStyle.Solid;
-                    bool modifiable = items.Any() &&
-                                      items.First().LookupParameter(heading) is Parameter p && !p.IsReadOnly;
+                    bool modifiable = GetElementParameter(items.First(), doc, fld.ParameterId) is Parameter pp && !pp.IsReadOnly;
                     cell.Style.Fill.BackgroundColor.SetColor(modifiable ? Color.LightGreen : Color.LightCoral);
                     cell.Style.Font.Color.SetColor(Color.Black);
                 }
-
-                // Gel des volets
                 ws.View.FreezePanes(2, 1);
 
-                // Données + zébrure
-                for (int r = 0; r < items.Count; r++)
+                int row = 2;
+                var prevKeys = new object[sortFields.Count];
+
+                foreach (var el in items)
                 {
-                    var el = items[r];
-                    int row = r + 2;
-                    var stripe = (r % 2 == 0) ? Color.White : Color.FromArgb(242, 242, 242);
+                    for (int i = 0; i < sortFields.Count; i++)
+                    {
+                        if (!sortFields[i].ShowHeader) continue;
+                        var fld = def.GetField(sortFields[i].FieldId);
+                        var p = GetElementParameter(el, doc, fld.ParameterId);
+                        var current = p?.AsValueString() ?? string.Empty;
+                        if (!Equals(prevKeys[i], current))
+                        {
+                            var hdrRange = ws.Cells[row, 1, row, fieldOrder.Count + 1];
+                            hdrRange.Value = current;
+                            hdrRange.Merge = false;
+                            hdrRange.Style.Font.Italic = true;
+                            hdrRange.Style.Fill.PatternType = ExcelFillStyle.Solid;
+                            hdrRange.Style.Fill.BackgroundColor.SetColor(Color.FromArgb(220, 230, 241));
+                            row++;
+                            prevKeys[i] = current;
+                            for (int j = i + 1; j < prevKeys.Length; j++) prevKeys[j] = null;
+                        }
+                    }
 
                     ws.Cells[row, 1].Value = el.Id.IntegerValue;
+                    for (int c = 0; c < fieldOrder.Count; c++)
+                    {
+                        var fld = def.GetField(fieldOrder[c]);
+                        var p = GetElementParameter(el, doc, fld.ParameterId);
+                        ws.Cells[row, c + 2].Value = p?.AsValueString();
+                    }
+                    var stripe = (row % 2 == 0) ? Color.White : Color.FromArgb(242, 242, 242);
                     ws.Cells[row, 1, row, fieldOrder.Count + 1]
                       .Style.Fill.PatternType = ExcelFillStyle.Solid;
                     ws.Cells[row, 1, row, fieldOrder.Count + 1]
                       .Style.Fill.BackgroundColor.SetColor(stripe);
-
-                    for (int c = 0; c < fieldOrder.Count; c++)
-                    {
-                        var name = def.GetField(fieldOrder[c]).ColumnHeading;
-                        var param = el.LookupParameter(name);
-                        object val = null;
-                        if (param != null)
-                        {
-                            switch (param.StorageType)
-                            {
-                                case StorageType.Double: val = param.AsDouble(); break;
-                                case StorageType.Integer: val = param.AsInteger(); break;
-                                case StorageType.String: val = param.AsString(); break;
-                                case StorageType.ElementId: val = param.AsElementId().IntegerValue; break;
-                            }
-                        }
-                        ws.Cells[row, c + 2].Value = val;
-                    }
+                    row++;
                 }
 
-                // Masquer ID
                 ws.Column(1).Hidden = true;
 
-                // Tableau structuré
-                int totalCols = 1 + fieldOrder.Count;
-                var range = ws.Cells[1, 1, items.Count + 1, totalCols];
-                string tblName = Regex.Replace(vsel.Name, @"\W+", "_");
+                var totalCols = 1 + fieldOrder.Count;
+                var tblRange = ws.Cells[1, 1, row - 1, totalCols];
+                var tblName = Regex.Replace(vsel.Name, "\\W+", "_");
                 if (!char.IsLetter(tblName, 0)) tblName = "tbl" + tblName;
-                var tblEp = ws.Tables.Add(range, tblName);
-                tblEp.ShowHeader = true;
-                tblEp.TableStyle = TableStyles.Light1;
-
-                // Ajustement colonnes
+                var table = ws.Tables.Add(tblRange, tblName);
+                table.ShowHeader = true;
+                table.TableStyle = TableStyles.Light1;
                 ws.Cells[ws.Dimension.Address].AutoFitColumns();
-
                 pkg.Save();
             }
 
             TaskDialog.Show("Terminé", $"Export créé : {sfd.FileName}");
+        }
+
+        private static Parameter GetElementParameter(Element el, Document doc, ElementId paramId)
+        {
+            if (Enum.IsDefined(typeof(BuiltInParameter), paramId.IntegerValue))
+                return el.get_Parameter((BuiltInParameter)paramId.IntegerValue);
+
+            var paramElem = doc.GetElement(paramId) as ParameterElement;
+            return paramElem != null
+                ? el.get_Parameter(paramElem.GetDefinition())
+                : null;
         }
 
         private void ImportSchedule(UIApplication uiApp, Document doc)
@@ -221,20 +258,32 @@ namespace MyRevitAddin
                         {
                             var param = e.LookupParameter(hdrs[c - 1]);
                             if (param == null || param.IsReadOnly) continue;
-                            var txt = ws.Cells[r, c].Text;
+
                             switch (param.StorageType)
                             {
                                 case StorageType.Double:
-                                    if (double.TryParse(txt, out double d)) param.Set(d);
+                                    // Lit la valeur Excel en tant que double
+                                    double userVal = ws.Cells[r, c].GetValue<double>();
+                                    // Convertit vers unités internes Revit
+                                    double internalVal = UnitUtils.ConvertToInternalUnits(
+                                        userVal,
+                                        param.GetUnitTypeId()
+                                    );
+                                    param.Set(internalVal);
                                     break;
+
                                 case StorageType.Integer:
-                                    if (int.TryParse(txt, out int i)) param.Set(i);
+                                    if (int.TryParse(ws.Cells[r, c].Text, out var i))
+                                        param.Set(i);
                                     break;
+
                                 case StorageType.String:
-                                    param.Set(txt);
+                                    param.Set(ws.Cells[r, c].Text);
                                     break;
+
                                 case StorageType.ElementId:
-                                    if (int.TryParse(txt, out int eid)) param.Set(new ElementId(eid));
+                                    if (int.TryParse(ws.Cells[r, c].Text, out var ei))
+                                        param.Set(new ElementId(ei));
                                     break;
                             }
                         }

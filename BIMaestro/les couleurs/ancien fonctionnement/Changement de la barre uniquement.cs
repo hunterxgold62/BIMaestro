@@ -9,7 +9,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Interop;
 
-namespace MyRevitPlugin
+namespace Couleur
 {
     // Appliquez l'attribut Transaction avec le mode ReadOnly
     [Transaction(TransactionMode.ReadOnly)]

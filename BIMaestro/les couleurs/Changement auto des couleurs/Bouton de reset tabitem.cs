@@ -3,7 +3,7 @@ using Autodesk.Revit.UI;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.Attributes;
 
-namespace MyRevitPlugin
+namespace Couleur
 {
     [Transaction(TransactionMode.Manual)]
     public class ResetTabItemRandomColorsCommand : IExternalCommand

@@ -9,7 +9,7 @@ using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
-namespace FamilyBrowserPlugin
+namespace Famille
 {
     public partial class FamilyBrowserWindow : Window
     {

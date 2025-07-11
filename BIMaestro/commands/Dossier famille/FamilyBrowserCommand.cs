@@ -4,7 +4,7 @@ using Autodesk.Revit.UI;
 using System;
 using System.Windows.Interop;
 
-namespace FamilyBrowserPlugin
+namespace Famille
 {
     [Transaction(TransactionMode.Manual)]
     public class FamilyBrowserCommand : IExternalCommand

@@ -5,7 +5,7 @@ using System.Linq;
 using System.Windows;
 
 
-namespace FamilyBrowserPlugin
+namespace Famille
 {
     public class LoadFamilyHandler : IExternalEventHandler
     {

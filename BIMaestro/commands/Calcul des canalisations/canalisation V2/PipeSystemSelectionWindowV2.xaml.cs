@@ -3,7 +3,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 
-namespace MyRevitPluginV2
+namespace Analyse
 {
     /// <summary>
     /// Interaction logic for PipeSystemTypeSelectionWindowV2.xaml

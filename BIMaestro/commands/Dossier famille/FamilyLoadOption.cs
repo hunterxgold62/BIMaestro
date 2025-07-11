@@ -1,6 +1,6 @@
 ﻿using Autodesk.Revit.DB;
 
-namespace FamilyBrowserPlugin
+namespace Famille
 {
     public class FamilyLoadOption : IFamilyLoadOptions
     {

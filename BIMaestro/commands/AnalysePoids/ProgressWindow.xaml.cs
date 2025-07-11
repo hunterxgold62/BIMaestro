@@ -1,6 +1,6 @@
 ﻿using System.Windows;
 
-namespace AnalysePoidsPlugin
+namespace Analyse
 {
     public partial class ProgressWindow : Window
     {

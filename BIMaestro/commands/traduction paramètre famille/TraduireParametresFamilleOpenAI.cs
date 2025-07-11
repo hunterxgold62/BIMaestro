@@ -9,7 +9,7 @@ using Newtonsoft.Json.Linq;
 using System.Linq;
 using IA;
 
-namespace MonPluginRevit
+namespace Famille
 {
     [Transaction(TransactionMode.Manual)]
     public class TraduireParametresFamilleOpenAI : IExternalCommand

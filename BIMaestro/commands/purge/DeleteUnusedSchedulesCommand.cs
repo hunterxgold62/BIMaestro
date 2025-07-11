@@ -6,7 +6,7 @@ using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 
-namespace MyRevitAddin.Commands
+namespace Modification
 {
     [Transaction(TransactionMode.Manual)]
     public class DeleteUnusedSchedulesCommand : IExternalCommand

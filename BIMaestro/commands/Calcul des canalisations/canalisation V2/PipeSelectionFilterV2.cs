@@ -20,7 +20,7 @@ using Autodesk.Revit.DB.Plumbing;
 using Autodesk.Revit.DB.Mechanical;
 
 
-namespace MyRevitPluginV2
+namespace Analyse
 {
     [Transaction(TransactionMode.ReadOnly)]
     public class PipeLengthByDiameterCommandV2 : IExternalCommand

@@ -5,7 +5,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
 
-namespace AnalysePoidsPlugin
+namespace Analyse
 {
     public partial class ResultWindow : Window
     {

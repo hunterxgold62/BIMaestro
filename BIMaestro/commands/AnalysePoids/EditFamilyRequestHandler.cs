@@ -3,7 +3,7 @@ using Autodesk.Revit.DB;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace AnalysePoidsPlugin
+namespace Analyse
 {
     public class SelectionRequestHandler : IExternalEventHandler
     {

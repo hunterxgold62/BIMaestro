@@ -5,7 +5,7 @@ using System.Linq;
 using System.Collections.Generic;
 using Autodesk.Revit.UI.Selection;
 
-namespace MyRevitPlugin
+namespace Analyse
 {
     [Autodesk.Revit.Attributes.Transaction(Autodesk.Revit.Attributes.TransactionMode.Manual)]
     public class MainCommand : IExternalCommand

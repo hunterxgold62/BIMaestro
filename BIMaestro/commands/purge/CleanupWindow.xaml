@@ -1,5 +1,5 @@
 ﻿<!-- UI/CleanupWindow.xaml -->
-<Window x:Class="MyRevitAddin.UI.CleanupWindow"
+<Window x:Class="Modification.CleanupWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Nettoyage du projet" Height="260" Width="340"

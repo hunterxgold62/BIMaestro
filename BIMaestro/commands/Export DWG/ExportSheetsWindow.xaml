@@ -1,4 +1,4 @@
-﻿<Window x:Class="MonPluginRevit.ExportWindow"
+﻿<Window x:Class="Visualisation.ExportWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Export DWG par feuille" Height="180" Width="480"
