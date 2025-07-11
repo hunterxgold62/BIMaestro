@@ -1,7 +1,7 @@
 # 🎼 BIMaestro
 
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
-![Revit Version](https://img.shields.io/badge/Revit-2023/24-blue)
+![Revit Version](https://img.shields.io/badge/Revit-2023/24/25-blue)
 ![Status](https://img.shields.io/badge/status-actif-green)
 
 **BIMaestro** est un plugin Revit open source destiné à améliorer la productivité des dessinateurs/projeteurs.  
@@ -35,12 +35,16 @@ productivité, standardisation, intelligence artificielle et ergonomie au cœur 
 - **Réorienter Vue 3D** selon une face sélectionnée
 - **Information d’élément** : matériaux, surface, volume, etc.
 - **Export Nomenclature** : vers Excel ou PDF
+- **Export DWG** : export automatique de vues ou feuilles
+
 
 ### 🛠️ Modification
 - **Changer couleur élément** : personnalisation des vues
 - **Organisateur d’Éléments** : renommage intelligent dans le sens de lecture de la vue active
 - **Auto Réservation** : crée des réservations automatiques pour tout objet traversant un mur (pas limité au MEP)
 - **Outils Canalisations** : lancement de scripts Dynamo spécifiques
+- **Gestion Excel** : export ou import de nomenclatures
+- **Purge du plan** : nettoyage des vues, familles et nomenclatures inutiles
 
 ### 🤖 Outils IA
 - **Chatbot + élément** : assistant IA avec accès aux éléments Revit
@@ -57,6 +61,7 @@ productivité, standardisation, intelligence artificielle et ergonomie au cœur 
 - **Purge des paramètres** inutiles dans une famille
 - **Navigateur de Familles** avec aperçus et favoris
 - **Traduction de paramètre IA** : via OpenAI, noms traduits automatiquement
+- **Changement d'unité** : import/export des unités du projet
 
 ### 🎨 Couleur du projet
 - **couleur Oui/Non** : active la colorisation dynamique du projet
@@ -67,7 +72,7 @@ productivité, standardisation, intelligence artificielle et ergonomie au cœur 
 
 ## 🖼️ Aperçu du Ruban
 
-![Aperçu du ruban BIMaestro](https://github.com/user-attachments/assets/186aa385-4e78-4491-9df8-9cb7f3fde479)
+<img width="2256" height="122" alt="image" src="https://github.com/user-attachments/assets/833cfa08-d57b-4e83-acb6-292570cade42" />
 
 > 📷 *Capture du ruban Revit personnalisable de BIMaestro.*
 
