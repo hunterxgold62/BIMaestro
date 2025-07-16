@@ -19,8 +19,8 @@ namespace Modification
             ICollection<ElementId> selectedIds = uiDoc.Selection.GetElementIds();
             if (selectedIds.Count == 0)
             {
-                message = "Aucun élément sélectionné.";
-                return Result.Failed;
+                TaskDialog.Show("Sélection", "Aucun élément sélectionné. Veuillez sélectionner des éléments dans Revit.");
+                return Result.Cancelled;
             }
 
             // Récupérer les paramètres texte modifiables du premier élément sélectionné

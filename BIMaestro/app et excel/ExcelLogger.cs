@@ -16,7 +16,8 @@ public static class ExcelLogger
         try
         {
             // Définition du contexte de licence pour EPPlus
-            ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+            ExcelPackage.License.SetNonCommercialPersonal("OK1");
+
 
             // Dossier RevitLogs dans Mes Documents
             string logDirectory = Path.Combine(

@@ -134,7 +134,8 @@ namespace Modification
             var sfd = new WF.SaveFileDialog { Filter = "Excel (*.xlsx)|*.xlsx", FileName = vsel.Name + ".xlsx" };
             if (sfd.ShowDialog() != WF.DialogResult.OK) return;
 
-            ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+            ExcelPackage.License.SetNonCommercialPersonal("OK1");
+
             var fileInfo = new FileInfo(sfd.FileName);
             if (fileInfo.Exists) fileInfo.Delete();
 
@@ -235,7 +236,8 @@ namespace Modification
             var ofd = new WF.OpenFileDialog { Filter = "Excel (*.xlsx)|*.xlsx" };
             if (ofd.ShowDialog() != WF.DialogResult.OK) return;
 
-            ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+            ExcelPackage.License.SetNonCommercialPersonal("OK1");
+
             using (var pkg = new ExcelPackage(new FileInfo(ofd.FileName)))
             {
                 var ws = pkg.Workbook.Worksheets.First();

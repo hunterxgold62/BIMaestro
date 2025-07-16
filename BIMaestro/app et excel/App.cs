@@ -1,12 +1,17 @@
-﻿using Autodesk.Revit.UI;
-using Autodesk.Revit.DB;
+﻿using Autodesk.Revit.DB;
+using Autodesk.Revit.DB.Events;
+using Autodesk.Revit.UI;
 using Autodesk.Revit.UI.Events;
+using Couleur;
+using IA;
+using MyRevitPlugin;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using Couleur;
-using IA;
-using Autodesk.Revit.DB.Events;
+using System.Linq;
+using System.Net.NetworkInformation;
+using System.Security.Cryptography;
+using System.Text;
 
 public class App : IExternalApplication
 {
@@ -33,6 +38,12 @@ public class App : IExternalApplication
     {
         try
         {
+
+            // 1) Licence « serveur‑first » : pas de contournement en changeant l'heure du PC
+            string licenseKey = Environment.UserName;
+            string machineId = LicenseManager.ComputeMachineId();
+            LicenseManager.ValidateOrThrow(licenseKey, machineId);
+
             // Stocker l'instance de UIControlledApplication
             UIControlledApp = application;
 
@@ -74,6 +85,7 @@ public class App : IExternalApplication
         {
             LogError("OnStartup", ex);
             TaskDialog.Show("Erreur OnStartup", ex.ToString());
+            TaskDialog.Show("Erreur de licence", ex.Message);
             return Result.Failed;
         }
     }
@@ -214,10 +226,13 @@ public class App : IExternalApplication
         }
     }
 
-    /// <summary>
+  
+
+ /// <summary>
     /// On ouvre une session pour ce document, 
     /// et on log "Ouvert" via ExcelLogger.
     /// </summary>
+    ///
     private void StartSession(Document document)
     {
         if (!documentSessions.ContainsKey(document.Title))

@@ -47,10 +47,9 @@ namespace Visualisation
                     uidoc.RefreshActiveView();
                     return Result.Succeeded;
                 }
-                catch (OperationCanceledException)
+                catch (Autodesk.Revit.Exceptions.OperationCanceledException)
                 {
-                    // Gestion de l'annulation par l'utilisateur
-                    TaskDialog.Show("Annulé", "Opération annulée. Pas de souci, tu peux réessayer à tout moment !");
+                    // Annulation silencieuse si l'utilisateur appuie sur Échap sans rien sélectionner
                     return Result.Cancelled;
                 }
                 catch (Autodesk.Revit.Exceptions.InvalidOperationException ex)

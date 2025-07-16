@@ -43,7 +43,8 @@ namespace Analyse
             var cache = LoadCache(cacheFile);
 
             // 3. Lancer l'indexation disque en tâche de fond
-            var indexTask = Task.Run(() => BuildFileIndex(doc));
+            //    (se fait en parallèle de l'analyse des familles)
+            var indexTask = BuildFileIndexAsync(doc);
 
             // 4. Analyser les familles
             var famInfos = AnalyseFamilles(doc, commandData, cache, cacheFile);
@@ -95,6 +96,12 @@ namespace Analyse
                 catch { }
             });
             return idx.ToDictionary(k => k.Key, v => v.Value, StringComparer.OrdinalIgnoreCase);
+        }
+
+        // Lance l'indexation dans un thread séparé
+        private Task<Dictionary<string, string>> BuildFileIndexAsync(Document doc)
+        {
+            return Task.Run(() => BuildFileIndex(doc));
         }
 
         // ==== Analyse des familles ====

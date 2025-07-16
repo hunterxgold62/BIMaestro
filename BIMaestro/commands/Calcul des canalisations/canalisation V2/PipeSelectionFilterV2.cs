@@ -475,29 +475,32 @@ namespace Analyse
                 if (filterBySystemType && selectedSystemTypes.Count == 1)
                     singleSystemType = selectedSystemTypes[0];
 
-                // Export vers Excel (la méthode retourne le chemin complet du fichier)
-                string excelFilePath = ExportToExcel(
-    doc.Title,
-    pipeLengths,
-    pipeFittingLengths,
-    ductLengths,
-    ductFittingLengths,
-    includeDucts,
-    elbowCounts,
-    teeCounts,
-    dnToDiameters,
-    pipeVolumes,
-    singleSystemType,
-    networkAggregates,
-    pipeAccessoryCounts,
-    networkColors);
-
-
-                // À la fin, proposer d'ouvrir le fichier
-                if (MessageBox.Show("Les résultats ont été exportés vers Excel avec succès.\nVoulez-vous ouvrir le fichier ?",
-                                    "Succès", MessageBoxButton.YesNo, MessageBoxImage.Information) == MessageBoxResult.Yes)
+                // Export vers Excel seulement si l'option est cochée
+                if (exportToExcel)
                 {
-                    Process.Start(new ProcessStartInfo(excelFilePath) { UseShellExecute = true });
+                    // La méthode retourne le chemin complet du fichier généré
+                    string excelFilePath = ExportToExcel(
+                        doc.Title,
+                        pipeLengths,
+                        pipeFittingLengths,
+                        ductLengths,
+                        ductFittingLengths,
+                        includeDucts,
+                        elbowCounts,
+                        teeCounts,
+                        dnToDiameters,
+                        pipeVolumes,
+                        singleSystemType,
+                        networkAggregates,
+                        pipeAccessoryCounts,
+                        networkColors);
+
+                    // À la fin, proposer d'ouvrir le fichier
+                    if (MessageBox.Show("Les résultats ont été exportés vers Excel avec succès.\nVoulez-vous ouvrir le fichier ?",
+                                        "Succès", MessageBoxButton.YesNo, MessageBoxImage.Information) == MessageBoxResult.Yes)
+                    {
+                        Process.Start(new ProcessStartInfo(excelFilePath) { UseShellExecute = true });
+                    }
                 }
 
                 return Result.Succeeded;
@@ -688,7 +691,8 @@ namespace Analyse
             var headerFillColor = System.Drawing.Color.LightBlue;
             var totalFillColor = System.Drawing.Color.LightGreen;
 
-            ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+            ExcelPackage.License.SetNonCommercialPersonal("OK1");
+
             using (ExcelPackage excel = new ExcelPackage())
             {
                 // Feuille générale
