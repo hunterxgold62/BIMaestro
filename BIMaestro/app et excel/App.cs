@@ -4,7 +4,7 @@ using Autodesk.Revit.UI;
 using Autodesk.Revit.UI.Events;
 using Couleur;
 using IA;
-using MyRevitPlugin;
+using Licensing;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -42,7 +42,7 @@ public class App : IExternalApplication
             // 1) Licence « serveur‑first » : pas de contournement en changeant l'heure du PC
             string licenseKey = Environment.UserName;
             string machineId = LicenseManager.ComputeMachineId();
-            LicenseManager.ValidateOrThrow(licenseKey, machineId);
+            LicenseManager.Validate(licenseKey, machineId);
 
             // Stocker l'instance de UIControlledApplication
             UIControlledApp = application;

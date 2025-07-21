@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>Mon Plugin</Name>
+    <Assembly>%LOCALAPPDATA%\BIMaestro\Bin\BIMaestro.dll</Assembly>
+    <AddInId>91a60dd2-8c82-4c78-b9fe-36f97bfbd19b</AddInId>
+    <FullClassName>App</FullClassName>
+    <VendorId>PAUL LEMERT</VendorId>
+    <VendorDescription>Paul LEMERT</VendorDescription>
+  </AddIn>
+</RevitAddIns>

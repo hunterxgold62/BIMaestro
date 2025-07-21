@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using System.Windows.Interop;
+using Licensing;
 
 namespace IA
 {
@@ -16,10 +17,14 @@ namespace IA
     public class TextCorrectionCommand : IExternalCommand
     {
         // Clé API OpenAI
-        public static string apiKey = ApiKeys.OpenAIKey;
 
         public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
         {
+            // 1) Récupère le JWT de ta licence
+            string licenseKey = Environment.UserName;
+            string machineId = LicenseManager.ComputeMachineId();
+            string jwt = LicenseManager.Validate(licenseKey, machineId);
+
             try
             {
                 UIDocument uidoc = commandData.Application.ActiveUIDocument;

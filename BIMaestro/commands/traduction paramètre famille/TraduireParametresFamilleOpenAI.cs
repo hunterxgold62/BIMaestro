@@ -1,153 +1,114 @@
 ﻿using System;
-using System.Net.Http;
-using System.Text;
 using System.Collections.Generic;
+using System.Text.Json;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
-using Newtonsoft.Json.Linq;
-using System.Linq;
-using IA;
+using Licensing;                
+  
 
 namespace Famille
 {
     [Transaction(TransactionMode.Manual)]
     public class TraduireParametresFamilleOpenAI : IExternalCommand
     {
-        public static string apiKey = ApiKeys.OpenAIKey;
-
-        public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        public Result Execute(
+            ExternalCommandData commandData,
+            ref string message,
+            ElementSet elements)
         {
-            UIDocument uidoc = commandData.Application.ActiveUIDocument;
-            Document doc = uidoc.Document;
-
-            if (!doc.IsFamilyDocument)
+            var uiDoc = commandData.Application.ActiveUIDocument;
+            var doc = uiDoc?.Document;
+            if (doc == null || !doc.IsFamilyDocument)
             {
-                TaskDialog.Show("Erreur", "Ouvrez une famille avant d’exécuter ce plugin.");
+                TaskDialog.Show("Erreur",
+                    "Ouvrez une famille avant d’exécuter ce plugin.");
                 return Result.Cancelled;
             }
 
-            FamilyManager familyManager = doc.FamilyManager;
-            IList<FamilyParameter> fParams = familyManager.GetParameters();
+            // 1) Récupère le JWT de licence
+            // Remplacez ces deux lignes par votre logique réelle
+            string licenseKey = Environment.UserName;
+            string machineId = LicenseManager.ComputeMachineId();
+            string jwt = LicenseManager.Validate(licenseKey, machineId);
 
-            Dictionary<FamilyParameter, string> parametresTraduits = new Dictionary<FamilyParameter, string>();
+            // 2) Parcours des paramètres
+            var familyManager = doc.FamilyManager;
+            var fParams = familyManager.GetParameters();
+            var parametresTraduits = new Dictionary<FamilyParameter, string>();
 
-            foreach (FamilyParameter fParam in fParams)
+            foreach (var fParam in fParams)
             {
-                if (fParam?.Definition == null)
-                    continue;
-
+                if (fParam?.Definition == null) continue;
                 string originalName = fParam.Definition.Name;
-                if (string.IsNullOrEmpty(originalName))
+                if (string.IsNullOrWhiteSpace(originalName)) continue;
+
+                // Ne traduire que les paramètres utilisateur
+                if (fParam.IsShared) continue;
+                if (fParam.Definition is InternalDefinition def
+                    && def.BuiltInParameter != BuiltInParameter.INVALID)
                     continue;
 
-                // Vérifier si c'est un paramètre créé par l'utilisateur :
-                // On cast la Definition en InternalDefinition pour accéder à BuiltInParameter
-                InternalDefinition internalDef = fParam.Definition as InternalDefinition;
-                if (internalDef == null)
-                    continue;
+                // 3) Appel synchrone à l’IA via AiClient
+                string prompt =
+                  $"Le texte suivant est soit déjà en français, soit dans une autre langue. " +
+                  $"Si c’est déjà du français, renvoie-le tel quel. Sinon, traduis-le. " +
+                  $"Ne renvoie que le texte final, sans guillemets ni texte superflu.\n\n" +
+                  $"Texte : {originalName}";
 
-                BuiltInParameter bip = internalDef.BuiltInParameter;
+                string traduit;
+                try
+                {
+                    // Envoie le prompt et récupère la réponse
+                    JsonDocument json = AiClient.SendChat(jwt, "gpt-4o-mini", prompt);
+                    traduit = json.RootElement
+                                  .GetProperty("choices")[0]
+                                  .GetProperty("message")
+                                  .GetProperty("content")
+                                  .GetString() ?? originalName;
+                }
+                catch (Exception ex)
+                {
+                    // En cas d’erreur IA, on garde l’original
+                    traduit = originalName;
+                    TaskDialog.Show("Erreur IA", ex.Message);
+                }
 
-                // On ignore les partagés et les intégrés
-                if (fParam.IsShared || bip != BuiltInParameter.INVALID)
-                    continue;
-
-                // Si on veut juste s'assurer que si c'est déjà en français on ne le modifie pas,
-                // le prompt OpenAI fera ce travail.
-
-                string traduit = TraduireTexteSync(originalName, "fr");
-                // Si la traduction est identique à l'original, cela veut dire qu'il était déjà en français.
-                // On peut décider si on le renomme ou pas. Ici, s'il ne change pas, on ne fait rien.
-                if (!string.IsNullOrWhiteSpace(traduit) && traduit != originalName)
+                if (!string.Equals(traduit, originalName, StringComparison.OrdinalIgnoreCase))
                 {
                     parametresTraduits[fParam] = traduit.Trim();
                 }
             }
 
-            using (Transaction t = new Transaction(doc, "Traduire Paramètres via OpenAI"))
+            // 4) Renommage des paramètres
+            if (parametresTraduits.Count > 0)
             {
-                t.Start();
-                foreach (var kvp in parametresTraduits)
+                using (var tx = new Transaction(doc, "Traduire paramètres via OpenAI"))
                 {
-                    FamilyParameter fParam = kvp.Key;
-                    string newName = kvp.Value;
-                    try
+                    tx.Start();
+                    foreach (var kvp in parametresTraduits)
                     {
-                        familyManager.RenameParameter(fParam, newName);
-                    }
-                    catch (Exception ex)
-                    {
-                        TaskDialog.Show("Erreur",
-                            $"Impossible de renommer '{fParam.Definition.Name}' en '{newName}': {ex.Message}");
-                    }
-                }
-                t.Commit();
-            }
-
-            TaskDialog.Show("Terminé", "La traduction des paramètres a été effectuée avec succès.");
-            return Result.Succeeded;
-        }
-
-        private string TraduireTexteSync(string text, string targetLanguage)
-        {
-            // Nouveau prompt plus précis :
-            // On demande d'abord de vérifier si le texte est déjà en français.
-            // Si oui, le renvoyer tel quel, sinon le traduire.
-            // Pas de guillemets, pas de ponctuation supplémentaire, juste le texte final.
-            string prompt =
-                $"Le texte ou mot suivant est soit déjà en français, soit dans une autre langue.\n" +
-                $"Si le texte ou mot est déjà en français, renvoie-le tel quel.\n" +
-                $"Sinon, traduis-le en français.\n" +
-                $"Ne retourne que le texte final, sans guillemets, sans ponctuation superflue, sans préfixe, sans 'La traduction est:', ni 'Traduction:'. Juste le texte.\n\n" +
-                $"Texte: {text}";
-
-            try
-            {
-                using (HttpClient client = new HttpClient())
-                {
-                    client.Timeout = TimeSpan.FromSeconds(10);
-                    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
-
-                    var requestData = new
-                    {
-                        model = "gpt-4o-mini",
-                        messages = new object[]
+                        try
                         {
-                            new { role = "system", content = "Tu es un assistant utile qui traduit le texte en français si nécessaire, sans ajouter de guillemets ni de texte superflu."},
-                            new { role = "user", content = prompt }
-                        },
-                        max_tokens = 500,
-                       
-                    };
-
-                    string json = Newtonsoft.Json.JsonConvert.SerializeObject(requestData);
-                    StringContent content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                    HttpResponseMessage response = client.PostAsync("https://api.openai.com/v1/chat/completions", content).GetAwaiter().GetResult();
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        // En cas de problème, on ne modifie pas le texte
-                        return text;
+                            familyManager.RenameParameter(kvp.Key, kvp.Value);
+                        }
+                        catch (Exception ex)
+                        {
+                            TaskDialog.Show("Erreur",
+                                $"Impossible de renommer '{kvp.Key.Definition.Name}' en '{kvp.Value}' : {ex.Message}");
+                        }
                     }
-
-                    string responseString = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-                    JObject jsonResponse = JObject.Parse(responseString);
-                    string translated = (string)jsonResponse["choices"]?[0]?["message"]?["content"];
-                    if (translated == null)
-                        return text;
-
-                    // Nettoyage du résultat : on supprime les guillemets au cas où
-                    translated = translated.Replace("\"", "").Trim();
-
-                    return translated;
+                    tx.Commit();
                 }
+
+                TaskDialog.Show("Terminé", "La traduction des paramètres a été effectuée avec succès.");
             }
-            catch
+            else
             {
-                // En cas d'échec (timeout, etc.) on renvoie le texte original
-                return text;
+                TaskDialog.Show("Information", "Aucun paramètre à traduire.");
             }
+
+            return Result.Succeeded;
         }
     }
 }

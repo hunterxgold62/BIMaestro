@@ -6,12 +6,13 @@ using System.Net.Http.Json;
 using System.Net.NetworkInformation;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
-namespace MyRevitPlugin
+namespace Licensing
 {
     /// <summary>
-    /// Centralise tout ce qui concerne la licence : calcul du machine_id
-    /// et validation “serveur‑first” pour empêcher le contournement local.
+    /// Centralise tout ce qui concerne la licence :
+    /// calcul du machine_id et validation “serveur‑first”.
     /// </summary>
     public static class LicenseManager
     {
@@ -26,10 +27,10 @@ namespace MyRevitPlugin
           + "ocKoeuUTLQ_oOr83TtpaJD3RUDOBbwLQ5nJNvOinYlo";
 
         /// <summary>
-        /// Appelle la function validate et jette une exception si la licence n’est pas active.
-        /// L’heure du PC ne peut pas biaiser, tout est validé côté serveur.
+        /// Appelle la function validate et jette si la licence n’est pas active.
+        /// Retourne le JWT de licence.
         /// </summary>
-        public static void ValidateOrThrow(string licenseKey, string machineId)
+        public static string Validate(string licenseKey, string machineId)
         {
             using var client = new HttpClient();
             client.DefaultRequestHeaders.Add("apikey", ApiKey);
@@ -41,6 +42,7 @@ namespace MyRevitPlugin
                 machine_id = machineId
             };
 
+            // Appel synchrone (GetAwaiter...) pour simplifier l'appel depuis Revit
             var response = client
                 .PostAsJsonAsync(ValidateUrl, payload)
                 .GetAwaiter().GetResult();
@@ -53,18 +55,28 @@ namespace MyRevitPlugin
 
             if (!response.IsSuccessStatusCode)
             {
-                // 404 ou 500 ou autre : on renvoie le message exact du serveur
+                // 404, 500 ou autre
                 var err = response.Content
                                   .ReadAsStringAsync()
                                   .GetAwaiter().GetResult();
                 throw new InvalidOperationException($"Erreur licence : {err}");
             }
 
-            // 200 = OK, la licence est valide. On ignore le JWT côté client.
+            // 200 = OK, on lit le JSON { "token": "..." }
+            var json = response.Content
+                               .ReadFromJsonAsync<JsonElement>()
+                               .GetAwaiter().GetResult();
+
+            if (json.TryGetProperty("token", out var tokElem)
+                && tokElem.ValueKind == JsonValueKind.String)
+            {
+                return tokElem.GetString()!;
+            }
+            throw new InvalidOperationException("Réponse invalide du serveur de licence.");
         }
 
         /// <summary>
-        /// Calcule le machine_id comme SHA-256(MachineName + première adresse MAC opérationnelle).
+        /// Calcule le machine_id comme SHA‑256(MachineName + MAC).
         /// </summary>
         public static string ComputeMachineId()
         {
