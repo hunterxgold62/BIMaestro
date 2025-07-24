@@ -1,23 +1,28 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.Http;
-using System.Net.Http.Headers;
+
 using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Threading;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
 using IA;
+using Licensing;
 
 namespace ScanTextRevit
 {
     public class AiGrammarChecker
     {
-        private readonly string _apiKey = ApiKeys.OpenAIKey;
-        private readonly string _apiUrl = "https://api.openai.com/v1/chat/completions";
+        private readonly string _jwt;
         private const int MAX_CHARS_PER_CHUNK = 3000;
+
+        public AiGrammarChecker(string jwt)
+        {
+            _jwt = jwt;
+        }
 
         /// <summary>
         /// Déclenché après chaque chunk, en fournissant la clé (feuille ou vue) 
@@ -181,48 +186,26 @@ namespace ScanTextRevit
 
         private async Task<string> CallChatGptApiAsync(string prompt)
         {
-            using (var client = new HttpClient())
+            return await Task.Run(() =>
             {
-                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
-                var requestBody = new
-                {
-                    model = "gpt-4o-mini",
-                    messages = new object[]
-                    {
-                        new { role = "system", content = "Tu es un expert en correction grammaticale et orthographique du français." },
-                        new { role = "user", content = prompt }
-                    },
-                    temperature = 0
-                };
-
-                string jsonBody = JsonConvert.SerializeObject(requestBody);
-                var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
                 try
                 {
-                    var cts = new CancellationTokenSource(TimeSpan.FromSeconds(90));
-                    HttpResponseMessage response = await client.PostAsync(_apiUrl, content, cts.Token).ConfigureAwait(false);
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        return $"[{{ \"LineNumber\": 0, \"OriginalText\": \"{prompt}\", \"CorrectedText\": \"Erreur API: {response.StatusCode}\", \"Explanation\": \"\" }}]";
-                    }
-                    string responseString = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                    try
-                    {
-                        dynamic jsonResponse = JsonConvert.DeserializeObject(responseString);
-                        string messageContent = jsonResponse.choices[0].message.content;
-                        return messageContent;
-                    }
-                    catch (Exception ex)
-                    {
-                        return $"[{{ \"LineNumber\": 0, \"OriginalText\": \"{prompt}\", \"CorrectedText\": \"Erreur lors de l'analyse de la réponse de l'API.\", \"Explanation\": \"{ex.Message}\" }}]";
-                    }
+                    var json = AiClient.SendOpenAI(_jwt, "gpt-4o-mini", prompt);
+                    string messageContent = json.RootElement
+                        .GetProperty("choices")[0]
+                        .GetProperty("message")
+                        .GetProperty("content")
+                        .GetString();
+                    return messageContent;
                 }
                 catch (Exception ex)
                 {
-                    return $"[{{ \"LineNumber\": 0, \"OriginalText\": \"{prompt}\", \"CorrectedText\": \"Erreur lors de l'appel à l'API: {ex.Message}\", \"Explanation\": \"\" }}]";
+                    return $"[{{ \"LineNumber\": 0, \"OriginalText\": \"{prompt}\", \"CorrectedText\": \"Erreur API: {ex.Message}\", \"Explanation\": \"\" }}]";
                 }
-            }
+            });
         }
+
+
 
         private List<CorrectionItem> ParseCorrectionsRobust(string aiResponse, string originalTextIfError)
         {

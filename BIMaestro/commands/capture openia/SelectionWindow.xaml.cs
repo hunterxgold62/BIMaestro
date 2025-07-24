@@ -5,11 +5,10 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
-using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Forms;
 using Brushes = System.Windows.Media.Brushes;
@@ -17,6 +16,8 @@ using MessageBox = System.Windows.MessageBox;
 using Point = System.Drawing.Point;
 using Rectangle = System.Drawing.Rectangle;
 using Size = System.Drawing.Size;
+using Licensing;
+using LicenseManager = Licensing.LicenseManager;
 
 namespace IA
 {
@@ -27,6 +28,8 @@ namespace IA
         private string screenshotDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "RevitDernierScreenIA");
         private Bitmap capturedImage;
         private bool isRequestPending;
+        private readonly string _jwt;
+
 
         public bool IsRequestPending
         {
@@ -48,6 +51,9 @@ namespace IA
             Directory.CreateDirectory(screenshotDirectory);
             DeleteOldScreenshots(); // Delete old screenshots on startup
             IsRequestPending = false; // Initialize as false
+            string licenseKey = Environment.UserName;
+            string machineId = LicenseManager.ComputeMachineId();
+            _jwt = LicenseManager.Validate(licenseKey, machineId);
         }
 
         private void DeleteOldScreenshots()
@@ -204,49 +210,19 @@ namespace IA
 
         private async Task<string> SendImageToAPIAsync(string base64Image, string userPrompt, string imagePath)
         {
-            using (HttpClient client = new HttpClient())
+            return await Task.Run(() =>
             {
-                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ApiKeys.OpenAIKey);
-
-                var prompt = new
-                {
-                    model = "gpt-4o-mini",
-                    messages = new[]
-                    {
-                        new
-                        {
-                            role = "user",
-                            content = new object[]
-                            {
-                                new { type = "text", text = userPrompt },
-                                new { type = "image_url", image_url = new { url = $"data:image/png;base64,{base64Image}" } }
-                            }
-                        }
-                    },
-                    max_tokens = 2000
-                };
-
-                var contentJson = new StringContent(System.Text.Json.JsonSerializer.Serialize(prompt), Encoding.UTF8, "application/json");
-
                 try
                 {
-                    var response = await client.PostAsync("https://api.openai.com/v1/chat/completions", contentJson);
-                    response.EnsureSuccessStatusCode();
-                    var responseBody = await response.Content.ReadAsStringAsync();
-
-                    var responseJson = System.Text.Json.JsonDocument.Parse(responseBody);
-                    var responseContent = responseJson.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
-                    return responseContent;
+                    string prompt = userPrompt + "\n[image base64:" + base64Image + "]";
+                    var json = AiClient.SendOpenAI(_jwt, "gpt-4o-mini", prompt);
+                    return json.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
                 }
-                catch (HttpRequestException e)
+                catch (Exception ex)
                 {
-                    return $"Request error: {e.Message}";
+                    return $"Erreur API: {ex.Message}";
                 }
-                catch (Exception e)
-                {
-                    return $"Unexpected error: {e.Message}";
-                }
-            }
+            });
         }
 
         protected void OnPropertyChanged([CallerMemberName] string name = null)

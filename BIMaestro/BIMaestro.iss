@@ -1,5 +1,5 @@
 ; --------------------------------------------------------
-; BIMaestro.iss — Installateur per‑user sans UAC, .addin 2023+2024
+; BIMaestro.iss — Installateur per‑user sans UAC, .addin 2025+2024
 ; nettoyage complet à la désinstallation
 ; --------------------------------------------------------
 
@@ -46,7 +46,7 @@ begin
 end;
 
 // -----------------------------------------------------------------
-// Après copie, on crée les manifests pour Revit 2023 et 2024
+// Après copie, on crée les manifests pour Revit 2025 et 2024
 // -----------------------------------------------------------------
 procedure CurStepChanged(CurStep: TSetupStep);
 var
@@ -64,7 +64,7 @@ begin
     AddinsRoot := ExpandConstant('{userappdata}\Autodesk\Revit\Addins');
 
     // 3) Versions ciblées
-    Versions[1] := '2023';
+    Versions[1] := '2025';
     Versions[2] := '2024';
 
     // 4) Génère le XML une seule fois

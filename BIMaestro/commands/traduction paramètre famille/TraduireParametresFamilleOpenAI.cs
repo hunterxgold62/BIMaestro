@@ -60,7 +60,7 @@ namespace Famille
                 try
                 {
                     // Envoie le prompt et récupère la réponse
-                    JsonDocument json = AiClient.SendChat(jwt, "gpt-4o-mini", prompt);
+                    JsonDocument json = AiClient.SendOpenAI(jwt, "gpt-4o-mini", prompt);
                     traduit = json.RootElement
                                   .GetProperty("choices")[0]
                                   .GetProperty("message")

@@ -15,6 +15,8 @@ public static class ExcelLogger
     {
         try
         {
+            System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+
             // Définition du contexte de licence pour EPPlus
             ExcelPackage.License.SetNonCommercialPersonal("OK1");
 

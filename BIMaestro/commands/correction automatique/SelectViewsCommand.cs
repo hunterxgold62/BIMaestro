@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using Licensing;
 
 namespace ScanTextRevit
 {
@@ -17,6 +18,11 @@ namespace ScanTextRevit
         {
             UIApplication uiApp = commandData.Application;
             Document doc = uiApp.ActiveUIDocument.Document;
+
+            // Récupère le JWT de licence pour les appels IA
+            string licenseKey = Environment.UserName;
+            string machineId = LicenseManager.ComputeMachineId();
+            string jwt = LicenseManager.Validate(licenseKey, machineId);
 
             // 1) Récupération de toutes les vues (hors feuilles) et toutes les feuilles
             var allViews = new FilteredElementCollector(doc)
@@ -102,7 +108,7 @@ namespace ScanTextRevit
             resultWindow.Show();
 
             // 6) Configuration du AiGrammarChecker et abonnements
-            AiGrammarChecker grammarChecker = new AiGrammarChecker();
+            AiGrammarChecker grammarChecker = new AiGrammarChecker(jwt);
             grammarChecker.ChunkProcessed += (key, partialCorrections) =>
             {
                 resultWindow.Dispatcher.Invoke(() =>

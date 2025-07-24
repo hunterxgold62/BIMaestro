@@ -26,10 +26,12 @@ public class App : IExternalApplication
     private Document previousDocument;
     private UIApplication uiApp;
 
+
+
     // Drapeau pour s'assurer que le reset de coloration n'est exécuté qu'une seule fois
     private bool _hasResetWhenOff = false;
 
-    // Dossier de log pour error_log.txt
+    // Dossier de log pour error_log.txt.
     private static readonly string logDirectory =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs");
 

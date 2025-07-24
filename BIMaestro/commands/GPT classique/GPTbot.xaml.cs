@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using System.Collections.ObjectModel;
@@ -12,17 +11,19 @@ using System.Windows.Controls;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using System.Linq;
+using System.Text.Json;
 using System.IO;
 using System.Windows.Documents;
 using Markdown.Xaml;
+using Licensing;
+using LicenseManager = Licensing.LicenseManager;
 
 namespace IA
 {
     public partial class GPTBotWindow : Window, INotifyPropertyChanged
     {
-        private readonly HttpClient httpClient = new HttpClient();
-        private readonly string apiKey = ApiKeys.DeepSeekKey;
         private ObservableCollection<MessageModel> conversationHistory = new ObservableCollection<MessageModel>();
+        private readonly string _jwt;
         private bool isAwaitingResponse = false; // Indicateur de réponse en attente
 
         public event PropertyChangedEventHandler PropertyChanged;
@@ -47,9 +48,10 @@ namespace IA
             // Définir l'ItemsSource de la ListBox
             MessagesListBox.ItemsSource = conversationHistory;
 
-            // Configuration du client HTTP
-            httpClient.BaseAddress = new Uri("https://api.deepseek.com/"); // URL de l'API DeepSeek
-            httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
+
+            string licenseKey = Environment.UserName;
+            string machineId = LicenseManager.ComputeMachineId();
+            _jwt = LicenseManager.Validate(licenseKey, machineId);
 
             // Ajouter le message système à l'historique des conversations
             if (!string.IsNullOrEmpty(systemMessage))
@@ -163,35 +165,24 @@ namespace IA
 
         private async Task<string> GetResponseFromDeepSeek()
         {
-            var messages = new List<dynamic>();
-            foreach (var message in conversationHistory)
+            var sb = new StringBuilder();
+            foreach (var msg in conversationHistory)
             {
-                messages.Add(new { role = message.Role, content = message.Content });
+                sb.AppendLine($"{msg.Role}: {msg.Content}");
             }
 
-            var requestData = new
+            return await Task.Run(() =>
             {
-                model = "deepseek-chat", // Remplacez par le modèle DeepSeek approprié
-                messages = messages,
-                temperature = 0.2,
-                max_tokens = 2500
-            };
-
-            string jsonRequest = JsonConvert.SerializeObject(requestData);
-            var content = new StringContent(jsonRequest, Encoding.UTF8, "application/json");
-
-            var response = await httpClient.PostAsync("v1/chat/completions", content);
-
-            if (response.IsSuccessStatusCode)
-            {
-                var responseContent = await response.Content.ReadAsStringAsync();
-                var result = JsonConvert.DeserializeObject<dynamic>(responseContent);
-                return result.choices[0].message.content.ToString(); // Ajustez selon la structure de réponse de DeepSeek
-            }
-            else
-            {
-                return $"Erreur lors de la requête : {response.StatusCode}, {await response.Content.ReadAsStringAsync()}";
-            }
+                try
+                {
+                    var json = AiClient.SendDeepSeek(_jwt, sb.ToString());
+                    return json.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
+                }
+                catch (Exception ex)
+                {
+                    return $"Erreur API: {ex.Message}";
+                }
+            });
         }
 
         // Gestionnaire d'événement pour copier le contenu du message
@@ -213,4 +204,5 @@ namespace IA
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
     }
+
 }
