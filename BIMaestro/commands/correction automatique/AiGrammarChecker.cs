@@ -6,7 +6,7 @@ using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Threading;
-using System.Text.Json;
+using Newtonsoft.Json.Linq;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
 using IA;
@@ -191,11 +191,7 @@ namespace ScanTextRevit
                 try
                 {
                     var json = AiClient.SendOpenAI(_jwt, "gpt-4o-mini", prompt);
-                    string messageContent = json.RootElement
-                        .GetProperty("choices")[0]
-                        .GetProperty("message")
-                        .GetProperty("content")
-                        .GetString();
+                    string messageContent = json["choices"]?[0]?["message"]?["content"]?.ToString();
                     return messageContent;
                 }
                 catch (Exception ex)

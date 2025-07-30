@@ -115,14 +115,12 @@
     </Reference>
     <Reference Include="PresentationCore" />
     <Reference Include="PresentationFramework" />
-    <Reference Include="RevitAPI, Version=24.3.10.0, Culture=neutral, processorArchitecture=AMD64">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\..\..\Program Files\Autodesk\Revit 2023\RevitAPI.dll</HintPath>
+    <Reference Include="RevitAPI">
+      <HintPath>..\..\..\..\..\..\Program Files\Autodesk\Revit 2024\RevitAPI.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="RevitAPIUI, Version=24.3.10.0, Culture=neutral, processorArchitecture=AMD64">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\..\..\Program Files\Autodesk\Revit 2023\RevitAPIUI.dll</HintPath>
+    <Reference Include="RevitAPIUI">
+      <HintPath>..\..\..\..\..\..\Program Files\Autodesk\Revit 2024\RevitAPIUI.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="RevitServices">
@@ -266,6 +264,7 @@
     </Compile>
     <Compile Include="commands\Dossier famille\FamilyLoadOption.cs" />
     <Compile Include="commands\Dossier famille\LoadFamilyHandler.cs" />
+    <Compile Include="commands\Dossier famille\ReloadFamilyHandler.cs" />
     <Compile Include="commands\export dwg\ExportSheetsCommand.cs" />
     <Compile Include="commands\export dwg\ExportSheetsWindow.xaml.cs">
       <DependentUpon>ExportSheetsWindow.xaml</DependentUpon>

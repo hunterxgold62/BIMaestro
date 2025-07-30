@@ -2,11 +2,10 @@
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Net.Http.Json;
+using Newtonsoft.Json.Linq;
 using System.Net.NetworkInformation;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 
 namespace Licensing
 {
@@ -43,8 +42,10 @@ namespace Licensing
             };
 
             // Appel synchrone (GetAwaiter...) pour simplifier l'appel depuis Revit
+            string jsonPayload = Newtonsoft.Json.JsonConvert.SerializeObject(payload);
+            var content = new StringContent(jsonPayload, System.Text.Encoding.UTF8, "application/json");
             var response = client
-                .PostAsJsonAsync(ValidateUrl, payload)
+                .PostAsync(ValidateUrl, content)
                 .GetAwaiter().GetResult();
 
             if (response.StatusCode == HttpStatusCode.Forbidden)
@@ -59,18 +60,16 @@ namespace Licensing
                 var err = response.Content
                                   .ReadAsStringAsync()
                                   .GetAwaiter().GetResult();
-                throw new InvalidOperationException($"Erreur licence : {err}");
+                throw new InvalidOperationException($"Erreur licence : {err}");
             }
 
             // 200 = OK, on lit le JSON { "token": "..." }
-            var json = response.Content
-                               .ReadFromJsonAsync<JsonElement>()
-                               .GetAwaiter().GetResult();
-
-            if (json.TryGetProperty("token", out var tokElem)
-                && tokElem.ValueKind == JsonValueKind.String)
+            var raw = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+            var json = JObject.Parse(raw);
+            var token = json["token"]?.ToString();
+            if (!string.IsNullOrEmpty(token))
             {
-                return tokElem.GetString()!;
+                return token;
             }
             throw new InvalidOperationException("Réponse invalide du serveur de licence.");
         }

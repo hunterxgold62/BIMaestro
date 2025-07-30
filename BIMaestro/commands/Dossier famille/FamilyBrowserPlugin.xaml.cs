@@ -1,32 +1,30 @@
 ﻿using System;
-using System.IO;
-using System.Linq;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using Autodesk.Revit.UI;
 
 namespace Famille
 {
     public partial class FamilyBrowserWindow : Window
     {
-        private string familiesFolder = @"P:\0-Boîte à outils Revit\0-Bibliothèque\A-Famille Revit";
-        private string imagesFolder = @"P:\0-Boîte à outils Revit\0-Bibliothèque\B-Famille Revit Image";
-        private string favoritesFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "SauvegardePréférence", "Favorites.txt");
-        private string configFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "SauvegardePréférence", "Config.txt");
+        private readonly string familiesFolder = @"P:\0-Boîte à outils Revit\0-Bibliothèque\A-Famille Revit";
+        private readonly string imagesFolder = @"P:\0-Boîte à outils Revit\0-Bibliothèque\B-Famille Revit Image";
+        private readonly string favoritesFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "SauvegardePréférence", "Favorites.txt");
+        private readonly string configFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "SauvegardePréférence", "Config.txt");
 
         private List<FamilyItem> allFamilies = new List<FamilyItem>();
         private List<FamilyItem> displayedFamilies = new List<FamilyItem>();
         private List<FamilyItem> favoriteFamilies = new List<FamilyItem>();
-
-        // Pour le binding dans l'onglet Favoris
-        public List<FamilyItem> FavoriteFamilies
-        {
-            get { return favoriteFamilies; }
-        }
+        public List<FamilyItem> FavoriteFamilies => favoriteFamilies;
 
         public FamilyBrowserWindow()
         {
@@ -38,271 +36,138 @@ namespace Famille
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             LoadConfig();
-            UpdateTheme(); // Applique le thème (PrimaryText, ImageBackground, etc.)
+            UpdateTheme();
 
             LoadFavoritesFromFile();
             LoadFolderTree();
-            MarkFavoritesInAllFamilies();
+            StartThumbnailLoading();
+
             FolderTreeView.SelectedItemChanged += FolderTreeView_SelectedItemChanged;
             PlaceholderText.Visibility = Visibility.Visible;
         }
 
-        #region Chargement et affichage des dossiers & familles
+        #region Dossiers & familles
 
         private void LoadFolderTree()
         {
+            FolderTreeView.Items.Clear();
             if (!Directory.Exists(familiesFolder))
             {
                 MessageBox.Show(this, "Le dossier de familles spécifié n'existe pas.", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
-            var rootDirectoryInfo = new DirectoryInfo(familiesFolder);
-            TreeViewItem rootItem = CreateDirectoryNode(rootDirectoryInfo);
-            FolderTreeView.Items.Add(rootItem);
-            rootItem.IsExpanded = true;
-            rootItem.IsSelected = true;
-            LoadFamilies(familiesFolder, recursive: true);
-            displayedFamilies = new List<FamilyItem>(allFamilies);
+            var root = new DirectoryInfo(familiesFolder);
+            var node = CreateDirectoryNode(root);
+            FolderTreeView.Items.Add(node);
+            node.IsExpanded = true;
+            node.IsSelected = true;
+            LoadFamilies(familiesFolder, true);
+            displayedFamilies = allFamilies.ToList();
             FamilyListView.ItemsSource = displayedFamilies;
             UpdateCount();
         }
 
-        private TreeViewItem CreateDirectoryNode(DirectoryInfo directoryInfo)
+        private TreeViewItem CreateDirectoryNode(DirectoryInfo dir)
         {
-            var directoryNode = new TreeViewItem
-            {
-                Header = directoryInfo.Name,
-                Tag = directoryInfo.FullName
-            };
-            foreach (var directory in directoryInfo.GetDirectories())
-            {
-                directoryNode.Items.Add(CreateDirectoryNode(directory));
-            }
-            return directoryNode;
+            var item = new TreeViewItem { Header = dir.Name, Tag = dir.FullName };
+            foreach (var sub in dir.GetDirectories())
+                item.Items.Add(CreateDirectoryNode(sub));
+            return item;
         }
 
-        private void FolderTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+        private void FolderTreeView_SelectedItemChanged(object s, RoutedPropertyChangedEventArgs<object> e)
         {
-            if (FolderTreeView.SelectedItem is TreeViewItem selectedItem)
+            if (FolderTreeView.SelectedItem is TreeViewItem tv)
             {
-                string selectedPath = selectedItem.Tag.ToString();
-                LoadFamilies(selectedPath, recursive: true);
-                displayedFamilies = new List<FamilyItem>(allFamilies);
+                LoadFamilies(tv.Tag.ToString(), true);
+                displayedFamilies = allFamilies.ToList();
                 MarkFavoritesInAllFamilies();
                 FamilyListView.ItemsSource = displayedFamilies;
                 SearchBox.Text = "";
                 ApplyFilters();
+                StartThumbnailLoading();
             }
         }
 
-        private void LoadFamilies(string path, bool recursive = true)
+        private void LoadFamilies(string path, bool recursive)
         {
             allFamilies.Clear();
-            var searchOption = recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
-            var familyFiles = Directory.GetFiles(path, "*.rfa", searchOption);
-            foreach (var file in familyFiles)
-            {
-                var family = CreateFamilyItemFromPath(file);
-                if (family != null)
-                    allFamilies.Add(family);
-            }
-            allFamilies = allFamilies.OrderBy(f => ParseFamilyNameForSorting(f.Name)).ToList();
+            var opt = recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
+            foreach (var f in Directory.GetFiles(path, "*.rfa", opt))
+                if (File.Exists(f))
+                    allFamilies.Add(CreateFamilyItemFromPath(f));
+
+            allFamilies = allFamilies
+                .OrderBy(f =>
+                {
+                    var p = f.Name.Split('-');
+                    if (p.Length == 2 && int.TryParse(p[1], out int n))
+                        return (p[0], n);
+                    return (f.Name, int.MaxValue);
+                })
+                .ToList();
         }
 
-        private (string prefix, int number) ParseFamilyNameForSorting(string name)
-        {
-            var parts = name.Split('-');
-            if (parts.Length == 2 && int.TryParse(parts[1], out int num))
-                return (parts[0], num);
-            return (name, int.MaxValue);
-        }
-
-        // Met à jour IsFavorite selon le fichier favorites
         private void MarkFavoritesInAllFamilies()
         {
-            if (!File.Exists(favoritesFile))
-                return;
-            var favPaths = File.ReadAllLines(favoritesFile);
+            if (!File.Exists(favoritesFile)) return;
+            var favs = File.ReadAllLines(favoritesFile);
             foreach (var fam in allFamilies)
-            {
-                fam.IsFavorite = favPaths.Contains(fam.Path);
-            }
+                fam.IsFavorite = favs.Contains(fam.Path);
         }
 
         #endregion
 
-        #region Gestion des fichiers et configuration
+        #region Chargement asynchrone des vignettes
 
-        private void EnsureFilesExist()
+        private void StartThumbnailLoading()
         {
-            try
-            {
-                if (!File.Exists(favoritesFile))
-                {
-                    Directory.CreateDirectory(Path.GetDirectoryName(favoritesFile));
-                    File.WriteAllText(favoritesFile, string.Empty);
-                }
-                if (!File.Exists(configFile))
-                {
-                    Directory.CreateDirectory(Path.GetDirectoryName(configFile));
-                    File.WriteAllText(configFile, string.Empty);
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(this, "Erreur lors de la création des fichiers de configuration : " + ex.Message, "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
+            var imgRoot = imagesFolder;
+            var famRoot = familiesFolder;
 
-        private void LoadConfig()
-        {
-            // Valeurs par défaut
-            string topColorHex = "#FFF2F2F2";
-            string bottomColorHex = "#FFFFFFFF";
-            string panelHex = "#F0F0F0";
-            string treeViewHex = "#F0F0F0";
-            string itemsHex = "Transparent";
-            string tabHex = "Transparent";
-            bool darkMode = false;
-            if (File.Exists(configFile))
+            Task.Run(() =>
             {
-                var lines = File.ReadAllLines(configFile);
-                foreach (var line in lines)
+                foreach (var fam in allFamilies)
                 {
-                    if (line.StartsWith("TopColor=", StringComparison.OrdinalIgnoreCase))
-                        topColorHex = line.Substring("TopColor=".Length).Trim();
-                    else if (line.StartsWith("BottomColor=", StringComparison.OrdinalIgnoreCase))
-                        bottomColorHex = line.Substring("BottomColor=".Length).Trim();
-                    else if (line.StartsWith("PanelBackground=", StringComparison.OrdinalIgnoreCase))
-                        panelHex = line.Substring("PanelBackground=".Length).Trim();
-                    else if (line.StartsWith("TreeViewBackground=", StringComparison.OrdinalIgnoreCase))
-                        treeViewHex = line.Substring("TreeViewBackground=".Length).Trim();
-                    else if (line.StartsWith("ItemsBackground=", StringComparison.OrdinalIgnoreCase))
-                        itemsHex = line.Substring("ItemsBackground=".Length).Trim();
-                    else if (line.StartsWith("TabBackground=", StringComparison.OrdinalIgnoreCase))
-                        tabHex = line.Substring("TabBackground=".Length).Trim();
-                    else if (line.StartsWith("DarkMode=", StringComparison.OrdinalIgnoreCase))
+                    var rel = GetRelativePath(famRoot, fam.Path);
+                    var img = Path.ChangeExtension(rel, ".png");
+                    var full = Path.Combine(imgRoot, img);
+                    if (!File.Exists(full)) continue;
+                    try
                     {
-                        bool.TryParse(line.Substring("DarkMode=".Length).Trim(), out darkMode);
+                        var bmp = new BitmapImage();
+                        bmp.BeginInit();
+                        bmp.UriSource = new Uri(full, UriKind.Absolute);
+                        bmp.CacheOption = BitmapCacheOption.OnLoad;
+                        bmp.EndInit();
+                        bmp.Freeze();
+                        Dispatcher.Invoke(() => fam.Icon = bmp);
                     }
+                    catch { }
                 }
-            }
-            TopColorPicker.SelectedColor = ColorFromHex(topColorHex);
-            BottomColorPicker.SelectedColor = ColorFromHex(bottomColorHex);
-            PanelBackgroundPicker.SelectedColor = ColorFromHex(panelHex);
-            TreeViewBackgroundPicker.SelectedColor = ColorFromHex(treeViewHex);
-            ItemsBackgroundPicker.SelectedColor = ColorFromHex(itemsHex);
-            TabBackgroundPicker.SelectedColor = ColorFromHex(tabHex);
-            DarkModeCheckBox.IsChecked = darkMode;
+            });
         }
 
-        private void SaveConfig()
+        private void LoadThumbnailForFamilyItem(FamilyItem fam)
         {
-            var lines = new string[]
+            Task.Run(() =>
             {
-                "TopColor=" + (TopColorPicker.SelectedColor == null ? "#FFF2F2F2" : ColorToHex(TopColorPicker.SelectedColor.Value)),
-                "BottomColor=" + (BottomColorPicker.SelectedColor == null ? "#FFFFFFFF" : ColorToHex(BottomColorPicker.SelectedColor.Value)),
-                "PanelBackground=" + (PanelBackgroundPicker.SelectedColor == Colors.Transparent ? "Transparent" : ColorToHex(PanelBackgroundPicker.SelectedColor.Value)),
-                "TreeViewBackground=" + (TreeViewBackgroundPicker.SelectedColor == Colors.Transparent ? "Transparent" : ColorToHex(TreeViewBackgroundPicker.SelectedColor.Value)),
-                "ItemsBackground=" + (ItemsBackgroundPicker.SelectedColor == Colors.Transparent ? "Transparent" : ColorToHex(ItemsBackgroundPicker.SelectedColor.Value)),
-                "TabBackground=" + (TabBackgroundPicker.SelectedColor == Colors.Transparent ? "Transparent" : ColorToHex(TabBackgroundPicker.SelectedColor.Value)),
-                "DarkMode=" + (DarkModeCheckBox.IsChecked == true ? "true" : "false")
-            };
-            File.WriteAllLines(configFile, lines);
-        }
-
-        private void SaveConfig_Click(object sender, RoutedEventArgs e)
-        {
-            SaveConfig();
-            MessageBox.Show("Configuration enregistrée avec succès. Redémarre l'application pour appliquer définitivement les changements.");
-        }
-
-        private void ResetConfig_Click(object sender, RoutedEventArgs e)
-        {
-            TopColorPicker.SelectedColor = ColorFromHex("#FFF2F2F2");
-            BottomColorPicker.SelectedColor = ColorFromHex("#FFFFFFFF");
-            PanelBackgroundPicker.SelectedColor = ColorFromHex("#F0F0F0");
-            TreeViewBackgroundPicker.SelectedColor = ColorFromHex("#F0F0F0");
-            ItemsBackgroundPicker.SelectedColor = Colors.Transparent;
-            TabBackgroundPicker.SelectedColor = Colors.Transparent;
-            DarkModeCheckBox.IsChecked = false;
-            UpdateTheme();
-            SaveConfig();
-            MessageBox.Show("Configuration réinitialisée aux valeurs par défaut. Redémarre l'application pour voir l'effet complet.");
-        }
-
-        #endregion
-
-        #region Création et chargement des objets FamilyItem
-
-        private FamilyItem CreateFamilyItemFromPath(string filePath)
-        {
-            if (!File.Exists(filePath)) return null;
-            string familyName = Path.GetFileNameWithoutExtension(filePath);
-            // Affecte la catégorie en fonction du nom (informative ici)
-            string category = "Général";
-            if (familyName.ToLower().Contains("porte"))
-                category = "Porte";
-            else if (familyName.ToLower().Contains("fenêtre") || familyName.ToLower().Contains("fenetre"))
-                category = "Fenêtre";
-            string relativePath = GetRelativePath(familiesFolder, filePath);
-            string imageRelativePath = Path.ChangeExtension(relativePath, ".png");
-            string imagePath = Path.Combine(imagesFolder, imageRelativePath);
-            BitmapImage thumbnail = LoadThumbnail(imagePath);
-            return new FamilyItem
-            {
-                Name = familyName,
-                Path = filePath,
-                Icon = thumbnail,
-                Category = category
-            };
-        }
-
-        private BitmapImage LoadThumbnail(string imagePath)
-        {
-            if (!File.Exists(imagePath))
-                return null;
-            try
-            {
-                var bitmap = new BitmapImage();
-                bitmap.BeginInit();
-                bitmap.UriSource = new Uri(imagePath);
-                bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                bitmap.EndInit();
-                return bitmap;
-            }
-            catch (Exception)
-            {
-                return null;
-            }
-        }
-
-        #endregion
-
-        #region Gestion de la recherche et affichage
-
-        private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            PlaceholderText.Visibility = string.IsNullOrEmpty(SearchBox.Text) ? Visibility.Visible : Visibility.Collapsed;
-            ApplyFilters();
-        }
-
-        private void ApplyFilters()
-        {
-            string searchText = SearchBox.Text.ToLower();
-            var filtered = displayedFamilies.Where(f => f.Name.ToLower().Contains(searchText));
-            FamilyListView.ItemsSource = filtered;
-            UpdateCount(filtered.Count());
-        }
-
-        private void UpdateCount(int? count = null)
-        {
-            if (CountTextBlock != null)
-            {
-                if (!count.HasValue)
-                    count = displayedFamilies.Count();
-                CountTextBlock.Text = count.Value.ToString();
-            }
+                var rel = GetRelativePath(familiesFolder, fam.Path);
+                var img = Path.ChangeExtension(rel, ".png");
+                var full = Path.Combine(imagesFolder, img);
+                if (!File.Exists(full)) return;
+                try
+                {
+                    var bmp = new BitmapImage();
+                    bmp.BeginInit();
+                    bmp.UriSource = new Uri(full, UriKind.Absolute);
+                    bmp.CacheOption = BitmapCacheOption.OnLoad;
+                    bmp.EndInit();
+                    bmp.Freeze();
+                    Dispatcher.Invoke(() => fam.Icon = bmp);
+                }
+                catch { }
+            });
         }
 
         #endregion
@@ -312,20 +177,21 @@ namespace Famille
         private void LoadFavoritesFromFile()
         {
             favoriteFamilies.Clear();
-            if (File.Exists(favoritesFile))
+            if (!File.Exists(favoritesFile)) return;
+            foreach (var p in File.ReadAllLines(favoritesFile))
             {
-                var lines = File.ReadAllLines(favoritesFile);
-                foreach (var line in lines)
+                var ex = allFamilies.FirstOrDefault(f => f.Path.Equals(p, StringComparison.OrdinalIgnoreCase));
+                if (ex != null)
                 {
-                    if (File.Exists(line))
-                    {
-                        var family = CreateFamilyItemFromPath(line);
-                        if (family != null)
-                        {
-                            family.IsFavorite = true;
-                            favoriteFamilies.Add(family);
-                        }
-                    }
+                    ex.IsFavorite = true;
+                    favoriteFamilies.Add(ex);
+                }
+                else if (File.Exists(p))
+                {
+                    var fi = CreateFamilyItemFromPath(p);
+                    fi.IsFavorite = true;
+                    favoriteFamilies.Add(fi);
+                    LoadThumbnailForFamilyItem(fi);
                 }
             }
             UpdateFavoritesUI();
@@ -333,118 +199,155 @@ namespace Famille
 
         private void UpdateFavoritesUI()
         {
-            if (FavoritesListView != null)
-            {
-                FavoritesListView.ItemsSource = null;
-                FavoritesListView.ItemsSource = favoriteFamilies;
-            }
+            FavoritesListView.ItemsSource = null;
+            FavoritesListView.ItemsSource = favoriteFamilies;
         }
 
-        private void FavoriteButton_Click(object sender, RoutedEventArgs e)
+        private void FavoriteButton_Click(object s, RoutedEventArgs e)
         {
-            if (sender is Button btn && btn.DataContext is FamilyItem family)
+            if (s is Button btn && btn.DataContext is FamilyItem fam)
             {
-                family.IsFavorite = !family.IsFavorite;
-                if (family.IsFavorite)
+                fam.IsFavorite = !fam.IsFavorite;
+                if (fam.IsFavorite)
                 {
-                    if (!favoriteFamilies.Any(f => f.Path == family.Path))
-                        favoriteFamilies.Add(family);
+                    if (!favoriteFamilies.Any(f => f.Path == fam.Path))
+                        favoriteFamilies.Add(fam);
                 }
                 else
                 {
-                    var itemToRemove = favoriteFamilies.FirstOrDefault(f => f.Path == family.Path);
-                    if (itemToRemove != null)
-                        favoriteFamilies.Remove(itemToRemove);
+                    var rem = favoriteFamilies.FirstOrDefault(f => f.Path == fam.Path);
+                    if (rem != null) favoriteFamilies.Remove(rem);
                 }
-                SaveFavoritesToFile();
+                File.WriteAllLines(favoritesFile, favoriteFamilies.Select(f => f.Path));
                 UpdateFavoritesUI();
-            }
-        }
-
-        private void SaveFavoritesToFile()
-        {
-            try
-            {
-                var lines = favoriteFamilies.Select(f => f.Path).ToArray();
-                File.WriteAllLines(favoritesFile, lines);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(this, "Erreur lors de la sauvegarde des favoris : " + ex.Message, "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         #endregion
 
-        #region Divers et utilitaires
+        #region Recherche & affichage
 
-        private void FamilyItem_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        private void SearchBox_TextChanged(object s, TextChangedEventArgs e)
         {
-            // Ne réagir qu'en cas de double-clic
-            if (e.ClickCount != 2) return;
+            PlaceholderText.Visibility =
+                string.IsNullOrEmpty(SearchBox.Text) ? Visibility.Visible : Visibility.Collapsed;
+            ApplyFilters();
+        }
 
-            if (sender is Border border && border.DataContext is FamilyItem family)
+        private void ApplyFilters()
+        {
+            var txt = SearchBox.Text.ToLower();
+            var filt = displayedFamilies.Where(f => f.Name.ToLower().Contains(txt));
+            FamilyListView.ItemsSource = filt;
+            UpdateCount(filt.Count());
+        }
+
+        private void UpdateCount(int? c = null)
+        {
+            if (CountTextBlock == null) return;
+            if (!c.HasValue) c = displayedFamilies.Count;
+            CountTextBlock.Text = c.Value.ToString();
+        }
+
+        #endregion
+
+        #region Configuration & thèmes
+
+        private void EnsureFilesExist()
+        {
+            try
             {
-                if (FamilyBrowserCommand.LoadFamilyHandlerInstance != null && FamilyBrowserCommand.LoadFamilyEventInstance != null)
-                {
-                    FamilyBrowserCommand.LoadFamilyHandlerInstance.FamilyPath = family.Path;
-                    FamilyBrowserCommand.LoadFamilyEventInstance.Raise();
-                }
+                Directory.CreateDirectory(Path.GetDirectoryName(favoritesFile));
+                if (!File.Exists(favoritesFile)) File.WriteAllText(favoritesFile, "");
+                Directory.CreateDirectory(Path.GetDirectoryName(configFile));
+                if (!File.Exists(configFile)) File.WriteAllText(configFile, "");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, "Erreur création fichiers config : " + ex.Message, "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
-        /// <summary>
-        /// Ouvre le fichier .rfa dans l'application associée.
-        /// </summary>
-        private void OpenFamilyFile_Click(object sender, RoutedEventArgs e)
+        private void LoadConfig()
         {
-            if ((sender as MenuItem)?.DataContext is FamilyItem family)
+            string top = "#FFF2F2F2", bottom = "#FFFFFFFF", panel = "#F0F0F0",
+                   treeBg = "#F0F0F0", itemsBg = "Transparent", tabBg = "Transparent";
+            bool dark = false;
+
+            if (File.Exists(configFile))
             {
-                try
+                foreach (var line in File.ReadAllLines(configFile))
                 {
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(family.Path) { UseShellExecute = true });
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show(FamilyBrowserCommand.MainWindowRef, "Impossible d'ouvrir le fichier de famille : " + ex.Message, "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+                    if (line.StartsWith("TopColor=", StringComparison.OrdinalIgnoreCase))
+                        top = line.Substring("TopColor=".Length);
+                    else if (line.StartsWith("BottomColor=", StringComparison.OrdinalIgnoreCase))
+                        bottom = line.Substring("BottomColor=".Length);
+                    else if (line.StartsWith("PanelBackground=", StringComparison.OrdinalIgnoreCase))
+                        panel = line.Substring("PanelBackground=".Length);
+                    else if (line.StartsWith("TreeViewBackground=", StringComparison.OrdinalIgnoreCase))
+                        treeBg = line.Substring("TreeViewBackground=".Length);
+                    else if (line.StartsWith("ItemsBackground=", StringComparison.OrdinalIgnoreCase))
+                        itemsBg = line.Substring("ItemsBackground=".Length);
+                    else if (line.StartsWith("TabBackground=", StringComparison.OrdinalIgnoreCase))
+                        tabBg = line.Substring("TabBackground=".Length);
+                    else if (line.StartsWith("DarkMode=", StringComparison.OrdinalIgnoreCase))
+                        bool.TryParse(line.Substring("DarkMode=".Length), out dark);
                 }
             }
+
+            TopColorPicker.SelectedColor = ColorFromHex(top);
+            BottomColorPicker.SelectedColor = ColorFromHex(bottom);
+            PanelBackgroundPicker.SelectedColor = ColorFromHex(panel);
+            TreeViewBackgroundPicker.SelectedColor = ColorFromHex(treeBg);
+            ItemsBackgroundPicker.SelectedColor = ColorFromHex(itemsBg);
+            TabBackgroundPicker.SelectedColor = ColorFromHex(tabBg);
+            DarkModeCheckBox.IsChecked = dark;
         }
 
-        public static string GetRelativePath(string relativeTo, string path)
+        private void SaveConfig_Click(object s, RoutedEventArgs e)
         {
-            var fromUri = new Uri(relativeTo.EndsWith(Path.DirectorySeparatorChar.ToString()) ? relativeTo : relativeTo + Path.DirectorySeparatorChar);
-            var toUri = new Uri(path);
-            var relativeUri = fromUri.MakeRelativeUri(toUri);
-            string relativePath = Uri.UnescapeDataString(relativeUri.ToString());
-            return relativePath.Replace('/', Path.DirectorySeparatorChar);
+            var lines = new[]
+            {
+                "TopColor="    + ColorToHex(TopColorPicker.SelectedColor ?? Colors.White),
+                "BottomColor=" + ColorToHex(BottomColorPicker.SelectedColor ?? Colors.White),
+                "PanelBackground="      + ColorToHex(PanelBackgroundPicker.SelectedColor ?? Colors.Transparent),
+                "TreeViewBackground="   + ColorToHex(TreeViewBackgroundPicker.SelectedColor ?? Colors.Transparent),
+                "ItemsBackground="      + (ItemsBackgroundPicker.SelectedColor == Colors.Transparent
+                                              ? "Transparent"
+                                              : ColorToHex(ItemsBackgroundPicker.SelectedColor.Value)),
+                "TabBackground="        + (TabBackgroundPicker.SelectedColor   == Colors.Transparent
+                                              ? "Transparent"
+                                              : ColorToHex(TabBackgroundPicker.SelectedColor.Value)),
+                "DarkMode=" + (DarkModeCheckBox.IsChecked == true ? "true" : "false")
+            };
+            File.WriteAllLines(configFile, lines);
+            MessageBox.Show("Configuration enregistrée. Redémarrez pour appliquer.");
         }
 
-        private string ColorToHex(Color c)
+        private void ResetConfig_Click(object s, RoutedEventArgs e)
         {
-            return $"#{c.A:X2}{c.R:X2}{c.G:X2}{c.B:X2}";
+            TopColorPicker.SelectedColor = ColorFromHex("#FFF2F2F2");
+            BottomColorPicker.SelectedColor = ColorFromHex("#FFFFFFFF");
+            PanelBackgroundPicker.SelectedColor = ColorFromHex("#F0F0F0");
+            TreeViewBackgroundPicker.SelectedColor = ColorFromHex("#F0F0F0");
+            ItemsBackgroundPicker.SelectedColor = Colors.Transparent;
+            TabBackgroundPicker.SelectedColor = Colors.Transparent;
+            DarkModeCheckBox.IsChecked = false;
+            UpdateTheme();
+            SaveConfig_Click(s, e);
         }
 
-        private Color ColorFromHex(string hex)
-        {
-            if (hex.Equals("Transparent", StringComparison.OrdinalIgnoreCase))
-                return Colors.Transparent;
-            return (Color)ColorConverter.ConvertFromString(hex);
-        }
-
-        /// <summary>
-        /// Applique le thème sombre ou clair (mise à jour de PrimaryText, ImageBackground, etc.).
-        /// </summary>
         private void UpdateTheme()
         {
-            if (DarkModeCheckBox.IsChecked == true)
+            bool isDark = DarkModeCheckBox.IsChecked == true;
+
+            if (isDark)
             {
-                // Mode sombre
-                Resources["BackgroundGradient"] = new LinearGradientBrush(new GradientStopCollection {
-                    new GradientStop(Colors.Black, 0),
-                    new GradientStop(Colors.DarkGray, 1)
-                })
-                { StartPoint = new Point(0, 0), EndPoint = new Point(0, 1) };
+                Resources["BackgroundGradient"] = new LinearGradientBrush(
+                    new GradientStopCollection {
+                        new GradientStop(Colors.Black, 0),
+                        new GradientStop(Colors.DarkGray, 1)
+                    }, new Point(0, 0), new Point(0, 1));
                 Resources["PanelBackground"] = new SolidColorBrush(Color.FromRgb(51, 51, 51));
                 Resources["TreeViewBackground"] = new SolidColorBrush(Color.FromRgb(51, 51, 51));
                 Resources["ItemsBackground"] = new SolidColorBrush(Color.FromRgb(34, 34, 34));
@@ -454,74 +357,145 @@ namespace Famille
             }
             else
             {
-                // Mode clair
-                UpdateGradient();
+                var top = TopColorPicker.SelectedColor ?? Colors.White;
+                var bot = BottomColorPicker.SelectedColor ?? Colors.White;
+                Resources["BackgroundGradient"] = new LinearGradientBrush(
+                    new GradientStopCollection {
+                        new GradientStop(top, 0),
+                        new GradientStop(bot, 1)
+                    }, new Point(0, 0), new Point(0, 1));
+                var panel = PanelBackgroundPicker.SelectedColor ?? Colors.White;
+                var treeBg = TreeViewBackgroundPicker.SelectedColor ?? Colors.White;
+                var itemsBg = ItemsBackgroundPicker.SelectedColor ?? Colors.Transparent;
+                var tabBg = TabBackgroundPicker.SelectedColor ?? Colors.Transparent;
+                Resources["PanelBackground"] = new SolidColorBrush(panel);
+                Resources["TreeViewBackground"] = new SolidColorBrush(treeBg);
+                Resources["ItemsBackground"] = new SolidColorBrush(itemsBg);
+                Resources["TabBackground"] = new SolidColorBrush(tabBg);
                 Resources["ImageBackground"] = new SolidColorBrush(Colors.Transparent);
                 Resources["PrimaryText"] = new SolidColorBrush(Colors.Black);
             }
         }
 
-        private void UpdateGradient()
+        #endregion
+
+        #region Interaction UI
+
+        private void ApplyColors_Click(object sender, RoutedEventArgs e) => UpdateTheme();
+
+        private void ReloadFamily_Click(object sender, RoutedEventArgs e)
         {
-            try
+            if (sender is MenuItem mi && mi.DataContext is FamilyItem fam)
             {
-                var topColor = TopColorPicker.SelectedColor ?? Colors.White;
-                var bottomColor = BottomColorPicker.SelectedColor ?? Colors.White;
-                var panelColor = PanelBackgroundPicker.SelectedColor ?? Colors.White;
-                var treeColor = TreeViewBackgroundPicker.SelectedColor ?? Colors.White;
-                var itemsColor = ItemsBackgroundPicker.SelectedColor ?? Colors.Transparent;
-                var tabColor = TabBackgroundPicker.SelectedColor ?? Colors.Transparent;
-                var newGradient = new LinearGradientBrush(new GradientStopCollection {
-                    new GradientStop(topColor, 0),
-                    new GradientStop(bottomColor, 1)
-                })
-                { StartPoint = new Point(0, 0), EndPoint = new Point(0, 1) };
-                Resources["BackgroundGradient"] = newGradient;
-                Resources["PanelBackground"] = new SolidColorBrush(panelColor);
-                Resources["TreeViewBackground"] = new SolidColorBrush(treeColor);
-                Resources["ItemsBackground"] = new SolidColorBrush(itemsColor);
-                Resources["TabBackground"] = new SolidColorBrush(tabColor);
-            }
-            catch (Exception)
-            {
-                MessageBox.Show("Pour appliquer ces couleurs, veuillez soit enregistrer et redémarrer, soit sélectionner des couleurs valides.");
+                FamilyBrowserCommand.ReloadFamilyHandlerInstance.FamilyPath = fam.Path;
+                FamilyBrowserCommand.ReloadFamilyEventInstance.Raise();
             }
         }
 
-        private void ApplyColors_Click(object sender, RoutedEventArgs e)
+        private void FamilyItem_DoubleClick(object sender, MouseButtonEventArgs e)
         {
-            UpdateTheme();
+            if (e.ClickCount != 2) return;
+            if (sender is Border b && b.DataContext is FamilyItem fam)
+                    {
+                // on revient à LoadFamilyHandler qui gèrera aussi le placement
+                FamilyBrowserCommand.LoadFamilyHandlerInstance.FamilyPath = fam.Path;
+                FamilyBrowserCommand.LoadFamilyEventInstance.Raise();
+            }
         }
+
+        private void OpenFamilyFile_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as MenuItem)?.DataContext is FamilyItem fam)
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo(fam.Path) { UseShellExecute = true });
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(this, "Impossible d’ouvrir le fichier : " + ex.Message);
+                }
+            }
+        }
+
+        #endregion
+
+        #region Helpers
+
+        public static string GetRelativePath(string relativeTo, string path)
+        {
+            var fromUri = new Uri(relativeTo.EndsWith(Path.DirectorySeparatorChar.ToString())
+                ? relativeTo : relativeTo + Path.DirectorySeparatorChar);
+            var toUri = new Uri(path);
+            var relUri = fromUri.MakeRelativeUri(toUri);
+            return Uri.UnescapeDataString(relUri.ToString())
+                      .Replace('/', Path.DirectorySeparatorChar);
+        }
+
+        private FamilyItem CreateFamilyItemFromPath(string path)
+        {
+            var name = System.IO.Path.GetFileNameWithoutExtension(path);
+            var cat = "Général";
+            var low = name.ToLower();
+            if (low.Contains("porte")) cat = "Porte";
+            else if (low.Contains("fenêtre") || low.Contains("fenetre")) cat = "Fenêtre";
+
+            return new FamilyItem
+            {
+                Name = name,
+                Path = path,
+                Category = cat,
+                Icon = null
+            };
+        }
+
+        private string ColorToHex(Color c)
+            => $"#{c.A:X2}{c.R:X2}{c.G:X2}{c.B:X2}";
+
+        private Color ColorFromHex(string hex)
+            => hex.Equals("Transparent", StringComparison.OrdinalIgnoreCase)
+               ? Colors.Transparent
+               : (Color)ColorConverter.ConvertFromString(hex);
 
         #endregion
     }
 
-    // Classe FamilyItem implémentant INotifyPropertyChanged pour actualiser IsFavorite
     public class FamilyItem : INotifyPropertyChanged
     {
         public string Name { get; set; }
         public string Path { get; set; }
-        public BitmapImage Icon { get; set; }
-        public string Category { get; set; } = "Général";
+        public string Category { get; set; }
 
-        private bool _isFavorite = false;
+        private BitmapImage _icon;
+        public BitmapImage Icon
+        {
+            get => _icon;
+            set
+            {
+                if (_icon != value)
+                {
+                    _icon = value;
+                    OnPropertyChanged(nameof(Icon));
+                }
+            }
+        }
+
+        private bool _isFavorite;
         public bool IsFavorite
         {
-            get { return _isFavorite; }
+            get => _isFavorite;
             set
             {
                 if (_isFavorite != value)
                 {
                     _isFavorite = value;
-                    OnPropertyChanged("IsFavorite");
+                    OnPropertyChanged(nameof(IsFavorite));
                 }
             }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
-        protected void OnPropertyChanged(string propertyName)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
+        protected void OnPropertyChanged(string propName)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propName));
     }
 }

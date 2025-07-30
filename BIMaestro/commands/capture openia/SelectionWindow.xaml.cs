@@ -8,7 +8,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
-using System.Text.Json;
+using Newtonsoft.Json.Linq;
 using System.Windows;
 using System.Windows.Forms;
 using Brushes = System.Windows.Media.Brushes;
@@ -216,7 +216,7 @@ namespace IA
                 {
                     string prompt = userPrompt + "\n[image base64:" + base64Image + "]";
                     var json = AiClient.SendOpenAI(_jwt, "gpt-4o-mini", prompt);
-                    return json.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
+                    return json["choices"]?[0]?["message"]?["content"]?.ToString();
                 }
                 catch (Exception ex)
                 {

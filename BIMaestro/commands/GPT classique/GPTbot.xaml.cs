@@ -11,7 +11,7 @@ using System.Windows.Controls;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using System.Linq;
-using System.Text.Json;
+using Newtonsoft.Json.Linq;
 using System.IO;
 using System.Windows.Documents;
 using Markdown.Xaml;
@@ -32,6 +32,7 @@ namespace IA
 
         // Variable pour stocker les informations des éléments
         private string storedElementInfo = null;
+        private string categoryName;
 
         public GPTBotWindow(string systemMessage, UIDocument uidoc)
         {
@@ -118,42 +119,60 @@ namespace IA
         {
             try
             {
-                // Récupérer les éléments actuellement sélectionnés
+                // 1) Récupérer la sélection Revit
                 ICollection<ElementId> selectedElementIds = uidoc.Selection.GetElementIds();
-
-                if (selectedElementIds.Count == 0)
+                if (selectedElementIds == null || !selectedElementIds.Any())
                 {
-                    MessageBox.Show("Aucun élément sélectionné. Veuillez sélectionner des éléments dans Revit avant de cliquer sur le bouton 'Élément'.");
+                    MessageBox.Show("Aucun élément sélectionné. Veuillez sélectionner des éléments dans Revit avant de cliquer sur 'Élément'.");
                     return;
                 }
 
-                List<ElementInfo> elementInfos = new List<ElementInfo>();
-
+                // 2) Pour chaque élément, on construit un ElementInfo
+                var elementInfos = new List<ElementInfo>();
                 foreach (ElementId elementId in selectedElementIds)
                 {
                     Element element = uidoc.Document.GetElement(elementId);
-                    Level level = element.Document.GetElement(element.LevelId) as Level;
-                    string levelName = level != null ? level.Name : "Niveau inconnu";
+
+                    // ——————— Remplacement LevelId ———————
+                    ElementId lvlId = ElementId.InvalidElementId;
+                    Parameter lvlParam = element.get_Parameter(BuiltInParameter.LEVEL_PARAM);
+                    if (lvlParam != null && lvlParam.StorageType == StorageType.ElementId)
+                    {
+                        lvlId = lvlParam.AsElementId();
+                    }
+                    Level level = lvlId != ElementId.InvalidElementId
+                                  ? uidoc.Document.GetElement(lvlId) as Level
+                                  : null;
+                    string levelName = level?.Name ?? "Niveau inconnu";
+                    // ————————————————————————————————
 
                     string categoryName = element.Category?.Name ?? "Catégorie inconnue";
 
-                    ElementInfo elementInfo = new ElementInfo
+                    var info = new ElementInfo
                     {
                         Id = element.Id.ToString(),
                         Name = element.Name,
                         Category = categoryName,
                         Material = ElementUtilities.GetElementMaterials(element),
-                        CustomParameters = ElementUtilities.GetCustomParameters(element), // Pas besoin de passer UIApplication
-                        Level = levelName,
-                        SurfaceAndVolume = ElementUtilities.GetElementFloorAreaAndVolume(element, categoryName) // Pass category
+                        CustomParameters = ElementUtilities.GetCustomParameters(element),
+                        Level = levelName
                     };
-                    elementInfos.Add(elementInfo);
+
+                    elementInfos.Add(info);
                 }
 
-                storedElementInfo = string.Join("\n\n", elementInfos.Select(ei => ei.ToString()));
+                // 3) Conserver le texte pour la prochaine question
+                storedElementInfo = string.Join(
+                    Environment.NewLine + Environment.NewLine,
+                    elementInfos.Select(ei => ei.ToString())
+                );
 
-                // Optionnel : Afficher un message dans le chat pour informer que les éléments ont été enregistrés
-                var infoMessage = new MessageModel { Role = "assistant", Content = "Les informations des éléments sélectionnés ont été enregistrées. Elles seront envoyées avec votre prochaine question." };
+                // 4) Feedback à l'utilisateur dans le chat
+                var infoMessage = new MessageModel
+                {
+                    Role = "assistant",
+                    Content = "Les informations des éléments sélectionnés ont été enregistrées. Elles seront incluses dans votre prochaine question."
+                };
                 conversationHistory.Add(infoMessage);
                 MessagesListBox.ScrollIntoView(infoMessage);
             }
@@ -162,6 +181,7 @@ namespace IA
                 MessageBox.Show("Erreur lors de la récupération des éléments sélectionnés : " + ex.Message);
             }
         }
+
 
         private async Task<string> GetResponseFromDeepSeek()
         {
@@ -176,7 +196,7 @@ namespace IA
                 try
                 {
                     var json = AiClient.SendDeepSeek(_jwt, sb.ToString());
-                    return json.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
+                    return json["choices"]?[0]?["message"]?["content"]?.ToString();
                 }
                 catch (Exception ex)
                 {

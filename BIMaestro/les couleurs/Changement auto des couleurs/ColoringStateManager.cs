@@ -272,6 +272,8 @@ namespace Couleur
                     // d’emblée, fond pastel
                     foreach (var b in _bimBorders)
                         b.Background = _pastelBrush;
+                    ColorTextBlocks(_bimButton, Brushes.Black);
+
 
                     // timer WPF sur le même thread UI
                     _bimWatcher = new DispatcherTimer(DispatcherPriority.Render)
@@ -305,6 +307,8 @@ namespace Couleur
 
             foreach (var b in _bimBorders)
                 b.Background = target;
+            ColorTextBlocks(_bimButton, Brushes.Black);
+
         }
 
         private static void ResetTabItemColoring(IntPtr mainWindowHandle)
@@ -331,6 +335,8 @@ namespace Couleur
                 foreach (var b in _bimBorders)
                     b.ClearValue(Border.BackgroundProperty);
             }
+            if (_bimButton != null)
+                ClearTextBlocks(_bimButton);
             _bimButton = null;
             _bimBorders = null;
         }

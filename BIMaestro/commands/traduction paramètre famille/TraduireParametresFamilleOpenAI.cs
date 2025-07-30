@@ -1,11 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text.Json;
-using Autodesk.Revit.Attributes;
+﻿using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Licensing;                
-  
+using System;
+using System.Collections.Generic;
+using System.Text.Json;
+using Newtonsoft.Json.Linq;
+
+
 
 namespace Famille
 {
@@ -60,12 +62,8 @@ namespace Famille
                 try
                 {
                     // Envoie le prompt et récupère la réponse
-                    JsonDocument json = AiClient.SendOpenAI(jwt, "gpt-4o-mini", prompt);
-                    traduit = json.RootElement
-                                  .GetProperty("choices")[0]
-                                  .GetProperty("message")
-                                  .GetProperty("content")
-                                  .GetString() ?? originalName;
+                    JObject json = AiClient.SendOpenAI(jwt, "gpt-4o-mini", prompt);
+                    traduit = json["choices"]?[0]?["message"]?["content"]?.ToString() ?? originalName;
                 }
                 catch (Exception ex)
                 {

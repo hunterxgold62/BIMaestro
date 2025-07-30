@@ -2,7 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text.Json;
+using Newtonsoft.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -104,7 +104,7 @@ namespace TonNamespace
                 if (File.Exists(ConfigFilePath))
                 {
                     var json = File.ReadAllText(ConfigFilePath);
-                    _configuredCommands = JsonSerializer.Deserialize<List<string>>(json);
+                    _configuredCommands = JsonConvert.DeserializeObject<List<string>>(json);
                 }
                 else
                 {
@@ -124,8 +124,7 @@ namespace TonNamespace
             {
                 try
                 {
-                    var json = JsonSerializer.Serialize(_configuredCommands);
-                    File.WriteAllText(ConfigFilePath, json);
+                    var json = JsonConvert.SerializeObject(_configuredCommands); File.WriteAllText(ConfigFilePath, json);
                 }
                 catch { }
             }), DispatcherPriority.Background);

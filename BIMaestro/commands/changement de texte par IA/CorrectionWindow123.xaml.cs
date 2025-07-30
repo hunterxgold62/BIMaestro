@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Text;
-using System.Text.Json;
+using Newtonsoft.Json.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -80,14 +80,8 @@ namespace IA
                 );
 
                 // Extraction des résultats
-                var suggestions = jsonDoc.RootElement
-                    .GetProperty("choices")
-                    .EnumerateArray()
-                    .Select(ch => ch
-                        .GetProperty("message")
-                        .GetProperty("content")
-                        .GetString()!
-                        .Trim())
+                var suggestions = jsonDoc["choices"]?
+                    .Select(ch => ch?["message"]?["content"]?.ToString()?.Trim())
                     .Where(s => !string.IsNullOrEmpty(s))
                     .ToList();
 

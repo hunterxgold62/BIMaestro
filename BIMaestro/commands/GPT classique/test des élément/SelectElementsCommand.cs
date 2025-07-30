@@ -1,7 +1,7 @@
-﻿using Autodesk.Revit.UI;
+﻿// SelectElementsCommand.cs
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
-using Autodesk.Revit.UI.Selection;
+using Autodesk.Revit.UI;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,15 +16,11 @@ namespace IA
             UIDocument uidoc = commandData.Application.ActiveUIDocument;
             Document doc = uidoc.Document;
 
-            // Initialiser ElementUtilities avec UIApplication
-            ElementUtilities.Initialize(commandData.Application);
-
             try
             {
-                // Sélection des éléments
-                ICollection<ElementId> selectedElementIds = uidoc.Selection.GetElementIds();
-
-                if (selectedElementIds.Count == 0)
+                // Récupération des éléments sélectionnés
+                ICollection<ElementId> selectedIds = uidoc.Selection.GetElementIds();
+                if (selectedIds == null || !selectedIds.Any())
                 {
                     TaskDialog.Show("Sélection", "Aucun élément sélectionné. Veuillez sélectionner des éléments.");
                     return Result.Cancelled;
@@ -32,35 +28,46 @@ namespace IA
 
                 List<ElementInfo> elementInfos = new List<ElementInfo>();
 
-                foreach (ElementId elementId in selectedElementIds)
+                foreach (ElementId elementId in selectedIds)
                 {
                     Element element = doc.GetElement(elementId);
-                    Level level = element.Document.GetElement(element.LevelId) as Level;
-                    string levelName = level != null ? level.Name : "Niveau inconnu";
 
+                    // Récupération sûre du niveau via le paramètre LEVEL_PARAM
+                    ElementId lvlId = ElementId.InvalidElementId;
+                    Parameter lvlParam = element.get_Parameter(BuiltInParameter.LEVEL_PARAM);
+                    if (lvlParam != null && lvlParam.StorageType == StorageType.ElementId)
+                    {
+                        lvlId = lvlParam.AsElementId();
+                    }
+                    Level level = lvlId != ElementId.InvalidElementId
+                                  ? doc.GetElement(lvlId) as Level
+                                  : null;
+                    string levelName = level?.Name ?? "Niveau inconnu";
+
+                    // Catégorie et autres propriétés
                     string categoryName = element.Category?.Name ?? "Catégorie inconnue";
 
-                    ElementInfo elementInfo = new ElementInfo
+                    ElementInfo info = new ElementInfo
                     {
                         Id = element.Id.ToString(),
                         Name = element.Name,
                         Category = categoryName,
                         Material = ElementUtilities.GetElementMaterials(element),
-                        CustomParameters = ElementUtilities.GetCustomParameters(element), // Pas besoin de passer UIApplication
-                        Level = levelName,
-                        SurfaceAndVolume = ElementUtilities.GetElementFloorAreaAndVolume(element, categoryName) // Pass category
+                        CustomParameters = ElementUtilities.GetCustomParameters(element),
+                        Level = levelName
                     };
-                    elementInfos.Add(elementInfo);
+
+                    elementInfos.Add(info);
                 }
 
-                string elementsInfoLog = string.Join(Environment.NewLine + Environment.NewLine, elementInfos.Select(e => e.ToString()));
-                TaskDialog.Show("Informations des éléments", elementsInfoLog);
+                // Construction du texte à afficher
+                string elementsInfoLog = string.Join(
+                    Environment.NewLine + Environment.NewLine,
+                    elementInfos.Select(ei => ei.ToString())
+                );
 
+                TaskDialog.Show("Informations des éléments", elementsInfoLog);
                 return Result.Succeeded;
-            }
-            catch (Autodesk.Revit.Exceptions.OperationCanceledException)
-            {
-                return Result.Cancelled;
             }
             catch (Exception ex)
             {

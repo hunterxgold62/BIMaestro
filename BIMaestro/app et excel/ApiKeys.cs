@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Net.Http;
-using System.Net.Http.Json;
-using System.Text.Json;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Licensing
 {
@@ -11,7 +11,7 @@ namespace Licensing
             "https://xqovxfgghbqxwsadzhzl.functions.supabase.co/ai-proxy";
 
         // Méthode générique pour OpenAI
-        public static JsonDocument SendOpenAI(string jwtLicense, object openaiRequest)
+        public static JObject SendOpenAI(string jwtLicense, object openaiRequest)
         {
             using var client = new HttpClient();
             client.DefaultRequestHeaders.Authorization =
@@ -23,8 +23,10 @@ namespace Licensing
                 parameters = openaiRequest
             };
 
+            string jsonBody = JsonConvert.SerializeObject(wrapper);
+            var content = new StringContent(jsonBody, System.Text.Encoding.UTF8, "application/json");
             var resp = client
-                .PostAsJsonAsync(ProxyUrl, wrapper)
+                .PostAsync(ProxyUrl, content)
                 .GetAwaiter().GetResult();
 
             var raw = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
@@ -33,11 +35,11 @@ namespace Licensing
             if (!resp.IsSuccessStatusCode)
                 throw new InvalidOperationException($"AI proxy error ({(int)resp.StatusCode}): {raw}");
 
-            return JsonDocument.Parse(raw);
+            return JObject.Parse(raw);
         }
 
         // Surcharge claire pour OpenAI : prend model + prompt
-        public static JsonDocument SendOpenAI(string jwtLicense, string model, string prompt)
+        public static JObject SendOpenAI(string jwtLicense, string model, string prompt)
         {
             var openaiRequest = new
             {
@@ -48,7 +50,7 @@ namespace Licensing
         }
 
         // >>> MISE À JOUR <<< : méthode DeepSeek corrigée
-        public static JsonDocument SendDeepSeek(string jwtLicense, string query)
+        public static JObject SendDeepSeek(string jwtLicense, string query)
         {
             using var client = new HttpClient();
             client.DefaultRequestHeaders.Authorization =
@@ -64,14 +66,16 @@ namespace Licensing
                 }
             };
 
+            string jsonBody = JsonConvert.SerializeObject(wrapper);
+            var content = new StringContent(jsonBody, System.Text.Encoding.UTF8, "application/json");
             var resp = client
-                .PostAsJsonAsync(ProxyUrl, wrapper)
+                .PostAsync(ProxyUrl, content)
                 .GetAwaiter().GetResult();
 
             var raw = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
             if (!resp.IsSuccessStatusCode)
                 throw new InvalidOperationException($"AI proxy error ({(int)resp.StatusCode}): {raw}");
-            return JsonDocument.Parse(raw);
+            return JObject.Parse(raw);
         }
     }
 }

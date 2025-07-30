@@ -4,7 +4,7 @@ using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using System.Windows.Interop;
-using IA;              // ← AiClient
+using Newtonsoft.Json.Linq;
 using Licensing;      // ← LicenseManager
 
 namespace IA
@@ -50,12 +50,7 @@ namespace IA
                         $"Corrige sans ajouter de nouvelles informations : {original}"
                     );
 
-                    baseline = json.RootElement
-                        .GetProperty("choices")[0]
-                        .GetProperty("message")
-                        .GetProperty("content")
-                        .GetString()!
-                        .Trim();
+                    baseline = json["choices"]?[0]?["message"]?["content"]?.ToString()?.Trim() ?? "";
                 }
                 catch
                 {

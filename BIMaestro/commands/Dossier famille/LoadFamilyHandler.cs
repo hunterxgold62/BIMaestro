@@ -1,9 +1,10 @@
-﻿using Autodesk.Revit.UI;
-using Autodesk.Revit.DB;
+﻿// LoadFamilyHandler.cs
 using System;
 using System.Linq;
-using System.Windows;
-
+using System.Collections.Generic;
+using Autodesk.Revit.Attributes;
+using Autodesk.Revit.DB;
+using Autodesk.Revit.UI;
 
 namespace Famille
 {
@@ -11,62 +12,58 @@ namespace Famille
     {
         public string FamilyPath { get; set; }
 
-        public void Execute(UIApplication app)
+        public void Execute(UIApplication uiapp)
         {
-            try
+            var uidoc = uiapp.ActiveUIDocument;
+            var doc = uidoc.Document;
+            Family famLoaded = null;
+
+            // 1) Charger la famille (ou tenter de charger)
+            using (var tx = new Transaction(doc, "Charger Famille"))
             {
-                if (!System.IO.File.Exists(FamilyPath))
-                {
-                    MessageBox.Show(FamilyBrowserCommand.MainWindowRef, $"Le fichier de famille '{FamilyPath}' n'existe pas.", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
-                }
+                tx.Start();
+                doc.LoadFamily(FamilyPath, new FamilyLoadOption(), out famLoaded);
+                tx.Commit();
+            }
 
-                Document doc = app.ActiveUIDocument.Document;
-                string familyName = System.IO.Path.GetFileNameWithoutExtension(FamilyPath);
-
-                // Vérifier si une famille du même nom existe déjà
-                Family existingFamily = new FilteredElementCollector(doc)
+            // 2) Si elle était déjà présente, la retrouver dans le document
+            if (famLoaded == null)
+            {
+                var famName = System.IO.Path.GetFileNameWithoutExtension(FamilyPath);
+                famLoaded = new FilteredElementCollector(doc)
                     .OfClass(typeof(Family))
                     .Cast<Family>()
-                    .FirstOrDefault(f => f.Name.Equals(familyName, StringComparison.OrdinalIgnoreCase));
-
-                if (existingFamily != null)
-                {
-                    var result = MessageBox.Show(FamilyBrowserCommand.MainWindowRef,
-                        $"La famille '{familyName}' existe déjà dans le projet.\nVoulez-vous l'écraser ?",
-                        "Famille déjà présente",
-                        MessageBoxButton.YesNo,
-                        MessageBoxImage.Question);
-
-                    if (result == MessageBoxResult.No)
-                    {
-                        return;
-                    }
-                }
-
-                using (Transaction trans = new Transaction(doc, "Charger la Famille"))
-                {
-                    trans.Start();
-                    if (doc.LoadFamily(FamilyPath, new FamilyLoadOption(), out Family family))
-                    {
-                        MessageBox.Show(FamilyBrowserCommand.MainWindowRef, $"La famille '{family.Name}' a été chargée avec succès.", "Succès", MessageBoxButton.OK, MessageBoxImage.Information);
-                    }
-                    else
-                    {
-                        MessageBox.Show(FamilyBrowserCommand.MainWindowRef, $"Échec du chargement de la famille '{familyName}'.", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
-                    trans.Commit();
-                }
+                    .FirstOrDefault(f =>
+                        f.Name.Equals(famName, StringComparison.OrdinalIgnoreCase));
             }
-            catch (Exception ex)
+
+            // 3) Si on n’a toujours pas la famille, on quitte
+            if (famLoaded == null)
+                return;
+
+            // 4) Récupérer et activer le premier FamilySymbol
+            var symId = famLoaded.GetFamilySymbolIds().FirstOrDefault();
+            if (symId == ElementId.InvalidElementId)
+                return;
+            var symbol = doc.GetElement(symId) as FamilySymbol;
+            if (symbol == null)
+                return;
+
+            if (!symbol.IsActive)
             {
-                MessageBox.Show(FamilyBrowserCommand.MainWindowRef, $"Une erreur s'est produite : {ex.Message}\n{ex.StackTrace}", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+                using (var tx2 = new Transaction(doc, "Activer symbole"))
+                {
+                    tx2.Start();
+                    symbol.Activate();
+                    tx2.Commit();
+                }
             }
+
+            // 5) Sélectionner puis lancer le mode placement du symbole
+            uidoc.Selection.SetElementIds(new List<ElementId> { symbol.Id });
+            uidoc.PostRequestForElementTypePlacement(symbol);
         }
 
-        public string GetName()
-        {
-            return "LoadFamilyHandler";
-        }
+        public string GetName() => "LoadFamilyHandler";
     }
 }
