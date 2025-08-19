@@ -374,8 +374,8 @@ namespace ScanTextRevit
                 lower.Contains("révision actuelle diffusée") ||
                 lower.Contains("révision actuelle diffusée par") ||
                 lower.Contains("révision actuelle remise à") ||
-                lower.Contains("echelle") ||      // Pour "Echelle"
-                lower.Contains("échelle") ||      // Si Revit renvoie "Échelle"
+                lower.Contains("echelle") ||      
+                lower.Contains("échelle") ||      
                 lower.Contains("révisions sur feuille") ||
                 lower.Contains("créateur") ||
                 lower.Contains("dessiné par") ||

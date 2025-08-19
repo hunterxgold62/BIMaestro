@@ -81,18 +81,34 @@ namespace ScanTextRevit
 
             foreach (var c in corrections)
             {
-                // Filtrage des corrections inutiles
-                string expl = c.Explanation?.ToLower() ?? "";
-                if (expl.Contains("aucune correction nécessaire") || expl.Contains("aucune erreur détectée"))
+                // Normaliser le texte de l'explication et des champs textuels
+                string expl = c.Explanation?.ToLowerInvariant() ?? "";
+                string origTrim = c.OriginalText?.Trim() ?? "";
+                string corrTrim = c.CorrectedText?.Trim() ?? "";
+
+                // Condition pour détecter un "pas de correction"
+                bool isNoCorrection =
+                    expl.Contains("aucune correction nécessaire") ||
+                    expl.Contains("aucune erreur détectée") ||
+                    expl.Contains("texte correct") ||
+                    expl.Contains("pas d'erreur") ||
+                    expl.Contains("pas de correction nécessaire") ||
+                    string.Equals(origTrim, corrTrim, StringComparison.OrdinalIgnoreCase);
+
+                if (isNoCorrection)
                     continue;
 
-                string uniqueKey = $"{c.ElementId}||{c.OriginalText}||{c.CorrectedText}";
-                if (!_allResults[key].Any(existing => $"{existing.ElementId}||{existing.OriginalText}||{existing.CorrectedText}" == uniqueKey))
+                // Déduplication habituelle
+                string uniqueKey = $"{c.ElementId}||{origTrim}||{corrTrim}";
+                if (!_allResults[key].Any(existing =>
+                    $"{existing.ElementId}||{existing.OriginalText?.Trim()}||{existing.CorrectedText?.Trim()}"
+                     == uniqueKey))
                 {
                     c.ViewId = ExtractIdFromKey(key);
                     _allResults[key].Add(c);
                 }
             }
+
             RefreshDisplay();
         }
 

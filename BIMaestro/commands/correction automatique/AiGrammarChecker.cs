@@ -1,16 +1,15 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-
-using System.Text;
+﻿using IA;
+using Licensing;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using System.Threading;
-using Newtonsoft.Json.Linq;
-using System.Threading.Tasks;
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
-using IA;
-using Licensing;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace ScanTextRevit
 {
@@ -79,11 +78,14 @@ namespace ScanTextRevit
                     {
                         // Préparation du prompt
                         var promptBuilder = new StringBuilder();
-                        for (int i = 0; i < chunk.Count; i++)
-                        {
-                            promptBuilder.AppendLine($"{i + 1}. {chunk[i].Text.Trim()}");
-                        }
-                        string prompt = BuildPrompt(promptBuilder.ToString());
+                        var linesArray = chunk
+     .Select((item, idx) => new {
+         LineNumber = idx + 1,
+         Text = item.Text.Trim()
+     })
+     .ToList();
+                        string linesJson = JsonConvert.SerializeObject(linesArray, Formatting.None);
+                        string prompt = BuildPrompt(linesJson);
                         string promptHash = _cache.ComputeHash(prompt);
 
                         // 3) Appel à l'IA (avec cache)
@@ -114,12 +116,22 @@ namespace ScanTextRevit
                         {
                             if (!string.IsNullOrEmpty(corr.OriginalText) && !string.IsNullOrEmpty(corr.CorrectedText))
                             {
-                                string origNoPunct = RemovePunctuation(corr.OriginalText).Trim();
-                                string corrNoPunct = RemovePunctuation(corr.CorrectedText).Trim();
-                                if (string.Equals(origNoPunct, corrNoPunct, StringComparison.OrdinalIgnoreCase))
-                                {
+                                // On normalise en FormKD pour séparer accents, puis on retire tous les signes de ponctuation Unicode
+                                string Normalize(string s) =>
+                                    new string(
+                                        s.Normalize(NormalizationForm.FormKD)
+                                         .Where(ch => CharUnicodeInfo.GetUnicodeCategory(ch)
+                                                         != UnicodeCategory.NonSpacingMark
+                                                         && !char.IsPunctuation(ch))
+                                         .ToArray()
+                                    ).Trim();
+
+                                // Puis :
+                                var nOrig = Normalize(corr.OriginalText).ToLowerInvariant();
+                                var nCorr = Normalize(corr.CorrectedText).ToLowerInvariant();
+                                if (nOrig == nCorr)
                                     corr.Category = "Mineur";
-                                }
+                            
                             }
                         }
 
@@ -151,14 +163,13 @@ namespace ScanTextRevit
             return finalResults;
         }
 
-        private string BuildPrompt(string chunkedTexts)
+        private string BuildPrompt(string linesJson)
         {
-            return "Tu es un correcteur orthographique et grammatical expert en français. Corrige les fautes dans les textes suivants. " +
-                   "Pour chaque ligne, renvoie un objet JSON contenant : " +
-                   "LineNumber (numéro de ligne, commençant à 1), OriginalText, CorrectedText, Explanation, et Category ('Mineur' si seule la ponctuation ou les espaces ont été modifiés, 'Erreur' sinon). " +
-                   "Réponds uniquement avec un tableau JSON ayant exactement le même nombre d'objets que de lignes. " +
-                   "Voici les textes (chaque ligne préfixée par son numéro) :\n" +
-                   chunkedTexts;
+            return
+              "Tu es un correcteur expert en français. Pour chaque objet du tableau JSON ci‑dessous, "
+            + "fournis LineNumber, OriginalText, CorrectedText, Explanation, Category. "
+            + "Si aucun texte ne requiert de correction, réponds STRICTEMENT avec [] (tableau JSON vide).\n"
+            + linesJson;
         }
 
         private List<List<ScannedTextItem>> SplitScannedTextsIntoChunks(List<ScannedTextItem> items, int maxChars)
@@ -166,17 +177,29 @@ namespace ScanTextRevit
             var chunks = new List<List<ScannedTextItem>>();
             var currentChunk = new List<ScannedTextItem>();
             int currentSize = 0;
+
             foreach (var item in items)
             {
-                // +1 pour le saut de ligne potentiel
-                if (currentSize + item.Text.Length + 1 > maxChars && currentChunk.Count > 0)
+                // On découpe l'item en sous-phrases via ponctuation forte
+                var sentences = Regex.Split(item.Text.Trim(),
+                    @"(?<=[\.!\?])\s+", RegexOptions.Compiled);
+                foreach (var sentence in sentences)
                 {
-                    chunks.Add(new List<ScannedTextItem>(currentChunk));
-                    currentChunk.Clear();
-                    currentSize = 0;
+                    if (sentence.Length == 0) continue;
+                    // Si la phrase seule dépasse maxChars, on la force quand même
+                    if (currentSize + sentence.Length + 1 > maxChars && currentChunk.Count > 0)
+                    {
+                        chunks.Add(new List<ScannedTextItem>(currentChunk));
+                        currentChunk.Clear();
+                        currentSize = 0;
+                    }
+                    currentChunk.Add(new ScannedTextItem
+                    {
+                        Text = sentence,
+                        ElementId = item.ElementId
+                    });
+                    currentSize += sentence.Length + 1;
                 }
-                currentChunk.Add(item);
-                currentSize += item.Text.Length + 1;
             }
             if (currentChunk.Count > 0)
                 chunks.Add(currentChunk);
@@ -194,9 +217,47 @@ namespace ScanTextRevit
                     string messageContent = json["choices"]?[0]?["message"]?["content"]?.ToString();
                     return messageContent;
                 }
+                catch (InvalidOperationException ex) when (ex.Message == AiClient.QuotaExceededMessage)
+                {
+                    // Quota dépassé → on renvoie un CorrectionItem avec le message centralisé
+                    var errorObj = new CorrectionItem
+                    {
+                        LineNumber = 0,
+                        OriginalText = prompt,
+                        CorrectedText = AiClient.QuotaExceededMessage,
+                        Explanation = "",
+                        Category = "Erreur"
+                    };
+                    var arr = new List<CorrectionItem> { errorObj };
+                    return JsonConvert.SerializeObject(arr);
+                }
+                catch (InvalidOperationException ex) when (ex.Message.StartsWith("AI proxy error (403)"))
+                {
+                    // Au cas où le proxy renvoie un autre message 403
+                    var errorObj = new CorrectionItem
+                    {
+                        LineNumber = 0,
+                        OriginalText = prompt,
+                        CorrectedText = AiClient.QuotaExceededMessage,
+                        Explanation = "",
+                        Category = "Erreur"
+                    };
+                    var arr = new List<CorrectionItem> { errorObj };
+                    return JsonConvert.SerializeObject(arr);
+                }
                 catch (Exception ex)
                 {
-                    return $"[{{ \"LineNumber\": 0, \"OriginalText\": \"{prompt}\", \"CorrectedText\": \"Erreur API: {ex.Message}\", \"Explanation\": \"\" }}]";
+                    // Toutes les autres erreurs
+                    var errorObj = new CorrectionItem
+                    {
+                        LineNumber = 0,
+                        OriginalText = prompt,
+                        CorrectedText = $"Erreur API: {ex.Message}",
+                        Explanation = "",
+                        Category = "Erreur"
+                    };
+                    var arr = new List<CorrectionItem> { errorObj };
+                    return JsonConvert.SerializeObject(arr);
                 }
             });
         }
@@ -264,36 +325,23 @@ namespace ScanTextRevit
 
         private string ExtractValidJson(string input)
         {
-            if (string.IsNullOrWhiteSpace(input))
-                return input;
-            input = input.Trim();
+            if (string.IsNullOrWhiteSpace(input)) return input.Trim();
 
-            // Si la réponse commence par ```json
-            if (input.StartsWith("```json", StringComparison.OrdinalIgnoreCase))
-            {
-                int startBlock = input.IndexOf("```json", StringComparison.OrdinalIgnoreCase) + "```json".Length;
-                int endBlock = input.IndexOf("```", startBlock);
-                if (endBlock > startBlock)
-                {
-                    input = input.Substring(startBlock, endBlock - startBlock).Trim();
-                }
-            }
+            // Cherche un bloc ```json ... ```
+            var m = Regex.Match(input, @"```json\s*(\[\s*[\s\S]*\]|\{\s*[\s\S]*\})\s*```",
+                                RegexOptions.IgnoreCase);
+            if (m.Success)
+                return m.Groups[1].Value.Trim();
 
-            // Retrait progressif de la fin jusqu'à obtenir du JSON valide
-            while (!string.IsNullOrEmpty(input))
-            {
-                try
-                {
-                    JToken.Parse(input);
-                    return input;
-                }
-                catch (JsonReaderException)
-                {
-                    input = input.Substring(0, input.Length - 1).Trim();
-                }
-            }
-            return input;
+            // Sinon retourne tout ce qui ressemble à un tableau JSON
+            m = Regex.Match(input, @"(\[\s*[\s\S]*\])");
+            if (m.Success)
+                return m.Groups[1].Value.Trim();
+
+            // Fallback : on renvoie l’input brut (puis JToken.Parse lèvera)
+            return input.Trim();
         }
+
 
         private string RemovePunctuation(string input)
         {

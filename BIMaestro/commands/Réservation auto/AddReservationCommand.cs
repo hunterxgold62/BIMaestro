@@ -37,6 +37,8 @@ namespace Modification
                     .Where(sym =>
                         sym.Family != null &&
                         (sym.Family.Name.Equals("CML_Réservation circulaire murale", StringComparison.OrdinalIgnoreCase)
+                      || (sym.Family.Name.Equals("Réservation circulaire murale", StringComparison.OrdinalIgnoreCase))
+                      || (sym.Family.Name.Equals("Réservation rectangulaire murale", StringComparison.OrdinalIgnoreCase))
                       || sym.Family.Name.Equals("CML_Réservation rectangulaire murale", StringComparison.OrdinalIgnoreCase))
                     )
                     .OrderBy(sym => sym.Name)

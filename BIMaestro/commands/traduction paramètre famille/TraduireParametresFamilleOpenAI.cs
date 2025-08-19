@@ -65,16 +65,25 @@ namespace Famille
                     JObject json = AiClient.SendOpenAI(jwt, "gpt-4o-mini", prompt);
                     traduit = json["choices"]?[0]?["message"]?["content"]?.ToString() ?? originalName;
                 }
+               catch (InvalidOperationException ex) when (ex.Message == AiClient.QuotaExceededMessage)
+                {
+                    // Quota dépassé → on arrête tout et on informe l'utilisateur
+                    TaskDialog.Show(
+                        "Quota dépassé",
+                        AiClient.QuotaExceededMessage
+                    );
+                    return Result.Cancelled;
+                }
                 catch (Exception ex)
                 {
-                    // En cas d’erreur IA, on garde l’original
+                    // Autre erreur IA → on garde le nom original et on affiche
                     traduit = originalName;
                     TaskDialog.Show("Erreur IA", ex.Message);
                 }
 
                 if (!string.Equals(traduit, originalName, StringComparison.OrdinalIgnoreCase))
                 {
-                    parametresTraduits[fParam] = traduit.Trim();
+                    parametresTraduits[fParam] = traduit;
                 }
             }
 

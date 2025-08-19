@@ -2,12 +2,17 @@
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using System;
+using Licensing;        
 
 namespace Famille
 {
     [Transaction(TransactionMode.Manual)]
-    public class FamilyBrowserCommand : IExternalCommand
+    public class FamilyBrowserCommand : BaseTrackedCommand
     {
+        // Identifiant analytics (court, stable)
+        protected override string ButtonId => "FamilyBrowser";
+
+        // Champs existants conservés
         public static UIApplication uiapp;
         public static FamilyBrowserWindow MainWindowRef;
 
@@ -17,11 +22,12 @@ namespace Famille
         public static ReloadFamilyHandler ReloadFamilyHandlerInstance;
         public static ExternalEvent ReloadFamilyEventInstance;
 
-        public Result Execute(ExternalCommandData data, ref string message, ElementSet elements)
+        // Ton code d'origine, déplacé dans OnExecute
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
             uiapp = data.Application;
 
-            // Si la fenêtre est déjà ouverte, on la remet simplement au premier plan
+            // Si la fenêtre est déjà ouverte, on la remet au premier plan
             if (MainWindowRef != null)
             {
                 if (MainWindowRef.WindowState == System.Windows.WindowState.Minimized)
@@ -29,7 +35,7 @@ namespace Famille
                 if (!MainWindowRef.IsVisible)
                     MainWindowRef.Show();
                 MainWindowRef.Activate();
-                return Result.Succeeded;
+                return Result.Succeeded; // La base tracera success=true
             }
 
             // (Re)créer les handlers et événements
@@ -47,10 +53,11 @@ namespace Famille
                 window.Closed += (s, e) => MainWindowRef = null;
                 window.Show();
                 window.Activate();
-                return Result.Succeeded;
+                return Result.Succeeded; // La base tracera success=true
             }
             catch (Exception ex)
             {
+                // La base tracera success=false avec { error = ... }
                 TaskDialog.Show("Erreur", ex.Message);
                 return Result.Failed;
             }

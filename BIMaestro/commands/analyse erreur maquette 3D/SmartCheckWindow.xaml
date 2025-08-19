@@ -1,0 +1,121 @@
+﻿<Window x:Class="BIMastro.SmartCheck.SmartCheckWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="BIMastro – Smart Check (Contradictions invisibles)"
+        Height="680" Width="980"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResizeWithGrip">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Toolbar -->
+        <DockPanel Grid.Row="0" LastChildFill="True" Margin="0,0,0,8">
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" Margin="0,0,12,0">
+                <TextBlock Text="Résultats d’analyse — murs &amp; MEP" FontSize="18" FontWeight="Bold" Margin="0,0,12,0"/>
+                <Button Content="Ouvrir/MAJ vue 3D" Padding="10,6" Margin="0,0,8,0" Click="OnEnsure3D"/>
+                <ToggleButton x:Name="BtnShowAll" Content="Afficher toutes les erreurs" Padding="10,6" Margin="0,0,8,0"
+                              Checked="OnShowAll" Unchecked="OnShowAll"/>
+                <CheckBox x:Name="ChkAutoFocus" Content="Focus auto 3D (sélection)" IsChecked="True" VerticalAlignment="Center" Margin="8,0,0,0"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                <Button Content="⟨ Précédent" Padding="10,6" Margin="0,0,6,0" Click="OnPrev"/>
+                <Button Content="Suivant ⟩" Padding="10,6" Click="OnNext"/>
+            </StackPanel>
+        </DockPanel>
+
+        <!-- Tabs -->
+        <TabControl Grid.Row="1" x:Name="Tabs">
+            <TabItem Header="Toutes">
+                <DataGrid x:Name="GridAll" AutoGenerateColumns="False" IsReadOnly="True"
+                          CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Type" Binding="{Binding Category}" Width="180"/>
+                        <DataGridTextColumn Header="Id" Binding="{Binding ElementId.IntegerValue}" Width="80"/>
+                        <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*"/>
+                        <DataGridTemplateColumn Header="Actions" Width="220">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <Button Content="Focus 3D" Padding="8,4" Margin="0,0,6,0" Click="OnFocus"/>
+                                        <Button Content="Marquer OK" Padding="8,4" Click="OnIgnore"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </TabItem>
+
+            <TabItem Header="Murs">
+                <DataGrid x:Name="GridWalls" AutoGenerateColumns="False" IsReadOnly="True"
+                          CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Type" Binding="{Binding Category}" Width="180"/>
+                        <DataGridTextColumn Header="Id" Binding="{Binding ElementId.IntegerValue}" Width="80"/>
+                        <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*"/>
+                        <DataGridTemplateColumn Header="Actions" Width="220">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <Button Content="Focus 3D" Padding="8,4" Margin="0,0,6,0" Click="OnFocus"/>
+                                        <Button Content="Marquer OK" Padding="8,4" Click="OnIgnore"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </TabItem>
+
+            <TabItem Header="Traversées (sans réservation)">
+                <DataGrid x:Name="GridMEP" AutoGenerateColumns="False" IsReadOnly="True"
+                          CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Type" Binding="{Binding Category}" Width="220"/>
+                        <DataGridTextColumn Header="Id" Binding="{Binding ElementId.IntegerValue}" Width="80"/>
+                        <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*"/>
+                        <DataGridTemplateColumn Header="Actions" Width="220">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <Button Content="Focus 3D" Padding="8,4" Margin="0,0,6,0" Click="OnFocus"/>
+                                        <Button Content="Marquer OK" Padding="8,4" Click="OnIgnore"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </TabItem>
+
+            <TabItem Header="Raccords ouverts">
+                <DataGrid x:Name="GridOpen" AutoGenerateColumns="False" IsReadOnly="True"
+                          CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Type" Binding="{Binding Category}" Width="180"/>
+                        <DataGridTextColumn Header="Id" Binding="{Binding ElementId.IntegerValue}" Width="80"/>
+                        <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*"/>
+                        <DataGridTemplateColumn Header="Actions" Width="220">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <Button Content="Focus 3D" Padding="8,4" Margin="0,0,6,0" Click="OnFocus"/>
+                                        <Button Content="Marquer OK" Padding="8,4" Click="OnIgnore"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </TabItem>
+        </TabControl>
+
+        <TextBlock Grid.Row="2" Margin="0,8,0,0"
+                   Text="Astuce : Focus 3D met en avant l’élément (et le mur si traversée). 'Afficher toutes les erreurs' enlève la zone de coupe."
+                   Opacity="0.7"/>
+    </Grid>
+</Window>

@@ -4,6 +4,8 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Globalization;
+using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -16,21 +18,37 @@ namespace Famille
 {
     public partial class FamilyBrowserWindow : Window
     {
+        private readonly string rootFolderPath = @"P:\0-Boîte à outils Revit\0-Bibliothèque\A-Famille Revit";
         private readonly string familiesFolder = @"P:\0-Boîte à outils Revit\0-Bibliothèque\A-Famille Revit";
         private readonly string imagesFolder = @"P:\0-Boîte à outils Revit\0-Bibliothèque\B-Famille Revit Image";
         private readonly string favoritesFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "SauvegardePréférence", "Favorites.txt");
         private readonly string configFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "SauvegardePréférence", "Config.txt");
+        // dossier temporaire où on duplique les familles avant ouverture
+        private readonly string workFolder =Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "FamilleRevit");
 
         private List<FamilyItem> allFamilies = new List<FamilyItem>();
         private List<FamilyItem> displayedFamilies = new List<FamilyItem>();
         private List<FamilyItem> favoriteFamilies = new List<FamilyItem>();
+        private string currentFolderPath;
+
+        public string RootFolderName
+        {
+            get
+            {
+                // retourne le nom du dossier mère (sans chemin ni extension)
+                return System.IO.Path.GetFileName(rootFolderPath);
+            }
+        }
         public List<FamilyItem> FavoriteFamilies => favoriteFamilies;
 
         public FamilyBrowserWindow()
         {
             InitializeComponent();
-            EnsureFilesExist();
             DataContext = this;
+
+            // Au démarrage, on se place à la racine
+            currentFolderPath = rootFolderPath;
+            LoadFolderTree();
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -50,6 +68,7 @@ namespace Famille
 
         private void LoadFolderTree()
         {
+            currentFolderPath = rootFolderPath;
             FolderTreeView.Items.Clear();
             if (!Directory.Exists(familiesFolder))
             {
@@ -57,14 +76,79 @@ namespace Famille
                 return;
             }
             var root = new DirectoryInfo(familiesFolder);
-            var node = CreateDirectoryNode(root);
-            FolderTreeView.Items.Add(node);
-            node.IsExpanded = true;
-            node.IsSelected = true;
+
+            // On n’ajoute plus la racine, uniquement ses sous-dossiers
+            foreach (var sub in root.GetDirectories())
+            {
+                var node = CreateDirectoryNode(sub);
+                node.IsExpanded = false;    // ou true si vous voulez les développer par défaut
+                FolderTreeView.Items.Add(node);
+            }
+
+            // (Optionnel) sélectionner automatiquement le premier sous-dossier
+            if (FolderTreeView.Items.Count > 0)
+                ((TreeViewItem)FolderTreeView.Items[0]).IsSelected = true;
+
             LoadFamilies(familiesFolder, true);
             displayedFamilies = allFamilies.ToList();
             FamilyListView.ItemsSource = displayedFamilies;
+            // Mise à jour du compteur
             UpdateCount();
+
+            // Relancer le chargement asynchrone des vignettes
+            StartThumbnailLoading();
+
+            // Mettre à jour le carrousel Top-8
+            RefreshTop8();
+
+        }
+        private void AllFamiliesButton_Click(object sender, RoutedEventArgs e)
+        {
+            // 1) On réinitialise la recherche
+            SearchBox.Text = "";
+
+            // 2) On recharge l’arborescence et l’affichage racine
+            LoadFolderTree();
+
+            // 3) On remet à jour le Top-8 maintenant qu’on est bien à la racine
+            RefreshTop8();
+        }
+
+
+
+        /// <summary>
+        /// Charge le top 8 via FamilyUsageManager et ajuste visibilité/ItemsSource.
+        /// </summary>
+        private void RefreshTop8()
+        {
+            bool atRoot = string.Equals(currentFolderPath, rootFolderPath, StringComparison.OrdinalIgnoreCase);
+            bool show = (ShowTop8CheckBox.IsChecked == true);
+
+            // si on n'est pas à la racine, ou si l'utilisateur a désactivé le Top-8
+            if (!atRoot || !show)
+            {
+                TopFamiliesView.Visibility = Visibility.Collapsed;
+                TopSeparator.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            // sinon, on calcule et on affiche les 8 familles les plus utilisées
+            var usage = FamilyUsageManager.Load();
+            var top8 = allFamilies
+                .OrderByDescending(f => usage.TryGetValue(f.Path, out var c) ? c : 0)
+                .Take(8)
+                .ToList();
+
+            TopFamiliesView.ItemsSource = top8;
+            var vis = top8.Any() ? Visibility.Visible : Visibility.Collapsed;
+            TopFamiliesView.Visibility = vis;
+            TopSeparator.Visibility = vis;
+        }
+
+
+        private void ShowTop8CheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            RefreshTop8();
         }
 
         private TreeViewItem CreateDirectoryNode(DirectoryInfo dir)
@@ -75,19 +159,30 @@ namespace Famille
             return item;
         }
 
-        private void FolderTreeView_SelectedItemChanged(object s, RoutedPropertyChangedEventArgs<object> e)
+        private void FolderTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
-            if (FolderTreeView.SelectedItem is TreeViewItem tv)
-            {
-                LoadFamilies(tv.Tag.ToString(), true);
-                displayedFamilies = allFamilies.ToList();
-                MarkFavoritesInAllFamilies();
-                FamilyListView.ItemsSource = displayedFamilies;
-                SearchBox.Text = "";
-                ApplyFilters();
-                StartThumbnailLoading();
-            }
+            if (!(FolderTreeView.SelectedItem is TreeViewItem tv)) return;
+
+            // On stocke le chemin du dossier cliqué
+            currentFolderPath = tv.Tag.ToString();
+
+            // Masquer le Top-8 (on n’est plus à la racine)
+            RefreshTop8();
+
+            // Charger et afficher les familles pour ce sous-dossier
+            LoadFamilies(currentFolderPath, true);
+            displayedFamilies = allFamilies.ToList();
+            MarkFavoritesInAllFamilies();
+            FamilyListView.ItemsSource = displayedFamilies;
+
+            // Réinitialiser la recherche et le compteur
+            SearchBox.Text = "";
+            ApplyFilters();
+
+            // Relancer le chargement des vignettes
+            StartThumbnailLoading();
         }
+
 
         private void LoadFamilies(string path, bool recursive)
         {
@@ -178,24 +273,35 @@ namespace Famille
         {
             favoriteFamilies.Clear();
             if (!File.Exists(favoritesFile)) return;
-            foreach (var p in File.ReadAllLines(favoritesFile))
+
+            var paths = File.ReadAllLines(favoritesFile);
+            foreach (var p in paths)
             {
-                var ex = allFamilies.FirstOrDefault(f => f.Path.Equals(p, StringComparison.OrdinalIgnoreCase));
-                if (ex != null)
+                FamilyItem fi = allFamilies.FirstOrDefault(f => f.Path.Equals(p, StringComparison.OrdinalIgnoreCase));
+                if (fi != null)
                 {
-                    ex.IsFavorite = true;
-                    favoriteFamilies.Add(ex);
+                    // famille déjà présente dans allFamilies
+                    fi.IsFavorite = true;
+                    favoriteFamilies.Add(fi);
+
+                    // **forçage** du chargement d'icône
+                    LoadThumbnailForFamilyItem(fi);
                 }
                 else if (File.Exists(p))
                 {
-                    var fi = CreateFamilyItemFromPath(p);
-                    fi.IsFavorite = true;
-                    favoriteFamilies.Add(fi);
-                    LoadThumbnailForFamilyItem(fi);
+                    // famille externe à allFamilies (rare)
+                    var ext = CreateFamilyItemFromPath(p);
+                    ext.IsFavorite = true;
+                    favoriteFamilies.Add(ext);
+
+                    // chargement de l'icône
+                    LoadThumbnailForFamilyItem(ext);
                 }
             }
+
             UpdateFavoritesUI();
         }
+
 
         private void UpdateFavoritesUI()
         {
@@ -236,8 +342,19 @@ namespace Famille
 
         private void ApplyFilters()
         {
-            var txt = SearchBox.Text.ToLower();
-            var filt = displayedFamilies.Where(f => f.Name.ToLower().Contains(txt));
+            // 1) Récupérer et normaliser le texte de recherche
+            var raw = SearchBox.Text ?? "";
+            var txt = StripDiacritics(raw).ToLowerInvariant();
+
+            // 2) Filtrer en supprimant aussi les accents du nom de chaque famille
+            var filt = displayedFamilies
+                .Where(f =>
+                {
+                    var nameNorm = StripDiacritics(f.Name).ToLowerInvariant();
+                    return nameNorm.Contains(txt);
+                });
+
+            // 3) Appliquer au ItemsControl et mettre à jour le compteur
             FamilyListView.ItemsSource = filt;
             UpdateCount(filt.Count());
         }
@@ -248,7 +365,31 @@ namespace Famille
             if (!c.HasValue) c = displayedFamilies.Count;
             CountTextBlock.Text = c.Value.ToString();
         }
+        /// <summary>
+        /// Supprime les accents d'une chaîne (form NormalizationForm.FormD)
+        /// et remet en FormC.
+        /// </summary>
+        private static string StripDiacritics(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return text;
 
+            // Décompose en caractères de base + diacritiques
+            var normalized = text.Normalize(NormalizationForm.FormD);
+            var sb = new StringBuilder(capacity: normalized.Length);
+
+            foreach (var c in normalized)
+            {
+                var uc = CharUnicodeInfo.GetUnicodeCategory(c);
+                if (uc != UnicodeCategory.NonSpacingMark)
+                    sb.Append(c);
+            }
+
+            // Recompose la chaîne sans diacritiques
+            return sb
+                   .ToString()
+                   .Normalize(NormalizationForm.FormC);
+        }
         #endregion
 
         #region Configuration & thèmes
@@ -273,6 +414,7 @@ namespace Famille
             string top = "#FFF2F2F2", bottom = "#FFFFFFFF", panel = "#F0F0F0",
                    treeBg = "#F0F0F0", itemsBg = "Transparent", tabBg = "Transparent";
             bool dark = false;
+            bool showTop8 = false;
 
             if (File.Exists(configFile))
             {
@@ -292,6 +434,8 @@ namespace Famille
                         tabBg = line.Substring("TabBackground=".Length);
                     else if (line.StartsWith("DarkMode=", StringComparison.OrdinalIgnoreCase))
                         bool.TryParse(line.Substring("DarkMode=".Length), out dark);
+                    else if (line.StartsWith("ShowTop8=", StringComparison.OrdinalIgnoreCase))        
+                        bool.TryParse(line.Substring("ShowTop8=".Length), out showTop8);
                 }
             }
 
@@ -302,6 +446,9 @@ namespace Famille
             ItemsBackgroundPicker.SelectedColor = ColorFromHex(itemsBg);
             TabBackgroundPicker.SelectedColor = ColorFromHex(tabBg);
             DarkModeCheckBox.IsChecked = dark;
+
+            ShowTop8CheckBox.IsChecked = showTop8;
+
         }
 
         private void SaveConfig_Click(object s, RoutedEventArgs e)
@@ -318,7 +465,8 @@ namespace Famille
                 "TabBackground="        + (TabBackgroundPicker.SelectedColor   == Colors.Transparent
                                               ? "Transparent"
                                               : ColorToHex(TabBackgroundPicker.SelectedColor.Value)),
-                "DarkMode=" + (DarkModeCheckBox.IsChecked == true ? "true" : "false")
+                "DarkMode=" + (DarkModeCheckBox.IsChecked == true ? "true" : "false"),
+                "ShowTop8="  + (ShowTop8CheckBox.IsChecked   == true ? "true" : "false")
             };
             File.WriteAllLines(configFile, lines);
             MessageBox.Show("Configuration enregistrée. Redémarrez pour appliquer.");
@@ -409,14 +557,29 @@ namespace Famille
             {
                 try
                 {
-                    Process.Start(new ProcessStartInfo(fam.Path) { UseShellExecute = true });
+                    // 1) Préparer le dossier de travail
+                    Directory.CreateDirectory(workFolder);
+
+                    // 2) Construire le chemin cible
+                    string fileName = Path.GetFileName(fam.Path);
+                    string targetPath = Path.Combine(workFolder, fileName);
+
+                    // 3) Copier si nécessaire (on écrase toujours pour avoir la dernière version)
+                    File.Copy(fam.Path, targetPath, overwrite: true);
+
+                    // 4) Ouvrir la copie dans Revit
+                    Process.Start(new ProcessStartInfo(targetPath) { UseShellExecute = true });
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show(this, "Impossible d’ouvrir le fichier : " + ex.Message);
+                    MessageBox.Show(this,
+                        "Impossible d’ouvrir la famille en mode travail :\n" + ex.Message,
+                        "Erreur",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
+
 
         #endregion
 
@@ -493,6 +656,8 @@ namespace Famille
                 }
             }
         }
+
+
 
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged(string propName)

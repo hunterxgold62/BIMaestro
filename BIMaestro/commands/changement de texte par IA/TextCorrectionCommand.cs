@@ -5,7 +5,7 @@ using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using System.Windows.Interop;
 using Newtonsoft.Json.Linq;
-using Licensing;      // ← LicenseManager
+using Licensing;      
 
 namespace IA
 {

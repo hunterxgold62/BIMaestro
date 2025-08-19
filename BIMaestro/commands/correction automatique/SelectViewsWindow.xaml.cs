@@ -1,32 +1,37 @@
-﻿using System;
+﻿// SelectViewsWindow.xaml.cs
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using Autodesk.Revit.DB;
-using System.IO;
-using Newtonsoft.Json;
 using System.Windows.Media;
+using Autodesk.Revit.DB;
+using Newtonsoft.Json;
 using Color = System.Windows.Media.Color;
 
 namespace ScanTextRevit
 {
     public partial class SelectViewsWindow : Window
     {
-        private List<View> _allViews;
-        private List<ViewSheet> _allSheets;
-        private Document _doc;
+        private readonly List<View> _allViews;
+        private readonly List<ViewSheet> _allSheets;
+        private readonly Document _doc;
 
+        // Pour la pré‑charge des viewports et des nomenclatures
+        private Dictionary<ElementId, List<Viewport>> _vpsBySheet;
+        private Dictionary<ElementId, List<ScheduleSheetInstance>> _schedulesBySheet;
+
+        // Pour la gestion du thème
         private Preferences _preferences;
         private static string PrefFilePath
         {
             get
             {
-                string baseDir = Path.Combine(
+                var baseDir = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
                     "RevitLogs",
-                    "SauvegardePréférence"
-                );
+                    "SauvegardePréférence");
                 Directory.CreateDirectory(baseDir);
                 return Path.Combine(baseDir, "thème IA auto.json");
             }
@@ -35,152 +40,186 @@ namespace ScanTextRevit
         public SelectViewsWindow(List<View> allViews, List<ViewSheet> allSheets, Document doc)
         {
             InitializeComponent();
+
             _allViews = allViews;
             _allSheets = allSheets;
             _doc = doc;
-            LoadPreferences();
-            ApplyTheme();
-            PopulateTreeView();
+
+            PreloadData();      // 1) on charge une seule fois tous les viewports et nomenclatures
+            LoadPreferences();  // 2) on lit le thème
+            ApplyTheme();       // 3) on applique le thème
+            PopulateTreeView();// 4) on construit l'arbre
+        }
+
+        /// <summary>
+        /// Récupère en un seul passage tous les Viewport et ScheduleSheetInstance,
+        /// puis les groupe par feuille (via OwnerViewId).
+        /// </summary>
+        private void PreloadData()
+        {
+            // Tous les viewports du doc
+            var allVps = new FilteredElementCollector(_doc)
+                            .OfClass(typeof(Viewport))
+                            .Cast<Viewport>()
+                            .ToList();
+            _vpsBySheet = allVps
+                            .GroupBy(vp => vp.SheetId)
+                            .ToDictionary(g => g.Key, g => g.ToList());
+
+            // Toutes les instances de nomenclature placées
+            var allSchedules = new FilteredElementCollector(_doc)
+                                   .OfClass(typeof(ScheduleSheetInstance))
+                                   .Cast<ScheduleSheetInstance>()
+                                   .ToList();
+            // **On utilise OwnerViewId** pour connaître la feuille qui porte la nomenclature
+            _schedulesBySheet = allSchedules
+                                   .GroupBy(ssi => ssi.OwnerViewId)
+                                   .ToDictionary(g => g.Key, g => g.ToList());
         }
 
         private void PopulateTreeView()
         {
             ViewsTreeView.Items.Clear();
 
-            // 1) Vues placées sur des feuilles
+            // 1) Repérer toutes les vues déjà placées sur une feuille
             var placedViewIds = new HashSet<ElementId>();
-            if (_allSheets != null && _allSheets.Count > 0 && _doc != null)
+            foreach (var sheet in _allSheets)
             {
-                foreach (var sheet in _allSheets)
-                {
-                    var vports = new FilteredElementCollector(_doc, sheet.Id)
-                        .OfClass(typeof(Viewport))
-                        .Cast<Viewport>()
-                        .ToList();
-                    foreach (var vp in vports)
-                    {
+                if (_vpsBySheet.TryGetValue(sheet.Id, out var vps))
+                    foreach (var vp in vps)
                         placedViewIds.Add(vp.ViewId);
-                    }
-                }
             }
 
-            // 2) Vues indépendantes
-            var independentViews = _allViews.Where(v => !placedViewIds.Contains(v.Id)).ToList();
-
-            if (independentViews.Count > 0)
+            // 2) Groupe "VUES indépendantes"
+            var independentViews = _allViews
+                                        .Where(v => !placedViewIds.Contains(v.Id))
+                                        .ToList();
+            if (independentViews.Any())
             {
-                CheckBox groupCheckBoxVues = new CheckBox
+                var chkGroupVues = new CheckBox
                 {
                     Content = "VUES (cocher/décocher tout)",
                     IsChecked = false,
                     Foreground = this.Foreground
                 };
-                TreeViewItem groupItemVues = new TreeViewItem
+                var groupVues = new TreeViewItem
                 {
-                    Header = groupCheckBoxVues,
-                    IsExpanded = true
+                    Header = chkGroupVues,
+                    Tag = independentViews, // stocke les données pour lazy‑load
+                    IsExpanded = false
                 };
-                groupCheckBoxVues.Checked += (s, e) => SetChildCheckBoxes(groupItemVues, true);
-                groupCheckBoxVues.Unchecked += (s, e) => SetChildCheckBoxes(groupItemVues, false);
+                chkGroupVues.Checked += (s, e) => SetChildCheckBoxes(groupVues, true);
+                chkGroupVues.Unchecked += (s, e) => SetChildCheckBoxes(groupVues, false);
 
-                foreach (var view in independentViews)
+                // placeholder pour déclencher le lazy‑load
+                groupVues.Items.Add((object)null);
+                groupVues.Expanded += (s, e) =>
                 {
-                    string label = $"{GetViewTypeLabel(view)} : {view.Name}";
-                    CheckBox cb = new CheckBox
+                    if (groupVues.Items.Count == 1 && groupVues.Items[0] == null)
                     {
-                        Content = label,
-                        Tag = view.Id,
-                        IsChecked = false,
-                        Foreground = this.Foreground
-                    };
-                    TreeViewItem childItem = new TreeViewItem { Header = cb };
-                    groupItemVues.Items.Add(childItem);
-                }
-                ViewsTreeView.Items.Add(groupItemVues);
+                        groupVues.Items.Clear();
+                        var listVues = (List<View>)groupVues.Tag;
+                        foreach (var view in listVues)
+                        {
+                            var cb = new CheckBox
+                            {
+                                Content = $"{GetViewTypeLabel(view)} : {view.Name}",
+                                Tag = view.Id,
+                                Foreground = this.Foreground
+                            };
+                            groupVues.Items.Add(new TreeViewItem { Header = cb });
+                        }
+                    }
+                };
+
+                ViewsTreeView.Items.Add(groupVues);
             }
 
-            if (_allSheets != null && _allSheets.Count > 0 && _doc != null)
+            // 3) Groupe "FEUILLES"
+            if (_allSheets.Any())
             {
-                CheckBox groupCheckBoxSheets = new CheckBox
+                var chkGroupSheets = new CheckBox
                 {
                     Content = "FEUILLES (cocher/décocher tout)",
                     IsChecked = false,
                     Foreground = this.Foreground
                 };
-                TreeViewItem groupItemSheets = new TreeViewItem
+                var groupSheets = new TreeViewItem
                 {
-                    Header = groupCheckBoxSheets,
-                    IsExpanded = true
+                    Header = chkGroupSheets,
+                    Tag = _allSheets, // lazy‑load
+                    IsExpanded = false
                 };
-                groupCheckBoxSheets.Checked += (s, e) => SetChildCheckBoxes(groupItemSheets, true);
-                groupCheckBoxSheets.Unchecked += (s, e) => SetChildCheckBoxes(groupItemSheets, false);
+                chkGroupSheets.Checked += (s, e) => SetChildCheckBoxes(groupSheets, true);
+                chkGroupSheets.Unchecked += (s, e) => SetChildCheckBoxes(groupSheets, false);
 
-                foreach (var sheet in _allSheets)
+                groupSheets.Items.Add((object)null);
+                groupSheets.Expanded += (s, e) =>
                 {
-                    string sheetLabel = $"Feuille : {sheet.SheetNumber} - {sheet.Name}";
-                    CheckBox sheetCheckBox = new CheckBox
+                    if (groupSheets.Items.Count == 1 && groupSheets.Items[0] == null)
                     {
-                        Content = sheetLabel,
-                        Tag = sheet.Id,
-                        IsChecked = false,
-                        Foreground = this.Foreground
-                    };
-                    TreeViewItem sheetItem = new TreeViewItem
-                    {
-                        Header = sheetCheckBox,
-                        IsExpanded = true
-                    };
-                    sheetCheckBox.Checked += (s, e) => SetChildCheckBoxes(sheetItem, true);
-                    sheetCheckBox.Unchecked += (s, e) => SetChildCheckBoxes(sheetItem, false);
-
-                    // (A) Vues placées
-                    var vports = new FilteredElementCollector(_doc, sheet.Id)
-                        .OfClass(typeof(Viewport))
-                        .Cast<Viewport>()
-                        .ToList();
-                    foreach (var vp in vports)
-                    {
-                        View placedView = _doc.GetElement(vp.ViewId) as View;
-                        if (placedView == null) continue;
-                        string prefix = GetViewTypeLabel(placedView);
-                        string childLabel = $"{prefix} : {placedView.Name}";
-                        CheckBox childCb = new CheckBox
+                        groupSheets.Items.Clear();
+                        var listSheets = (List<ViewSheet>)groupSheets.Tag;
+                        foreach (var sheet in listSheets)
                         {
-                            Content = childLabel,
-                            Tag = placedView.Id,
-                            IsChecked = false,
-                            Foreground = this.Foreground
-                        };
-                        TreeViewItem childItem = new TreeViewItem { Header = childCb };
-                        sheetItem.Items.Add(childItem);
-                    }
+                            var sheetCb = new CheckBox
+                            {
+                                Content = $"Feuille : {sheet.SheetNumber} - {sheet.Name}",
+                                Tag = sheet.Id,
+                                Foreground = this.Foreground
+                            };
+                            var sheetItem = new TreeViewItem
+                            {
+                                Header = sheetCb,
+                                IsExpanded = false
+                            };
+                            sheetCb.Checked += (s2, e2) => SetChildCheckBoxes(sheetItem, true);
+                            sheetCb.Unchecked += (s2, e2) => SetChildCheckBoxes(sheetItem, false);
 
-                    // (B) Nomenclatures placées
-                    var scheduleInstances = new FilteredElementCollector(_doc, sheet.Id)
-                        .OfClass(typeof(ScheduleSheetInstance))
-                        .Cast<ScheduleSheetInstance>()
-                        .ToList();
-                    foreach (var ssi in scheduleInstances)
-                    {
-                        ViewSchedule vsched = _doc.GetElement(ssi.ScheduleId) as ViewSchedule;
-                        if (vsched == null) continue;
-                        string childLabel = $"Nomenclature : {vsched.Name}";
-                        CheckBox childCb = new CheckBox
-                        {
-                            Content = childLabel,
-                            Tag = vsched.Id,
-                            IsChecked = false,
-                            Foreground = this.Foreground
-                        };
-                        TreeViewItem childItem = new TreeViewItem { Header = childCb };
-                        sheetItem.Items.Add(childItem);
+                            // (A) Vues placées sur cette feuille
+                            if (_vpsBySheet.TryGetValue(sheet.Id, out var vps))
+                            {
+                                foreach (var vp in vps)
+                                {
+                                    if (!(_doc.GetElement(vp.ViewId) is View placedView)) continue;
+                                    var cbChild = new CheckBox
+                                    {
+                                        Content = $"{GetViewTypeLabel(placedView)} : {placedView.Name}",
+                                        Tag = placedView.Id,
+                                        Foreground = this.Foreground
+                                    };
+                                    sheetItem.Items.Add(new TreeViewItem { Header = cbChild });
+                                }
+                            }
+
+                            // (B) Nomenclatures placées sur cette feuille
+                            if (_schedulesBySheet.TryGetValue(sheet.Id, out var ssiList))
+                            {
+                                foreach (var ssi in ssiList)
+                                {
+                                    if (!(_doc.GetElement(ssi.ScheduleId) is ViewSchedule vsched)) continue;
+                                    var cbChild = new CheckBox
+                                    {
+                                        Content = $"Nomenclature : {vsched.Name}",
+                                        Tag = vsched.Id,
+                                        Foreground = this.Foreground
+                                    };
+                                    sheetItem.Items.Add(new TreeViewItem { Header = cbChild });
+                                }
+                            }
+
+                            groupSheets.Items.Add(sheetItem);
+                        }
                     }
-                    groupItemSheets.Items.Add(sheetItem);
-                }
-                ViewsTreeView.Items.Add(groupItemSheets);
+                };
+
+                ViewsTreeView.Items.Add(groupSheets);
             }
         }
 
+        /// <summary>
+        /// Coche/décoche récursivement tous les enfants d'un TreeViewItem.
+        /// </summary>
         private void SetChildCheckBoxes(TreeViewItem parentItem, bool isChecked)
         {
             foreach (var child in parentItem.Items)
@@ -188,9 +227,7 @@ namespace ScanTextRevit
                 if (child is TreeViewItem cItem)
                 {
                     if (cItem.Header is CheckBox cb)
-                    {
                         cb.IsChecked = isChecked;
-                    }
                     SetChildCheckBoxes(cItem, isChecked);
                 }
             }
@@ -203,35 +240,28 @@ namespace ScanTextRevit
             return "Vue";
         }
 
+        /// <summary>
+        /// Récupère la liste des ElementId cochés dans l'arbre.
+        /// </summary>
         public List<ElementId> GetSelectedElementIds()
         {
-            var selectedIds = new List<ElementId>();
-            foreach (var topItem in ViewsTreeView.Items)
+            var selected = new List<ElementId>();
+            foreach (var top in ViewsTreeView.Items)
             {
-                if (topItem is TreeViewItem tvi)
-                {
-                    CollectCheckedElementIds(tvi, selectedIds);
-                }
+                if (top is TreeViewItem tvi)
+                    CollectCheckedElementIds(tvi, selected);
             }
-            return selectedIds;
+            return selected;
         }
 
-        private void CollectCheckedElementIds(TreeViewItem item, List<ElementId> selectedIds)
+        private void CollectCheckedElementIds(TreeViewItem item, List<ElementId> list)
         {
-            if (item.Header is CheckBox cb && cb.IsChecked == true)
-            {
-                if (cb.Tag is ElementId eId)
-                {
-                    selectedIds.Add(eId);
-                }
-            }
+            if (item.Header is CheckBox cb && cb.IsChecked == true && cb.Tag is ElementId id)
+                list.Add(id);
+
             foreach (var child in item.Items)
-            {
                 if (child is TreeViewItem cItem)
-                {
-                    CollectCheckedElementIds(cItem, selectedIds);
-                }
-            }
+                    CollectCheckedElementIds(cItem, list);
         }
 
         private void OkButton_Click(object sender, RoutedEventArgs e)
@@ -246,32 +276,34 @@ namespace ScanTextRevit
             Close();
         }
 
-        // Gestion des Préférences
+        // -----------------------------------
+        //   Gestion des Préférences & Thème
+        // -----------------------------------
 
         private void LoadPreferences()
         {
-            if (File.Exists(PrefFilePath))
+            try
             {
-                try
+                if (File.Exists(PrefFilePath))
                 {
-                    string json = File.ReadAllText(PrefFilePath);
+                    var json = File.ReadAllText(PrefFilePath);
                     _preferences = JsonConvert.DeserializeObject<Preferences>(json);
-                }
-                catch
-                {
-                    _preferences = new Preferences();
+                    return;
                 }
             }
-            else
-            {
-                _preferences = new Preferences();
-            }
+            catch { /* ignore */ }
+
+            _preferences = new Preferences();
         }
 
         private void SavePreferences()
         {
-            string json = JsonConvert.SerializeObject(_preferences, Formatting.Indented);
-            File.WriteAllText(PrefFilePath, json);
+            try
+            {
+                var json = JsonConvert.SerializeObject(_preferences, Formatting.Indented);
+                File.WriteAllText(PrefFilePath, json);
+            }
+            catch { /* ignore */ }
         }
 
         private void ApplyTheme()
@@ -292,4 +324,5 @@ namespace ScanTextRevit
             }
         }
     }
+
 }

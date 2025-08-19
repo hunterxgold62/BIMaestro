@@ -73,7 +73,7 @@ namespace Famille
             // 6) Sélectionner puis relancer le mode placement
             uidoc.Selection.SetElementIds(new List<ElementId> { symbol.Id });
             uidoc.PostRequestForElementTypePlacement(symbol);
-
+            FamilyUsageManager.RegisterUse(FamilyPath);
             // 7) Message utilisateur
             if (isSame)
                 TaskDialog.Show("Rechargement", $"La famille « {famName} » est déjà à jour.");

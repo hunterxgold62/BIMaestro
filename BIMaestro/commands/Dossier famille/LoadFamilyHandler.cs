@@ -2,6 +2,7 @@
 using System;
 using System.Linq;
 using System.Collections.Generic;
+using System.IO;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
@@ -16,33 +17,46 @@ namespace Famille
         {
             var uidoc = uiapp.ActiveUIDocument;
             var doc = uidoc.Document;
-            Family famLoaded = null;
+            Family fam = null;
 
-            // 1) Charger la famille (ou tenter de charger)
-            using (var tx = new Transaction(doc, "Charger Famille"))
+            // Nom de la famille sans extension
+            var famName = Path.GetFileNameWithoutExtension(FamilyPath);
+
+            // 1) On cherche d'abord la famille dans le document
+            fam = new FilteredElementCollector(doc)
+                .OfClass(typeof(Family))
+                .Cast<Family>()
+                .FirstOrDefault(f =>
+                    f.Name.Equals(famName, StringComparison.OrdinalIgnoreCase));
+
+            // 2) Si elle n'existe pas, on la charge une seule fois depuis le fichier
+            if (fam == null)
             {
-                tx.Start();
-                doc.LoadFamily(FamilyPath, new FamilyLoadOption(), out famLoaded);
-                tx.Commit();
+                using (var tx = new Transaction(doc, "Charger Famille"))
+                {
+                    tx.Start();
+                    doc.LoadFamily(FamilyPath, new FamilyLoadOption(), out fam);
+                    tx.Commit();
+                }
+
+                // Si jamais LoadFamily n'a pas trouvé de nouvelle famille,  
+                // on retente de récupérer l'existante
+                if (fam == null)
+                {
+                    fam = new FilteredElementCollector(doc)
+                        .OfClass(typeof(Family))
+                        .Cast<Family>()
+                        .FirstOrDefault(f =>
+                            f.Name.Equals(famName, StringComparison.OrdinalIgnoreCase));
+                }
             }
 
-            // 2) Si elle était déjà présente, la retrouver dans le document
-            if (famLoaded == null)
-            {
-                var famName = System.IO.Path.GetFileNameWithoutExtension(FamilyPath);
-                famLoaded = new FilteredElementCollector(doc)
-                    .OfClass(typeof(Family))
-                    .Cast<Family>()
-                    .FirstOrDefault(f =>
-                        f.Name.Equals(famName, StringComparison.OrdinalIgnoreCase));
-            }
-
-            // 3) Si on n’a toujours pas la famille, on quitte
-            if (famLoaded == null)
+            // 3) Si on n'a toujours pas la famille, on arrête
+            if (fam == null)
                 return;
 
-            // 4) Récupérer et activer le premier FamilySymbol
-            var symId = famLoaded.GetFamilySymbolIds().FirstOrDefault();
+            // 4) Récupérer et activer le premier symbole
+            var symId = fam.GetFamilySymbolIds().FirstOrDefault();
             if (symId == ElementId.InvalidElementId)
                 return;
             var symbol = doc.GetElement(symId) as FamilySymbol;
@@ -59,9 +73,10 @@ namespace Famille
                 }
             }
 
-            // 5) Sélectionner puis lancer le mode placement du symbole
+            // 5) Sélectionner puis lancer le mode placement
             uidoc.Selection.SetElementIds(new List<ElementId> { symbol.Id });
             uidoc.PostRequestForElementTypePlacement(symbol);
+            FamilyUsageManager.RegisterUse(FamilyPath);
         }
 
         public string GetName() => "LoadFamilyHandler";

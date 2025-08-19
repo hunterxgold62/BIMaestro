@@ -76,7 +76,7 @@ namespace IA
 
                 // Appel via AiClient
                 var jsonDoc = await Task.Run(() =>
-                    AiClient.SendOpenAI(_jwt, "gpt-4o-mini", prompt)
+    AiClient.SendOpenAI(_jwt, "gpt-4o-mini", prompt, 3)
                 );
 
                 // Extraction des résultats
@@ -90,14 +90,23 @@ namespace IA
                 foreach (var s in suggestions)
                     proposalsListBox.Items.Add(CreateListBoxItemFromText(s));
             }
-            catch (Exception ex)
+            catch (InvalidOperationException ex) when (ex.Message == AiClient.QuotaExceededMessage)
             {
+                // MessageBox.Show utilise la constante définie dans AiClient
                 MessageBox.Show(
-                  "Erreur IA : " + ex.Message,
-                  "Erreur", MessageBoxButton.OK, MessageBoxImage.Error
+                    AiClient.QuotaExceededMessage,
+                    "Quota dépassé",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning
                 );
             }
+            catch (InvalidOperationException ex)
+            {
+                // autres erreurs IA
+                MessageBox.Show(ex.Message, "Erreur IA", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
+        
 
         private void proposalsListBox_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {

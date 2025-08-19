@@ -11,7 +11,7 @@
         Loaded="Window_Loaded">
 
     <Window.Resources>
-        <!-- Couleurs et styles -->
+        <!-- Couleurs & styles -->
         <SolidColorBrush x:Key="PrimaryText" Color="Black"/>
         <LinearGradientBrush x:Key="BackgroundGradient" StartPoint="0,0" EndPoint="0,1">
             <GradientStop Offset="0" Color="#FFEB0F0F"/>
@@ -35,19 +35,20 @@
             </Setter>
         </Style>
 
-        <!-- Template pour chaque famille -->
+        <!-- Template pour chaque vignette de famille -->
         <DataTemplate x:Key="FamilyItemTemplate" DataType="{x:Type local:FamilyItem}">
             <Border Margin="5" Width="200"
-              Background="{DynamicResource PanelBackground}"
-              CornerRadius="5"
-MouseLeftButtonDown="FamilyItem_DoubleClick">                <Border.ContextMenu>
+                    Background="{DynamicResource PanelBackground}"
+                    CornerRadius="5"
+                    MouseLeftButtonDown="FamilyItem_DoubleClick">
+                <Border.ContextMenu>
                     <ContextMenu>
                         <MenuItem Header="Rentrer dans la famille"
-                      Click="OpenFamilyFile_Click"
-                      DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                  Click="OpenFamilyFile_Click"
+                                  DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                         <MenuItem Header="Charger la dernière version"
-                      Click="ReloadFamily_Click"
-                      DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                  Click="ReloadFamily_Click"
+                                  DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                     </ContextMenu>
                 </Border.ContextMenu>
                 <Grid Margin="5">
@@ -55,31 +56,28 @@ MouseLeftButtonDown="FamilyItem_DoubleClick">                <Border.ContextMenu
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-
                     <Border Background="{DynamicResource ImageBackground}" Padding="3" Grid.Row="0">
                         <Image Source="{Binding Icon}"
-                   Width="180" Height="180"
-                   Stretch="UniformToFill"
-                   HorizontalAlignment="Center"
-                   VerticalAlignment="Center"
-                   Style="{StaticResource ImageStyle}"/>
+                               Width="180" Height="180"
+                               Stretch="UniformToFill"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Style="{StaticResource ImageStyle}"/>
                     </Border>
-
                     <Grid Grid.Row="1">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-
                         <Button Grid.Column="0" Content="★"
-                    Click="FavoriteButton_Click"
-                    ToolTip="Ajouter ou retirer des favoris"
-                    Background="Transparent"
-                    BorderThickness="0"
-                    FontSize="16"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Top"
-                    Margin="0,0,5,0">
+                                Click="FavoriteButton_Click"
+                                ToolTip="Ajouter ou retirer des favoris"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                FontSize="16"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Top"
+                                Margin="0,0,5,0">
                             <Button.Style>
                                 <Style TargetType="Button">
                                     <Setter Property="Foreground" Value="SkyBlue"/>
@@ -91,16 +89,15 @@ MouseLeftButtonDown="FamilyItem_DoubleClick">                <Border.ContextMenu
                                 </Style>
                             </Button.Style>
                         </Button>
-
                         <TextBlock Grid.Column="1"
-                       Text="{Binding Name}"
-                       Foreground="{DynamicResource PrimaryText}"
-                       FontWeight="Bold"
-                       TextWrapping="Wrap"
-                       TextAlignment="Center"
-                       HorizontalAlignment="Center"
-                       Margin="0,0,5,0"
-                       ToolTip="Nom complet de la famille"/>
+                                   Text="{Binding Name}"
+                                   Foreground="{DynamicResource PrimaryText}"
+                                   FontWeight="Bold"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,0,5,0"
+                                   ToolTip="Nom complet de la famille"/>
                     </Grid>
                 </Grid>
             </Border>
@@ -118,81 +115,123 @@ MouseLeftButtonDown="FamilyItem_DoubleClick">                <Border.ContextMenu
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Arborescence des dossiers -->
+                    <!-- Colonne de gauche : bouton racine + TreeView -->
                     <StackPanel Grid.Column="0" Background="Transparent">
-                        <TextBlock Text="Dossiers"
-                       FontSize="14" FontWeight="Bold"
-                       Foreground="{DynamicResource PrimaryText}"
-                       Height="35"/>
+                        <Button x:Name="AllFamiliesButton"
+                                Content="{Binding RootFolderName}"
+                                FontSize="14" FontWeight="Bold"
+                                Foreground="{DynamicResource PrimaryText}"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Height="35"
+                                HorizontalContentAlignment="Left"
+                                Click="AllFamiliesButton_Click"/>
                         <TreeView x:Name="FolderTreeView"
-                      Background="{DynamicResource TreeViewBackground}"
-                      Foreground="{DynamicResource PrimaryText}"
-                      ToolTip="Arborescence des dossiers de familles"
-                      Height="460"/>
+                                  Background="{DynamicResource TreeViewBackground}"
+                                  Foreground="{DynamicResource PrimaryText}"
+                                  ToolTip="Sous-dossiers de familles"
+                                  Height="460"
+                                  ScrollViewer.VerticalScrollBarVisibility="Auto"/>
                     </StackPanel>
 
-                    <!-- Liste des familles -->
+                    <!-- Colonne de droite : recherche + zone scrollée -->
                     <Grid Grid.Column="1" Background="Transparent">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
+                            <!-- Recherche -->
                             <RowDefinition Height="Auto"/>
+                            <!-- Séparateur -->
                             <RowDefinition Height="*"/>
+                            <!-- Contenu scrollable -->
                             <RowDefinition Height="Auto"/>
+                            <!-- Compteur -->
                         </Grid.RowDefinitions>
 
-                        <Grid Grid.Row="0" Background="Transparent">
+                        <!-- Recherche -->
+                        <Grid Grid.Row="0">
                             <TextBox x:Name="SearchBox"
-                       Height="30"
-                       VerticalAlignment="Center"
-                       TextChanged="SearchBox_TextChanged"
-                       Background="#FFFFFF"
-                       Foreground="{DynamicResource PrimaryText}"
-                       BorderBrush="#CCCCCC"
-                       Padding="5"
-                       Margin="5,0,0,0"/>
+                                     Height="30"
+                                     VerticalAlignment="Center"
+                                     TextChanged="SearchBox_TextChanged"
+                                     Background="#FFFFFF"
+                                     Foreground="{DynamicResource PrimaryText}"
+                                     BorderBrush="#CCCCCC"
+                                     Padding="5"
+                                     Margin="5,0,0,0"/>
                             <TextBlock x:Name="PlaceholderText"
-                         Text="Rechercher..."
-                         Foreground="Gray"
-                         Margin="10,0,0,0"
-                         VerticalAlignment="Center"
-                         IsHitTestVisible="False"/>
+                                       Text="Rechercher..."
+                                       Foreground="Gray"
+                                       Margin="10,0,0,0"
+                                       VerticalAlignment="Center"
+                                       IsHitTestVisible="False"/>
                         </Grid>
 
-                        <Rectangle Grid.Row="1" Height="1" Fill="#CCCCCC" Margin="0,5"/>
+                        <!-- Séparateur -->
+                        <Rectangle Grid.Row="1"
+                                   Height="1"
+                                   Fill="#CCCCCC"
+                                   Margin="0,5"/>
 
-                        <ScrollViewer Grid.Row="2" Background="{DynamicResource ItemsBackground}">
-                            <ItemsControl x:Name="FamilyListView"
-                            ItemTemplate="{StaticResource FamilyItemTemplate}"
-                            ItemsSource="{Binding}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <WrapPanel IsItemsHost="True"/>
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                            </ItemsControl>
+                        <!-- Zone défilable unique -->
+                        <ScrollViewer Grid.Row="2"
+                                      Background="{DynamicResource ItemsBackground}"
+                                      VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+
+                                <!-- Carrousel Top-8 (uniquement au root) -->
+                                <ItemsControl x:Name="TopFamiliesView"
+                                              ItemTemplate="{StaticResource FamilyItemTemplate}"
+                                              Visibility="Collapsed">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel IsItemsHost="True"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                </ItemsControl>
+
+                                <!-- Séparateur sous Top-8 -->
+                                <Rectangle x:Name="TopSeparator"
+                                           Height="1"
+                                           Fill="#CCCCCC"
+                                           Margin="0,5"
+                                           Visibility="Collapsed"/>
+
+                                <!-- Liste complète des familles -->
+                                <ItemsControl x:Name="FamilyListView"
+                                              ItemTemplate="{StaticResource FamilyItemTemplate}"
+                                              ItemsSource="{Binding}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel IsItemsHost="True"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                </ItemsControl>
+
+                            </StackPanel>
                         </ScrollViewer>
 
+                        <!-- Compteur -->
                         <StackPanel Grid.Row="3"
-                        Orientation="Horizontal"
-                        HorizontalAlignment="Right"
-                        Margin="0,5,0,0">
+                                    Orientation="Horizontal"
+                                    HorizontalAlignment="Right"
+                                    Margin="0,5,0,0">
                             <TextBlock Text="Familles affichées : "
-                         Foreground="{DynamicResource PrimaryText}"/>
+                                       Foreground="{DynamicResource PrimaryText}"/>
                             <TextBlock x:Name="CountTextBlock"
-                         Foreground="{DynamicResource PrimaryText}"
-                         FontWeight="Bold"/>
+                                       Foreground="{DynamicResource PrimaryText}"
+                                       FontWeight="Bold"/>
                         </StackPanel>
                     </Grid>
                 </Grid>
             </TabItem>
 
-            <!-- Onglet Favoris -->
+            <!-- Onglet Favoris (inchangé) -->
             <TabItem Header="Favoris" Background="{DynamicResource TabBackground}">
                 <Grid Margin="10" Background="Transparent" ToolTip="Liste de vos familles favorites">
                     <ScrollViewer Background="{DynamicResource ItemsBackground}">
                         <ItemsControl x:Name="FavoritesListView"
-                          ItemTemplate="{StaticResource FamilyItemTemplate}"
-                          ItemsSource="{Binding FavoriteFamilies}">
+                                      ItemTemplate="{StaticResource FamilyItemTemplate}"
+                                      ItemsSource="{Binding FavoriteFamilies}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <WrapPanel IsItemsHost="True"/>
@@ -205,7 +244,7 @@ MouseLeftButtonDown="FamilyItem_DoubleClick">                <Border.ContextMenu
 
             <!-- Onglet Paramètres -->
             <TabItem Header="Paramètres" Background="{DynamicResource TabBackground}">
-                <Grid Margin="10" Background="Transparent" ToolTip="Personnalisez l'apparence">
+                <Grid Margin="12,10,8,10" Background="Transparent" ToolTip="Personnalisez l'apparence">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -219,9 +258,9 @@ MouseLeftButtonDown="FamilyItem_DoubleClick">                <Border.ContextMenu
                     </Grid.RowDefinitions>
 
                     <TextBlock Text="Paramètres d'apparence"
-                     FontSize="14" FontWeight="Bold"
-                     Grid.Row="0" Margin="0,0,0,10"
-                     Foreground="{DynamicResource PrimaryText}"/>
+                               FontSize="14" FontWeight="Bold"
+                               Grid.Row="0" Margin="0,0,0,10"
+                               Foreground="{DynamicResource PrimaryText}"/>
 
                     <!-- Couleurs dégradé -->
                     <StackPanel Orientation="Horizontal" Grid.Row="1" Margin="0,0,0,5">
@@ -255,11 +294,24 @@ MouseLeftButtonDown="FamilyItem_DoubleClick">                <Border.ContextMenu
                         <CheckBox x:Name="DarkModeCheckBox"/>
                     </StackPanel>
 
+
+
                     <!-- Boutons -->
                     <StackPanel Orientation="Horizontal" Grid.Row="7" Margin="0,10,0,10">
-                        <Button Content="Appliquer"   Click="ApplyColors_Click" Margin="0,0,10,0" Width="80"/>
-                        <Button Content="Enregistrer" Click="SaveConfig_Click"   Margin="0,0,10,0" Width="80"/>
+                        <Button Content="Appliquer" Click="ApplyColors_Click" Margin="0,0,10,0" Width="80"/>
+                        <Button Content="Enregistrer" Click="SaveConfig_Click" Margin="0,0,10,0" Width="80"/>
                         <Button Content="Réinitialiser" Click="ResetConfig_Click" Width="80"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Grid.Row="8" Margin="0,6,0,255">
+                        <TextBlock Text="Afficher le Top-8 :" 
+             VerticalAlignment="Center" 
+             Margin="0,0,10,0"
+             Foreground="{DynamicResource PrimaryText}"/>
+                        <CheckBox x:Name="ShowTop8CheckBox"
+            IsChecked="False"
+            Checked="ShowTop8CheckBox_Changed"
+            Unchecked="ShowTop8CheckBox_Changed" Height="16"/>
                     </StackPanel>
 
                 </Grid>

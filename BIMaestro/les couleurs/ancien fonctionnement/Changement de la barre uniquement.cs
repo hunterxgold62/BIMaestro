@@ -99,7 +99,7 @@ namespace Couleur
                             // Définir l'épaisseur de la bordure
                             panelBorder.BorderThickness = new Thickness(1);
 
-                            // Modifier la couleur des TextBlocks enfants en rouge
+                            // Modifier la couleur des TextBlocks enfants en noir
                             ModifyTextBlocks(panelBorder, Brushes.Black);
                         }
                         catch (Exception ex)
@@ -117,7 +117,7 @@ namespace Couleur
         }
 
         /// <summary>
-        /// Modifie la couleur de texte de tous les TextBlocks enfants en rouge.
+        /// Modifie la couleur de texte de tous les TextBlocks enfants en noir.
         /// </summary>
         /// <param name="parent">Élément parent contenant les TextBlocks.</param>
         /// <param name="color">Nouvelle couleur de texte.</param>

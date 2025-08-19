@@ -198,9 +198,19 @@ namespace IA
                     var json = AiClient.SendDeepSeek(_jwt, sb.ToString());
                     return json["choices"]?[0]?["message"]?["content"]?.ToString();
                 }
+                catch (InvalidOperationException ex) when (ex.Message == AiClient.QuotaExceededMessage)
+                {
+                    // Quota dépassé → on remonte le même message centralisé
+                    return AiClient.QuotaExceededMessage;
+                }
+                catch (InvalidOperationException ex) when (ex.Message.StartsWith("AI proxy error (403)"))
+                {
+                    // Au cas où ton proxy renverrait un autre texte pour 403
+                    return AiClient.QuotaExceededMessage;
+                }
                 catch (Exception ex)
                 {
-                    return $"Erreur API: {ex.Message}";
+                    return $"Erreur API : {ex.Message}";
                 }
             });
         }
