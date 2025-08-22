@@ -10,13 +10,13 @@ using Licensing;
 namespace IA
 {
     [Transaction(TransactionMode.Manual)]
-    public class TextCorrectionCommand : IExternalCommand
+    public class TextCorrectionCommand : BaseTrackedCommand
     {
-        public Result Execute(
-            ExternalCommandData commandData,
-            ref string message,
-            ElementSet elements)
+        protected override string ButtonId => "TextCorrectionCommand";
+
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
+            var commandData = data;
             // 1) Licence → JWT
             string licenseKey = Environment.UserName;
             string machineId = LicenseManager.ComputeMachineId();

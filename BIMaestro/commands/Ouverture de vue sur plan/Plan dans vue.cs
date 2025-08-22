@@ -3,17 +3,20 @@ using Autodesk.Revit.UI;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI.Selection;
 using System.Linq;
+using Licensing;
+
 
 namespace Visualisation
 {
     [Autodesk.Revit.Attributes.Transaction(Autodesk.Revit.Attributes.TransactionMode.Manual)]
-    public class OpenSheetFromView : IExternalCommand
+    public class OpenSheetFromView : BaseTrackedCommand
     {
-        public Result Execute(
-          ExternalCommandData commandData,
-          ref string message,
-          ElementSet elements)
+
+        protected override string ButtonId => "OpenSheetFromView";
+
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
+            var commandData = data;
             UIDocument uidoc = commandData.Application.ActiveUIDocument;
             Document doc = uidoc.Document;
 

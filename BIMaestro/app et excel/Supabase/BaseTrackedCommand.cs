@@ -5,7 +5,7 @@ using Autodesk.Revit.UI;
 namespace Licensing
 {
     /// <summary>
-    /// Hérite de cette classe au lieu de IExternalCommand pour tracer automatiquement.
+    /// Base pour tracer automatiquement chaque commande.
     /// </summary>
     public abstract class BaseTrackedCommand : IExternalCommand
     {
@@ -13,13 +13,27 @@ namespace Licensing
 
         protected virtual object BuildContext(ExternalCommandData data)
         {
-            var doc = data.Application?.ActiveUIDocument?.Document;
-            var view = data.Application?.ActiveUIDocument?.ActiveView;
+            var uiApp = data?.Application;
+            var app = uiApp?.Application;            // Autodesk.Revit.ApplicationServices.Application
+            var uidoc = uiApp?.ActiveUIDocument;
+            var doc = uidoc?.Document;
+            var view = uidoc?.ActiveView;
+
             return new
             {
-                doc = doc?.Title,
+                // Identités
+                revit_username = app?.Username,                   // OK ici (on a UIApplication)
+                windows_user = Environment.UserName,
+                machine_name = Environment.MachineName,
+
+                // Revit env
+                revit_version = app?.VersionNumber,
+                revit_build = app?.VersionBuild,               // <- CORRECTION (pas BuildNumber)
+                // Contexte doc
+                doc_title = doc?.Title ?? "(untitled)",
+                doc_path = doc?.PathName ?? string.Empty,
                 view = view?.Name,
-                viewType = view?.ViewType.ToString()
+                view_type = view?.ViewType.ToString()
             };
         }
 
@@ -35,7 +49,11 @@ namespace Licensing
             }
             catch (Exception ex)
             {
-                Telemetry.TrackButton(ButtonId, false, new { error = ex.GetType().Name, ex.Message });
+                Telemetry.TrackButton(ButtonId, false, new
+                {
+                    error = ex.GetType().Name,
+                    message = ex.Message
+                });
                 throw;
             }
         }

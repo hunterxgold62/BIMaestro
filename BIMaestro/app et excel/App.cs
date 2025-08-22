@@ -22,26 +22,37 @@ public class App : IExternalApplication
     {
         try
         {
-            // --- LICENCE (inchangé, sauf qu'on récupère maintenant le JWT) ---
-            string licenseKey = Environment.UserName;
-            string machineId = LicenseManager.ComputeMachineId();          // SHA-256(MachineName + MAC) selon ton implémentation
-            string licenseJwt = LicenseManager.Validate(licenseKey, machineId);
-
             UIControlledApp = application;
 
-            // --- WPF App (inchangé) ---
+            // --- WPF App ---
             if (System.Windows.Application.Current == null)
-                WpfApp = new System.Windows.Application() { ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown };
+                WpfApp = new System.Windows.Application { ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown };
             else
                 WpfApp = System.Windows.Application.Current;
 
-            if (!Directory.Exists(LogDirectory))
-                Directory.CreateDirectory(LogDirectory);
+            Directory.CreateDirectory(LogDirectory);
 
-            // --- Couleurs : restaurer l’état (inchangé) ---
+            // --- Récup infos Revit (version) ---
+            var revitVersion = application.ControlledApplication.VersionNumber;
+
+            // --- Username Revit (pas dispo via ControlledApplication) ---
+            // On tente depuis Revit.ini, sinon on prend Windows.
+            string revitUser = TryReadRevitUsernameFromIni(revitVersion)
+                               ?? Environment.UserName;
+
+            // --- LICENCE ---
+            string licenseKey = string.IsNullOrWhiteSpace(revitUser) ? Environment.UserName : revitUser;
+            string machineId = LicenseManager.ComputeMachineId();
+            string installId = LicenseManager.GetOrCreateInstallId();
+            string version = GetPluginVersion();
+            string userAgent = $"BIMaestro/{version} Revit/{revitVersion}";
+
+            string licenseJwt = LicenseManager.Validate(licenseKey, machineId, userAgent);
+
+            // --- États existants ---
             Couleur.ColoringStateManager.LoadState();
 
-            // --- Init tracker + Excel (inchangé) ---
+            // --- Excel logger ---
             ExcelLogger.Initialize();
             ExcelLogger.ConfigureActivity(
                 idleThreshold: TimeSpan.FromMinutes(15),
@@ -51,52 +62,68 @@ public class App : IExternalApplication
                 countBusyWhenUnfocused: false
             );
 
-            // >>> TÉLÉMÉTRIE : Init (ne bloque jamais Revit si ça échoue)
+            // --- TÉLÉMÉTRIE ---
             try
             {
                 string functionsBaseUrl = "https://xqovxfgghbqxwsadzhzl.functions.supabase.co";
-                string pluginVersion = GetPluginVersion();
-                Licensing.Telemetry.Init(
-                    functionsBaseUrl,
-                    licenseJwt,
-                    pluginVersion,
-                    machineId,
-                    licenseKey);
+                Telemetry.Init(
+                    edgeFunctionsBaseUrl: functionsBaseUrl,
+                    licenseJwt: licenseJwt,
+                    pluginVersion: version,
+                    machineIdHash: machineId,
+                    fallbackLicenseKey: licenseKey
+                );
+                Telemetry.TrackButton("Plugin.Startup", true, new
+                {
+                    revit_username = revitUser,
+                    windows_user = Environment.UserName,
+                    machine_name = Environment.MachineName,
+                    install_id = installId,
+                    revit_version = revitVersion
+                });
             }
             catch (Exception telEx)
             {
-                // log silencieux si besoin, pas de TaskDialog pour ne pas polluer l’UX
-                try
-                {
-                    string logFilePath = Path.Combine(LogDirectory, "error_log.txt");
-                    File.AppendAllText(logFilePath,
-                        $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Telemetry.Init : {telEx.Message}\n{telEx.StackTrace}\n---\n");
-                }
-                catch { }
+                AppendLog($"Telemetry.Init : {telEx.Message}\n{telEx.StackTrace}");
             }
 
-            // --- Events Revit (inchangé) ---
+            // --- Events Revit ---
             application.ControlledApplication.DocumentOpened += OnDocumentOpenedSafe;
             application.ControlledApplication.DocumentClosing += OnDocumentClosingSafe;
             application.ViewActivated += OnViewActivatedSafe;
             application.Idling += OnIdlingSafe;
 
-            // --- Ruban (inchangé) ---
+            // --- Ruban ---
             AppUI.CreateRibbonUI(application);
 
             return Result.Succeeded;
         }
+        catch (InvalidOperationException) // licence invalide
+        {
+            string addinsFolder = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "Autodesk", "Revit", "Addins", "2024");
+
+            var td = new TaskDialog("BIMaestro – licence requise")
+            {
+                MainInstruction = "Licence invalide ou expirée",
+                MainContent =
+                    "Ta licence BIMaestro n'est pas active pour cette machine.\n\n" +
+                    "Si tu veux tester, écris-moi : bimaestro.plugin@gmail.com\n" +
+                    "Pour désinstaller, supprime BIMaestro.addin du dossier Addins."
+            };
+            td.CommonButtons = TaskDialogCommonButtons.Close;
+            td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Ouvrir le dossier Addins");
+            var result = td.Show();
+            if (result == TaskDialogResult.CommandLink1)
+                System.Diagnostics.Process.Start("explorer.exe", addinsFolder);
+
+            return Result.Failed;
+        }
         catch (Exception ex)
         {
-            try
-            {
-                string logFilePath = Path.Combine(LogDirectory, "error_log.txt");
-                File.AppendAllText(logFilePath,
-                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] OnStartup : {ex.Message}\n{ex.StackTrace}\n---\n");
-            }
-            catch { }
+            AppendLog($"OnStartup : {ex.Message}\n{ex.StackTrace}");
             TaskDialog.Show("Erreur OnStartup", ex.ToString());
-            TaskDialog.Show("Erreur de licence", ex.Message);
             return Result.Failed;
         }
     }
@@ -105,7 +132,6 @@ public class App : IExternalApplication
     {
         try
         {
-            // >>> FLUSH FINAL TÉLÉMÉTRIE (synchrone, entouré pour ne jamais planter)
             try { Telemetry.FlushAsync().GetAwaiter().GetResult(); }
             catch { }
             finally { Telemetry.Shutdown(); }
@@ -115,13 +141,7 @@ public class App : IExternalApplication
         }
         catch (Exception ex)
         {
-            try
-            {
-                string logFilePath = Path.Combine(LogDirectory, "error_log.txt");
-                File.AppendAllText(logFilePath,
-                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] OnShutdown : {ex.Message}\n{ex.StackTrace}\n---\n");
-            }
-            catch { }
+            AppendLog($"OnShutdown : {ex.Message}\n{ex.StackTrace}");
         }
         return Result.Succeeded;
     }
@@ -133,7 +153,6 @@ public class App : IExternalApplication
             _uiApp ??= sender as UIApplication;
             if (_uiApp == null) return;
 
-            // — Coloration existante —
             if (!Couleur.ColoringStateManager.IsColoringActive)
             {
                 if (!_hasResetWhenOff)
@@ -153,18 +172,11 @@ public class App : IExternalApplication
                     Couleur.PartialColoringHelper.ApplyPartialColoring(_uiApp.MainWindowHandle);
             }
 
-            // — Tracking existant —
             ExcelLogger.OnIdling(_uiApp);
         }
         catch (Exception ex)
         {
-            try
-            {
-                string logFilePath = Path.Combine(LogDirectory, "error_log.txt");
-                File.AppendAllText(logFilePath,
-                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] OnIdling : {ex.Message}\n{ex.StackTrace}\n---\n");
-            }
-            catch { }
+            AppendLog($"OnIdling : {ex.Message}\n{ex.StackTrace}");
         }
     }
 
@@ -207,7 +219,6 @@ public class App : IExternalApplication
         }
     }
 
-    // >>> utilitaire version plugin (prend InformationalVersion sinon AssemblyVersion)
     private static string GetPluginVersion()
     {
         try
@@ -219,5 +230,43 @@ public class App : IExternalApplication
             return v != null ? v.ToString() : "dev";
         }
         catch { return "dev"; }
+    }
+
+    private static string TryReadRevitUsernameFromIni(string versionNumber)
+    {
+        try
+        {
+            // %AppData%\Autodesk\Revit\Autodesk Revit {YEAR}\Revit.ini  (ex: 2023, 2024, 2025)
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var iniPath = Path.Combine(appData, "Autodesk", "Revit", $"Autodesk Revit {versionNumber}", "Revit.ini");
+            if (!File.Exists(iniPath)) return null;
+
+            // Section [UserInterface] Username=...
+            string currentSection = "";
+            foreach (var lineRaw in File.ReadAllLines(iniPath))
+            {
+                var line = lineRaw.Trim();
+                if (line.StartsWith("[") && line.EndsWith("]"))
+                    currentSection = line.Substring(1, line.Length - 2);
+                else if (currentSection.Equals("UserInterface", StringComparison.OrdinalIgnoreCase)
+                         && line.StartsWith("Username=", StringComparison.OrdinalIgnoreCase))
+                {
+                    var v = line.Substring("Username=".Length).Trim();
+                    return string.IsNullOrWhiteSpace(v) ? null : v;
+                }
+            }
+            return null;
+        }
+        catch { return null; }
+    }
+
+    private static void AppendLog(string txt)
+    {
+        try
+        {
+            var path = Path.Combine(LogDirectory, "error_log.txt");
+            File.AppendAllText(path, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {txt}\n---\n");
+        }
+        catch { }
     }
 }

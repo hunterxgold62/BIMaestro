@@ -5,7 +5,7 @@ using System.Windows.Controls;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 
-namespace BIMastro.SmartCheck
+namespace Analyse
 {
     public partial class SmartCheckWindow : System.Windows.Window
     {

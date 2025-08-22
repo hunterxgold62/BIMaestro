@@ -10,12 +10,13 @@ using Licensing;
 namespace ScanTextRevit
 {
     [Transaction(TransactionMode.Manual)]
-    public class SelectViewsCommand : IExternalCommand
+    public class SelectViewsCommand : BaseTrackedCommand
     {
-        public Result Execute(ExternalCommandData commandData,
-                              ref string message,
-                              ElementSet elements)
+        protected override string ButtonId => "SelectViewsCommand";
+
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
+            var commandData = data;
             UIApplication uiApp = commandData.Application;
             Document doc = uiApp.ActiveUIDocument.Document;
 

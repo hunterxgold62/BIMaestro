@@ -12,13 +12,14 @@ using Newtonsoft.Json.Linq;
 namespace Famille
 {
     [Transaction(TransactionMode.Manual)]
-    public class TraduireParametresFamilleOpenAI : IExternalCommand
+    public class TraduireParametresFamilleOpenAI : BaseTrackedCommand
     {
-        public Result Execute(
-            ExternalCommandData commandData,
-            ref string message,
-            ElementSet elements)
+
+        protected override string ButtonId => "TraduireParametresFamilleOpenAI";
+
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
+            var commandData = data;
             var uiDoc = commandData.Application.ActiveUIDocument;
             var doc = uiDoc?.Document;
             if (doc == null || !doc.IsFamilyDocument)

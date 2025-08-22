@@ -21,11 +21,10 @@ namespace Modification
     {
         protected override string ButtonId => "ExcelScheduleCommand";
 
-        public Result Execute(ExternalCommandData cmdData,
-                              ref string message,
-                              ElementSet elements)
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
-            UIDocument uiDoc = cmdData.Application.ActiveUIDocument;
+            var commandData = data;
+            UIDocument uiDoc = commandData.Application.ActiveUIDocument;
             Document doc = uiDoc.Document;
 
             var dlg = new TaskDialog("Excel Nomenclature")
@@ -40,7 +39,7 @@ namespace Modification
             if (res == TaskDialogResult.CommandLink1)
                 ExportSchedule(doc);
             else if (res == TaskDialogResult.CommandLink2)
-                ImportSchedule(cmdData.Application, doc);
+                ImportSchedule(commandData.Application, doc);
 
             return Result.Succeeded;
         }
@@ -515,9 +514,6 @@ namespace Modification
                 : null;
         }
 
-        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
-        {
-            throw new NotImplementedException();
-        }
+       
     }
 }

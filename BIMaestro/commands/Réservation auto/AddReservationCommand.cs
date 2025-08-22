@@ -11,18 +11,21 @@ using Autodesk.Revit.UI;               // Pour TaskDialog, IExternalCommand
 using Autodesk.Revit.UI.Selection;     // Pour PickObject, ISelectionFilter
 using Dynamo.Applications;             // Pour DynamoRevit, DynamoRevitCommandData
 using Dynamo.Applications.Properties;
+using Licensing;
 #endregion
 
 namespace Modification
 {
     [Transaction(TransactionMode.Manual)]
-    public class ReservationAutoMultiCommand : IExternalCommand
+    public class ReservationAutoMultiCommand : BaseTrackedCommand
     {
         // Surdimensionnement pour ~50 mm
         private const double OVERSIZE_FT = 0.164; // 50 mm ≈ 0.164 ft
+        protected override string ButtonId => "ReservationAutoMultiCommand";
 
-        public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
+            var commandData = data;
             UIApplication uiApp = commandData.Application;
             UIDocument uiDoc = uiApp.ActiveUIDocument;
             Document doc = uiDoc.Document;

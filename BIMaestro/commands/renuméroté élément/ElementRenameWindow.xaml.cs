@@ -9,30 +9,17 @@ namespace Modification
     public partial class ElementRenamerWindow : Window, INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler PropertyChanged;
-
         protected void OnPropertyChanged(string propertyName)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
         private string _prefix;
-        public string Prefix
-        {
-            get => _prefix;
-            set { if (_prefix != value) { _prefix = value; OnPropertyChanged(nameof(Prefix)); } }
-        }
+        public string Prefix { get => _prefix; set { if (_prefix != value) { _prefix = value; OnPropertyChanged(nameof(Prefix)); } } }
 
         private string _suffix;
-        public string Suffix
-        {
-            get => _suffix;
-            set { if (_suffix != value) { _suffix = value; OnPropertyChanged(nameof(Suffix)); } }
-        }
+        public string Suffix { get => _suffix; set { if (_suffix != value) { _suffix = value; OnPropertyChanged(nameof(Suffix)); } } }
 
         private string _startNumber;
-        public string StartNumber
-        {
-            get => _startNumber;
-            set { if (_startNumber != value) { _startNumber = value; OnPropertyChanged(nameof(StartNumber)); } }
-        }
+        public string StartNumber { get => _startNumber; set { if (_startNumber != value) { _startNumber = value; OnPropertyChanged(nameof(StartNumber)); } } }
 
         private string _selectedNumberFormat;
         public string SelectedNumberFormat
@@ -50,39 +37,19 @@ namespace Modification
         }
 
         private List<string> _numberFormats;
-        public List<string> NumberFormats
-        {
-            get => _numberFormats;
-            set { if (_numberFormats != value) { _numberFormats = value; OnPropertyChanged(nameof(NumberFormats)); } }
-        }
+        public List<string> NumberFormats { get => _numberFormats; set { if (_numberFormats != value) { _numberFormats = value; OnPropertyChanged(nameof(NumberFormats)); } } }
 
         private string _bandHeight;
-        public string BandHeight
-        {
-            get => _bandHeight;
-            set { if (_bandHeight != value) { _bandHeight = value; OnPropertyChanged(nameof(BandHeight)); } }
-        }
+        public string BandHeight { get => _bandHeight; set { if (_bandHeight != value) { _bandHeight = value; OnPropertyChanged(nameof(BandHeight)); } } }
 
         private bool _isSortByLevelEnabled;
-        public bool IsSortByLevelEnabled
-        {
-            get => _isSortByLevelEnabled;
-            set { if (_isSortByLevelEnabled != value) { _isSortByLevelEnabled = value; OnPropertyChanged(nameof(IsSortByLevelEnabled)); } }
-        }
+        public bool IsSortByLevelEnabled { get => _isSortByLevelEnabled; set { if (_isSortByLevelEnabled != value) { _isSortByLevelEnabled = value; OnPropertyChanged(nameof(IsSortByLevelEnabled)); } } }
 
         private List<string> _availableParameters;
-        public List<string> AvailableParameters
-        {
-            get => _availableParameters;
-            set { if (_availableParameters != value) { _availableParameters = value; OnPropertyChanged(nameof(AvailableParameters)); } }
-        }
+        public List<string> AvailableParameters { get => _availableParameters; set { if (_availableParameters != value) { _availableParameters = value; OnPropertyChanged(nameof(AvailableParameters)); } } }
 
         private string _selectedParameter;
-        public string SelectedParameter
-        {
-            get => _selectedParameter;
-            set { if (_selectedParameter != value) { _selectedParameter = value; OnPropertyChanged(nameof(SelectedParameter)); } }
-        }
+        public string SelectedParameter { get => _selectedParameter; set { if (_selectedParameter != value) { _selectedParameter = value; OnPropertyChanged(nameof(SelectedParameter)); } } }
 
         public bool IsReset { get; private set; }
         public bool IsNumberingEnabled { get; internal set; }
@@ -100,7 +67,7 @@ namespace Modification
             IsSortByLevelEnabled = false;
             SelectedNumberFormat = NumberFormats[0]; // "1,2,3..."
             StartNumber = "1";
-            BandHeight = "1.0"; // affichage utilisateur (sera converti)
+            BandHeight = "1.0"; // sera converti en unités internes
         }
 
         private void OnRenameClick(object sender, RoutedEventArgs e)

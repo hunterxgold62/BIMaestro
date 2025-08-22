@@ -2,6 +2,7 @@
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.UI.Selection;
+using Licensing;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,13 +11,13 @@ using System.Text;
 namespace Visualisation
 {
     [Transaction(TransactionMode.Manual)]
-    public class GetPaintedMaterialsCommand : IExternalCommand
+    public class GetPaintedMaterialsCommand : BaseTrackedCommand
     {
-        public Result Execute(
-          ExternalCommandData commandData,
-          ref string message,
-          ElementSet elements)
+        protected override string ButtonId => "GetPaintedMaterialsCommand";
+
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
+            var commandData = data;
             UIDocument uidoc = commandData.Application.ActiveUIDocument;
             Document doc = uidoc.Document;
 

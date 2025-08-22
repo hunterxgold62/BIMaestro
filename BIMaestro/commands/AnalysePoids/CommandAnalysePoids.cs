@@ -10,16 +10,21 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 using System.Windows.Threading;
 using System.Windows.Interop;
+using Licensing;
 
 namespace Analyse
 {
     [Transaction(TransactionMode.Manual)]
-    public class CommandAnalysePoids : IExternalCommand
+    public class CommandAnalysePoids : BaseTrackedCommand
+
+
     {
-        public Result Execute(ExternalCommandData commandData,
-                              ref string message,
-                              ElementSet elements)
+
+        protected override string ButtonId => "CommandAnalysePoids";
+
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
+            var commandData = data;
             UIDocument uiDoc = commandData.Application.ActiveUIDocument;
             Document doc = uiDoc.Document;
 

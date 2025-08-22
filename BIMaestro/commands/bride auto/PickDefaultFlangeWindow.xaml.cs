@@ -106,9 +106,11 @@ namespace Modification
             var doc = data.Application.ActiveUIDocument.Document;
 
             var symbols = new FilteredElementCollector(doc)
-                .OfClass(typeof(FamilySymbol)).Cast<FamilySymbol>()
-                .OrderBy(fs => fs.FamilyName).ThenBy(fs => fs.Name)
-                .ToList();
+    .OfClass(typeof(FamilySymbol))
+    .OfCategory(BuiltInCategory.OST_PipeAccessory)   // <<< le filtre manquant
+    .Cast<FamilySymbol>()
+    .OrderBy(fs => fs.FamilyName).ThenBy(fs => fs.Name)
+    .ToList();
 
             if (symbols.Count == 0)
             {

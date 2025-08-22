@@ -2,9 +2,10 @@
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
-using Microsoft.WindowsAPICodePack.Dialogs;  // NuGet : Microsoft.WindowsAPICodePack.Dialogs
+using Microsoft.WindowsAPICodePack.Dialogs;
 using System.Collections.Generic;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
@@ -20,22 +21,18 @@ namespace Visualisation
         public ExportWindow(ExternalCommandData cmdData)
         {
             InitializeComponent();
-
-            // 1) Charge le Document et tous les ViewSheetSet
             _doc = cmdData.Application.ActiveUIDocument.Document;
-            _sheetSets = new FilteredElementCollector(_doc)
-                             .OfClass(typeof(ViewSheetSet))
-                             .Cast<ViewSheetSet>()
-                             .ToList();
 
-            SheetSetComboBox.ItemsSource = _sheetSets
-                .Select(s => s.Name)
-                .OrderBy(n => n);
+            _sheetSets = new FilteredElementCollector(_doc)
+                .OfClass(typeof(ViewSheetSet))
+                .Cast<ViewSheetSet>()
+                .ToList();
+
+            SheetSetComboBox.ItemsSource = _sheetSets.Select(s => s.Name).OrderBy(n => n);
         }
 
         private void BrowseButton_Click(object sender, RoutedEventArgs e)
         {
-            // Explorateur de dossiers moderne
             var dlg = new CommonOpenFileDialog
             {
                 Title = "Choisissez le dossier d’export DWG",
@@ -45,63 +42,49 @@ namespace Visualisation
                 EnsureValidNames = true
             };
             if (dlg.ShowDialog() == CommonFileDialogResult.Ok)
-            {
                 FolderTextBox.Text = dlg.FileName;
-            }
         }
 
-        private void CancelButton_Click(object sender, RoutedEventArgs e)
-        {
-            Close();
-        }
+        private void CancelButton_Click(object sender, RoutedEventArgs e) => Close();
 
         private void ExportButton_Click(object sender, RoutedEventArgs e)
         {
-            // 2) Validation du nom du jeu
             string setName = SheetSetComboBox.Text?.Trim();
             if (string.IsNullOrEmpty(setName))
             {
-                MessageBox.Show("Veuillez saisir un nom de jeu de feuilles.",
-                                "Erreur", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Veuillez saisir un nom de jeu de feuilles.", "Erreur",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
-            var sheetSet = _sheetSets
-                .FirstOrDefault(s => s.Name.Equals(setName,
-                                                   StringComparison.OrdinalIgnoreCase));
+            var sheetSet = _sheetSets.FirstOrDefault(s => s.Name.Equals(setName, StringComparison.OrdinalIgnoreCase));
             if (sheetSet == null)
             {
-                MessageBox.Show($"Le jeu '{setName}' n'existe pas.",
-                                "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"Le jeu '{setName}' n'existe pas.", "Erreur",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
-            // 3) Validation du dossier
             string exportDir = FolderTextBox.Text;
             if (string.IsNullOrEmpty(exportDir) || !Directory.Exists(exportDir))
             {
-                MessageBox.Show("Veuillez choisir un dossier d’export valide.",
-                                "Erreur", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Veuillez choisir un dossier d’export valide.", "Erreur",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
-            // 4) Désactive l’UI
             ExportButton.IsEnabled = false;
             CancelButton.IsEnabled = false;
 
-            // 5) Récupère les ViewSheet du ViewSet
-            var sheets = sheetSet.Views
-                                 .OfType<ViewSheet>()
-                                 .ToList();
+            var sheets = sheetSet.Views.OfType<ViewSheet>().ToList();
             if (sheets.Count == 0)
             {
-                MessageBox.Show("Aucune feuille à exporter dans ce jeu.",
-                                "Info", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Aucune feuille à exporter dans ce jeu.", "Info",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
                 Close();
                 return;
             }
 
-            // 6) Prépare les options DWG
             var options = new DWGExportOptions
             {
                 MergedViews = true,
@@ -109,26 +92,29 @@ namespace Visualisation
                 Colors = ExportColorMode.TrueColorPerView
             };
 
-            // 7) Boucle par feuille
+            var pdfRule = TryGetActivePdfNamingRule(_doc);
+
             var sw = Stopwatch.StartNew();
             foreach (var vs in sheets)
             {
-                // Nom "élaboré", puis nom de secours (numéro de feuille)
-                string elaborateName = BuildFileName(vs);
-                elaborateName = SanitizeFileName(elaborateName);
+                string nameFromPdf = pdfRule != null ? BuildNameFromPdfRule(_doc, vs, pdfRule) : null;
 
-                bool success = TryExport(vs, exportDir, elaborateName, options);
+                string candidate = !string.IsNullOrWhiteSpace(nameFromPdf)
+                    ? nameFromPdf
+                    : BuildNameFromCmlParams(vs); // fallback
 
+                candidate = SanitizeFileName(candidate);
+                string unique = EnsureUnique(exportDir, candidate, "dwg");
+
+                bool success = TryExport(vs, exportDir, unique, options);
                 if (!success)
                 {
-                    // Nom de secours : juste le numéro de la feuille
-                    string fallback = SanitizeFileName(vs.SheetNumber);
+                    string fallback = EnsureUnique(exportDir, SanitizeFileName(vs.SheetNumber), "dwg");
                     TryExport(vs, exportDir, fallback, options);
                 }
             }
             sw.Stop();
 
-            // 8) Retour utilisateur
             MessageBox.Show(
                 $"Export de {sheets.Count} feuilles réalisé en {sw.Elapsed:mm\\:ss}.",
                 "Terminé", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -136,44 +122,151 @@ namespace Visualisation
             Close();
         }
 
-        // Tente l'export et retourne true si OK
-        private bool TryExport(ViewSheet vs, string dir, string name, DWGExportOptions options)
+        private bool TryExport(ViewSheet vs, string dir, string nameNoExt, DWGExportOptions options)
         {
             try
             {
-                _doc.Export(dir, name, new List<ElementId> { vs.Id }, options);
-                // suppression éventuelle du .pcp
-                string pcp = Path.Combine(dir, name + ".pcp");
+                _doc.Export(dir, nameNoExt, new List<ElementId> { vs.Id }, options);
+                string pcp = Path.Combine(dir, nameNoExt + ".pcp");
                 if (File.Exists(pcp)) File.Delete(pcp);
                 return true;
             }
             catch (Exception ex)
             {
-                // On loggue le message (ou affiche selon besoin)
-                Debug.WriteLine($"Export failed '{name}' : {ex.Message}");
+                Debug.WriteLine($"Export failed '{nameNoExt}' : {ex.Message}");
                 return false;
             }
         }
 
-        // Retire les caractères invalides pour un nom de fichier
+        private static string EnsureUnique(string dir, string baseNameNoExt, string extNoDot)
+        {
+            string path = Path.Combine(dir, baseNameNoExt + "." + extNoDot);
+            if (!File.Exists(path)) return baseNameNoExt;
+            int i = 1;
+            while (File.Exists(Path.Combine(dir, $"{baseNameNoExt} ({i}).{extNoDot}"))) i++;
+            return $"{baseNameNoExt} ({i})";
+        }
+
         private static string SanitizeFileName(string name)
         {
             var invalid = Path.GetInvalidFileNameChars();
             var regex = new Regex($"[{Regex.Escape(new string(invalid))}]");
-            var clean = regex.Replace(name, "_");
-            // Limite à 120 caractères comme avant
+            var clean = regex.Replace(name, "_").Trim().TrimEnd('.');
             return clean.Length <= 120 ? clean : clean.Substring(0, 120);
         }
 
+        // ----------- RÈGLE PDF -----------
+        private static IList<TableCellCombinedParameterData> TryGetActivePdfNamingRule(Document doc)
+        {
+            ExportPDFSettings settings = ExportPDFSettings.GetActivePredefinedSettings(doc);
+            if (settings == null)
+            {
+                var names = ExportPDFSettings.ListNames(doc);
+                if (names != null && names.Count > 0)
+                    settings = ExportPDFSettings.FindByName(doc, names[0]);
+            }
+            if (settings == null) return null;
+
+            var opts = settings.GetOptions();
+            var rule = opts.GetNamingRule();
+            return (rule != null && rule.Count > 0) ? rule : null;
+        }
+
+        private static string BuildNameFromPdfRule(Document doc, ViewSheet sheet, IList<TableCellCombinedParameterData> rule)
+        {
+            // Vue principale si la règle cible "Vues"
+            View primaryView = null;
+            var vpId = sheet.GetAllViewports().FirstOrDefault();
+            if (vpId != ElementId.InvalidElementId)
+            {
+                if (doc.GetElement(vpId) is Viewport vp)
+                    primaryView = doc.GetElement(vp.ViewId) as View;
+            }
+
+            var sb = new StringBuilder();
+
+            for (int i = 0; i < rule.Count; i++)
+            {
+                var cell = rule[i];
+                string value = "";
+
+                Element target = null;
+                if (cell.CategoryId != null && cell.CategoryId != ElementId.InvalidElementId)
+                {
+                    var bic = (BuiltInCategory)cell.CategoryId.IntegerValue;
+                    if (bic == BuiltInCategory.OST_Sheets) target = sheet;
+                    else if (bic == BuiltInCategory.OST_ProjectInformation) target = doc.ProjectInformation;
+                    else if (bic == BuiltInCategory.OST_Views) target = (Element)primaryView ?? sheet;
+                }
+
+                if (target != null && cell.ParamId != null && cell.ParamId != ElementId.InvalidElementId)
+                {
+                    value = GetParamValue(doc, target, cell.ParamId);
+                }
+
+                if (string.IsNullOrWhiteSpace(value))
+                    value = cell.SampleValue ?? "";
+
+                if (!string.IsNullOrEmpty(cell.Prefix)) sb.Append(cell.Prefix);
+                sb.Append(value);
+                if (!string.IsNullOrEmpty(cell.Suffix)) sb.Append(cell.Suffix);
+                if (!string.IsNullOrEmpty(cell.Separator) && i < rule.Count - 1)
+                    sb.Append(cell.Separator);
+            }
+
+            return sb.ToString();
+        }
+
         /// <summary>
-        /// Construit le nom DWG (script Dynamo)
+        /// Résout un ParamId de la règle PDF : BuiltInParameter ou ParameterElement.
+        /// Essaie sur l’instance puis sur le type. Retourne AsString() ou AsValueString().
         /// </summary>
-        private static string BuildFileName(ViewSheet sheet)
+        private static string GetParamValue(Document doc, Element target, ElementId paramId)
+        {
+            // 1) – Cas BuiltInParameter (enum)
+            try
+            {
+                var bip = (BuiltInParameter)paramId.IntegerValue;
+                // Enum.IsDefined n’est pas obligatoire : certains BIP ne sont pas déclarés mais restent valides.
+                Parameter p = target.get_Parameter(bip);
+                if (p == null)
+                {
+                    var type = doc.GetElement(target.GetTypeId()) as ElementType;
+                    if (type != null) p = type.get_Parameter(bip);
+                }
+                if (p != null) return p.AsString() ?? p.AsValueString() ?? "";
+            }
+            catch { /* pas un BIP valide → on tente ParameterElement */ }
+
+            // 2) – Cas ParameterElement (paramètre partagé/projet)
+            if (doc.GetElement(paramId) is ParameterElement pe)
+            {
+                Definition def = pe.GetDefinition();
+                if (def != null)
+                {
+                    Parameter p = target.get_Parameter(def);
+                    if (p == null)
+                    {
+                        var type = doc.GetElement(target.GetTypeId()) as ElementType;
+                        if (type != null) p = type.get_Parameter(def);
+                    }
+                    if (p != null) return p.AsString() ?? p.AsValueString() ?? "";
+
+                    // dernier filet : Lookup par nom (selon def.Name)
+                    var byName = target.LookupParameter(def.Name) ??
+                                 (doc.GetElement(target.GetTypeId()) as ElementType)?.LookupParameter(def.Name);
+                    if (byName != null) return byName.AsString() ?? byName.AsValueString() ?? "";
+                }
+            }
+
+            return "";
+        }
+
+        // ----------- Fallback CML_* -----------
+        private static string BuildNameFromCmlParams(ViewSheet sheet)
         {
             string P(string n) =>
-                sheet.LookupParameter(n) is Parameter p && p.HasValue
-                    ? p.AsString().Trim()
-                    : "";
+                sheet.LookupParameter(n) is Parameter p && p.HasValue ? (p.AsString() ?? "").Trim() : "";
 
             var parts = new[]
             {
@@ -183,16 +276,11 @@ namespace Visualisation
                 P("CML_Lot"),
                 P("CML_Nature"),
                 P("Numéro de la feuille"),
-                !string.IsNullOrEmpty(P("Révisions sur feuille"))
-                    ? P("Révisions sur feuille")
-                    : P("Révision actuelle"),
+                !string.IsNullOrEmpty(P("Révisions sur feuille")) ? P("Révisions sur feuille") : P("Révision actuelle"),
                 sheet.Name
-            }
-            .Where(s => !string.IsNullOrEmpty(s))
-            .ToArray();
+            }.Where(s => !string.IsNullOrEmpty(s)).ToArray();
 
-            var name = string.Join("-", parts);
-            return name;
+            return string.Join("-", parts);
         }
     }
 }

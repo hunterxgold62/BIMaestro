@@ -9,14 +9,19 @@ using System.IO;
 using System.Collections.ObjectModel;
 using System.Reflection;
 using System.Windows;
+using Licensing;
 
 namespace Famille
 {
     [Transaction(TransactionMode.Manual)]
-    public class PurgeFamilyParametersCommand : IExternalCommand
+    public class PurgeFamilyParametersCommand : BaseTrackedCommand
     {
-        public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        protected override string ButtonId => "PurgeFamilyParametersCommand";
+
+
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
+            var commandData = data;
             UIDocument uidoc = commandData.Application.ActiveUIDocument;
             Document doc = uidoc.Document;
 

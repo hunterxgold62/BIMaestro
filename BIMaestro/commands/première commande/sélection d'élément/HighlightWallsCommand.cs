@@ -4,14 +4,19 @@ using Autodesk.Revit.UI;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
+using Licensing;
+
 
 namespace Visualisation
 {
     [Transaction(TransactionMode.ReadOnly)]
-    public class HighlightElementsByCategoriesCommand : IExternalCommand
+    public class HighlightElementsByCategoriesCommand : BaseTrackedCommand
     {
-        public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        protected override string ButtonId => "HighlightElementsByCategoriesCommand";
+
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
+            var commandData = data;
             UIDocument uidoc = commandData.Application.ActiveUIDocument;
             Document doc = uidoc.Document;
 

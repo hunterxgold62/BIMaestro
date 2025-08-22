@@ -13,16 +13,19 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Autodesk.Revit.UI;
+using WinForms = System.Windows.Forms;
+using Newtonsoft.Json;
 
 namespace Famille
 {
     public partial class FamilyBrowserWindow : Window
     {
-        private readonly string rootFolderPath = @"P:\0-Boîte à outils Revit\0-Bibliothèque\A-Famille Revit";
-        private readonly string familiesFolder = @"P:\0-Boîte à outils Revit\0-Bibliothèque\A-Famille Revit";
-        private readonly string imagesFolder = @"P:\0-Boîte à outils Revit\0-Bibliothèque\B-Famille Revit Image";
+        private string rootFolderPath = @"P:\0-Boîte à outils Revit\0-Bibliothèque\A-Famille Revit";
+        private string familiesFolder = @"P:\0-Boîte à outils Revit\0-Bibliothèque\A-Famille Revit";
+        private string imagesFolder = @"P:\0-Boîte à outils Revit\0-Bibliothèque\B-Famille Revit Image";
         private readonly string favoritesFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "SauvegardePréférence", "Favorites.txt");
         private readonly string configFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "SauvegardePréférence", "Config.txt");
+        private readonly string pathsFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "SauvegardePréférence", "CheminsFamille.json");
         // dossier temporaire où on duplique les familles avant ouverture
         private readonly string workFolder =Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "FamilleRevit");
 
@@ -45,10 +48,101 @@ namespace Famille
         {
             InitializeComponent();
             DataContext = this;
-
+            LoadSavedPaths();
+            if (!Directory.Exists(familiesFolder) || !Directory.Exists(imagesFolder))
+            {
+                if (!PromptForFolders())
+                {
+                    Close();
+                    return;
+                }
+            }
             // Au démarrage, on se place à la racine
             currentFolderPath = rootFolderPath;
             LoadFolderTree();
+        }
+        private bool PromptForFolders()
+        {
+            MessageBox.Show(this,
+                "Le dossier par défaut n'a pas été trouvé.\n\n" +
+                "1) Choisis d'abord le dossier qui contient tes familles Revit (.rfa).\n" +
+                "2) Ensuite sélectionne le dossier des images (.png) avec le même nom que les familles.\n\n" +
+                "Ces chemins seront enregistrés pour ne plus te le demander.",
+                "Chemins introuvables",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+
+            var famDialog = new WinForms.FolderBrowserDialog
+            {
+                Description = "Choisis le dossier avec les fichiers .rfa puis clique sur OK."
+            };
+            if (famDialog.ShowDialog() != WinForms.DialogResult.OK)
+                return false;
+            familiesFolder = famDialog.SelectedPath;
+            rootFolderPath = familiesFolder;
+
+            var imgDialog = new WinForms.FolderBrowserDialog
+            {
+                Description = "Choisis le dossier avec les images (.png) nommées comme les fichiers .rfa, puis clique sur OK."
+            };
+            if (imgDialog.ShowDialog() == WinForms.DialogResult.OK)
+            {
+                imagesFolder = imgDialog.SelectedPath;
+            }
+            else
+            {
+                MessageBox.Show(this,
+                    "Aucun dossier d'images choisi. Les vignettes ne seront pas affichées.",
+                    "Information",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                imagesFolder = familiesFolder;
+            }
+
+            SavePaths();
+            MessageBox.Show(this,
+                "Les dossiers sont enregistrés. Pour les modifier plus tard, supprime le fichier 'CheminsFamille.json' dans ton dossier Documents/RevitLogs/SauvegardePréférence.",
+                "Chemins enregistrés",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return true;
+        }
+
+        private void LoadSavedPaths()
+        {
+            try
+            {
+                if (File.Exists(pathsFile))
+                {
+                    var json = File.ReadAllText(pathsFile);
+                    var cfg = JsonConvert.DeserializeObject<FolderSettings>(json);
+                    if (cfg != null)
+                    {
+                        familiesFolder = cfg.FamiliesFolder;
+                        imagesFolder = cfg.ImagesFolder;
+                        rootFolderPath = familiesFolder;
+                    }
+                }
+            }
+            catch { }
+        }
+
+        private void SavePaths()
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(pathsFile));
+                var cfg = new FolderSettings { FamiliesFolder = familiesFolder, ImagesFolder = imagesFolder };
+                var json = JsonConvert.SerializeObject(cfg, Formatting.Indented);
+                File.WriteAllText(pathsFile, json);
+            }
+            catch { }
+        }
+
+        private class FolderSettings
+        {
+            public string FamiliesFolder { get; set; }
+            public string ImagesFolder { get; set; }
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)

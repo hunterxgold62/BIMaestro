@@ -1,22 +1,28 @@
 ﻿// ExportScheduleCommand.cs
-using Autodesk.Revit.UI;
-using Autodesk.Revit.DB;
 using Autodesk.Revit.Attributes;
+using Autodesk.Revit.DB;
+using Autodesk.Revit.UI;
+using Licensing;
 using System;
-using System.IO;
-using System.Linq;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Runtime.InteropServices;    // Nécessaire pour Marshal.ReleaseComObject
+using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;    
 using Excel = Microsoft.Office.Interop.Excel;
+
+
 
 namespace Visualisation
 {
     [Transaction(TransactionMode.Manual)]
-    public class ExportScheduleCommand : IExternalCommand
+    public class ExportScheduleCommand : BaseTrackedCommand
     {
-        public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        protected override string ButtonId => "ExportScheduleCommand";
+
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
+            var commandData = data;
             UIDocument uidoc = commandData.Application.ActiveUIDocument;
             Document doc = uidoc.Document;
 
@@ -245,5 +251,6 @@ namespace Visualisation
                 // On ignore volontairement les erreurs de release
             }
         }
+
     }
 }

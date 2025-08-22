@@ -2,17 +2,19 @@
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using Licensing;
 
 namespace Modification
 {
     [Transaction(TransactionMode.Manual)]
-    public class CombinedCleanupCommand : IExternalCommand
+    public class CombinedCleanupCommand : BaseTrackedCommand
     {
-        public Result Execute(
-            ExternalCommandData commandData,
-            ref string message,
-            ElementSet elements)
+
+        protected override string ButtonId => "CombinedCleanupCommand";
+
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
+            var commandData = data;
             // 1) Affiche la fenêtre WPF
             var window = new CleanupWindow();
             var helper = new System.Windows.Interop.WindowInteropHelper(window)

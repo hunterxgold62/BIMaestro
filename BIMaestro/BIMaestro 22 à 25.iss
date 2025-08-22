@@ -1,6 +1,8 @@
 ; --------------------------------------------------------
 ; BIMaestro.iss — Installateur per-user sans UAC
-; installe BIMaestro.addin en local (2022–2025)
+; installe BIMaestro.addin en local (2022–2026)
+; + Copie d’un uninstalleur renommé "Suppression BIMaestro.exe"
+;   dans le dossier Addins\2024
 ; --------------------------------------------------------
 
 [Setup]
@@ -43,13 +45,16 @@ end;
 
 // -----------------------------------------------------------------
 // Après copie, on crée BIMaestro.addin per-user pour Revit 2022–2025
+// + on dépose un uninstalleur renommé dans Addins\2024
 // -----------------------------------------------------------------
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   AddinsRoot, BinFolder, Xml: String;
-  Versions: array[1..4] of String;
+  Versions: array[1..5] of String;
   i: Integer;
   ManifestPath: String;
+
+  DestFolder, SourceExe, SourceDat, DestExe, DestDat: String;
 begin
   if CurStep = ssPostInstall then
   begin
@@ -60,6 +65,7 @@ begin
     Versions[2] := '2023';
     Versions[3] := '2024';
     Versions[4] := '2025';
+      Versions[5] := '2026';
 
     Xml := BuildXml(BinFolder);
 
@@ -69,6 +75,23 @@ begin
       ManifestPath := AddinsRoot + '\' + Versions[i] + '\BIMaestro.addin';
       SaveStringToFile(ManifestPath, Xml, False);
     end;
+
+    // --- Copie de l’uninstalleur renommé dans le dossier 2024 ---
+    DestFolder := AddinsRoot + '\2024';
+    ForceDirectories(DestFolder);
+
+    // Chemins uninstalleur source et .dat
+    SourceExe := ExpandConstant('{uninstallexe}');
+    SourceDat := ChangeFileExt(SourceExe, '.dat');
+
+    // Cibles renommées
+    DestExe := DestFolder + '\Suppression BIMaestro.exe';
+    DestDat := DestFolder + '\Suppression BIMaestro.dat';
+
+    if FileExists(SourceExe) then
+      FileCopy(SourceExe, DestExe, False);  // False = écrase si existe
+    if FileExists(SourceDat) then
+      FileCopy(SourceDat, DestDat, False);
   end;
 end;
 
@@ -82,9 +105,17 @@ Type: files;            Name: "{userappdata}\Autodesk\Revit\Addins\2022\BIMaestr
 Type: files;            Name: "{userappdata}\Autodesk\Revit\Addins\2023\BIMaestro.addin"
 Type: files;            Name: "{userappdata}\Autodesk\Revit\Addins\2024\BIMaestro.addin"
 Type: files;            Name: "{userappdata}\Autodesk\Revit\Addins\2025\BIMaestro.addin"
+Type: files;            Name: "{userappdata}\Autodesk\Revit\Addins\2026\BIMaestro.addin"
+
+
+; Supprime la copie de l’uninstalleur renommé déposée dans 2024 (si ce n’est pas elle qui s’auto-supprime)
+Type: files;            Name: "{userappdata}\Autodesk\Revit\Addins\2024\Suppression BIMaestro.exe"
+Type: files;            Name: "{userappdata}\Autodesk\Revit\Addins\2024\Suppression BIMaestro.dat"
 
 ; Nettoie les dossiers version s’ils sont devenus vides
 Type: dirifempty;       Name: "{userappdata}\Autodesk\Revit\Addins\2022"
 Type: dirifempty;       Name: "{userappdata}\Autodesk\Revit\Addins\2023"
 Type: dirifempty;       Name: "{userappdata}\Autodesk\Revit\Addins\2024"
 Type: dirifempty;       Name: "{userappdata}\Autodesk\Revit\Addins\2025"
+Type: dirifempty;       Name: "{userappdata}\Autodesk\Revit\Addins\2026"
+

@@ -2,14 +2,20 @@
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.ApplicationServices;
+using Licensing;
+
 
 namespace IA
 {
     [Transaction(TransactionMode.Manual)]
-    public class GPTBotWindowCommand : IExternalCommand
+    public class GPTBotWindowCommand : BaseTrackedCommand
     {
-        public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+
+        protected override string ButtonId => "GPTBotWindowCommand";
+
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
+            var commandData = data;
             // Afficher la fenêtre de sélection de profil
             ProfileSelectionWindow selectionWindow = new ProfileSelectionWindow();
             bool? result = selectionWindow.ShowDialog();

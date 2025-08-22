@@ -3,14 +3,19 @@ using System.Collections.Generic;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using Licensing;
 
 namespace Modification
 {
     [Transaction(TransactionMode.Manual)]
-    public class OverrideColorCommand : IExternalCommand
+    public class OverrideColorCommand : BaseTrackedCommand
     {
-        public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+
+        protected override string ButtonId => "OverrideColorCommand";
+
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
+            var commandData = data;
             var uiapp = commandData.Application;
             var uidoc = uiapp.ActiveUIDocument;
             var doc = uidoc.Document;

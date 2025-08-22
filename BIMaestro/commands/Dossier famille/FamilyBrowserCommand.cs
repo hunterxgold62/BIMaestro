@@ -10,7 +10,7 @@ namespace Famille
     public class FamilyBrowserCommand : BaseTrackedCommand
     {
         // Identifiant analytics (court, stable)
-        protected override string ButtonId => "FamilyBrowser";
+        protected override string ButtonId => "FamilyBrowserCommand";
 
         // Champs existants conservés
         public static UIApplication uiapp;
@@ -22,7 +22,7 @@ namespace Famille
         public static ReloadFamilyHandler ReloadFamilyHandlerInstance;
         public static ExternalEvent ReloadFamilyEventInstance;
 
-        // Ton code d'origine, déplacé dans OnExecute
+        
         protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
             uiapp = data.Application;

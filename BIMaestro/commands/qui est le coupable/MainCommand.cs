@@ -4,17 +4,20 @@ using System;
 using System.Linq;
 using System.Collections.Generic;
 using Autodesk.Revit.UI.Selection;
+using Licensing;
+
 
 namespace Analyse
 {
     [Autodesk.Revit.Attributes.Transaction(Autodesk.Revit.Attributes.TransactionMode.Manual)]
-    public class MainCommand : IExternalCommand
+    public class MainCommand : BaseTrackedCommand
     {
-        public Result Execute(
-          ExternalCommandData commandData,
-          ref string message,
-          ElementSet elements)
+
+        protected override string ButtonId => "MainCommand";
+
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
+            var commandData = data;
             UIApplication uiapp = commandData.Application;
             UIDocument uidoc = uiapp.ActiveUIDocument;
             Document doc = uidoc.Document;

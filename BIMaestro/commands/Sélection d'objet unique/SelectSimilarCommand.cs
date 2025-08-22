@@ -1,13 +1,15 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text.Json;
-using System.Drawing;
-using Autodesk.Revit.Attributes;
+﻿using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.UI.Selection;
+using Licensing;
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+// REMPLACÉ : using System.Text.Json;
+using Newtonsoft.Json; // <-- Newtonsoft.Json
 using Color = System.Drawing.Color;
 
 namespace Visualisation
@@ -62,7 +64,7 @@ namespace Visualisation
                 if (File.Exists(PrefsPath))
                 {
                     var json = File.ReadAllText(PrefsPath);
-                    var prefs = JsonSerializer.Deserialize<SelectSimilarPreferences>(json);
+                    var prefs = JsonConvert.DeserializeObject<SelectSimilarPreferences>(json);
                     if (prefs != null) return prefs;
                 }
             }
@@ -74,7 +76,7 @@ namespace Visualisation
         {
             try
             {
-                var json = JsonSerializer.Serialize(prefs, new JsonSerializerOptions { WriteIndented = true });
+                var json = JsonConvert.SerializeObject(prefs, Formatting.Indented);
                 File.WriteAllText(PrefsPath, json);
             }
             catch { }
@@ -97,7 +99,7 @@ namespace Visualisation
                 if (File.Exists(path))
                 {
                     var json = File.ReadAllText(path);
-                    return JsonSerializer.Deserialize<LastColoredSet>(json);
+                    return JsonConvert.DeserializeObject<LastColoredSet>(json);
                 }
             }
             catch { }
@@ -108,7 +110,7 @@ namespace Visualisation
         {
             try
             {
-                var json = JsonSerializer.Serialize(set, new JsonSerializerOptions { WriteIndented = true });
+                var json = JsonConvert.SerializeObject(set, Formatting.Indented);
                 File.WriteAllText(SelectSimilarPreferences.LastSetPath, json);
             }
             catch { }
@@ -127,35 +129,65 @@ namespace Visualisation
 
     // ====================== COMMANDE PRINCIPALE ======================
     [Transaction(TransactionMode.Manual)]
-    public class SelectSimilarCommand : IExternalCommand
+    public class SelectSimilarCommand : BaseTrackedCommand
     {
         private const string ANY_TAG_TOKEN = "__ANY_TAG__";
+        protected override string ButtonId => "SelectSimilarCommand";
 
-        public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
-            var uiDoc = commandData.Application.ActiveUIDocument;
+            var uiDoc = data.Application.ActiveUIDocument;
             var doc = uiDoc.Document;
             var view = doc.ActiveView;
 
-            // 1) Références initiales
-            IList<Reference> initialRefs;
-            try
+            // 0) Pré-sélection éventuelle
+            var preSelIds = uiDoc.Selection.GetElementIds() ?? new List<ElementId>();
+            bool hasPreselection = preSelIds.Count > 0;
+
+            // 1) Références initiales (pré-sélection si dispo, sinon PickObjects)
+            List<Element> referenceElements = new List<Element>();
+            if (hasPreselection)
             {
-                initialRefs = uiDoc.Selection.PickObjects(
-                    ObjectType.Element,
-                    "Cliquez les éléments de référence, puis Terminer pour ouvrir les options.");
+                foreach (var id in preSelIds)
+                {
+                    var el = doc.GetElement(id);
+                    if (el != null) referenceElements.Add(el);
+                }
             }
-            catch (Autodesk.Revit.Exceptions.OperationCanceledException)
+            else
             {
-                return Result.Cancelled;
+                IList<Reference> initialRefs;
+                try
+                {
+                    initialRefs = uiDoc.Selection.PickObjects(
+                        ObjectType.Element,
+                        "Cliquez les éléments de référence, puis Terminer pour ouvrir les options.");
+                }
+                catch (Autodesk.Revit.Exceptions.OperationCanceledException)
+                {
+                    return Result.Cancelled;
+                }
+
+                if (initialRefs == null || initialRefs.Count == 0)
+                {
+                    TaskDialog.Show("Sélection similaire", "Aucun élément de référence sélectionné.");
+                    return Result.Cancelled;
+                }
+
+                foreach (var r in initialRefs)
+                {
+                    var el = doc.GetElement(r.ElementId);
+                    if (el != null) referenceElements.Add(el);
+                }
             }
-            if (initialRefs == null || initialRefs.Count == 0)
+
+            if (referenceElements.Count == 0)
             {
-                TaskDialog.Show("Sélection similaire", "Aucun élément de référence sélectionné.");
+                TaskDialog.Show("Sélection similaire", "Impossible d’identifier des éléments de référence.");
                 return Result.Cancelled;
             }
 
-            // 2) TaskDialog clair : 3 critères + Effacer mes dernières couleurs (dernier item)
+            // 2) TaskDialog (identique)
             var prefs = SelectSimilarPreferences.Load();
 
             var dlg = new TaskDialog("Sélection similaire")
@@ -180,7 +212,6 @@ namespace Visualisation
             if (dr == TaskDialogResult.CommandLink4)
                 return ClearOverridesByLastSetFlow(doc);
 
-            // 3) Critère
             var opt = dr switch
             {
                 TaskDialogResult.CommandLink1 => FilterOption.Category,
@@ -192,62 +223,25 @@ namespace Visualisation
             prefs.LastCriterion = opt;
             SelectSimilarPreferences.Save(prefs);
 
-            // 4) Préparer comparateurs
+            // 3) Préparer comparateurs à partir des éléments de référence
             var wallCatId = Category.GetCategory(doc, BuiltInCategory.OST_Walls)?.Id;
             var catIds = new HashSet<ElementId>();
             var famNames = new HashSet<string>(StringComparer.Ordinal);
             var typeIds = new HashSet<ElementId>();
             bool includeAllTags = prefs.IncludeAllTagsExplicit;
 
-            foreach (var r in initialRefs)
-            {
-                var el = doc.GetElement(r.ElementId);
-                if (el == null) continue;
+            BuildComparatorsFromElements(
+                doc, referenceElements, opt, wallCatId,
+                catIds, famNames, typeIds,
+                ref includeAllTags);
 
-                if (el is IndependentTag) includeAllTags = true;
-
-                switch (opt)
-                {
-                    case FilterOption.Category:
-                        if (el.Category != null) catIds.Add(el.Category.Id);
-                        break;
-
-                    case FilterOption.Family:
-                        if (el.Category != null && el.Category.Id == wallCatId)
-                        {
-                            if (doc.GetElement(el.GetTypeId()) is ElementType wt)
-                                famNames.Add(wt.Name);
-                        }
-                        else if (el is IndependentTag)
-                        {
-                            famNames.Add(ANY_TAG_TOKEN);
-                        }
-                        else if (el is FamilyInstance fi)
-                        {
-                            famNames.Add(fi.Symbol.FamilyName);
-                        }
-                        else
-                        {
-                            if (doc.GetElement(el.GetTypeId()) is ElementType et)
-                            {
-                                if (!string.IsNullOrEmpty(et.FamilyName)) famNames.Add(et.FamilyName);
-                                famNames.Add(et.Name);
-                            }
-                        }
-                        break;
-
-                    case FilterOption.Type:
-                        typeIds.Add(el.GetTypeId());
-                        break;
-                }
-            }
-
-            // 5) Deuxième sélection (éléments similaires)
+            // 4) Sélection des éléments similaires (flux d’origine)
             var filter = new SimilarElementFilter(doc, opt, catIds, famNames, typeIds, includeAllTags, wallCatId);
             IList<Reference> selRefs;
             try
             {
-                selRefs = uiDoc.Selection.PickObjects(ObjectType.Element, filter,
+                selRefs = uiDoc.Selection.PickObjects(
+                    ObjectType.Element, filter,
                     "Sélectionnez les éléments similaires (Échap pour terminer).");
             }
             catch (Autodesk.Revit.Exceptions.OperationCanceledException)
@@ -258,25 +252,27 @@ namespace Visualisation
             var selIds = selRefs.Select(x => x.ElementId).Distinct().ToList();
             uiDoc.Selection.SetElementIds(selIds);
 
-            // 6) Si pas de coloration -> fin (on ne mémorise pas de série)
+            // 5) Sans coloration => fin
             if (!prefs.Colorize)
             {
                 TaskDialog.Show("Résultat", $"{selIds.Count} élément(s) – Critère : {opt}\n(Coloration désactivée)");
                 return Result.Succeeded;
             }
 
-            // 7) Groupes + palette
-            var groupKeys = selIds.Select(id => ComputeKey(doc, wallCatId, doc.GetElement(id)))
-                                  .Distinct(StringComparer.Ordinal).ToList();
+            // 6) Groupage + palette
+            var groupKeys = selIds
+                .Select(id => ComputeKey(doc, wallCatId, doc.GetElement(id)))
+                .Distinct(StringComparer.Ordinal).ToList();
+
             int n = Math.Max(1, groupKeys.Count);
-            var palette = new Dictionary<string, Color>(StringComparer.Ordinal);
+            var palette = new Dictionary<string, System.Drawing.Color>(StringComparer.Ordinal);
             for (int i = 0; i < n; i++)
             {
                 double hue = i / (double)n;
                 palette[groupKeys[i]] = ColorFromHSL(hue, 0.5, 0.8);
             }
 
-            // 8) Appliquer & mémoriser la série colorée (vue + éléments)
+            // 7) Appliquer & mémoriser la série
             var coloredUniqueIds = new List<string>();
             using (var t = new Transaction(doc, "Surligner similaires"))
             {
@@ -314,7 +310,6 @@ namespace Visualisation
                 t.Commit();
             }
 
-            // Sauvegarde de la dernière série
             var last = new LastColoredSet
             {
                 DocumentTitle = doc.Title,
@@ -396,7 +391,7 @@ namespace Visualisation
             return !string.IsNullOrEmpty(et?.FamilyName) ? et.FamilyName : et?.Name ?? el.Category?.Name ?? "Autres";
         }
 
-        private static Color ColorFromHSL(double h, double s, double l)
+        private static System.Drawing.Color ColorFromHSL(double h, double s, double l)
         {
             double r, g, b;
             if (s == 0) { r = g = b = l; }
@@ -408,7 +403,7 @@ namespace Visualisation
                 g = Hue2RGB(p, q, h);
                 b = Hue2RGB(p, q, h - 1.0 / 3);
             }
-            return Color.FromArgb((int)(r * 255.0), (int)(g * 255.0), (int)(b * 255.0));
+            return System.Drawing.Color.FromArgb((int)(r * 255.0), (int)(g * 255.0), (int)(b * 255.0));
         }
         private static double Hue2RGB(double p, double q, double t)
         {
@@ -417,6 +412,64 @@ namespace Visualisation
             if (t < 1.0 / 2) return q;
             if (t < 2.0 / 3) return p + (q - p) * (2.0 / 3 - t) * 6;
             return p;
+        }
+
+        // ---- Nouveau helper : construit les comparateurs à partir d'une liste d'éléments
+        private static void BuildComparatorsFromElements(
+            Document doc,
+            IEnumerable<Element> initialElements,
+            FilterOption opt,
+            ElementId wallCatId,
+            HashSet<ElementId> catIds,
+            HashSet<string> famNames,
+            HashSet<ElementId> typeIds,
+            ref bool includeAllTags)
+        {
+            bool flag = includeAllTags;
+
+            foreach (var el in initialElements)
+            {
+                if (el == null) continue;
+
+                if (el is IndependentTag) flag = true;
+
+                switch (opt)
+                {
+                    case FilterOption.Category:
+                        if (el.Category != null) catIds.Add(el.Category.Id);
+                        break;
+
+                    case FilterOption.Family:
+                        if (el.Category != null && wallCatId != null && el.Category.Id == wallCatId)
+                        {
+                            if (doc.GetElement(el.GetTypeId()) is ElementType wt)
+                                famNames.Add(wt.Name);
+                        }
+                        else if (el is IndependentTag)
+                        {
+                            famNames.Add(ANY_TAG_TOKEN);
+                        }
+                        else if (el is FamilyInstance fi)
+                        {
+                            famNames.Add(fi.Symbol.FamilyName);
+                        }
+                        else
+                        {
+                            if (doc.GetElement(el.GetTypeId()) is ElementType et)
+                            {
+                                if (!string.IsNullOrEmpty(et.FamilyName)) famNames.Add(et.FamilyName);
+                                famNames.Add(et.Name);
+                            }
+                        }
+                        break;
+
+                    case FilterOption.Type:
+                        typeIds.Add(el.GetTypeId());
+                        break;
+                }
+            }
+
+            includeAllTags = flag;
         }
     }
 

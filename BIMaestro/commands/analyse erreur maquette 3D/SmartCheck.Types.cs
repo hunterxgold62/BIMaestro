@@ -1,6 +1,6 @@
 ﻿using Autodesk.Revit.DB;
 
-namespace BIMastro.SmartCheck
+namespace Analyse
 {
     public enum IssueKind
     {

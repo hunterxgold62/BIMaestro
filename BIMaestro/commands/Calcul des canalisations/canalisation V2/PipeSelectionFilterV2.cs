@@ -7,6 +7,7 @@ using Autodesk.Revit.DB;
 using Autodesk.Revit.Attributes;
 using System.IO;
 using System.Diagnostics;
+using Licensing;
 
 // Références pour EPPlus
 using OfficeOpenXml;
@@ -23,7 +24,7 @@ using Autodesk.Revit.DB.Mechanical;
 namespace Analyse
 {
     [Transaction(TransactionMode.ReadOnly)]
-    public class PipeLengthByDiameterCommandV2 : IExternalCommand
+    public class PipeLengthByDiameterCommandV2 : BaseTrackedCommand
     {
         // Classe pour agréger les données par réseau
         private class NetworkAggregation
@@ -39,8 +40,12 @@ namespace Analyse
                 new Dictionary<double, (double, double)>();
         }
 
-        public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        protected override string ButtonId => "PipeLengthByDiameterCommandV2";
+
+
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
+            var commandData = data;
             // Obtenir le document actif
             UIDocument uidoc = commandData.Application.ActiveUIDocument;
             Autodesk.Revit.DB.Document doc = uidoc.Document;

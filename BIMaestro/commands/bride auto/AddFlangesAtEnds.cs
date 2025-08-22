@@ -8,6 +8,7 @@ using Autodesk.Revit.UI.Selection;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Licensing;
 
 namespace Modification
 {
@@ -22,12 +23,15 @@ namespace Modification
     }
 
     [Transaction(TransactionMode.Manual)]
-    public class AddFlangesAtEnds : IExternalCommand
+    public class AddFlangesAtEnds : BaseTrackedCommand
     {
         private const bool ACCESSORY_SIDE_IS_IN = true;
+        protected override string ButtonId => "AddFlangesAtEnds";
 
-        public Result Execute(ExternalCommandData data, ref string message, ElementSet elements)
+
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
+            var commandData = data;
             UIDocument uiDoc = data.Application.ActiveUIDocument;
             Document doc = uiDoc.Document;
             UIApplication uiApp = data.Application;
@@ -236,11 +240,12 @@ namespace Modification
 
             // 2) Recherche standard (exclusion de la famille problématique)
             var symbols = new FilteredElementCollector(doc)
-     .OfClass(typeof(FamilySymbol)).Cast<FamilySymbol>()
-     .Where(fs => fs?.Category != null &&
-                  fs.Category.Id.IntegerValue == (int)BuiltInCategory.OST_PipeAccessory) // <-- TOUS les accessoires de cana
-     .OrderBy(fs => fs.FamilyName).ThenBy(fs => fs.Name)
-     .ToList();
+    .OfClass(typeof(FamilySymbol))
+    .OfCategory(BuiltInCategory.OST_PipeAccessory)   // <<< le filtre manquant
+    .Cast<FamilySymbol>()
+    .OrderBy(fs => fs.FamilyName).ThenBy(fs => fs.Name)
+    .ToList();
+
 
 
             symbols = symbols.Where(fs =>

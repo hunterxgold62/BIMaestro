@@ -10,17 +10,18 @@ using Autodesk.Revit.UI;
 using Licensing;
 
 
-namespace BIMastro.SmartCheck
+namespace Analyse
 {
     [Transaction(TransactionMode.ReadOnly)]
     public class SmartCheckCommand : BaseTrackedCommand
     {
         public static readonly string Smart3DName = "BIMastro – SmartCheck 3D";
-        protected override string ButtonId => "ExcelScheduleCommand";
+        protected override string ButtonId => "SmartCheckCommand";
 
 
-        public Result Execute(ExternalCommandData data, ref string message, ElementSet elements)
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
+            var commandData = data;
             var uiapp = data.Application;
             var uidoc = uiapp.ActiveUIDocument;
             var doc = uidoc.Document;
@@ -277,10 +278,7 @@ namespace BIMastro.SmartCheck
         private static double FeetToMm(double ft) => ft * 304.8;
         private static double Mm3ToFt3(double mm3) => mm3 / Math.Pow(304.8, 3);
 
-        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
-        {
-            throw new NotImplementedException();
-        }
+
     }
 
     // ---------- Handler : focus robuste + ShowAll atomique ----------
