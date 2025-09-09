@@ -19,7 +19,7 @@ namespace Modification
             "SauvegardePréférence");
         private static readonly string ConfigFile = Path.Combine(ConfigFolder, "DynamoPaths.txt");
         private static readonly string DefaultPath =
-            @"P:\0-Boîte à outils Revit\1-Dynamo\CML_Arases réservations_V24.dyn";
+            @"P:\0-Boîte à outils Revit\1-Dynamo\CML_LOD_200.dyn";
 
         // Tableau mémoire pour 5 chemins
         private static readonly string[] userPaths = new string[5];

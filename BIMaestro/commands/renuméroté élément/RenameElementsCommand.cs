@@ -3,7 +3,6 @@ using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 
 namespace Modification
@@ -16,369 +15,396 @@ namespace Modification
             UIDocument uiDoc = commandData.Application.ActiveUIDocument;
             Document doc = uiDoc.Document;
 
-            var selIds = uiDoc.Selection.GetElementIds();
-            if (selIds == null || selIds.Count == 0)
+            // Récupérer les éléments sélectionnés
+            ICollection<ElementId> selectedIds = uiDoc.Selection.GetElementIds();
+            if (selectedIds.Count == 0)
             {
-                TaskDialog.Show("Sélection", "Sélectionne au moins un élément.");
+                TaskDialog.Show("Sélection", "Aucun élément sélectionné. Veuillez sélectionner des éléments dans Revit.");
                 return Result.Cancelled;
             }
 
-            // Écarter les types / liens
-            var targets = selIds.Select(doc.GetElement)
-                                .Where(e => e != null && !(e is ElementType) && !(e is RevitLinkInstance))
-                                .ToList();
-            if (targets.Count == 0)
+            // Récupérer les paramètres texte modifiables du premier élément sélectionné
+            Element firstElement = doc.GetElement(selectedIds.First());
+            List<string> textParameters = GetWritableTextParameters(firstElement);
+
+            if (!textParameters.Any())
             {
-                TaskDialog.Show("Info", "Aucun élément renommable trouvé.");
-                return Result.Cancelled;
+                TaskDialog.Show("Erreur", "Aucun paramètre texte modifiable trouvé sur les éléments sélectionnés.");
+                return Result.Failed;
             }
 
-            // Paramètres proposés d’après le 1er élément (+ “Nom” pour déclencher le .Name)
-            var first = targets.First();
-            var parameters = GetWritableTextParameters(first);
-            if (!parameters.Contains("Nom")) parameters.Add("Nom");
-            parameters.Sort(StringComparer.CurrentCultureIgnoreCase);
-
-            var win = new ElementRenamerWindow(parameters);
-            if (win.ShowDialog() != true) return Result.Cancelled;
-
-            string selectedParam = win.SelectedParameter ?? "Nom";
-
-            // Tri (bande → Y, puis X) + unités
-            double bandHeightInternal = ParseBandHeightToInternal(doc, win.BandHeight);
-            var locs = GetElementsWithLocations(doc, targets.Select(t => t.Id).ToList(), uiDoc.ActiveView);
-            var ordered = SortElementsByGridLocation(locs, bandHeightInternal);
-
-            // Worksharing : checkout
-            TryCheckout(doc, ordered.Select(o => o.Element.Id).ToList());
-
-            // Numérotation
-            string prefix = win.Prefix ?? "";
-            string suffix = win.Suffix ?? "";
-            int current = 1;
-            bool isNumeric = win.SelectedNumberFormat == "1,2,3..." ||
-                             win.SelectedNumberFormat == "001,002,003..." ||
-                             win.SelectedNumberFormat == "0001,0002,0003...";
-            bool isAlpha = win.SelectedNumberFormat == "A,B,C...";
-
-            if (isNumeric)
+            // Afficher la fenêtre de renommage avec les paramètres disponibles
+            ElementRenamerWindow renamerWindow = new ElementRenamerWindow(textParameters);
+            if (renamerWindow.ShowDialog() == true)
             {
-                if (!int.TryParse(win.StartNumber, NumberStyles.Integer, CultureInfo.InvariantCulture, out current))
-                {
-                    TaskDialog.Show("Erreur", "Le numéro de départ doit être un entier.");
-                    return Result.Failed;
-                }
-            }
-            else if (isAlpha)
-            {
-                current = LettersToNumber((win.StartNumber ?? "A").ToUpperInvariant());
-                if (current <= 0)
-                {
-                    TaskDialog.Show("Erreur", "Le départ alphabétique doit être une lettre/séquence valide (A, AA...).");
-                    return Result.Failed;
-                }
-            }
+                string selectedParameter = renamerWindow.SelectedParameter;
 
-            var notes = new List<string>();
-
-            using (Transaction tx = new Transaction(doc, "Renommer éléments"))
-            {
-                tx.Start();
-
-                // RESET ?
-                if (win.IsReset)
+                using (Transaction tx = new Transaction(doc, "Mettre à jour ou réinitialiser les éléments"))
                 {
-                    foreach (var el in ordered.Select(o => o.Element))
+                    try
                     {
-                        // Ne pas vider les éléments qui exigent un Name non vide
-                        if (SupportsNameSetter(el) || IsGridLike(el)) continue;
+                        tx.Start();
 
-                        Parameter p = el.LookupParameter(selectedParam);
-                        if (p != null && !p.IsReadOnly && p.StorageType == StorageType.String)
+                        if (renamerWindow.IsReset)
                         {
-                            using (SubTransaction st = new SubTransaction(doc))
+                            // Réinitialiser le paramètre sélectionné
+                            foreach (ElementId id in selectedIds)
                             {
-                                try { st.Start(); p.Set(string.Empty); st.Commit(); }
-                                catch { st.RollBack(); }
+                                Element element = doc.GetElement(id);
+                                Parameter param = element.LookupParameter(selectedParameter);
+                                if (param != null && !param.IsReadOnly && param.StorageType == StorageType.String)
+                                {
+                                    param.Set(""); // Réinitialiser le paramètre à une chaîne vide
+                                }
                             }
                         }
-                    }
-                    tx.Commit();
-                    return Result.Succeeded;
-                }
-
-                foreach (var el in ordered.Select(o => o.Element))
-                {
-                    string num = "";
-                    if (isNumeric)
-                    {
-                        if (win.SelectedNumberFormat == "0001,0002,0003...") num = current.ToString("D4", CultureInfo.InvariantCulture);
-                        else if (win.SelectedNumberFormat == "001,002,003...") num = current.ToString("D3", CultureInfo.InvariantCulture);
-                        else num = current.ToString(CultureInfo.InvariantCulture);
-                    }
-                    else if (isAlpha)
-                    {
-                        num = NumberToLetters(current);
-                    }
-
-                    string proposed = prefix + num + suffix;
-                    if (string.IsNullOrWhiteSpace(proposed)) proposed = isAlpha ? "A" : "1";
-
-                    using (SubTransaction st = new SubTransaction(doc))
-                    {
-                        try
+                        else
                         {
-                            st.Start();
-                            bool ok = false;
+                            // Renommer les éléments
+                            string prefix = renamerWindow.Prefix ?? "";
+                            string suffix = renamerWindow.Suffix ?? "";
 
-                            // === 1) Quadrillages : DATUM_TEXT — c’est LA voie fiable en 2023 ===
-                            if (IsGridLike(el))
-                            {
-                                ok = RenameGridByDatumText(doc, el, proposed); // unicité incluse
-                            }
-                            // === 2) Niveau / Vue / Feuille / Plan réf. : .Name (+ unicité si besoin) ===
-                            else if (el is Level lvl)
-                                ok = RenameLevelWithUniqueness(doc, lvl, proposed);
-                            else if (el is View v)
-                                ok = RenameViewWithUniqueness(doc, v, proposed);
-                            else if (el is ViewSheet vs)
-                                ok = RenameViewSheetWithUniqueness(doc, vs, proposed);
-                            else if (el is ReferencePlane rp)
-                            {
-                                rp.Name = proposed; ok = true;
-                            }
-                            // === 3) Sinon : paramètre texte choisi ===
-                            if (!ok)
-                                ok = TrySetStringParameter(el, selectedParam, proposed);
+                            int currentNumber = 1;
+                            int totalElements = selectedIds.Count;
 
-                            if (!ok)
+                            bool isNumeric = renamerWindow.SelectedNumberFormat == "1,2,3..." || renamerWindow.SelectedNumberFormat == "001,002,003...";
+                            bool isAlphabetic = renamerWindow.SelectedNumberFormat == "A,B,C...";
+
+                            if (isNumeric)
                             {
-                                notes.Add($"Élément {el.Id.IntegerValue} : non modifié (Grid/Name/param).");
-                                st.RollBack();
+                                if (!int.TryParse(renamerWindow.StartNumber, out currentNumber))
+                                {
+                                    TaskDialog.Show("Erreur", "Le numéro de départ doit être un nombre entier pour le format sélectionné.");
+                                    tx.RollBack();
+                                    return Result.Failed;
+                                }
+                            }
+                            else if (isAlphabetic)
+                            {
+                                currentNumber = LettersToNumber(renamerWindow.StartNumber.ToUpper());
+                                if (currentNumber == -1)
+                                {
+                                    TaskDialog.Show("Erreur", "Le numéro de départ doit être une lettre (A-Z) ou une séquence alphabétique valide pour le format alphabétique.");
+                                    tx.RollBack();
+                                    return Result.Failed;
+                                }
+                            }
+
+                            // Conversion de la hauteur de bande avec gestion des erreurs
+                            if (!double.TryParse(renamerWindow.BandHeight, out double bandHeight))
+                            {
+                                bandHeight = 1.0; // Valeur par défaut si la conversion échoue
+                            }
+
+                            // Obtenir les éléments avec leurs positions transformées selon la vue active
+                            var elementLocations = GetElementsWithLocations(doc, selectedIds, uiDoc.ActiveView);
+
+                            List<ElementLocation> sortedElements;
+
+                            // Vérifier si le tri par niveau est activé
+                            if (renamerWindow.IsSortByLevelEnabled)
+                            {
+                                // Vérifier si tous les éléments ont un paramètre de niveau
+                                if (!AllElementsHaveLevel(elementLocations))
+                                {
+                                    TaskDialog.Show("Erreur", "Tous les éléments n'ont pas de paramètre 'Niveau'. Le tri par niveau n'est pas possible pour ces éléments. Veuillez trier niveau par niveau.");
+                                    tx.RollBack();
+                                    return Result.Failed;
+                                }
+
+                                // Utiliser le tri par niveau
+                                sortedElements = SortElementsByLevelAndLocation(elementLocations, bandHeight, doc);
                             }
                             else
                             {
-                                st.Commit();
-                                current++;
+                                // Utiliser le tri standard
+                                sortedElements = SortElementsByGridLocation(elementLocations, bandHeight);
+                            }
+
+                            foreach (var elemLoc in sortedElements)
+                            {
+                                Element element = elemLoc.Element;
+                                Parameter param = element.LookupParameter(selectedParameter);
+                                if (param != null && !param.IsReadOnly && param.StorageType == StorageType.String)
+                                {
+                                    string numberString = "";
+
+                                    if (isNumeric)
+                                    {
+                                        if (renamerWindow.SelectedNumberFormat == "0001,0002,0003...")
+                                        {
+                                            numberString = currentNumber.ToString("D4");
+                                        }
+                                        else if (renamerWindow.SelectedNumberFormat == "001,002,003...")
+                                        {
+                                            numberString = currentNumber.ToString("D3");
+                                        }
+                                        else
+                                        {
+                                            numberString = currentNumber.ToString();
+                                        }
+                                        currentNumber++;
+                                    }
+                                    else if (isAlphabetic)
+                                    {
+                                        numberString = NumberToLetters(currentNumber);
+                                        currentNumber++;
+                                    }
+
+                                    string newValue = prefix + numberString + suffix;
+                                    param.Set(newValue);
+                                }
                             }
                         }
-                        catch (Exception ex)
-                        {
-                            notes.Add($"Élément {el.Id.IntegerValue} : {ex.Message}");
-                            st.RollBack();
-                            current++;
-                        }
+
+                        tx.Commit();
+
+                    }
+                    catch (Exception ex)
+                    {
+                        tx.RollBack();
+                        TaskDialog.Show("Erreur", $"Une erreur est survenue : {ex.Message}");
+                        return Result.Failed;
                     }
                 }
 
-                if (notes.Count > 0)
-                {
-                    TaskDialog.Show("Terminé (avec avertissements)",
-                        string.Join(Environment.NewLine, notes.Take(25)) +
-                        (notes.Count > 25 ? $"\n... (+{notes.Count - 25} autres)" : ""));
-                }
-
-                tx.Commit();
+                return Result.Succeeded;
             }
 
-            return Result.Succeeded;
+            return Result.Cancelled;
         }
 
-        // ---------- Helpers principaux ----------
-
-        private static bool IsGridLike(Element e) => (e is Grid) || (e is MultiSegmentGrid);
-        private static bool SupportsNameSetter(Element e) =>
-            (e is Level) || (e is View) || (e is ViewSheet) || (e is ReferencePlane);
-
-        // *** Grids via DATUM_TEXT (2023 fiable) + unicité ***
-        private bool RenameGridByDatumText(Document doc, Element e, string proposed)
+        private List<string> GetWritableTextParameters(Element element)
         {
-            // 1) Obtenir le paramètre DATUM_TEXT sur Grid ou MultiSegmentGrid
-            Parameter GetDatum(Element el) => el.get_Parameter(BuiltInParameter.DATUM_TEXT);
+            List<string> textParameters = new List<string>();
 
-            // 2) unicité : aucun autre Grid/MultiSegmentGrid ne doit porter ce nom
-            bool NameFree(string name) =>
-                !new FilteredElementCollector(doc)
-                    .WherePasses(new LogicalOrFilter(new ElementClassFilter(typeof(Grid)), new ElementClassFilter(typeof(MultiSegmentGrid))))
-                    .Cast<Element>()
-                    .Any(x =>
+            foreach (Parameter param in element.Parameters)
+            {
+                if (param.StorageType == StorageType.String && !param.IsReadOnly)
+                {
+                    textParameters.Add(param.Definition.Name);
+                }
+            }
+
+            return textParameters;
+        }
+
+        // Classe pour associer un élément avec sa position transformée selon la vue active
+        private class ElementLocation
+        {
+            public Element Element { get; set; }
+            public XYZ Location { get; set; }
+        }
+
+        // Récupérer les éléments avec leurs positions transformées selon la vue active
+        private List<ElementLocation> GetElementsWithLocations(Document doc, ICollection<ElementId> elementIds, View activeView)
+        {
+            List<ElementLocation> elementLocations = new List<ElementLocation>();
+
+            // Créer une transformation pour passer des coordonnées du monde aux coordonnées de la vue
+            Transform viewTransform = Transform.Identity;
+            viewTransform.BasisX = activeView.RightDirection;
+            viewTransform.BasisY = activeView.UpDirection;
+            viewTransform.BasisZ = activeView.ViewDirection;
+
+            Transform worldToViewTransform = viewTransform.Inverse;
+
+            foreach (ElementId id in elementIds)
+            {
+                Element element = doc.GetElement(id);
+                LocationPoint locationPoint = element.Location as LocationPoint;
+                if (locationPoint != null)
+                {
+                    XYZ transformedLocation = worldToViewTransform.OfPoint(locationPoint.Point);
+                    elementLocations.Add(new ElementLocation
                     {
-                        var p = GetDatum(x);
-                        return p != null && string.Equals(p.AsString(), name, StringComparison.InvariantCultureIgnoreCase);
+                        Element = element,
+                        Location = transformedLocation
                     });
-
-            string candidate = proposed;
-            if (!NameFree(candidate))
-            {
-                string baseName = proposed;
-                int bump = 1;
-                while (bump < 10000 && !NameFree(candidate = $"{baseName}-{bump}")) bump++;
-                if (bump == 10000) return false;
+                }
+                else
+                {
+                    LocationCurve locationCurve = element.Location as LocationCurve;
+                    if (locationCurve != null)
+                    {
+                        XYZ midpoint = (locationCurve.Curve.GetEndPoint(0) + locationCurve.Curve.GetEndPoint(1)) / 2;
+                        XYZ transformedLocation = worldToViewTransform.OfPoint(midpoint);
+                        elementLocations.Add(new ElementLocation
+                        {
+                            Element = element,
+                            Location = transformedLocation
+                        });
+                    }
+                    else
+                    {
+                        // Utiliser le centre de la BoundingBox lorsque Location est indisponible (ex. portes de mur rideau)
+                        BoundingBoxXYZ bb = element.get_BoundingBox(null);
+                        if (bb != null)
+                        {
+                            XYZ center = (bb.Min + bb.Max) / 2;
+                            XYZ transformedLocation = worldToViewTransform.OfPoint(center);
+                            elementLocations.Add(new ElementLocation
+                            {
+                                Element = element,
+                                Location = transformedLocation
+                            });
+                        }
+                        else
+                        {
+                            // Ignorer les éléments sans position géométrique
+                            continue;
+                        }
+                    }
+                }
             }
 
-            var datum = GetDatum(e);
-            if (datum == null || datum.IsReadOnly) return false;
-
-            return datum.Set(candidate);
+            return elementLocations;
         }
 
-        // Param string générique
-        private bool TrySetStringParameter(Element e, string paramName, string value)
+        // Vérifier si tous les éléments ont un paramètre de niveau
+        private bool AllElementsHaveLevel(List<ElementLocation> elements)
         {
-            Parameter p = e.LookupParameter(paramName);
-            if (p != null && !p.IsReadOnly && p.StorageType == StorageType.String)
-                return p.Set(value);
-            return false;
-        }
-
-        // Levels
-        private bool RenameLevelWithUniqueness(Document doc, Level lvl, string proposed)
-        {
-            bool Free(string name) => !new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>()
-                                       .Any(l => string.Equals(l.Name, name, StringComparison.InvariantCultureIgnoreCase));
-            string candidate = proposed;
-            if (!Free(candidate))
+            foreach (var elemLoc in elements)
             {
-                string baseName = proposed;
-                int i = 1;
-                while (i < 10000 && !Free(candidate = $"{baseName}-{i}")) i++;
-                if (i == 10000) return false;
+                ElementId levelId = GetElementLevelId(elemLoc.Element);
+                if (levelId == ElementId.InvalidElementId)
+                {
+                    return false;
+                }
             }
-            lvl.Name = candidate;
             return true;
         }
 
-        // Views
-        private bool RenameViewWithUniqueness(Document doc, View v, string proposed)
+        // Trier les éléments en utilisant une grille de taille définie
+        private List<ElementLocation> SortElementsByGridLocation(List<ElementLocation> elements, double gridSize = 1.0)
         {
-            bool Free(string name) => !new FilteredElementCollector(doc).OfClass(typeof(View)).Cast<View>()
-                                       .Any(x => string.Equals(x.Name, name, StringComparison.InvariantCultureIgnoreCase));
-            string candidate = proposed;
-            if (!Free(candidate))
+            // Grouper les éléments par cellule de grille en Y
+            var groupedElements = elements
+                .GroupBy(e => (int)Math.Floor(e.Location.Y / gridSize)) // Regrouper par cellule de grille en Y
+                .OrderByDescending(g => g.Key) // Trier les bandes de haut en bas
+                .ToList();
+
+            // Trier les éléments dans chaque bande de gauche à droite (X)
+            var sortedElements = new List<ElementLocation>();
+            foreach (var group in groupedElements)
             {
-                string baseName = proposed;
-                int i = 1;
-                while (i < 10000 && !Free(candidate = $"{baseName}-{i}")) i++;
-                if (i == 10000) return false;
+                var sortedGroup = group.OrderBy(e => e.Location.X).ToList(); // Trier de gauche à droite
+                sortedElements.AddRange(sortedGroup);
             }
-            v.Name = candidate;
-            return true;
+
+            return sortedElements;
         }
 
-        // ViewSheets
-        private bool RenameViewSheetWithUniqueness(Document doc, ViewSheet vs, string proposed)
+        // Tri par niveau puis par position
+        private List<ElementLocation> SortElementsByLevelAndLocation(List<ElementLocation> elements, double gridSize, Document doc)
         {
-            bool Free(string name) => !new FilteredElementCollector(doc).OfClass(typeof(ViewSheet)).Cast<ViewSheet>()
-                                       .Any(x => string.Equals(x.Name, name, StringComparison.InvariantCultureIgnoreCase));
-            string candidate = proposed;
-            if (!Free(candidate))
+            // Regrouper les éléments par niveau
+            var groupedByLevel = elements
+                .GroupBy(e => GetElementLevelId(e.Element))
+                .OrderBy(g => GetLevelElevation(g.Key, doc)) // Trier du niveau le plus bas au plus haut
+                .ToList();
+
+            var sortedElements = new List<ElementLocation>();
+
+            foreach (var levelGroup in groupedByLevel)
             {
-                string baseName = proposed;
-                int i = 1;
-                while (i < 10000 && !Free(candidate = $"{baseName}-{i}")) i++;
-                if (i == 10000) return false;
+                // Au sein de chaque niveau, trier les éléments par position en utilisant la grille
+                var elementsInLevel = levelGroup.ToList();
+                var sortedInLevel = SortElementsByGridLocation(elementsInLevel, gridSize);
+                sortedElements.AddRange(sortedInLevel);
             }
-            vs.Name = candidate;
-            return true;
+
+            return sortedElements;
         }
 
-        // ---------- Tri / localisations / unités ----------
-
-        private class ElementLocation { public Element Element; public XYZ Location; }
-
-        private List<ElementLocation> GetElementsWithLocations(Document doc, ICollection<ElementId> ids, View view)
+        // Méthode pour obtenir l'Id du niveau de l'élément
+        private ElementId GetElementLevelId(Element element)
         {
-            var list = new List<ElementLocation>();
-            Transform t = Transform.Identity;
-            t.BasisX = view.RightDirection; t.BasisY = view.UpDirection; t.BasisZ = view.ViewDirection;
-            Transform w2v = t.Inverse;
+            ElementId levelId = ElementId.InvalidElementId;
 
-            foreach (var id in ids)
+            // Essayer d'utiliser la propriété LevelId si disponible
+            if (element is FamilyInstance familyInstance && familyInstance.LevelId != ElementId.InvalidElementId)
             {
-                var e = doc.GetElement(id);
-                if (e == null) continue;
+                levelId = familyInstance.LevelId;
+            }
+            else if (element is Wall wall)
+            {
+                levelId = wall.LevelId;
+            }
+            else if (element is Floor floor)
+            {
+                levelId = floor.LevelId;
+            }
+            else if (element is Ceiling ceiling)
+            {
+                levelId = ceiling.LevelId;
+            }
+            else if (element is RoofBase roof)
+            {
+                levelId = roof.LevelId;
+            }
+            else
+            {
+                // Utiliser un paramètre intégré pour récupérer le niveau
+                Parameter levelParam = element.get_Parameter(BuiltInParameter.LEVEL_PARAM);
+                if (levelParam == null)
+                {
+                    levelParam = element.get_Parameter(BuiltInParameter.SCHEDULE_LEVEL_PARAM);
+                }
+                if (levelParam == null)
+                {
+                    levelParam = element.get_Parameter(BuiltInParameter.FAMILY_LEVEL_PARAM);
+                }
 
-                if (e.Location is LocationPoint lp)
+                if (levelParam != null && levelParam.HasValue)
                 {
-                    list.Add(new ElementLocation { Element = e, Location = w2v.OfPoint(lp.Point) });
-                    continue;
-                }
-                if (e.Location is LocationCurve lc && lc.Curve != null)
-                {
-                    list.Add(new ElementLocation { Element = e, Location = w2v.OfPoint(lc.Curve.Evaluate(0.5, true)) });
-                    continue;
-                }
-                var bb = e.get_BoundingBox(null);
-                if (bb != null)
-                {
-                    list.Add(new ElementLocation { Element = e, Location = w2v.OfPoint((bb.Min + bb.Max) / 2.0) });
+                    levelId = levelParam.AsElementId();
                 }
             }
-            return list;
+
+            return levelId;
         }
 
-        private List<ElementLocation> SortElementsByGridLocation(List<ElementLocation> elems, double grid = 1.0)
+        // Méthode pour obtenir l'élévation du niveau
+        private double GetLevelElevation(ElementId levelId, Document doc)
         {
-            var grouped = elems.GroupBy(e => (int)Math.Floor(e.Location.Y / grid)).OrderByDescending(g => g.Key);
-            var res = new List<ElementLocation>();
-            foreach (var g in grouped) res.AddRange(g.OrderBy(e => e.Location.X));
-            return res;
+            if (levelId != ElementId.InvalidElementId)
+            {
+                Level level = doc.GetElement(levelId) as Level;
+                if (level != null)
+                {
+                    return level.Elevation;
+                }
+            }
+            return double.MinValue; // Si pas de niveau, on met l'élévation minimale
         }
 
-        // (non utilisé ici par défaut, mais dispo)
-        private ElementId GetElementLevelId(Element e)
+        // Convertir un nombre en séquence de lettres (A, B, ..., AA, AB, ...)
+        private string NumberToLetters(int number)
         {
-            if (e is FamilyInstance fi && fi.LevelId != ElementId.InvalidElementId) return fi.LevelId;
-            if (e is Wall w) return w.LevelId;
-            if (e is Floor f) return f.LevelId;
-            if (e is Ceiling c) return c.LevelId;
-            if (e is RoofBase r) return r.LevelId;
-
-            var p = e.get_Parameter(BuiltInParameter.LEVEL_PARAM)
-                 ?? e.get_Parameter(BuiltInParameter.SCHEDULE_LEVEL_PARAM)
-                 ?? e.get_Parameter(BuiltInParameter.FAMILY_LEVEL_PARAM);
-            return (p != null && p.HasValue) ? p.AsElementId() : ElementId.InvalidElementId;
+            string result = string.Empty;
+            while (number > 0)
+            {
+                number--;
+                result = (char)('A' + (number % 26)) + result;
+                number /= 26;
+            }
+            return result;
         }
 
-        private double ParseBandHeightToInternal(Document doc, string text)
+        // Convertir une séquence de lettres en nombre (A=1, B=2, ..., AA=27, AB=28, ...)
+        private int LettersToNumber(string letters)
         {
-            double u;
-            if (!double.TryParse(text, NumberStyles.Any, CultureInfo.CurrentCulture, out u) &&
-                !double.TryParse(text, NumberStyles.Any, CultureInfo.InvariantCulture, out u))
-                u = 1.0;
-
-            var fo = doc.GetUnits().GetFormatOptions(SpecTypeId.Length);
-            var du = fo.GetUnitTypeId();
-            double internalVal = UnitUtils.ConvertToInternalUnits(u, du);
-            return internalVal > 0 ? internalVal : 1.0;
-        }
-
-        private void TryCheckout(Document doc, List<ElementId> ids)
-        {
-            try { if (doc.IsWorkshared && ids.Count > 0) WorksharingUtils.CheckoutElements(doc, ids); }
-            catch { /* non bloquant */ }
-        }
-
-        private List<string> GetWritableTextParameters(Element e)
-        {
-            var list = new List<string>();
-            foreach (Parameter p in e.Parameters)
-                if (p.StorageType == StorageType.String && !p.IsReadOnly)
-                    if (!string.IsNullOrEmpty(p.Definition?.Name)) list.Add(p.Definition.Name);
-            return list.Distinct(StringComparer.CurrentCultureIgnoreCase).ToList();
-        }
-
-        private string NumberToLetters(int n)
-        {
-            string r = string.Empty;
-            while (n > 0) { n--; r = (char)('A' + (n % 26)) + r; n /= 26; }
-            return r;
-        }
-        private int LettersToNumber(string s)
-        {
-            int n = 0;
-            foreach (char c in s) { if (c < 'A' || c > 'Z') return -1; n = n * 26 + (c - 'A' + 1); }
-            return n;
+            int number = 0;
+            foreach (char c in letters)
+            {
+                if (c < 'A' || c > 'Z')
+                {
+                    return -1; // Erreur si caractère non valide
+                }
+                number = number * 26 + (c - 'A' + 1);
+            }
+            return number;
         }
     }
 }

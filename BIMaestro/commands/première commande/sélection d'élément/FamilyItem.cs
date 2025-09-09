@@ -15,28 +15,33 @@ namespace Visualisation
         public ObservableCollection<FamilyItem> SubFamilies { get; set; }
 
         /// <summary>
-        /// Propriété principale pour (dé)cocher.
-        /// - Si on décoche le parent, on force la décoche de tous les enfants
-        ///   pour éviter les incohérences.
+        /// Case à cocher du parent :
+        /// - Maintenant on PROPAGE dans les deux sens.
+        ///   * parent = true  ⇒ tous les enfants = true
+        ///   * parent = false ⇒ tous les enfants = false
         /// </summary>
         public bool IsSelected
         {
             get => _isSelected;
             set
             {
-                if (_isSelected != value)
-                {
-                    _isSelected = value;
-                    OnPropertyChanged(nameof(IsSelected));
-                    OnPropertyChanged(nameof(VisibleSubFamilies));
+                if (_isSelected == value) return;
 
-                    // Parent décoché ⇒ forcer la décoche de tous les enfants
-                    if (!_isSelected && SubFamilies != null)
+                _isSelected = value;
+                OnPropertyChanged(nameof(IsSelected));
+
+                // Propagation vers les enfants dans les deux cas
+                if (SubFamilies != null)
+                {
+                    foreach (var child in SubFamilies)
                     {
-                        foreach (var child in SubFamilies)
-                            child.IsSelected = false;
+                        child.IsSelected = value;
                     }
                 }
+
+                // Si tu relies l'affichage des sous-familles à IsSelected
+                // on notifie pour rafraîchir l'UI.
+                OnPropertyChanged(nameof(VisibleSubFamilies));
             }
         }
 

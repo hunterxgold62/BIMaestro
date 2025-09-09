@@ -194,8 +194,8 @@ namespace Visualisation
             {
                 MainInstruction = "Que voulez-vous faire ?",
                 MainContent =
-                    "• Catégorie : même catégorie (Murs, Portes, …)\n" +
-                    "• Famille : même famille (pour Murs : clé = nom du Type)\n" +
+                    "• Catégorie : même catégorie (Murs, Sols, Portes, …)\n" +
+                    "• Famille : même famille (Murs & Sols : clé = nom du Type)\n" +
                     "• Type : même type exact",
                 CommonButtons = TaskDialogCommonButtons.Close,
                 VerificationText = "Colorier les éléments (préférence)"
@@ -223,20 +223,23 @@ namespace Visualisation
             prefs.LastCriterion = opt;
             SelectSimilarPreferences.Save(prefs);
 
-            // 3) Préparer comparateurs à partir des éléments de référence
+            // 3) Préparer comparateurs (ajout de FLOORS en plus des WALLS)
             var wallCatId = Category.GetCategory(doc, BuiltInCategory.OST_Walls)?.Id;
+            var floorCatId = Category.GetCategory(doc, BuiltInCategory.OST_Floors)?.Id;
+
             var catIds = new HashSet<ElementId>();
             var famNames = new HashSet<string>(StringComparer.Ordinal);
             var typeIds = new HashSet<ElementId>();
             bool includeAllTags = prefs.IncludeAllTagsExplicit;
 
             BuildComparatorsFromElements(
-                doc, referenceElements, opt, wallCatId,
-                catIds, famNames, typeIds,
-                ref includeAllTags);
+                doc, referenceElements, opt, wallCatId, floorCatId,
+                catIds, famNames, typeIds, ref includeAllTags);
 
-            // 4) Sélection des éléments similaires (flux d’origine)
-            var filter = new SimilarElementFilter(doc, opt, catIds, famNames, typeIds, includeAllTags, wallCatId);
+            // 4) Sélection des éléments similaires
+            var filter = new SimilarElementFilter(
+                doc, opt, catIds, famNames, typeIds, includeAllTags, wallCatId, floorCatId);
+
             IList<Reference> selRefs;
             try
             {
@@ -261,7 +264,7 @@ namespace Visualisation
 
             // 6) Groupage + palette
             var groupKeys = selIds
-                .Select(id => ComputeKey(doc, wallCatId, doc.GetElement(id)))
+                .Select(id => ComputeKey(doc, wallCatId, floorCatId, doc.GetElement(id)))
                 .Distinct(StringComparer.Ordinal).ToList();
 
             int n = Math.Max(1, groupKeys.Count);
@@ -289,7 +292,7 @@ namespace Visualisation
                     var el = doc.GetElement(id);
                     if (el == null) continue;
 
-                    var key = ComputeKey(doc, wallCatId, el);
+                    var key = ComputeKey(doc, wallCatId, floorCatId, el);
                     var c = palette[key];
                     var rc = new Autodesk.Revit.DB.Color(c.R, c.G, c.B);
 
@@ -376,19 +379,26 @@ namespace Visualisation
         }
 
         // ---- Helpers
-        private static string ComputeKey(Document doc, ElementId wallCatId, Element el)
+        private static string ComputeKey(Document doc, ElementId wallCatId, ElementId floorCatId, Element el)
         {
             if (el is IndependentTag) return "Étiquettes";
 
-            if (el?.Category != null && wallCatId != null && el.Category.Id == wallCatId)
+            // Murs & Sols (familles système) => clé = nom du Type
+            if (el?.Category != null)
             {
-                var wt = doc.GetElement(el.GetTypeId()) as ElementType;
-                return wt != null ? wt.Name : "Mur";
+                var catId = el.Category.Id;
+                if ((wallCatId != null && catId == wallCatId) ||
+                    (floorCatId != null && catId == floorCatId))
+                {
+                    var et = doc.GetElement(el.GetTypeId()) as ElementType;
+                    return et != null ? et.Name : (catId == wallCatId ? "Mur" : "Sol");
+                }
             }
+
             if (el is FamilyInstance fi) return fi.Symbol.FamilyName;
 
-            var et = doc.GetElement(el.GetTypeId()) as ElementType;
-            return !string.IsNullOrEmpty(et?.FamilyName) ? et.FamilyName : et?.Name ?? el.Category?.Name ?? "Autres";
+            var et2 = doc.GetElement(el.GetTypeId()) as ElementType;
+            return !string.IsNullOrEmpty(et2?.FamilyName) ? et2.FamilyName : et2?.Name ?? el.Category?.Name ?? "Autres";
         }
 
         private static System.Drawing.Color ColorFromHSL(double h, double s, double l)
@@ -420,6 +430,7 @@ namespace Visualisation
             IEnumerable<Element> initialElements,
             FilterOption opt,
             ElementId wallCatId,
+            ElementId floorCatId,
             HashSet<ElementId> catIds,
             HashSet<string> famNames,
             HashSet<ElementId> typeIds,
@@ -440,12 +451,20 @@ namespace Visualisation
                         break;
 
                     case FilterOption.Family:
-                        if (el.Category != null && wallCatId != null && el.Category.Id == wallCatId)
+                        // Murs & Sols (famille système) : utiliser le nom du Type comme "famille"
+                        if (el.Category != null)
                         {
-                            if (doc.GetElement(el.GetTypeId()) is ElementType wt)
-                                famNames.Add(wt.Name);
+                            var catId = el.Category.Id;
+                            if ((wallCatId != null && catId == wallCatId) ||
+                                (floorCatId != null && catId == floorCatId))
+                            {
+                                if (doc.GetElement(el.GetTypeId()) is ElementType wt)
+                                    famNames.Add(wt.Name);
+                                break;
+                            }
                         }
-                        else if (el is IndependentTag)
+
+                        if (el is IndependentTag)
                         {
                             famNames.Add(ANY_TAG_TOKEN);
                         }
@@ -483,11 +502,12 @@ namespace Visualisation
         private readonly HashSet<ElementId> _typeIds;
         private readonly bool _includeAllTags;
         private readonly ElementId _wallCatId;
+        private readonly ElementId _floorCatId;
 
         public SimilarElementFilter(
             Document doc, FilterOption opt,
             HashSet<ElementId> catIds, HashSet<string> famNames, HashSet<ElementId> typeIds,
-            bool includeAllTags, ElementId wallCatId)
+            bool includeAllTags, ElementId wallCatId, ElementId floorCatId)
         {
             _doc = doc; _opt = opt;
             _catIds = catIds ?? new HashSet<ElementId>();
@@ -495,6 +515,7 @@ namespace Visualisation
             _typeIds = typeIds ?? new HashSet<ElementId>();
             _includeAllTags = includeAllTags;
             _wallCatId = wallCatId;
+            _floorCatId = floorCatId;
         }
 
         public bool AllowElement(Element elem)
@@ -507,11 +528,18 @@ namespace Visualisation
                     return elem.Category != null && _catIds.Contains(elem.Category.Id);
 
                 case FilterOption.Family:
-                    if (elem.Category != null && _wallCatId != null && elem.Category.Id == _wallCatId)
+                    // Murs & Sols : comparer par nom de Type
+                    if (elem.Category != null)
                     {
-                        var t = _doc.GetElement(elem.GetTypeId()) as ElementType;
-                        return t != null && _famNames.Contains(t.Name);
+                        var catId = elem.Category.Id;
+                        if ((_wallCatId != null && catId == _wallCatId) ||
+                            (_floorCatId != null && catId == _floorCatId))
+                        {
+                            var t = _doc.GetElement(elem.GetTypeId()) as ElementType;
+                            return t != null && _famNames.Contains(t.Name);
+                        }
                     }
+
                     if (_famNames.Contains("__ANY_TAG__") && elem is IndependentTag) return true;
 
                     if (elem is FamilyInstance fi)

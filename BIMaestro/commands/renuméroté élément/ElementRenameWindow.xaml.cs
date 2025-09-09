@@ -9,22 +9,60 @@ namespace Modification
     public partial class ElementRenamerWindow : Window, INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler PropertyChanged;
-        protected void OnPropertyChanged(string propertyName)
-            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
+        // Méthode pour notifier les changements de propriété
+        protected void OnPropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        // Propriétés avec implémentation de notification
         private string _prefix;
-        public string Prefix { get => _prefix; set { if (_prefix != value) { _prefix = value; OnPropertyChanged(nameof(Prefix)); } } }
+        public string Prefix
+        {
+            get { return _prefix; }
+            set
+            {
+                if (_prefix != value)
+                {
+                    _prefix = value;
+                    OnPropertyChanged(nameof(Prefix));
+                }
+            }
+        }
 
         private string _suffix;
-        public string Suffix { get => _suffix; set { if (_suffix != value) { _suffix = value; OnPropertyChanged(nameof(Suffix)); } } }
+        public string Suffix
+        {
+            get { return _suffix; }
+            set
+            {
+                if (_suffix != value)
+                {
+                    _suffix = value;
+                    OnPropertyChanged(nameof(Suffix));
+                }
+            }
+        }
 
         private string _startNumber;
-        public string StartNumber { get => _startNumber; set { if (_startNumber != value) { _startNumber = value; OnPropertyChanged(nameof(StartNumber)); } } }
+        public string StartNumber
+        {
+            get { return _startNumber; }
+            set
+            {
+                if (_startNumber != value)
+                {
+                    _startNumber = value;
+                    OnPropertyChanged(nameof(StartNumber));
+                }
+            }
+        }
 
         private string _selectedNumberFormat;
         public string SelectedNumberFormat
         {
-            get => _selectedNumberFormat;
+            get { return _selectedNumberFormat; }
             set
             {
                 if (_selectedNumberFormat != value)
@@ -37,62 +75,135 @@ namespace Modification
         }
 
         private List<string> _numberFormats;
-        public List<string> NumberFormats { get => _numberFormats; set { if (_numberFormats != value) { _numberFormats = value; OnPropertyChanged(nameof(NumberFormats)); } } }
+        public List<string> NumberFormats
+        {
+            get { return _numberFormats; }
+            set
+            {
+                if (_numberFormats != value)
+                {
+                    _numberFormats = value;
+                    OnPropertyChanged(nameof(NumberFormats));
+                }
+            }
+        }
 
         private string _bandHeight;
-        public string BandHeight { get => _bandHeight; set { if (_bandHeight != value) { _bandHeight = value; OnPropertyChanged(nameof(BandHeight)); } } }
+        public string BandHeight
+        {
+            get { return _bandHeight; }
+            set
+            {
+                if (_bandHeight != value)
+                {
+                    _bandHeight = value;
+                    OnPropertyChanged(nameof(BandHeight));
+                }
+            }
+        }
+
 
         private bool _isSortByLevelEnabled;
-        public bool IsSortByLevelEnabled { get => _isSortByLevelEnabled; set { if (_isSortByLevelEnabled != value) { _isSortByLevelEnabled = value; OnPropertyChanged(nameof(IsSortByLevelEnabled)); } } }
+        public bool IsSortByLevelEnabled
+        {
+            get { return _isSortByLevelEnabled; }
+            set
+            {
+                if (_isSortByLevelEnabled != value)
+                {
+                    _isSortByLevelEnabled = value;
+                    OnPropertyChanged(nameof(IsSortByLevelEnabled));
+                }
+            }
+        }
 
         private List<string> _availableParameters;
-        public List<string> AvailableParameters { get => _availableParameters; set { if (_availableParameters != value) { _availableParameters = value; OnPropertyChanged(nameof(AvailableParameters)); } } }
+        public List<string> AvailableParameters
+        {
+            get { return _availableParameters; }
+            set
+            {
+                if (_availableParameters != value)
+                {
+                    _availableParameters = value;
+                    OnPropertyChanged(nameof(AvailableParameters));
+                }
+            }
+        }
 
         private string _selectedParameter;
-        public string SelectedParameter { get => _selectedParameter; set { if (_selectedParameter != value) { _selectedParameter = value; OnPropertyChanged(nameof(SelectedParameter)); } } }
+        public string SelectedParameter
+        {
+            get { return _selectedParameter; }
+            set
+            {
+                if (_selectedParameter != value)
+                {
+                    _selectedParameter = value;
+                    OnPropertyChanged(nameof(SelectedParameter));
+                }
+            }
+        }
 
-        public bool IsReset { get; private set; }
+        public bool IsReset { get; private set; } // Propriété pour savoir si l'utilisateur veut réinitialiser
         public bool IsNumberingEnabled { get; internal set; }
 
         public ElementRenamerWindow(List<string> parameters)
         {
             InitializeComponent();
-            DataContext = this;
+            this.DataContext = this;
 
             AvailableParameters = parameters ?? new List<string>();
             if (AvailableParameters.Any())
+            {
                 SelectedParameter = AvailableParameters.First();
+            }
 
+            // Initialiser la liste des formats de numérotation
             NumberFormats = new List<string> { "1,2,3...", "A,B,C...", "001,002,003...", "0001,0002,0003..." };
+            // Valeurs par défaut
             IsSortByLevelEnabled = false;
-            SelectedNumberFormat = NumberFormats[0]; // "1,2,3..."
+            SelectedNumberFormat = NumberFormats[0]; // "1,2,3..." par défaut
             StartNumber = "1";
-            BandHeight = "1.0"; // sera converti en unités internes
+            BandHeight = "1.0"; // Valeur par défaut pour la hauteur de bande
         }
 
         private void OnRenameClick(object sender, RoutedEventArgs e)
         {
-            DialogResult = true;
-            Close();
+            // Lorsque l'utilisateur clique sur le bouton Renommer, fermer la fenêtre
+            this.DialogResult = true;
+            this.Close();
         }
 
         private void OnResetClick(object sender, RoutedEventArgs e)
         {
+            // Définir la propriété IsReset à true pour indiquer que l'utilisateur a demandé une réinitialisation
             IsReset = true;
-            DialogResult = true;
-            Close();
+            this.DialogResult = true;
+            this.Close();
         }
 
         private void UpdateStartNumberBasedOnFormat()
         {
             if (SelectedNumberFormat == "1,2,3...")
+            {
                 StartNumber = "1";
+            }
             else if (SelectedNumberFormat == "001,002,003...")
+            {
                 StartNumber = "001";
+
+            }
+
             else if (SelectedNumberFormat == "0001,0002,0003...")
+            {
                 StartNumber = "0001";
+            }
+
             else if (SelectedNumberFormat == "A,B,C...")
+            {
                 StartNumber = "A";
+            }
         }
     }
 }

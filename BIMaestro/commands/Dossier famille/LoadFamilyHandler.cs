@@ -35,7 +35,7 @@ namespace Famille
                 using (var tx = new Transaction(doc, "Charger Famille"))
                 {
                     tx.Start();
-                    doc.LoadFamily(FamilyPath, new FamilyLoadOption(), out fam);
+                    doc.LoadFamily(FamilyPath, new FamilyLoadOptionKeep(), out fam);
                     tx.Commit();
                 }
 

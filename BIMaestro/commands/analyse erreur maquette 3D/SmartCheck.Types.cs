@@ -15,8 +15,9 @@ namespace Analyse
     {
         SelectOnly,
         Ensure3D,
-        FocusIssue,
-        ShowAllApply,   // action atomique (ON/OFF)
+        FocusIssue,     // legacy (gardé si tu l’utilises encore)
+        FocusApply,     // ✅ nouveau : Ensure3D + Focus + Zoom en un seul event
+        ShowAllApply,   // action atomique ON/OFF
         MarkIgnored
     }
 
@@ -27,7 +28,7 @@ namespace Analyse
         public IssueKind Kind { get; set; }
         public string Category { get; set; }
         public string Message { get; set; }
-        public BoundingBoxXYZ BBox { get; set; }
+        public BoundingBoxXYZ BBox { get; set; }      // BB serrée (intersection si dispo)
         public bool Ignored { get; set; } = false;
     }
 }

@@ -60,7 +60,7 @@
 
         <!-- Options -->
         <StackPanel Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Vertical" Margin="0,10,0,0">
-           
+
             <CheckBox x:Name="SortByLevelCheckBox" Content="Trier par niveau" IsChecked="{Binding IsSortByLevelEnabled, Mode=TwoWay}" Margin="0,5"
                       ToolTip="Cochez cette case pour trier les éléments par niveau avant d'appliquer le renommage."/>
         </StackPanel>

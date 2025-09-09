@@ -7,6 +7,7 @@ using System;
 using System.IO;
 using System.Reflection;
 
+
 public class App : IExternalApplication
 {
     public static UIControlledApplication UIControlledApp { get; private set; }

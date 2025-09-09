@@ -26,8 +26,8 @@ namespace Licensing
 
     /// <summary>
     /// Buffer + envoi batch async vers l'Edge Function collect-usage.
-    /// Logs -> Mes Documents\RevitLogs\telemetry.log
     /// Fallback d'URL: /functions/v1/collect-usage -> /collect-usage
+    /// (Aucun log fichier; traces éventuelles via Debug.WriteLine uniquement.)
     /// </summary>
     public static class Telemetry
     {
@@ -52,7 +52,6 @@ namespace Licensing
         private static readonly HttpClient _http;
 
         private static string _queueFile;
-        private static string _logFile;
         private static bool _initialized;
 
         /// <summary>DEBUG: flush immédiat à chaque TrackButton (désactive-le en prod).</summary>
@@ -95,14 +94,13 @@ namespace Licensing
             _machineIdHash = string.IsNullOrWhiteSpace(machineIdHash) ? "unknown" : machineIdHash.Trim();
             _fallbackLicenseKey = string.IsNullOrWhiteSpace(fallbackLicenseKey) ? null : fallbackLicenseKey.Trim();
 
-            // Chemins logs & file-queue
+            // Chemin file-queue (sans log fichier)
             var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             var logDir = Path.Combine(docs, "RevitLogs");
             Directory.CreateDirectory(logDir);
-            _logFile = Path.Combine(logDir, "telemetry.log");
             _queueFile = Path.Combine(logDir, "telemetry_queue.json");
 
-            WriteLog($"[Init] base={_endpointBase} version={_pluginVersion}");
+            Debug.WriteLine($"[Telemetry.Init] base={_endpointBase} version={_pluginVersion}");
             TryRestoreQueueFromDisk();
 
             _timer?.Dispose();
@@ -116,12 +114,12 @@ namespace Licensing
         {
             if (!_initialized || _endpointBase == null || string.IsNullOrEmpty(_licenseJwt))
             {
-                WriteLog("[TrackButton] Telemetry not initialized. Event dropped.");
+                Debug.WriteLine("[Telemetry.TrackButton] Telemetry not initialized. Event dropped.");
                 return;
             }
             if (string.IsNullOrWhiteSpace(buttonId))
             {
-                WriteLog("[TrackButton] Empty buttonId.");
+                Debug.WriteLine("[Telemetry.TrackButton] Empty buttonId.");
                 return;
             }
 
@@ -139,13 +137,13 @@ namespace Licensing
             lock (_lock)
             {
                 _buffer.Add(evt);
-                WriteLog($"[TrackButton] queued '{buttonId}', buffer={_buffer.Count}");
+                Debug.WriteLine($"[Telemetry.TrackButton] queued '{buttonId}', buffer={_buffer.Count}");
             }
 
             if (FlushImmediatelyForDebug)
             {
                 try { SafeFlushAsync().GetAwaiter().GetResult(); }
-                catch (Exception ex) { WriteLog("[TrackButton/ImmediateFlush] " + ex.Message); }
+                catch (Exception ex) { Debug.WriteLine("[Telemetry.TrackButton/ImmediateFlush] " + ex.Message); }
             }
         }
 
@@ -155,13 +153,13 @@ namespace Licensing
         public static bool ForceFlushSync()
         {
             try { SafeFlushAsync().GetAwaiter().GetResult(); return true; }
-            catch (Exception ex) { WriteLog("[ForceFlushSync] " + ex.Message); return false; }
+            catch (Exception ex) { Debug.WriteLine("[Telemetry.ForceFlushSync] " + ex.Message); return false; }
         }
 
         public static void Shutdown()
         {
             try { _timer?.Dispose(); } catch { }
-            WriteLog("[Shutdown]");
+            Debug.WriteLine("[Telemetry.Shutdown]");
             _initialized = false;
         }
 
@@ -198,7 +196,7 @@ namespace Licensing
 
                     req.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                    WriteLog($"[Flush] POST {endpoint} batch={toSend.Count}");
+                    Debug.WriteLine($"[Telemetry.Flush] POST {endpoint} batch={toSend.Count}");
                     HttpResponseMessage resp = null;
                     try
                     {
@@ -208,25 +206,25 @@ namespace Licensing
 
                         if (code == 404 || code == 405)
                         {
-                            WriteLog($"[Flush] HTTP {code} (bad path), trying fallback…");
+                            Debug.WriteLine($"[Telemetry.Flush] HTTP {code} (bad path), trying fallback…");
                             continue; // essaie l’autre chemin
                         }
 
                         if (!resp.IsSuccessStatusCode)
                         {
-                            WriteLog($"[Flush] HTTP {code} - {body}");
+                            Debug.WriteLine($"[Telemetry.Flush] HTTP {code} - {body}");
                             PersistQueueToDisk(toSend);
                         }
                         else
                         {
-                            WriteLog($"[Flush] HTTP {code} OK (pathIndex={pathIndex})");
+                            Debug.WriteLine($"[Telemetry.Flush] HTTP {code} OK (pathIndex={pathIndex})");
                             _activePathIndex = pathIndex;
                         }
                         break;
                     }
                     catch (Exception ex)
                     {
-                        WriteLog("[Flush] EX: " + ex.Message);
+                        Debug.WriteLine("[Telemetry.Flush] EX: " + ex.Message);
                         PersistQueueToDisk(toSend);
                         break;
                     }
@@ -238,7 +236,7 @@ namespace Licensing
             }
             catch (Exception ex)
             {
-                WriteLog("[Flush/Outer] EX: " + ex.Message);
+                Debug.WriteLine("[Telemetry.Flush/Outer] EX: " + ex.Message);
                 PersistQueueToDisk(toSend);
             }
             finally
@@ -271,11 +269,11 @@ namespace Licensing
                 {
                     NullValueHandling = NullValueHandling.Ignore
                 }));
-                WriteLog($"[Persist] queued to disk, total now={disk.Count}");
+                Debug.WriteLine($"[Telemetry.Persist] queued to disk, total now={disk.Count}");
             }
             catch (Exception ex)
             {
-                WriteLog("[Persist] EX: " + ex.Message);
+                Debug.WriteLine("[Telemetry.Persist] EX: " + ex.Message);
             }
         }
 
@@ -299,28 +297,12 @@ namespace Licensing
 
                 lock (_lock) { _buffer.AddRange(disk); }
                 File.Delete(_queueFile);
-                WriteLog($"[Restore] restored {disk.Count} events from disk");
+                Debug.WriteLine($"[Telemetry.Restore] restored {disk.Count} events from disk");
             }
             catch (Exception ex)
             {
-                WriteLog("[Restore] EX: " + ex.Message);
+                Debug.WriteLine("[Telemetry.Restore] EX: " + ex.Message);
             }
-        }
-
-        private static void WriteLog(string line)
-        {
-            try
-            {
-                if (string.IsNullOrEmpty(_logFile))
-                {
-                    var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-                    var logDir = Path.Combine(docs, "RevitLogs");
-                    Directory.CreateDirectory(logDir);
-                    _logFile = Path.Combine(logDir, "telemetry.log");
-                }
-                File.AppendAllText(_logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {line}\n");
-            }
-            catch { /* ignore */ }
         }
 
         // ------- Utilitaires conseillés --------

@@ -77,9 +77,7 @@ public class AppUI : IExternalApplication
             new List<(string buttonName, string buttonText, string className, string resourceImageName, string toolTip)>
             {
                 ("Bride auto", "Bride\nauto", "Modification.AddFlangesAtEnds", "bride auto.png","Ajoute automatiquement des brides aux extrémités sélectionné"),
-                ("Choix bride", "Choix\nbride", "Modification.PickDefaultFlange", "safeimagekit-bouton reset4.png","Permet de choisir la bride par défaut"),
-                                ("suppression bride", "suppression\nbride", "Modification.RemoveFlangesReconnect", "bride suppresion.png","Permet de supprimer les brides")
-
+                ("Choix bride", "Choix\nbride", "Modification.PickDefaultFlange", "safeimagekit-bouton reset4.png","Permet de choisir la bride par défaut")
             });
 
         AddSplitButton(panelEditing, "chatbot IA", "Outils Canalisations", assemblyPath,
