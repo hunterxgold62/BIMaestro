@@ -39,12 +39,14 @@ productivité, standardisation, intelligence artificielle et ergonomie au cœur 
 
 
 ### 🛠️ Modification
-- **Changer couleur élément** : personnalisation des vues
+- **Changer couleur élément** : personnalisation des vues (multi-vues, masquage ou réinitialisation)
 - **Organisateur d’Éléments** : renommage intelligent dans le sens de lecture de la vue active
 - **Auto Réservation** : crée des réservations automatiques pour tout objet traversant un mur (pas limité au MEP)
 - **Outils Canalisations** : lancement de scripts Dynamo spécifiques
 - **Gestion Excel** : export ou import de nomenclatures
 - **Purge du plan** : nettoyage des vues, familles et nomenclatures inutiles
+- **Brides auto** : ajoute ou retire automatiquement des brides aux extrémités des accessoires CVC
+- **Connexion auto canalisations** : relie deux canalisations sélectionnées en générant le réseau optimal
 
 ### 🤖 Outils IA
 - **Chatbot + élément** : assistant IA avec accès aux éléments Revit
@@ -56,6 +58,7 @@ productivité, standardisation, intelligence artificielle et ergonomie au cœur 
 - **Calcule des canalisations** : longueurs, volumes, accessoires, filtrage, export Excel
 - **Qui a fais ça ??** : identifie les auteurs/modificateurs de vues et éléments
 - **Analyse de Poids** : familles, DWG, PDF triés par taille, nombre d’instances, etc.
+- **SmartCheck 3D** : détecte murs flottants, traversées MEP sans réservation et raccords ouverts
 
 ### 🧱 Spécifique aux familles
 - **Purge des paramètres** inutiles dans une famille
@@ -71,8 +74,7 @@ productivité, standardisation, intelligence artificielle et ergonomie au cœur 
 ---
 
 ## 🖼️ Aperçu du Ruban
-
-<img width="2256" height="122" alt="image" src="https://github.com/user-attachments/assets/833cfa08-d57b-4e83-acb6-292570cade42" />
+<img width="2336" height="122" alt="image" src="https://github.com/user-attachments/assets/634778bd-dd70-4c3d-9cd5-c23019844c27" />
 
 > 📷 *Capture du ruban Revit personnalisable de BIMaestro.*
 
