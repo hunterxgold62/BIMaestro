@@ -18,9 +18,7 @@ namespace IA
         {
             var commandData = data;
             // 1) Licence → JWT
-            string licenseKey = Environment.UserName;
-            string machineId = LicenseManager.ComputeMachineId();
-            string jwt = LicenseManager.Validate(licenseKey, machineId);
+            string jwt = App.LicenseJwt;
 
             UIDocument uidoc = commandData.Application.ActiveUIDocument;
             Document doc = uidoc.Document;

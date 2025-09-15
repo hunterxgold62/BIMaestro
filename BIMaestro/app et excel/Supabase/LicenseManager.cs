@@ -7,147 +7,174 @@ using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace Licensing
 {
     /// <summary>
-    /// Validation de licence côté Edge Function Supabase + identifiants locaux robustes.
+    /// Validation licence + cache hors-ligne (fichier) + machine_id.
+    /// Cache : Mes Documents\RevitLogs\License\token_{licence}.json
     /// </summary>
     public static class LicenseManager
     {
+        // Edge Function “validate”
         private const string ValidateUrl =
             "https://xqovxfgghbqxwsadzhzl.functions.supabase.co/validate";
 
-        // ANON key publique (OK à embarquer côté client)
+        // Supabase ANON key (publique)
         private const string ApiKey =
             "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
           + "eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhxb3Z4ZmdnaGJxeHdzYWR6aHpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI0MDY5MzMsImV4cCI6MjA2Nzk4MjkzM30."
           + "ocKoeuUTLQ_oOr83TtpaJD3RUDOBbwLQ5nJNvOinYlo";
 
-        private static readonly HttpClient _http;
+        private static string CacheFile(string licenseKey)
+            => Path.Combine(Paths.LicenseDir, $"token_{Sanitize(licenseKey)}.json");
 
-        static LicenseManager()
-        {
-            var handler = new HttpClientHandler
-            {
-                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
-                UseProxy = true,
-                Proxy = WebRequest.GetSystemWebProxy(),
-                UseDefaultCredentials = true
-            };
-            _http = new HttpClient(handler)
-            {
-                Timeout = TimeSpan.FromSeconds(8)
-            };
-            _http.DefaultRequestHeaders.Add("apikey", ApiKey);
-            _http.DefaultRequestHeaders.Add("Authorization", $"Bearer {ApiKey}");
-            _http.DefaultRequestHeaders.UserAgent.ParseAdd("BIMaestro/LicenseClient");
-        }
+        private static string InstallIdFile
+            => Path.Combine(Paths.LicenseDir, "install_id.txt");
 
-        /// <summary>
-        /// Appelle la function validate. Retourne le JWT si OK.
-        /// Retry simple avec backoff.
-        /// </summary>
-        public static string Validate(string licenseKey, string machineId, string userAgentExtra = null)
-        {
-            if (!string.IsNullOrWhiteSpace(userAgentExtra))
-                _http.DefaultRequestHeaders.UserAgent.ParseAdd(userAgentExtra);
+        private static string Sanitize(string s)
+            => new string((s ?? "").Where(c => char.IsLetterOrDigit(c) || c == '-' || c == '_').ToArray());
 
-            var payload = new
-            {
-                license_key = licenseKey,
-                machine_id = machineId
-            };
-
-            string jsonPayload = Newtonsoft.Json.JsonConvert.SerializeObject(payload);
-            var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
-
-            // 2 tentatives
-            for (int attempt = 1; attempt <= 2; attempt++)
-            {
-                try
-                {
-                    var resp = _http.PostAsync(ValidateUrl, content).GetAwaiter().GetResult();
-                    var body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-
-                    if (resp.StatusCode == HttpStatusCode.Forbidden)
-                        throw new InvalidOperationException("Votre licence BIMaestro est expirée, révoquée ou non autorisée sur cette machine.");
-
-                    if (!resp.IsSuccessStatusCode)
-                        throw new InvalidOperationException($"Erreur licence ({(int)resp.StatusCode}) : {body}");
-
-                    var json = JObject.Parse(body);
-                    var token = json["token"]?.ToString();
-                    if (string.IsNullOrWhiteSpace(token))
-                        throw new InvalidOperationException("Réponse invalide du serveur de licence (token manquant).");
-
-                    return token;
-                }
-                catch (Exception ex) when (attempt == 1 && IsTransient(ex))
-                {
-                    // Backoff rapide
-                    System.Threading.Thread.Sleep(400);
-                    continue;
-                }
-            }
-
-            // Si on est ici, dernière tentative a échoué avec exception non-transient
-            throw new InvalidOperationException("Impossible de valider la licence (réseau/serveur).");
-        }
-
-        private static bool IsTransient(Exception ex)
-        {
-            return ex is HttpRequestException || ex is TaskCanceledException || ex is TimeoutException;
-        }
-
-        /// <summary>
-        /// Calcule un hash machine stable à partir de MachineName + MAC (hors loopback/virtual quand possible).
-        /// </summary>
+        /// <summary>SHA-256(MachineName + MAC)</summary>
         public static string ComputeMachineId()
         {
             string name = Environment.MachineName;
             string mac = NetworkInterface.GetAllNetworkInterfaces()
-                .Where(nic =>
-                    nic.OperationalStatus == OperationalStatus.Up &&
-                    nic.NetworkInterfaceType != NetworkInterfaceType.Loopback &&
-                    !nic.Description.ToLowerInvariant().Contains("virtual") &&
-                    !nic.Description.ToLowerInvariant().Contains("vmware") &&
-                    !nic.Description.ToLowerInvariant().Contains("hyper-v"))
-                .Select(nic => nic.GetPhysicalAddress()?.ToString())
-                .FirstOrDefault(s => !string.IsNullOrWhiteSpace(s)) ?? string.Empty;
+                .Where(n => n.OperationalStatus == OperationalStatus.Up
+                         && n.NetworkInterfaceType != NetworkInterfaceType.Loopback)
+                .Select(n => n.GetPhysicalAddress().ToString())
+                .FirstOrDefault() ?? "";
 
-            string raw = name + mac;
             using var sha = SHA256.Create();
-            byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(raw));
+            var hash = sha.ComputeHash(Encoding.UTF8.GetBytes(name + mac));
             return string.Concat(hash.Select(b => b.ToString("x2")));
         }
 
         /// <summary>
-        /// ID d’installation persistant (GUID stocké en local). Stable même si le MAC change.
+        /// ID d’installation persistant (GUID) : RevitLogs\License\install_id.txt
         /// </summary>
         public static string GetOrCreateInstallId()
         {
-            var path = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "BIMaestro", "install_id.txt");
+            Directory.CreateDirectory(Paths.LicenseDir);
+            if (File.Exists(InstallIdFile))
+            {
+                try { var t = File.ReadAllText(InstallIdFile).Trim(); if (!string.IsNullOrEmpty(t)) return t; }
+                catch { /* ignore */ }
+            }
+            var id = Guid.NewGuid().ToString("N");
+            try { File.WriteAllText(InstallIdFile, id); } catch { /* ignore */ }
+            return id;
+        }
+
+        /// <summary>
+        /// Réseau-seulement. Surcharge compatible avec ton ancien code.
+        /// </summary>
+        public static string Validate(string licenseKey, string machineId, string userAgent = null)
+        {
+            using var client = NetSupport.CreateHttpClient(TimeSpan.FromSeconds(15));
+            if (!string.IsNullOrWhiteSpace(userAgent))
+                client.DefaultRequestHeaders.UserAgent.ParseAdd(userAgent);
+
+            client.DefaultRequestHeaders.Add("apikey", ApiKey);
+            client.DefaultRequestHeaders.Add("Authorization", $"Bearer {ApiKey}");
+
+            var body = new { license_key = licenseKey, machine_id = machineId };
+            var json = Newtonsoft.Json.JsonConvert.SerializeObject(body);
+            using var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var resp = client.PostAsync(ValidateUrl, content).GetAwaiter().GetResult();
+
+            if (resp.StatusCode == HttpStatusCode.ProxyAuthenticationRequired)
+                throw new HttpRequestException("Proxy requiert une authentification (407).");
+
+            if (resp.StatusCode == HttpStatusCode.Forbidden)
+                throw new InvalidOperationException("Votre licence BIMaestro est expirée ou inactive.");
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                var err = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                throw new InvalidOperationException($"Erreur licence : {err}");
+            }
+
+            var raw = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+            var token = JObject.Parse(raw)["token"]?.ToString();
+            if (string.IsNullOrEmpty(token))
+                throw new InvalidOperationException("Réponse invalide du serveur de licence.");
+
+            return token!;
+        }
+
+        /// <summary>
+        /// Essaie online. Si réseau/proxy KO, utilise un jeton en cache
+        /// encore valide pour cette machine. Renvoie le JWT. Indique si cache.
+        /// </summary>
+        public static string ValidateOrUseCache(string licenseKey, string machineId, out bool fromCache, string userAgent = null)
+        {
+            Directory.CreateDirectory(Paths.LicenseDir);
+
+            Exception netErr = null;
+            try
+            {
+                string jwt = Validate(licenseKey, machineId, userAgent);
+                SaveToken(licenseKey, jwt);
+                fromCache = false;
+                return jwt;
+            }
+            catch (HttpRequestException ex) { netErr = ex; }
+            catch (WebException ex) { netErr = ex; }
+
+            // Si on est ici : réseau KO -> tente le cache
+            string cached = LoadTokenIfValid(licenseKey, machineId);
+            if (cached != null) { fromCache = true; return cached; }
+
+            // Sinon, remonte une erreur explicite (corrige le "throw;" illégal)
+            fromCache = false;
+            var msg = "Impossible de valider la licence et aucun jeton valide en cache."
+                    + (netErr != null ? $" Détail réseau : {netErr.Message}" : "");
+            throw new InvalidOperationException(msg, netErr);
+        }
+
+        private static void SaveToken(string licenseKey, string token)
+        {
+            try
+            {
+                var path = CacheFile(licenseKey);
+                File.WriteAllText(path, Newtonsoft.Json.JsonConvert.SerializeObject(new { token }));
+            }
+            catch { /* ignore */ }
+        }
+
+        private static string LoadTokenIfValid(string licenseKey, string machineId)
+        {
+            var path = CacheFile(licenseKey);
+            if (!File.Exists(path)) return null;
 
             try
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(path));
-                if (File.Exists(path))
-                {
-                    var txt = File.ReadAllText(path).Trim();
-                    if (Guid.TryParse(txt, out var _)) return txt;
-                }
-                var id = Guid.NewGuid().ToString("N");
-                File.WriteAllText(path, id);
-                return id;
+                var raw = File.ReadAllText(path);
+                var tok = JObject.Parse(raw)["token"]?.ToString();
+                if (string.IsNullOrEmpty(tok)) return null;
+
+                var parts = tok.Split('.');
+                if (parts.Length != 3) return null;
+                var payload = JObject.Parse(DecodeBase64Url(parts[1]));
+
+                long exp = payload.Value<long?>("exp") ?? 0;
+                string mid = payload.Value<string>("machine_id") ?? "";
+                var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
+                if (now >= exp) return null; // expiré
+                if (!string.Equals(mid, machineId, StringComparison.OrdinalIgnoreCase)) return null;
+
+                return tok;
             }
-            catch
+            catch { return null; }
+
+            static string DecodeBase64Url(string s)
             {
-                // Fallback en RAM si on ne peut pas écrire
-                return Guid.NewGuid().ToString("N");
+                s = s.Replace('-', '+').Replace('_', '/');
+                s = s.PadRight(s.Length + ((4 - s.Length % 4) % 4), '=');
+                return Encoding.UTF8.GetString(Convert.FromBase64String(s));
             }
         }
     }

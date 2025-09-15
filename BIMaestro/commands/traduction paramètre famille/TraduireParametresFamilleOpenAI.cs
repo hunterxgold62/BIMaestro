@@ -31,9 +31,7 @@ namespace Famille
 
             // 1) Récupère le JWT de licence
             // Remplacez ces deux lignes par votre logique réelle
-            string licenseKey = Environment.UserName;
-            string machineId = LicenseManager.ComputeMachineId();
-            string jwt = LicenseManager.Validate(licenseKey, machineId);
+            string jwt = App.LicenseJwt;
 
             // 2) Parcours des paramètres
             var familyManager = doc.FamilyManager;

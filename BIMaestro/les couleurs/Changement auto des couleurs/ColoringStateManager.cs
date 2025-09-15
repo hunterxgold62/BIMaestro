@@ -1,31 +1,33 @@
-﻿using System;
-using System.IO;
+﻿using Autodesk.Revit.Attributes;
+using Autodesk.Revit.DB;
+using Autodesk.Revit.UI;
+using Licensing;
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Automation;
 using System.Windows.Threading;
-using Autodesk.Revit.UI;
-using Autodesk.Revit.DB;
-using Autodesk.Revit.Attributes;
 using Color = System.Windows.Media.Color;
 
 namespace Couleur
 {
     [Transaction(TransactionMode.Manual)]
-    public class ToggleCombinedColoringCommand : IExternalCommand
+    public class ToggleCombinedColoringCommand : BaseTrackedCommand
     {
         private const int DoubleClickThresholdMs = 300;
         private static bool _waitingForDoubleClick = false;
         private static Timer _singleClickTimer = null;
-
-        public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        protected override string ButtonId => "ToggleCombinedColoringCommand";
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
+            var commandData = data;
             try
             {
                 ColoringStateManager.LoadState();

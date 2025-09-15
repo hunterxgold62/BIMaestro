@@ -1,4 +1,8 @@
-﻿using System;
+﻿using Autodesk.Revit.Attributes;
+using Autodesk.Revit.DB;
+using Autodesk.Revit.UI;
+using Licensing;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Threading;
@@ -7,14 +11,11 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
-using Autodesk.Revit.Attributes;
-using Autodesk.Revit.DB;
-using Autodesk.Revit.UI;
 
 namespace Couleur
 {
     [Transaction(TransactionMode.Manual)]
-    public class PapanoelCommand : IExternalCommand
+    public class PapanoelCommand : BaseTrackedCommand
     {
         private static Random _rnd = new Random();
         private static bool _isRunning = false; // Contrôle d'exécution
@@ -23,7 +24,7 @@ namespace Couleur
         private static int _clickCount = 0;
         private static readonly int DoubleClickThreshold = 300; // Temps pour le double-clic en ms
         private static DateTime _lastClickTime = DateTime.MinValue;
-
+        protected override string ButtonId => "PapanoelCommand";
         private static readonly List<string> _targetKeywords = new List<string>
         {
             "Outils de Visualisation",
@@ -35,8 +36,9 @@ namespace Couleur
             "Spécifique aux familles"
         };
 
-        public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
+            var commandData = data;
             UIApplication uiapp = commandData.Application;
             IntPtr mainWindowHandle = uiapp.MainWindowHandle;
 

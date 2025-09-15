@@ -1,18 +1,22 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using Autodesk.Revit.Attributes;
+﻿using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using Licensing;
 using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
+using System.IO;
 
 namespace Famille
 {
     [Transaction(TransactionMode.Manual)]
-    public class ImportProjectUnitsCommand : IExternalCommand
+    public class ImportProjectUnitsCommand : BaseTrackedCommand
     {
-        public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+
+        protected override string ButtonId => "ImportProjectUnitsCommand";
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
+            var commandData = data;
             // 1) Chemin du JSON
             string docDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             string prefDir = Path.Combine(docDir, "RevitLogs", "SauvegardePréférence");

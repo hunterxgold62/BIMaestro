@@ -1,11 +1,11 @@
-﻿using System;
-using Autodesk.Revit.DB;
+﻿using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using System;
 
 namespace Licensing
 {
     /// <summary>
-    /// Base pour tracer automatiquement chaque commande.
+    /// À hériter pour tracer automatiquement (succès/échec + contexte).
     /// </summary>
     public abstract class BaseTrackedCommand : IExternalCommand
     {
@@ -13,27 +13,16 @@ namespace Licensing
 
         protected virtual object BuildContext(ExternalCommandData data)
         {
-            var uiApp = data?.Application;
-            var app = uiApp?.Application;            // Autodesk.Revit.ApplicationServices.Application
-            var uidoc = uiApp?.ActiveUIDocument;
-            var doc = uidoc?.Document;
-            var view = uidoc?.ActiveView;
-
+            var doc = data.Application?.ActiveUIDocument?.Document;
+            var view = data.Application?.ActiveUIDocument?.ActiveView;
             return new
             {
-                // Identités
-                revit_username = app?.Username,                   // OK ici (on a UIApplication)
+                doc_title = doc?.Title ?? "",
+                view = view?.Name ?? "",
+                view_type = view?.ViewType.ToString() ?? "",
+                revit_username = data.Application?.Application?.Username ?? Environment.UserName,
                 windows_user = Environment.UserName,
-                machine_name = Environment.MachineName,
-
-                // Revit env
-                revit_version = app?.VersionNumber,
-                revit_build = app?.VersionBuild,               // <- CORRECTION (pas BuildNumber)
-                // Contexte doc
-                doc_title = doc?.Title ?? "(untitled)",
-                doc_path = doc?.PathName ?? string.Empty,
-                view = view?.Name,
-                view_type = view?.ViewType.ToString()
+                revit_version = data.Application?.Application?.VersionNumber
             };
         }
 
@@ -49,11 +38,7 @@ namespace Licensing
             }
             catch (Exception ex)
             {
-                Telemetry.TrackButton(ButtonId, false, new
-                {
-                    error = ex.GetType().Name,
-                    message = ex.Message
-                });
+                Telemetry.TrackButton(ButtonId, false, new { error = ex.GetType().Name, ex.Message });
                 throw;
             }
         }

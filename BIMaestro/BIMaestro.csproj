@@ -258,6 +258,8 @@
     <Compile Include="app et excel\App.cs" />
     <Compile Include="app et excel\Supabase\BaseTrackedCommand.cs" />
     <Compile Include="app et excel\Supabase\LicenseManager.cs" />
+    <Compile Include="app et excel\Supabase\NetSupport.cs" />
+    <Compile Include="app et excel\Supabase\Paths.cs" />
     <Compile Include="app et excel\Supabase\Telemetry.cs" />
     <Compile Include="app et excel\temps revit\ShowTimeDashboard.cs" />
     <Compile Include="app et excel\temps revit\TimeSeriesDashboardWindow.xaml.cs">
@@ -309,12 +311,16 @@
     <Compile Include="commands\correction automatique\SelectViewsWindow.xaml.cs">
       <DependentUpon>SelectViewsWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="commands\Dossier famille\Collections.cs" />
     <Compile Include="commands\Dossier famille\FamilyBrowserCommand.cs" />
     <Compile Include="commands\Dossier famille\FamilyBrowserPlugin.xaml.cs">
       <DependentUpon>FamilyBrowserPlugin.xaml</DependentUpon>
     </Compile>
+    <Compile Include="commands\Dossier famille\FamilyIndexService.cs" />
     <Compile Include="commands\Dossier famille\FamilyLoadOption.cs" />
     <Compile Include="commands\Dossier famille\FamilyUsageManager.cs" />
+    <Compile Include="commands\Dossier famille\ImageResolver.cs" />
+    <Compile Include="commands\Dossier famille\LoadCollectionHandler.cs" />
     <Compile Include="commands\Dossier famille\LoadFamilyHandler.cs" />
     <Compile Include="commands\Dossier famille\ReloadFamilyHandler.cs" />
     <Compile Include="commands\export dwg\ExportSheetsCommand.cs" />
@@ -334,6 +340,13 @@
     <Compile Include="commands\unité de famille\ExportProjectUnitsCommand.cs" />
     <Compile Include="commands\unité de famille\UpdateProjectUnitsCommand.cs" />
     <Compile Include="commands\export import excel\ScheduleExcelIO.cs" />
+    <Compile Include="Test\roue de gta\RevitIdleRunner.cs" />
+    <Compile Include="Test\roue de gta\ImageDiscovery.cs" />
+    <Compile Include="Test\roue de gta\OwnerWindowHelper.cs" />
+    <Compile Include="Test\roue de gta\RadialMenuCommand.cs" />
+    <Compile Include="Test\roue de gta\RadialMenuWindow.xaml.cs">
+      <DependentUpon>RadialMenuWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Themes\app.xaml.cs">
       <DependentUpon>app.xaml</DependentUpon>
     </Compile>
@@ -532,6 +545,10 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </None>
+    <Page Include="Test\roue de gta\RadialMenuWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="Themes\app.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -696,9 +713,7 @@
     <EmbeddedResource Include="Resources\cana auto.png" />
     <EmbeddedResource Include="Resources\correction 3D.png" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Test\export import excel\" />
-  </ItemGroup>
+  <ItemGroup />
   <ItemGroup>
     <EmbeddedResource Include="Resources\bride suppresion.png" />
   </ItemGroup>

@@ -2,18 +2,18 @@
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.UI.Selection;
+using Licensing;
 using System;
 
 namespace Visualisation
 {
     [Transaction(TransactionMode.Manual)]
-    public class ReorientViewCommand : IExternalCommand
+    public class ReorientViewCommand : BaseTrackedCommand
     {
-        public Result Execute(
-          ExternalCommandData commandData,
-          ref string message,
-          ElementSet elements)
+        protected override string ButtonId => "ReorientViewCommand";
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
+            var commandData = data;
             UIDocument uidoc = commandData.Application.ActiveUIDocument;
             Document doc = uidoc.Document;
             View activeView = doc.ActiveView;

@@ -49,12 +49,16 @@ namespace IA
             // Définir l'ItemsSource de la ListBox
             MessagesListBox.ItemsSource = conversationHistory;
 
+            // Récupère le JWT obtenu au démarrage
+            _jwt = App.LicenseJwt;
+            if (string.IsNullOrEmpty(_jwt))
+            {
+                MessageBox.Show("Licence non initialisée. Relancez le plugin.");
+                this.Close();
+                return;
+            }
 
-            string licenseKey = Environment.UserName;
-            string machineId = LicenseManager.ComputeMachineId();
-            _jwt = LicenseManager.Validate(licenseKey, machineId);
-
-            // Ajouter le message système à l'historique des conversations
+            // Ajouter le message système...
             if (!string.IsNullOrEmpty(systemMessage))
             {
                 var systemMessageModel = new MessageModel { Role = "system", Content = systemMessage };

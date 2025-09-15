@@ -11,7 +11,7 @@
         Loaded="Window_Loaded">
 
     <Window.Resources>
-        <!-- Couleurs & styles -->
+        <!-- Thème -->
         <SolidColorBrush x:Key="PrimaryText" Color="Black"/>
         <LinearGradientBrush x:Key="BackgroundGradient" StartPoint="0,0" EndPoint="0,1">
             <GradientStop Offset="0" Color="#FFEB0F0F"/>
@@ -23,6 +23,7 @@
         <SolidColorBrush x:Key="TabBackground"      Color="Transparent"/>
         <SolidColorBrush x:Key="ImageBackground"    Color="Transparent"/>
 
+        <!-- Styles -->
         <Style TargetType="TreeViewItem">
             <Setter Property="Foreground" Value="{DynamicResource PrimaryText}"/>
         </Style>
@@ -35,7 +36,7 @@
             </Setter>
         </Style>
 
-        <!-- Template pour chaque vignette de famille -->
+        <!-- Vignette famille (onglet Dossiers) -->
         <DataTemplate x:Key="FamilyItemTemplate" DataType="{x:Type local:FamilyItem}">
             <Border Margin="5" Width="200"
                     Background="{DynamicResource PanelBackground}"
@@ -49,13 +50,22 @@
                         <MenuItem Header="Charger la dernière version"
                                   Click="ReloadFamily_Click"
                                   DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+
+                        <Separator/>
+
+                        <!-- Ajout express dans la collection active -->
+                        <MenuItem Header="Ajouter à la collection active"
+                                  Click="AddToActiveCollection_Click"
+                                  DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                     </ContextMenu>
                 </Border.ContextMenu>
+
                 <Grid Margin="5">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
+
                     <Border Background="{DynamicResource ImageBackground}" Padding="3" Grid.Row="0">
                         <Image Source="{Binding Icon}"
                                Width="180" Height="180"
@@ -64,14 +74,17 @@
                                VerticalAlignment="Center"
                                Style="{StaticResource ImageStyle}"/>
                     </Border>
+
                     <Grid Grid.Row="1">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
+
+                        <!-- ★ : Favoris -->
                         <Button Grid.Column="0" Content="★"
                                 Click="FavoriteButton_Click"
-                                ToolTip="Ajouter ou retirer des favoris"
+                                ToolTip="Ajouter/retirer des Favoris"
                                 Background="Transparent"
                                 BorderThickness="0"
                                 FontSize="16"
@@ -89,6 +102,7 @@
                                 </Style>
                             </Button.Style>
                         </Button>
+
                         <TextBlock Grid.Column="1"
                                    Text="{Binding Name}"
                                    Foreground="{DynamicResource PrimaryText}"
@@ -98,6 +112,71 @@
                                    HorizontalAlignment="Center"
                                    Margin="0,0,5,0"
                                    ToolTip="Nom complet de la famille"/>
+                    </Grid>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <!-- Vignette famille (onglet Favoris/Collections) : bouton 🗑 -->
+        <DataTemplate x:Key="CollectionItemTemplate" DataType="{x:Type local:FamilyItem}">
+            <Border Margin="5" Width="200"
+                    Background="{DynamicResource PanelBackground}"
+                    CornerRadius="5"
+                    MouseLeftButtonDown="FamilyItem_DoubleClick">
+                <Border.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Rentrer dans la famille"
+                                  Click="OpenFamilyFile_Click"
+                                  DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                        <MenuItem Header="Charger la dernière version"
+                                  Click="ReloadFamily_Click"
+                                  DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                    </ContextMenu>
+                </Border.ContextMenu>
+
+                <Grid Margin="5">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <Border Background="{DynamicResource ImageBackground}" Padding="3" Grid.Row="0">
+                        <Image Source="{Binding Icon}"
+                               Width="180" Height="180"
+                               Stretch="UniformToFill"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Style="{StaticResource ImageStyle}"/>
+                    </Border>
+
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- 🗑 : supprimer de la collection courante (taille réduite) -->
+                        <Button Grid.Column="0"
+        Content="🗑"
+        Click="RemoveFromCollection_Click"
+        ToolTip="Retirer de la collection courante"
+        Background="Transparent"
+        BorderThickness="0"
+        FontSize="13"
+        Padding="0"
+        Width="20" Height="20"
+        HorizontalAlignment="Center"
+        VerticalAlignment="Top"
+        Margin="0,0,6,0"/>
+
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding Name}"
+                                   Foreground="{DynamicResource PrimaryText}"
+                                   FontWeight="Bold"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,0,5,0"/>
                     </Grid>
                 </Grid>
             </Border>
@@ -115,7 +194,6 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Colonne de gauche : bouton racine + TreeView -->
                     <StackPanel Grid.Column="0" Background="Transparent">
                         <Button x:Name="AllFamiliesButton"
                                 Content="{Binding RootFolderName}"
@@ -129,22 +207,17 @@
                         <TreeView x:Name="FolderTreeView"
                                   Background="{DynamicResource TreeViewBackground}"
                                   Foreground="{DynamicResource PrimaryText}"
-                                  ToolTip="Sous-dossiers de familles"
                                   Height="460"
-                                  ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                  SelectedItemChanged="FolderTreeView_SelectedItemChanged"/>
                     </StackPanel>
 
-                    <!-- Colonne de droite : recherche + zone scrollée -->
                     <Grid Grid.Column="1" Background="Transparent">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
-                            <!-- Recherche -->
                             <RowDefinition Height="Auto"/>
-                            <!-- Séparateur -->
                             <RowDefinition Height="*"/>
-                            <!-- Contenu scrollable -->
                             <RowDefinition Height="Auto"/>
-                            <!-- Compteur -->
                         </Grid.RowDefinitions>
 
                         <!-- Recherche -->
@@ -153,32 +226,31 @@
                                      Height="30"
                                      VerticalAlignment="Center"
                                      TextChanged="SearchBox_TextChanged"
+                                     GotKeyboardFocus="SearchBox_GotKeyboardFocus"
+                                     LostKeyboardFocus="SearchBox_LostKeyboardFocus"
                                      Background="#FFFFFF"
                                      Foreground="{DynamicResource PrimaryText}"
                                      BorderBrush="#CCCCCC"
                                      Padding="5"
                                      Margin="5,0,0,0"/>
                             <TextBlock x:Name="PlaceholderText"
-                                       Text="Rechercher..."
+                                       Text="Rechercher (cliquer pour recherche globale)…"
                                        Foreground="Gray"
                                        Margin="10,0,0,0"
                                        VerticalAlignment="Center"
                                        IsHitTestVisible="False"/>
                         </Grid>
 
-                        <!-- Séparateur -->
-                        <Rectangle Grid.Row="1"
-                                   Height="1"
-                                   Fill="#CCCCCC"
-                                   Margin="0,5"/>
+                        <Rectangle Grid.Row="1" Height="1" Fill="#CCCCCC" Margin="0,5"/>
 
-                        <!-- Zone défilable unique -->
-                        <ScrollViewer Grid.Row="2"
+                        <ScrollViewer x:Name="ItemsScroll"
+                                      Grid.Row="2"
                                       Background="{DynamicResource ItemsBackground}"
-                                      VerticalScrollBarVisibility="Auto">
+                                      VerticalScrollBarVisibility="Auto"
+                                      ScrollChanged="ItemsScroll_ScrollChanged">
                             <StackPanel>
 
-                                <!-- Carrousel Top-8 (uniquement au root) -->
+                                <!-- Top-8 -->
                                 <ItemsControl x:Name="TopFamiliesView"
                                               ItemTemplate="{StaticResource FamilyItemTemplate}"
                                               Visibility="Collapsed">
@@ -189,17 +261,15 @@
                                     </ItemsControl.ItemsPanel>
                                 </ItemsControl>
 
-                                <!-- Séparateur sous Top-8 -->
                                 <Rectangle x:Name="TopSeparator"
                                            Height="1"
                                            Fill="#CCCCCC"
                                            Margin="0,5"
                                            Visibility="Collapsed"/>
 
-                                <!-- Liste complète des familles -->
+                                <!-- Résultats paginés -->
                                 <ItemsControl x:Name="FamilyListView"
-                                              ItemTemplate="{StaticResource FamilyItemTemplate}"
-                                              ItemsSource="{Binding}">
+                                              ItemTemplate="{StaticResource FamilyItemTemplate}">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>
                                             <WrapPanel IsItemsHost="True"/>
@@ -207,31 +277,57 @@
                                     </ItemsControl.ItemsPanel>
                                 </ItemsControl>
 
+                                <TextBlock x:Name="PagingStatusText"
+                                           Margin="8,12,8,20"
+                                           HorizontalAlignment="Center"
+                                           Foreground="{DynamicResource PrimaryText}"
+                                           Visibility="Collapsed"/>
                             </StackPanel>
                         </ScrollViewer>
 
-                        <!-- Compteur -->
-                        <StackPanel Grid.Row="3"
-                                    Orientation="Horizontal"
-                                    HorizontalAlignment="Right"
-                                    Margin="0,5,0,0">
-                            <TextBlock Text="Familles affichées : "
-                                       Foreground="{DynamicResource PrimaryText}"/>
-                            <TextBlock x:Name="CountTextBlock"
-                                       Foreground="{DynamicResource PrimaryText}"
-                                       FontWeight="Bold"/>
-                        </StackPanel>
+                        <DockPanel Grid.Row="3">
+                            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                                <TextBlock Text="Familles affichées : " Foreground="{DynamicResource PrimaryText}"/>
+                                <TextBlock x:Name="CountTextBlock" Foreground="{DynamicResource PrimaryText}" FontWeight="Bold"/>
+                            </StackPanel>
+                            <TextBlock x:Name="IndexStatusText" Foreground="{DynamicResource PrimaryText}" Margin="0,5,10,0"/>
+                        </DockPanel>
                     </Grid>
                 </Grid>
             </TabItem>
 
-            <!-- Onglet Favoris (inchangé) -->
+            <!-- Onglet Favoris / Collections -->
             <TabItem Header="Favoris" Background="{DynamicResource TabBackground}">
-                <Grid Margin="10" Background="Transparent" ToolTip="Liste de vos familles favorites">
-                    <ScrollViewer Background="{DynamicResource ItemsBackground}">
-                        <ItemsControl x:Name="FavoritesListView"
-                                      ItemTemplate="{StaticResource FamilyItemTemplate}"
-                                      ItemsSource="{Binding FavoriteFamilies}">
+                <Grid Margin="10" Background="Transparent">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,6">
+                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                            <TextBlock Text="Collection :" VerticalAlignment="Center"
+                                       Margin="0,0,8,0" Foreground="{DynamicResource PrimaryText}"/>
+                            <ComboBox x:Name="CollectionCombo"
+                                      Width="240"
+                                      DisplayMemberPath="Name"
+                                      SelectionChanged="CollectionCombo_SelectionChanged"/>
+                            <Button Content="Nouv."   Width="60" Margin="6,0,0,0" Click="CollectionNew_Click"/>
+                            <Button Content="Ren."    Width="60" Margin="6,0,0,0" Click="CollectionRename_Click"/>
+                            <Button Content="Suppr."  Width="70" Margin="6,0,0,0" Click="CollectionDelete_Click"/>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                            <Button Content="Charger la collection"
+                                    Width="160"
+                                    Click="CollectionLoad_Click"/>
+                        </StackPanel>
+                    </DockPanel>
+
+                    <ScrollViewer Grid.Row="1" Background="{DynamicResource ItemsBackground}">
+                        <ItemsControl x:Name="CollectionListView"
+                                      ItemTemplate="{StaticResource CollectionItemTemplate}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <WrapPanel IsItemsHost="True"/>
@@ -239,13 +335,20 @@
                             </ItemsControl.ItemsPanel>
                         </ItemsControl>
                     </ScrollViewer>
+
+                    <StackPanel Orientation="Horizontal" Grid.Row="2" HorizontalAlignment="Right" Margin="0,6,0,0">
+                        <TextBlock Text="Éléments dans la collection : " Foreground="{DynamicResource PrimaryText}"/>
+                        <TextBlock x:Name="CollectionCountText" Foreground="{DynamicResource PrimaryText}" FontWeight="Bold"/>
+                    </StackPanel>
                 </Grid>
             </TabItem>
 
             <!-- Onglet Paramètres -->
             <TabItem Header="Paramètres" Background="{DynamicResource TabBackground}">
-                <Grid Margin="12,10,8,10" Background="Transparent" ToolTip="Personnalisez l'apparence">
+                <Grid Margin="12,10,8,10" Background="Transparent">
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -262,58 +365,58 @@
                                Grid.Row="0" Margin="0,0,0,10"
                                Foreground="{DynamicResource PrimaryText}"/>
 
-                    <!-- Couleurs dégradé -->
                     <StackPanel Orientation="Horizontal" Grid.Row="1" Margin="0,0,0,5">
                         <TextBlock Text="Couleur du haut :" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource PrimaryText}"/>
                         <xctk:ColorPicker x:Name="TopColorPicker" Width="150" Height="25" SelectedColor="#FFF2F2F2"/>
-                        <TextBlock Text="Couleur du bas :" VerticalAlignment="Center" Margin="20,0,10,0" Foreground="{DynamicResource PrimaryText}"/>
+                        <TextBlock Text="  Couleur du bas :" VerticalAlignment="Center" Margin="20,0,10,0" Foreground="{DynamicResource PrimaryText}"/>
                         <xctk:ColorPicker x:Name="BottomColorPicker" Width="150" Height="25" SelectedColor="#FFFFFFFF"/>
                     </StackPanel>
 
-                    <!-- Autres couleurs -->
                     <StackPanel Orientation="Horizontal" Grid.Row="2" Margin="0,0,0,5">
                         <TextBlock Text="PanelBackground :" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource PrimaryText}"/>
                         <xctk:ColorPicker x:Name="PanelBackgroundPicker" Width="150" Height="25" SelectedColor="#F0F0F0"/>
                     </StackPanel>
+
                     <StackPanel Orientation="Horizontal" Grid.Row="3" Margin="0,0,0,5">
                         <TextBlock Text="TreeViewBackground :" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource PrimaryText}"/>
                         <xctk:ColorPicker x:Name="TreeViewBackgroundPicker" Width="150" Height="25" SelectedColor="#F0F0F0"/>
                     </StackPanel>
+
                     <StackPanel Orientation="Horizontal" Grid.Row="4" Margin="0,0,0,5">
                         <TextBlock Text="ItemsBackground :" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource PrimaryText}"/>
                         <xctk:ColorPicker x:Name="ItemsBackgroundPicker" Width="150" Height="25" SelectedColor="Transparent"/>
                     </StackPanel>
+
                     <StackPanel Orientation="Horizontal" Grid.Row="5" Margin="0,0,0,5">
                         <TextBlock Text="TabBackground :" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource PrimaryText}"/>
                         <xctk:ColorPicker x:Name="TabBackgroundPicker" Width="150" Height="25" SelectedColor="Transparent"/>
                     </StackPanel>
 
-                    <!-- Mode sombre -->
                     <StackPanel Orientation="Horizontal" Grid.Row="6" Margin="0,0,0,5">
                         <TextBlock Text="Mode sombre :" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource PrimaryText}"/>
                         <CheckBox x:Name="DarkModeCheckBox"/>
                     </StackPanel>
 
-
-
-                    <!-- Boutons -->
-                    <StackPanel Orientation="Horizontal" Grid.Row="7" Margin="0,10,0,10">
-                        <Button Content="Appliquer" Click="ApplyColors_Click" Margin="0,0,10,0" Width="80"/>
-                        <Button Content="Enregistrer" Click="SaveConfig_Click" Margin="0,0,10,0" Width="80"/>
-                        <Button Content="Réinitialiser" Click="ResetConfig_Click" Width="80"/>
-                    </StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Grid.Row="8" Margin="0,6,0,255">
-                        <TextBlock Text="Afficher le Top-8 :" 
-             VerticalAlignment="Center" 
-             Margin="0,0,10,0"
-             Foreground="{DynamicResource PrimaryText}"/>
+                    <StackPanel Orientation="Horizontal" Grid.Row="7" Margin="0,6,0,5">
+                        <TextBlock Text="Afficher le Top-8 :" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource PrimaryText}"/>
                         <CheckBox x:Name="ShowTop8CheckBox"
-            IsChecked="False"
-            Checked="ShowTop8CheckBox_Changed"
-            Unchecked="ShowTop8CheckBox_Changed" Height="16"/>
+                                  IsChecked="False"
+                                  Checked="ShowTop8CheckBox_Changed"
+                                  Unchecked="ShowTop8CheckBox_Changed" Height="16"/>
                     </StackPanel>
 
+                    <StackPanel Orientation="Horizontal" Grid.Row="8" Margin="0,6,0,5">
+                        <TextBlock Text="Toujours au-dessus :" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource PrimaryText}"/>
+                        <CheckBox x:Name="AlwaysOnTopCheckBox"
+                                  Checked="AlwaysOnTopCheckBox_Changed"
+                                  Unchecked="AlwaysOnTopCheckBox_Changed"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Grid.Row="9" Margin="0,10,0,10">
+                        <Button Content="Appliquer" Click="ApplyColors_Click" Margin="0,0,10,0" Width="100"/>
+                        <Button Content="Enregistrer" Click="SaveConfig_Click" Margin="0,0,10,0" Width="100"/>
+                        <Button Content="Réinitialiser" Click="ResetConfig_Click" Width="100"/>
+                    </StackPanel>
                 </Grid>
             </TabItem>
 

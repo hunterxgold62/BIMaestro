@@ -1,15 +1,19 @@
-﻿using System;
-using Autodesk.Revit.UI;
+﻿using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
-using Autodesk.Revit.Attributes;
+using Autodesk.Revit.UI;
+using Licensing;
+using System;
 
 namespace Couleur
 {
     [Transaction(TransactionMode.Manual)]
-    public class ResetTabItemRandomColorsCommand : IExternalCommand
+    public class ResetTabItemRandomColorsCommand : BaseTrackedCommand
     {
-        public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+
+        protected override string ButtonId => "ResetTabItemRandomColorsCommand";
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
+            var commandData = data;
             try
             {
                 // Réinitialise le dictionnaire des couleurs (les couleurs aléatoires)

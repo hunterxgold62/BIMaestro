@@ -1,22 +1,25 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using Autodesk.Revit.Attributes;
+﻿using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Plumbing;
 using Autodesk.Revit.UI;
+using Licensing;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Modification
 {
     [Transaction(TransactionMode.Manual)]
-    public class ConnectPipesCommand : IExternalCommand
+    public class ConnectPipesCommand : BaseTrackedCommand
     {
         // Marges XY (mm) pour l’exploration A*
         static readonly double[] XY_MARGINS_MM = { 1600, 3200, 5600 };
         private static bool _teePlacedThisRun = false;
+        protected override string ButtonId => "ConnectPipesCommand";
 
-        public Result Execute(ExternalCommandData data, ref string message, ElementSet elements)
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
+            var commandData = data;
             var uiapp = data.Application;
             var uidoc = uiapp.ActiveUIDocument;
             var doc   = uidoc.Document;

@@ -1,15 +1,12 @@
-﻿// BIMaestro/Analytics/Telemetry.cs
+﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Http;
-using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 
 namespace Licensing
 {
@@ -21,59 +18,33 @@ namespace Licensing
         public string machine_id_hash { get; set; }
         public object context { get; set; }
         public DateTime created_at { get; set; }
-        public string license_key { get; set; } // facultatif
+        public string license_key { get; set; } // fallback si JWT ne la porte pas
     }
 
-    /// <summary>
-    /// Buffer + envoi batch async vers l'Edge Function collect-usage.
-    /// Fallback d'URL: /functions/v1/collect-usage -> /collect-usage
-    /// (Aucun log fichier; traces éventuelles via Debug.WriteLine uniquement.)
-    /// </summary>
+    /// <summary>Buffer + envoi batch async vers collect-usage (proxy OK) + queue disque.</summary>
     public static class Telemetry
     {
         private static readonly object _lock = new object();
         private static readonly List<UsageEvent> _buffer = new List<UsageEvent>(64);
         private static Timer _timer;
-        private static volatile bool _flushing = false;
+        private static volatile bool _flushing;
 
-        private static Uri _endpointBase; // ex: https://<proj>.functions.supabase.co/
-        private static readonly string[] _paths = new[]
-        {
-            "/functions/v1/collect-usage", // standard Supabase
-            "/collect-usage"               // fallback si exposée à la racine
-        };
-        private static int _activePathIndex = 0;
+        private static Uri _endpointBase; // ex: https://...functions.supabase.co/
+        private static readonly string[] _paths = new[] { "/functions/v1/collect-usage", "/collect-usage" };
+        private static int _activePathIndex;
 
-        private static string _licenseJwt;         // JWT (validate)
-        private static string _pluginVersion;      // jamais null après Init
-        private static string _machineIdHash;      // jamais null après Init
-        private static string _fallbackLicenseKey; // transmis dans le body si le JWT ne la porte pas
+        private static string _licenseJwt;
+        private static string _pluginVersion;
+        private static string _machineIdHash;
+        private static string _fallbackLicenseKey;
 
-        private static readonly HttpClient _http;
+        private static HttpClient _http;
 
         private static string _queueFile;
-        private static bool _initialized;
+        private static string _logFile;
 
-        /// <summary>DEBUG: flush immédiat à chaque TrackButton (désactive-le en prod).</summary>
         public static bool FlushImmediatelyForDebug { get; set; } = false;
 
-        static Telemetry()
-        {
-            var handler = new HttpClientHandler
-            {
-                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
-                UseProxy = true,
-                Proxy = WebRequest.GetSystemWebProxy(),
-                UseDefaultCredentials = true
-            };
-            _http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(10) };
-        }
-
-        /// <param name="edgeFunctionsBaseUrl">ex: https://xqovxfgghbqxwsadzhzl.functions.supabase.co</param>
-        /// <param name="licenseJwt">JWT signé par validate (HS256)</param>
-        /// <param name="pluginVersion">version plugin</param>
-        /// <param name="machineIdHash">hash machine</param>
-        /// <param name="fallbackLicenseKey">clé licence à mettre dans le body si absente du JWT</param>
         public static void Init(
             string edgeFunctionsBaseUrl,
             string licenseJwt,
@@ -88,79 +59,56 @@ namespace Licensing
             _endpointBase = new Uri(baseUrl);
             _activePathIndex = 0;
 
-            // valeurs durcies (jamais null)
             _licenseJwt = licenseJwt;
-            _pluginVersion = string.IsNullOrWhiteSpace(pluginVersion) ? "dev" : pluginVersion.Trim();
-            _machineIdHash = string.IsNullOrWhiteSpace(machineIdHash) ? "unknown" : machineIdHash.Trim();
-            _fallbackLicenseKey = string.IsNullOrWhiteSpace(fallbackLicenseKey) ? null : fallbackLicenseKey.Trim();
+            _pluginVersion = string.IsNullOrWhiteSpace(pluginVersion) ? "dev" : pluginVersion;
+            _machineIdHash = machineIdHash;
+            _fallbackLicenseKey = fallbackLicenseKey;
 
-            // Chemin file-queue (sans log fichier)
-            var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-            var logDir = Path.Combine(docs, "RevitLogs");
-            Directory.CreateDirectory(logDir);
-            _queueFile = Path.Combine(logDir, "telemetry_queue.json");
+            var logDir = Paths.RevitLogsDir;
+            _logFile = Path.Combine(logDir, "telemetry.log");
+            _queueFile = Path.Combine(logDir, "telemetry.queue.json");
 
-            Debug.WriteLine($"[Telemetry.Init] base={_endpointBase} version={_pluginVersion}");
+            _http = NetSupport.CreateHttpClient(TimeSpan.FromSeconds(10));
             TryRestoreQueueFromDisk();
+            WriteLog($"[Init] base={_endpointBase} version={_pluginVersion}");
 
-            _timer?.Dispose();
             _timer = new Timer(async _ => await SafeFlushAsync().ConfigureAwait(false),
                 null, TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(15));
-
-            _initialized = true;
         }
 
         public static void TrackButton(string buttonId, bool success, object context = null)
         {
-            if (!_initialized || _endpointBase == null || string.IsNullOrEmpty(_licenseJwt))
+            try
             {
-                Debug.WriteLine("[Telemetry.TrackButton] Telemetry not initialized. Event dropped.");
-                return;
-            }
-            if (string.IsNullOrWhiteSpace(buttonId))
-            {
-                Debug.WriteLine("[Telemetry.TrackButton] Empty buttonId.");
-                return;
-            }
+                if (_endpointBase == null || string.IsNullOrEmpty(_licenseJwt)) { WriteLog("[TrackButton] Telemetry not initialized."); return; }
+                if (string.IsNullOrWhiteSpace(buttonId)) { WriteLog("[TrackButton] Empty buttonId."); return; }
 
-            var evt = new UsageEvent
-            {
-                button_id = buttonId,
-                success = success,
-                plugin_version = string.IsNullOrWhiteSpace(_pluginVersion) ? "dev" : _pluginVersion,
-                machine_id_hash = string.IsNullOrWhiteSpace(_machineIdHash) ? "unknown" : _machineIdHash,
-                context = context ?? new { }, // jamais null
-                created_at = DateTime.UtcNow,
-                license_key = _fallbackLicenseKey
-            };
+                var evt = new UsageEvent
+                {
+                    button_id = buttonId,
+                    success = success,
+                    plugin_version = _pluginVersion,
+                    machine_id_hash = _machineIdHash,
+                    context = context ?? new { },
+                    created_at = DateTime.UtcNow,
+                    license_key = _fallbackLicenseKey
+                };
 
-            lock (_lock)
-            {
-                _buffer.Add(evt);
-                Debug.WriteLine($"[Telemetry.TrackButton] queued '{buttonId}', buffer={_buffer.Count}");
-            }
+                lock (_lock) { _buffer.Add(evt); }
+                WriteLog($"[TrackButton] queued '{buttonId}', buffer={_buffer.Count}");
 
-            if (FlushImmediatelyForDebug)
-            {
-                try { SafeFlushAsync().GetAwaiter().GetResult(); }
-                catch (Exception ex) { Debug.WriteLine("[Telemetry.TrackButton/ImmediateFlush] " + ex.Message); }
+                if (FlushImmediatelyForDebug)
+                    SafeFlushAsync().GetAwaiter().GetResult();
             }
+            catch (Exception ex) { WriteLog("[TrackButton] " + ex.Message); }
         }
 
         public static Task FlushAsync() => SafeFlushAsync();
 
-        /// <summary>Forcer un flush synchrone (utile pour un bouton de test).</summary>
-        public static bool ForceFlushSync()
-        {
-            try { SafeFlushAsync().GetAwaiter().GetResult(); return true; }
-            catch (Exception ex) { Debug.WriteLine("[Telemetry.ForceFlushSync] " + ex.Message); return false; }
-        }
-
         public static void Shutdown()
         {
             try { _timer?.Dispose(); } catch { }
-            Debug.WriteLine("[Telemetry.Shutdown]");
-            _initialized = false;
+            WriteLog("[Shutdown]");
         }
 
         private static async Task SafeFlushAsync()
@@ -179,10 +127,7 @@ namespace Licensing
             try
             {
                 var payload = new { license_key = _fallbackLicenseKey, events = toSend };
-                var json = JsonConvert.SerializeObject(payload, new JsonSerializerSettings
-                {
-                    NullValueHandling = NullValueHandling.Ignore
-                });
+                var json = JsonConvert.SerializeObject(payload);
 
                 for (int attempt = 0; attempt < _paths.Length; attempt++)
                 {
@@ -191,12 +136,9 @@ namespace Licensing
 
                     var req = new HttpRequestMessage(HttpMethod.Post, endpoint);
                     req.Headers.Add("Authorization", $"Bearer {_licenseJwt}");
-                    // Optionnel : utile si ton Edge réutilise le header apikey
-                    // req.Headers.Add("apikey", "<your_anon_key_if_needed>");
-
                     req.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                    Debug.WriteLine($"[Telemetry.Flush] POST {endpoint} batch={toSend.Count}");
+                    WriteLog($"[Flush] POST {endpoint} batch={toSend.Count}");
                     HttpResponseMessage resp = null;
                     try
                     {
@@ -206,57 +148,43 @@ namespace Licensing
 
                         if (code == 404 || code == 405)
                         {
-                            Debug.WriteLine($"[Telemetry.Flush] HTTP {code} (bad path), trying fallback…");
-                            continue; // essaie l’autre chemin
+                            WriteLog($"[Flush] HTTP {code} (bad path), try fallback…");
+                            continue;
                         }
 
                         if (!resp.IsSuccessStatusCode)
                         {
-                            Debug.WriteLine($"[Telemetry.Flush] HTTP {code} - {body}");
+                            WriteLog($"[Flush] HTTP {code} - {body}");
                             PersistQueueToDisk(toSend);
                         }
                         else
                         {
-                            Debug.WriteLine($"[Telemetry.Flush] HTTP {code} OK (pathIndex={pathIndex})");
+                            WriteLog($"[Flush] HTTP {code} OK (pathIndex={pathIndex})");
                             _activePathIndex = pathIndex;
                         }
                         break;
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine("[Telemetry.Flush] EX: " + ex.Message);
+                        WriteLog("[Flush] EX: " + ex.Message);
                         PersistQueueToDisk(toSend);
                         break;
                     }
-                    finally
-                    {
-                        resp?.Dispose();
-                    }
+                    finally { resp?.Dispose(); }
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine("[Telemetry.Flush/Outer] EX: " + ex.Message);
+                WriteLog("[Flush/Outer] EX: " + ex.Message);
                 PersistQueueToDisk(toSend);
             }
-            finally
-            {
-                _flushing = false;
-            }
+            finally { _flushing = false; }
         }
 
         private static void PersistQueueToDisk(List<UsageEvent> events)
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(_queueFile))
-                {
-                    var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-                    var logDir = Path.Combine(docs, "RevitLogs");
-                    Directory.CreateDirectory(logDir);
-                    _queueFile = Path.Combine(logDir, "telemetry_queue.json");
-                }
-
                 List<UsageEvent> disk = new List<UsageEvent>();
                 if (File.Exists(_queueFile))
                 {
@@ -265,30 +193,16 @@ namespace Licensing
                         disk = JsonConvert.DeserializeObject<List<UsageEvent>>(existing) ?? new List<UsageEvent>();
                 }
                 disk.AddRange(events);
-                File.WriteAllText(_queueFile, JsonConvert.SerializeObject(disk, new JsonSerializerSettings
-                {
-                    NullValueHandling = NullValueHandling.Ignore
-                }));
-                Debug.WriteLine($"[Telemetry.Persist] queued to disk, total now={disk.Count}");
+                File.WriteAllText(_queueFile, JsonConvert.SerializeObject(disk));
+                WriteLog($"[Persist] queued to disk, total now={disk.Count}");
             }
-            catch (Exception ex)
-            {
-                Debug.WriteLine("[Telemetry.Persist] EX: " + ex.Message);
-            }
+            catch (Exception ex) { WriteLog("[Persist] EX: " + ex.Message); }
         }
 
         private static void TryRestoreQueueFromDisk()
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(_queueFile))
-                {
-                    var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-                    var logDir = Path.Combine(docs, "RevitLogs");
-                    Directory.CreateDirectory(logDir);
-                    _queueFile = Path.Combine(logDir, "telemetry_queue.json");
-                }
-
                 if (!File.Exists(_queueFile)) return;
                 var txt = File.ReadAllText(_queueFile);
                 if (string.IsNullOrWhiteSpace(txt)) return;
@@ -297,33 +211,20 @@ namespace Licensing
 
                 lock (_lock) { _buffer.AddRange(disk); }
                 File.Delete(_queueFile);
-                Debug.WriteLine($"[Telemetry.Restore] restored {disk.Count} events from disk");
+                WriteLog($"[Restore] restored {disk.Count} events from disk");
             }
-            catch (Exception ex)
-            {
-                Debug.WriteLine("[Telemetry.Restore] EX: " + ex.Message);
-            }
+            catch (Exception ex) { WriteLog("[Restore] EX: " + ex.Message); }
         }
 
-        // ------- Utilitaires conseillés --------
-
-        /// <summary>Version lisible et stable depuis l'assembly.</summary>
-        public static string GetAssemblyVersionSafe(Assembly asm = null)
+        private static void WriteLog(string line)
         {
             try
             {
-                asm ??= Assembly.GetExecutingAssembly();
-                var info = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
-                if (!string.IsNullOrWhiteSpace(info)) return info;
-                var fvi = FileVersionInfo.GetVersionInfo(asm.Location)?.ProductVersion;
-                if (!string.IsNullOrWhiteSpace(fvi)) return fvi;
-                var v = asm.GetName().Version?.ToString();
-                return string.IsNullOrWhiteSpace(v) ? "dev" : v;
+                if (string.IsNullOrEmpty(_logFile))
+                    _logFile = Path.Combine(Paths.RevitLogsDir, "telemetry.log");
+                File.AppendAllText(_logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {line}\n");
             }
-            catch
-            {
-                return "dev";
-            }
+            catch { /* ignore */ }
         }
     }
 }

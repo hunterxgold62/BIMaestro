@@ -7,11 +7,16 @@ using System;
 using System.IO;
 using System.Reflection;
 
-
 public class App : IExternalApplication
 {
     public static UIControlledApplication UIControlledApp { get; private set; }
     public static System.Windows.Application WpfApp { get; private set; }
+
+    // >>> Ajout : expose ces infos au reste du plugin
+    public static string LicenseJwt { get; private set; }
+    public static string MachineId { get; private set; }
+    public static string InstallId { get; private set; }
+    public static string PluginVersion { get; private set; }
 
     private UIApplication _uiApp;
     private bool _hasResetWhenOff = false;
@@ -33,22 +38,26 @@ public class App : IExternalApplication
 
             Directory.CreateDirectory(LogDirectory);
 
-            // --- Récup infos Revit (version) ---
+            // --- Infos Revit ---
             var revitVersion = application.ControlledApplication.VersionNumber;
 
-            // --- Username Revit (pas dispo via ControlledApplication) ---
-            // On tente depuis Revit.ini, sinon on prend Windows.
+            // Username Revit (fallback Windows)
             string revitUser = TryReadRevitUsernameFromIni(revitVersion)
                                ?? Environment.UserName;
 
-            // --- LICENCE ---
+            // --- LICENCE (réseau sinon cache) ---
             string licenseKey = string.IsNullOrWhiteSpace(revitUser) ? Environment.UserName : revitUser;
-            string machineId = LicenseManager.ComputeMachineId();
-            string installId = LicenseManager.GetOrCreateInstallId();
-            string version = GetPluginVersion();
-            string userAgent = $"BIMaestro/{version} Revit/{revitVersion}";
+            MachineId = LicenseManager.ComputeMachineId();
+            InstallId = LicenseManager.GetOrCreateInstallId();
+            PluginVersion = GetPluginVersion();
+            string userAgent = $"BIMaestro/{PluginVersion} Revit/{revitVersion} Install/{InstallId}";
 
-            string licenseJwt = LicenseManager.Validate(licenseKey, machineId, userAgent);
+            bool fromCache;
+            LicenseJwt = LicenseManager.ValidateOrUseCache(licenseKey, MachineId, out fromCache, userAgent);
+
+            // log non bloquant si hors-ligne
+            if (fromCache)
+                AppendLog("Licence utilisée depuis le cache (offline/proxy).");
 
             // --- États existants ---
             Couleur.ColoringStateManager.LoadState();
@@ -69,9 +78,9 @@ public class App : IExternalApplication
                 string functionsBaseUrl = "https://xqovxfgghbqxwsadzhzl.functions.supabase.co";
                 Telemetry.Init(
                     edgeFunctionsBaseUrl: functionsBaseUrl,
-                    licenseJwt: licenseJwt,
-                    pluginVersion: version,
-                    machineIdHash: machineId,
+                    licenseJwt: LicenseJwt,
+                    pluginVersion: PluginVersion,
+                    machineIdHash: MachineId,
                     fallbackLicenseKey: licenseKey
                 );
                 Telemetry.TrackButton("Plugin.Startup", true, new
@@ -79,7 +88,7 @@ public class App : IExternalApplication
                     revit_username = revitUser,
                     windows_user = Environment.UserName,
                     machine_name = Environment.MachineName,
-                    install_id = installId,
+                    install_id = InstallId,
                     revit_version = revitVersion
                 });
             }
@@ -99,7 +108,7 @@ public class App : IExternalApplication
 
             return Result.Succeeded;
         }
-        catch (InvalidOperationException) // licence invalide
+        catch (InvalidOperationException) // licence invalide / expirée et pas de cache
         {
             string addinsFolder = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -237,12 +246,10 @@ public class App : IExternalApplication
     {
         try
         {
-            // %AppData%\Autodesk\Revit\Autodesk Revit {YEAR}\Revit.ini  (ex: 2023, 2024, 2025)
             var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
             var iniPath = Path.Combine(appData, "Autodesk", "Revit", $"Autodesk Revit {versionNumber}", "Revit.ini");
             if (!File.Exists(iniPath)) return null;
 
-            // Section [UserInterface] Username=...
             string currentSection = "";
             foreach (var lineRaw in File.ReadAllLines(iniPath))
             {
