@@ -319,10 +319,19 @@
     <Compile Include="commands\Dossier famille\FamilyIndexService.cs" />
     <Compile Include="commands\Dossier famille\FamilyLoadOption.cs" />
     <Compile Include="commands\Dossier famille\FamilyUsageManager.cs" />
+    <Compile Include="commands\Dossier famille\image native de revit\ThumbnailCache.cs" />
     <Compile Include="commands\Dossier famille\ImageResolver.cs" />
     <Compile Include="commands\Dossier famille\LoadCollectionHandler.cs" />
     <Compile Include="commands\Dossier famille\LoadFamilyHandler.cs" />
     <Compile Include="commands\Dossier famille\ReloadFamilyHandler.cs" />
+    <Compile Include="commands\Dossier famille\image native de revit\ShellThumbnailProvider.cs" />
+    <Compile Include="commands\Dossier famille\roue de gta\ImageDiscovery.cs" />
+    <Compile Include="commands\Dossier famille\roue de gta\OwnerWindowHelper.cs" />
+    <Compile Include="commands\Dossier famille\roue de gta\RadialMenuCommand.cs" />
+    <Compile Include="commands\Dossier famille\roue de gta\RadialMenuWindow.xaml.cs">
+      <DependentUpon>RadialMenuWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\Dossier famille\roue de gta\RevitIdleRunner.cs" />
     <Compile Include="commands\export dwg\ExportSheetsCommand.cs" />
     <Compile Include="commands\export dwg\ExportSheetsWindow.xaml.cs">
       <DependentUpon>ExportSheetsWindow.xaml</DependentUpon>
@@ -340,13 +349,13 @@
     <Compile Include="commands\unité de famille\ExportProjectUnitsCommand.cs" />
     <Compile Include="commands\unité de famille\UpdateProjectUnitsCommand.cs" />
     <Compile Include="commands\export import excel\ScheduleExcelIO.cs" />
-    <Compile Include="Test\roue de gta\RevitIdleRunner.cs" />
-    <Compile Include="Test\roue de gta\ImageDiscovery.cs" />
-    <Compile Include="Test\roue de gta\OwnerWindowHelper.cs" />
-    <Compile Include="Test\roue de gta\RadialMenuCommand.cs" />
-    <Compile Include="Test\roue de gta\RadialMenuWindow.xaml.cs">
+    <None Include="Test\roue de gta\RevitIdleRunner.cs" />
+    <None Include="Test\roue de gta\ImageDiscovery.cs" />
+    <None Include="Test\roue de gta\OwnerWindowHelper.cs" />
+    <None Include="Test\roue de gta\RadialMenuCommand.cs" />
+    <None Include="Test\roue de gta\RadialMenuWindow.xaml.cs">
       <DependentUpon>RadialMenuWindow.xaml</DependentUpon>
-    </Compile>
+    </None>
     <Compile Include="Themes\app.xaml.cs">
       <DependentUpon>app.xaml</DependentUpon>
     </Compile>
@@ -481,6 +490,10 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <Page Include="commands\Dossier famille\roue de gta\RadialMenuWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
     <Page Include="commands\Dynamo\ConfigureDynamoWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -545,10 +558,10 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </None>
-    <Page Include="Test\roue de gta\RadialMenuWindow.xaml">
+    <None Include="Test\roue de gta\RadialMenuWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
-    </Page>
+    </None>
     <Page Include="Themes\app.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>

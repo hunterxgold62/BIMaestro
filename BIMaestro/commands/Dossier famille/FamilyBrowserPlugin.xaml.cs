@@ -36,14 +36,21 @@ namespace Famille
         private readonly string pathsFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "SauvegardePréférence", "CheminsFamille.json");
         private readonly string workFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "FamilleRevit");
 
+        // Cache de vignettes (disque)
+        private readonly string thumbCacheFolder =
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                         "RevitLogs", "CacheVignettes");
+
+        // Options (exposables dans Paramètres si tu veux)
+        private bool useShellThumbs = true;   // ON par défaut
+        private bool useRevitPreview = false;  // OFF (fallback lourd, non branché ici)
+
         // ===== Données UI =====
         private List<FamilyItem> allFamilies = new();
         private List<FamilyItem> displayedFamilies = new();
-        private List<FamilyItem> favoriteFamilies = new();
         private string currentFolderPath;
 
         public string RootFolderName => System.IO.Path.GetFileName(rootFolderPath);
-        public List<FamilyItem> FavoriteFamilies => favoriteFamilies;
 
         // Pagination & recherche
         private const int PageSize = 200;
@@ -55,9 +62,10 @@ namespace Famille
         private FamilyIndexService _index;
         private bool _globalSearchMode = false;
 
-        // Vignettes
+        // Concurrence & cache mémoire pour images
         private static readonly System.Threading.SemaphoreSlim _thumbGate = new(4);
-        private static readonly Dictionary<string, BitmapImage> _bitmapCache = new(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, ImageSource> _bitmapCache =
+            new(StringComparer.OrdinalIgnoreCase);
 
         // ===== Collections =====
         private ObservableCollection<Collection> _collections = new();
@@ -100,9 +108,6 @@ namespace Famille
             LoadCollections();
             EnsureFavoritesCollection();
             ImportFavoritesTxtIntoFavoritesCollection(); // synchro compat
-
-            // Favoris (★ visuel)
-            MarkFavoritesInAllFamilies();
 
             // Arbo + Top-8
             LoadFolderTree();
@@ -181,7 +186,6 @@ namespace Famille
 
             currentFolderPath = tv.Tag.ToString();
             LoadFamilies(currentFolderPath, recursive: false);
-            MarkFavoritesInAllFamilies(); // maj des ★
 
             BeginPaging(allFamilies);
 
@@ -252,7 +256,7 @@ namespace Famille
 
         #endregion
 
-        #region Favoris (★)  + compat Favorites.txt
+        #region Favoris (★)  + compat Favorites.txt  via Collection "Favoris"
 
         private void ImportFavoritesTxtIntoFavoritesCollection()
         {
@@ -280,27 +284,6 @@ namespace Famille
             catch { }
         }
 
-        private void LoadFavoritesFromFile()
-        {
-            favoriteFamilies.Clear();
-            if (!File.Exists(favoritesFile)) return;
-
-            var paths = File.ReadAllLines(favoritesFile);
-            foreach (var p in paths)
-            {
-                if (File.Exists(p))
-                {
-                    var ext = CreateFamilyItemFromPath(p);
-                    ext.IsFavorite = true;
-                    favoriteFamilies.Add(ext);
-                    LoadThumbnailForFamilyItem(ext);
-                }
-            }
-            UpdateFavoritesUI();
-        }
-
-        private void UpdateFavoritesUI() { /* pas nécessaire ici */ }
-
         private void FavoriteButton_Click(object s, RoutedEventArgs e)
         {
             if (s is not Button btn || btn.DataContext is not FamilyItem fam) return;
@@ -324,15 +307,13 @@ namespace Famille
             ExportFavoritesCollectionToTxt();
         }
 
-        private void MarkFavoritesInAllFamilies()
+        private void MarkFavoritesInView(IEnumerable<FamilyItem> items)
         {
             try
             {
                 var favCol = GetFavoritesCollection();
                 var set = new HashSet<string>(favCol.Paths, StringComparer.OrdinalIgnoreCase);
-                foreach (var fam in allFamilies)
-                    fam.IsFavorite = set.Contains(fam.Path);
-                foreach (var fam in displayedFamilies)
+                foreach (var fam in items)
                     fam.IsFavorite = set.Contains(fam.Path);
             }
             catch { }
@@ -448,11 +429,12 @@ namespace Famille
                 LoadThumbnailForFamilyItem(item);
             }
 
+            // rafraîchit source
             FamilyListView.ItemsSource = null;
             FamilyListView.ItemsSource = displayedFamilies;
 
             // Met à jour les étoiles selon la collection Favoris
-            MarkFavoritesInAllFamilies();
+            MarkFavoritesInView(displayedFamilies);
 
             PagingStatusText.Text = _nextIndex >= _currentResult.Count
                 ? "Fin de la liste."
@@ -544,15 +526,17 @@ namespace Famille
         private void CollectionLoad_Click(object sender, RoutedEventArgs e)
         {
             if (_selectedCollection == null || _selectedCollection.Paths.Count == 0) return;
-            // Toujours en overwrite
+            // Toujours en overwrite (handler dédié)
             FamilyBrowserCommand.LoadCollectionHandlerInstance.FamilyPaths = new List<string>(_selectedCollection.Paths);
             FamilyBrowserCommand.LoadCollectionEventInstance.Raise();
         }
 
         #endregion
 
-        #region Vignettes
+        #region Vignettes (catalogue -> cache -> Shell -> placeholder)
 
+        // Affiche l’image "catalogue" si elle existe (PNG/JPG).
+        // Sinon : cache → Shell → placeholder. IMPORTANT : le Shell NE s’active PAS si une image "prévue" existe.
         private void LoadThumbnailForFamilyItem(FamilyItem fam)
         {
             if (fam == null || fam.Icon != null) return;
@@ -562,86 +546,55 @@ namespace Famille
                 await _thumbGate.WaitAsync().ConfigureAwait(false);
                 try
                 {
-                    var full = ImageResolver.Resolve(familiesFolder, imagesFolder, fam.Path);
-                    if (string.IsNullOrEmpty(full) || !File.Exists(full))
+                    const int SIZE = 256;
+
+                    // 0) Cache mémoire
+                    if (_bitmapCache.TryGetValue(fam.Path, out var memCached))
                     {
-                        // Placeholder ultra léger pour éviter les vides
-                        Dispatcher.Invoke(() =>
-                        {
-                            var ph = new BitmapImage();
-                            ph.BeginInit();
-                            ph.UriSource = new Uri("pack://application:,,,/"); // pixel transparent
-                            ph.DecodePixelWidth = 1;
-                            ph.EndInit();
-                            ph.Freeze();
-                            fam.Icon = ph;
-                        });
+                        Dispatcher.Invoke(() => fam.Icon = memCached);
                         return;
                     }
 
-                    // cache ?
-                    if (_bitmapCache.TryGetValue(full, out var cachedBmp))
+                    // 1) Image "prévue" (catalogue) existe ?
+                    if (TryGetCatalogImagePath(fam.Path, out var plannedImagePath))
                     {
-                        Dispatcher.Invoke(() => fam.Icon = cachedBmp);
-                        return;
-                    }
-
-                    BitmapImage bmp = null;
-
-                    // 1) Essai par Uri absolue
-                    try
-                    {
-                        var uri = new Uri(full, UriKind.Absolute);
-                        var bi = new BitmapImage();
-                        bi.BeginInit();
-                        bi.UriSource = uri;
-                        bi.CacheOption = BitmapCacheOption.OnLoad;
-                        bi.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
-                        bi.DecodePixelWidth = 256;
-                        bi.EndInit();
-                        bi.Freeze();
-                        bmp = bi;
-                    }
-                    catch
-                    {
-                        // 2) Fallback par flux
-                        try
+                        var bmp = LoadBitmapImage(plannedImagePath, SIZE);
+                        if (bmp != null)
                         {
-                            using (var fs = File.OpenRead(full))
-                            {
-                                var bi = new BitmapImage();
-                                bi.BeginInit();
-                                bi.CacheOption = BitmapCacheOption.OnLoad;
-                                bi.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
-                                bi.DecodePixelWidth = 256;
-                                bi.StreamSource = fs;
-                                bi.EndInit();
-                                bi.Freeze();
-                                bmp = bi;
-                            }
+                            _bitmapCache[fam.Path] = bmp;
+                            Dispatcher.Invoke(() => fam.Icon = bmp);
                         }
-                        catch { /* on laisse bmp = null */ }
+                        else
+                        {
+                            // L’image existe mais est illisible → on n’active PAS le Shell.
+                            Dispatcher.Invoke(() => fam.Icon = CreateSolidPlaceholder(180, 180));
+                        }
+                        return;
                     }
 
-                    if (bmp != null)
+                    // 2) Cache disque (thumbnail générée antérieurement)
+                    if (ThumbnailCache.TryGet(thumbCacheFolder, fam.Path, SIZE, out var cached) && File.Exists(cached))
                     {
-                        _bitmapCache[full] = bmp;
-                        Dispatcher.Invoke(() => fam.Icon = bmp);
-                    }
-                    else
-                    {
-                        // Fallback dernier recours (pixel)
-                        Dispatcher.Invoke(() =>
+                        var bmp = LoadBitmapImage(cached, SIZE);
+                        if (bmp != null)
                         {
-                            var ph = new BitmapImage();
-                            ph.BeginInit();
-                            ph.UriSource = new Uri("pack://application:,,,/");
-                            ph.DecodePixelWidth = 1;
-                            ph.EndInit();
-                            ph.Freeze();
-                            fam.Icon = ph;
-                        });
+                            _bitmapCache[fam.Path] = bmp;
+                            Dispatcher.Invoke(() => fam.Icon = bmp);
+                            return;
+                        }
                     }
+
+                    // 3) Miniature Windows (Shell) → seulement s'il n'y a AUCUNE image prévue
+                    if (useShellThumbs && ShellThumbnailProvider.TryGetThumbnail(fam.Path, SIZE, out var shellBmp))
+                    {
+                        try { ThumbnailCache.Save(thumbCacheFolder, fam.Path, SIZE, shellBmp); } catch { }
+                        _bitmapCache[fam.Path] = shellBmp;
+                        Dispatcher.Invoke(() => fam.Icon = shellBmp);
+                        return;
+                    }
+
+                    // 4) Placeholder visible
+                    Dispatcher.Invoke(() => fam.Icon = CreateSolidPlaceholder(180, 180));
                 }
                 finally
                 {
@@ -650,7 +603,77 @@ namespace Famille
             });
         }
 
+        // Détecte si une image "catalogue" est PRÉVUE (existe sur disque) — PNG ou JPG
+        private bool TryGetCatalogImagePath(string familyPath, out string imgPath)
+        {
+            imgPath = null;
+            try
+            {
+                string rel = GetRelativePath(familiesFolder, familyPath);
+                string fileNameNoExt = Path.GetFileNameWithoutExtension(familyPath);
 
+                string InImgMirror(string ext) => Path.ChangeExtension(Path.Combine(imagesFolder, rel), ext);
+                string InImgFlat(string ext) => Path.Combine(imagesFolder, fileNameNoExt + ext);
+                string NextToFamily(string ext) => Path.ChangeExtension(familyPath, ext);
+
+                string[] candidates =
+                {
+            InImgMirror(".png"), NextToFamily(".png"), InImgFlat(".png"),
+            InImgMirror(".jpg"), NextToFamily(".jpg"), InImgFlat(".jpg"),
+        };
+
+                foreach (var c in candidates)
+                    if (!string.IsNullOrEmpty(c) && File.Exists(c))
+                    { imgPath = c; return true; }
+
+                return false;
+            }
+            catch { return false; }
+        }
+
+
+        // Remplace l'ancienne version (avec FileStream) par celle-ci
+        private static ImageSource LoadBitmapImage(string path, int decodeWidth)
+        {
+            try
+            {
+                var bi = new BitmapImage();
+                bi.BeginInit();
+                bi.UriSource = new Uri(path, UriKind.Absolute); // ← charge par URI (plus robuste sur réseau)
+                bi.CacheOption = BitmapCacheOption.OnLoad;
+                bi.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
+                bi.DecodePixelWidth = decodeWidth;
+                bi.EndInit();
+                bi.Freeze();
+                return bi;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+
+        private static ImageSource CreateSolidPlaceholder(int w, int h)
+        {
+            var pixels = new byte[w * h * 4];
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    int i = (y * w + x) * 4;
+                    byte c = (byte)((((x / 8) + (y / 8)) % 2 == 0) ? 230 : 210); // damier léger
+                    pixels[i + 0] = c; // B
+                    pixels[i + 1] = c; // G
+                    pixels[i + 2] = c; // R
+                    pixels[i + 3] = 255; // A
+                }
+            }
+            var bmp = BitmapSource.Create(
+                w, h, 96, 96, PixelFormats.Bgra32, null, pixels, w * 4);
+            bmp.Freeze();
+            return bmp;
+        }
 
         #endregion
 
@@ -701,8 +724,6 @@ namespace Famille
             return true;
         }
 
-
-
         private void LoadSavedPaths()
         {
             try
@@ -748,6 +769,7 @@ namespace Famille
                 if (!File.Exists(favoritesFile)) File.WriteAllText(favoritesFile, "");
                 Directory.CreateDirectory(Path.GetDirectoryName(configFile));
                 if (!File.Exists(configFile)) File.WriteAllText(configFile, "");
+                Directory.CreateDirectory(thumbCacheFolder);
             }
             catch (Exception ex)
             {
@@ -777,6 +799,8 @@ namespace Famille
                     else if (line.StartsWith("DarkMode=", StringComparison.OrdinalIgnoreCase)) bool.TryParse(line.Substring("DarkMode=".Length), out dark);
                     else if (line.StartsWith("ShowTop8=", StringComparison.OrdinalIgnoreCase)) bool.TryParse(line.Substring("ShowTop8=".Length), out showTop8);
                     else if (line.StartsWith("AlwaysOnTop=", StringComparison.OrdinalIgnoreCase)) bool.TryParse(line.Substring("AlwaysOnTop=".Length), out alwaysOnTop);
+                    else if (line.StartsWith("UseShellThumbs=", StringComparison.OrdinalIgnoreCase)) bool.TryParse(line.Substring("UseShellThumbs=".Length), out useShellThumbs);
+                    else if (line.StartsWith("UseRevitPreview=", StringComparison.OrdinalIgnoreCase)) bool.TryParse(line.Substring("UseRevitPreview=".Length), out useRevitPreview);
                 }
             }
 
@@ -806,6 +830,8 @@ namespace Famille
                 "DarkMode="   + ((DarkModeCheckBox?.IsChecked == true) ? "true" : "false"),
                 "ShowTop8="   + ((ShowTop8CheckBox?.IsChecked == true) ? "true" : "false"),
                 "AlwaysOnTop="+ ((AlwaysOnTopCheckBox?.IsChecked == true) ? "true" : "false"),
+                "UseShellThumbs="  + (useShellThumbs  ? "true" : "false"),
+                "UseRevitPreview=" + (useRevitPreview ? "true" : "false"),
             };
             Directory.CreateDirectory(Path.GetDirectoryName(configFile));
             File.WriteAllLines(configFile, lines);
@@ -1065,25 +1091,18 @@ namespace Famille
 
             if (_selectedCollection.Id == FavoritesCollectionId)
             {
-                SetFavoriteFlagInViews(fam.Path, false);
+                // retire l'étoile dans les vues
+                foreach (var it in displayedFamilies)
+                    if (string.Equals(it.Path, fam.Path, StringComparison.OrdinalIgnoreCase))
+                        it.IsFavorite = false;
+
+                foreach (var it in allFamilies)
+                    if (string.Equals(it.Path, fam.Path, StringComparison.OrdinalIgnoreCase))
+                        it.IsFavorite = false;
+
                 ExportFavoritesCollectionToTxt();
             }
         }
-
-        private void SetFavoriteFlagInViews(string path, bool value)
-        {
-            foreach (var it in displayedFamilies)
-                if (string.Equals(it.Path, path, StringComparison.OrdinalIgnoreCase))
-                    it.IsFavorite = value;
-
-            foreach (var it in allFamilies)
-                if (string.Equals(it.Path, path, StringComparison.OrdinalIgnoreCase))
-                    it.IsFavorite = value;
-        }
-
-        #endregion
-
-        #region Handlers divers
 
         private void AlwaysOnTopCheckBox_Changed(object sender, RoutedEventArgs e)
         {
@@ -1115,6 +1134,8 @@ namespace Famille
         #endregion
     }
 
+    // ======================= FamilyItem =======================
+
     public class FamilyItem : INotifyPropertyChanged
     {
         public string Name { get; set; }
@@ -1122,8 +1143,8 @@ namespace Famille
         public string Category { get; set; }
         public string NormalizedName { get; set; }
 
-        private BitmapImage _icon;
-        public BitmapImage Icon
+        private ImageSource _icon;
+        public ImageSource Icon
         {
             get => _icon;
             set { if (_icon != value) { _icon = value; OnPropertyChanged(nameof(Icon)); } }
