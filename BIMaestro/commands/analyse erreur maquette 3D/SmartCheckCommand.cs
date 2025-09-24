@@ -15,11 +15,10 @@ namespace Analyse
     public class SmartCheckCommand : BaseTrackedCommand
     {
         public static readonly string Smart3DName = "BIMastro – SmartCheck 3D";
-        protected override string ButtonId => "BaseTrackedCommand";
+        protected override string ButtonId => "BaseTrackedCommand"; // garde ton infra
 
         protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
-            var commandData = data;
             var uiapp = data.Application;
             var uidoc = uiapp.ActiveUIDocument;
             var doc = uidoc.Document;
@@ -193,7 +192,7 @@ namespace Analyse
                             Kind = IssueKind.MepThroughWallNoSleeve,
                             Category = "Traversée sans réservation",
                             Message = $"{NiceType(e)} #{e.Id.IntegerValue} traverse Mur #{w.Id.IntegerValue} sans réservation détectée.",
-                            BBox = ibb               // <-- BB de l'intersection (serrée)
+                            BBox = ibb               // BB de l'intersection (serrée)
                         };
                     }
                 }
@@ -231,7 +230,7 @@ namespace Analyse
                 }
                 catch { /* ignore */ }
 
-                if (candidate != null) yield return candidate; // CS1626-safe
+                if (candidate != null) yield return candidate;
             }
         }
 
@@ -271,7 +270,7 @@ namespace Analyse
             return x && y && z;
         }
 
-        private static string NiceType(Element e) => e.Category?.Name ?? e.GetType().Name;
+        private static string NiceType(Element e) => e?.Category?.Name ?? e?.GetType().Name ?? "Élément";
         private static double MmToFeet(double mm) => mm / 304.8;
         private static double FeetToMm(double ft) => ft * 304.8;
         private static double Mm3ToFt3(double mm3) => mm3 / Math.Pow(304.8, 3);

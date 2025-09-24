@@ -1,4 +1,4 @@
-﻿// ExportScheduleCommand.cs
+﻿// Visualisation/ExportScheduleCommand.cs
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
@@ -7,10 +7,13 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Reflection;
 using Excel = Microsoft.Office.Interop.Excel;
 
 namespace Visualisation
 {
+    // Ceinture + bretelles : évite le renommage de la classe (optionnel selon ton obfuscateur)
+    [Obfuscation(Exclude = true, ApplyToMembers = false, StripAfterObfuscation = false)]
     [Transaction(TransactionMode.Manual)]
     public class ExportScheduleCommand : BaseTrackedCommand
     {
@@ -146,7 +149,7 @@ namespace Visualisation
                     var rowRange = ws.Range[ws.Cells[firstRow + r - 1, 1], ws.Cells[firstRow + r - 1, totalCols]];
                     rowRange.Interior.Color = System.Drawing.ColorTranslator.ToOle(
                         System.Drawing.Color.FromArgb(242, 242, 242));
-                    ComRelease(rowRange);
+                    ComUtils.Release(rowRange);
                 }
 
                 // Zone d'impression
@@ -160,12 +163,12 @@ namespace Visualisation
                 if (wb != null) wb.Close(false);
                 if (app != null) app.Quit();
 
-                ComRelease(headerRange);
-                ComRelease(fullRange);
-                ComRelease(used);
-                ComRelease(ws);
-                ComRelease(wb);
-                ComRelease(app);
+                ComUtils.Release(headerRange);
+                ComUtils.Release(fullRange);
+                ComUtils.Release(used);
+                ComUtils.Release(ws);
+                ComUtils.Release(wb);
+                ComUtils.Release(app);
 
                 // Assure la libération des COM
                 GC.Collect();
@@ -225,14 +228,47 @@ namespace Visualisation
                     var rowRange = ws.Range[ws.Cells[firstRow + r - 1, 1], ws.Cells[firstRow + r - 1, totalCols]];
                     rowRange.Interior.Color = System.Drawing.ColorTranslator.ToOle(
                         System.Drawing.Color.FromArgb(242, 242, 242));
-                    ComRelease(rowRange);
+                    ComUtils.Release(rowRange);
                 }
 
-                ws.PageSetup.PrintArea = fullRange.Address[false, false];
-                ws.PageSetup.Orientation = Excel.XlPageOrientation.xlLandscape;
-                ws.PageSetup.FitToPagesWide = 1;   // 1 page en largeur
-                ws.PageSetup.FitToPagesTall = 0;   // autant de pages que nécessaire en hauteur
+                // --- Mise en page sûre pour Interop ---
+                var ps = ws.PageSetup;
 
+                // Tenter d'assurer une imprimante valide (non bloquant)
+                try
+                {
+                    string ap = app.ActivePrinter; // lecture (peut throw sur certaines machines)
+                    // app.ActivePrinter = "Microsoft Print to PDF"; // optionnel : forcer si tu veux
+                }
+                catch { /* no-op */ }
+
+                try
+                {
+                    // IMPORTANT : désactiver le Zoom avant FitToPages*
+                    ps.Zoom = false;
+
+                    // Fit sur 1 page en largeur; hauteur libre
+                    ps.FitToPagesWide = 1;
+                    ps.FitToPagesTall = 0;
+
+                    ps.Orientation = Excel.XlPageOrientation.xlLandscape;
+                    ps.PrintArea = fullRange.Address[false, false];
+                }
+                catch (System.Runtime.InteropServices.COMException)
+                {
+                    // Fallback (si l'environnement bloque FitToPages* à cause d'absence d'imprimante / GPO)
+                    try
+                    {
+                        ps.FitToPagesWide = 0;
+                        ps.FitToPagesTall = 0;
+                        ps.Zoom = 100;
+                        ps.Orientation = Excel.XlPageOrientation.xlLandscape;
+                        ps.PrintArea = fullRange.Address[false, false];
+                    }
+                    catch { /* ignore */ }
+                }
+
+                // Export PDF
                 wb.ExportAsFixedFormat(
                     Excel.XlFixedFormatType.xlTypePDF,
                     pdfPath,
@@ -246,12 +282,12 @@ namespace Visualisation
                 if (wb != null) wb.Close(false);
                 if (app != null) app.Quit();
 
-                ComRelease(headerRange);
-                ComRelease(fullRange);
-                ComRelease(used);
-                ComRelease(ws);
-                ComRelease(wb);
-                ComRelease(app);
+                ComUtils.Release(headerRange);
+                ComUtils.Release(fullRange);
+                ComUtils.Release(used);
+                ComUtils.Release(ws);
+                ComUtils.Release(wb);
+                ComUtils.Release(app);
 
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
@@ -272,17 +308,6 @@ namespace Visualisation
             {
                 Process.Start(new ProcessStartInfo(filePath) { UseShellExecute = true });
             }
-        }
-
-        // ---------- Libération COM centralisée (évite l'erreur ReleaseCom introuvable) ----------
-        private static void ComRelease(object obj)
-        {
-            if (obj == null) return;
-            try
-            {
-                while (Marshal.ReleaseComObject(obj) > 0) { }
-            }
-            catch { /* ignore */ }
         }
     }
 }

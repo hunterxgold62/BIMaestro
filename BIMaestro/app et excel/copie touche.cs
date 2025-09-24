@@ -77,7 +77,9 @@ public class AppUI : IExternalApplication
             new List<(string buttonName, string buttonText, string className, string resourceImageName, string toolTip)>
             {
                 ("Bride auto", "Bride\nauto", "Modification.AddFlangesAtEnds", "bride auto.png","Ajoute automatiquement des brides aux extrémités sélectionné"),
-                ("Choix bride", "Choix\nbride", "Modification.PickDefaultFlange", "safeimagekit-bouton reset4.png","Permet de choisir la bride par défaut")
+                ("Choix bride", "Choix\nbride", "Modification.PickDefaultFlange", "safeimagekit-bouton reset4.png","Permet de choisir la bride par défaut"),
+                                ("suppression bride", "suppression\nbride", "Modification.RemoveFlangesReconnect", "bride suppresion.png","Permet de supprimer les brides")
+
             });
 
         AddSplitButton(panelEditing, "chatbot IA", "Outils Canalisations", assemblyPath,
@@ -98,7 +100,7 @@ public class AppUI : IExternalApplication
 
         //("ScreenCaptureButton", "Chatbot\n+ screen", "IA.ScreenCaptureCommand", "Safeimagekit-resized-img (5).png","Cette commande permet :  \r\n- De capturer des captures d'écran en sélectionnant une zone spécifique.  \r\n- D'enregistrer et gérer les captures dans un répertoire dédié.  \r\n- D'envoyer les captures d'écran et des messages texte à une API IA pour traitement.  \r\n- D'afficher les réponses de l'IA directement dans l'interface.  \r\n\r\nUtilité :  \r\nAutomatisez l'analyse d'images et intégrez des workflows basés sur l'IA pour gagner du temps. ")
 
-        AddPushButton(panelIA, "GPTBotWindowButton", "Chatbot\n+ élément", assemblyPath, "IA.GPTBotWindowCommand", "Image IA.png", "Cette commande permet :  \r\n- D'envoyer des questions ou des demandes d'analyse à un assistant IA basé sur GPT.  \r\n- De récupérer des informations détaillées sur les éléments sélectionnés dans Revit (niveau, matériaux, surface, volume).  \r\n- D'afficher une conversation interactive avec l'IA directement dans une interface dédiée.  \r\n- De personnaliser le profil du chatbot pour s'adapter à différents contextes (BIM Manager, utilisateur Revit, etc.).  \r\n\r\nUtilité :  \r\nOptimisez votre travail dans Revit grâce à un assistant intelligent capable de fournir des conseils, des analyses, et des informations détaillées. ");
+        AddPushButton(panelIA, "GPTBotWindowButton", "Chatbot\n+ élément", assemblyPath, "IA.GPTBotWindowCommand", "Image IA.png", "Cette commande permet :  \r\n- D'envoyer des questions ou des demandes d'analyse à un assistant IA basé sur DeepSeek.  \r\n- De récupérer des informations détaillées sur les éléments sélectionnés dans Revit (niveau, matériaux, surface, volume).  \r\n- D'afficher une conversation interactive avec l'IA directement dans une interface dédiée.  \r\n- De personnaliser le profil du chatbot pour s'adapter à différents contextes (BIM Manager, utilisateur Revit, etc.).  \r\n\r\nUtilité :  \r\nOptimisez votre travail dans Revit grâce à un assistant intelligent capable de fournir des conseils, des analyses, et des informations détaillées. ");
 
         AddPushButton(panelIA, "TextCorrectionButton", "Correction de\ntexte IA", assemblyPath, "IA.TextCorrectionCommand", "safeimagekit-correction de texte IA.png", "Cette commande permet :  \r\n- De corriger les fautes dans les textes sélectionnés dans Revit.  \r\n- De reformuler les textes dans différents styles : professionnel, cool, baratin ou personnalisé.  \r\n- D'interagir avec une interface utilisateur pour accepter, modifier ou ignorer les corrections proposées.  \r\n- D'utiliser une IA avancée (basée sur GPT) pour produire des textes plus clairs et sans erreurs.  \r\n\r\nUtilité :  \r\nAméliorez rapidement la qualité des textes dans vos annotations Revit grâce à une correction automatisée et personnalisable.  ");
         AddPushButton(panelIA, "ScanText", "ScanText\nIA", assemblyPath, "ScanTextRevit.SelectViewsCommand", "safeimagekit-qfdfsf.png", "Corrige automatiquement les fautes d'orthographe et de grammaire dans les textes visibles sur les vues ou feuilles du projet. \r\nL'IA analyse les textes scannés par chunk et indique les erreurs ligne par ligne avec explication. \r\nLes corrections sont classées en \"Mineur\" (ponctuation, espaces) ou \"Erreur\" (grammaire, orthographe).\r\n");
@@ -125,16 +127,20 @@ public class AppUI : IExternalApplication
         AddPushButton(panelAnalysis, "Temps par projet", "Temps par\nprojet", assemblyPath, "BIMaestro.Dashboard.ShowTimeDashboard", "analyse de temps.png", "Affiche le temps passé par projet.");
         AddPushButton(panelAnalysis, "Chek 3D", "Chek 3D", assemblyPath, "Analyse.SmartCheckCommand", "correction 3D.png", "Vérifie les éléments 3D sélectionnés pour détecter les incohérences.");
 
-
-        AddPushButton(panelFamille, "FamilyBrowser", "Navigateur\nde Familles", assemblyPath, "Famille.FamilyBrowserCommand", "maison famille (1).png", "Cette commande permet :  \r\n- De parcourir les dossiers et charger des familles Revit depuis un emplacement centralisé.  \r\n- D'afficher des aperçus d'icônes pour identifier rapidement les familles.  \r\n- De gérer des favoris pour accéder plus facilement aux familles les plus utilisées.  \r\n- D'appliquer des filtres de recherche pour une sélection rapide.  \r\n- D'ajuster le thème (mode clair/sombre) et les paramètres visuels.  \r\n\r\nUtilité :  \r\nSimplifie la gestion et le chargement des familles dans vos projets, augmentant votre efficacité.  ");
+        AddSplitButton(panelFamille, "FamilyBrowser", "Navigateur\nde Familles", assemblyPath,
+            new List<(string buttonName, string buttonText, string className, string resourceImageName, string toolTip)>
+            {
+                                ("FamilyBrowser", "Navigateur\nde Familles", "Famille.FamilyBrowserCommand", "maison famille (1).png","Cette commande permet :  \r\n- De parcourir les dossiers et charger des familles Revit depuis un emplacement centralisé.  \r\n- D'afficher des aperçus d'icônes pour identifier rapidement les familles.  \r\n- De gérer des favoris pour accéder plus facilement aux familles les plus utilisées.  \r\n- D'appliquer des filtres de recherche pour une sélection rapide.  \r\n- D'ajuster le thème (mode clair/sombre) et les paramètres visuels.  \r\n\r\nUtilité :  \r\nSimplifie la gestion et le chargement des familles dans vos projets, augmentant votre efficacité.  "),
+                                ("Rosace", ".","BIMaestro.UI.RadialMenuCommand", "vide.png","Rosace des familles à ajouter en raccourci clavier voir raccourci souris.")
+            });
         AddPushButton(panelFamille, "PurgeFamilyParameters", "Purge des\nparamètres", assemblyPath, "Famille.PurgeFamilyParametersCommand", "Purge famille32x32.png", "Cette commande permet :  \r\n- De supprimer les paramètres inutilisés dans une famille Revit.  \r\n- De vérifier les cotes, formules et contraintes pour déterminer si un paramètre est utilisé.  \r\n- De sauvegarder automatiquement une copie de la famille avant la purge.  \r\n\r\nUtilité :  \r\nOptimisez vos familles en éliminant les paramètres inutiles, réduisant leur complexité et taille.  \r\n");
         AddPushButton(panelFamille, "Familytraduction", "Traduction de\nparamètre IA", assemblyPath, "Famille.TraduireParametresFamilleOpenAI", "Pour paramètre de famille1.png", "Cette commande permet :  \r\n- De traduire les noms des paramètres utilisateur dans une famille Revit en français.  \r\n- De s'assurer que les paramètres déjà en français ne sont pas modifiés.  \r\n- D'utiliser l'API OpenAI pour garantir une traduction précise.  \r\n- De sauvegarder automatiquement les changements via une transaction.  \r\n\r\nUtilité :  \r\nFacilite l'adaptation des familles Revit à des projets nécessitant des noms de paramètres en français, améliorant la lisibilité et la conformité.  ");
         AddSplitButton(panelFamille, "Changement d'unité", "Changement\nd'unité", assemblyPath,
             new List<(string buttonName, string buttonText, string className, string resourceImageName, string toolTip)>
             {
-                                ("Export d'unité", "Export\nd'unité", "Famille.ExportProjectUnitsCommand", "export unité.png","Cette commande permet :  \r\n- De capturer des captures d'écran en sélectionnant une zone spécifique.  \r\n- D'enregistrer et gérer les captures dans un répertoire dédié.  \r\n- D'envoyer les captures d'écran et des messages texte à une API IA pour traitement.  \r\n- D'afficher les réponses de l'IA directement dans l'interface.  \r\n\r\nUtilité :  \r\nAutomatisez l'analyse d'images et intégrez des workflows basés sur l'IA pour gagner du temps. "),
-                                ("Import d'unité", "Import\nd'unité","Famille.ImportProjectUnitsCommand", "import unité.png","Cette commande permet :  \r\n- D'envoyer des questions ou des demandes d'analyse à un assistant IA basé sur GPT.  \r\n- De récupérer des informations détaillées sur les éléments sélectionnés dans Revit (niveau, matériaux, surface, volume).  \r\n- D'afficher une conversation interactive avec l'IA directement dans une interface dédiée.  \r\n- De personnaliser le profil du chatbot pour s'adapter à différents contextes (BIM Manager, utilisateur Revit, etc.).  \r\n\r\nUtilité :  \r\nOptimisez votre travail dans Revit grâce à un assistant intelligent capable de fournir des conseils, des analyses, et des informations détaillées. ")
-            });
+                                ("Export d'unité", "Export\nd'unité", "Famille.ExportProjectUnitsCommand", "export unité.png","Sauvegarde dans un fichier JSON les unités et leur précision (longueur, surface, volume, angle, etc.) du projet en cours, dans le dossier Mes Documents/RevitLogs/SauvegardePréférence."),
+                                ("Import d'unité", "Import\nd'unité","Famille.ImportProjectUnitsCommand", "import unité.png","Recharge depuis le fichier JSON les unités et leur précision pour appliquer rapidement vos préférences au projet.")
+ });
     }
     private static void AddPushButton(RibbonPanel panel, string buttonName, string buttonText, string assemblyPath, string className, string resourceImageName, string toolTip)
     {
@@ -172,8 +178,8 @@ public class AppUI : IExternalApplication
      string assemblyPath,
      List<(string buttonName, string buttonText, string className, string resourceImageName, string toolTip)> buttons,
      string splitToolTip = null,                   // optionnel : info sur le groupe
-     string splitToolTipImageResource = null       // optionnel : image d'aide
- )
+     string splitToolTipImageResource = null)       // optionnel : image d'aide
+
     {
         var splitButtonData = new SplitButtonData(splitButtonName, splitButtonText);
         var splitButton = panel.AddItem(splitButtonData) as SplitButton;
@@ -229,14 +235,21 @@ public class AppUI : IExternalApplication
             // 2) ToolTip court + LongDescription riche
             //    -> on prend la 1ère ligne comme ToolTip (court),
             //       et l'intégralité pour LongDescription (détaillé).
+            // ...
             string tt = toolTip ?? "";
-            string shortTip = tt.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)[0];
+            string[] parts = tt.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            string shortTip = parts[0];
             if (string.IsNullOrWhiteSpace(shortTip))
                 shortTip = $"Exécuter {buttonText}";
 
             buttonData.ToolTip = shortTip;
-            if (!string.IsNullOrWhiteSpace(tt))
+
+            // Assigner LongDescription seulement si elle apporte plus que le ToolTip
+            bool hasMultiLine = parts.Length > 1;
+            bool isDifferent = hasMultiLine || (tt.Trim().Length > shortTip.Trim().Length + 5);
+            if (!string.IsNullOrWhiteSpace(tt) && isDifferent)
                 buttonData.LongDescription = tt;
+
 
             // (Option) Ajouter une image d'aide au tooltip des sous-boutons :
             // string helperImageRes = "MonImageAide.png";

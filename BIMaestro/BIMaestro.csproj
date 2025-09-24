@@ -252,9 +252,9 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <None Include="app et excel\appUI copie.cs" />
+    <Compile Include="app et excel\copie touche.cs" />
     <Compile Include="app et excel\Supabase\ApiKeys.cs" />
-    <Compile Include="app et excel\AppUI.cs" />
+    <None Include="app et excel\AppUI.cs" />
     <Compile Include="app et excel\App.cs" />
     <Compile Include="app et excel\Supabase\BaseTrackedCommand.cs" />
     <Compile Include="app et excel\Supabase\LicenseManager.cs" />
@@ -325,13 +325,19 @@
     <Compile Include="commands\Dossier famille\LoadFamilyHandler.cs" />
     <Compile Include="commands\Dossier famille\ReloadFamilyHandler.cs" />
     <Compile Include="commands\Dossier famille\image native de revit\ShellThumbnailProvider.cs" />
+    <Compile Include="commands\Dossier famille\roue de gta\CatalogImageResolver.cs" />
+    <Compile Include="commands\Dossier famille\roue de gta\FamilyRecentManager.cs" />
     <Compile Include="commands\Dossier famille\roue de gta\ImageDiscovery.cs" />
     <Compile Include="commands\Dossier famille\roue de gta\OwnerWindowHelper.cs" />
+    <Compile Include="commands\Dossier famille\roue de gta\RadialItem.cs" />
     <Compile Include="commands\Dossier famille\roue de gta\RadialMenuCommand.cs" />
     <Compile Include="commands\Dossier famille\roue de gta\RadialMenuWindow.xaml.cs">
       <DependentUpon>RadialMenuWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="commands\Dossier famille\roue de gta\RadialPathsConfig.cs" />
+    <Compile Include="commands\Dossier famille\roue de gta\RadialPlaceFamilyHandler.cs" />
     <Compile Include="commands\Dossier famille\roue de gta\RevitIdleRunner.cs" />
+    <Compile Include="commands\export de nomenclature\ExportScheduleAddinObfuscation.cs" />
     <Compile Include="commands\export dwg\ExportSheetsCommand.cs" />
     <Compile Include="commands\export dwg\ExportSheetsWindow.xaml.cs">
       <DependentUpon>ExportSheetsWindow.xaml</DependentUpon>
@@ -356,6 +362,9 @@
     <None Include="Test\roue de gta\RadialMenuWindow.xaml.cs">
       <DependentUpon>RadialMenuWindow.xaml</DependentUpon>
     </None>
+    <None Include="Test\2024 to 2023\ExportFamilyToJson.cs" />
+    <None Include="Test\2024 to 2023\FamilyExchangeModel.cs" />
+    <None Include="Test\2024 to 2023\ImportFamilyFromJson.cs" />
     <Compile Include="Themes\app.xaml.cs">
       <DependentUpon>app.xaml</DependentUpon>
     </Compile>
@@ -726,7 +735,9 @@
     <EmbeddedResource Include="Resources\cana auto.png" />
     <EmbeddedResource Include="Resources\correction 3D.png" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\vide.png" />
+  </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Resources\bride suppresion.png" />
   </ItemGroup>

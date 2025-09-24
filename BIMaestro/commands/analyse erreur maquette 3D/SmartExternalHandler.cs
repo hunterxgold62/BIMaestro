@@ -1,5 +1,4 @@
-﻿using Analyse;
-using Autodesk.Revit.DB;
+﻿using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using System;
 using System.Collections.Generic;
@@ -11,31 +10,26 @@ namespace Analyse
     {
         private readonly UIApplication _uiapp;
 
-        // Anti re-entrance côté handler (visible depuis la fenêtre)
         public static volatile bool IsExecuting = false;
 
         public SmartAction Action { get; set; } = SmartAction.SelectOnly;
-
-        // Focus d'un item
-        public ElementId IssueId { get; set; } = ElementId.InvalidElementId;     // élément principal (ex: MEP)
-        public ElementId RelatedId { get; set; } = ElementId.InvalidElementId;   // élément lié (ex: mur traversé)
+        public ElementId IssueId { get; set; } = ElementId.InvalidElementId;
+        public ElementId RelatedId { get; set; } = ElementId.InvalidElementId;
         public IssueKind CurrentKind { get; set; } = IssueKind.WallFloating;
-        public BoundingBoxXYZ IssueBox { get; set; }                             // BB serrée (intersection si dispo)
+        public BoundingBoxXYZ IssueBox { get; set; }
 
-        // Affichage global (“Afficher toutes les erreurs”)
         public IList<ElementId> AllIssueIds { get; set; } = new List<ElementId>();
-        public bool ShowAllMode { get; set; } = false;     // si ON, le focus ne reset pas les overrides
-        public bool ShowAllEnabled { get; set; } = false;  // état demandé par le toggle
+        public bool ShowAllMode { get; set; } = false;
+        public bool ShowAllEnabled { get; set; } = false;
 
         public bool AutoSectionBox { get; set; } = true;
 
         public SmartExternalHandler(UIApplication app) { _uiapp = app; }
-
         public string GetName() => "BIMastro.SmartExternalHandler";
 
         public void Execute(UIApplication app)
         {
-            if (IsExecuting) return;        // si jamais Revit ré-exécute, on évite re-entrance
+            if (IsExecuting) return;
             IsExecuting = true;
             try
             {
@@ -51,26 +45,8 @@ namespace Analyse
                             break;
                         }
 
-                    case SmartAction.FocusApply:        // ✅ un seul event pour Ensure3D + Focus + Zoom
-                        {
-                            var v = EnsureSmart3D(doc);
-                            uidoc.ActiveView = v;
-
-                            BoundingBoxXYZ focusBox = null;
-                            using (var t = new Transaction(doc, "BIMastro Focus"))
-                            {
-                                t.Start();
-                                if (!ShowAllMode) ClearOverrides(uidoc, v);
-                                focusBox = FocusIn3D(uidoc, v, IssueId, RelatedId, CurrentKind, IssueBox, AutoSectionBox);
-                                doc.Regenerate();
-                                t.Commit();
-                            }
-                            ZoomTo(uidoc, v, focusBox, IssueId);
-                            TryRefresh(uidoc);
-                            break;
-                        }
-
-                    case SmartAction.FocusIssue: // legacy (si utilisé)
+                    case SmartAction.FocusApply:        // Ensure3D + Focus + Zoom
+                    case SmartAction.FocusIssue:        // legacy
                         {
                             var v = EnsureSmart3D(doc);
                             uidoc.ActiveView = v;
@@ -97,10 +73,10 @@ namespace Analyse
                             using (var t = new Transaction(doc, "BIMastro ShowAll APPLY"))
                             {
                                 t.Start();
-                                TryDisableSectionBox(v);    // vision d’ensemble
-                                ClearOverrides(uidoc, v);   // reset complet
+                                TryDisableSectionBox(v);
+                                ClearOverrides(uidoc, v);
                                 if (ShowAllEnabled)
-                                    ShowAllIssues(uidoc, v, AllIssueIds);
+                                    ShowAllIssues(uidoc, v, CleanIds(AllIssueIds));
                                 doc.Regenerate();
                                 t.Commit();
                             }
@@ -112,7 +88,7 @@ namespace Analyse
                     case SmartAction.SelectOnly:
                     default:
                         {
-                            if (IssueId != ElementId.InvalidElementId)
+                            if (IsValidId(IssueId))
                             {
                                 var el = doc.GetElement(IssueId);
                                 if (el != null)
@@ -129,13 +105,25 @@ namespace Analyse
             }
             catch (Exception ex)
             {
-                // en dev : utile pour comprendre un blocage
                 TaskDialog.Show("BIMastro – SmartExternalHandler", ex.Message);
             }
             finally
             {
                 IsExecuting = false;
             }
+        }
+
+        // ---------- Helpers IDs ----------
+        private static bool IsValidId(ElementId id)
+            => id != null && id != ElementId.InvalidElementId && id.IntegerValue > 0;
+
+        private static List<ElementId> CleanIds(IEnumerable<ElementId> ids)
+            => (ids ?? Enumerable.Empty<ElementId>()).Where(IsValidId).Distinct(new ElemIdCmp()).ToList();
+
+        private class ElemIdCmp : IEqualityComparer<ElementId>
+        {
+            public bool Equals(ElementId a, ElementId b) => (a?.IntegerValue ?? int.MinValue) == (b?.IntegerValue ?? int.MinValue);
+            public int GetHashCode(ElementId obj) => obj?.IntegerValue.GetHashCode() ?? 0;
         }
 
         // ---------- Vue 3D dédiée ----------
@@ -157,7 +145,6 @@ namespace Analyse
                 }
             }
 
-            // Réglages (et on enlève un éventuel View Template qui pourrait bloquer la section box)
             using (var t2 = new Transaction(doc, "Réglages SmartCheck 3D"))
             {
                 t2.Start();
@@ -175,40 +162,39 @@ namespace Analyse
         private static void TryDisableSectionBox(View3D v) { try { v.IsSectionBoxActive = false; } catch { } }
         private static void TryRefresh(UIDocument uidoc) { try { uidoc.RefreshActiveView(); } catch { } }
 
-        /// <summary>
-        /// Focus : si traversée sans réservation → emphase MEP + Mur, le reste à 85% dans la vue.
-        /// Retourne la BBox de focus (union locale MEP+mur avec petite marge).
-        /// </summary>
         private BoundingBoxXYZ FocusIn3D(UIDocument uidoc, View3D v,
             ElementId id, ElementId related, IssueKind kind, BoundingBoxXYZ box, bool setSection)
         {
             var doc = uidoc.Document;
 
-            // Sélection
+            // Sélection — nettoyée
             var ids = new List<ElementId>();
-            if (id != ElementId.InvalidElementId) ids.Add(id);
-            if (related != ElementId.InvalidElementId) ids.Add(related);
-            if (ids.Count > 0) uidoc.Selection.SetElementIds(ids);
+            if (IsValidId(id)) ids.Add(id);
+            if (IsValidId(related)) ids.Add(related);
+            ids = CleanIds(ids);
 
-            // Détermine la boîte de focus (préférence : BB serrée d'intersection si fournie)
+            if (ids.Count > 0)
+                uidoc.Selection.SetElementIds(ids);
+
+            // Boîte de focus
             BoundingBoxXYZ focus = box;
-            if (related != ElementId.InvalidElementId)
+            if (IsValidId(related))
             {
                 var rel = doc.GetElement(related);
                 var rbb = rel?.get_BoundingBox(null);
                 if (rbb != null && box != null) focus = Union(new[] { box, rbb });
                 else if (rbb != null && box == null) focus = rbb;
             }
-            if (focus == null && id != ElementId.InvalidElementId)
+            if (focus == null && IsValidId(id))
             {
                 var el = doc.GetElement(id);
                 focus = el?.get_BoundingBox(null);
             }
 
-            // Section box compacte (+ marge 200 mm)
+            // Section box compacte (+200 mm)
             if (setSection && focus != null)
             {
-                var pad = new XYZ(1, 1, 1) * (200.0 / 304.8); // 200 mm
+                var pad = new XYZ(1, 1, 1) * (200.0 / 304.8);
                 var b = new BoundingBoxXYZ { Min = focus.Min - pad, Max = focus.Max + pad };
                 v.SetSectionBox(b);
                 TryEnableSectionBox(v);
@@ -226,23 +212,22 @@ namespace Analyse
             fade.SetSurfaceTransparency(85);
             fade.SetHalftone(true);
 
-            if (kind == IssueKind.MepThroughWallNoSleeve)
+            if (kind == IssueKind.MepThroughWallNoSleeve && ids.Count > 0)
             {
-                foreach (var eid in ids.Distinct()) v.SetElementOverrides(eid, emphasize);
+                foreach (var eid in ids) v.SetElementOverrides(eid, emphasize);
 
-                // Le reste transparent (dans la vue)
                 var allIds = new FilteredElementCollector(doc, v.Id)
                     .WhereElementIsNotElementType()
                     .ToElementIds();
 
-                var keep = new HashSet<ElementId>(ids);
+                var keep = new HashSet<ElementId>(ids, new ElemIdCmp());
                 foreach (var oid in allIds)
                     if (!keep.Contains(oid))
                         v.SetElementOverrides(oid, fade);
             }
             else
             {
-                if (id != ElementId.InvalidElementId)
+                if (IsValidId(id))
                     v.SetElementOverrides(id, emphasize);
             }
 
@@ -256,7 +241,7 @@ namespace Analyse
             if (uiview == null) return;
 
             BoundingBoxXYZ bb = focusBox;
-            if (bb == null && fallbackId != ElementId.InvalidElementId)
+            if (bb == null && IsValidId(fallbackId))
             {
                 var el = uidoc.Document.GetElement(fallbackId);
                 bb = el?.get_BoundingBox(v) ?? el?.get_BoundingBox(null);
@@ -269,6 +254,7 @@ namespace Analyse
         private void ShowAllIssues(UIDocument uidoc, View3D v, IList<ElementId> issueIds)
         {
             var doc = uidoc.Document;
+            var ids = CleanIds(issueIds);
 
             var err = new OverrideGraphicSettings();
             err.SetProjectionLineColor(new Color(255, 0, 0));
@@ -276,12 +262,11 @@ namespace Analyse
             err.SetProjectionLineWeight(8);
 #endif
             err.SetSurfaceTransparency(0);
-            foreach (var id in issueIds.Distinct())
+            foreach (var id in ids)
                 v.SetElementOverrides(id, err);
 
-            // Le reste transparent
             var allIds = new FilteredElementCollector(doc, v.Id).WhereElementIsNotElementType().ToElementIds();
-            var set = new HashSet<ElementId>(issueIds);
+            var set = new HashSet<ElementId>(ids, new ElemIdCmp());
             var others = allIds.Where(i => !set.Contains(i)).ToList();
 
             var fade = new OverrideGraphicSettings();
@@ -290,7 +275,7 @@ namespace Analyse
             foreach (var oid in others)
                 v.SetElementOverrides(oid, fade);
 
-            TryDisableSectionBox(v); // pas de section box en mode “Afficher tout”
+            TryDisableSectionBox(v);
         }
 
         private void ClearOverrides(UIDocument uidoc, View3D v)
@@ -305,7 +290,7 @@ namespace Analyse
         private static BoundingBoxXYZ Union(IEnumerable<BoundingBoxXYZ> bbs)
         {
             BoundingBoxXYZ u = null;
-            foreach (var bb in bbs)
+            foreach (var bb in bbs.Where(b => b != null))
             {
                 if (u == null) u = new BoundingBoxXYZ { Min = bb.Min, Max = bb.Max };
                 else

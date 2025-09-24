@@ -109,6 +109,9 @@ namespace Famille
             EnsureFavoritesCollection();
             ImportFavoritesTxtIntoFavoritesCollection(); // synchro compat
 
+
+            Famille.CatalogImageResolver.Initialize(familiesFolder, imagesFolder);
+
             // Arbo + Top-8
             LoadFolderTree();
 

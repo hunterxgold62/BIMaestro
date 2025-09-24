@@ -2,7 +2,6 @@
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using System;
-using System.Windows;
 
 namespace BIMaestro.Dashboard
 {
@@ -13,9 +12,7 @@ namespace BIMaestro.Dashboard
         {
             try
             {
-                // EPPlus : contexte non commercial par variable d'env (compatible v5→v8)
                 Environment.SetEnvironmentVariable("EPPlusLicenseContext", "NonCommercial", EnvironmentVariableTarget.Process);
-
                 new TimeSeriesDashboardWindow().Show();
                 return Result.Succeeded;
             }

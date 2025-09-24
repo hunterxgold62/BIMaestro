@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;                  // <— JSON prefs
+﻿using Newtonsoft.Json;
 using OfficeOpenXml;
 using OxyPlot;
 using OxyPlot.Axes;
@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection;            // <-- IMPORTANT
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
@@ -18,6 +19,8 @@ using SWM = System.Windows.Media;
 
 namespace BIMaestro.Dashboard
 {
+    // Empêche le renommage/strip de la classe ET de ses membres (handlers XAML, champs x:Name, etc.)
+    [Obfuscation(Exclude = true, ApplyToMembers = true, StripAfterObfuscation = false)]
     public partial class TimeSeriesDashboardWindow : Window
     {
         // ===== FICHIERS =====
@@ -34,16 +37,16 @@ namespace BIMaestro.Dashboard
 
         // ===== OxyPlot =====
         private PlotModel _plotModel;
-        private readonly HashSet<string> _hiddenBars = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _hiddenBars = new(StringComparer.OrdinalIgnoreCase);
 
         // Debounce recherche
         private DispatcherTimer _searchDebounce;
 
         // ===== Data =====
-        private List<LogRow> _rows = new List<LogRow>();
-        private List<ProjectItem> _projects = new List<ProjectItem>();
-        private List<ProjectItem> _filteredProjects = new List<ProjectItem>();
-        private Dictionary<string, double> _hoursByProject = new Dictionary<string, double>(StringComparer.Ordinal);
+        private List<LogRow> _rows = new();
+        private List<ProjectItem> _projects = new();
+        private List<ProjectItem> _filteredProjects = new();
+        private Dictionary<string, double> _hoursByProject = new(StringComparer.Ordinal);
 
         private const int DEFAULT_TOP_N = 20;
         private const int TOP_N_MIN = 1;
@@ -52,7 +55,7 @@ namespace BIMaestro.Dashboard
         private enum SortMode { HoursDesc, NameAZ }
         private enum AutoGran { Day, Week, Month }
 
-        private Prefs _prefs = new Prefs();
+        private Prefs _prefs = new();
 
         public TimeSeriesDashboardWindow()
         {
@@ -95,7 +98,7 @@ namespace BIMaestro.Dashboard
             InputBindings.Add(new KeyBinding(new RelayCommand(_ => _lvProjects.SelectAll()), new KeyGesture(Key.A, ModifierKeys.Control)));
         }
 
-        // ===== Handlers XAML =====
+        // ===== Handlers XAML (ils doivent garder leur NOM exact) =====
         private void OnDateChanged(object sender, SelectionChangedEventArgs e) { if (!_uiReady) return; RefreshAll(); }
         private void OnSortChanged(object sender, SelectionChangedEventArgs e) { if (!_uiReady) return; RefreshAll(); }
 
@@ -142,27 +145,23 @@ namespace BIMaestro.Dashboard
         private void Search_TextChanged(object sender, TextChangedEventArgs e) { if (!_uiReady) return; _searchDebounce.Start(); }
         private void ClearSearch_Click(object sender, RoutedEventArgs e) { if (!_uiReady) return; _tbSearch.Text = ""; _tbSearch.Focus(); }
 
-        // Chips dates
         private void Chip7_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; SetRange(DateTime.Today.AddDays(-7), DateTime.Today); }
         private void Chip30_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; SetRange(DateTime.Today.AddDays(-30), DateTime.Today); }
         private void ChipYtd_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; SetRange(new DateTime(DateTime.Today.Year, 1, 1), DateTime.Today); }
         private void Chip12m_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; SetRange(DateTime.Today.AddYears(-1), DateTime.Today); }
         private void ChipAll_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; SetRange(null, null); }
 
-        // Top N
         private void BtnTopNMinus_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; AdjustTopN(-1); }
         private void BtnTopNPlus_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; AdjustTopN(+1); }
         private void TopN_PreviewTextInput(object sender, TextCompositionEventArgs e) => e.Handled = !char.IsDigit(e.Text, 0);
         private void TopN_TextChanged(object sender, TextChangedEventArgs e) { if (!_uiReady) return; if (int.TryParse(_tbTopN.Text, out int n)) SetTopN(n); }
         private void ChipTop_Click(object sender, RoutedEventArgs e) { if (!_uiReady) return; if (sender is Button b && int.TryParse(b.Content?.ToString(), out int n)) SetTopN(n); }
 
-        // Actions
         private void OpenExcel_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; OpenExcel(); }
         private void ExportCsv_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; ExportCsv(); }
         private void ExportPng_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; ExportPng(); }
         private void Reset_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; ResetFilters(); }
 
-        // ===== UI helpers =====
         private void SetRange(DateTime? from, DateTime? to) { _dpFrom.SelectedDate = from; _dpTo.SelectedDate = to; RefreshAll(); }
         private void FocusSearch() => _tbSearch.Focus();
 
@@ -172,33 +171,31 @@ namespace BIMaestro.Dashboard
             _rows.Clear();
             if (!File.Exists(_excelPath)) return;
 
-            using (var pkg = new ExcelPackage(new FileInfo(_excelPath)))
+            using var pkg = new ExcelPackage(new FileInfo(_excelPath));
+            var ws = pkg.Workbook.Worksheets["Historique_Temps_Revit"];
+            if (ws == null || ws.Dimension == null) return;
+
+            int r0 = ws.Dimension.Start.Row + 1, rn = ws.Dimension.End.Row;
+            for (int r = r0; r <= rn; r++)
             {
-                var ws = pkg.Workbook.Worksheets["Historique_Temps_Revit"];
-                if (ws == null || ws.Dimension == null) return;
+                string ev = (ws.Cells[r, 1].Value ?? "").ToString();
+                if (string.IsNullOrWhiteSpace(ev)) continue;
+                string docId = (ws.Cells[r, 2].Value ?? "").ToString();
+                string docName = (ws.Cells[r, 3].Value ?? "").ToString();
+                string revitVer = (ws.Cells[r, 4].Value ?? "").ToString();
+                string dateStr = (ws.Cells[r, 5].Value ?? "").ToString();
+                string timeStr = (ws.Cells[r, 6].Value ?? "").ToString();
+                object durObj = ws.Cells[r, 7].Value;
 
-                int r0 = ws.Dimension.Start.Row + 1, rn = ws.Dimension.End.Row;
-                for (int r = r0; r <= rn; r++)
+                _rows.Add(new LogRow
                 {
-                    string ev = (ws.Cells[r, 1].Value ?? "").ToString();
-                    if (string.IsNullOrWhiteSpace(ev)) continue;
-                    string docId = (ws.Cells[r, 2].Value ?? "").ToString();
-                    string docName = (ws.Cells[r, 3].Value ?? "").ToString();
-                    string revitVer = (ws.Cells[r, 4].Value ?? "").ToString();
-                    string dateStr = (ws.Cells[r, 5].Value ?? "").ToString();
-                    string timeStr = (ws.Cells[r, 6].Value ?? "").ToString();
-                    object durObj = ws.Cells[r, 7].Value;
-
-                    _rows.Add(new LogRow
-                    {
-                        Event = ev,
-                        DocumentId = docId,
-                        DocumentName = docName,
-                        RevitVersion = revitVer,
-                        When = ParseDateTimeFlexible(dateStr, timeStr),
-                        Duration = ParseDurationFlexible(durObj)
-                    });
-                }
+                    Event = ev,
+                    DocumentId = docId,
+                    DocumentName = docName,
+                    RevitVersion = revitVer,
+                    When = ParseDateTimeFlexible(dateStr, timeStr),
+                    Duration = ParseDurationFlexible(durObj)
+                });
             }
         }
 
@@ -248,7 +245,7 @@ namespace BIMaestro.Dashboard
 
             IEnumerable<ProjectItem> seq = _projects ?? Enumerable.Empty<ProjectItem>();
             foreach (var p in seq)
-                p.Hours = _hoursByProject.ContainsKey(p.DocumentId) ? _hoursByProject[p.DocumentId] : 0.0;
+                p.Hours = _hoursByProject.TryGetValue(p.DocumentId, out double h) ? h : 0.0;
 
             if (!string.IsNullOrEmpty(q))
             {
@@ -296,7 +293,6 @@ namespace BIMaestro.Dashboard
 
             if (_tgOverview.IsChecked == true)
             {
-                // --------- APERÇU EN COLONNES (via RectangleBarSeries) ----------
                 var totals = closed
                     .Where(r => selected.Any(s => s.DocumentId == r.DocumentId))
                     .GroupBy(r => r.DocumentId)
@@ -315,39 +311,19 @@ namespace BIMaestro.Dashboard
 
                 var shown = top.Where(t => !_hiddenBars.Contains(t.Name)).ToList();
 
-                var catAxis = new CategoryAxis
-                {
-                    Position = AxisPosition.Bottom,  // noms en bas
-                    Angle = -50
-                };
+                var catAxis = new CategoryAxis { Position = AxisPosition.Bottom, Angle = -50 };
                 foreach (var t in shown) catAxis.Labels.Add(Short(t.Name));
                 model.Axes.Add(catAxis);
 
-                model.Axes.Add(new LinearAxis
-                {
-                    Position = AxisPosition.Left,
-                    Title = "heures (total)",
-                    Minimum = 0
-                });
-
+                model.Axes.Add(new LinearAxis { Position = AxisPosition.Left, Title = "heures (total)", Minimum = 0 });
                 model.Title = $"Temps passé — Aperçu (Top {topN})";
 
-                var rect = new RectangleBarSeries
-                {
-                    Title = $"Top {topN}",
-                    StrokeThickness = 0.5,
-                    FillColor = GetOxyColor(0)
-                    // (Optionnel) LabelFormatString disponible selon version
-                    // LabelFormatString = "{4:0.00} h"
-                };
-
+                var rect = new RectangleBarSeries { Title = $"Top {topN}", StrokeThickness = 0.5, FillColor = GetOxyColor(0) };
                 for (int i = 0; i < shown.Count; i++)
                 {
                     double v = Math.Round(shown[i].Hours, 2);
-                    // rectangle centré sur la catégorie i, de 0 à v (barre verticale)
                     rect.Items.Add(new RectangleBarItem(i - 0.4, 0, i + 0.4, v));
                 }
-
                 model.Series.Add(rect);
 
                 if (_cbLegend.IsChecked == true)
@@ -372,7 +348,6 @@ namespace BIMaestro.Dashboard
             }
             else
             {
-                // --------- COMPARER (courbes) ----------
                 Func<DateTime, DateTime> bucket = dt =>
                 {
                     if (gran == AutoGran.Week) return StartOfIsoWeek(dt);
@@ -412,7 +387,7 @@ namespace BIMaestro.Dashboard
                     {
                         Title = legend,
                         StrokeThickness = 2.5,
-                        MarkerType = OxyPlot.MarkerType.Circle,   // <- évite l’ambiguïté
+                        MarkerType = MarkerType.Circle,
                         MarkerSize = 3.5,
                         Color = GetOxyColor(idx),
                         TrackerFormatString = "{0}\n{1}: {2:0.00} h"
@@ -466,7 +441,7 @@ namespace BIMaestro.Dashboard
                                   .Where(r => selected.Contains(r.DocumentId));
 
             var inRangeWeekdays = inRangeAll
-                .Where(r => r.When.DayOfWeek != DayOfWeek.Saturday && r.When.DayOfWeek != DayOfWeek.Sunday)
+                .Where(r => r.When.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday)
                 .ToList();
 
             double totalH = inRangeWeekdays.Sum(r => r.Duration.TotalHours);
@@ -479,7 +454,6 @@ namespace BIMaestro.Dashboard
             _kpiAvg.Text = avg.ToString("0.0") + " h";
         }
 
-        // ===== ACTIONS =====
         private void ExportPng()
         {
             var dlg = new Microsoft.Win32.SaveFileDialog { FileName = "dashboard_temps.png", Filter = "Image PNG|*.png" };
@@ -559,7 +533,6 @@ namespace BIMaestro.Dashboard
             RefreshAll();
         }
 
-        // ===== PREFS =====
         private void LoadPrefs()
         {
             try
@@ -606,7 +579,6 @@ namespace BIMaestro.Dashboard
             catch { }
         }
 
-        // ===== TOP N =====
         private int GetTopN() { if (!int.TryParse(_tbTopN.Text, out int n)) n = DEFAULT_TOP_N; return ClampInt(n, TOP_N_MIN, TOP_N_MAX); }
         private void SetTopN(int n) { _tbTopN.Text = ClampInt(n, TOP_N_MIN, TOP_N_MAX).ToString(); if (_uiReady) { DrawChart(); SavePrefs(); } }
         private void AdjustTopN(int delta) => SetTopN(GetTopN() + delta);
@@ -657,11 +629,20 @@ namespace BIMaestro.Dashboard
         {
             if (string.IsNullOrWhiteSpace(id)) return "(id)";
             string s = id;
-            int i = s.LastIndexOf('|'); if (i >= 0 && i < s.Length - 1) s = s.Substring(i + 1);
-            int j1 = s.LastIndexOf('\\'); int j2 = s.LastIndexOf('/'); int j = (j1 > j2) ? j1 : j2;
-            if (j >= 0 && j < s.Length - 1) s = s.Substring(j + 1);
+
+            int i = s.LastIndexOf('|');
+            if (i >= 0 && i < s.Length - 1)
+                s = s.Substring(i + 1);
+
+            int j1 = s.LastIndexOf('\\');
+            int j2 = s.LastIndexOf('/');
+            int j = (j1 > j2) ? j1 : j2;
+            if (j >= 0 && j < s.Length - 1)
+                s = s.Substring(j + 1);
+
             return s;
         }
+
 
         private static DateTime StartOfIsoWeek(DateTime dt)
         {
@@ -745,7 +726,6 @@ namespace BIMaestro.Dashboard
         private static int ClampInt(int value, int min, int max) { if (value < min) return min; if (value > max) return max; return value; }
         private static double ClampDouble(double value, double min, double max) { if (value < min) return min; if (value > max) return max; return value; }
 
-        // Render helpers
         private static System.Windows.Media.Imaging.BitmapSource RenderVisualToBitmap(FrameworkElement element)
         {
             element.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
@@ -761,12 +741,27 @@ namespace BIMaestro.Dashboard
             var bmp = RenderVisualToBitmap(element);
             var enc = new System.Windows.Media.Imaging.PngBitmapEncoder();
             enc.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bmp));
-            using (var fs = new FileStream(path, FileMode.Create, FileAccess.Write)) enc.Save(fs);
+            using var fs = new FileStream(path, FileMode.Create, FileAccess.Write);
+            enc.Save(fs);
         }
 
         // ===== Models & Prefs =====
+        // Ces classes sont utilisées par le XAML (Binding). Il FAUT conserver les noms publics.
+        [Obfuscation(Exclude = true, ApplyToMembers = true, StripAfterObfuscation = false)]
         private class LogRow { public string Event, DocumentId, DocumentName, RevitVersion; public DateTime When; public TimeSpan Duration; }
-        private class ProjectItem { public string DocumentId { get; set; } public string Name { get; set; } public string BaseName { get; set; } public string Folder { get; set; } public string Tail { get; set; } public double Hours { get; set; } }
+
+        [Obfuscation(Exclude = true, ApplyToMembers = true, StripAfterObfuscation = false)]
+        private class ProjectItem
+        {
+            public string DocumentId { get; set; }
+            public string Name { get; set; }
+            public string BaseName { get; set; }
+            public string Folder { get; set; }
+            public string Tail { get; set; }
+            public double Hours { get; set; }
+        }
+
+        [Obfuscation(Exclude = true, ApplyToMembers = true, StripAfterObfuscation = false)]
         private class LegendItemVM : System.ComponentModel.INotifyPropertyChanged
         {
             private bool _isChecked = true;
@@ -778,8 +773,19 @@ namespace BIMaestro.Dashboard
             public event System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
         }
 
-        private class Prefs { public DateTime? From { get; set; } public DateTime? To { get; set; } public string Sort { get; set; } = "HoursDesc"; public int TopN { get; set; } = DEFAULT_TOP_N; public string Mode { get; set; } = "Overview"; public bool LegendShown { get; set; } = false; public bool ShowFolder { get; set; } = false; }
+        [Obfuscation(Exclude = true, ApplyToMembers = true, StripAfterObfuscation = false)]
+        private class Prefs
+        {
+            public DateTime? From { get; set; }
+            public DateTime? To { get; set; }
+            public string Sort { get; set; } = "HoursDesc";
+            public int TopN { get; set; } = DEFAULT_TOP_N;
+            public string Mode { get; set; } = "Overview";
+            public bool LegendShown { get; set; } = false;
+            public bool ShowFolder { get; set; } = false;
+        }
 
+        [Obfuscation(Exclude = true, ApplyToMembers = true, StripAfterObfuscation = false)]
         private class RelayCommand : ICommand
         {
             private readonly Action<object> _act; public RelayCommand(Action<object> act) { _act = act; }

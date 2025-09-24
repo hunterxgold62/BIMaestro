@@ -101,6 +101,7 @@ namespace Famille
 
                 // Analytics facultatif
                 FamilyUsageManager.RegisterUse(FamilyPath);
+                FamilyRecentManager.RegisterUse(FamilyPath);
             }
             catch (Exception ex)
             {

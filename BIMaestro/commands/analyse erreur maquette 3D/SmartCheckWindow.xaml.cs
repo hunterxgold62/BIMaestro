@@ -1,7 +1,6 @@
 ﻿using Autodesk.Revit.DB;
 using Autodesk.Revit.Exceptions;
 using Autodesk.Revit.UI;
-using DocumentFormat.OpenXml.Wordprocessing;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,7 +10,7 @@ using System.Windows.Controls;
 
 namespace Analyse
 {
-    public partial class SmartCheckWindow : System.Windows.Window
+    public partial class SmartCheckWindow : Window
     {
         private readonly ExternalEvent _extEvent;
         private readonly SmartExternalHandler _handler;
@@ -48,6 +47,9 @@ namespace Analyse
             GridMEP.ItemsSource = _mepNoSleeve.Where(i => !i.Ignored).ToList();
             GridOpen.ItemsSource = _openConnectors.Where(i => !i.Ignored).ToList();
         }
+
+        private static bool IsValidId(ElementId id)
+            => id != null && id != ElementId.InvalidElementId && id.IntegerValue > 0;
 
         private string CurrentTabName() => (Tabs.SelectedItem as TabItem)?.Header?.ToString() ?? "Toutes";
 
@@ -92,15 +94,26 @@ namespace Analyse
             SafeRaise();
         }
 
-        // ----- Afficher toutes les erreurs : action atomique -----
+        // ----- Afficher toutes les erreurs (atomique) -----
         private void OnShowAll(object sender, RoutedEventArgs e)
         {
-            var ids = IssuesForCurrentTab().Select(i => i.ElementId).Distinct().ToList();
+            var ids = IssuesForCurrentTab()
+                .Select(i => i.ElementId)
+                .Where(IsValidId)
+                .Distinct(new IdCmp())
+                .ToList();
+
             _handler.AllIssueIds = ids;
             _handler.ShowAllEnabled = (BtnShowAll.IsChecked == true);
 
             _handler.Action = SmartAction.ShowAllApply;
             SafeRaise();
+        }
+
+        private class IdCmp : IEqualityComparer<ElementId>
+        {
+            public bool Equals(ElementId a, ElementId b) => (a?.IntegerValue ?? int.MinValue) == (b?.IntegerValue ?? int.MinValue);
+            public int GetHashCode(ElementId obj) => obj?.IntegerValue.GetHashCode() ?? 0;
         }
 
         private void OnPrev(object sender, RoutedEventArgs e)
@@ -121,17 +134,15 @@ namespace Analyse
 
         private void DoFocus(ModelIssue issue, bool keepShowAll)
         {
-            // sélection logique (onglet "Toutes")
             GridAll.SelectedItem = issue;
             GridAll.ScrollIntoView(issue);
 
-            // Focus atomique (Ensure3D + Focus + Zoom)
             _handler.Action = SmartAction.FocusApply;
-            _handler.IssueId = issue.ElementId;
-            _handler.RelatedId = issue.RelatedId;
+            _handler.IssueId = issue.ElementId ?? ElementId.InvalidElementId;
+            _handler.RelatedId = issue.RelatedId ?? ElementId.InvalidElementId;
             _handler.CurrentKind = issue.Kind;
             _handler.IssueBox = issue.BBox;
-            _handler.ShowAllMode = keepShowAll; // si ShowAll ON, on ne reset pas les overrides
+            _handler.ShowAllMode = keepShowAll;
             _handler.AutoSectionBox = true;
             SafeRaise();
         }
@@ -156,14 +167,10 @@ namespace Analyse
         }
 
         /// <summary>
-        /// Lancement sécurisé de l'ExternalEvent :
-        /// - évite "already raised" si un event est en cours,
-        /// - retente après un court délai,
-        /// - catch l'exception Revit si malgré tout ça rebondit.
+        /// Lancement sécurisé de l'ExternalEvent (anti "already raised").
         /// </summary>
         private async void SafeRaise()
         {
-            // évite spam : si le handler est encore en train d'exécuter, on attend un peu
             int tries = 0;
             while (SmartExternalHandler.IsExecuting && tries < 20)
             {
@@ -177,14 +184,10 @@ namespace Analyse
             }
             catch (ExternalApplicationException)
             {
-                // "ExternalEvent is already raised" -> on retente une fois après un court délai
                 await Task.Delay(50);
-                try { _extEvent.Raise(); } catch { /* on abandonne silencieusement */ }
+                try { _extEvent.Raise(); } catch { }
             }
-            catch
-            {
-                // on évite de casser le thread WPF
-            }
+            catch { /* rien */ }
         }
     }
 }

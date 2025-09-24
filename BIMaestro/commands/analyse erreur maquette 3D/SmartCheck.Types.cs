@@ -15,16 +15,17 @@ namespace Analyse
     {
         SelectOnly,
         Ensure3D,
-        FocusIssue,     // legacy (gardé si tu l’utilises encore)
-        FocusApply,     // ✅ nouveau : Ensure3D + Focus + Zoom en un seul event
-        ShowAllApply,   // action atomique ON/OFF
+        FocusIssue,     // legacy
+        FocusApply,     // Ensure3D + Focus + Zoom
+        ShowAllApply,   // toggle ON/OFF
         MarkIgnored
     }
 
     public class ModelIssue
     {
-        public ElementId ElementId { get; set; }      // élément principal (ex: MEP)
-        public ElementId RelatedId { get; set; }      // élément lié (ex: mur traversé)
+        // Par défaut -> jamais null
+        public ElementId ElementId { get; set; } = ElementId.InvalidElementId;  // élément principal (ex: MEP)
+        public ElementId RelatedId { get; set; } = ElementId.InvalidElementId;  // élément lié (ex: mur traversé)
         public IssueKind Kind { get; set; }
         public string Category { get; set; }
         public string Message { get; set; }

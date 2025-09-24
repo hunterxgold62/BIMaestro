@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -18,12 +16,13 @@ namespace BIMaestro.UI
 {
     public partial class RadialMenuWindow : Window
     {
-        public event Action<bool, int> Completed; // (accepted, index 0..7)
+        public event Action<bool, int, RadialItem> Completed;
+        public event Action<RadialItem> ReloadRequested; // <<< nouveau
 
-        private readonly List<string> _allImages;
+        private readonly List<RadialItem> _items; // 24 attendus
         private int _pageIndex = 0;
         private const int PAGE_SIZE = 8;
-        private readonly string[] _currentPageImages = new string[PAGE_SIZE];
+        private readonly RadialItem[] _currentPageItems = new RadialItem[PAGE_SIZE];
 
         private readonly int _screenXpx;
         private readonly int _screenYpx;
@@ -39,10 +38,6 @@ namespace BIMaestro.UI
         private readonly Color _sectorStroke = Color.FromArgb(160, 150, 150, 160);
         private readonly Color _accent = (Color)ColorConverter.ConvertFromString("#3A86FF");
 
-        public int SelectedIndex { get; private set; } = -1;
-        public bool Accepted { get; private set; } = false;
-        private bool _closingPosted = false;
-
         private readonly List<Path> _sectors = new();
         private readonly List<Border> _iconBorders = new();
         private Path _hoverOutlinePath;
@@ -50,17 +45,21 @@ namespace BIMaestro.UI
         private Image _centerPreview;
         private Polygon _leftArrow;
         private Polygon _rightArrow;
-        private TextBlock _centerLabel;    // << libellé “top-8 / cmd récent”
+        private TextBlock _centerLabel;
 
         private static readonly Dictionary<string, BitmapImage> s_ImageCache =
             new Dictionary<string, BitmapImage>(StringComparer.OrdinalIgnoreCase);
         private const int CACHE_MAX = 256;
 
-        public RadialMenuWindow(List<string> allImages, int screenXpx, int screenYpx)
+        private DateTime _canCloseAfter = DateTime.MaxValue;
+        private bool _closing;
+
+        public RadialMenuWindow(List<RadialItem> items, int screenXpx, int screenYpx)
         {
             InitializeComponent();
-            _allImages = (allImages ?? new List<string>()).ToList();
-            Shuffle(_allImages);
+            _items = items ?? new List<RadialItem>();
+            while (_items.Count < 24) _items.Add(new RadialItem());
+
             _screenXpx = screenXpx;
             _screenYpx = screenYpx;
 
@@ -69,6 +68,8 @@ namespace BIMaestro.UI
             this.Height = diameter;
 
             Loaded += Window_Loaded;
+            Unloaded += Window_Unloaded;
+
             KeyDown += Window_KeyDown;
             Deactivated += Window_Deactivated;
         }
@@ -84,16 +85,58 @@ namespace BIMaestro.UI
 
             BuildWheel();
             LoadPage(0);
-            UpdatePageLabel(); // => "top-8"
+            UpdatePageLabel();
             this.Focus();
+
+            _canCloseAfter = DateTime.UtcNow.AddMilliseconds(250);
+
+            Mouse.Capture(RootCanvas, CaptureMode.SubTree);
+            Mouse.AddPreviewMouseDownOutsideCapturedElementHandler(RootCanvas, OnClickOutsideCaptured);
+            try { Application.Current.Deactivated += App_Deactivated; } catch { }
 
             RootCanvas.Opacity = 0;
             var fade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(120)) { EasingFunction = new QuadraticEase() };
             RootCanvas.BeginAnimation(UIElement.OpacityProperty, fade);
         }
 
-        private void Window_Deactivated(object? sender, EventArgs e) => SafeComplete(false, -1);
-        private void Window_KeyDown(object sender, KeyEventArgs e) { if (e.Key == Key.Escape) SafeComplete(false, -1); }
+        private void Window_Unloaded(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (Mouse.Captured == RootCanvas) Mouse.Capture(null);
+                Mouse.RemovePreviewMouseDownOutsideCapturedElementHandler(RootCanvas, OnClickOutsideCaptured);
+                try { Application.Current.Deactivated -= App_Deactivated; } catch { }
+            }
+            catch { }
+        }
+
+        private void OnClickOutsideCaptured(object sender, MouseButtonEventArgs e)
+        {
+            if (_closing) return;
+            if (DateTime.UtcNow < _canCloseAfter) return;
+            e.Handled = true;
+            SafeComplete(false, -1, null);
+        }
+
+        private void App_Deactivated(object? sender, EventArgs e)
+        {
+            if (_closing) return;
+            if (DateTime.UtcNow < _canCloseAfter) return;
+            SafeComplete(false, -1, null);
+        }
+
+        private void Window_Deactivated(object? sender, EventArgs e)
+        {
+            if (_closing) return;
+            if (DateTime.UtcNow < _canCloseAfter) return;
+            SafeComplete(false, -1, null);
+        }
+
+        private void Window_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (_closing) return;
+            if (e.Key == Key.Escape) SafeComplete(false, -1, null);
+        }
 
         private void BuildWheel()
         {
@@ -134,10 +177,9 @@ namespace BIMaestro.UI
             Canvas.SetTop(_centerPreview, cy - _centerPreview.Height / 2.0);
             RootCanvas.Children.Add(_centerPreview);
 
-            // --- libellé centré AU-DESSUS de l'image centrale (ajustement dynamique) ---
             _centerLabel = new TextBlock
             {
-                Text = "top-8",
+                Text = "Top-8",
                 Foreground = new SolidColorBrush(Color.FromArgb(230, 60, 60, 80)),
                 FontSize = 12,
                 FontWeight = FontWeights.SemiBold,
@@ -146,20 +188,18 @@ namespace BIMaestro.UI
                 Opacity = 0.95
             };
             Canvas.SetLeft(_centerLabel, cx - _centerLabel.Width / 2.0);
-
-            // Place le texte juste au-dessus de l'aperçu central (plus bas qu'avant)
-            double labelTop = cy - (_centerPreview.Height / 2.0) - 16; // 16 px d’espace
+            double labelTop = cy - (_centerPreview.Height / 2.0) - 16;
             Canvas.SetTop(_centerLabel, labelTop);
             RootCanvas.Children.Add(_centerLabel);
 
             _leftArrow = MakeArrowPolygon(isRight: false, size: 18);
             PositionArrow(_leftArrow, cx - INNER_R * 0.65, cy);
-            _leftArrow.MouseLeftButtonUp += (s, e) => { e.Handled = true; PrevPage(); };
+            _leftArrow.MouseLeftButtonUp += (s, e) => { if (_closing) return; e.Handled = true; PrevPage(); };
             RootCanvas.Children.Add(_leftArrow);
 
             _rightArrow = MakeArrowPolygon(isRight: true, size: 18);
             PositionArrow(_rightArrow, cx + INNER_R * 0.65, cy);
-            _rightArrow.MouseLeftButtonUp += (s, e) => { e.Handled = true; NextPage(); };
+            _rightArrow.MouseLeftButtonUp += (s, e) => { if (_closing) return; e.Handled = true; NextPage(); };
             RootCanvas.Children.Add(_rightArrow);
 
             _hoverOutlinePath = new Path
@@ -183,13 +223,19 @@ namespace BIMaestro.UI
                 sector.StrokeThickness = 1.0;
                 sector.Tag = idx;
 
-                sector.MouseEnter += (_, __) => SetHover(idx);
+                // clic gauche = placer
+                sector.MouseEnter += (_, __) => { if (!_closing) SetHover(idx); };
                 sector.MouseLeftButtonUp += (s, e) =>
                 {
+                    if (_closing) return;
                     e.Handled = true;
-                    if (!string.IsNullOrEmpty(_currentPageImages[idx]))
-                        SafeComplete(true, idx);
+                    var item = _currentPageItems[idx];
+                    if (item != null && !string.IsNullOrEmpty(item.FamilyPath))
+                        SafeComplete(true, _pageIndex * PAGE_SIZE + idx, item);
                 };
+
+                // >>> clic droit = context menu "Recharger dernière version"
+                sector.ContextMenu = BuildContextMenu(idx);
 
                 _sectors.Add(sector);
                 RootCanvas.Children.Add(sector);
@@ -206,13 +252,18 @@ namespace BIMaestro.UI
                     RenderTransform = new ScaleTransform(1.0, 1.0)
                 };
 
-                border.MouseEnter += (_, __) => SetHover(idx);
+                border.MouseEnter += (_, __) => { if (!_closing) SetHover(idx); };
                 border.MouseLeftButtonUp += (s, e) =>
                 {
+                    if (_closing) return;
                     e.Handled = true;
-                    if (!string.IsNullOrEmpty(_currentPageImages[idx]))
-                        SafeComplete(true, idx);
+                    var item = _currentPageItems[idx];
+                    if (item != null && !string.IsNullOrEmpty(item.FamilyPath))
+                        SafeComplete(true, _pageIndex * PAGE_SIZE + idx, item);
                 };
+
+                // >>> clic droit sur l’icône = même menu
+                border.ContextMenu = BuildContextMenu(idx);
 
                 double midDeg = start + actualSweep / 2.0;
                 double midRad = midDeg * Math.PI / 180.0;
@@ -226,37 +277,44 @@ namespace BIMaestro.UI
                 RootCanvas.Children.Add(border);
             }
 
-            RootCanvas.MouseLeftButtonUp += (s, e) => { if (!e.Handled) SafeComplete(false, -1); };
+            RootCanvas.MouseLeftButtonUp += (s, e) =>
+            {
+                if (_closing) return;
+                if (!e.Handled && DateTime.UtcNow >= _canCloseAfter)
+                    SafeComplete(false, -1, null);
+            };
         }
 
-        // --- pagination ---
-        private int PageCount => Math.Max(1, (_allImages.Count + PAGE_SIZE - 1) / PAGE_SIZE);
+        // Construit un menu contextuel “Recharger la dernière version…”
+        private ContextMenu BuildContextMenu(int idx)
+        {
+            var cm = new ContextMenu();
+            var mi = new MenuItem { Header = "Recharger la dernière version" };
+            mi.Click += (s, e) =>
+            {
+                var item = _currentPageItems[idx];
+                if (item == null || string.IsNullOrWhiteSpace(item.FamilyPath)) return;
 
-        private void PrevPage()
-        {
-            if (_allImages.Count == 0) return;
-            _pageIndex = (_pageIndex - 1 + PageCount) % PageCount;
-            LoadPage(_pageIndex);
-            UpdatePageLabel();
+                try { ReloadRequested?.Invoke(item); } catch { }
+                SafeComplete(false, -1, null); // on ferme la rosace après l’action
+            };
+            cm.Items.Add(mi);
+            return cm;
         }
-        private void NextPage()
-        {
-            if (_allImages.Count == 0) return;
-            _pageIndex = (_pageIndex + 1) % PageCount;
-            LoadPage(_pageIndex);
-            UpdatePageLabel();
-        }
+
+        private int PageCount => 3;
+
+        private void PrevPage() { _pageIndex = (_pageIndex - 1 + PageCount) % PageCount; LoadPage(_pageIndex); UpdatePageLabel(); }
+        private void NextPage() { _pageIndex = (_pageIndex + 1) % PageCount; LoadPage(_pageIndex); UpdatePageLabel(); }
 
         private void LoadPage(int index)
         {
             _pageIndex = index;
-            Array.Clear(_currentPageImages, 0, _currentPageImages.Length);
-            int start = index * PAGE_SIZE;
+            Array.Clear(_currentPageItems, 0, _currentPageItems.Length);
+
+            int offset = index * PAGE_SIZE;
             for (int i = 0; i < PAGE_SIZE; i++)
-            {
-                int g = start + i;
-                _currentPageImages[i] = (g < _allImages.Count) ? _allImages[g] : null;
-            }
+                _currentPageItems[i] = (offset + i < _items.Count) ? _items[offset + i] : null;
 
             _hoverOutlinePath.Visibility = Visibility.Collapsed;
             _centerPreview.Source = null;
@@ -264,21 +322,26 @@ namespace BIMaestro.UI
             for (int i = 0; i < _iconBorders.Count; i++)
             {
                 var img = (Image)_iconBorders[i].Child;
-                var src = LoadImage(_currentPageImages[i]);
+                var item = _currentPageItems[i];
+                var src = LoadImage(item?.ImagePath);
                 img.Source = src;
-                _iconBorders[i].Opacity = (src == null) ? 0.3 : 1.0;
+                _iconBorders[i].Opacity = (item == null || string.IsNullOrEmpty(item.FamilyPath)) ? 0.2 : 1.0;
 
                 var tr = (ScaleTransform)_iconBorders[i].RenderTransform;
                 tr.ScaleX = tr.ScaleY = 1.0;
             }
         }
 
-        // --- libellé central : "top-8" ou "cmd récent" ---
         private void UpdatePageLabel()
         {
             if (_centerLabel == null) return;
-
-            _centerLabel.Text = (_pageIndex == 0) ? "top-8" : "cmd récent";
+            _centerLabel.Text = _pageIndex switch
+            {
+                0 => "Top-8",
+                1 => "Récents (1/2)",
+                2 => "Récents (2/2)",
+                _ => ""
+            };
 
             _centerLabel.Opacity = 0;
             var fade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(120)) { EasingFunction = new QuadraticEase() };
@@ -304,25 +367,26 @@ namespace BIMaestro.UI
             _hoverOutlinePath.Data = _sectors[i].Data?.CloneCurrentValue();
             _hoverOutlinePath.Visibility = Visibility.Visible;
 
-            _centerPreview.Source = LoadImage(_currentPageImages[i]);
+            var item = _currentPageItems[i];
+            _centerPreview.Source = LoadImage(item?.ImagePath);
         }
 
-        private void SafeComplete(bool accepted, int index)
+        private void SafeComplete(bool accepted, int globalIndex, RadialItem item)
         {
-            if (_closingPosted) return;
-            _closingPosted = true;
-            Accepted = accepted;
-            SelectedIndex = index;
+            if (_closing) return;
+            _closing = true;
 
-            try { Completed?.Invoke(Accepted, SelectedIndex); } catch { }
+            try { Completed?.Invoke(accepted, globalIndex, item); } catch { }
+
+            try { if (Mouse.Captured == RootCanvas) Mouse.Capture(null); } catch { }
+            try { Close(); } catch { }
 
             Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
             {
-                try { Close(); } catch { }
+                try { if (IsVisible) Close(); } catch { }
             }));
         }
 
-        // --- helpers ---
         private static Path CreateSector(Point center, double innerR, double outerR, double startDeg, double sweepDeg)
         {
             double start = startDeg * Math.PI / 180.0;
@@ -333,15 +397,15 @@ namespace BIMaestro.UI
             Point p3 = new(center.X + innerR * Math.Cos(end), center.Y + innerR * Math.Sin(end));
             Point p4 = new(center.X + innerR * Math.Cos(start), center.Y + innerR * Math.Sin(start));
 
-            bool isLargeArc = sweepDeg > 180.0;
+            bool large = sweepDeg > 180.0;
 
             var geo = new StreamGeometry();
             using (var ctx = geo.Open())
             {
                 ctx.BeginFigure(p1, true, true);
-                ctx.ArcTo(p2, new Size(outerR, outerR), 0, isLargeArc, SweepDirection.Clockwise, true, true);
+                ctx.ArcTo(p2, new Size(outerR, outerR), 0, large, SweepDirection.Clockwise, true, true);
                 ctx.LineTo(p3, true, true);
-                ctx.ArcTo(p4, new Size(innerR, innerR), 0, isLargeArc, SweepDirection.Counterclockwise, true, true);
+                ctx.ArcTo(p4, new Size(innerR, innerR), 0, large, SweepDirection.Counterclockwise, true, true);
             }
             geo.Freeze();
             return new Path { Data = geo };
@@ -356,9 +420,9 @@ namespace BIMaestro.UI
                 StrokeThickness = 1.1,
                 Points = new PointCollection(new[]
                 {
-                    new Point(isRight ? -size/2 : size/2, -size/1.6),
-                    new Point(isRight ? -size/2 : size/2,  size/1.6),
-                    new Point(isRight ?  size/2 : -size/2, 0)
+                    new Point(isRight ? -size/2 :  size/2, -size/1.6),
+                    new Point(isRight ? -size/2 :  size/2,  size/1.6),
+                    new Point(isRight ?  size/2 : -size/2,  0)
                 })
             };
             poly.Effect = new DropShadowEffect { Color = Colors.Black, BlurRadius = 6, ShadowDepth = 0, Opacity = 0.25 };
@@ -386,60 +450,25 @@ namespace BIMaestro.UI
             Canvas.SetTop(arrow, centerY - arrow.StrokeThickness);
         }
 
-        private static void Shuffle<T>(IList<T> list)
+        private static BitmapImage LoadImage(string path)
         {
-            var rng = new Random();
-            for (int n = list.Count - 1; n > 0; n--)
-            {
-                int k = rng.Next(n + 1);
-                (list[n], list[k]) = (list[k], list[n]);
-            }
-        }
-
-        private static BitmapImage LoadImage(string pathOrResource)
-        {
-            if (string.IsNullOrWhiteSpace(pathOrResource)) return null;
-
-            if (s_ImageCache.TryGetValue(pathOrResource, out var cached))
-                return cached;
+            if (string.IsNullOrWhiteSpace(path)) return null;
+            if (s_ImageCache.TryGetValue(path, out var cached)) return cached;
 
             try
             {
-                BitmapImage bmp = null;
+                var bi = new BitmapImage();
+                bi.BeginInit();
+                bi.UriSource = new Uri(path, UriKind.Absolute);
+                bi.CacheOption = BitmapCacheOption.OnLoad;
+                bi.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
+                bi.DecodePixelWidth = 256;
+                bi.EndInit();
+                bi.Freeze();
 
-                if (File.Exists(pathOrResource))
-                {
-                    using (var fs = new FileStream(pathOrResource, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                    {
-                        bmp = new BitmapImage();
-                        bmp.BeginInit();
-                        bmp.CacheOption = BitmapCacheOption.OnLoad;
-                        bmp.StreamSource = fs;
-                        bmp.EndInit();
-                        bmp.Freeze();
-                    }
-                }
-                else
-                {
-                    var asm = Assembly.GetExecutingAssembly();
-                    using (var s = asm.GetManifestResourceStream(pathOrResource))
-                    {
-                        if (s == null) return null;
-                        bmp = new BitmapImage();
-                        bmp.BeginInit();
-                        bmp.CacheOption = BitmapCacheOption.OnLoad;
-                        bmp.StreamSource = s;
-                        bmp.EndInit();
-                        bmp.Freeze();
-                    }
-                }
-
-                if (bmp != null)
-                {
-                    if (s_ImageCache.Count >= CACHE_MAX) s_ImageCache.Clear();
-                    s_ImageCache[pathOrResource] = bmp;
-                }
-                return bmp;
+                if (s_ImageCache.Count >= CACHE_MAX) s_ImageCache.Clear();
+                s_ImageCache[path] = bi;
+                return bi;
             }
             catch { return null; }
         }

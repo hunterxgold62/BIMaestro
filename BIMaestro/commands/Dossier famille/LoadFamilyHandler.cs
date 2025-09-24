@@ -77,6 +77,7 @@ namespace Famille
             uidoc.Selection.SetElementIds(new List<ElementId> { symbol.Id });
             uidoc.PostRequestForElementTypePlacement(symbol);
             FamilyUsageManager.RegisterUse(FamilyPath);
+            FamilyRecentManager.RegisterUse(FamilyPath);
         }
 
         public string GetName() => "LoadFamilyHandler";

@@ -205,16 +205,25 @@ namespace Licensing
             {
                 if (!File.Exists(_queueFile)) return;
                 var txt = File.ReadAllText(_queueFile);
-                if (string.IsNullOrWhiteSpace(txt)) return;
-                var disk = JsonConvert.DeserializeObject<List<UsageEvent>>(txt);
-                if (disk == null || disk.Count == 0) return;
+                if (string.IsNullOrWhiteSpace(txt)) { File.Delete(_queueFile); return; }
+
+                var disk = JsonConvert.DeserializeObject<List<UsageEvent>>(txt) ?? new List<UsageEvent>();
+
+                // >>> filtre anti-boucle : on garde seulement les events valides
+                disk = disk.FindAll(e => e != null && !string.IsNullOrWhiteSpace(e.button_id));
+
+                if (disk.Count == 0) { File.Delete(_queueFile); return; }
 
                 lock (_lock) { _buffer.AddRange(disk); }
                 File.Delete(_queueFile);
                 WriteLog($"[Restore] restored {disk.Count} events from disk");
             }
-            catch (Exception ex) { WriteLog("[Restore] EX: " + ex.Message); }
+            catch (Exception ex)
+            {
+                WriteLog("[Restore] EX: " + ex.Message);
+            }
         }
+
 
         private static void WriteLog(string line)
         {
