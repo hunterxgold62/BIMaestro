@@ -6,6 +6,7 @@
         Background="Transparent"
         ShowInTaskbar="False"
         Topmost="True"
+        PreviewMouseWheel="OnWheelScroll"
         ResizeMode="NoResize"
         WindowStartupLocation="Manual"
         Width="1" Height="1"

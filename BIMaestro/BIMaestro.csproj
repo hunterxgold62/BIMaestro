@@ -48,6 +48,9 @@
     <PackageReference Include="EPPlus">
       <Version>8.0.8</Version>
     </PackageReference>
+    <PackageReference Include="HelixToolkit.Wpf">
+      <Version>2.27.3</Version>
+    </PackageReference>
     <PackageReference Include="Markdown.Xaml">
       <Version>1.0.0</Version>
     </PackageReference>
@@ -323,6 +326,13 @@
     <Compile Include="commands\Dossier famille\ImageResolver.cs" />
     <Compile Include="commands\Dossier famille\LoadCollectionHandler.cs" />
     <Compile Include="commands\Dossier famille\LoadFamilyHandler.cs" />
+    <Compile Include="commands\Dossier famille\orbit 3D\FamilyMeshExtractor.cs" />
+    <Compile Include="commands\Dossier famille\orbit 3D\FamilyPreviewBridge.cs" />
+    <Compile Include="commands\Dossier famille\orbit 3D\MeshData.cs" />
+    <Compile Include="commands\Dossier famille\orbit 3D\Family3DPreviewWindow.xaml.cs">
+      <DependentUpon>Family3DPreviewWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\Dossier famille\orbit 3D\PreviewExportContext.cs" />
     <Compile Include="commands\Dossier famille\ReloadFamilyHandler.cs" />
     <Compile Include="commands\Dossier famille\image native de revit\ShellThumbnailProvider.cs" />
     <Compile Include="commands\Dossier famille\roue de gta\CatalogImageResolver.cs" />
@@ -498,6 +508,10 @@
     <Page Include="commands\Dossier famille\FamilyBrowserPlugin.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\Dossier famille\orbit 3D\Family3DPreviewWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="commands\Dossier famille\roue de gta\RadialMenuWindow.xaml">
       <Generator>MSBuild:Compile</Generator>

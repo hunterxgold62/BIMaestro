@@ -23,6 +23,12 @@ namespace Visualisation
         /// </summary>
         public List<string> ExcludedSubFamilies { get; private set; }
 
+        /// <summary>
+        /// True = appliquer à toute la maquette (ignore la vue active).
+        /// False = se limiter à la vue active (comportement historique).
+        /// </summary>
+        public bool ScopeEntireModel { get; private set; } = false;
+
         private List<FamilyItem> AllFamilyItems { get; set; }
 
         public FamilySelectionWindow(List<string> families)
@@ -37,7 +43,6 @@ namespace Visualisation
             // Construire l'arborescence
             foreach (var fam in families)
             {
-                // Trim() pour éviter les espaces parasites
                 string family = fam.Trim();
 
                 if (family.Contains(":"))
@@ -66,6 +71,9 @@ namespace Visualisation
 
         private void FinishButton_Click(object sender, RoutedEventArgs e)
         {
+            // Récupérer la portée
+            ScopeEntireModel = (EntireModelCheckBox.IsChecked == true);
+
             // Vider les listes
             SelectedParentFamilies.Clear();
             SelectedSubFamilies.Clear();
@@ -124,9 +132,7 @@ namespace Visualisation
             {
                 family.IsSelected = true;
                 foreach (var child in family.SubFamilies)
-                {
                     child.IsSelected = true;
-                }
             }
         }
 
@@ -139,9 +145,7 @@ namespace Visualisation
             {
                 family.IsSelected = false;
                 foreach (var child in family.SubFamilies)
-                {
                     child.IsSelected = false;
-                }
             }
         }
     }

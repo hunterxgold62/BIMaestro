@@ -16,9 +16,7 @@ namespace Visualisation
 
         /// <summary>
         /// Case à cocher du parent :
-        /// - Maintenant on PROPAGE dans les deux sens.
-        ///   * parent = true  ⇒ tous les enfants = true
-        ///   * parent = false ⇒ tous les enfants = false
+        /// - Propagation dans les deux sens (parent -> enfants).
         /// </summary>
         public bool IsSelected
         {
@@ -30,17 +28,14 @@ namespace Visualisation
                 _isSelected = value;
                 OnPropertyChanged(nameof(IsSelected));
 
-                // Propagation vers les enfants dans les deux cas
+                // Propagation vers les enfants
                 if (SubFamilies != null)
                 {
                     foreach (var child in SubFamilies)
-                    {
                         child.IsSelected = value;
-                    }
                 }
 
                 // Si tu relies l'affichage des sous-familles à IsSelected
-                // on notifie pour rafraîchir l'UI.
                 OnPropertyChanged(nameof(VisibleSubFamilies));
             }
         }
@@ -67,8 +62,6 @@ namespace Visualisation
 
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged(string propName)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propName));
-        }
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propName));
     }
 }

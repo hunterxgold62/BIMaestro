@@ -1,4 +1,8 @@
-﻿using System;
+﻿using Autodesk.Revit.UI;
+using BIMaestro.UI;
+using Famille.Orbit3D;
+using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -14,9 +18,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
-using Autodesk.Revit.UI;
 using WinForms = System.Windows.Forms;
-using Newtonsoft.Json;
 
 namespace Famille
 {
@@ -77,6 +79,7 @@ namespace Famille
             DataContext = this;
 
             LoadSavedPaths();
+
 
             _searchDebounce.Tick += (s, e) =>
             {
@@ -473,6 +476,15 @@ namespace Famille
                 FamilyBrowserCommand.ReloadFamilyEventInstance.Raise();
             }
         }
+        public class Preview3DHandler : IExternalEventHandler
+        {
+            public string FamilyPath { get; set; }
+
+            public void Execute(UIApplication app)
+                => Orbit3D.FamilyPreviewBridge.ShowPreview(app, FamilyPath);
+
+            public string GetName() => "Preview3D";
+        }
 
         private void FamilyItem_DoubleClick(object sender, MouseButtonEventArgs e)
         {
@@ -503,6 +515,22 @@ namespace Famille
                         "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
+        }
+        // ====== APERÇU 3D (bouton "3D" sur la tuile) ======
+        private void OnPreview3DClick(object sender, RoutedEventArgs e)
+        {
+            e.Handled = true;
+
+            FamilyItem fam = (sender as FrameworkElement)?.DataContext as FamilyItem;
+            if (fam == null || string.IsNullOrWhiteSpace(fam.Path) || !File.Exists(fam.Path))
+            {
+                MessageBox.Show(this, "Fichier famille introuvable.", "Aperçu 3D",
+                                MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            Famille.FamilyBrowserCommand.Preview3DHandlerInstance.FamilyPath = fam.Path;
+            Famille.FamilyBrowserCommand.Preview3DEventInstance.Raise();
         }
 
         private void AllFamiliesButton_Click(object sender, RoutedEventArgs e)

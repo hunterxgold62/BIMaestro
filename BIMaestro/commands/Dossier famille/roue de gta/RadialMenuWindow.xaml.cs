@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -16,28 +15,34 @@ namespace BIMaestro.UI
 {
     public partial class RadialMenuWindow : Window
     {
+        // ======== Events externes ========
         public event Action<bool, int, RadialItem> Completed;
-        public event Action<RadialItem> ReloadRequested; // <<< nouveau
+        public event Action<RadialItem> ReloadRequested; // clic droit → "Recharger"
 
-        private readonly List<RadialItem> _items; // 24 attendus
+        // ======== Données / pagination ========
+        private readonly List<RadialItem> _items; // 24 attendus (Top8 + récents 16)
         private int _pageIndex = 0;
         private const int PAGE_SIZE = 8;
         private readonly RadialItem[] _currentPageItems = new RadialItem[PAGE_SIZE];
 
+        // ======== Position écran (px natifs) ========
         private readonly int _screenXpx;
         private readonly int _screenYpx;
 
+        // ======== Géométrie roue ========
         private const int SEGMENTS = 8;
         private const double OUTER_R = 220;
         private const double INNER_R = 80;
         private const double IMG_SIZE = 64;
-        private const double GAP_DEG = 4;
+        private const double GAP_DEG = 4; // angle mort visuel ET (ci-dessous) en hit-test
 
+        // ======== Couleurs / styles ========
         private readonly Color _sectorFill = Color.FromArgb(200, 245, 245, 245);
         private readonly Color _sectorFillHover = Color.FromArgb(230, 255, 255, 255);
         private readonly Color _sectorStroke = Color.FromArgb(160, 150, 150, 160);
         private readonly Color _accent = (Color)ColorConverter.ConvertFromString("#3A86FF");
 
+        // ======== Eléments visuels ========
         private readonly List<Path> _sectors = new();
         private readonly List<Border> _iconBorders = new();
         private Path _hoverOutlinePath;
@@ -47,18 +52,36 @@ namespace BIMaestro.UI
         private Polygon _rightArrow;
         private TextBlock _centerLabel;
 
+        // ======== Cache images ========
         private static readonly Dictionary<string, BitmapImage> s_ImageCache =
             new Dictionary<string, BitmapImage>(StringComparer.OrdinalIgnoreCase);
         private const int CACHE_MAX = 256;
 
+        // ======== Sécurité fermeture / état ========
         private DateTime _canCloseAfter = DateTime.MaxValue;
         private bool _closing;
+
+        // ======== Molette : anti-saut multi-pages ========
+        private DateTime _lastWheelSwitch = DateTime.MinValue;
+        private static readonly TimeSpan _wheelCooldown = TimeSpan.FromMilliseconds(120);
+        public bool InvertWheel { get; set; } = false; // option : inverser sens molette
+
+        // ======== Hystérésis de survol (anti-papillonnage) ========
+        private int _lastHover = -1;
+        private double _lastAngleDeg = double.NaN;
+        private const double HOVER_HYSTERESIS_DEG = 6; // ne pas changer de secteur pour < 6°
+
+        // ======== Auto-fermeture douce ========
+        public bool AutoCloseEnabled { get; set; } = true;
+        public TimeSpan AutoCloseDelay { get; set; } = TimeSpan.FromSeconds(5);
+        private DispatcherTimer _idleTimer;
 
         public RadialMenuWindow(List<RadialItem> items, int screenXpx, int screenYpx)
         {
             InitializeComponent();
+
             _items = items ?? new List<RadialItem>();
-            while (_items.Count < 24) _items.Add(new RadialItem());
+            while (_items.Count < 24) _items.Add(new RadialItem()); // complète à 24
 
             _screenXpx = screenXpx;
             _screenYpx = screenYpx;
@@ -70,16 +93,18 @@ namespace BIMaestro.UI
             Loaded += Window_Loaded;
             Unloaded += Window_Unloaded;
 
-            KeyDown += Window_KeyDown;
-            Deactivated += Window_Deactivated;
+            KeyDown += Window_KeyDown;         // ESC + raccourcis 1..8
+            Deactivated += Window_Deactivated; // Alt-Tab etc.
         }
+
+        // ===================== Cycle de vie =====================
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            // Positionne la roue au-dessus de la souris (corrigé DPI)
             var dpi = VisualTreeHelper.GetDpi(this);
             double xDip = _screenXpx / dpi.DpiScaleX;
             double yDip = _screenYpx / dpi.DpiScaleY;
-
             this.Left = xDip - (this.Width / 2.0);
             this.Top = yDip - (this.Height / 2.0);
 
@@ -88,27 +113,62 @@ namespace BIMaestro.UI
             UpdatePageLabel();
             this.Focus();
 
+            // ouvre "protégé" 250ms (évite fermeture immédiate par clic d'activation)
             _canCloseAfter = DateTime.UtcNow.AddMilliseconds(250);
 
+            // capture globale & fermeture clic-extérieur
             Mouse.Capture(RootCanvas, CaptureMode.SubTree);
             Mouse.AddPreviewMouseDownOutsideCapturedElementHandler(RootCanvas, OnClickOutsideCaptured);
             try { Application.Current.Deactivated += App_Deactivated; } catch { }
 
+            // fade-in
             RootCanvas.Opacity = 0;
-            var fade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(120)) { EasingFunction = new QuadraticEase() };
+            var fade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(120))
+            { EasingFunction = new QuadraticEase() };
             RootCanvas.BeginAnimation(UIElement.OpacityProperty, fade);
+
+            // molette + mouvement pour hover continu
+            this.PreviewMouseWheel += OnWheelScroll;
+            RootCanvas.MouseMove += OnRootMouseMove;
+
+            // Auto-close timer + capteurs d'activité
+            _idleTimer = new DispatcherTimer { Interval = AutoCloseDelay };
+            _idleTimer.Tick += (_, __) => BeginSoftClose();
+            this.PreviewMouseMove += AnyUserActivity;
+            this.PreviewMouseDown += AnyUserActivity;
+            this.PreviewMouseWheel += AnyUserActivity;
+            this.PreviewKeyDown += AnyUserActivity;
+
+            if (AutoCloseEnabled) ResetIdleTimer();
         }
 
         private void Window_Unloaded(object sender, RoutedEventArgs e)
         {
             try
             {
+                // libère la capture
                 if (Mouse.Captured == RootCanvas) Mouse.Capture(null);
                 Mouse.RemovePreviewMouseDownOutsideCapturedElementHandler(RootCanvas, OnClickOutsideCaptured);
                 try { Application.Current.Deactivated -= App_Deactivated; } catch { }
+
+                // désabonnements
+                this.PreviewMouseWheel -= OnWheelScroll;
+                RootCanvas.MouseMove -= OnRootMouseMove;
+
+                if (_idleTimer != null)
+                {
+                    _idleTimer.Stop();
+                    _idleTimer.Tick -= (_, __) => BeginSoftClose(); // (no-op safe)
+                }
+                this.PreviewMouseMove -= AnyUserActivity;
+                this.PreviewMouseDown -= AnyUserActivity;
+                this.PreviewMouseWheel -= AnyUserActivity;
+                this.PreviewKeyDown -= AnyUserActivity;
             }
             catch { }
         }
+
+        // ===================== Gestion fermeture/activation =====================
 
         private void OnClickOutsideCaptured(object sender, MouseButtonEventArgs e)
         {
@@ -132,11 +192,33 @@ namespace BIMaestro.UI
             SafeComplete(false, -1, null);
         }
 
+        // ===================== Clavier =====================
+
         private void Window_KeyDown(object sender, KeyEventArgs e)
         {
             if (_closing) return;
-            if (e.Key == Key.Escape) SafeComplete(false, -1, null);
+            ResetIdleTimer();
+
+            if (e.Key == Key.Escape)
+            {
+                SafeComplete(false, -1, null);
+                return;
+            }
+
+            // Raccourcis 1..8 / NumPad 1..8
+            int idx = -1;
+            if (e.Key >= Key.D1 && e.Key <= Key.D8) idx = (int)(e.Key - Key.D1);
+            else if (e.Key >= Key.NumPad1 && e.Key <= Key.NumPad8) idx = (int)(e.Key - Key.NumPad1);
+
+            if (idx >= 0 && idx < SEGMENTS)
+            {
+                var item = _currentPageItems[idx];
+                if (item != null && !string.IsNullOrEmpty(item.FamilyPath))
+                    SafeComplete(true, _pageIndex * PAGE_SIZE + idx, item);
+            }
         }
+
+        // ===================== Construction roue =====================
 
         private void BuildWheel()
         {
@@ -147,6 +229,7 @@ namespace BIMaestro.UI
             double cx = this.Width / 2.0;
             double cy = this.Height / 2.0;
 
+            // Anneau arrière (légère vignette + ombre)
             var ring = new Ellipse
             {
                 Width = OUTER_R * 2,
@@ -159,6 +242,7 @@ namespace BIMaestro.UI
             Canvas.SetTop(ring, cy - OUTER_R);
             RootCanvas.Children.Add(ring);
 
+            // Disque centre
             _centerDisk = new Ellipse
             {
                 Width = INNER_R * 2,
@@ -172,11 +256,13 @@ namespace BIMaestro.UI
             Canvas.SetTop(_centerDisk, cy - INNER_R);
             RootCanvas.Children.Add(_centerDisk);
 
+            // Aperçu centre
             _centerPreview = new Image { Width = INNER_R * 0.9, Height = INNER_R * 0.9, Stretch = Stretch.Uniform };
             Canvas.SetLeft(_centerPreview, cx - _centerPreview.Width / 2.0);
             Canvas.SetTop(_centerPreview, cy - _centerPreview.Height / 2.0);
             RootCanvas.Children.Add(_centerPreview);
 
+            // Label centre
             _centerLabel = new TextBlock
             {
                 Text = "Top-8",
@@ -192,16 +278,18 @@ namespace BIMaestro.UI
             Canvas.SetTop(_centerLabel, labelTop);
             RootCanvas.Children.Add(_centerLabel);
 
+            // Flèche gauche/droite (pagination)
             _leftArrow = MakeArrowPolygon(isRight: false, size: 18);
             PositionArrow(_leftArrow, cx - INNER_R * 0.65, cy);
-            _leftArrow.MouseLeftButtonUp += (s, e) => { if (_closing) return; e.Handled = true; PrevPage(); };
+            _leftArrow.MouseLeftButtonUp += (s, e) => { if (_closing) return; ResetIdleTimer(); e.Handled = true; PrevPage(); };
             RootCanvas.Children.Add(_leftArrow);
 
             _rightArrow = MakeArrowPolygon(isRight: true, size: 18);
             PositionArrow(_rightArrow, cx + INNER_R * 0.65, cy);
-            _rightArrow.MouseLeftButtonUp += (s, e) => { if (_closing) return; e.Handled = true; NextPage(); };
+            _rightArrow.MouseLeftButtonUp += (s, e) => { if (_closing) return; ResetIdleTimer(); e.Handled = true; NextPage(); };
             RootCanvas.Children.Add(_rightArrow);
 
+            // Contour hover (copie du secteur survolé)
             _hoverOutlinePath = new Path
             {
                 Stroke = new SolidColorBrush(_accent),
@@ -210,6 +298,7 @@ namespace BIMaestro.UI
             };
             RootCanvas.Children.Add(_hoverOutlinePath);
 
+            // Secteurs + icônes
             double sweep = 360.0 / SEGMENTS;
             for (int i = 0; i < SEGMENTS; i++)
             {
@@ -223,23 +312,26 @@ namespace BIMaestro.UI
                 sector.StrokeThickness = 1.0;
                 sector.Tag = idx;
 
-                // clic gauche = placer
-                sector.MouseEnter += (_, __) => { if (!_closing) SetHover(idx); };
+                // Survol → hystérésis (anti-papillon)
+                sector.MouseEnter += (_, __) => { if (!_closing) SetHoverWithHysteresis(idx); };
+                // Clic gauche → valider
                 sector.MouseLeftButtonUp += (s, e) =>
                 {
                     if (_closing) return;
+                    ResetIdleTimer();
                     e.Handled = true;
                     var item = _currentPageItems[idx];
                     if (item != null && !string.IsNullOrEmpty(item.FamilyPath))
                         SafeComplete(true, _pageIndex * PAGE_SIZE + idx, item);
                 };
 
-                // >>> clic droit = context menu "Recharger dernière version"
+                // Menu contextuel (clic droit)
                 sector.ContextMenu = BuildContextMenu(idx);
 
                 _sectors.Add(sector);
                 RootCanvas.Children.Add(sector);
 
+                // Icône
                 var icon = new Image { Width = IMG_SIZE, Height = IMG_SIZE, Stretch = Stretch.Uniform };
                 var border = new Border
                 {
@@ -252,19 +344,19 @@ namespace BIMaestro.UI
                     RenderTransform = new ScaleTransform(1.0, 1.0)
                 };
 
-                border.MouseEnter += (_, __) => { if (!_closing) SetHover(idx); };
+                border.MouseEnter += (_, __) => { if (!_closing) SetHoverWithHysteresis(idx); };
                 border.MouseLeftButtonUp += (s, e) =>
                 {
                     if (_closing) return;
+                    ResetIdleTimer();
                     e.Handled = true;
                     var item = _currentPageItems[idx];
                     if (item != null && !string.IsNullOrEmpty(item.FamilyPath))
                         SafeComplete(true, _pageIndex * PAGE_SIZE + idx, item);
                 };
-
-                // >>> clic droit sur l’icône = même menu
                 border.ContextMenu = BuildContextMenu(idx);
 
+                // Position icône au milieu du secteur
                 double midDeg = start + actualSweep / 2.0;
                 double midRad = midDeg * Math.PI / 180.0;
                 double r = (INNER_R + OUTER_R) / 2.0;
@@ -277,6 +369,7 @@ namespace BIMaestro.UI
                 RootCanvas.Children.Add(border);
             }
 
+            // clic ailleurs dans la roue => fermeture (après délai d’armement)
             RootCanvas.MouseLeftButtonUp += (s, e) =>
             {
                 if (_closing) return;
@@ -285,7 +378,8 @@ namespace BIMaestro.UI
             };
         }
 
-        // Construit un menu contextuel “Recharger la dernière version…”
+        // ===================== Menus / Pages =====================
+
         private ContextMenu BuildContextMenu(int idx)
         {
             var cm = new ContextMenu();
@@ -296,7 +390,7 @@ namespace BIMaestro.UI
                 if (item == null || string.IsNullOrWhiteSpace(item.FamilyPath)) return;
 
                 try { ReloadRequested?.Invoke(item); } catch { }
-                SafeComplete(false, -1, null); // on ferme la rosace après l’action
+                SafeComplete(false, -1, null); // on ferme après action
             };
             cm.Items.Add(mi);
             return cm;
@@ -304,8 +398,21 @@ namespace BIMaestro.UI
 
         private int PageCount => 3;
 
-        private void PrevPage() { _pageIndex = (_pageIndex - 1 + PageCount) % PageCount; LoadPage(_pageIndex); UpdatePageLabel(); }
-        private void NextPage() { _pageIndex = (_pageIndex + 1) % PageCount; LoadPage(_pageIndex); UpdatePageLabel(); }
+        private void PrevPage()
+        {
+            _pageIndex = (_pageIndex - 1 + PageCount) % PageCount;
+            LoadPage(_pageIndex);
+            UpdatePageLabel();
+            UpdateHoverFromMouse();
+        }
+
+        private void NextPage()
+        {
+            _pageIndex = (_pageIndex + 1) % PageCount;
+            LoadPage(_pageIndex);
+            UpdatePageLabel();
+            UpdateHoverFromMouse();
+        }
 
         private void LoadPage(int index)
         {
@@ -318,6 +425,7 @@ namespace BIMaestro.UI
 
             _hoverOutlinePath.Visibility = Visibility.Collapsed;
             _centerPreview.Source = null;
+            _lastHover = -1; // reset hystérésis
 
             for (int i = 0; i < _iconBorders.Count; i++)
             {
@@ -344,9 +452,12 @@ namespace BIMaestro.UI
             };
 
             _centerLabel.Opacity = 0;
-            var fade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(120)) { EasingFunction = new QuadraticEase() };
+            var fade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(120))
+            { EasingFunction = new QuadraticEase() };
             _centerLabel.BeginAnimation(UIElement.OpacityProperty, fade);
         }
+
+        // ===================== Survol / sélection =====================
 
         private void SetHover(int i)
         {
@@ -359,7 +470,8 @@ namespace BIMaestro.UI
             {
                 var tr = (ScaleTransform)_iconBorders[k].RenderTransform;
                 double target = (k == i) ? 1.18 : 1.0;
-                var anim = new DoubleAnimation(target, TimeSpan.FromMilliseconds(90)) { EasingFunction = new QuadraticEase() };
+                var anim = new DoubleAnimation(target, TimeSpan.FromMilliseconds(90))
+                { EasingFunction = new QuadraticEase() };
                 tr.BeginAnimation(ScaleTransform.ScaleXProperty, anim);
                 tr.BeginAnimation(ScaleTransform.ScaleYProperty, anim);
             }
@@ -369,6 +481,132 @@ namespace BIMaestro.UI
 
             var item = _currentPageItems[i];
             _centerPreview.Source = LoadImage(item?.ImagePath);
+        }
+
+        private void SetHoverWithHysteresis(int idx) // version MouseEnter (sans point)
+        {
+            var p = Mouse.GetPosition(RootCanvas);
+            SetHoverWithHysteresis(idx, p);
+        }
+
+        private void SetHoverWithHysteresis(int idx, Point p) // version MouseMove
+        {
+            if (idx < 0 || idx >= SEGMENTS)
+            {
+                // garde l'aperçu sticky ; ne cache que le contour si on sort
+                _hoverOutlinePath.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            double cx = this.Width / 2.0, cy = this.Height / 2.0;
+            double aDeg = Math.Atan2(p.Y - cy, p.X - cx) * 180.0 / Math.PI; if (aDeg < 0) aDeg += 360.0;
+
+            if (_lastHover == -1)
+            {
+                _lastHover = idx; _lastAngleDeg = aDeg; SetHover(idx); return;
+            }
+
+            double delta = Math.Abs(aDeg - _lastAngleDeg);
+            if (delta > 180) delta = 360 - delta;
+
+            if (idx != _lastHover && delta < HOVER_HYSTERESIS_DEG)
+                return; // déplacement trop faible → ignore
+
+            _lastHover = idx; _lastAngleDeg = aDeg; SetHover(idx);
+        }
+
+        private void OnRootMouseMove(object sender, MouseEventArgs e)
+        {
+            if (_closing) return;
+            // recalcul continu (gère les "gaps" et hors anneau)
+            UpdateHoverFromMouse();
+        }
+
+        private void UpdateHoverFromMouse()
+        {
+            try
+            {
+                Point p = Mouse.GetPosition(RootCanvas);
+                int idx = GetSectorIndexFromPoint(p);
+                SetHoverWithHysteresis(idx, p);
+            }
+            catch { /* no-op */ }
+        }
+
+        private int GetSectorIndexFromPoint(Point p)
+        {
+            // centre = milieu de la fenêtre (identique à BuildWheel)
+            double cx = this.Width / 2.0;
+            double cy = this.Height / 2.0;
+
+            var v = new Vector(p.X - cx, p.Y - cy);
+            double r = v.Length;
+            if (r < INNER_R || r > OUTER_R) return -1; // hors anneau
+
+            double a = Math.Atan2(v.Y, v.X); // [-π ; +π]
+            if (a < 0) a += 2 * Math.PI;     // [0 ; 2π)
+
+            double sweep = 2 * Math.PI / SEGMENTS;
+            int raw = (int)Math.Floor(a / sweep);
+
+            // applique le "gap" en radians → zone morte aux séparations
+            double gap = (GAP_DEG * Math.PI / 180.0);
+            double centerOfSector = raw * sweep + sweep / 2.0;
+            double dist = Math.Abs(a - centerOfSector);
+            if (dist > Math.PI) dist = 2 * Math.PI - dist;
+            if (dist > (sweep / 2.0 - gap / 2.0)) return -1; // on est dans le gap
+
+            return raw;
+        }
+
+        // ===================== Molette (pagination) =====================
+
+        private void OnWheelScroll(object sender, MouseWheelEventArgs e)
+        {
+            if (_closing) return;
+            ResetIdleTimer();
+
+            var now = DateTime.UtcNow;
+            if (now - _lastWheelSwitch < _wheelCooldown)
+            {
+                e.Handled = true;
+                return; // throttle
+            }
+            _lastWheelSwitch = now;
+
+            bool up = e.Delta > 0;
+            if (InvertWheel) up = !up;
+
+            if (up) PrevPage();
+            else NextPage();
+
+            UpdateHoverFromMouse(); // feedback immédiat
+            e.Handled = true;
+        }
+
+        // ===================== Fermeture & idle =====================
+
+        private void AnyUserActivity(object sender, EventArgs e) => ResetIdleTimer();
+
+        private void ResetIdleTimer()
+        {
+            if (!AutoCloseEnabled || _closing) return;
+            _idleTimer.Stop();
+            _idleTimer.Interval = AutoCloseDelay;
+            _idleTimer.Start();
+        }
+
+        private void BeginSoftClose()
+        {
+            if (_closing || DateTime.UtcNow < _canCloseAfter) { ResetIdleTimer(); return; }
+
+            _closing = true;
+            _idleTimer.Stop();
+
+            var anim = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(150))
+            { EasingFunction = new QuadraticEase() };
+            anim.Completed += (s, e) => SafeComplete(false, -1, null);
+            RootCanvas.BeginAnimation(UIElement.OpacityProperty, anim);
         }
 
         private void SafeComplete(bool accepted, int globalIndex, RadialItem item)
@@ -381,11 +619,14 @@ namespace BIMaestro.UI
             try { if (Mouse.Captured == RootCanvas) Mouse.Capture(null); } catch { }
             try { Close(); } catch { }
 
+            // seconde chance asynchrone (si fermeture bloquée par un handler externe)
             Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
             {
                 try { if (IsVisible) Close(); } catch { }
             }));
         }
+
+        // ===================== Outils géométrie / UI =====================
 
         private static Path CreateSector(Point center, double innerR, double outerR, double startDeg, double sweepDeg)
         {
@@ -407,7 +648,7 @@ namespace BIMaestro.UI
                 ctx.LineTo(p3, true, true);
                 ctx.ArcTo(p4, new Size(innerR, innerR), 0, large, SweepDirection.Counterclockwise, true, true);
             }
-            geo.Freeze();
+            try { geo.Freeze(); } catch { }
             return new Path { Data = geo };
         }
 
@@ -432,7 +673,8 @@ namespace BIMaestro.UI
                 poly.RenderTransformOrigin = new Point(0.5, 0.5);
                 var tr = new ScaleTransform(1, 1);
                 poly.RenderTransform = tr;
-                var anim = new DoubleAnimation(1.12, TimeSpan.FromMilliseconds(100)) { EasingFunction = new QuadraticEase() };
+                var anim = new DoubleAnimation(1.12, TimeSpan.FromMilliseconds(100))
+                { EasingFunction = new QuadraticEase() };
                 tr.BeginAnimation(ScaleTransform.ScaleXProperty, anim);
                 tr.BeginAnimation(ScaleTransform.ScaleYProperty, anim);
             };

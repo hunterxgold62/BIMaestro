@@ -1,16 +1,20 @@
 ﻿using Autodesk.Revit.Attributes;
+using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using Famille; // Usage/Recent + CatalogImageResolver + ThumbnailCache + ShellThumbnailProvider + ReloadFamilyHandler
+using Licensing;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using Famille; // Usage/Recent + CatalogImageResolver + ThumbnailCache + ShellThumbnailProvider + ReloadFamilyHandler
 
 namespace BIMaestro.UI
 {
     [Transaction(TransactionMode.Manual)]
-    public class RadialMenuCommand : IExternalCommand
+    public class RadialMenuCommand : BaseTrackedCommand
     {
+
+        protected override string ButtonId => "RadialMenuCommand";
         private static RadialPlaceFamilyHandler s_placeHandler;
         private static ExternalEvent s_placeEvent;
 
@@ -18,8 +22,9 @@ namespace BIMaestro.UI
         private static ReloadFamilyHandler s_reloadHandler;
         private static ExternalEvent s_reloadEvent;
 
-        public Result Execute(ExternalCommandData commandData, ref string message, Autodesk.Revit.DB.ElementSet elements)
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
+            var commandData = data;
             try
             {
                 var uiapp = commandData.Application;

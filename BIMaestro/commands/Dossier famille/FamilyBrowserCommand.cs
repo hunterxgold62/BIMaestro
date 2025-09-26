@@ -3,6 +3,7 @@ using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Licensing;
 using System;
+using static Famille.FamilyBrowserWindow;
 
 namespace Famille
 {
@@ -10,6 +11,9 @@ namespace Famille
     public class FamilyBrowserCommand : BaseTrackedCommand
     {
         protected override string ButtonId => "FamilyBrowserCommand";
+
+        public static readonly Preview3DHandler Preview3DHandlerInstance = new Preview3DHandler();
+        public static readonly ExternalEvent Preview3DEventInstance = ExternalEvent.Create(Preview3DHandlerInstance);
 
         public static UIApplication uiapp;
         public static FamilyBrowserWindow MainWindowRef;

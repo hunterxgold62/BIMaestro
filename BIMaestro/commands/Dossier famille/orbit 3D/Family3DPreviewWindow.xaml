@@ -1,0 +1,51 @@
+﻿<Window x:Class="Famille.Orbit3D.Family3DPreviewWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:h="http://helix-toolkit.org/wpf"
+        Title="Aperçu 3D famille" Height="700" Width="1000"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Background="#FFF4F5F7">
+    <Grid>
+        <!-- Vue 3D -->
+        <h:HelixViewport3D x:Name="view"
+                   Background="#FFF4F5F7"
+                   ZoomExtentsWhenLoaded="True"
+                   ShowCoordinateSystem="True"
+                   ShowViewCube="True">
+
+            <!-- Lumière réaliste par défaut -->
+            <h:DefaultLights x:Name="RealisticLightsNode"/>
+
+            <!-- Mode uniforme (désactivé par défaut, on l’ajoute/retire en code) -->
+            <ModelVisual3D x:Name="AmbientLightsNode">
+                <ModelVisual3D.Content>
+                    <AmbientLight Color="#FFFFFFFF"/>
+                </ModelVisual3D.Content>
+            </ModelVisual3D>
+
+            <!-- Head-light qui suivra la caméra -->
+            <ModelVisual3D x:Name="HeadlightNode">
+                <ModelVisual3D.Content>
+                    <!-- direction initiale quelconque, mise à jour en code -->
+                    <DirectionalLight x:Name="Headlight" Color="#FFFFFFFF" Direction="-1,-1,-1"/>
+                </ModelVisual3D.Content>
+            </ModelVisual3D>
+
+            <ModelVisual3D x:Name="_root"/>
+        </h:HelixViewport3D>
+
+
+
+
+
+        <!-- Overlay "chargement/erreur" -->
+        <Border x:Name="Overlay"
+                Background="#66000000" Visibility="Collapsed">
+            <TextBlock x:Name="OverlayText"
+                       Foreground="White" FontSize="18"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Text="Chargement..." TextWrapping="Wrap"
+                       Margin="24"/>
+        </Border>
+    </Grid>
+</Window>
