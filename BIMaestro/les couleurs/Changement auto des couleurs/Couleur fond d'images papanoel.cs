@@ -30,7 +30,7 @@ namespace Couleur
             "Outils de Visualisation",
             "Modification",
             "Outils IA",
-            "Couleur du projet",
+            "Couleur et information",
             "Panneaux réservés au test",
             "Analyse",
             "Spécifique aux familles"

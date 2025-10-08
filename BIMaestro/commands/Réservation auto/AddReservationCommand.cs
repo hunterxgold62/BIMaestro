@@ -294,7 +294,8 @@ namespace Modification
                                 }
 
                                 // 4) Centre et niveau
-                                XYZ center = (bbIntersect.Min + bbIntersect.Max) * 0.5;
+                                XYZ fallbackCenter = (bbIntersect.Min + bbIntersect.Max) * 0.5;
+                                XYZ center = GetPlacementPointOnWall(selWall, selElem, fallbackCenter);
                                 var usedLevel = doc.GetElement(selWall.LevelId) as Level
                                               ?? new FilteredElementCollector(doc)
                                                      .OfClass(typeof(Level))
@@ -441,8 +442,9 @@ namespace Modification
                     BoundingBoxXYZ bbIntersect = IntersectBoundingBoxes(bbWall, bbElem);
                     if (bbIntersect == null) continue;
 
-                    XYZ center = (bbIntersect.Min + bbIntersect.Max) * 0.5;
-                    Level lvl = wallLevel
+                                    XYZ fallbackCenter = (bbIntersect.Min + bbIntersect.Max) * 0.5;
+                                    XYZ center = GetPlacementPointOnWall(wall, elem, fallbackCenter);
+                                    Level lvl = wallLevel
                                ?? doc.GetElement(elem.LevelId) as Level
                                ?? new FilteredElementCollector(doc)
                                     .OfClass(typeof(Level))
@@ -504,9 +506,10 @@ namespace Modification
 
                 double w, h;
                 GetOrientedXYDimensions(elem, out w, out h);
-                XYZ center = (bbElem.Min + bbElem.Max) * 0.5;
+                                XYZ fallbackCenter = (bbElem.Min + bbElem.Max) * 0.5;
+                                XYZ center = GetPlacementPointOnWall(wallHost, elem, fallbackCenter);
 
-                Level hostLevel = doc.GetElement(wallHost.LevelId) as Level
+                                Level hostLevel = doc.GetElement(wallHost.LevelId) as Level
                                ?? new FilteredElementCollector(doc)
                                     .OfClass(typeof(Level))
                                     .Cast<Level>()
@@ -661,6 +664,9 @@ namespace Modification
 
             // 4) Centre & création de l’instance réservation
             XYZ centroid = (bbAll.Min + bbAll.Max) * 0.5;
+            var referencePipe = pipes.FirstOrDefault();
+            if (referencePipe != null)
+                centroid = GetPlacementPointOnWall(wall, referencePipe, centroid);
             FamilyInstance fi = doc.Create.NewFamilyInstance(
                 centroid,
                 symbol,
@@ -760,6 +766,9 @@ namespace Modification
             };
 
             XYZ centroid = (bbAll.Min + bbAll.Max) * 0.5;
+            var referenceElement = elements.FirstOrDefault();
+            if (referenceElement != null)
+                centroid = GetPlacementPointOnWall(wall, referenceElement, centroid);
             FamilyInstance fi = doc.Create.NewFamilyInstance(
                 centroid,
                 symbol,
@@ -807,20 +816,157 @@ namespace Modification
 
         private BoundingBoxXYZ IntersectBoundingBoxes(BoundingBoxXYZ bb1, BoundingBoxXYZ bb2)
         {
-            double minX = Math.Max(bb1.Min.X, bb2.Min.X);
-            double maxX = Math.Min(bb1.Max.X, bb2.Max.X);
+            var worldBb1 = ToWorldBoundingBox(bb1);
+            var worldBb2 = ToWorldBoundingBox(bb2);
+            if (worldBb1 == null || worldBb2 == null) return null;
+
+            double minX = Math.Max(worldBb1.Min.X, worldBb2.Min.X);
+            double maxX = Math.Min(worldBb1.Max.X, worldBb2.Max.X);
             if (minX > maxX) return null;
-            double minY = Math.Max(bb1.Min.Y, bb2.Min.Y);
-            double maxY = Math.Min(bb1.Max.Y, bb2.Max.Y);
+
+            double minY = Math.Max(worldBb1.Min.Y, worldBb2.Min.Y);
+            double maxY = Math.Min(worldBb1.Max.Y, worldBb2.Max.Y);
             if (minY > maxY) return null;
-            double minZ = Math.Max(bb1.Min.Z, bb2.Min.Z);
-            double maxZ = Math.Min(bb1.Max.Z, bb2.Max.Z);
+
+            double minZ = Math.Max(worldBb1.Min.Z, worldBb2.Min.Z);
+            double maxZ = Math.Min(worldBb1.Max.Z, worldBb2.Max.Z);
             if (minZ > maxZ) return null;
+
             return new BoundingBoxXYZ
             {
                 Min = new XYZ(minX, minY, minZ),
                 Max = new XYZ(maxX, maxY, maxZ)
             };
+        }
+
+        private BoundingBoxXYZ ToWorldBoundingBox(BoundingBoxXYZ bb)
+        {
+            if (bb == null) return null;
+
+            Transform transform = bb.Transform ?? Transform.Identity;
+            var corners = new List<XYZ>
+            {
+                new XYZ(bb.Min.X, bb.Min.Y, bb.Min.Z),
+                new XYZ(bb.Min.X, bb.Min.Y, bb.Max.Z),
+                new XYZ(bb.Min.X, bb.Max.Y, bb.Min.Z),
+                new XYZ(bb.Min.X, bb.Max.Y, bb.Max.Z),
+                new XYZ(bb.Max.X, bb.Min.Y, bb.Min.Z),
+                new XYZ(bb.Max.X, bb.Min.Y, bb.Max.Z),
+                new XYZ(bb.Max.X, bb.Max.Y, bb.Min.Z),
+                new XYZ(bb.Max.X, bb.Max.Y, bb.Max.Z)
+            }
+            .Select(p => transform.OfPoint(p))
+            .ToList();
+
+            double minX = corners.Min(p => p.X);
+            double minY = corners.Min(p => p.Y);
+            double minZ = corners.Min(p => p.Z);
+            double maxX = corners.Max(p => p.X);
+            double maxY = corners.Max(p => p.Y);
+            double maxZ = corners.Max(p => p.Z);
+
+            return new BoundingBoxXYZ
+            {
+                Min = new XYZ(minX, minY, minZ),
+                Max = new XYZ(maxX, maxY, maxZ)
+            };
+        }
+
+        private XYZ GetPlacementPointOnWall(Wall wall, Element intersectingElement, XYZ fallbackCenter)
+        {
+            if (wall == null || intersectingElement == null)
+                return fallbackCenter;
+
+            var intersection = TryGetIntersectionOnWallPlane(wall, intersectingElement);
+            if (intersection != null)
+            {
+                XYZ point = intersection;
+                double z = double.IsNaN(fallbackCenter.Z) ? point.Z : fallbackCenter.Z;
+                return new XYZ(point.X, point.Y, z);
+            }
+
+            return fallbackCenter;
+        }
+
+        private XYZ? TryGetIntersectionOnWallPlane(Wall wall, Element intersectingElement)
+        {
+            if (!(wall.Location is LocationCurve wallLocCurve))
+                return null;
+
+            Curve wallCurve = wallLocCurve.Curve;
+            if (wallCurve == null)
+                return null;
+
+            XYZ wallNormal = wall.Orientation;
+            if (wallNormal == null || wallNormal.IsZeroLength())
+                return null;
+
+            wallNormal = wallNormal.Normalize();
+            XYZ planeOrigin = wallCurve.Evaluate(0.5, true);
+
+            if (intersectingElement is FamilyInstance fi && fi.Location is LocationPoint lp)
+            {
+                XYZ point = lp.Point;
+                double distance = wallNormal.DotProduct(point - planeOrigin);
+                return point - wallNormal * distance;
+            }
+
+            if (intersectingElement.Location is LocationCurve elemLocCurve)
+            {
+                Curve elemCurve = elemLocCurve.Curve;
+                if (elemCurve == null)
+                    return null;
+
+                if (elemCurve is Line elemLine)
+                {
+                    return IntersectLineWithPlane(elemLine, planeOrigin, wallNormal);
+                }
+
+                XYZ start = elemCurve.GetEndPoint(0);
+                XYZ end = elemCurve.GetEndPoint(1);
+                double startVal = wallNormal.DotProduct(start - planeOrigin);
+                double endVal = wallNormal.DotProduct(end - planeOrigin);
+
+                if (Math.Abs(startVal) < 1e-6)
+                    return start;
+                if (Math.Abs(endVal) < 1e-6)
+                    return end;
+                if (startVal * endVal < 0)
+                {
+                    double t = startVal / (startVal - endVal);
+                    XYZ point = start + t * (end - start);
+                    return point;
+                }
+            }
+
+            return null;
+        }
+
+        private XYZ? IntersectLineWithPlane(Line line, XYZ planeOrigin, XYZ planeNormal)
+        {
+            if (line == null)
+                return null;
+
+            XYZ origin = planeOrigin ?? XYZ.Zero;
+            XYZ normal = planeNormal ?? XYZ.BasisZ;
+
+            XYZ lineStart = line.GetEndPoint(0);
+            XYZ lineDir = line.Direction;
+
+            double denom = normal.DotProduct(lineDir);
+            if (Math.Abs(denom) < 1e-9)
+                return null;
+
+            double t = normal.DotProduct(origin - lineStart) / denom;
+            if (t < -1e-6 || t > line.Length + 1e-6)
+                return null;
+
+            XYZ intersection = lineStart + t * lineDir;
+            double residual = normal.DotProduct(intersection - origin);
+            if (Math.Abs(residual) > 1e-6)
+                intersection -= normal * residual;
+
+            return intersection;
         }
 
         private bool CheckSelectedElementType(Element elem, ExtendedReservationWindow.ObjectType objType)

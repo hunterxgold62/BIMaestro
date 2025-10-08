@@ -313,7 +313,8 @@ private List<string> GetImportNames(Document doc)
                     Type = "Famille",
                     TailleEnMo = mo,
                     Count = cnt,
-                    ElementIds = instanceIds
+                    ElementIds = instanceIds,
+                    PrimaryId = fam.Id
                 });
             }
 
@@ -373,13 +374,15 @@ private List<string> GetImportNames(Document doc)
                             ? new FileInfo(path).Length / 1024.0 / 1024.0
                             : 0;
 
+                var elementIds = grp.Select(i => i.Id).ToList();
                 infos.Add(new ElementInfo
                 {
                     Nom = name,
                     Type = kind,
                     TailleEnMo = mo,
-                    Count = grp.Count(),
-                    ElementIds = grp.Select(i => i.Id).ToList()
+                    Count = elementIds.Count,
+                    ElementIds = elementIds,
+                    PrimaryId = elementIds.FirstOrDefault()
                 });
             }
 
@@ -408,13 +411,15 @@ private List<string> GetImportNames(Document doc)
                 double mo = (!string.IsNullOrEmpty(path) && File.Exists(path))
                             ? new FileInfo(path).Length / 1024.0 / 1024.0 : 0;
 
+                var elementIds = grp.Select(i => i.Id).ToList();
                 infos.Add(new ElementInfo
                 {
                     Nom = name,
                     Type = "PDF/Image",
                     TailleEnMo = mo,
-                    Count = grp.Count(),
-                    ElementIds = grp.Select(i => i.Id).ToList()
+                    Count = elementIds.Count,
+                    ElementIds = elementIds,
+                    PrimaryId = elementIds.FirstOrDefault()
                 });
             }
 
@@ -474,13 +479,15 @@ private List<string> GetImportNames(Document doc)
                             ? new FileInfo(path).Length / 1024.0 / 1024.0
                             : 0.0;
 
+                var elementIds = grp.Select(lk => lk.Id).ToList();
                 infos.Add(new ElementInfo
                 {
                     Nom = fileName,
                     Type = "Lien Revit/IFC",
                     TailleEnMo = mo,
-                    Count = grp.Count(),
-                    ElementIds = grp.Select(lk => lk.Id).ToList()
+                    Count = elementIds.Count,
+                    ElementIds = elementIds,
+                    PrimaryId = elementIds.FirstOrDefault()
                 });
             }
 
@@ -541,8 +548,8 @@ private List<string> GetImportNames(Document doc)
                     Nom = pc.Name,           // ou Path.GetFileName(fullPath)
                     Type = "Nuage de points",
                     TailleEnMo = mo,
-                    Count = 1,
-                    ElementIds = new List<ElementId> { pc.Id }
+                    ElementIds = new List<ElementId> { pc.Id },
+                    PrimaryId = pc.Id
                 });
             }
 
@@ -593,6 +600,8 @@ private List<string> GetImportNames(Document doc)
         public double TailleEnMo { get; set; }
         public int Count { get; set; }
         public IList<ElementId> ElementIds { get; set; }
+        public ElementId PrimaryId { get; set; }
+        public bool IsFamily => string.Equals(Type, "Famille", StringComparison.OrdinalIgnoreCase);
     }
 
     public class FamilyCacheEntry

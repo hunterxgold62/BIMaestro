@@ -30,10 +30,18 @@ namespace Modification
         private readonly UIApplication _uiapp;
         private List<View> _allViews;
 
-        public ColorPickerWindow(UIApplication uiapp)
+        private readonly bool _allowOverrideEditing;
+
+        public ColorPickerWindow(UIApplication uiapp, bool allowOverrideEditing = true)
         {
             InitializeComponent();
             _uiapp = uiapp;
+            _allowOverrideEditing = allowOverrideEditing;
+
+            if (!_allowOverrideEditing)
+            {
+                Title = "Copier les graphismes existants";
+            }
 
             // Valeurs par défaut
             SelectedColor = Colors.Red;
@@ -57,6 +65,13 @@ namespace Modification
         {
             var doc = _uiapp.ActiveUIDocument.Document;
             var activeViewId = _uiapp.ActiveUIDocument.ActiveView.Id;
+            if (!_allowOverrideEditing)
+            {
+                GeneralOptionsTab.IsEnabled = false;
+                ColorsTab.IsEnabled = false;
+                LinesTab.IsEnabled = false;
+                ViewsTab.IsSelected = true;
+            }
 
             // Remplir les combobox de motifs
             var fillPatterns = new FilteredElementCollector(doc)

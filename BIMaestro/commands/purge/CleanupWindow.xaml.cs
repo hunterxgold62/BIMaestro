@@ -2,7 +2,7 @@
 using System.Windows;
 
 namespace Modification
-{ 
+{
     public partial class CleanupWindow : Window
     {
         public bool DeleteViews => ViewsCheckbox.IsChecked == true;

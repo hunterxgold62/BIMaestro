@@ -25,7 +25,7 @@
                 <DataGridTextColumn Header="Type"
                                     Binding="{Binding Type}" Width="2*"/>
                 <DataGridTextColumn Header="Taille (Mo)"
-                                    Binding="{Binding TailleEnMo, StringFormat={}{0:N2}}" Width="*"/>
+                                    Binding="{Binding TailleEnMo, StringFormat={}{{0:N2}}}" Width="*"/>
                 <DataGridTextColumn Header="Instances"
                                     Binding="{Binding Count}" Width="*"/>
             </DataGrid.Columns>

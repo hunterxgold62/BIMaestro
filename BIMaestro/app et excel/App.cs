@@ -18,6 +18,8 @@ public class App : IExternalApplication
     public static string InstallId { get; private set; }
     public static string PluginVersion { get; private set; }
 
+
+
     private UIApplication _uiApp;
     private bool _hasResetWhenOff = false;
 

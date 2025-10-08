@@ -230,7 +230,7 @@ namespace Visualisation
             var catIds = new HashSet<ElementId>();
             var famNames = new HashSet<string>(StringComparer.Ordinal);
             var typeIds = new HashSet<ElementId>();
-            bool includeAllTags = prefs.IncludeAllTagsExplicit;
+            bool includeAllTags = opt == FilterOption.Type ? false : prefs.IncludeAllTagsExplicit;
 
             BuildComparatorsFromElements(
                 doc, referenceElements, opt, wallCatId, floorCatId,
@@ -258,7 +258,6 @@ namespace Visualisation
             // 5) Sans coloration => fin
             if (!prefs.Colorize)
             {
-                TaskDialog.Show("Résultat", $"{selIds.Count} élément(s) – Critère : {opt}\n(Coloration désactivée)");
                 return Result.Succeeded;
             }
 
@@ -322,10 +321,8 @@ namespace Visualisation
             };
             LastColoredSet.Save(last);
 
-            TaskDialog.Show("Résultat",
-                $"{coloredUniqueIds.Count} élément(s) colorés – Critère : {opt}\n" +
-                $"Vue : {view.Name}\n" +
-                $"Série mémorisée (effaçable plus tard).");
+          
+               
             return Result.Succeeded;
         }
 
@@ -442,7 +439,7 @@ namespace Visualisation
             {
                 if (el == null) continue;
 
-                if (el is IndependentTag) flag = true;
+                if (el is IndependentTag && opt != FilterOption.Type) flag = true;
 
                 switch (opt)
                 {
@@ -520,7 +517,7 @@ namespace Visualisation
 
         public bool AllowElement(Element elem)
         {
-            if (_includeAllTags && elem is IndependentTag) return true;
+            if (_includeAllTags && _opt != FilterOption.Type && elem is IndependentTag) return true;
 
             switch (_opt)
             {

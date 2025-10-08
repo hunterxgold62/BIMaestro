@@ -209,7 +209,7 @@ namespace Couleur
                 { "Outils de Visualisation",   new SolidColorBrush(Color.FromRgb(255, 230, 230)) },
                 { "Modification",             new SolidColorBrush(Color.FromRgb(230, 255, 230)) },
                 { "Outils IA",                new SolidColorBrush(Color.FromRgb(230, 230, 255)) },
-                { "Couleur du projet",        new SolidColorBrush(Color.FromRgb(230, 230, 230)) },
+                { "Couleur et information",        new SolidColorBrush(Color.FromRgb(230, 230, 230)) },
                 { "Panneaux réservés au test",new SolidColorBrush(Color.FromRgb(255, 255, 230)) },
                 { "Analyse",                  new SolidColorBrush(Color.FromRgb(230, 255, 255)) },
                 { "Spécifique aux familles",  new SolidColorBrush(Color.FromRgb(255, 230, 255)) }
@@ -218,7 +218,7 @@ namespace Couleur
         private static readonly List<string> _targetKeywords = new List<string>
         {
             "Outils de Visualisation", "Modification", "Outils IA",
-            "Couleur du projet", "Panneaux réservés au test",
+            "Couleur et information", "Panneaux réservés au test",
             "Spécifique aux familles", "Analyse"
         };
 
@@ -472,7 +472,7 @@ namespace Couleur
                 { "Analyse",                  new SolidColorBrush(Color.FromRgb(230, 255, 255)) },
                 { "Spécifique aux familles",  new SolidColorBrush(Color.FromRgb(255, 230, 255)) },
                 { "Panneaux réservés au test",new SolidColorBrush(Color.FromRgb(255, 255, 230)) },
-                { "Couleur du projet",        new SolidColorBrush(Color.FromRgb(230, 230, 230)) }
+                { "Couleur et information",        new SolidColorBrush(Color.FromRgb(230, 230, 230)) }
             };
 
         public static void ApplyPartialColoring(IntPtr mainWindowHandle)

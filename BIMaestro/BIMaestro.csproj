@@ -66,6 +66,9 @@
     <PackageReference Include="Microsoft.Bcl.AsyncInterfaces">
       <Version>9.0.8</Version>
     </PackageReference>
+    <PackageReference Include="Microsoft.Web.WebView2">
+      <Version>1.0.3485.44</Version>
+    </PackageReference>
     <PackageReference Include="Newtonsoft.Json">
       <Version>13.0.3</Version>
     </PackageReference>
@@ -255,9 +258,9 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="app et excel\copie touche.cs" />
+    <Compile Include="app et excel\AppUI.cs" />
     <Compile Include="app et excel\Supabase\ApiKeys.cs" />
-    <None Include="app et excel\AppUI.cs" />
+    <None Include="app et excel\copie touche.cs" />
     <Compile Include="app et excel\App.cs" />
     <Compile Include="app et excel\Supabase\BaseTrackedCommand.cs" />
     <Compile Include="app et excel\Supabase\LicenseManager.cs" />
@@ -335,6 +338,7 @@
     <Compile Include="commands\Dossier famille\orbit 3D\PreviewExportContext.cs" />
     <Compile Include="commands\Dossier famille\ReloadFamilyHandler.cs" />
     <Compile Include="commands\Dossier famille\image native de revit\ShellThumbnailProvider.cs" />
+    <Compile Include="commands\Dossier famille\RevitPreviewProvider.cs" />
     <Compile Include="commands\Dossier famille\roue de gta\CatalogImageResolver.cs" />
     <Compile Include="commands\Dossier famille\roue de gta\FamilyRecentManager.cs" />
     <Compile Include="commands\Dossier famille\roue de gta\ImageDiscovery.cs" />
@@ -351,6 +355,14 @@
     <Compile Include="commands\export dwg\ExportSheetsCommand.cs" />
     <Compile Include="commands\export dwg\ExportSheetsWindow.xaml.cs">
       <DependentUpon>ExportSheetsWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\page de mise à jour en direct\MiseAJourCommand.cs" />
+    <Compile Include="commands\page de mise à jour en direct\Page d%27explication projet\GuideCommand.cs" />
+    <Compile Include="commands\page de mise à jour en direct\Page d%27explication projet\GuideWindow.xaml.cs">
+      <DependentUpon>GuideWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\page de mise à jour en direct\UpdateWindow.xaml.cs">
+      <DependentUpon>UpdateWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="commands\purge\CleanupWindow.xaml.cs">
       <DependentUpon>CleanupWindow.xaml</DependentUpon>
@@ -445,10 +457,6 @@
     <Compile Include="les couleurs\Changement auto des couleurs\Bouton de reset tabitem.cs" />
     <Compile Include="les couleurs\Changement auto des couleurs\ColoringStateManager.cs" />
     <None Include="Test\dwg to revit\ImportDwgWallsCommand.cs" />
-    <None Include="Test\page de mise à jour en direct\MiseAJourCommand.cs" />
-    <None Include="Test\page de mise à jour en direct\UpdateWindow.xaml.cs">
-      <DependentUpon>UpdateWindow.xaml</DependentUpon>
-    </None>
     <None Include="Test\popup\CommandStickmanAnimation.cs" />
     <None Include="Test\popup\StickmanAnimationWindow.xaml.cs">
       <DependentUpon>StickmanAnimationWindow.xaml</DependentUpon>
@@ -460,7 +468,7 @@
     <None Include="Test\racourci clavier\LoadShortcutsCommand.cs" />
     <None Include="Test\wtf photo\RandomImageWindow.cs" />
     <Compile Include="les couleurs\Changement auto des couleurs\Couleur fond d%27images papanoel.cs" />
-    <Compile Include="les couleurs\ancien fonctionnement\Changement de la barre uniquement.cs" />
+    <None Include="les couleurs\ancien fonctionnement\Changement de la barre uniquement.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="commands\renuméroté élément\ElementRenameWindow.xaml.cs">
       <DependentUpon>ElementRenameWindow.xaml</DependentUpon>
@@ -537,6 +545,14 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <Page Include="commands\page de mise à jour en direct\Page d%27explication projet\GuideWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="commands\page de mise à jour en direct\UpdateWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
     <Page Include="commands\première commande\sélection d%27élément\FamilySelectionWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -566,10 +582,6 @@
       <SubType>Designer</SubType>
     </Page>
     <None Include="Test\Clé d%27accés\Clés d%27accés.xaml">
-      <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
-    </None>
-    <None Include="Test\page de mise à jour en direct\UpdateWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </None>

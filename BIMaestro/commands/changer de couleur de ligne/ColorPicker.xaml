@@ -23,7 +23,7 @@
         <TabControl>
 
             <!-- Options générales -->
-            <TabItem Header="Options générales">
+            <TabItem x:Name="GeneralOptionsTab" Header="Options générales">
                 <StackPanel Margin="10">
                     <StackPanel Orientation="Horizontal">
                         <CheckBox x:Name="HalftoneCheckBox"
@@ -45,7 +45,7 @@
             </TabItem>
 
             <!-- Couleurs et motifs -->
-            <TabItem Header="Couleurs et Motifs">
+            <TabItem x:Name="ColorsTab" Header="Couleurs et Motifs">
                 <StackPanel Margin="10">
                     <Label Content="Couleur des motifs:"/>
                     <xctk:ColorPicker x:Name="ColorPickerControl"
@@ -73,7 +73,7 @@
             </TabItem>
 
             <!-- Lignes et contours -->
-            <TabItem Header="Lignes et Contours">
+            <TabItem x:Name="LinesTab" Header="Lignes et Contours">
                 <StackPanel Margin="10">
                     <CheckBox x:Name="ModifyLineColorCheckBox"
                               Content="Modifier lignes et contours"/>
@@ -104,7 +104,7 @@
             </TabItem>
 
             <!-- Sélection des vues -->
-            <TabItem Header="Sélection des vues">
+            <TabItem x:Name="ViewsTab" Header="Sélection des vues">
                 <StackPanel Margin="10">
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                         <Button x:Name="SelectAllViewsButton"

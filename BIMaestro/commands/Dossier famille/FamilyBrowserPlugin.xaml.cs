@@ -29,9 +29,9 @@ namespace Famille
         private const string FavoritesCollectionName = "Favoris";
 
         // ===== Chemins =====
-        private string rootFolderPath = @"P:\0-Boîte à outils Revit\0-Bibliothèque\A-Famille Revit";
-        private string familiesFolder = @"P:\0-Boîte à outils Revit\0-Bibliothèque\A-Famille Revit";
-        private string imagesFolder = @"P:\0-Boîte à outils Revit\0-Bibliothèque\B-Famille Revit Image";
+        private string rootFolderPath = @"P:\0-Boîte à outils Revit\0-Bibliothèque\A-Famille Revi";
+        private string familiesFolder = @"P:\0-Boîte à outils Revit\0-Bibliothèque\A-Famille Revi";
+        private string imagesFolder = @"P:\0-Boîte à outils Revit\0-Bibliothèque\B-Famille Revit Imag";
 
         private readonly string favoritesFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "SauvegardePréférence", "Favorites.txt");
         private readonly string configFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "SauvegardePréférence", "Config.txt");
@@ -45,7 +45,7 @@ namespace Famille
 
         // Options (exposables dans Paramètres si tu veux)
         private bool useShellThumbs = true;   // ON par défaut
-        private bool useRevitPreview = false;  // OFF (fallback lourd, non branché ici)
+        private bool useRevitPreview = false;  // ON : fallback natif Revit lorsque pas d'image catalogue
 
         // ===== Données UI =====
         private List<FamilyItem> allFamilies = new();
@@ -114,6 +114,7 @@ namespace Famille
 
 
             Famille.CatalogImageResolver.Initialize(familiesFolder, imagesFolder);
+            Famille.FamilyThumbnailProvider.Initialize(FamilyBrowserCommand.uiapp);
 
             // Arbo + Top-8
             LoadFolderTree();
@@ -568,6 +569,7 @@ namespace Famille
 
         // Affiche l’image "catalogue" si elle existe (PNG/JPG).
         // Sinon : cache → Shell → placeholder. IMPORTANT : le Shell NE s’active PAS si une image "prévue" existe.
+        // ====== VIGNETTES (catalogue -> cache -> Revit(type) -> Shell -> placeholder) ======
         private void LoadThumbnailForFamilyItem(FamilyItem fam)
         {
             if (fam == null || fam.Icon != null) return;
@@ -579,14 +581,14 @@ namespace Famille
                 {
                     const int SIZE = 256;
 
-                    // 0) Cache mémoire
+                    // 0) cache mémoire
                     if (_bitmapCache.TryGetValue(fam.Path, out var memCached))
                     {
                         Dispatcher.Invoke(() => fam.Icon = memCached);
                         return;
                     }
 
-                    // 1) Image "prévue" (catalogue) existe ?
+                    // 1) image "catalogue" (PNG/JPG à côté ou miroir)
                     if (TryGetCatalogImagePath(fam.Path, out var plannedImagePath))
                     {
                         var bmp = LoadBitmapImage(plannedImagePath, SIZE);
@@ -597,13 +599,12 @@ namespace Famille
                         }
                         else
                         {
-                            // L’image existe mais est illisible → on n’active PAS le Shell.
                             Dispatcher.Invoke(() => fam.Icon = CreateSolidPlaceholder(180, 180));
                         }
                         return;
                     }
 
-                    // 2) Cache disque (thumbnail générée antérieurement)
+                    // 2) cache disque
                     if (ThumbnailCache.TryGet(thumbCacheFolder, fam.Path, SIZE, out var cached) && File.Exists(cached))
                     {
                         var bmp = LoadBitmapImage(cached, SIZE);
@@ -615,7 +616,24 @@ namespace Famille
                         }
                     }
 
-                    // 3) Miniature Windows (Shell) → seulement s'il n'y a AUCUNE image prévue
+                    // 3) *** Revit : Type Image -> preview de type ***
+                    //    NB: FamilyThumbnailProvider bloque l'ouverture si upgrade nécessaire
+                    if (useRevitPreview)
+                    {
+                        var revitThumb = await FamilyThumbnailProvider
+                                            .RequestFromFamilyFileAsync(fam.Path, SIZE)
+                                            .ConfigureAwait(false);
+
+                        if (revitThumb != null)
+                        {
+                            try { ThumbnailCache.Save(thumbCacheFolder, fam.Path, SIZE, revitThumb); } catch { }
+                            _bitmapCache[fam.Path] = revitThumb;
+                            Dispatcher.Invoke(() => fam.Icon = revitThumb);
+                            return;
+                        }
+                    }
+
+                    // 4) Shell (3D) en dernier recours uniquement
                     if (useShellThumbs && ShellThumbnailProvider.TryGetThumbnail(fam.Path, SIZE, out var shellBmp))
                     {
                         try { ThumbnailCache.Save(thumbCacheFolder, fam.Path, SIZE, shellBmp); } catch { }
@@ -624,7 +642,7 @@ namespace Famille
                         return;
                     }
 
-                    // 4) Placeholder visible
+                    // 5) placeholder
                     Dispatcher.Invoke(() => fam.Icon = CreateSolidPlaceholder(180, 180));
                 }
                 finally
@@ -633,6 +651,7 @@ namespace Famille
                 }
             });
         }
+
 
         // Détecte si une image "catalogue" est PRÉVUE (existe sur disque) — PNG ou JPG
         private bool TryGetCatalogImagePath(string familyPath, out string imgPath)
