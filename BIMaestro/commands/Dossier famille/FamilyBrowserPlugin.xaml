@@ -181,6 +181,7 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
                         <DockPanel Grid.Row="0" LastChildFill="True">
@@ -249,11 +250,19 @@
                                    Foreground="{DynamicResource PrimaryText}"
                                    Margin="0,6,0,0"
                                    TextWrapping="Wrap">
-                            <Run Text="Chemin : "/>
-                            <Run Text="{Binding Path}"/>
+                            <Run Text="Version Revit : "/>
+                            <Run Text="{Binding RevitSavedVersion, TargetNullValue=—}"/>
                         </TextBlock>
 
                         <TextBlock Grid.Row="3"
+                                   Foreground="{DynamicResource PrimaryText}"
+                                   Margin="0,6,0,0"
+                                   TextWrapping="Wrap">
+                            <Run Text="Dernière mise à jour : "/>
+                            <Run Text="{Binding LastUpdatedText, TargetNullValue=—}"/>
+                        </TextBlock>
+
+                        <TextBlock Grid.Row="4"
                                    Foreground="{DynamicResource PrimaryText}"
                                    Margin="0,6,0,0"
                                    TextWrapping="Wrap">
@@ -261,7 +270,7 @@
                             <Run Text="{Binding OmniClassNumber, TargetNullValue=—}"/>
                         </TextBlock>
 
-                        <TextBlock Grid.Row="4"
+                        <TextBlock Grid.Row="5"
                                    Foreground="Gray"
                                    Margin="0,6,0,0"
                                    FontStyle="Italic"
