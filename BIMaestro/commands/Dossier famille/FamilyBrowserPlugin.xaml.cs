@@ -76,7 +76,7 @@ namespace Famille
             new(StringComparer.OrdinalIgnoreCase);
         private static readonly HashSet<string> _omniClassPending =
             new(StringComparer.OrdinalIgnoreCase);
-        private static readonly System.Threading.SemaphoreSlim _omniClassGate = new(1);
+
         private static readonly object _omniClassLock = new();
 
         // ===== Collections =====
@@ -125,6 +125,7 @@ namespace Famille
 
             Famille.CatalogImageResolver.Initialize(familiesFolder, imagesFolder);
             Famille.FamilyThumbnailProvider.Initialize(FamilyBrowserCommand.uiapp);
+            Famille.FamilyMetadataProvider.Initialize(FamilyBrowserCommand.uiapp);
 
             // Arbo + Top-8
             LoadFolderTree();
@@ -672,6 +673,74 @@ namespace Famille
                     _thumbGate.Release();
                 }
             });
+        }
+
+        private void LoadOmniClassForFamilyItem(FamilyItem fam)
+        {
+            if (fam == null || string.IsNullOrEmpty(fam.Path)) return;
+
+            string cached;
+            lock (_omniClassLock)
+            {
+                if (_omniClassCache.TryGetValue(fam.Path, out cached))
+                {
+                    UpdateOmniClassBinding(fam, cached);
+                    return;
+                }
+
+                if (_omniClassPending.Contains(fam.Path))
+                    return;
+
+                _omniClassPending.Add(fam.Path);
+            }
+
+            if (!FamilyMetadataProvider.IsAvailable)
+            {
+                lock (_omniClassLock)
+                {
+                    _omniClassPending.Remove(fam.Path);
+                    _omniClassCache[fam.Path] = null;
+                }
+                UpdateOmniClassBinding(fam, null);
+                return;
+            }
+
+            Task.Run(async () =>
+            {
+                string number = null;
+                try
+                {
+                    number = await FamilyMetadataProvider
+                                    .RequestOmniClassNumberAsync(fam.Path)
+                                    .ConfigureAwait(false);
+                    if (!string.IsNullOrWhiteSpace(number))
+                        number = number.Trim();
+                    else
+                        number = null;
+                }
+                catch
+                {
+                    number = null;
+                }
+
+                lock (_omniClassLock)
+                {
+                    _omniClassPending.Remove(fam.Path);
+                    _omniClassCache[fam.Path] = number;
+                }
+
+                UpdateOmniClassBinding(fam, number);
+            });
+        }
+
+        private void UpdateOmniClassBinding(FamilyItem fam, string value)
+        {
+            if (fam == null) return;
+
+            if (Dispatcher.CheckAccess())
+                fam.OmniClassNumber = value;
+            else
+                Dispatcher.Invoke(() => fam.OmniClassNumber = value);
         }
 
 
@@ -1276,6 +1345,7 @@ namespace Famille
             FamilyListView.ItemsSource = null;
             FamilyListView.ItemsSource = currentItems;
             FamilyListView.Items.Refresh();
+
         }
 
         public static string GetRelativePath(string relativeTo, string path)
@@ -1527,6 +1597,13 @@ namespace Famille
         public string Path { get; set; }
         public string Category { get; set; }
         public string NormalizedName { get; set; }
+
+        private string _omniClassNumber;
+        public string OmniClassNumber
+        {
+            get => _omniClassNumber;
+            set { if (_omniClassNumber != value) { _omniClassNumber = value; OnPropertyChanged(nameof(OmniClassNumber)); } }
+        }
 
         private ImageSource _icon;
         public ImageSource Icon

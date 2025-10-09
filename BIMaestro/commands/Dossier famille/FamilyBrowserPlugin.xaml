@@ -257,21 +257,7 @@
                                    Foreground="{DynamicResource PrimaryText}"
                                    Margin="0,6,0,0"
                                    TextWrapping="Wrap">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding OmniClassNumber}" Value="{x:Null}">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                        </DataTrigger>
-                                        <DataTrigger Binding="{Binding OmniClassNumber}" Value="">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                            <Run Text="Numéro OmniClass : "/>
-                            <Run Text="{Binding OmniClassNumber}"/>
+
                         </TextBlock>
 
                         <TextBlock Grid.Row="4"
@@ -473,6 +459,14 @@
                         </ScrollViewer>
 
                         <DockPanel Grid.Row="3">
+                            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                                <CheckBox x:Name="DetailedViewCheckBox"
+                                          Content="Vue détaillée"
+                                          Margin="0,0,20,0"
+                                          Foreground="{DynamicResource PrimaryText}"
+                                          Checked="DetailedViewCheckBox_Changed"
+                                          Unchecked="DetailedViewCheckBox_Changed"/>
+                            </StackPanel>
                             <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
                                 <TextBlock Text="Familles affichées : " Foreground="{DynamicResource PrimaryText}"/>
                                 <TextBlock x:Name="CountTextBlock" Foreground="{DynamicResource PrimaryText}" FontWeight="Bold"/>
