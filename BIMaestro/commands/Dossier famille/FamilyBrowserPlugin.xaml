@@ -23,6 +23,14 @@
         <SolidColorBrush x:Key="TabBackground"      Color="Transparent"/>
         <SolidColorBrush x:Key="ImageBackground"    Color="Transparent"/>
 
+        <ItemsPanelTemplate x:Key="FamilyListWrapPanel">
+            <WrapPanel IsItemsHost="True"/>
+        </ItemsPanelTemplate>
+
+        <ItemsPanelTemplate x:Key="FamilyListStackPanel">
+            <StackPanel IsItemsHost="True" Orientation="Vertical"/>
+        </ItemsPanelTemplate>
+
         <!-- Styles -->
         <Style TargetType="TreeViewItem">
             <Setter Property="Foreground" Value="{DynamicResource PrimaryText}"/>
@@ -120,6 +128,144 @@
                                    HorizontalAlignment="Center"
                                    Margin="0,0,5,0"
                                    ToolTip="Nom complet de la famille"/>
+                    </Grid>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="FamilyItemDetailedTemplate" DataType="{x:Type local:FamilyItem}">
+            <Border Margin="5"
+                    Background="{DynamicResource PanelBackground}"
+                    CornerRadius="5"
+                    MouseLeftButtonDown="FamilyItem_DoubleClick"
+                    HorizontalAlignment="Stretch">
+                <Border.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Rentrer dans la famille"
+                                  Click="OpenFamilyFile_Click"
+                                  DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                        <MenuItem Header="Charger la dernière version"
+                                  Click="ReloadFamily_Click"
+                                  DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+
+                        <Separator/>
+
+                        <MenuItem Header="Ajouter à la collection active"
+                                  Click="AddToActiveCollection_Click"
+                                  DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                    </ContextMenu>
+                </Border.ContextMenu>
+
+                <Grid Margin="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="220"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Background="{DynamicResource ImageBackground}"
+                            Padding="3"
+                            Grid.Column="0"
+                            HorizontalAlignment="Left">
+                        <Image Source="{Binding Icon}"
+                               Width="200" Height="200"
+                               Stretch="Uniform"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Style="{StaticResource ImageStyle}"/>
+                    </Border>
+
+                    <Grid Grid.Column="1" Margin="15,0,5,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <DockPanel Grid.Row="0" LastChildFill="True">
+                            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                                <Button Content="3D"
+                                        Width="32" Height="22" FontSize="10" Padding="0"
+                                        Margin="0,0,8,0"
+                                        Click="OnPreview3DClick"
+                                        ToolTip="Aperçu 3D de la famille"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        BorderBrush="Transparent"
+                                        FocusVisualStyle="{x:Null}"/>
+                                <Button Content="★"
+                                        Click="FavoriteButton_Click"
+                                        ToolTip="Ajouter/retirer des Favoris"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        FontSize="18"
+                                        Width="32"
+                                        HorizontalAlignment="Right"
+                                        Margin="0,0,0,0">
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="Foreground" Value="SkyBlue"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsFavorite}" Value="True">
+                                                    <Setter Property="Foreground" Value="Orange"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                            </StackPanel>
+                            <TextBlock Text="{Binding Name}"
+                                       Foreground="{DynamicResource PrimaryText}"
+                                       FontWeight="Bold"
+                                       FontSize="16"
+                                       TextWrapping="Wrap"
+                                       Margin="0,0,10,0"
+                                       VerticalAlignment="Center"/>
+                        </DockPanel>
+
+                        <TextBlock Grid.Row="1"
+                                   Foreground="{DynamicResource PrimaryText}"
+                                   Margin="0,6,0,0"
+                                   TextWrapping="Wrap">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Category}" Value="">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Category}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                            <Run Text="Catégorie : "/>
+                            <Run Text="{Binding Category}"/>
+                        </TextBlock>
+
+                        <TextBlock Grid.Row="2"
+                                   Foreground="{DynamicResource PrimaryText}"
+                                   Margin="0,6,0,0"
+                                   TextWrapping="Wrap">
+                            <Run Text="Chemin : "/>
+                            <Run Text="{Binding Path}"/>
+                        </TextBlock>
+
+                        <TextBlock Grid.Row="3"
+                                   Foreground="{DynamicResource PrimaryText}"
+                                   Margin="0,6,0,0"
+                                   TextWrapping="Wrap">
+                            <Run Text="Numéro OmniClass : "/>
+                            <Run Text="{Binding OmniClassNumber, TargetNullValue=—}"/>
+                        </TextBlock>
+
+                        <TextBlock Grid.Row="4"
+                                   Foreground="Gray"
+                                   Margin="0,6,0,0"
+                                   FontStyle="Italic"
+                                   Text="Double-cliquer pour charger la famille"/>
                     </Grid>
                 </Grid>
             </Border>
@@ -287,13 +433,8 @@
 
                                 <!-- Résultats paginés -->
                                 <ItemsControl x:Name="FamilyListView"
-                                              ItemTemplate="{StaticResource FamilyItemTemplate}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <WrapPanel IsItemsHost="True"/>
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                </ItemsControl>
+                                              ItemTemplate="{StaticResource FamilyItemTemplate}"
+                                              ItemsPanel="{StaticResource FamilyListWrapPanel}"/>
 
                                 <TextBlock x:Name="PagingStatusText"
                                            Margin="8,12,8,20"
@@ -304,6 +445,14 @@
                         </ScrollViewer>
 
                         <DockPanel Grid.Row="3">
+                            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                                <CheckBox x:Name="DetailedViewCheckBox"
+                                          Content="Vue détaillée"
+                                          Margin="0,0,20,0"
+                                          Foreground="{DynamicResource PrimaryText}"
+                                          Checked="DetailedViewCheckBox_Changed"
+                                          Unchecked="DetailedViewCheckBox_Changed"/>
+                            </StackPanel>
                             <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
                                 <TextBlock Text="Familles affichées : " Foreground="{DynamicResource PrimaryText}"/>
                                 <TextBlock x:Name="CountTextBlock" Foreground="{DynamicResource PrimaryText}" FontWeight="Bold"/>
