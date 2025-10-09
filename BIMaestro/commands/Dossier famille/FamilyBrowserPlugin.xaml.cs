@@ -14,7 +14,6 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -23,7 +22,7 @@ using WinForms = System.Windows.Forms;
 
 namespace Famille
 {
-    public partial class FamilyBrowserWindow : Window, INotifyPropertyChanged
+    public partial class FamilyBrowserWindow : Window
     {
         // ===== Constantes =====
         private const string FavoritesCollectionId = "builtin_favoris";
@@ -55,9 +54,6 @@ namespace Famille
         private string currentFolderPath;
 
         public string RootFolderName => System.IO.Path.GetFileName(rootFolderPath);
-        public string ActiveCategoryFilter => _activeCategoryFilter;
-        public string ActiveVersionFilter => _activeVersionFilter;
-        public bool IsSizeSortActive => _isSizeSortActive;
 
         // Pagination & recherche
         private const int PageSize = 200;
@@ -79,72 +75,9 @@ namespace Famille
             new(StringComparer.OrdinalIgnoreCase);
         private static readonly object _metadataLock = new();
 
-        private string _activeCategoryFilter;
-        private string _activeVersionFilter;
-        private bool _isSizeSortActive;
-        private bool _pendingSizeResort;
-
         // ===== Collections =====
         private ObservableCollection<Collection> _collections = new();
         private Collection _selectedCollection;
-
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        private enum BubbleFilterType
-        {
-            None,
-            Category,
-            Version,
-            SizeDescending
-        }
-
-        private BubbleFilterType _activeBubbleFilter = BubbleFilterType.None;
-        private string _activeBubbleValue;
-
-        private string _activeCategoryFilter;
-        public string ActiveCategoryFilter
-        {
-            get => _activeCategoryFilter;
-            private set
-            {
-                if (!string.Equals(_activeCategoryFilter, value, StringComparison.OrdinalIgnoreCase))
-                {
-                    _activeCategoryFilter = value;
-                    OnPropertyChanged(nameof(ActiveCategoryFilter));
-                }
-            }
-        }
-
-        private string _activeVersionFilter;
-        public string ActiveVersionFilter
-        {
-            get => _activeVersionFilter;
-            private set
-            {
-                if (!string.Equals(_activeVersionFilter, value, StringComparison.OrdinalIgnoreCase))
-                {
-                    _activeVersionFilter = value;
-                    OnPropertyChanged(nameof(ActiveVersionFilter));
-                }
-            }
-        }
-
-        private bool _isSizeSortActive;
-        public bool IsSizeSortActive
-        {
-            get => _isSizeSortActive;
-            private set
-            {
-                if (_isSizeSortActive != value)
-                {
-                    _isSizeSortActive = value;
-                    OnPropertyChanged(nameof(IsSizeSortActive));
-                }
-            }
-        }
-
-        private void OnPropertyChanged(string propertyName)
-            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
         public FamilyBrowserWindow()
         {
@@ -263,7 +196,6 @@ namespace Famille
             }
 
             currentFolderPath = tv.Tag.ToString();
-            ClearBubbleFilter(refreshView: false);
             LoadFamilies(currentFolderPath, recursive: false);
 
             BeginPaging(allFamilies);
@@ -274,8 +206,6 @@ namespace Famille
 
         private void LoadFamilies(string path, bool recursive)
         {
-            ClearChipFilters();
-
             allFamilies.Clear();
             var opt = recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
 
@@ -291,9 +221,6 @@ namespace Famille
                     return (f.Name, int.MaxValue);
                 })
                 .ToList();
-
-            for (int i = 0; i < allFamilies.Count; i++)
-                allFamilies[i].NaturalOrder = i;
 
             TopFamiliesView.Visibility = Visibility.Collapsed;
             TopSeparator.Visibility = Visibility.Collapsed;
@@ -395,26 +322,6 @@ namespace Famille
             ExportFavoritesCollectionToTxt();
         }
 
-        private void OnInfoChipClick(object sender, RoutedEventArgs e)
-        {
-            if (sender is not Button btn || btn.DataContext is not FamilyItem fam) return;
-
-            switch (btn.Tag as string)
-            {
-                case "Category":
-                    ActivateCategoryFilter(fam.Category);
-                    break;
-                case "Version":
-                    ActivateVersionFilter(fam.RevitSavedVersion);
-                    break;
-                case "Size":
-                    ActivateSizeSort();
-                    break;
-            }
-
-            e.Handled = true;
-        }
-
         private void MarkFavoritesInView(IEnumerable<FamilyItem> items)
         {
             try
@@ -429,172 +336,12 @@ namespace Famille
 
         #endregion
 
-        #region Pastilles interactives
-
-        private void CategoryChip_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not Button btn || btn.DataContext is not FamilyItem fam) return;
-
-            var target = fam.Category;
-            if (EqualsIgnoreCase(_activeCategoryFilter, target))
-                SetActiveCategoryFilter(null);
-            else
-                SetActiveCategoryFilter(target);
-
-            e.Handled = true;
-        }
-
-        private void VersionChip_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not Button btn || btn.DataContext is not FamilyItem fam) return;
-
-            var target = fam.RevitSavedVersion;
-            if (EqualsIgnoreCase(_activeVersionFilter, target))
-                SetActiveVersionFilter(null);
-            else
-                SetActiveVersionFilter(target);
-
-            e.Handled = true;
-        }
-
-        private void SizeChip_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not Button btn || btn.DataContext is not FamilyItem fam) return;
-
-            // assure la récupération du poids même si les métadonnées ne sont pas encore là
-            if (!_isSizeSortActive)
-                _ = GetFileSizeValue(fam);
-
-            SetSizeSortActive(!_isSizeSortActive, applySort: true);
-            e.Handled = true;
-        }
-
-        private void ClearChipFilters()
-        {
-            SetActiveCategoryFilter(null);
-            SetActiveVersionFilter(null);
-            SetSizeSortActive(false, applySort: false);
-        }
-
-        private void SetActiveCategoryFilter(string category)
-        {
-            string normalized = NormalizeFilterValue(category);
-            if (EqualsIgnoreCase(_activeCategoryFilter, normalized))
-                return;
-
-            _activeCategoryFilter = normalized;
-            OnPropertyChanged(nameof(ActiveCategoryFilter));
-        }
-
-        private void SetActiveVersionFilter(string version)
-        {
-            string normalized = NormalizeFilterValue(version);
-            if (EqualsIgnoreCase(_activeVersionFilter, normalized))
-                return;
-
-            _activeVersionFilter = normalized;
-            OnPropertyChanged(nameof(ActiveVersionFilter));
-        }
-
-        private void SetSizeSortActive(bool active, bool applySort)
-        {
-            if (_isSizeSortActive == active)
-            {
-                if (applySort) ApplySizeSort();
-                return;
-            }
-
-            _isSizeSortActive = active;
-            OnPropertyChanged(nameof(IsSizeSortActive));
-            if (!active)
-                _pendingSizeResort = false;
-
-            if (applySort)
-                ApplySizeSort();
-        }
-
-        private static bool EqualsIgnoreCase(string left, string right)
-        {
-            if (left == null && right == null) return true;
-            if (left == null || right == null) return false;
-            return string.Equals(left.Trim(), right.Trim(), StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static string NormalizeFilterValue(string value)
-            => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-
-        private void ApplySizeSort()
-        {
-            if (_currentResult == null) return;
-
-            var source = _currentResult.ToList();
-            List<FamilyItem> ordered;
-
-            if (_isSizeSortActive)
-            {
-                ordered = source
-                    .OrderByDescending(GetFileSizeValue)
-                    .ThenBy(f => f.NaturalOrder)
-                    .ToList();
-            }
-            else
-            {
-                ordered = source
-                    .OrderBy(f => f.NaturalOrder)
-                    .ToList();
-            }
-
-            BeginPaging(ordered);
-        }
-
-        private long GetFileSizeValue(FamilyItem fam)
-        {
-            if (fam == null) return long.MinValue;
-
-            if (fam.FileSizeBytes.HasValue)
-                return fam.FileSizeBytes.Value;
-
-            lock (_metadataLock)
-            {
-                if (_metadataCache.TryGetValue(fam.Path, out var meta) && meta?.FileSizeBytes.HasValue == true)
-                {
-                    fam.FileSizeBytes = meta.FileSizeBytes;
-                    return meta.FileSizeBytes.Value;
-                }
-            }
-
-            try
-            {
-                var info = new FileInfo(fam.Path);
-                fam.FileSizeBytes = info.Length;
-                return info.Length;
-            }
-            catch
-            {
-                return long.MinValue;
-            }
-        }
-
-        private void RequestSizeResort()
-        {
-            if (!_isSizeSortActive || _pendingSizeResort) return;
-
-            _pendingSizeResort = true;
-            Dispatcher.InvokeAsync(() =>
-            {
-                _pendingSizeResort = false;
-                ApplySizeSort();
-            }, DispatcherPriority.Background);
-        }
-
-        #endregion
-
         #region Recherche + pagination
 
         private void SearchBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
         {
             _globalSearchMode = true;
-        
+
             _searchDebounce.Stop();
             _searchDebounce.Start();
         }
@@ -641,16 +388,13 @@ namespace Famille
                 }
 
                 var hits = _index.Search(txt, max: 8000);
-                var items = hits.Select((e, idx) => new FamilyItem
+                var items = hits.Select(e => new FamilyItem
                 {
                     Name = e.Name,
                     Path = e.Path,
                     Category = e.Category,
-                    NormalizedName = e.NormalizedName,
-                    NaturalOrder = idx
+                    NormalizedName = e.NormalizedName
                 }).ToList();
-
-                items = ApplyActiveOrdering(items);
 
                 BeginPaging(items);
                 return;
@@ -661,27 +405,8 @@ namespace Famille
                 if (!string.IsNullOrEmpty(txt))
                     baseSet = baseSet.Where(f => f.NormalizedName.Contains(txt));
 
-                var scoped = baseSet.ToList();
-                scoped = ApplyActiveOrdering(scoped);
-
-                BeginPaging(scoped);
+                BeginPaging(baseSet.ToList());
             }
-        }
-
-        private List<FamilyItem> ApplyActiveOrdering(List<FamilyItem> items)
-        {
-            if (items == null)
-                return new List<FamilyItem>();
-
-            if (_activeBubbleFilter == BubbleFilterType.SizeDescending)
-            {
-                return items
-                    .OrderByDescending(f => f.FileSizeBytes ?? long.MinValue)
-                    .ThenBy(f => f.Name, StringComparer.CurrentCultureIgnoreCase)
-                    .ToList();
-            }
-
-            return items;
         }
 
         private void BeginPaging(List<FamilyItem> fullResult)
@@ -691,131 +416,11 @@ namespace Famille
             displayedFamilies = new List<FamilyItem>();
             FamilyListView.ItemsSource = displayedFamilies;
 
-            ApplyHighlightToCurrentResult();
-
             PagingStatusText.Visibility = Visibility.Visible;
             PagingStatusText.Text = _currentResult.Count == 0 ? "Aucun résultat." : "Chargement...";
 
             AppendNextPage();
             UpdateCount(_currentResult.Count);
-        }
-
-        private void ApplyHighlightToCurrentResult()
-        {
-            if (_currentResult == null) return;
-
-            foreach (var fam in _currentResult)
-            {
-                bool highlight = false;
-
-                if (_activeBubbleFilter == BubbleFilterType.Category && !string.IsNullOrEmpty(_activeBubbleValue))
-                {
-                    highlight = !string.IsNullOrEmpty(fam.Category) &&
-                                string.Equals(fam.Category, _activeBubbleValue, StringComparison.OrdinalIgnoreCase);
-                }
-                else if (_activeBubbleFilter == BubbleFilterType.Version && !string.IsNullOrEmpty(_activeBubbleValue))
-                {
-                    highlight = !string.IsNullOrEmpty(fam.RevitSavedVersion) &&
-                                string.Equals(fam.RevitSavedVersion, _activeBubbleValue, StringComparison.OrdinalIgnoreCase);
-                }
-
-                fam.IsTagHighlighted = highlight;
-            }
-        }
-
-        private void ClearBubbleFilter(bool refreshView = true)
-        {
-            var previous = _activeBubbleFilter;
-
-            _activeBubbleFilter = BubbleFilterType.None;
-            _activeBubbleValue = null;
-            ActiveCategoryFilter = null;
-            ActiveVersionFilter = null;
-            IsSizeSortActive = false;
-
-            if (!refreshView) return;
-
-            if (previous == BubbleFilterType.SizeDescending)
-                ApplyFilters();
-            else
-                ApplyHighlightToCurrentResult();
-        }
-
-        private void ActivateCategoryFilter(string category)
-        {
-            var normalized = category?.Trim();
-            if (string.IsNullOrWhiteSpace(normalized))
-            {
-                ClearBubbleFilter();
-                return;
-            }
-
-            if (_activeBubbleFilter == BubbleFilterType.Category &&
-                string.Equals(_activeBubbleValue, normalized, StringComparison.OrdinalIgnoreCase))
-            {
-                ClearBubbleFilter();
-                return;
-            }
-
-            bool wasSizeSort = _activeBubbleFilter == BubbleFilterType.SizeDescending;
-
-            _activeBubbleFilter = BubbleFilterType.Category;
-            _activeBubbleValue = normalized;
-            ActiveCategoryFilter = normalized;
-            ActiveVersionFilter = null;
-            IsSizeSortActive = false;
-
-            if (wasSizeSort)
-                ApplyFilters();
-            else
-                ApplyHighlightToCurrentResult();
-        }
-
-        private void ActivateVersionFilter(string version)
-        {
-            var normalized = version?.Trim();
-            if (string.IsNullOrWhiteSpace(normalized))
-            {
-                ClearBubbleFilter();
-                return;
-            }
-
-            if (_activeBubbleFilter == BubbleFilterType.Version &&
-                string.Equals(_activeBubbleValue, normalized, StringComparison.OrdinalIgnoreCase))
-            {
-                ClearBubbleFilter();
-                return;
-            }
-
-            bool wasSizeSort = _activeBubbleFilter == BubbleFilterType.SizeDescending;
-
-            _activeBubbleFilter = BubbleFilterType.Version;
-            _activeBubbleValue = normalized;
-            ActiveVersionFilter = normalized;
-            ActiveCategoryFilter = null;
-            IsSizeSortActive = false;
-
-            if (wasSizeSort)
-                ApplyFilters();
-            else
-                ApplyHighlightToCurrentResult();
-        }
-
-        private void ActivateSizeSort()
-        {
-            if (_activeBubbleFilter == BubbleFilterType.SizeDescending)
-            {
-                ClearBubbleFilter();
-                return;
-            }
-
-            _activeBubbleFilter = BubbleFilterType.SizeDescending;
-            _activeBubbleValue = null;
-            ActiveCategoryFilter = null;
-            ActiveVersionFilter = null;
-            IsSizeSortActive = true;
-
-            ApplyFilters();
         }
 
         private void AppendNextPage()
@@ -1142,9 +747,6 @@ namespace Famille
                         fam.Category = null;
                     fam.FileSizeText = null;
                 }
-
-                if (meta?.FileSizeBytes.HasValue == true)
-                    RequestSizeResort();
             }
 
             if (Dispatcher.CheckAccess())
@@ -1723,52 +1325,21 @@ namespace Famille
 
         #endregion
 
-        #region INotifyPropertyChanged
-
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        protected void OnPropertyChanged(string propertyName)
-            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-
-        #endregion
-
         #region Modèle
 
         private FamilyItem CreateFamilyItemFromPath(string path)
         {
             var name = System.IO.Path.GetFileNameWithoutExtension(path);
-            var size = TryGetFileSize(path);
             return new FamilyItem
             {
                 Name = name,
                 Path = path,
                 Icon = null,
-                NormalizedName = StripDiacritics(name).ToLowerInvariant(),
-                FileSizeBytes = size,
-                FileSizeText = FormatFileSize(size)
+                NormalizedName = StripDiacritics(name).ToLowerInvariant()
             };
         }
 
         #endregion
-    }
-
-    public class StringEqualsConverter : IMultiValueConverter
-    {
-        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
-        {
-            if (values == null || values.Length < 2) return false;
-
-            var left = values[0]?.ToString();
-            var right = values[1]?.ToString();
-
-            if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right))
-                return false;
-
-            return string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
-        }
-
-        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
-            => throw new NotSupportedException();
     }
 
     // ======================= FamilyItem =======================
@@ -1830,54 +1401,5 @@ namespace Famille
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged(string propName)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propName));
-    }
-
-    public class ChipActiveConverter : IMultiValueConverter
-    {
-        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
-        {
-            if (values == null || values.Length < 2) return false;
-
-            var value = values[0] as string;
-            var active = values[1] as string;
-
-            if (string.IsNullOrWhiteSpace(value) || string.IsNullOrWhiteSpace(active))
-                return false;
-
-            return string.Equals(value.Trim(), active.Trim(), StringComparison.OrdinalIgnoreCase);
-        }
-
-        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
-            => throw new NotSupportedException();
-    }
-
-    public class FamilyHighlightConverter : IMultiValueConverter
-    {
-        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
-        {
-            if (values == null || values.Length < 4)
-                return false;
-
-            var category = values[0] as string;
-            var activeCategory = values[1] as string;
-            var version = values[2] as string;
-            var activeVersion = values[3] as string;
-
-            bool categoryMatch = !string.IsNullOrWhiteSpace(activeCategory) && AreEqual(category, activeCategory);
-            bool versionMatch = !string.IsNullOrWhiteSpace(activeVersion) && AreEqual(version, activeVersion);
-
-            return categoryMatch || versionMatch;
-        }
-
-        private static bool AreEqual(string left, string right)
-        {
-            if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right))
-                return false;
-
-            return string.Equals(left.Trim(), right.Trim(), StringComparison.OrdinalIgnoreCase);
-        }
-
-        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
-            => throw new NotSupportedException();
     }
 }

@@ -88,7 +88,7 @@ namespace Famille
         private static readonly Regex RxProductVersion = new Regex(@"<\s*(?:[A-Za-z0-9]+:)?product-version\s*>\s*(\d{4})\s*</\s*(?:[A-Za-z0-9]+:)?product-version\s*>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex RxUpdated = new Regex(@"<\s*updated\s*>\s*([0-9T:\-\.Z\+]+)\s*</\s*updated\s*>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-        
+
 
         private static string ExtractOmniClassNumber(string path)
         {
@@ -222,7 +222,7 @@ namespace Famille
                             }
                         }
 
-                       
+
 
                         // chevauchement
                         if (total > overlap) { Buffer.BlockCopy(buffer, total - overlap, buffer, 0, overlap); carry = overlap; }
@@ -267,6 +267,5 @@ namespace Famille
             return s;
         }
 
-        }
     }
-
+}
