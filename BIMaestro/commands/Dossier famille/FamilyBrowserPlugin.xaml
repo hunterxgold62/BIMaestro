@@ -341,6 +341,8 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            
                         </Grid.RowDefinitions>
 
                         <DockPanel Grid.Row="0" LastChildFill="True">
@@ -383,114 +385,179 @@
                                        Margin="0,0,10,0"
                                        VerticalAlignment="Center"/>
                         </DockPanel>
+                        <WrapPanel Grid.Row="1" Margin="0,14,0,0">
+                                <Border Background="#FFE9EEF6"
+                                    BorderBrush="#FFC9D7F5"
+                                    BorderThickness="1"
+                                    CornerRadius="12"
+                                    Padding="10,4"
+                                    Margin="0,0,8,8">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Category}" Value="">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Category}" Value="{x:Null}">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <TextBlock Text="{Binding Category}"
+                                           Foreground="#FF1F3B57"
+                                           FontWeight="SemiBold"/>
+                                </Border>
 
-                        <WrapPanel Grid.Row="1" Margin="0,10,0,0">
-                            <Button Style="{StaticResource CategoryChipStyle}"
-                                    Content="{Binding Category}"
-                                    Click="CategoryChip_Click"/>
+                                <Border Background="#FFF2F5FC"
+                                    BorderBrush="#FFDCE6FA"
+                                    BorderThickness="1"
+                                    CornerRadius="12"
+                                    Padding="10,4"
+                                    Margin="0,0,8,8">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding RevitSavedVersion}" Value="">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding RevitSavedVersion}" Value="{x:Null}">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <TextBlock Foreground="#FF2A3F6A" FontWeight="SemiBold">
+                                    <Run Text="Revit "/>
+                                    <Run Text="{Binding RevitSavedVersion}"/>
+                                    </TextBlock>
+                                </Border>
 
-                            <Button Style="{StaticResource VersionChipStyle}"
-                                    Content="{Binding RevitSavedVersion, StringFormat=Revit {0}}"
-                                    Click="VersionChip_Click"/>
+                                <Border Background="#FFFDF2E8"
+                                    BorderBrush="#FFF6D9B8"
+                                    BorderThickness="1"
+                                    CornerRadius="12"
+                                    Padding="10,4"
+                                    Margin="0,0,8,8">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding FileSizeText}" Value="">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding FileSizeText}" Value="{x:Null}">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <TextBlock Text="{Binding FileSizeText}"
+                                           Foreground="#FF594525"
+                                           FontWeight="SemiBold"/>
+                                </Border>
+                            </WrapPanel>
 
-                            <Button Style="{StaticResource SizeChipStyle}"
-                                    Content="{Binding FileSizeText}"
-                                    Click="SizeChip_Click"/>
-                        </WrapPanel>
-
-                        <Border Grid.Row="2"
-                                Margin="0,10,0,0"
+                            <Border Grid.Row="2"
+                                Margin="0,16,0,0"
                                 Background="#FFFFFFFF"
                                 BorderBrush="#22000000"
                                 BorderThickness="1"
                                 CornerRadius="10"
                                 Padding="18">
-                            <StackPanel>
-                                <TextBlock Text="Détails"
+                                <StackPanel>
+                                    <TextBlock Text="Détails"
                                            Foreground="#FF1F3B57"
                                            FontWeight="SemiBold"
                                            FontSize="14"/>
-                                <Border Height="1"
+                                    <Border Height="1"
                                         Margin="0,10,0,14"
                                         Background="#22000000"/>
 
-                                <Grid Margin="0,0,0,12">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="18"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0"
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="18"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0"
                                                Foreground="#FF6C7A92"
                                                FontWeight="SemiBold"
                                                Text="Catégorie"/>
-                                    <TextBlock Grid.Column="2"
+                                        <TextBlock Grid.Column="2"
                                                Foreground="#FF1F3B57"
                                                Text="{Binding Category, TargetNullValue=—}"/>
-                                </Grid>
+                                    </Grid>
 
-                                <Grid Margin="0,0,0,12">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="18"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0"
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="18"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0"
                                                Foreground="#FF6C7A92"
                                                FontWeight="SemiBold"
                                                Text="Version Revit"/>
-                                    <TextBlock Grid.Column="2"
+                                        <TextBlock Grid.Column="2"
                                                Foreground="#FF1F3B57"
                                                Text="{Binding RevitSavedVersion, TargetNullValue=—}"/>
-                                </Grid>
+                                    </Grid>
 
-                                <Grid Margin="0,0,0,12">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="18"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0"
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="18"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0"
                                                Foreground="#FF6C7A92"
                                                FontWeight="SemiBold"
                                                Text="Dernière mise à jour"/>
-                                    <TextBlock Grid.Column="2"
+                                        <TextBlock Grid.Column="2"
                                                Foreground="#FF1F3B57"
                                                Text="{Binding LastUpdatedText, TargetNullValue=—}"/>
-                                </Grid>
+                                    </Grid>
 
-                                <Grid Margin="0,0,0,12">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="18"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0"
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="18"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0"
                                                Foreground="#FF6C7A92"
                                                FontWeight="SemiBold"
                                                Text="Taille du fichier"/>
-                                    <TextBlock Grid.Column="2"
+                                        <TextBlock Grid.Column="2"
                                                Foreground="#FF1F3B57"
                                                Text="{Binding FileSizeText, TargetNullValue=—}"/>
-                                </Grid>
+                                    </Grid>
 
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="18"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0"
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="18"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0"
                                                Foreground="#FF6C7A92"
                                                FontWeight="SemiBold"
                                                Text="Numéro OmniClass"/>
-                                    <TextBlock Grid.Column="2"
+                                        <TextBlock Grid.Column="2"
                                                Foreground="#FF1F3B57"
                                                Text="{Binding OmniClassNumber, TargetNullValue=—}"/>
-                                </Grid>
-                            </StackPanel>
-                        </Border>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
 
+                            <TextBlock Grid.Row="3"
+                                   Foreground="Gray"
+                                   Margin="0,18,0,0"
+                                   FontStyle="Italic"
+                                   Text="Double-cliquer pour charger la famille"/>
                     </Grid>
                 </Grid>
             </Border>
