@@ -710,6 +710,8 @@ namespace Famille
                     ? null
                     : meta.OmniClassCode.Trim();
 
+                fam.FileSizeText = FormatFileSize(meta?.FileSizeBytes);
+
                 if (meta != null)
                 {
                     fam.Category = string.IsNullOrWhiteSpace(meta.Category)
@@ -743,6 +745,7 @@ namespace Famille
                     fam.RevitSavedVersion = null;
                     if (string.IsNullOrWhiteSpace(fam.Category))
                         fam.Category = null;
+                    fam.FileSizeText = null;
                 }
             }
 
@@ -750,6 +753,26 @@ namespace Famille
                 Apply();
             else
                 Dispatcher.Invoke(Apply);
+        }
+
+        private static string FormatFileSize(long? bytes)
+        {
+            if (!bytes.HasValue || bytes.Value <= 0)
+                return null;
+
+            double mb = bytes.Value / (1024d * 1024d);
+            if (mb >= 1d)
+                return string.Format(CultureInfo.CurrentCulture, "{0:N2} Mo", mb);
+
+            double kb = bytes.Value / 1024d;
+            if (kb >= 1d)
+                return string.Format(CultureInfo.CurrentCulture, "{0:N0} Ko", kb);
+
+            return string.Format(
+                CultureInfo.CurrentCulture,
+                "{0} octet{1}",
+                bytes.Value,
+                bytes.Value > 1 ? "s" : string.Empty);
         }
 
 
@@ -1366,6 +1389,13 @@ namespace Famille
         {
             get => _lastUpdatedText;
             set { if (_lastUpdatedText != value) { _lastUpdatedText = value; OnPropertyChanged(nameof(LastUpdatedText)); } }
+        }
+
+        private string _fileSizeText;
+        public string FileSizeText
+        {
+            get => _fileSizeText;
+            set { if (_fileSizeText != value) { _fileSizeText = value; OnPropertyChanged(nameof(FileSizeText)); } }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
