@@ -44,12 +44,147 @@
             </Setter>
         </Style>
 
+        <local:ChipActiveConverter x:Key="ChipActiveConverter"/>
+        <local:FamilyHighlightConverter x:Key="FamilyHighlightConverter"/>
+
+        <Style x:Key="ChipButtonBaseStyle" TargetType="Button">
+            <Setter Property="Padding" Value="10,4"/>
+            <Setter Property="Margin" Value="0,0,8,8"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="12"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="CategoryChipStyle" TargetType="Button" BasedOn="{StaticResource ChipButtonBaseStyle}">
+            <Setter Property="Background" Value="#FFE9EEF6"/>
+            <Setter Property="BorderBrush" Value="#FFC9D7F5"/>
+            <Setter Property="Foreground" Value="#FF1F3B57"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#FFD9E3F5"/>
+                    <Setter Property="BorderBrush" Value="#FFB1C3E9"/>
+                </Trigger>
+                <DataTrigger Binding="{Binding Category}" Value="">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Category}" Value="{x:Null}">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+                <DataTrigger Value="True">
+                    <DataTrigger.Binding>
+                        <MultiBinding Converter="{StaticResource ChipActiveConverter}">
+                            <Binding Path="Category"/>
+                            <Binding Path="ActiveCategoryFilter" RelativeSource="{RelativeSource AncestorType=Window}"/>
+                        </MultiBinding>
+                    </DataTrigger.Binding>
+                    <Setter Property="Background" Value="#FFCBD8F6"/>
+                    <Setter Property="BorderBrush" Value="#FF87A3E2"/>
+                    <Setter Property="Foreground" Value="#FF1C2F4D"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="VersionChipStyle" TargetType="Button" BasedOn="{StaticResource ChipButtonBaseStyle}">
+            <Setter Property="Background" Value="#FFF2F5FC"/>
+            <Setter Property="BorderBrush" Value="#FFDCE6FA"/>
+            <Setter Property="Foreground" Value="#FF2A3F6A"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#FFE4ECFA"/>
+                    <Setter Property="BorderBrush" Value="#FFC1D3F6"/>
+                </Trigger>
+                <DataTrigger Binding="{Binding RevitSavedVersion}" Value="">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding RevitSavedVersion}" Value="{x:Null}">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+                <DataTrigger Value="True">
+                    <DataTrigger.Binding>
+                        <MultiBinding Converter="{StaticResource ChipActiveConverter}">
+                            <Binding Path="RevitSavedVersion"/>
+                            <Binding Path="ActiveVersionFilter" RelativeSource="{RelativeSource AncestorType=Window}"/>
+                        </MultiBinding>
+                    </DataTrigger.Binding>
+                    <Setter Property="Background" Value="#FFD7E4FB"/>
+                    <Setter Property="BorderBrush" Value="#FF96B6F1"/>
+                    <Setter Property="Foreground" Value="#FF1E3162"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SizeChipStyle" TargetType="Button" BasedOn="{StaticResource ChipButtonBaseStyle}">
+            <Setter Property="Background" Value="#FFFDF2E8"/>
+            <Setter Property="BorderBrush" Value="#FFF6D9B8"/>
+            <Setter Property="Foreground" Value="#FF594525"/>
+            <Setter Property="ToolTip" Value="Cliquer pour trier par taille (décroissant)"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#FFF7E5CF"/>
+                    <Setter Property="BorderBrush" Value="#FFE8C69E"/>
+                </Trigger>
+                <DataTrigger Binding="{Binding FileSizeText}" Value="">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding FileSizeText}" Value="{x:Null}">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsSizeSortActive, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                    <Setter Property="Background" Value="#FFFFE6C7"/>
+                    <Setter Property="BorderBrush" Value="#FFEDBC82"/>
+                    <Setter Property="Foreground" Value="#FF3E2A0F"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <!-- Vignette famille (onglet Dossiers) -->
         <DataTemplate x:Key="FamilyItemTemplate" DataType="{x:Type local:FamilyItem}">
             <Border Margin="5" Width="200"
-                    Background="{DynamicResource PanelBackground}"
                     CornerRadius="5"
                     MouseLeftButtonDown="FamilyItem_DoubleClick">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Background" Value="{DynamicResource PanelBackground}"/>
+                        <Setter Property="BorderBrush" Value="#22000000"/>
+                        <Setter Property="BorderThickness" Value="0"/>
+                        <Setter Property="Effect" Value="{x:Null}"/>
+                        <Style.Triggers>
+                            <DataTrigger Value="True">
+                                <DataTrigger.Binding>
+                                    <MultiBinding Converter="{StaticResource FamilyHighlightConverter}">
+                                        <Binding Path="Category"/>
+                                        <Binding Path="ActiveCategoryFilter" RelativeSource="{RelativeSource AncestorType=Window}"/>
+                                        <Binding Path="RevitSavedVersion"/>
+                                        <Binding Path="ActiveVersionFilter" RelativeSource="{RelativeSource AncestorType=Window}"/>
+                                    </MultiBinding>
+                                </DataTrigger.Binding>
+                                <Setter Property="Background" Value="#FFF4F8FF"/>
+                                <Setter Property="BorderBrush" Value="#FF6AA7FF"/>
+                                <Setter Property="BorderThickness" Value="2"/>
+                                <Setter Property="Effect">
+                                    <Setter.Value>
+                                        <DropShadowEffect Color="#FF6AA7FF" ShadowDepth="0" BlurRadius="18" Opacity="0.35"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
                 <Border.ContextMenu>
                     <ContextMenu>
                         <MenuItem Header="Rentrer dans la famille"
@@ -135,10 +270,37 @@
 
         <DataTemplate x:Key="FamilyItemDetailedTemplate" DataType="{x:Type local:FamilyItem}">
             <Border Margin="5"
-                    Background="{DynamicResource PanelBackground}"
                     CornerRadius="5"
                     MouseLeftButtonDown="FamilyItem_DoubleClick"
                     HorizontalAlignment="Stretch">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Background" Value="{DynamicResource PanelBackground}"/>
+                        <Setter Property="BorderBrush" Value="#22000000"/>
+                        <Setter Property="BorderThickness" Value="0"/>
+                        <Setter Property="Effect" Value="{x:Null}"/>
+                        <Style.Triggers>
+                            <DataTrigger Value="True">
+                                <DataTrigger.Binding>
+                                    <MultiBinding Converter="{StaticResource FamilyHighlightConverter}">
+                                        <Binding Path="Category"/>
+                                        <Binding Path="ActiveCategoryFilter" RelativeSource="{RelativeSource AncestorType=Window}"/>
+                                        <Binding Path="RevitSavedVersion"/>
+                                        <Binding Path="ActiveVersionFilter" RelativeSource="{RelativeSource AncestorType=Window}"/>
+                                    </MultiBinding>
+                                </DataTrigger.Binding>
+                                <Setter Property="Background" Value="#FFF4F8FF"/>
+                                <Setter Property="BorderBrush" Value="#FF6AA7FF"/>
+                                <Setter Property="BorderThickness" Value="2"/>
+                                <Setter Property="Effect">
+                                    <Setter.Value>
+                                        <DropShadowEffect Color="#FF6AA7FF" ShadowDepth="0" BlurRadius="18" Opacity="0.35"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
                 <Border.ContextMenu>
                     <ContextMenu>
                         <MenuItem Header="Rentrer dans la famille"
@@ -174,11 +336,8 @@
                                Style="{StaticResource ImageStyle}"/>
                     </Border>
 
-                    <Grid Grid.Column="1" Margin="15,0,5,0">
+                    <Grid Grid.Column="1" Margin="20,0,10,0">
                         <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
@@ -219,62 +378,119 @@
                             <TextBlock Text="{Binding Name}"
                                        Foreground="{DynamicResource PrimaryText}"
                                        FontWeight="Bold"
-                                       FontSize="16"
+                                       FontSize="18"
                                        TextWrapping="Wrap"
                                        Margin="0,0,10,0"
                                        VerticalAlignment="Center"/>
                         </DockPanel>
 
-                        <TextBlock Grid.Row="1"
-                                   Foreground="{DynamicResource PrimaryText}"
-                                   Margin="0,6,0,0"
-                                   TextWrapping="Wrap">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding Category}" Value="">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                        </DataTrigger>
-                                        <DataTrigger Binding="{Binding Category}" Value="{x:Null}">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                            <Run Text="Catégorie : "/>
-                            <Run Text="{Binding Category}"/>
-                        </TextBlock>
+                        <WrapPanel Grid.Row="1" Margin="0,10,0,0">
+                            <Button Style="{StaticResource CategoryChipStyle}"
+                                    Content="{Binding Category}"
+                                    Click="CategoryChip_Click"/>
 
-                        <TextBlock Grid.Row="2"
-                                   Foreground="{DynamicResource PrimaryText}"
-                                   Margin="0,6,0,0"
-                                   TextWrapping="Wrap">
-                            <Run Text="Version Revit : "/>
-                            <Run Text="{Binding RevitSavedVersion, TargetNullValue=—}"/>
-                        </TextBlock>
+                            <Button Style="{StaticResource VersionChipStyle}"
+                                    Content="{Binding RevitSavedVersion, StringFormat=Revit {0}}"
+                                    Click="VersionChip_Click"/>
 
-                        <TextBlock Grid.Row="3"
-                                   Foreground="{DynamicResource PrimaryText}"
-                                   Margin="0,6,0,0"
-                                   TextWrapping="Wrap">
-                            <Run Text="Dernière mise à jour : "/>
-                            <Run Text="{Binding LastUpdatedText, TargetNullValue=—}"/>
-                        </TextBlock>
+                            <Button Style="{StaticResource SizeChipStyle}"
+                                    Content="{Binding FileSizeText}"
+                                    Click="SizeChip_Click"/>
+                        </WrapPanel>
 
-                        <TextBlock Grid.Row="4"
-                                   Foreground="{DynamicResource PrimaryText}"
-                                   Margin="0,6,0,0"
-                                   TextWrapping="Wrap">
-                            <Run Text="Numéro OmniClass : "/>
-                            <Run Text="{Binding OmniClassNumber, TargetNullValue=—}"/>
-                        </TextBlock>
+                        <Border Grid.Row="2"
+                                Margin="0,10,0,0"
+                                Background="#FFFFFFFF"
+                                BorderBrush="#22000000"
+                                BorderThickness="1"
+                                CornerRadius="10"
+                                Padding="18">
+                            <StackPanel>
+                                <TextBlock Text="Détails"
+                                           Foreground="#FF1F3B57"
+                                           FontWeight="SemiBold"
+                                           FontSize="14"/>
+                                <Border Height="1"
+                                        Margin="0,10,0,14"
+                                        Background="#22000000"/>
 
-                        <TextBlock Grid.Row="5"
-                                   Foreground="Gray"
-                                   Margin="0,6,0,0"
-                                   FontStyle="Italic"
-                                   Text="Double-cliquer pour charger la famille"/>
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="18"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0"
+                                               Foreground="#FF6C7A92"
+                                               FontWeight="SemiBold"
+                                               Text="Catégorie"/>
+                                    <TextBlock Grid.Column="2"
+                                               Foreground="#FF1F3B57"
+                                               Text="{Binding Category, TargetNullValue=—}"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="18"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0"
+                                               Foreground="#FF6C7A92"
+                                               FontWeight="SemiBold"
+                                               Text="Version Revit"/>
+                                    <TextBlock Grid.Column="2"
+                                               Foreground="#FF1F3B57"
+                                               Text="{Binding RevitSavedVersion, TargetNullValue=—}"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="18"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0"
+                                               Foreground="#FF6C7A92"
+                                               FontWeight="SemiBold"
+                                               Text="Dernière mise à jour"/>
+                                    <TextBlock Grid.Column="2"
+                                               Foreground="#FF1F3B57"
+                                               Text="{Binding LastUpdatedText, TargetNullValue=—}"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="18"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0"
+                                               Foreground="#FF6C7A92"
+                                               FontWeight="SemiBold"
+                                               Text="Taille du fichier"/>
+                                    <TextBlock Grid.Column="2"
+                                               Foreground="#FF1F3B57"
+                                               Text="{Binding FileSizeText, TargetNullValue=—}"/>
+                                </Grid>
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="18"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0"
+                                               Foreground="#FF6C7A92"
+                                               FontWeight="SemiBold"
+                                               Text="Numéro OmniClass"/>
+                                    <TextBlock Grid.Column="2"
+                                               Foreground="#FF1F3B57"
+                                               Text="{Binding OmniClassNumber, TargetNullValue=—}"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
                     </Grid>
                 </Grid>
             </Border>
