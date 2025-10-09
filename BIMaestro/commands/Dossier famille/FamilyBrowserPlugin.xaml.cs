@@ -1,4 +1,5 @@
-﻿using Autodesk.Revit.UI;
+﻿using Autodesk.Revit.DB;
+using Autodesk.Revit.UI;
 using BIMaestro.UI;
 using Famille.Orbit3D;
 using Newtonsoft.Json;
@@ -10,7 +11,9 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -73,6 +76,7 @@ namespace Famille
             new(StringComparer.OrdinalIgnoreCase);
         private static readonly HashSet<string> _omniClassPending =
             new(StringComparer.OrdinalIgnoreCase);
+
         private static readonly object _omniClassLock = new();
 
         // ===== Collections =====
@@ -395,13 +399,19 @@ namespace Famille
                 }
 
                 var hits = _index.Search(txt, max: 8000);
-                var items = hits.Select(e => new FamilyItem
+                var items = new List<FamilyItem>();
+                foreach (var e in hits)
                 {
-                    Name = e.Name,
-                    Path = e.Path,
-                    Category = e.Category,
-                    NormalizedName = e.NormalizedName
-                }).ToList();
+                    var item = new FamilyItem
+                    {
+                        Name = e.Name,
+                        Path = e.Path,
+                        Category = e.Category,
+                        NormalizedName = e.NormalizedName
+                    };
+                    ApplyCachedOmniClassIfAvailable(item);
+                    items.Add(item);
+                }
 
                 BeginPaging(items);
                 return;
@@ -734,6 +744,281 @@ namespace Famille
         }
 
 
+        private void LoadOmniClassForFamilyItem(FamilyItem fam)
+        {
+            if (fam == null || string.IsNullOrWhiteSpace(fam.Path)) return;
+
+            string cached = null;
+
+            lock (_omniClassLock)
+            {
+                if (_omniClassCache.TryGetValue(fam.Path, out cached))
+                {
+                }
+                else if (fam.OmniClassNumber != null)
+                {
+                    _omniClassCache[fam.Path] = fam.OmniClassNumber;
+                    return;
+                }
+                else
+                {
+                    if (_omniClassPending.Contains(fam.Path))
+                        return;
+
+                    _omniClassPending.Add(fam.Path);
+                }
+            }
+
+            if (cached != null)
+            {
+                if (fam.OmniClassNumber != cached)
+                    fam.OmniClassNumber = cached;
+                return;
+            }
+
+            Task.Run(async () =>
+            {
+                string result = null;
+                try
+                {
+                    await _omniClassGate.WaitAsync().ConfigureAwait(false);
+                    result = TryExtractOmniClassNumber(fam.Path);
+                }
+                catch
+                {
+                    result = null;
+                }
+                finally
+                {
+                    _omniClassGate.Release();
+                }
+
+                if (string.IsNullOrWhiteSpace(result))
+                    result = "Non renseigné";
+                else
+                    result = result.Trim();
+
+                lock (_omniClassLock)
+                {
+                    _omniClassCache[fam.Path] = result;
+                    _omniClassPending.Remove(fam.Path);
+                }
+
+                var finalResult = result;
+                try
+                {
+                    if (!Dispatcher.HasShutdownStarted)
+                    {
+                        Dispatcher.Invoke(() => fam.OmniClassNumber = finalResult);
+                    }
+                }
+                catch { }
+            });
+        }
+
+        private void ApplyCachedOmniClassIfAvailable(FamilyItem fam)
+        {
+            if (fam == null || string.IsNullOrWhiteSpace(fam.Path)) return;
+
+            lock (_omniClassLock)
+            {
+                if (_omniClassCache.TryGetValue(fam.Path, out var cached))
+                    fam.OmniClassNumber = cached;
+            }
+        }
+
+        private string TryExtractOmniClassNumber(string familyPath)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(familyPath) || !File.Exists(familyPath))
+                    return null;
+
+                var uiapp = FamilyBrowserCommand.uiapp;
+                var app = uiapp?.Application;
+                if (app == null)
+                    return null;
+
+                if (FamilyFileRequiresUpgrade(app, familyPath))
+                    return null;
+
+                Document famDoc = null;
+                try
+                {
+                    famDoc = app.OpenDocumentFile(familyPath);
+                    if (famDoc == null || !famDoc.IsFamilyDocument)
+                        return null;
+
+                    var value = ExtractOmniClassFromDocument(famDoc);
+                    return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+                }
+                catch
+                {
+                    return null;
+                }
+                finally
+                {
+                    if (famDoc != null)
+                    {
+                        try { famDoc.Close(false); } catch { }
+                    }
+                }
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private string ExtractOmniClassFromDocument(Document famDoc)
+        {
+            if (famDoc == null) return null;
+
+            try
+            {
+                var fam = famDoc.OwnerFamily;
+                if (fam != null)
+                {
+                    var param = fam.get_Parameter(BuiltInParameter.OMNICLASS_CODE);
+                    if (param != null)
+                    {
+                        var value = param.AsString();
+                        if (!string.IsNullOrWhiteSpace(value)) return value.Trim();
+
+                        value = param.AsValueString();
+                        if (!string.IsNullOrWhiteSpace(value)) return value.Trim();
+                    }
+                }
+
+                var manager = famDoc.FamilyManager;
+                if (manager != null)
+                {
+                    FamilyParameter target = null;
+                    try { target = manager.get_Parameter(BuiltInParameter.OMNICLASS_CODE); } catch { target = null; }
+
+                    if (target == null)
+                    {
+                        foreach (FamilyParameter p in manager.Parameters)
+                        {
+                            var name = p.Definition?.Name;
+                            if (!string.IsNullOrEmpty(name) &&
+                                name.IndexOf("omniclass", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                target = p;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (target != null)
+                    {
+                        string value = null;
+                        try { value = manager.CurrentType?.AsString(target); } catch { }
+                        if (string.IsNullOrWhiteSpace(value))
+                        {
+                            try { value = manager.CurrentType?.AsValueString(target); } catch { }
+                        }
+                        if (string.IsNullOrWhiteSpace(value) && manager.OwnerFamily != null)
+                        {
+                            try
+                            {
+                                var famParam = manager.OwnerFamily.get_Parameter(target.Id);
+                                value = famParam?.AsString();
+                                if (string.IsNullOrWhiteSpace(value))
+                                    value = famParam?.AsValueString();
+                            }
+                            catch { }
+                        }
+                        if (!string.IsNullOrWhiteSpace(value)) return value.Trim();
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return null;
+        }
+
+        private bool FamilyFileRequiresUpgrade(Autodesk.Revit.ApplicationServices.Application app, string rfaPath)
+        {
+            try
+            {
+                var info = BasicFileInfo.Extract(rfaPath);
+                if (info == null) return true;
+
+                int current = ParseYear(app?.VersionNumber);
+
+                if (TryGetSavedMajorVersion(info, out int saved))
+                    return saved != current;
+
+                if (TryGetYearFromProp(info, "RevitBuild", out saved) ||
+                    TryGetYearFromProp(info, "RevitProduct", out saved) ||
+                    TryGetYearFromProp(info, "Format", out saved))
+                    return saved != current;
+
+                return true;
+            }
+            catch
+            {
+                return true;
+            }
+        }
+
+        private bool TryGetSavedMajorVersion(object info, out int year)
+        {
+            return
+                TryGetYearFromProp(info, "SavedInVersion", out year) ||
+                TryGetYearFromProp(info, "SavedInVersionNumber", out year) ||
+                TryGetYearFromProp(info, "SavedInVersionMajor", out year) ||
+                TryGetYearFromProp(info, "SavedIn", out year) ||
+                TryGetYearFromProp(info, "FileVersion", out year);
+        }
+
+        private bool TryGetYearFromProp(object obj, string propName, out int year)
+        {
+            year = 0;
+            var p = obj.GetType().GetProperty(propName, BindingFlags.Public | BindingFlags.Instance);
+            if (p == null) return false;
+
+            var val = p.GetValue(obj);
+            if (val == null) return false;
+
+            if (val is int i)
+            {
+                year = NormalizeToYear(i);
+                return year >= 2008;
+            }
+
+            string s = val.ToString();
+            var m = Regex.Match(s ?? string.Empty, @"\b(20\d{2})\b");
+            if (m.Success && int.TryParse(m.Groups[1].Value, out year))
+                return true;
+
+            if (int.TryParse(s, out i))
+            {
+                year = NormalizeToYear(i);
+                return year >= 2008;
+            }
+
+            return false;
+        }
+
+        private int NormalizeToYear(int v)
+        {
+            if (v < 100 && v >= 8) return 2000 + v;
+            return v;
+        }
+
+        private int ParseYear(string s)
+        {
+            if (int.TryParse(s, out int v)) return NormalizeToYear(v);
+            var m = Regex.Match(s ?? string.Empty, @"\b(20\d{2})\b");
+            if (m.Success && int.TryParse(m.Groups[1].Value, out int y)) return y;
+            return DateTime.Now.Year;
+        }
+
+
         // Détecte si une image "catalogue" est PRÉVUE (existe sur disque) — PNG ou JPG
         private bool TryGetCatalogImagePath(string familyPath, out string imgPath)
         {
@@ -1061,11 +1346,6 @@ namespace Famille
             FamilyListView.ItemsSource = currentItems;
             FamilyListView.Items.Refresh();
 
-            if (detailedViewMode && currentItems != null)
-            {
-                foreach (var item in currentItems)
-                    LoadOmniClassForFamilyItem(item);
-            }
         }
 
         public static string GetRelativePath(string relativeTo, string path)
@@ -1293,7 +1573,7 @@ namespace Famille
             if (low.Contains("porte")) cat = "Porte";
             else if (low.Contains("fenetre") || low.Contains("fenêtre")) cat = "Fenêtre";
 
-            return new FamilyItem
+            var item = new FamilyItem
             {
                 Name = name,
                 Path = path,
@@ -1301,6 +1581,9 @@ namespace Famille
                 Icon = null,
                 NormalizedName = StripDiacritics(name).ToLowerInvariant()
             };
+
+            ApplyCachedOmniClassIfAvailable(item);
+            return item;
         }
 
         #endregion
@@ -1334,6 +1617,13 @@ namespace Famille
         {
             get => _isFavorite;
             set { if (_isFavorite != value) { _isFavorite = value; OnPropertyChanged(nameof(IsFavorite)); } }
+        }
+
+        private string _omniClassNumber;
+        public string OmniClassNumber
+        {
+            get => _omniClassNumber;
+            set { if (_omniClassNumber != value) { _omniClassNumber = value; OnPropertyChanged(nameof(OmniClassNumber)); } }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

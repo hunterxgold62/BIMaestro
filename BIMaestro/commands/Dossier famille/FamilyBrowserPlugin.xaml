@@ -257,8 +257,7 @@
                                    Foreground="{DynamicResource PrimaryText}"
                                    Margin="0,6,0,0"
                                    TextWrapping="Wrap">
-                            <Run Text="Numéro OmniClass : "/>
-                            <Run Text="{Binding OmniClassNumber, TargetNullValue=—}"/>
+
                         </TextBlock>
 
                         <TextBlock Grid.Row="4"
@@ -358,8 +357,15 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel Grid.Column="0" Background="Transparent">
+                    <Grid Grid.Column="0" Background="Transparent">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
                         <Button x:Name="AllFamiliesButton"
+                                Grid.Row="0"
                                 Content="{Binding RootFolderName}"
                                 FontSize="14" FontWeight="Bold"
                                 Foreground="{DynamicResource PrimaryText}"
@@ -369,12 +375,20 @@
                                 HorizontalContentAlignment="Left"
                                 Click="AllFamiliesButton_Click"/>
                         <TreeView x:Name="FolderTreeView"
+                                  Grid.Row="1"
                                   Background="{DynamicResource TreeViewBackground}"
                                   Foreground="{DynamicResource PrimaryText}"
                                   Height="460"
                                   ScrollViewer.VerticalScrollBarVisibility="Auto"
                                   SelectedItemChanged="FolderTreeView_SelectedItemChanged"/>
-                    </StackPanel>
+                        <CheckBox x:Name="DetailedViewCheckBox"
+                                  Grid.Row="2"
+                                  Content="Vue détaillée"
+                                  Margin="5,12,0,0"
+                                  Foreground="{DynamicResource PrimaryText}"
+                                  Checked="DetailedViewCheckBox_Changed"
+                                  Unchecked="DetailedViewCheckBox_Changed"/>
+                    </Grid>
 
                     <Grid Grid.Column="1" Background="Transparent">
                         <Grid.RowDefinitions>
@@ -524,6 +538,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
@@ -572,14 +587,14 @@
                                   Unchecked="ShowTop8CheckBox_Changed" Height="16"/>
                     </StackPanel>
 
-                    <StackPanel Orientation="Horizontal" Grid.Row="8" Margin="0,6,0,5">
+                    <StackPanel Orientation="Horizontal" Grid.Row="9" Margin="0,6,0,5">
                         <TextBlock Text="Toujours au-dessus :" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource PrimaryText}"/>
                         <CheckBox x:Name="AlwaysOnTopCheckBox"
                                   Checked="AlwaysOnTopCheckBox_Changed"
                                   Unchecked="AlwaysOnTopCheckBox_Changed"/>
                     </StackPanel>
 
-                    <StackPanel Orientation="Horizontal" Grid.Row="9" Margin="0,10,0,10">
+                    <StackPanel Orientation="Horizontal" Grid.Row="10" Margin="0,10,0,10">
                         <Button Content="Appliquer" Click="ApplyColors_Click" Margin="0,0,10,0" Width="100"/>
                         <Button Content="Enregistrer" Click="SaveConfig_Click" Margin="0,0,10,0" Width="100"/>
                         <Button Content="Réinitialiser" Click="ResetConfig_Click" Width="100"/>
