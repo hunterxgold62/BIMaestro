@@ -14,6 +14,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -22,7 +23,7 @@ using WinForms = System.Windows.Forms;
 
 namespace Famille
 {
-    public partial class FamilyBrowserWindow : Window
+    public partial class FamilyBrowserWindow : Window, INotifyPropertyChanged
     {
         // ===== Constantes =====
         private const string FavoritesCollectionId = "builtin_favoris";
@@ -54,6 +55,9 @@ namespace Famille
         private string currentFolderPath;
 
         public string RootFolderName => System.IO.Path.GetFileName(rootFolderPath);
+        public string ActiveCategoryFilter => _activeCategoryFilter;
+        public string ActiveVersionFilter => _activeVersionFilter;
+        public bool IsSizeSortActive => _isSizeSortActive;
 
         // Pagination & recherche
         private const int PageSize = 200;
@@ -74,6 +78,11 @@ namespace Famille
         private static readonly HashSet<string> _metadataPending =
             new(StringComparer.OrdinalIgnoreCase);
         private static readonly object _metadataLock = new();
+
+        private string _activeCategoryFilter;
+        private string _activeVersionFilter;
+        private bool _isSizeSortActive;
+        private bool _pendingSizeResort;
 
         // ===== Collections =====
         private ObservableCollection<Collection> _collections = new();
@@ -265,6 +274,8 @@ namespace Famille
 
         private void LoadFamilies(string path, bool recursive)
         {
+            ClearChipFilters();
+
             allFamilies.Clear();
             var opt = recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
 
@@ -280,6 +291,9 @@ namespace Famille
                     return (f.Name, int.MaxValue);
                 })
                 .ToList();
+
+            for (int i = 0; i < allFamilies.Count; i++)
+                allFamilies[i].NaturalOrder = i;
 
             TopFamiliesView.Visibility = Visibility.Collapsed;
             TopSeparator.Visibility = Visibility.Collapsed;
@@ -415,6 +429,166 @@ namespace Famille
 
         #endregion
 
+        #region Pastilles interactives
+
+        private void CategoryChip_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn || btn.DataContext is not FamilyItem fam) return;
+
+            var target = fam.Category;
+            if (EqualsIgnoreCase(_activeCategoryFilter, target))
+                SetActiveCategoryFilter(null);
+            else
+                SetActiveCategoryFilter(target);
+
+            e.Handled = true;
+        }
+
+        private void VersionChip_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn || btn.DataContext is not FamilyItem fam) return;
+
+            var target = fam.RevitSavedVersion;
+            if (EqualsIgnoreCase(_activeVersionFilter, target))
+                SetActiveVersionFilter(null);
+            else
+                SetActiveVersionFilter(target);
+
+            e.Handled = true;
+        }
+
+        private void SizeChip_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn || btn.DataContext is not FamilyItem fam) return;
+
+            // assure la récupération du poids même si les métadonnées ne sont pas encore là
+            if (!_isSizeSortActive)
+                _ = GetFileSizeValue(fam);
+
+            SetSizeSortActive(!_isSizeSortActive, applySort: true);
+            e.Handled = true;
+        }
+
+        private void ClearChipFilters()
+        {
+            SetActiveCategoryFilter(null);
+            SetActiveVersionFilter(null);
+            SetSizeSortActive(false, applySort: false);
+        }
+
+        private void SetActiveCategoryFilter(string category)
+        {
+            string normalized = NormalizeFilterValue(category);
+            if (EqualsIgnoreCase(_activeCategoryFilter, normalized))
+                return;
+
+            _activeCategoryFilter = normalized;
+            OnPropertyChanged(nameof(ActiveCategoryFilter));
+        }
+
+        private void SetActiveVersionFilter(string version)
+        {
+            string normalized = NormalizeFilterValue(version);
+            if (EqualsIgnoreCase(_activeVersionFilter, normalized))
+                return;
+
+            _activeVersionFilter = normalized;
+            OnPropertyChanged(nameof(ActiveVersionFilter));
+        }
+
+        private void SetSizeSortActive(bool active, bool applySort)
+        {
+            if (_isSizeSortActive == active)
+            {
+                if (applySort) ApplySizeSort();
+                return;
+            }
+
+            _isSizeSortActive = active;
+            OnPropertyChanged(nameof(IsSizeSortActive));
+            if (!active)
+                _pendingSizeResort = false;
+
+            if (applySort)
+                ApplySizeSort();
+        }
+
+        private static bool EqualsIgnoreCase(string left, string right)
+        {
+            if (left == null && right == null) return true;
+            if (left == null || right == null) return false;
+            return string.Equals(left.Trim(), right.Trim(), StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string NormalizeFilterValue(string value)
+            => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+        private void ApplySizeSort()
+        {
+            if (_currentResult == null) return;
+
+            var source = _currentResult.ToList();
+            List<FamilyItem> ordered;
+
+            if (_isSizeSortActive)
+            {
+                ordered = source
+                    .OrderByDescending(GetFileSizeValue)
+                    .ThenBy(f => f.NaturalOrder)
+                    .ToList();
+            }
+            else
+            {
+                ordered = source
+                    .OrderBy(f => f.NaturalOrder)
+                    .ToList();
+            }
+
+            BeginPaging(ordered);
+        }
+
+        private long GetFileSizeValue(FamilyItem fam)
+        {
+            if (fam == null) return long.MinValue;
+
+            if (fam.FileSizeBytes.HasValue)
+                return fam.FileSizeBytes.Value;
+
+            lock (_metadataLock)
+            {
+                if (_metadataCache.TryGetValue(fam.Path, out var meta) && meta?.FileSizeBytes.HasValue == true)
+                {
+                    fam.FileSizeBytes = meta.FileSizeBytes;
+                    return meta.FileSizeBytes.Value;
+                }
+            }
+
+            try
+            {
+                var info = new FileInfo(fam.Path);
+                fam.FileSizeBytes = info.Length;
+                return info.Length;
+            }
+            catch
+            {
+                return long.MinValue;
+            }
+        }
+
+        private void RequestSizeResort()
+        {
+            if (!_isSizeSortActive || _pendingSizeResort) return;
+
+            _pendingSizeResort = true;
+            Dispatcher.InvokeAsync(() =>
+            {
+                _pendingSizeResort = false;
+                ApplySizeSort();
+            }, DispatcherPriority.Background);
+        }
+
+        #endregion
+
         #region Recherche + pagination
 
         private void SearchBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
@@ -467,12 +641,13 @@ namespace Famille
                 }
 
                 var hits = _index.Search(txt, max: 8000);
-                var items = hits.Select(e => new FamilyItem
+                var items = hits.Select((e, idx) => new FamilyItem
                 {
                     Name = e.Name,
                     Path = e.Path,
                     Category = e.Category,
-                    NormalizedName = e.NormalizedName
+                    NormalizedName = e.NormalizedName,
+                    NaturalOrder = idx
                 }).ToList();
 
                 items = ApplyActiveOrdering(items);
@@ -967,6 +1142,9 @@ namespace Famille
                         fam.Category = null;
                     fam.FileSizeText = null;
                 }
+
+                if (meta?.FileSizeBytes.HasValue == true)
+                    RequestSizeResort();
             }
 
             if (Dispatcher.CheckAccess())
@@ -1545,6 +1723,15 @@ namespace Famille
 
         #endregion
 
+        #region INotifyPropertyChanged
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        protected void OnPropertyChanged(string propertyName)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
+        #endregion
+
         #region Modèle
 
         private FamilyItem CreateFamilyItemFromPath(string path)
@@ -1643,5 +1830,54 @@ namespace Famille
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged(string propName)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propName));
+    }
+
+    public class ChipActiveConverter : IMultiValueConverter
+    {
+        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (values == null || values.Length < 2) return false;
+
+            var value = values[0] as string;
+            var active = values[1] as string;
+
+            if (string.IsNullOrWhiteSpace(value) || string.IsNullOrWhiteSpace(active))
+                return false;
+
+            return string.Equals(value.Trim(), active.Trim(), StringComparison.OrdinalIgnoreCase);
+        }
+
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+            => throw new NotSupportedException();
+    }
+
+    public class FamilyHighlightConverter : IMultiValueConverter
+    {
+        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (values == null || values.Length < 4)
+                return false;
+
+            var category = values[0] as string;
+            var activeCategory = values[1] as string;
+            var version = values[2] as string;
+            var activeVersion = values[3] as string;
+
+            bool categoryMatch = !string.IsNullOrWhiteSpace(activeCategory) && AreEqual(category, activeCategory);
+            bool versionMatch = !string.IsNullOrWhiteSpace(activeVersion) && AreEqual(version, activeVersion);
+
+            return categoryMatch || versionMatch;
+        }
+
+        private static bool AreEqual(string left, string right)
+        {
+            if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right))
+                return false;
+
+            return string.Equals(left.Trim(), right.Trim(), StringComparison.OrdinalIgnoreCase);
+        }
+
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+            => throw new NotSupportedException();
     }
 }
