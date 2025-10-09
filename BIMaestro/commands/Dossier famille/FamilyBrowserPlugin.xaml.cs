@@ -939,7 +939,6 @@ namespace Famille
                     : meta.OmniClassCode.Trim();
 
                 fam.FileSizeText = FormatFileSize(meta?.FileSizeBytes);
-                fam.FileSizeBytes = meta?.FileSizeBytes;
 
                 if (meta != null)
                 {
@@ -975,7 +974,6 @@ namespace Famille
                     if (string.IsNullOrWhiteSpace(fam.Category))
                         fam.Category = null;
                     fam.FileSizeText = null;
-                    fam.FileSizeBytes = null;
                 }
 
                 ApplyHighlightToItem(fam);
@@ -1640,22 +1638,6 @@ namespace Famille
             get => _fileSizeText;
             set { if (_fileSizeText != value) { _fileSizeText = value; OnPropertyChanged(nameof(FileSizeText)); } }
         }
-
-        private long? _fileSizeBytes;
-        public long? FileSizeBytes
-        {
-            get => _fileSizeBytes;
-            set { if (_fileSizeBytes != value) { _fileSizeBytes = value; OnPropertyChanged(nameof(FileSizeBytes)); } }
-        }
-
-        private bool _isHighlighted;
-        public bool IsHighlighted
-        {
-            get => _isHighlighted;
-            set { if (_isHighlighted != value) { _isHighlighted = value; OnPropertyChanged(nameof(IsHighlighted)); } }
-        }
-
-        public int NaturalOrder { get; set; }
 
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged(string propName)
