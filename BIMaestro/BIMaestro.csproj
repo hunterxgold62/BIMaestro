@@ -324,6 +324,7 @@
     </Compile>
     <Compile Include="commands\Dossier famille\FamilyIndexService.cs" />
     <Compile Include="commands\Dossier famille\FamilyLoadOption.cs" />
+    <Compile Include="commands\Dossier famille\FamilyMetadataProvider.cs" />
     <Compile Include="commands\Dossier famille\FamilyUsageManager.cs" />
     <Compile Include="commands\Dossier famille\image native de revit\ThumbnailCache.cs" />
     <Compile Include="commands\Dossier famille\ImageResolver.cs" />
@@ -374,6 +375,7 @@
     <Compile Include="commands\purge\sup de famille forte.cs" />
     <Compile Include="commands\réseau auto entre canalisation\ConnectPipesCommand.cs" />
     <Compile Include="commands\Sélection d%27objet unique\SelectSimilarCommand.cs" />
+    <Compile Include="commands\traduction paramètre famille et vue_feuille\TraduireVuesFamilleOpenAl.cs" />
     <Compile Include="commands\unité de famille\ExportProjectUnitsCommand.cs" />
     <Compile Include="commands\unité de famille\UpdateProjectUnitsCommand.cs" />
     <Compile Include="commands\export import excel\ScheduleExcelIO.cs" />
@@ -431,7 +433,7 @@
     <Compile Include="commands\Réservation auto\ReservationWindow.xaml.cs">
       <DependentUpon>ReservationWindow.xaml</DependentUpon>
     </Compile>
-    <Compile Include="commands\traduction paramètre famille\TraduireParametresFamilleOpenAI.cs" />
+    <Compile Include="commands\traduction paramètre famille et vue_feuille\TraduireParametresFamilleOpenAI.cs" />
     <Compile Include="commands\GPT classique\messagemodel.cs" />
     <Compile Include="commands\GPT classique\ProfileSelectionWindow.xaml.cs">
       <DependentUpon>ProfileSelectionWindow.xaml</DependentUpon>

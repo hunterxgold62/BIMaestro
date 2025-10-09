@@ -1,4 +1,7 @@
-﻿using System.Collections.Generic;
+﻿
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
 
@@ -29,44 +32,22 @@ namespace Visualisation
         /// </summary>
         public bool ScopeEntireModel { get; private set; } = false;
 
+        private readonly List<string> _viewFamilies;
+        private readonly List<string> _entireModelFamilies;
         private List<FamilyItem> AllFamilyItems { get; set; }
 
-        public FamilySelectionWindow(List<string> families)
+        public FamilySelectionWindow(IEnumerable<string> viewFamilies, IEnumerable<string> entireModelFamilies)
         {
             InitializeComponent();
 
             SelectedParentFamilies = new List<string>();
             SelectedSubFamilies = new List<string>();
             ExcludedSubFamilies = new List<string>();
-            AllFamilyItems = new List<FamilyItem>();
 
-            // Construire l'arborescence
-            foreach (var fam in families)
-            {
-                string family = fam.Trim();
+            _viewFamilies = NormalizeFamilies(viewFamilies);
+            _entireModelFamilies = NormalizeFamilies(entireModelFamilies);
 
-                if (family.Contains(":"))
-                {
-                    var parts = family.Split(':');
-                    var parentName = parts[0].Trim();
-                    var childName = parts[1].Trim();
-
-                    var parent = AllFamilyItems.FirstOrDefault(f => f.Name == parentName);
-                    if (parent == null)
-                    {
-                        parent = new FamilyItem { Name = parentName };
-                        AllFamilyItems.Add(parent);
-                    }
-                    parent.SubFamilies.Add(new FamilyItem { Name = childName });
-                }
-                else
-                {
-                    // Famille sans sous-familles
-                    AllFamilyItems.Add(new FamilyItem { Name = family });
-                }
-            }
-
-            FamiliesTreeView.ItemsSource = AllFamilyItems;
+            BuildTree(_viewFamilies);
         }
 
         private void FinishButton_Click(object sender, RoutedEventArgs e)
@@ -78,6 +59,13 @@ namespace Visualisation
             SelectedParentFamilies.Clear();
             SelectedSubFamilies.Clear();
             ExcludedSubFamilies.Clear();
+
+            if (AllFamilyItems == null)
+            {
+                DialogResult = true;
+                Close();
+                return;
+            }
 
             // Parcourir chaque "famille parent"
             foreach (var familyItem in AllFamilyItems)
@@ -113,14 +101,14 @@ namespace Visualisation
                 }
             }
 
-            this.DialogResult = true;
-            this.Close();
+            DialogResult = true;
+            Close();
         }
 
         private void CancelButton_Click(object sender, RoutedEventArgs e)
         {
-            this.DialogResult = false;
-            this.Close();
+            DialogResult = false;
+            Close();
         }
 
         /// <summary>
@@ -128,12 +116,16 @@ namespace Visualisation
         /// </summary>
         private void SelectAllViewsButton_Click(object sender, RoutedEventArgs e)
         {
+            if (AllFamilyItems == null) return;
+
             foreach (var family in AllFamilyItems)
             {
                 family.IsSelected = true;
                 foreach (var child in family.SubFamilies)
                     child.IsSelected = true;
             }
+
+            FamiliesTreeView.Items.Refresh();
         }
 
         /// <summary>
@@ -141,12 +133,105 @@ namespace Visualisation
         /// </summary>
         private void DeselectAllViewsButton_Click(object sender, RoutedEventArgs e)
         {
+            if (AllFamilyItems == null) return;
+
             foreach (var family in AllFamilyItems)
             {
                 family.IsSelected = false;
                 foreach (var child in family.SubFamilies)
                     child.IsSelected = false;
             }
+
+            FamiliesTreeView.Items.Refresh();
+        }
+
+        private void EntireModelScopeChanged(object sender, RoutedEventArgs e)
+        {
+            var families = (EntireModelCheckBox.IsChecked == true)
+                ? _entireModelFamilies
+                : _viewFamilies;
+
+            BuildTree(families);
+        }
+
+        private void BuildTree(IEnumerable<string> families)
+        {
+            AllFamilyItems = CreateFamilyItems(families);
+
+            FamiliesTreeView.ItemsSource = null;
+            FamiliesTreeView.ItemsSource = AllFamilyItems;
+            FamiliesTreeView.Items.Refresh();
+        }
+
+        private static List<string> NormalizeFamilies(IEnumerable<string> families)
+        {
+            if (families == null)
+                return new List<string>();
+
+            return families
+                .Where(f => !string.IsNullOrWhiteSpace(f))
+                .Select(f => f.Trim())
+                .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                .OrderBy(f => f, StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
+        }
+
+        private static List<FamilyItem> CreateFamilyItems(IEnumerable<string> families)
+        {
+            var result = new List<FamilyItem>();
+            if (families == null)
+                return result;
+
+            var lookup = new Dictionary<string, FamilyItem>(StringComparer.CurrentCultureIgnoreCase);
+
+            foreach (var entry in families)
+            {
+                if (string.IsNullOrWhiteSpace(entry))
+                    continue;
+
+                string family = entry.Trim();
+                var parts = family.Split(new[] { ':' }, 2);
+
+                if (parts.Length == 2)
+                {
+                    string parentName = parts[0].Trim();
+                    string childName = parts[1].Trim();
+
+                    if (!lookup.TryGetValue(parentName, out var parent))
+                    {
+                        parent = new FamilyItem { Name = parentName };
+                        lookup[parentName] = parent;
+                        result.Add(parent);
+                    }
+
+                    parent.SubFamilies.Add(new FamilyItem { Name = childName });
+                }
+                else
+                {
+                    if (!lookup.TryGetValue(family, out var parent))
+                    {
+                        parent = new FamilyItem { Name = family };
+                        lookup[family] = parent;
+                        result.Add(parent);
+                    }
+                }
+            }
+
+            result = result
+                .OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
+
+            foreach (var parent in result)
+            {
+                var orderedChildren = parent.SubFamilies
+                    .OrderBy(child => child.Name, StringComparer.CurrentCultureIgnoreCase)
+                    .ToList();
+
+                parent.SubFamilies = new ObservableCollection<FamilyItem>(orderedChildren);
+                parent.IsSelected = true; // réinitialise la sélection + propage aux enfants
+            }
+
+            return result;
         }
     }
 }

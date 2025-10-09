@@ -78,29 +78,52 @@ namespace Visualisation
 
             // 5) Ouvrir la fenêtre pour choix familles/types + portée (vue / maquette)
             //    D’abord, on précollecte (par défaut vue active) pour construire l’arbre familles/types.
-            var preFamilies = new HashSet<string>();
-            foreach (var catId in selectedCategories)
+            var viewFamilies = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
+            var modelFamilies = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
+            var viewCache = new Dictionary<ElementId, IList<ElementId>>(new ElementIdComparer());
+            var modelCache = new Dictionary<ElementId, IList<ElementId>>(new ElementIdComparer());
+
+            void AppendFamilies(HashSet<string> target, IEnumerable<ElementId> ids)
             {
-                foreach (var id in CollectAllOfCategory(catId, entireModel: false)) // préview basée sur la vue active
+                if (ids == null) return;
+
+                foreach (var elementId in ids)
                 {
-                    var elem = doc.GetElement(id);
+                    var elem = doc.GetElement(elementId);
                     if (elem == null) continue;
 
-                    ElementType et = doc.GetElement(elem.GetTypeId()) as ElementType;
-                    if (et == null) continue;
+                    if (!(doc.GetElement(elem.GetTypeId()) is ElementType et)) continue;
 
-                    string famName = et.FamilyName?.Trim() ?? "";
-                    string typeName = et.Name?.Trim() ?? "";
+                    string famName = et.FamilyName?.Trim();
+                    if (string.IsNullOrEmpty(famName)) continue;
 
-                    if (!string.IsNullOrEmpty(famName))
-                        preFamilies.Add(string.IsNullOrEmpty(typeName) ? famName : (famName + " : " + typeName));
+                    string typeName = et.Name?.Trim() ?? string.Empty;
+                    string display = string.IsNullOrEmpty(typeName)
+                        ? famName
+                        : $"{famName} : {typeName}";
+
+                    target.Add(display);
                 }
             }
 
-            var familyList = preFamilies.ToList();
-            familyList.Sort(StringComparer.CurrentCultureIgnoreCase);
+            foreach (var catId in selectedCategories)
+            {
+                var viewElements = CollectAllOfCategory(catId, entireModel: false);
+                viewCache[catId] = viewElements;
+                AppendFamilies(viewFamilies, viewElements);
 
-            var win = new FamilySelectionWindow(familyList);
+                var modelElements = CollectAllOfCategory(catId, entireModel: true);
+                modelCache[catId] = modelElements;
+                AppendFamilies(modelFamilies, modelElements);
+            }
+
+            var viewFamilyList = viewFamilies.ToList();
+            viewFamilyList.Sort(StringComparer.CurrentCultureIgnoreCase);
+
+            var modelFamilyList = modelFamilies.ToList();
+            modelFamilyList.Sort(StringComparer.CurrentCultureIgnoreCase);
+
+            var win = new FamilySelectionWindow(viewFamilyList, modelFamilyList);
             bool? dialogResult = win.ShowDialog();
             if (dialogResult != true)
                 return Result.Cancelled;
@@ -111,7 +134,22 @@ namespace Visualisation
             foreach (var catId in selectedCategories)
             {
                 if (!catDict.ContainsKey(catId))
-                    catDict[catId] = CollectAllOfCategory(catId, entireModel).ToList();
+                {
+                    IList<ElementId> sourceIds;
+
+                    if (entireModel)
+                    {
+                        if (!modelCache.TryGetValue(catId, out sourceIds))
+                            sourceIds = CollectAllOfCategory(catId, entireModel: true);
+                    }
+                    else
+                    {
+                        if (!viewCache.TryGetValue(catId, out sourceIds))
+                            sourceIds = CollectAllOfCategory(catId, entireModel: false);
+                    }
+
+                    catDict[catId] = (sourceIds ?? new List<ElementId>()).ToList();
+                }
             }
 
             // 7) Si la sélection contient AU MOINS une étiquette, récupérer toutes les étiquettes (selon portée)

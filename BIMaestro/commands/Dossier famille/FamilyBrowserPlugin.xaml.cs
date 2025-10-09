@@ -46,6 +46,7 @@ namespace Famille
         // Options (exposables dans Paramètres si tu veux)
         private bool useShellThumbs = true;   // ON par défaut
         private bool useRevitPreview = false;  // ON : fallback natif Revit lorsque pas d'image catalogue
+        private bool detailedViewMode = false;
 
         // ===== Données UI =====
         private List<FamilyItem> allFamilies = new();
@@ -68,6 +69,11 @@ namespace Famille
         private static readonly System.Threading.SemaphoreSlim _thumbGate = new(4);
         private static readonly Dictionary<string, ImageSource> _bitmapCache =
             new(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, string> _omniClassCache =
+            new(StringComparer.OrdinalIgnoreCase);
+        private static readonly HashSet<string> _omniClassPending =
+            new(StringComparer.OrdinalIgnoreCase);
+        private static readonly object _omniClassLock = new();
 
         // ===== Collections =====
         private ObservableCollection<Collection> _collections = new();
@@ -115,6 +121,7 @@ namespace Famille
 
             Famille.CatalogImageResolver.Initialize(familiesFolder, imagesFolder);
             Famille.FamilyThumbnailProvider.Initialize(FamilyBrowserCommand.uiapp);
+            Famille.FamilyMetadataProvider.Initialize(FamilyBrowserCommand.uiapp);
 
             // Arbo + Top-8
             LoadFolderTree();
@@ -163,6 +170,7 @@ namespace Famille
             allFamilies.Clear();
             displayedFamilies.Clear();
             FamilyListView.ItemsSource = displayedFamilies;
+            UpdateFamilyListViewMode();
             UpdateCount(0);
 
             RefreshTop8_UsageOnly();
@@ -252,7 +260,11 @@ namespace Famille
             TopFamiliesView.Visibility = vis;
             TopSeparator.Visibility = vis;
 
-            foreach (var it in topItems) LoadThumbnailForFamilyItem(it);
+            foreach (var it in topItems)
+            {
+                LoadThumbnailForFamilyItem(it);
+                LoadOmniClassForFamilyItem(it);
+            }
         }
 
         private void ShowTop8CheckBox_Changed(object sender, RoutedEventArgs e)
@@ -434,6 +446,7 @@ namespace Famille
             {
                 displayedFamilies.Add(item);
                 LoadThumbnailForFamilyItem(item);
+                LoadOmniClassForFamilyItem(item);
             }
 
             // rafraîchit source
@@ -652,6 +665,74 @@ namespace Famille
             });
         }
 
+        private void LoadOmniClassForFamilyItem(FamilyItem fam)
+        {
+            if (fam == null || string.IsNullOrEmpty(fam.Path)) return;
+
+            string cached;
+            lock (_omniClassLock)
+            {
+                if (_omniClassCache.TryGetValue(fam.Path, out cached))
+                {
+                    UpdateOmniClassBinding(fam, cached);
+                    return;
+                }
+
+                if (_omniClassPending.Contains(fam.Path))
+                    return;
+
+                _omniClassPending.Add(fam.Path);
+            }
+
+            if (!FamilyMetadataProvider.IsAvailable)
+            {
+                lock (_omniClassLock)
+                {
+                    _omniClassPending.Remove(fam.Path);
+                    _omniClassCache[fam.Path] = null;
+                }
+                UpdateOmniClassBinding(fam, null);
+                return;
+            }
+
+            Task.Run(async () =>
+            {
+                string number = null;
+                try
+                {
+                    number = await FamilyMetadataProvider
+                                    .RequestOmniClassNumberAsync(fam.Path)
+                                    .ConfigureAwait(false);
+                    if (!string.IsNullOrWhiteSpace(number))
+                        number = number.Trim();
+                    else
+                        number = null;
+                }
+                catch
+                {
+                    number = null;
+                }
+
+                lock (_omniClassLock)
+                {
+                    _omniClassPending.Remove(fam.Path);
+                    _omniClassCache[fam.Path] = number;
+                }
+
+                UpdateOmniClassBinding(fam, number);
+            });
+        }
+
+        private void UpdateOmniClassBinding(FamilyItem fam, string value)
+        {
+            if (fam == null) return;
+
+            if (Dispatcher.CheckAccess())
+                fam.OmniClassNumber = value;
+            else
+                Dispatcher.Invoke(() => fam.OmniClassNumber = value);
+        }
+
 
         // Détecte si une image "catalogue" est PRÉVUE (existe sur disque) — PNG ou JPG
         private bool TryGetCatalogImagePath(string familyPath, out string imgPath)
@@ -835,6 +916,7 @@ namespace Famille
             bool dark = false;
             bool showTop8 = false;
             bool alwaysOnTop = false;
+            bool detailedView = false;
 
             if (File.Exists(configFile))
             {
@@ -849,6 +931,7 @@ namespace Famille
                     else if (line.StartsWith("DarkMode=", StringComparison.OrdinalIgnoreCase)) bool.TryParse(line.Substring("DarkMode=".Length), out dark);
                     else if (line.StartsWith("ShowTop8=", StringComparison.OrdinalIgnoreCase)) bool.TryParse(line.Substring("ShowTop8=".Length), out showTop8);
                     else if (line.StartsWith("AlwaysOnTop=", StringComparison.OrdinalIgnoreCase)) bool.TryParse(line.Substring("AlwaysOnTop=".Length), out alwaysOnTop);
+                    else if (line.StartsWith("DetailedView=", StringComparison.OrdinalIgnoreCase)) bool.TryParse(line.Substring("DetailedView=".Length), out detailedView);
                     else if (line.StartsWith("UseShellThumbs=", StringComparison.OrdinalIgnoreCase)) bool.TryParse(line.Substring("UseShellThumbs=".Length), out useShellThumbs);
                     else if (line.StartsWith("UseRevitPreview=", StringComparison.OrdinalIgnoreCase)) bool.TryParse(line.Substring("UseRevitPreview=".Length), out useRevitPreview);
                 }
@@ -863,8 +946,11 @@ namespace Famille
             if (DarkModeCheckBox != null) DarkModeCheckBox.IsChecked = dark;
             if (ShowTop8CheckBox != null) ShowTop8CheckBox.IsChecked = showTop8;
             if (AlwaysOnTopCheckBox != null) AlwaysOnTopCheckBox.IsChecked = alwaysOnTop;
+            detailedViewMode = detailedView;
+            if (DetailedViewCheckBox != null) DetailedViewCheckBox.IsChecked = detailedViewMode;
 
             this.Topmost = alwaysOnTop;
+            UpdateFamilyListViewMode();
         }
 
         private void SaveConfig_Click(object s, RoutedEventArgs e)
@@ -880,6 +966,7 @@ namespace Famille
                 "DarkMode="   + ((DarkModeCheckBox?.IsChecked == true) ? "true" : "false"),
                 "ShowTop8="   + ((ShowTop8CheckBox?.IsChecked == true) ? "true" : "false"),
                 "AlwaysOnTop="+ ((AlwaysOnTopCheckBox?.IsChecked == true) ? "true" : "false"),
+                "DetailedView=" + ((DetailedViewCheckBox?.IsChecked == true) ? "true" : "false"),
                 "UseShellThumbs="  + (useShellThumbs  ? "true" : "false"),
                 "UseRevitPreview=" + (useRevitPreview ? "true" : "false"),
             };
@@ -899,6 +986,7 @@ namespace Famille
             if (DarkModeCheckBox != null) DarkModeCheckBox.IsChecked = false;
             if (ShowTop8CheckBox != null) ShowTop8CheckBox.IsChecked = false;
             if (AlwaysOnTopCheckBox != null) AlwaysOnTopCheckBox.IsChecked = false;
+            if (DetailedViewCheckBox != null) DetailedViewCheckBox.IsChecked = false;
             this.Topmost = false;
             UpdateTheme();
             SaveConfig_Click(s, e);
@@ -943,6 +1031,40 @@ namespace Famille
                 Resources["TabBackground"] = new SolidColorBrush(tabBg);
                 Resources["ImageBackground"] = new SolidColorBrush(Colors.Transparent);
                 Resources["PrimaryText"] = new SolidColorBrush(Colors.Black);
+            }
+        }
+
+        private void DetailedViewCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            detailedViewMode = DetailedViewCheckBox?.IsChecked == true;
+            UpdateFamilyListViewMode();
+        }
+
+        private void UpdateFamilyListViewMode()
+        {
+            if (FamilyListView == null) return;
+
+            var templateKey = detailedViewMode ? "FamilyItemDetailedTemplate" : "FamilyItemTemplate";
+            if (TryFindResource(templateKey) is DataTemplate template)
+            {
+                FamilyListView.ItemTemplate = template;
+            }
+
+            var panelKey = detailedViewMode ? "FamilyListStackPanel" : "FamilyListWrapPanel";
+            if (TryFindResource(panelKey) is ItemsPanelTemplate panel)
+            {
+                FamilyListView.ItemsPanel = panel;
+            }
+
+            var currentItems = displayedFamilies;
+            FamilyListView.ItemsSource = null;
+            FamilyListView.ItemsSource = currentItems;
+            FamilyListView.Items.Refresh();
+
+            if (detailedViewMode && currentItems != null)
+            {
+                foreach (var item in currentItems)
+                    LoadOmniClassForFamilyItem(item);
             }
         }
 
@@ -1192,6 +1314,13 @@ namespace Famille
         public string Path { get; set; }
         public string Category { get; set; }
         public string NormalizedName { get; set; }
+
+        private string _omniClassNumber;
+        public string OmniClassNumber
+        {
+            get => _omniClassNumber;
+            set { if (_omniClassNumber != value) { _omniClassNumber = value; OnPropertyChanged(nameof(OmniClassNumber)); } }
+        }
 
         private ImageSource _icon;
         public ImageSource Icon

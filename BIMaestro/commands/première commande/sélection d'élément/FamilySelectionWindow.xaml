@@ -3,8 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:Visualisation"
         Title="Sélection des Familles"
-        Height="520" Width="510
-        "
+        Height="520" Width="510"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
         Background="#FAFBFC"
@@ -147,7 +146,9 @@
                       Style="{StaticResource CleanCheckBox}"
                       VerticalAlignment="Center"
                       Content="Étendre à toute la maquette"
-                      ToolTip="Quand coché : collecte/sélection dans tout le projet, pas uniquement la vue active."/>
+ToolTip="Quand coché : collecte/sélection dans tout le projet, pas uniquement la vue active."
+                      Checked="EntireModelScopeChanged"
+                      Unchecked="EntireModelScopeChanged"/>            
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right" >
                 <Button x:Name="SelectAllViewsButton"
                         Style="{StaticResource BaseButton}"
