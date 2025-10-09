@@ -1,4 +1,5 @@
-﻿using Autodesk.Revit.UI;
+﻿using Autodesk.Revit.DB;
+using Autodesk.Revit.UI;
 using BIMaestro.UI;
 using Famille.Orbit3D;
 using Newtonsoft.Json;
@@ -10,7 +11,9 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -46,6 +49,7 @@ namespace Famille
         // Options (exposables dans Paramètres si tu veux)
         private bool useShellThumbs = true;   // ON par défaut
         private bool useRevitPreview = false;  // ON : fallback natif Revit lorsque pas d'image catalogue
+        private bool detailedViewMode = false;
 
         // ===== Données UI =====
         private List<FamilyItem> allFamilies = new();
@@ -68,6 +72,12 @@ namespace Famille
         private static readonly System.Threading.SemaphoreSlim _thumbGate = new(4);
         private static readonly Dictionary<string, ImageSource> _bitmapCache =
             new(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, string> _omniClassCache =
+            new(StringComparer.OrdinalIgnoreCase);
+        private static readonly HashSet<string> _omniClassPending =
+            new(StringComparer.OrdinalIgnoreCase);
+        private static readonly System.Threading.SemaphoreSlim _omniClassGate = new(1);
+        private static readonly object _omniClassLock = new();
 
         // ===== Collections =====
         private ObservableCollection<Collection> _collections = new();
@@ -163,6 +173,7 @@ namespace Famille
             allFamilies.Clear();
             displayedFamilies.Clear();
             FamilyListView.ItemsSource = displayedFamilies;
+            UpdateFamilyListViewMode();
             UpdateCount(0);
 
             RefreshTop8_UsageOnly();
@@ -252,7 +263,11 @@ namespace Famille
             TopFamiliesView.Visibility = vis;
             TopSeparator.Visibility = vis;
 
-            foreach (var it in topItems) LoadThumbnailForFamilyItem(it);
+            foreach (var it in topItems)
+            {
+                LoadThumbnailForFamilyItem(it);
+                LoadOmniClassForFamilyItem(it);
+            }
         }
 
         private void ShowTop8CheckBox_Changed(object sender, RoutedEventArgs e)
@@ -383,13 +398,19 @@ namespace Famille
                 }
 
                 var hits = _index.Search(txt, max: 8000);
-                var items = hits.Select(e => new FamilyItem
+                var items = new List<FamilyItem>();
+                foreach (var e in hits)
                 {
-                    Name = e.Name,
-                    Path = e.Path,
-                    Category = e.Category,
-                    NormalizedName = e.NormalizedName
-                }).ToList();
+                    var item = new FamilyItem
+                    {
+                        Name = e.Name,
+                        Path = e.Path,
+                        Category = e.Category,
+                        NormalizedName = e.NormalizedName
+                    };
+                    ApplyCachedOmniClassIfAvailable(item);
+                    items.Add(item);
+                }
 
                 BeginPaging(items);
                 return;
@@ -434,6 +455,7 @@ namespace Famille
             {
                 displayedFamilies.Add(item);
                 LoadThumbnailForFamilyItem(item);
+                LoadOmniClassForFamilyItem(item);
             }
 
             // rafraîchit source
@@ -653,6 +675,281 @@ namespace Famille
         }
 
 
+        private void LoadOmniClassForFamilyItem(FamilyItem fam)
+        {
+            if (fam == null || string.IsNullOrWhiteSpace(fam.Path)) return;
+
+            string cached = null;
+
+            lock (_omniClassLock)
+            {
+                if (_omniClassCache.TryGetValue(fam.Path, out cached))
+                {
+                }
+                else if (fam.OmniClassNumber != null)
+                {
+                    _omniClassCache[fam.Path] = fam.OmniClassNumber;
+                    return;
+                }
+                else
+                {
+                    if (_omniClassPending.Contains(fam.Path))
+                        return;
+
+                    _omniClassPending.Add(fam.Path);
+                }
+            }
+
+            if (cached != null)
+            {
+                if (fam.OmniClassNumber != cached)
+                    fam.OmniClassNumber = cached;
+                return;
+            }
+
+            Task.Run(async () =>
+            {
+                string result = null;
+                try
+                {
+                    await _omniClassGate.WaitAsync().ConfigureAwait(false);
+                    result = TryExtractOmniClassNumber(fam.Path);
+                }
+                catch
+                {
+                    result = null;
+                }
+                finally
+                {
+                    _omniClassGate.Release();
+                }
+
+                if (string.IsNullOrWhiteSpace(result))
+                    result = "Non renseigné";
+                else
+                    result = result.Trim();
+
+                lock (_omniClassLock)
+                {
+                    _omniClassCache[fam.Path] = result;
+                    _omniClassPending.Remove(fam.Path);
+                }
+
+                var finalResult = result;
+                try
+                {
+                    if (!Dispatcher.HasShutdownStarted)
+                    {
+                        Dispatcher.Invoke(() => fam.OmniClassNumber = finalResult);
+                    }
+                }
+                catch { }
+            });
+        }
+
+        private void ApplyCachedOmniClassIfAvailable(FamilyItem fam)
+        {
+            if (fam == null || string.IsNullOrWhiteSpace(fam.Path)) return;
+
+            lock (_omniClassLock)
+            {
+                if (_omniClassCache.TryGetValue(fam.Path, out var cached))
+                    fam.OmniClassNumber = cached;
+            }
+        }
+
+        private string TryExtractOmniClassNumber(string familyPath)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(familyPath) || !File.Exists(familyPath))
+                    return null;
+
+                var uiapp = FamilyBrowserCommand.uiapp;
+                var app = uiapp?.Application;
+                if (app == null)
+                    return null;
+
+                if (FamilyFileRequiresUpgrade(app, familyPath))
+                    return null;
+
+                Document famDoc = null;
+                try
+                {
+                    famDoc = app.OpenDocumentFile(familyPath);
+                    if (famDoc == null || !famDoc.IsFamilyDocument)
+                        return null;
+
+                    var value = ExtractOmniClassFromDocument(famDoc);
+                    return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+                }
+                catch
+                {
+                    return null;
+                }
+                finally
+                {
+                    if (famDoc != null)
+                    {
+                        try { famDoc.Close(false); } catch { }
+                    }
+                }
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private string ExtractOmniClassFromDocument(Document famDoc)
+        {
+            if (famDoc == null) return null;
+
+            try
+            {
+                var fam = famDoc.OwnerFamily;
+                if (fam != null)
+                {
+                    var param = fam.get_Parameter(BuiltInParameter.OMNICLASS_CODE);
+                    if (param != null)
+                    {
+                        var value = param.AsString();
+                        if (!string.IsNullOrWhiteSpace(value)) return value.Trim();
+
+                        value = param.AsValueString();
+                        if (!string.IsNullOrWhiteSpace(value)) return value.Trim();
+                    }
+                }
+
+                var manager = famDoc.FamilyManager;
+                if (manager != null)
+                {
+                    FamilyParameter target = null;
+                    try { target = manager.get_Parameter(BuiltInParameter.OMNICLASS_CODE); } catch { target = null; }
+
+                    if (target == null)
+                    {
+                        foreach (FamilyParameter p in manager.Parameters)
+                        {
+                            var name = p.Definition?.Name;
+                            if (!string.IsNullOrEmpty(name) &&
+                                name.IndexOf("omniclass", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                target = p;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (target != null)
+                    {
+                        string value = null;
+                        try { value = manager.CurrentType?.AsString(target); } catch { }
+                        if (string.IsNullOrWhiteSpace(value))
+                        {
+                            try { value = manager.CurrentType?.AsValueString(target); } catch { }
+                        }
+                        if (string.IsNullOrWhiteSpace(value) && manager.OwnerFamily != null)
+                        {
+                            try
+                            {
+                                var famParam = manager.OwnerFamily.get_Parameter(target.Id);
+                                value = famParam?.AsString();
+                                if (string.IsNullOrWhiteSpace(value))
+                                    value = famParam?.AsValueString();
+                            }
+                            catch { }
+                        }
+                        if (!string.IsNullOrWhiteSpace(value)) return value.Trim();
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return null;
+        }
+
+        private bool FamilyFileRequiresUpgrade(Autodesk.Revit.ApplicationServices.Application app, string rfaPath)
+        {
+            try
+            {
+                var info = BasicFileInfo.Extract(rfaPath);
+                if (info == null) return true;
+
+                int current = ParseYear(app?.VersionNumber);
+
+                if (TryGetSavedMajorVersion(info, out int saved))
+                    return saved != current;
+
+                if (TryGetYearFromProp(info, "RevitBuild", out saved) ||
+                    TryGetYearFromProp(info, "RevitProduct", out saved) ||
+                    TryGetYearFromProp(info, "Format", out saved))
+                    return saved != current;
+
+                return true;
+            }
+            catch
+            {
+                return true;
+            }
+        }
+
+        private bool TryGetSavedMajorVersion(object info, out int year)
+        {
+            return
+                TryGetYearFromProp(info, "SavedInVersion", out year) ||
+                TryGetYearFromProp(info, "SavedInVersionNumber", out year) ||
+                TryGetYearFromProp(info, "SavedInVersionMajor", out year) ||
+                TryGetYearFromProp(info, "SavedIn", out year) ||
+                TryGetYearFromProp(info, "FileVersion", out year);
+        }
+
+        private bool TryGetYearFromProp(object obj, string propName, out int year)
+        {
+            year = 0;
+            var p = obj.GetType().GetProperty(propName, BindingFlags.Public | BindingFlags.Instance);
+            if (p == null) return false;
+
+            var val = p.GetValue(obj);
+            if (val == null) return false;
+
+            if (val is int i)
+            {
+                year = NormalizeToYear(i);
+                return year >= 2008;
+            }
+
+            string s = val.ToString();
+            var m = Regex.Match(s ?? string.Empty, @"\b(20\d{2})\b");
+            if (m.Success && int.TryParse(m.Groups[1].Value, out year))
+                return true;
+
+            if (int.TryParse(s, out i))
+            {
+                year = NormalizeToYear(i);
+                return year >= 2008;
+            }
+
+            return false;
+        }
+
+        private int NormalizeToYear(int v)
+        {
+            if (v < 100 && v >= 8) return 2000 + v;
+            return v;
+        }
+
+        private int ParseYear(string s)
+        {
+            if (int.TryParse(s, out int v)) return NormalizeToYear(v);
+            var m = Regex.Match(s ?? string.Empty, @"\b(20\d{2})\b");
+            if (m.Success && int.TryParse(m.Groups[1].Value, out int y)) return y;
+            return DateTime.Now.Year;
+        }
+
+
         // Détecte si une image "catalogue" est PRÉVUE (existe sur disque) — PNG ou JPG
         private bool TryGetCatalogImagePath(string familyPath, out string imgPath)
         {
@@ -835,6 +1132,7 @@ namespace Famille
             bool dark = false;
             bool showTop8 = false;
             bool alwaysOnTop = false;
+            bool detailedView = false;
 
             if (File.Exists(configFile))
             {
@@ -849,6 +1147,7 @@ namespace Famille
                     else if (line.StartsWith("DarkMode=", StringComparison.OrdinalIgnoreCase)) bool.TryParse(line.Substring("DarkMode=".Length), out dark);
                     else if (line.StartsWith("ShowTop8=", StringComparison.OrdinalIgnoreCase)) bool.TryParse(line.Substring("ShowTop8=".Length), out showTop8);
                     else if (line.StartsWith("AlwaysOnTop=", StringComparison.OrdinalIgnoreCase)) bool.TryParse(line.Substring("AlwaysOnTop=".Length), out alwaysOnTop);
+                    else if (line.StartsWith("DetailedView=", StringComparison.OrdinalIgnoreCase)) bool.TryParse(line.Substring("DetailedView=".Length), out detailedView);
                     else if (line.StartsWith("UseShellThumbs=", StringComparison.OrdinalIgnoreCase)) bool.TryParse(line.Substring("UseShellThumbs=".Length), out useShellThumbs);
                     else if (line.StartsWith("UseRevitPreview=", StringComparison.OrdinalIgnoreCase)) bool.TryParse(line.Substring("UseRevitPreview=".Length), out useRevitPreview);
                 }
@@ -863,8 +1162,11 @@ namespace Famille
             if (DarkModeCheckBox != null) DarkModeCheckBox.IsChecked = dark;
             if (ShowTop8CheckBox != null) ShowTop8CheckBox.IsChecked = showTop8;
             if (AlwaysOnTopCheckBox != null) AlwaysOnTopCheckBox.IsChecked = alwaysOnTop;
+            detailedViewMode = detailedView;
+            if (DetailedViewCheckBox != null) DetailedViewCheckBox.IsChecked = detailedViewMode;
 
             this.Topmost = alwaysOnTop;
+            UpdateFamilyListViewMode();
         }
 
         private void SaveConfig_Click(object s, RoutedEventArgs e)
@@ -880,6 +1182,7 @@ namespace Famille
                 "DarkMode="   + ((DarkModeCheckBox?.IsChecked == true) ? "true" : "false"),
                 "ShowTop8="   + ((ShowTop8CheckBox?.IsChecked == true) ? "true" : "false"),
                 "AlwaysOnTop="+ ((AlwaysOnTopCheckBox?.IsChecked == true) ? "true" : "false"),
+                "DetailedView=" + ((DetailedViewCheckBox?.IsChecked == true) ? "true" : "false"),
                 "UseShellThumbs="  + (useShellThumbs  ? "true" : "false"),
                 "UseRevitPreview=" + (useRevitPreview ? "true" : "false"),
             };
@@ -899,6 +1202,7 @@ namespace Famille
             if (DarkModeCheckBox != null) DarkModeCheckBox.IsChecked = false;
             if (ShowTop8CheckBox != null) ShowTop8CheckBox.IsChecked = false;
             if (AlwaysOnTopCheckBox != null) AlwaysOnTopCheckBox.IsChecked = false;
+            if (DetailedViewCheckBox != null) DetailedViewCheckBox.IsChecked = false;
             this.Topmost = false;
             UpdateTheme();
             SaveConfig_Click(s, e);
@@ -944,6 +1248,34 @@ namespace Famille
                 Resources["ImageBackground"] = new SolidColorBrush(Colors.Transparent);
                 Resources["PrimaryText"] = new SolidColorBrush(Colors.Black);
             }
+        }
+
+        private void DetailedViewCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            detailedViewMode = DetailedViewCheckBox?.IsChecked == true;
+            UpdateFamilyListViewMode();
+        }
+
+        private void UpdateFamilyListViewMode()
+        {
+            if (FamilyListView == null) return;
+
+            var templateKey = detailedViewMode ? "FamilyItemDetailedTemplate" : "FamilyItemTemplate";
+            if (TryFindResource(templateKey) is DataTemplate template)
+            {
+                FamilyListView.ItemTemplate = template;
+            }
+
+            var panelKey = detailedViewMode ? "FamilyListStackPanel" : "FamilyListWrapPanel";
+            if (TryFindResource(panelKey) is ItemsPanelTemplate panel)
+            {
+                FamilyListView.ItemsPanel = panel;
+            }
+
+            var currentItems = displayedFamilies;
+            FamilyListView.ItemsSource = null;
+            FamilyListView.ItemsSource = currentItems;
+            FamilyListView.Items.Refresh();
         }
 
         public static string GetRelativePath(string relativeTo, string path)
@@ -1171,7 +1503,7 @@ namespace Famille
             if (low.Contains("porte")) cat = "Porte";
             else if (low.Contains("fenetre") || low.Contains("fenêtre")) cat = "Fenêtre";
 
-            return new FamilyItem
+            var item = new FamilyItem
             {
                 Name = name,
                 Path = path,
@@ -1179,6 +1511,9 @@ namespace Famille
                 Icon = null,
                 NormalizedName = StripDiacritics(name).ToLowerInvariant()
             };
+
+            ApplyCachedOmniClassIfAvailable(item);
+            return item;
         }
 
         #endregion
@@ -1205,6 +1540,13 @@ namespace Famille
         {
             get => _isFavorite;
             set { if (_isFavorite != value) { _isFavorite = value; OnPropertyChanged(nameof(IsFavorite)); } }
+        }
+
+        private string _omniClassNumber;
+        public string OmniClassNumber
+        {
+            get => _omniClassNumber;
+            set { if (_omniClassNumber != value) { _omniClassNumber = value; OnPropertyChanged(nameof(OmniClassNumber)); } }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
