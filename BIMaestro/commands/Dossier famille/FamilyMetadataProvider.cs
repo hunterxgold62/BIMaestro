@@ -28,15 +28,7 @@ namespace Famille
         // (4) Dernière sauvegarde (gardé pour compatibilité UI)
         public DateTime? UpdatedUtc { get; set; }
 
-        // (5) Comportements clés (true/false/null si inconnu)
-        public bool? WorkPlaneBased { get; set; }
-        public bool? FaceBased { get; set; }
-        public bool? AlwaysVertical { get; set; }
-        public bool? CutWithVoidsWhenLoaded { get; set; }
-        public bool? AllowsCutInViews { get; set; }
-        public bool? Shared { get; set; }
-
-        // (8) Taille du fichier
+        // (5) Taille du fichier
         public long? FileSizeBytes { get; set; }
 
         public string Path { get; set; }
@@ -96,13 +88,7 @@ namespace Famille
         private static readonly Regex RxProductVersion = new Regex(@"<\s*(?:[A-Za-z0-9]+:)?product-version\s*>\s*(\d{4})\s*</\s*(?:[A-Za-z0-9]+:)?product-version\s*>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex RxUpdated = new Regex(@"<\s*updated\s*>\s*([0-9T:\-\.Z\+]+)\s*</\s*updated\s*>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-        private static readonly string YesNoGroup = @"(?:(?:Oui|Yes|True)|(?:Non|No|False))";
-        private static readonly Regex RxWorkPlane = new Regex(@"Bas[ée]e\s+sur\s+le\s+plan\s+de\s+construction[^<>]{0,80}(" + YesNoGroup + ")", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private static readonly Regex RxFaceBased = new Regex(@"(Placer\s+sur\s+face|Face[-\s]*based)[^<>]{0,80}(" + YesNoGroup + ")", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private static readonly Regex RxAlwaysVertical = new Regex(@"Toujours\s+verticalement[^<>]{0,80}(" + YesNoGroup + ")", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private static readonly Regex RxCutWithVoids = new Regex(@"Couper\s+avec\s+des\s+vides\s+une\s+fois\s+charg[ée]e[^<>]{0,80}(" + YesNoGroup + ")", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private static readonly Regex RxAllowsCut = new Regex(@"Autoriser\s+la\s+d[ée]coupe\s+dans\s+les\s+vues[^<>]{0,80}(" + YesNoGroup + ")", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private static readonly Regex RxShared = new Regex(@"Partag[ée]e?[^<>]{0,80}(" + YesNoGroup + ")", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        
 
         private static string ExtractOmniClassNumber(string path)
         {
@@ -236,22 +222,14 @@ namespace Famille
                             }
                         }
 
-                        // Comportements (bools)
-                        if (meta.WorkPlaneBased == null) meta.WorkPlaneBased = TryParseYesNo(text, RxWorkPlane);
-                        if (meta.FaceBased == null) meta.FaceBased = TryParseYesNo(text, RxFaceBased);
-                        if (meta.AlwaysVertical == null) meta.AlwaysVertical = TryParseYesNo(text, RxAlwaysVertical);
-                        if (meta.CutWithVoidsWhenLoaded == null) meta.CutWithVoidsWhenLoaded = TryParseYesNo(text, RxCutWithVoids);
-                        if (meta.AllowsCutInViews == null) meta.AllowsCutInViews = TryParseYesNo(text, RxAllowsCut);
-                        if (meta.Shared == null) meta.Shared = TryParseYesNo(text, RxShared);
+                       
 
                         // chevauchement
                         if (total > overlap) { Buffer.BlockCopy(buffer, total - overlap, buffer, 0, overlap); carry = overlap; }
                         else carry = total;
 
-                        // Stop anticipé si tout le principal est trouvé
-                        if (meta.OmniClassCode != null && meta.Category != null && meta.RevitSavedVersion != null &&
-                            (meta.WorkPlaneBased.HasValue || meta.FaceBased.HasValue || meta.AlwaysVertical.HasValue ||
-                             meta.CutWithVoidsWhenLoaded.HasValue || meta.AllowsCutInViews.HasValue || meta.Shared.HasValue))
+                        // Stop anticipé si l'essentiel est déjà trouvé
+                        if (meta.OmniClassCode != null && meta.Category != null && meta.RevitSavedVersion != null)
                         {
                             // on continue un peu pour tenter OmniClassTitle, sinon on pourrait break
                         }
@@ -289,16 +267,6 @@ namespace Famille
             return s;
         }
 
-        // Lit un bool "Oui/Non | Yes/No | True/False" à proximité d'un libellé.
-        private static bool? TryParseYesNo(string text, Regex pattern)
-        {
-            var m = pattern.Match(text);
-            if (!m.Success || m.Groups.Count < 2) return null;
-
-            var raw = m.Groups[m.Groups.Count - 1].Value.Trim().ToLowerInvariant();
-            if (raw.StartsWith("oui") || raw.StartsWith("yes") || raw.StartsWith("true")) return true;
-            if (raw.StartsWith("non") || raw.StartsWith("no") || raw.StartsWith("false")) return false;
-            return null;
         }
     }
-}
+
