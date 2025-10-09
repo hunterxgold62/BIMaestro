@@ -325,7 +325,6 @@
     <Compile Include="commands\Dossier famille\FamilyIndexService.cs" />
     <Compile Include="commands\Dossier famille\FamilyMetadataProvider.cs" />
     <Compile Include="commands\Dossier famille\FamilyLoadOption.cs" />
-    <Compile Include="commands\Dossier famille\FamilyMetadataProvider.cs" />
     <Compile Include="commands\Dossier famille\FamilyUsageManager.cs" />
     <Compile Include="commands\Dossier famille\image native de revit\ThumbnailCache.cs" />
     <Compile Include="commands\Dossier famille\ImageResolver.cs" />

@@ -10,233 +10,164 @@ using System.Threading.Tasks;
 namespace Famille
 {
     /// <summary>
-    /// Métadonnées rapides extraites du bloc PartAtom/XML d'un fichier .RFA,
-    /// sans ouvrir Revit.
+    /// Métadonnées utiles pour le navigateur de familles (sans ouvrir Revit).
+    /// Conserve UpdatedUtc pour compat avec ton code existant.
     /// </summary>
     public sealed class FamilyPartAtomMeta
     {
-        public string OmniClassCode { get; set; }          // ex: "23.40.20.00"
+        // (1) OmniClass
+        public string OmniClassCode { get; set; }          // ex: "23.40.20.00" ou "23.40.20.14.14.21"
+        public string OmniClassTitle { get; set; }         // optionnel si trouvé
+
+        // (2) Catégorie Revit
         public string Category { get; set; }               // ex: "Mobilier"
+
+        // (3) Version Revit de sauvegarde (année)
         public string RevitSavedVersion { get; set; }      // ex: "2023"
-        public DateTime? UpdatedUtc { get; set; }          // ex: 2025-02-18T09:47:20Z
-        public string Path { get; set; }                   // chemin du fichier (pour debug/cache)
+
+        // (4) Dernière sauvegarde (gardé pour compatibilité UI)
+        public DateTime? UpdatedUtc { get; set; }
+
+        // (5) Comportements clés (true/false/null si inconnu)
+        public bool? WorkPlaneBased { get; set; }
+        public bool? FaceBased { get; set; }
+        public bool? AlwaysVertical { get; set; }
+        public bool? CutWithVoidsWhenLoaded { get; set; }
+        public bool? AllowsCutInViews { get; set; }
+        public bool? Shared { get; set; }
+
+        // (8) Taille du fichier
+        public long? FileSizeBytes { get; set; }
+
+        public string Path { get; set; }
     }
 
-    internal static class FamilyMetadataProvider
+    /// <summary>
+    /// Fournit des métadonnées par lecture directe du fichier .RFA (PartAtom/texte).
+    /// API conservée (Initialize/IsAvailable/RequestOmniClassNumberAsync).
+    /// </summary>
+    public static class FamilyMetadataProvider
     {
-        private sealed class MetadataRequest
-        {
-            public string FamilyPath;
-            public TaskCompletionSource<string> Tcs; // pour compat: code OmniClass seul
-        }
+        // ===== Compat API attendue par ton plugin =====
+        public static bool IsAvailable => true;
 
-        private sealed class Handler : IExternalEventHandler
-        {
-            private readonly Queue<MetadataRequest> _queue;
-            public Handler(Queue<MetadataRequest> queue) => _queue = queue;
-            public string GetName() => nameof(FamilyMetadataProvider);
+        // Conserver la signature même si elle est no-op (pas d'ExternalEvent ici).
+        public static void Initialize(UIApplication app) { /* no-op pour compat */ }
 
-            public void Execute(UIApplication app)
-            {
-                MetadataRequest request;
-                while ((request = Dequeue()) != null)
-                {
-                    string result = null;
-                    try
-                    {
-                        // API historique : ne renvoie que le code OmniClass
-                        result = ExtractOmniClassNumber(request.FamilyPath);
-                    }
-                    catch
-                    {
-                        result = null;
-                    }
-                    request.Tcs.TrySetResult(result);
-                }
-            }
-
-            private MetadataRequest Dequeue()
-            {
-                lock (_queue)
-                {
-                    return _queue.Count > 0 ? _queue.Dequeue() : null;
-                }
-            }
-        }
-
-        private static readonly Queue<MetadataRequest> _queue = new();
-        private static ExternalEvent _eventRef;
-        private static Handler _handler;
-
-        // .NET Framework : pas d'Encoding.Latin1 → ISO-8859-1
-        private static readonly Encoding Latin1 = Encoding.GetEncoding("ISO-8859-1");
-
-        public static bool IsAvailable => _eventRef != null;
-
-        public static void Initialize(UIApplication app)
-        {
-            if (app == null || _handler != null) return;
-
-            _handler = new Handler(_queue);
-            try
-            {
-                _eventRef = ExternalEvent.Create(_handler);
-            }
-            catch
-            {
-                _handler = null;
-                _eventRef = null;
-            }
-        }
-
-        // ================== API existante (OmniClass uniquement) ==================
-
+        // API historique : renvoie uniquement le code OmniClass (ou null).
         public static Task<string> RequestOmniClassNumberAsync(string familyPath)
         {
-            if (string.IsNullOrWhiteSpace(familyPath) || _eventRef == null)
+            if (string.IsNullOrWhiteSpace(familyPath) || !File.Exists(familyPath))
                 return Task.FromResult<string>(null);
 
-            var request = new MetadataRequest
-            {
-                FamilyPath = familyPath,
-                Tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously)
-            };
-
-            lock (_queue) { _queue.Enqueue(request); }
-
-            try { _eventRef.Raise(); }
-            catch { request.Tcs.TrySetResult(null); }
-
-            return request.Tcs.Task;
+            string code = ExtractOmniClassNumber(familyPath);
+            return Task.FromResult(code);
         }
 
-        private static string ExtractOmniClassNumber(string path)
-        {
-            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
-                return null;
-
-            if (TryReadOmniClassFromFile(path, out var code) && !string.IsNullOrWhiteSpace(code))
-                return code;
-
-            return null;
-        }
-
-        private static bool TryReadOmniClassFromFile(string path, out string code)
-        {
-            code = null;
-            try
-            {
-                const int chunk = 256 * 1024;  // 256 Ko
-                const int overlap = 4 * 1024;  // 4 Ko
-                byte[] buffer = new byte[chunk + overlap];
-
-                using (var fs = new FileStream(
-                    path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite,
-                    1 << 16, FileOptions.SequentialScan))
-                {
-                    int carry = 0;
-                    while (true)
-                    {
-                        int read = fs.Read(buffer, carry, chunk);
-                        if (read <= 0) break;
-                        int total = read + carry;
-
-                        string text = Latin1.GetString(buffer, 0, total);
-
-                        int idx = text.IndexOf("omniclass", StringComparison.OrdinalIgnoreCase);
-                        if (idx >= 0)
-                        {
-                            int start = Math.Max(0, idx - 2048);
-                            int len = Math.Min(4096, text.Length - start);
-                            string window = text.Substring(start, len);
-
-                            var m = Regex.Match(window, @"\b(\d{2}\.\d{2}\.\d{2}\.\d{2}(?:\.\d{2})?)\b");
-                            if (m.Success)
-                            {
-                                code = m.Groups[1].Value;
-                                return true;
-                            }
-                        }
-
-                        if (total > overlap)
-                        {
-                            Buffer.BlockCopy(buffer, total - overlap, buffer, 0, overlap);
-                            carry = overlap;
-                        }
-                        else carry = total;
-                    }
-                }
-            }
-            catch { /* ignore */ }
-            return false;
-        }
-
-        // ================== NOUVELLE API : toutes les métadonnées utiles ==================
-
-        /// <summary>
-        /// Retourne (sans ouvrir Revit) l'OmniClass, la catégorie, la version de sauvegarde Revit,
-        /// et la date "updated" si présentes. Ultra-rapide.
-        /// </summary>
+        // ===== Nouvelle API rapide (si tu l'utilises déjà) =====
         public static Task<FamilyPartAtomMeta> RequestFastMetadataAsync(string familyPath)
         {
             if (string.IsNullOrWhiteSpace(familyPath) || !File.Exists(familyPath))
                 return Task.FromResult<FamilyPartAtomMeta>(null);
 
-            // Pas besoin d'ExternalEvent : on ne touche pas à l'API Revit.
             return Task.Run(() => ExtractFastMetadata(familyPath));
+        }
+
+        public static async Task<List<FamilyPartAtomMeta>> RequestFastMetadataBatchAsync(IEnumerable<string> rfaPaths)
+        {
+            var results = new List<FamilyPartAtomMeta>();
+            if (rfaPaths == null) return results;
+
+            var tasks = new List<Task<FamilyPartAtomMeta>>();
+            foreach (var p in rfaPaths) tasks.Add(RequestFastMetadataAsync(p));
+            results.AddRange(await Task.WhenAll(tasks).ConfigureAwait(false));
+            return results;
+        }
+
+        // ===== Implémentation =====
+
+        // .NET Framework : pas d'Encoding.Latin1 → ISO-8859-1 pour un mapping 1:1 byte→char
+        private static readonly Encoding Latin1 = Encoding.GetEncoding("ISO-8859-1");
+
+        // Regex précompilées
+        private static readonly Regex RxOmniCode = new Regex(@"\b(\d{2}(?:\.\d{2}){3,10})\b", RegexOptions.Compiled);
+        private static readonly Regex RxOmniTitle = new Regex(@"(Titre[_\-\s]*Omniclass|Omni\s*Class\s*Title|Omniclass\s*Title)[^>]*>\s*([^<]{1,200})", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex RxCategoryTerm = new Regex(@"<\s*category\s*>\s*<\s*term\s*>\s*([^<]{1,200}?)\s*</\s*term\s*>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex RxProductVersion = new Regex(@"<\s*(?:[A-Za-z0-9]+:)?product-version\s*>\s*(\d{4})\s*</\s*(?:[A-Za-z0-9]+:)?product-version\s*>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex RxUpdated = new Regex(@"<\s*updated\s*>\s*([0-9T:\-\.Z\+]+)\s*</\s*updated\s*>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        private static readonly string YesNoGroup = @"(?:(?:Oui|Yes|True)|(?:Non|No|False))";
+        private static readonly Regex RxWorkPlane = new Regex(@"Bas[ée]e\s+sur\s+le\s+plan\s+de\s+construction[^<>]{0,80}(" + YesNoGroup + ")", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex RxFaceBased = new Regex(@"(Placer\s+sur\s+face|Face[-\s]*based)[^<>]{0,80}(" + YesNoGroup + ")", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex RxAlwaysVertical = new Regex(@"Toujours\s+verticalement[^<>]{0,80}(" + YesNoGroup + ")", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex RxCutWithVoids = new Regex(@"Couper\s+avec\s+des\s+vides\s+une\s+fois\s+charg[ée]e[^<>]{0,80}(" + YesNoGroup + ")", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex RxAllowsCut = new Regex(@"Autoriser\s+la\s+d[ée]coupe\s+dans\s+les\s+vues[^<>]{0,80}(" + YesNoGroup + ")", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex RxShared = new Regex(@"Partag[ée]e?[^<>]{0,80}(" + YesNoGroup + ")", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        private static string ExtractOmniClassNumber(string path)
+        {
+            string omni = null;
+            try
+            {
+                const int chunk = 256 * 1024;
+                const int overlap = 4 * 1024;
+                byte[] buffer = new byte[chunk + overlap];
+
+                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 1 << 16, FileOptions.SequentialScan))
+                {
+                    int carry = 0;
+                    while (true)
+                    {
+                        int read = fs.Read(buffer, carry, chunk);
+                        if (read <= 0) break;
+                        int total = read + carry;
+
+                        string text = Latin1.GetString(buffer, 0, total);
+                        int idx = text.IndexOf("omniclass", StringComparison.OrdinalIgnoreCase);
+                        if (idx >= 0)
+                        {
+                            int start = Math.Max(0, idx - 4096);
+                            int len = Math.Min(8192, text.Length - start);
+                            string window = text.Substring(start, len);
+                            var m = RxOmniCode.Match(window);
+                            if (m.Success) { omni = m.Groups[1].Value; return omni; }
+                        }
+
+                        if (total > overlap) { Buffer.BlockCopy(buffer, total - overlap, buffer, 0, overlap); carry = overlap; }
+                        else carry = total;
+                    }
+                }
+            }
+            catch { /* ignore → null */ }
+            return omni;
         }
 
         private static FamilyPartAtomMeta ExtractFastMetadata(string path)
         {
-            if (!TryReadPartAtomMetadata(path,
-                    out var omni, out var category, out var productVersion, out var updatedUtc))
-                return null;
-
-            return new FamilyPartAtomMeta
+            var meta = new FamilyPartAtomMeta
             {
                 Path = path,
-                OmniClassCode = omni,
-                Category = category,
-                RevitSavedVersion = productVersion,
-                UpdatedUtc = updatedUtc
+                FileSizeBytes = SafeGetSize(path)
             };
+
+            TryReadPartAtom(path, meta);
+            return meta;
         }
 
-        /// <summary>
-        /// Lecture par blocs du .RFA et extraction via regex tolérantes :
-        /// - OmniClass autour de "omniclass"
-        /// - Category = 1er &lt;category&gt;&lt;term&gt;…&lt;/term&gt; non numérique
-        /// - ProductVersion = (A:)?product-version
-        /// - Updated = &lt;updated&gt;…&lt;/updated&gt;
-        /// </summary>
-        private static bool TryReadPartAtomMetadata(
-            string path,
-            out string omniClassCode,
-            out string category,
-            out string productVersion,
-            out DateTime? updatedUtc)
+        private static long? SafeGetSize(string path)
         {
-            omniClassCode = null; category = null; productVersion = null; updatedUtc = null;
+            try { return new FileInfo(path).Length; } catch { return null; }
+        }
 
+        private static void TryReadPartAtom(string path, FamilyPartAtomMeta meta)
+        {
             try
             {
-                const int chunk = 256 * 1024;  // 256 Ko
-                const int overlap = 4 * 1024;  // 4 Ko
+                const int chunk = 256 * 1024;
+                const int overlap = 4 * 1024;
                 byte[] buffer = new byte[chunk + overlap];
 
-                // Regex précompilées
-                var rxOmni = new Regex(@"\b(\d{2}\.\d{2}\.\d{2}\.\d{2}(?:\.\d{2})?)\b",
-                                       RegexOptions.Compiled);
-                var rxCategoryTerm = new Regex(@"<\s*category\s*>\s*<\s*term\s*>\s*([^<]{1,100}?)\s*</\s*term\s*>",
-                                               RegexOptions.IgnoreCase | RegexOptions.Compiled);
-                var rxProductVersion = new Regex(@"<\s*(?:[A-Za-z0-9]+:)?product-version\s*>\s*(\d{4})\s*</\s*(?:[A-Za-z0-9]+:)?product-version\s*>",
-                                                 RegexOptions.IgnoreCase | RegexOptions.Compiled);
-                var rxUpdated = new Regex(@"<\s*updated\s*>\s*([0-9T:\-\.Z\+]+)\s*</\s*updated\s*>",
-                                          RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-                using (var fs = new FileStream(
-                    path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite,
-                    1 << 16, FileOptions.SequentialScan))
+                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 1 << 16, FileOptions.SequentialScan))
                 {
                     int carry = 0;
                     while (true)
@@ -247,77 +178,127 @@ namespace Famille
 
                         string text = Latin1.GetString(buffer, 0, total);
 
-                        // 1) OmniClass : on repère "omniclass" et on scanne une fenêtre locale
-                        if (omniClassCode == null)
+                        // OmniClass (code + titre à proximité)
+                        if (meta.OmniClassCode == null)
                         {
                             int idx = text.IndexOf("omniclass", StringComparison.OrdinalIgnoreCase);
                             if (idx >= 0)
                             {
-                                int start = Math.Max(0, idx - 2048);
-                                int len = Math.Min(4096, text.Length - start);
+                                int start = Math.Max(0, idx - 4096);
+                                int len = Math.Min(8192, text.Length - start);
                                 string window = text.Substring(start, len);
-                                var m = rxOmni.Match(window);
-                                if (m.Success) omniClassCode = m.Groups[1].Value;
+
+                                var m = RxOmniCode.Match(window);
+                                if (m.Success) meta.OmniClassCode = m.Groups[1].Value;
+
+                                if (meta.OmniClassTitle == null)
+                                {
+                                    var t = RxOmniTitle.Match(window);
+                                    if (t.Success)
+                                        meta.OmniClassTitle = FixUtf8Mojibake(t.Groups[2].Value.Trim());
+                                }
                             }
                         }
 
-                        // 2) Product version : global
-                        if (productVersion == null)
+                        // Catégorie (1er term non code OmniClass)
+                        if (meta.Category == null)
                         {
-                            var m = rxProductVersion.Match(text);
-                            if (m.Success) productVersion = m.Groups[1].Value;
+                            foreach (Match m in RxCategoryTerm.Matches(text))
+                            {
+                                var termRaw = m.Groups[1].Value.Trim();
+                                var term = FixUtf8Mojibake(termRaw);
+                                if (!LooksLikeOmniClassCode(term))
+                                {
+                                    meta.Category = term;
+                                    break;
+                                }
+                            }
                         }
 
-                        // 3) Updated : global
-                        if (updatedUtc == null)
+                        // Version Revit
+                        if (meta.RevitSavedVersion == null)
                         {
-                            var m = rxUpdated.Match(text);
+                            var m = RxProductVersion.Match(text);
+                            if (m.Success) meta.RevitSavedVersion = m.Groups[1].Value;
+                        }
+
+                        // Dernière mise à jour (pour compat UpdatedUtc)
+                        if (meta.UpdatedUtc == null)
+                        {
+                            var m = RxUpdated.Match(text);
                             if (m.Success && DateTime.TryParse(
                                     m.Groups[1].Value,
                                     CultureInfo.InvariantCulture,
                                     DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal,
                                     out var dt))
                             {
-                                updatedUtc = dt;
+                                meta.UpdatedUtc = dt;
                             }
                         }
 
-                        // 4) Category : on retient le 1er term non numérique/dot-pattern
-                        if (category == null)
-                        {
-                            foreach (Match m in rxCategoryTerm.Matches(text))
-                            {
-                                var term = m.Groups[1].Value.Trim();
-                                // Écarte les codes type 23.40.20.00(.XX)
-                                if (!Regex.IsMatch(term, @"^\d{2}(\.\d{2}){3,4}$"))
-                                {
-                                    category = term;
-                                    break;
-                                }
-                            }
-                        }
-
-                        // Si tout trouvé, on peut quitter tôt
-                        if (omniClassCode != null && category != null && productVersion != null && updatedUtc.HasValue)
-                            return true;
+                        // Comportements (bools)
+                        if (meta.WorkPlaneBased == null) meta.WorkPlaneBased = TryParseYesNo(text, RxWorkPlane);
+                        if (meta.FaceBased == null) meta.FaceBased = TryParseYesNo(text, RxFaceBased);
+                        if (meta.AlwaysVertical == null) meta.AlwaysVertical = TryParseYesNo(text, RxAlwaysVertical);
+                        if (meta.CutWithVoidsWhenLoaded == null) meta.CutWithVoidsWhenLoaded = TryParseYesNo(text, RxCutWithVoids);
+                        if (meta.AllowsCutInViews == null) meta.AllowsCutInViews = TryParseYesNo(text, RxAllowsCut);
+                        if (meta.Shared == null) meta.Shared = TryParseYesNo(text, RxShared);
 
                         // chevauchement
-                        if (total > overlap)
-                        {
-                            Buffer.BlockCopy(buffer, total - overlap, buffer, 0, overlap);
-                            carry = overlap;
-                        }
+                        if (total > overlap) { Buffer.BlockCopy(buffer, total - overlap, buffer, 0, overlap); carry = overlap; }
                         else carry = total;
+
+                        // Stop anticipé si tout le principal est trouvé
+                        if (meta.OmniClassCode != null && meta.Category != null && meta.RevitSavedVersion != null &&
+                            (meta.WorkPlaneBased.HasValue || meta.FaceBased.HasValue || meta.AlwaysVertical.HasValue ||
+                             meta.CutWithVoidsWhenLoaded.HasValue || meta.AllowsCutInViews.HasValue || meta.Shared.HasValue))
+                        {
+                            // on continue un peu pour tenter OmniClassTitle, sinon on pourrait break
+                        }
                     }
                 }
-
-                // Succès si au moins une info utile trouvée
-                return omniClassCode != null || category != null || productVersion != null || updatedUtc.HasValue;
             }
             catch
             {
-                return false;
+                // silencieux : on préfère renvoyer ce qu'on a (ou nulls) plutôt que planter l'UI
             }
+        }
+
+        // ===== Helpers =====
+
+        private static bool LooksLikeOmniClassCode(string s)
+        {
+            if (string.IsNullOrWhiteSpace(s)) return false;
+            return Regex.IsMatch(s.Trim(), @"^\d{2}(?:\.\d{2}){3,10}$");
+        }
+
+        // Répare les “gÃ©nie” → “génie” si l’UTF-8 a été lu en Latin-1.
+        private static string FixUtf8Mojibake(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return s;
+            if (s.IndexOf('Ã') >= 0 || s.IndexOf('Â') >= 0)
+            {
+                try
+                {
+                    var bytes = Latin1.GetBytes(s);
+                    var utf8 = Encoding.UTF8.GetString(bytes);
+                    if (utf8.IndexOf('Ã') < 0 && utf8.IndexOf('Â') < 0) return utf8;
+                }
+                catch { }
+            }
+            return s;
+        }
+
+        // Lit un bool "Oui/Non | Yes/No | True/False" à proximité d'un libellé.
+        private static bool? TryParseYesNo(string text, Regex pattern)
+        {
+            var m = pattern.Match(text);
+            if (!m.Success || m.Groups.Count < 2) return null;
+
+            var raw = m.Groups[m.Groups.Count - 1].Value.Trim().ToLowerInvariant();
+            if (raw.StartsWith("oui") || raw.StartsWith("yes") || raw.StartsWith("true")) return true;
+            if (raw.StartsWith("non") || raw.StartsWith("no") || raw.StartsWith("false")) return false;
+            return null;
         }
     }
 }

@@ -181,6 +181,7 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
                         <DockPanel Grid.Row="0" LastChildFill="True">
@@ -249,11 +250,19 @@
                                    Foreground="{DynamicResource PrimaryText}"
                                    Margin="0,6,0,0"
                                    TextWrapping="Wrap">
-                            <Run Text="Chemin : "/>
-                            <Run Text="{Binding Path}"/>
+                            <Run Text="Version Revit : "/>
+                            <Run Text="{Binding RevitSavedVersion, TargetNullValue=—}"/>
                         </TextBlock>
 
                         <TextBlock Grid.Row="3"
+                                   Foreground="{DynamicResource PrimaryText}"
+                                   Margin="0,6,0,0"
+                                   TextWrapping="Wrap">
+                            <Run Text="Dernière mise à jour : "/>
+                            <Run Text="{Binding LastUpdatedText, TargetNullValue=—}"/>
+                        </TextBlock>
+
+                        <TextBlock Grid.Row="4"
                                    Foreground="{DynamicResource PrimaryText}"
                                    Margin="0,6,0,0"
                                    TextWrapping="Wrap">
@@ -261,7 +270,7 @@
                             <Run Text="{Binding OmniClassNumber, TargetNullValue=—}"/>
                         </TextBlock>
 
-                        <TextBlock Grid.Row="4"
+                        <TextBlock Grid.Row="5"
                                    Foreground="Gray"
                                    Margin="0,6,0,0"
                                    FontStyle="Italic"
@@ -445,19 +454,18 @@
                         </ScrollViewer>
 
                         <DockPanel Grid.Row="3">
-                            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
                                 <CheckBox x:Name="DetailedViewCheckBox"
                                           Content="Vue détaillée"
                                           Margin="0,0,20,0"
                                           Foreground="{DynamicResource PrimaryText}"
                                           Checked="DetailedViewCheckBox_Changed"
-                                          Unchecked="DetailedViewCheckBox_Changed"/>
+                                          Unchecked="DetailedViewCheckBox_Changed" Width="92"/>
                             </StackPanel>
-                            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
-                                <TextBlock Text="Familles affichées : " Foreground="{DynamicResource PrimaryText}"/>
+                            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                                <TextBlock Foreground="{DynamicResource PrimaryText}" Margin="5,0,0,0" Text="Familles affichées : "/>
                                 <TextBlock x:Name="CountTextBlock" Foreground="{DynamicResource PrimaryText}" FontWeight="Bold"/>
                             </StackPanel>
-                            <TextBlock x:Name="IndexStatusText" Foreground="{DynamicResource PrimaryText}" Margin="0,5,10,0"/>
                         </DockPanel>
                     </Grid>
                 </Grid>

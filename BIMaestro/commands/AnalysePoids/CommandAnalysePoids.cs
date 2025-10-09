@@ -598,6 +598,8 @@ private List<string> GetImportNames(Document doc)
         public string Nom { get; set; }
         public string Type { get; set; }
         public double TailleEnMo { get; set; }
+        public string TailleAffiche => $"{TailleEnMo:N2} Mo";
+
         public int Count { get; set; }
         public IList<ElementId> ElementIds { get; set; }
         public ElementId PrimaryId { get; set; }

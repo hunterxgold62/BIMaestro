@@ -69,11 +69,11 @@ namespace Famille
         private static readonly System.Threading.SemaphoreSlim _thumbGate = new(4);
         private static readonly Dictionary<string, ImageSource> _bitmapCache =
             new(StringComparer.OrdinalIgnoreCase);
-        private static readonly Dictionary<string, string> _omniClassCache =
+        private static readonly Dictionary<string, FamilyPartAtomMeta> _metadataCache =
             new(StringComparer.OrdinalIgnoreCase);
-        private static readonly HashSet<string> _omniClassPending =
+        private static readonly HashSet<string> _metadataPending =
             new(StringComparer.OrdinalIgnoreCase);
-        private static readonly object _omniClassLock = new();
+        private static readonly object _metadataLock = new();
 
         // ===== Collections =====
         private ObservableCollection<Collection> _collections = new();
@@ -129,16 +129,13 @@ namespace Famille
             PlaceholderText.Visibility = Visibility.Visible;
 
             // Index
-            IndexStatusText.Text = "Chargement de l'index…";
             await _index.StartAsync();
-            IndexStatusText.Text = _index.StatusText;
         }
 
         private void OnIndexUpdated()
         {
             Dispatcher.Invoke(() =>
             {
-                IndexStatusText.Text = _index.StatusText;
                 if (_globalSearchMode) ApplyFilters();
             });
         }
@@ -196,7 +193,6 @@ namespace Famille
                 _globalSearchMode = false;
                 SearchBox.Text = "";
                 Keyboard.ClearFocus();
-                IndexStatusText.Text = _index.StatusText;
             }
 
             currentFolderPath = tv.Tag.ToString();
@@ -263,7 +259,7 @@ namespace Famille
             foreach (var it in topItems)
             {
                 LoadThumbnailForFamilyItem(it);
-                LoadOmniClassForFamilyItem(it);
+                LoadMetadataForFamilyItem(it);
             }
         }
 
@@ -345,9 +341,7 @@ namespace Famille
         private void SearchBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
         {
             _globalSearchMode = true;
-            IndexStatusText.Text = _index.IsReady
-                ? "Recherche globale (index prêt)."
-                : "Recherche globale (index en cours…)";
+        
             _searchDebounce.Stop();
             _searchDebounce.Start();
         }
@@ -357,7 +351,6 @@ namespace Famille
             if (string.IsNullOrWhiteSpace(SearchBox.Text))
             {
                 _globalSearchMode = false;
-                IndexStatusText.Text = _index.StatusText;
                 BeginPaging(allFamilies);
             }
         }
@@ -446,7 +439,7 @@ namespace Famille
             {
                 displayedFamilies.Add(item);
                 LoadThumbnailForFamilyItem(item);
-                LoadOmniClassForFamilyItem(item);
+                LoadMetadataForFamilyItem(item);
             }
 
             // rafraîchit source
@@ -553,7 +546,6 @@ namespace Famille
             if (_globalSearchMode)
             {
                 _globalSearchMode = false;
-                IndexStatusText.Text = _index.StatusText;
                 BeginPaging(new List<FamilyItem>());
                 PagingStatusText.Text = "Tape au moins 2 caractères pour rechercher partout.";
                 UpdateCount(0);
@@ -665,72 +657,99 @@ namespace Famille
             });
         }
 
-        private void LoadOmniClassForFamilyItem(FamilyItem fam)
+        private void LoadMetadataForFamilyItem(FamilyItem fam)
         {
             if (fam == null || string.IsNullOrEmpty(fam.Path)) return;
 
-            string cached;
-            lock (_omniClassLock)
+            FamilyPartAtomMeta cached;
+            lock (_metadataLock)
             {
-                if (_omniClassCache.TryGetValue(fam.Path, out cached))
+                if (_metadataCache.TryGetValue(fam.Path, out cached))
                 {
-                    UpdateOmniClassBinding(fam, cached);
+                    UpdateMetadataBinding(fam, cached);
                     return;
                 }
 
-                if (_omniClassPending.Contains(fam.Path))
+                if (_metadataPending.Contains(fam.Path))
                     return;
 
-                _omniClassPending.Add(fam.Path);
-            }
-
-            if (!FamilyMetadataProvider.IsAvailable)
-            {
-                lock (_omniClassLock)
-                {
-                    _omniClassPending.Remove(fam.Path);
-                    _omniClassCache[fam.Path] = null;
-                }
-                UpdateOmniClassBinding(fam, null);
-                return;
+                _metadataPending.Add(fam.Path);
             }
 
             Task.Run(async () =>
             {
-                string number = null;
+                FamilyPartAtomMeta meta = null;
                 try
                 {
-                    number = await FamilyMetadataProvider
-                                    .RequestOmniClassNumberAsync(fam.Path)
+                    meta = await FamilyMetadataProvider
+                                    .RequestFastMetadataAsync(fam.Path)
                                     .ConfigureAwait(false);
-                    if (!string.IsNullOrWhiteSpace(number))
-                        number = number.Trim();
-                    else
-                        number = null;
                 }
                 catch
                 {
-                    number = null;
+                    meta = null;
                 }
 
-                lock (_omniClassLock)
+                lock (_metadataLock)
                 {
-                    _omniClassPending.Remove(fam.Path);
-                    _omniClassCache[fam.Path] = number;
+                    _metadataPending.Remove(fam.Path);
+                    _metadataCache[fam.Path] = meta;
                 }
 
-                UpdateOmniClassBinding(fam, number);
+                UpdateMetadataBinding(fam, meta);
             });
         }
 
-        private void UpdateOmniClassBinding(FamilyItem fam, string value)
+        private void UpdateMetadataBinding(FamilyItem fam, FamilyPartAtomMeta meta)
         {
             if (fam == null) return;
 
+            void Apply()
+            {
+                fam.OmniClassNumber = string.IsNullOrWhiteSpace(meta?.OmniClassCode)
+                    ? null
+                    : meta.OmniClassCode.Trim();
+
+                if (meta != null)
+                {
+                    fam.Category = string.IsNullOrWhiteSpace(meta.Category)
+                        ? null
+                        : meta.Category.Trim();
+
+                    fam.RevitSavedVersion = string.IsNullOrWhiteSpace(meta.RevitSavedVersion)
+                        ? null
+                        : meta.RevitSavedVersion.Trim();
+
+                    if (meta.UpdatedUtc.HasValue)
+                    {
+                        try
+                        {
+                            var local = TimeZoneInfo.ConvertTimeFromUtc(meta.UpdatedUtc.Value, TimeZoneInfo.Local);
+                            fam.LastUpdatedText = local.ToString("g", CultureInfo.CurrentCulture);
+                        }
+                        catch
+                        {
+                            fam.LastUpdatedText = meta.UpdatedUtc.Value.ToString("u", CultureInfo.InvariantCulture);
+                        }
+                    }
+                    else
+                    {
+                        fam.LastUpdatedText = null;
+                    }
+                }
+                else
+                {
+                    fam.LastUpdatedText = null;
+                    fam.RevitSavedVersion = null;
+                    if (string.IsNullOrWhiteSpace(fam.Category))
+                        fam.Category = null;
+                }
+            }
+
             if (Dispatcher.CheckAccess())
-                fam.OmniClassNumber = value;
+                Apply();
             else
-                Dispatcher.Invoke(() => fam.OmniClassNumber = value);
+                Dispatcher.Invoke(Apply);
         }
 
 
@@ -1064,7 +1083,7 @@ namespace Famille
             if (detailedViewMode && currentItems != null)
             {
                 foreach (var item in currentItems)
-                    LoadOmniClassForFamilyItem(item);
+                    LoadMetadataForFamilyItem(item);
             }
         }
 
@@ -1288,16 +1307,10 @@ namespace Famille
         private FamilyItem CreateFamilyItemFromPath(string path)
         {
             var name = System.IO.Path.GetFileNameWithoutExtension(path);
-            var cat = "Général";
-            var low = name.ToLowerInvariant();
-            if (low.Contains("porte")) cat = "Porte";
-            else if (low.Contains("fenetre") || low.Contains("fenêtre")) cat = "Fenêtre";
-
             return new FamilyItem
             {
                 Name = name,
                 Path = path,
-                Category = cat,
                 Icon = null,
                 NormalizedName = StripDiacritics(name).ToLowerInvariant()
             };
@@ -1312,7 +1325,12 @@ namespace Famille
     {
         public string Name { get; set; }
         public string Path { get; set; }
-        public string Category { get; set; }
+        private string _category;
+        public string Category
+        {
+            get => _category;
+            set { if (_category != value) { _category = value; OnPropertyChanged(nameof(Category)); } }
+        }
         public string NormalizedName { get; set; }
 
         private string _omniClassNumber;
@@ -1334,6 +1352,20 @@ namespace Famille
         {
             get => _isFavorite;
             set { if (_isFavorite != value) { _isFavorite = value; OnPropertyChanged(nameof(IsFavorite)); } }
+        }
+
+        private string _revitSavedVersion;
+        public string RevitSavedVersion
+        {
+            get => _revitSavedVersion;
+            set { if (_revitSavedVersion != value) { _revitSavedVersion = value; OnPropertyChanged(nameof(RevitSavedVersion)); } }
+        }
+
+        private string _lastUpdatedText;
+        public string LastUpdatedText
+        {
+            get => _lastUpdatedText;
+            set { if (_lastUpdatedText != value) { _lastUpdatedText = value; OnPropertyChanged(nameof(LastUpdatedText)); } }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
