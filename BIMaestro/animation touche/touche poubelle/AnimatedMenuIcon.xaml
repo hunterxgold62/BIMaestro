@@ -1,0 +1,128 @@
+﻿<UserControl x:Class="BIMaestro.UI.AnimatedDeleteIcon"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="root"
+             Width="{Binding IconSize, ElementName=root}"
+             Height="{Binding IconSize, ElementName=root}">
+    <Grid SnapsToDevicePixels="True" RenderOptions.EdgeMode="Aliased">
+        <!-- On travaille en base 24x24 pour coller au viewBox SVG -->
+        <Viewbox Stretch="Fill">
+            <Grid Width="24" Height="24">
+
+                <!-- GROUPE : Couvercle (équiv. motion.g) -->
+                <Grid>
+                    <!-- translateY du couvercle -->
+                    <Grid.RenderTransform>
+                        <TranslateTransform x:Name="LidTY" Y="0"/>
+                    </Grid.RenderTransform>
+
+                    <!-- Ligne horizontale du haut : M3 6h18 -->
+                    <Line X1="3" Y1="6" X2="21" Y2="6"
+                Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                StrokeThickness="2"
+                StrokeStartLineCap="Round"
+                StrokeEndLineCap="Round"/>
+
+                    <!-- Couvercle : M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2 -->
+                    <Path Data="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"
+                Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                StrokeThickness="2"
+                StrokeStartLineCap="Round"
+                StrokeEndLineCap="Round"
+                Fill="Transparent"/>
+                </Grid>
+
+                <!-- CORPS de la poubelle (équiv. d morphing 8→9 : on simule par translateY=+1) -->
+                <Path x:Name="BodyPath"
+              Data="M19 8v12c0 1-1 2-2 2H7c-1 0-2-1-2-2V8"
+              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=UserControl}}"
+              StrokeThickness="2"
+              StrokeStartLineCap="Round"
+              StrokeEndLineCap="Round"
+              Fill="Transparent">
+                    <Path.RenderTransform>
+                        <TranslateTransform x:Name="BodyTY" Y="0"/>
+                    </Path.RenderTransform>
+                </Path>
+
+                <!-- Lignes internes (x=10 et x=14, y=11→17) -->
+                <Line x:Name="Inner1" X1="10" Y1="11" X2="10" Y2="17"
+              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=UserControl}}"
+              StrokeThickness="2"
+              StrokeStartLineCap="Round"
+              StrokeEndLineCap="Round">
+                    <Line.RenderTransform>
+                        <TranslateTransform x:Name="Inner1TY" Y="0"/>
+                    </Line.RenderTransform>
+                </Line>
+
+                <Line x:Name="Inner2" X1="14" Y1="11" X2="14" Y2="17"
+              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=UserControl}}"
+              StrokeThickness="2"
+              StrokeStartLineCap="Round"
+              StrokeEndLineCap="Round">
+                    <Line.RenderTransform>
+                        <TranslateTransform x:Name="Inner2TY" Y="0"/>
+                    </Line.RenderTransform>
+                </Line>
+
+                <!-- Animations (survol) -->
+                <Grid.Triggers>
+                    <!-- MouseEnter : animate -->
+                    <EventTrigger RoutedEvent="MouseEnter">
+                        <BeginStoryboard x:Name="BS_Enter">
+                            <Storyboard>
+                                <!-- Couvercle : y -1.1 -->
+                                <DoubleAnimation Storyboard.TargetName="LidTY" Storyboard.TargetProperty="Y"
+                                 To="-1.1" Duration="0:0:0.18">
+                                    <DoubleAnimation.EasingFunction>
+                                        <CubicEase EasingMode="EaseOut"/>
+                                    </DoubleAnimation.EasingFunction>
+                                </DoubleAnimation>
+
+                                <!-- Corps : translateY +1 (équiv. d: 8 -> 9) -->
+                                <DoubleAnimation Storyboard.TargetName="BodyTY" Storyboard.TargetProperty="Y"
+                                 To="1" Duration="0:0:0.18">
+                                    <DoubleAnimation.EasingFunction>
+                                        <CubicEase EasingMode="EaseOut"/>
+                                    </DoubleAnimation.EasingFunction>
+                                </DoubleAnimation>
+
+                                <!-- Traits internes : +0.5 -->
+                                <DoubleAnimation Storyboard.TargetName="Inner1TY" Storyboard.TargetProperty="Y"
+                                 To="0.5" Duration="0:0:0.18">
+                                    <DoubleAnimation.EasingFunction>
+                                        <CubicEase EasingMode="EaseOut"/>
+                                    </DoubleAnimation.EasingFunction>
+                                </DoubleAnimation>
+                                <DoubleAnimation Storyboard.TargetName="Inner2TY" Storyboard.TargetProperty="Y"
+                                 To="0.5" Duration="0:0:0.18">
+                                    <DoubleAnimation.EasingFunction>
+                                        <CubicEase EasingMode="EaseOut"/>
+                                    </DoubleAnimation.EasingFunction>
+                                </DoubleAnimation>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </EventTrigger>
+
+                    <!-- MouseLeave : normal -->
+                    <EventTrigger RoutedEvent="MouseLeave">
+                        <BeginStoryboard x:Name="BS_Leave">
+                            <Storyboard>
+                                <DoubleAnimation Storyboard.TargetName="LidTY" Storyboard.TargetProperty="Y"
+                                 To="0" Duration="0:0:0.16"/>
+                                <DoubleAnimation Storyboard.TargetName="BodyTY" Storyboard.TargetProperty="Y"
+                                 To="0" Duration="0:0:0.16"/>
+                                <DoubleAnimation Storyboard.TargetName="Inner1TY" Storyboard.TargetProperty="Y"
+                                 To="0" Duration="0:0:0.16"/>
+                                <DoubleAnimation Storyboard.TargetName="Inner2TY" Storyboard.TargetProperty="Y"
+                                 To="0" Duration="0:0:0.16"/>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </EventTrigger>
+                </Grid.Triggers>
+
+            </Grid>
+        </Viewbox>
+    </Grid>
+</UserControl>

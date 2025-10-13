@@ -1,0 +1,172 @@
+﻿<UserControl x:Class="BIMaestro.UI.GhostSwitch"
+             x:Name="root"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             SnapsToDevicePixels="True"
+             MinWidth="100" MinHeight="40"
+             Background="Transparent">
+
+    <UserControl.Resources>
+        <!-- Piste -->
+        <SolidColorBrush x:Key="TrackOffBrush" Color="#7F7F7F"/>
+        <SolidColorBrush x:Key="TrackOnBrush"  Color="#459DEF"/>
+
+        <!-- Corps du fantôme (léger modelé) -->
+        <RadialGradientBrush x:Key="GhostBodyBrush" GradientOrigin="0.42,0.35" Center="0.5,0.5"
+                             RadiusX="0.65" RadiusY="0.65">
+            <GradientStop Color="#FFFFFFFF" Offset="0.00"/>
+            <GradientStop Color="#FFF9F9F9" Offset="0.55"/>
+            <GradientStop Color="#FFEFEFEF" Offset="1.00"/>
+        </RadialGradientBrush>
+
+        <!-- Glow autour du fantôme -->
+        <DropShadowEffect x:Key="GhostGlow"
+                          Color="#FFFFFFFF"
+                          BlurRadius="28"
+                          ShadowDepth="0"
+                          Opacity="0.55"/>
+    </UserControl.Resources>
+
+    <Grid x:Name="LayoutRoot" Background="Transparent">
+        <Grid x:Name="Host" ClipToBounds="False">
+            <!-- Piste -->
+            <Border x:Name="Track"
+                    Width="{Binding TrackWidth, ElementName=root}"
+                    Height="{Binding TrackHeight, ElementName=root}"
+                    CornerRadius="{Binding TrackCornerRadius, ElementName=root}"
+                    Background="{StaticResource TrackOffBrush}"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Center"/>
+
+            <!-- Fantôme -->
+            <Grid x:Name="Ghost"
+                  Width="{Binding GhostSize, ElementName=root}"
+                  Height="{Binding GhostSize, ElementName=root}"
+                  HorizontalAlignment="Left"
+                  VerticalAlignment="Center"
+                  RenderTransformOrigin="0.5,0.5">
+                <Grid.RenderTransform>
+                    <TransformGroup>
+                        <!-- X : slide ; Y : bobbing ; Scale : squash -->
+                        <TranslateTransform x:Name="GhostX"/>
+                        <TranslateTransform x:Name="GhostY"/>
+                        <ScaleTransform x:Name="GhostScale" ScaleX="1" ScaleY="1"/>
+                    </TransformGroup>
+                </Grid.RenderTransform>
+
+                <Grid.Effect>
+                    <StaticResource ResourceKey="GhostGlow"/>
+                </Grid.Effect>
+
+                <!-- Bras ronds (centrés verticalement) -->
+                <Ellipse x:Name="ArmLeft"  Fill="{StaticResource GhostBodyBrush}" Opacity="0.95"
+                         HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Ellipse.RenderTransform>
+                        <TransformGroup>
+                            <TranslateTransform x:Name="ArmLShift"/>
+                        </TransformGroup>
+                    </Ellipse.RenderTransform>
+                </Ellipse>
+                <Ellipse x:Name="ArmRight" Fill="{StaticResource GhostBodyBrush}" Opacity="0.95"
+                         HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Ellipse.RenderTransform>
+                        <TransformGroup>
+                            <TranslateTransform x:Name="ArmRShift"/>
+                        </TransformGroup>
+                    </Ellipse.RenderTransform>
+                </Ellipse>
+
+                <!-- Oreilles -->
+                <Ellipse x:Name="EarLeft"  Fill="{StaticResource GhostBodyBrush}"
+                         HorizontalAlignment="Left"  VerticalAlignment="Center"/>
+                <Ellipse x:Name="EarRight" Fill="{StaticResource GhostBodyBrush}"
+                         HorizontalAlignment="Right" VerticalAlignment="Center"/>
+
+                <!-- Tête -->
+                <Ellipse x:Name="Head" Fill="{StaticResource GhostBodyBrush}"/>
+
+                <!-- Yeux (centrés verticalement) -->
+                <Rectangle x:Name="EyeL" Fill="#000000" RadiusX="1.5" RadiusY="1.5"
+                           HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Rectangle.RenderTransform>
+                        <TransformGroup>
+                            <ScaleTransform x:Name="EyeLScale" ScaleX="1" ScaleY="1"/>
+                            <TranslateTransform x:Name="EyeLBase"/>
+                            <TranslateTransform x:Name="EyeLLook"/>
+                        </TransformGroup>
+                    </Rectangle.RenderTransform>
+                </Rectangle>
+                <Rectangle x:Name="EyeR" Fill="#000000" RadiusX="1.5" RadiusY="1.5"
+                           HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Rectangle.RenderTransform>
+                        <TransformGroup>
+                            <ScaleTransform x:Name="EyeRScale" ScaleX="1" ScaleY="1"/>
+                            <TranslateTransform x:Name="EyeRBase"/>
+                            <TranslateTransform x:Name="EyeRLook"/>
+                        </TransformGroup>
+                    </Rectangle.RenderTransform>
+                </Rectangle>
+            </Grid>
+
+            <!-- Couche de clic invisible (zéro carré bleu) -->
+            <ToggleButton x:Name="ToggleHit"
+                          Panel.ZIndex="10"
+                          HorizontalAlignment="Stretch"
+                          VerticalAlignment="Stretch"
+                          Background="Transparent"
+                          BorderThickness="0"
+                          Focusable="False"
+                          IsTabStop="False"
+                          FocusVisualStyle="{x:Null}"
+                          IsChecked="{Binding IsOn, ElementName=root, Mode=TwoWay}">
+                <ToggleButton.Template>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border Background="Transparent"/>
+                    </ControlTemplate>
+                </ToggleButton.Template>
+            </ToggleButton>
+        </Grid>
+    </Grid>
+
+    <!-- Bobbing (doux) + Blink -->
+    <UserControl.Triggers>
+        <!-- Bobbing vertical -->
+        <EventTrigger RoutedEvent="Loaded">
+            <BeginStoryboard>
+                <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                    <DoubleAnimation Storyboard.TargetName="GhostY"
+                                     Storyboard.TargetProperty="Y"
+                                     From="0" To="5.5"
+                                     Duration="0:0:2.15"/>
+                </Storyboard>
+            </BeginStoryboard>
+        </EventTrigger>
+
+        <!-- Clignement yeux -->
+        <EventTrigger RoutedEvent="Loaded">
+            <BeginStoryboard>
+                <Storyboard RepeatBehavior="Forever">
+                    <DoubleAnimationUsingKeyFrames Storyboard.TargetName="EyeLScale"
+                                                   Storyboard.TargetProperty="ScaleY">
+                        <DiscreteDoubleKeyFrame Value="1.0" KeyTime="0:0:0"/>
+                        <DiscreteDoubleKeyFrame Value="1.0" KeyTime="0:0:1.7"/>
+                        <EasingDoubleKeyFrame   Value="0.2" KeyTime="0:0:1.85"/>
+                        <EasingDoubleKeyFrame   Value="0.2" KeyTime="0:0:2.05"/>
+                        <EasingDoubleKeyFrame   Value="1.0" KeyTime="0:0:2.2"/>
+                        <DiscreteDoubleKeyFrame Value="1.0" KeyTime="0:0:4.25"/>
+                    </DoubleAnimationUsingKeyFrames>
+
+                    <DoubleAnimationUsingKeyFrames Storyboard.TargetName="EyeRScale"
+                                                   Storyboard.TargetProperty="ScaleY">
+                        <DiscreteDoubleKeyFrame Value="1.0" KeyTime="0:0:0"/>
+                        <DiscreteDoubleKeyFrame Value="1.0" KeyTime="0:0:1.8"/>
+                        <EasingDoubleKeyFrame   Value="0.2" KeyTime="0:0:1.95"/>
+                        <EasingDoubleKeyFrame   Value="0.2" KeyTime="0:0:2.15"/>
+                        <EasingDoubleKeyFrame   Value="1.0" KeyTime="0:0:2.3"/>
+                        <DiscreteDoubleKeyFrame Value="1.0" KeyTime="0:0:4.25"/>
+                    </DoubleAnimationUsingKeyFrames>
+                </Storyboard>
+            </BeginStoryboard>
+        </EventTrigger>
+    </UserControl.Triggers>
+</UserControl>

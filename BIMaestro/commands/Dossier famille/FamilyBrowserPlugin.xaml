@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:Famille"
+        xmlns:ui="clr-namespace:BIMaestro.UI"
         xmlns:xctk="http://schemas.xceed.com/wpf/xaml/toolkit"
         Title="Navigateur de Familles"
         Height="600" Width="1150"
@@ -43,12 +44,40 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style x:Key="PillButtonStyle" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="#FFE9EEF6"/>
+            <Setter Property="BorderBrush" Value="#FFC9D7F5"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="10,4"/>
+            <Setter Property="Margin" Value="0,0,8,8"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#FF1F3B57"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="12"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 
         <!-- Vignette famille (onglet Dossiers) -->
         <DataTemplate x:Key="FamilyItemTemplate" DataType="{x:Type local:FamilyItem}">
             <Border Margin="5" Width="200"
                     Background="{DynamicResource PanelBackground}"
                     CornerRadius="5"
+                    BorderBrush="#33000000"
+                    BorderThickness="1"
                     MouseLeftButtonDown="FamilyItem_DoubleClick">
                 <Border.ContextMenu>
                     <ContextMenu>
@@ -137,6 +166,8 @@
             <Border Margin="5"
                     Background="{DynamicResource PanelBackground}"
                     CornerRadius="5"
+                    BorderBrush="#33000000"
+                    BorderThickness="1"
                     MouseLeftButtonDown="FamilyItem_DoubleClick"
                     HorizontalAlignment="Stretch">
                 <Border.ContextMenu>
@@ -224,15 +255,11 @@
                                        VerticalAlignment="Center"/>
                         </DockPanel>
                         <WrapPanel Grid.Row="1" Margin="0,14,0,0">
-                            <Border Background="#FFE9EEF6"
-                                    BorderBrush="#FFC9D7F5"
-                                    BorderThickness="1"
-                                    CornerRadius="12"
-                                    Padding="10,4"
-                                    Margin="0,0,8,8">
-                                <Border.Style>
-                                    <Style TargetType="Border">
-                                        <Setter Property="Visibility" Value="Visible"/>
+                            <Button Click="CategoryPill_Click">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource PillButtonStyle}">
+                                        <Setter Property="Background" Value="#FFE9EEF6"/>
+                                        <Setter Property="BorderBrush" Value="#FFC9D7F5"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding Category}" Value="">
                                                 <Setter Property="Visibility" Value="Collapsed"/>
@@ -242,21 +269,16 @@
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
-                                </Border.Style>
-                                <TextBlock Text="{Binding Category}"
-                                           Foreground="#FF1F3B57"
-                                           FontWeight="SemiBold"/>
-                            </Border>
+                                </Button.Style>
+                                <TextBlock Text="{Binding Category}" Foreground="#FF1F3B57"/>
+                            </Button>
 
-                            <Border Background="#FFF2F5FC"
-                                    BorderBrush="#FFDCE6FA"
-                                    BorderThickness="1"
-                                    CornerRadius="12"
-                                    Padding="10,4"
-                                    Margin="0,0,8,8">
-                                <Border.Style>
-                                    <Style TargetType="Border">
-                                        <Setter Property="Visibility" Value="Visible"/>
+                            <Button Click="VersionPill_Click">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource PillButtonStyle}">
+                                        <Setter Property="Background" Value="#FFF2F5FC"/>
+                                        <Setter Property="BorderBrush" Value="#FFDCE6FA"/>
+                                        <Setter Property="Foreground" Value="#FF2A3F6A"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding RevitSavedVersion}" Value="">
                                                 <Setter Property="Visibility" Value="Collapsed"/>
@@ -266,22 +288,19 @@
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
-                                </Border.Style>
+                                </Button.Style>
                                 <TextBlock Foreground="#FF2A3F6A" FontWeight="SemiBold">
                                     <Run Text="Revit "/>
                                     <Run Text="{Binding RevitSavedVersion}"/>
                                 </TextBlock>
-                            </Border>
+                            </Button>
 
-                            <Border Background="#FFFDF2E8"
-                                    BorderBrush="#FFF6D9B8"
-                                    BorderThickness="1"
-                                    CornerRadius="12"
-                                    Padding="10,4"
-                                    Margin="0,0,8,8">
-                                <Border.Style>
-                                    <Style TargetType="Border">
-                                        <Setter Property="Visibility" Value="Visible"/>
+                            <Button Click="SizePill_Click">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource PillButtonStyle}">
+                                        <Setter Property="Background" Value="#FFFDF2E8"/>
+                                        <Setter Property="BorderBrush" Value="#FFF6D9B8"/>
+                                        <Setter Property="Foreground" Value="#FF594525"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding FileSizeText}" Value="">
                                                 <Setter Property="Visibility" Value="Collapsed"/>
@@ -289,13 +308,15 @@
                                             <DataTrigger Binding="{Binding FileSizeText}" Value="{x:Null}">
                                                 <Setter Property="Visibility" Value="Collapsed"/>
                                             </DataTrigger>
+                                            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=IsSizeSortActive}" Value="True">
+                                                <Setter Property="Background" Value="#FFF9E2C7"/>
+                                                <Setter Property="BorderBrush" Value="#FFE0A35C"/>
+                                            </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
-                                </Border.Style>
-                                <TextBlock Text="{Binding FileSizeText}"
-                                           Foreground="#FF594525"
-                                           FontWeight="SemiBold"/>
-                            </Border>
+                                </Button.Style>
+                                <TextBlock Text="{Binding FileSizeText}" Foreground="#FF594525" FontWeight="SemiBold"/>
+                            </Button>
                         </WrapPanel>
 
                         <Border Grid.Row="2"
@@ -391,11 +412,7 @@
                             </StackPanel>
                         </Border>
 
-                        <TextBlock Grid.Row="3"
-                                   Foreground="Gray"
-                                   Margin="0,18,0,0"
-                                   FontStyle="Italic"
-                                   Text="Double-cliquer pour charger la famille"/>
+                        
                     </Grid>
                 </Grid>
             </Border>
@@ -441,26 +458,32 @@
 
                         <!-- 🗑 : supprimer de la collection courante (taille réduite) -->
                         <Button Grid.Column="0"
-        Content="🗑"
         Click="RemoveFromCollection_Click"
         ToolTip="Retirer de la collection courante"
         Background="Transparent"
         BorderThickness="0"
-        FontSize="13"
         Padding="0"
-        Width="20" Height="20"
+        Width="24" Height="24"
         HorizontalAlignment="Center"
         VerticalAlignment="Top"
-        Margin="0,0,6,0"/>
+        Margin="0,0,6,0"
+        HorizontalContentAlignment="Center"
+        VerticalContentAlignment="Center"
+        Focusable="True">
+                            <!-- Icône poubelle animée (hover) -->
+                            <ui:AnimatedDeleteIcon IconSize="18"
+                         Foreground="{DynamicResource PrimaryText}"/>
+                        </Button>
 
                         <TextBlock Grid.Column="1"
-                                   Text="{Binding Name}"
-                                   Foreground="{DynamicResource PrimaryText}"
-                                   FontWeight="Bold"
-                                   TextWrapping="Wrap"
-                                   TextAlignment="Center"
-                                   HorizontalAlignment="Center"
-                                   Margin="0,0,5,0"/>
+           Text="{Binding Name}"
+           Foreground="{DynamicResource PrimaryText}"
+           FontWeight="Bold"
+           TextWrapping="Wrap"
+           TextAlignment="Center"
+           HorizontalAlignment="Center"
+           Margin="0,0,5,0"/>
+
                     </Grid>
                     <Button Content="3D"
         Width="28" Height="20" FontSize="10" Padding="0"

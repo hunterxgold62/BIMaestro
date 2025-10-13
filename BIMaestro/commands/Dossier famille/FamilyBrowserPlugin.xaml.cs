@@ -22,7 +22,7 @@ using WinForms = System.Windows.Forms;
 
 namespace Famille
 {
-    public partial class FamilyBrowserWindow : Window
+    public partial class FamilyBrowserWindow : Window, INotifyPropertyChanged
     {
         // ===== Constantes =====
         private const string FavoritesCollectionId = "builtin_favoris";
@@ -48,12 +48,45 @@ namespace Famille
         private bool useRevitPreview = false;  // ON : fallback natif Revit lorsque pas d'image catalogue
         private bool detailedViewMode = false;
 
+        private string _activeCategoryFilter;
+        private string _activeVersionFilter;
+        private bool _sizeSortDescending;
+        private bool _isResorting;
+
         // ===== Données UI =====
         private List<FamilyItem> allFamilies = new();
         private List<FamilyItem> displayedFamilies = new();
         private string currentFolderPath;
 
         public string RootFolderName => System.IO.Path.GetFileName(rootFolderPath);
+
+        public string ActiveCategoryFilter
+        {
+            get => _activeCategoryFilter;
+            private set
+            {
+                if (string.Equals(_activeCategoryFilter, value, StringComparison.OrdinalIgnoreCase)) return;
+                _activeCategoryFilter = value;
+                NotifyPropertyChanged(nameof(ActiveCategoryFilter));
+            }
+        }
+
+        public string ActiveVersionFilter
+        {
+            get => _activeVersionFilter;
+            private set
+            {
+                if (string.Equals(_activeVersionFilter, value, StringComparison.OrdinalIgnoreCase)) return;
+                _activeVersionFilter = value;
+                NotifyPropertyChanged(nameof(ActiveVersionFilter));
+            }
+        }
+
+        public bool IsSizeSortActive => _sizeSortDescending;
+
+        public event PropertyChangedEventHandler PropertyChanged;
+        private void NotifyPropertyChanged(string propertyName)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
         // Pagination & recherche
         private const int PageSize = 200;
@@ -188,6 +221,8 @@ namespace Famille
         {
             if (FolderTreeView.SelectedItem is not TreeViewItem tv) return;
 
+            ResetInteractiveFilters();
+
             if (!string.IsNullOrWhiteSpace(SearchBox.Text) || _globalSearchMode)
             {
                 _globalSearchMode = false;
@@ -198,7 +233,7 @@ namespace Famille
             currentFolderPath = tv.Tag.ToString();
             LoadFamilies(currentFolderPath, recursive: false);
 
-            BeginPaging(allFamilies);
+            BeginPaging(ApplyInteractiveSorting(new List<FamilyItem>(allFamilies)));
 
             TopFamiliesView.Visibility = Visibility.Collapsed;
             TopSeparator.Visibility = Visibility.Collapsed;
@@ -206,6 +241,7 @@ namespace Famille
 
         private void LoadFamilies(string path, bool recursive)
         {
+            ResetInteractiveFilters();
             allFamilies.Clear();
             var opt = recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
 
@@ -261,6 +297,7 @@ namespace Famille
                 LoadThumbnailForFamilyItem(it);
                 LoadMetadataForFamilyItem(it);
             }
+          
         }
 
         private void ShowTop8CheckBox_Changed(object sender, RoutedEventArgs e)
@@ -336,6 +373,201 @@ namespace Famille
 
         #endregion
 
+        #region Interactivité bulles & mise en avant
+
+        private void CategoryPill_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button button || button.DataContext is not FamilyItem fam) return;
+            SetCategoryFilter(fam.Category);
+        }
+
+        private void VersionPill_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button button || button.DataContext is not FamilyItem fam) return;
+            SetVersionFilter(fam.RevitSavedVersion);
+        }
+
+        private void SizePill_Click(object sender, RoutedEventArgs e)
+        {
+            ToggleSizeSorting();
+        }
+
+        private void SetCategoryFilter(string category)
+        {
+            string normalized = string.IsNullOrWhiteSpace(category) ? null : category.Trim();
+            if (!string.IsNullOrEmpty(ActiveCategoryFilter) &&
+                normalized != null &&
+                string.Equals(ActiveCategoryFilter, normalized, StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = null;
+            }
+
+            ActiveCategoryFilter = normalized;
+            ApplyFilters();
+        }
+
+        private void SetVersionFilter(string version)
+        {
+            string normalized = string.IsNullOrWhiteSpace(version) ? null : version.Trim();
+            if (!string.IsNullOrEmpty(ActiveVersionFilter) &&
+                normalized != null &&
+                string.Equals(ActiveVersionFilter, normalized, StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = null;
+            }
+
+            ActiveVersionFilter = normalized;
+            ApplyFilters();
+        }
+
+        private void ToggleSizeSorting()
+        {
+            _sizeSortDescending = !_sizeSortDescending;
+            NotifyPropertyChanged(nameof(IsSizeSortActive));
+            ApplyFilters();
+        }
+
+        private void ResetInteractiveFilters()
+        {
+            ActiveCategoryFilter = null;
+            ActiveVersionFilter = null;
+
+            if (_sizeSortDescending)
+            {
+                _sizeSortDescending = false;
+                NotifyPropertyChanged(nameof(IsSizeSortActive));
+            }
+        }
+        private List<FamilyItem> ApplyInteractiveSorting(List<FamilyItem> source)
+        {
+            if (source == null)
+                return new List<FamilyItem>();
+
+            var result = source.ToList();
+            if (result.Count == 0)
+                return result;
+
+            var categoryFilter = ActiveCategoryFilter;
+            var versionFilter = ActiveVersionFilter;
+            bool hasCategory = !string.IsNullOrEmpty(categoryFilter);
+            bool hasVersion = !string.IsNullOrEmpty(versionFilter);
+            bool hasSizeSort = _sizeSortDescending;
+
+            if (!hasCategory && !hasVersion && !hasSizeSort)
+                return result;
+
+            bool CategoryMatches(FamilyItem item)
+            {
+                if (!hasCategory || item == null)
+                    return false;
+
+                return !string.IsNullOrWhiteSpace(item.Category) &&
+                       string.Equals(item.Category.Trim(), categoryFilter, StringComparison.OrdinalIgnoreCase);
+            }
+
+            bool VersionMatches(FamilyItem item)
+            {
+                if (!hasVersion || item == null)
+                    return false;
+
+                return !string.IsNullOrWhiteSpace(item.RevitSavedVersion) &&
+                       string.Equals(item.RevitSavedVersion.Trim(), versionFilter, StringComparison.OrdinalIgnoreCase);
+            }
+
+            result.Sort((a, b) =>
+            {
+                if (hasCategory)
+                {
+                    int catCmp = CategoryMatches(b).CompareTo(CategoryMatches(a));
+                    if (catCmp != 0)
+                        return catCmp;
+                }
+
+                if (hasVersion)
+                {
+                    int verCmp = VersionMatches(b).CompareTo(VersionMatches(a));
+                    if (verCmp != 0)
+                        return verCmp;
+                }
+
+                if (hasSizeSort)
+                {
+                    long aSize = a?.FileSizeBytes ?? -1;
+                    long bSize = b?.FileSizeBytes ?? -1;
+                    int sizeCmp = bSize.CompareTo(aSize);
+                    if (sizeCmp != 0)
+                        return sizeCmp;
+                }
+
+                var aName = a?.Name ?? string.Empty;
+                var bName = b?.Name ?? string.Empty;
+                return CultureInfo.CurrentCulture.CompareInfo.Compare(aName, bName, CompareOptions.IgnoreCase);
+            });
+
+            return result;
+        }
+
+        private void ResortCurrentView()
+        {
+            if (_isResorting)
+                return;
+
+            if (_currentResult == null || _currentResult.Count == 0)
+                return;
+
+            var sorted = ApplyInteractiveSorting(_currentResult);
+            if (sorted.Count == 0)
+            {
+                try
+                {
+                    _isResorting = true;
+                    _currentResult = sorted;
+                    displayedFamilies = new List<FamilyItem>();
+                    FamilyListView.ItemsSource = displayedFamilies;
+                    UpdateCount(0);
+                    PagingStatusText.Text = "Aucun résultat.";
+                }
+                finally
+                {
+                    _isResorting = false;
+                }
+                return;
+            }
+
+            try
+            {
+                _isResorting = true;
+
+                _currentResult = sorted;
+                int loadedCount = Math.Min(displayedFamilies?.Count ?? 0, _currentResult.Count);
+                displayedFamilies = _currentResult.GetRange(0, loadedCount);
+                _nextIndex = loadedCount;
+
+                FamilyListView.ItemsSource = null;
+                FamilyListView.ItemsSource = displayedFamilies;
+
+                foreach (var item in displayedFamilies)
+                {
+                    LoadThumbnailForFamilyItem(item);
+                    LoadMetadataForFamilyItem(item);
+                }
+
+                MarkFavoritesInView(displayedFamilies);
+                UpdateCount(_currentResult.Count);
+
+                PagingStatusText.Text = _nextIndex >= _currentResult.Count
+                    ? "Fin de la liste."
+                    : $"Affichés : {displayedFamilies.Count}/{_currentResult.Count}";
+            }
+            finally
+            {
+                _isResorting = false;
+            }
+        }
+
+        #endregion
+
+
         #region Recherche + pagination
 
         private void SearchBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
@@ -351,12 +583,13 @@ namespace Famille
             if (string.IsNullOrWhiteSpace(SearchBox.Text))
             {
                 _globalSearchMode = false;
-                BeginPaging(allFamilies);
+                BeginPaging(ApplyInteractiveSorting(new List<FamilyItem>(allFamilies)));
             }
         }
 
         private void SearchBox_TextChanged(object s, TextChangedEventArgs e)
         {
+            ResetInteractiveFilters();
             PlaceholderText.Visibility = string.IsNullOrEmpty(SearchBox.Text)
                 ? Visibility.Visible : Visibility.Collapsed;
             _searchDebounce.Stop();
@@ -371,7 +604,7 @@ namespace Famille
             {
                 if (!_index.IsReady)
                 {
-                    BeginPaging(new List<FamilyItem>());
+                    BeginPaging(ApplyInteractiveSorting(new List<FamilyItem>()));
                     PagingStatusText.Visibility = Visibility.Visible;
                     PagingStatusText.Text = "Index en cours de préparation…";
                     UpdateCount(0);
@@ -380,7 +613,7 @@ namespace Famille
 
                 if (txt.Length < 2)
                 {
-                    BeginPaging(new List<FamilyItem>());
+                    BeginPaging(ApplyInteractiveSorting(new List<FamilyItem>()));
                     PagingStatusText.Visibility = Visibility.Visible;
                     PagingStatusText.Text = "Tape au moins 2 caractères pour rechercher partout.";
                     UpdateCount(0);
@@ -388,15 +621,21 @@ namespace Famille
                 }
 
                 var hits = _index.Search(txt, max: 8000);
-                var items = hits.Select(e => new FamilyItem
+                var items = hits.Select(e =>
                 {
-                    Name = e.Name,
-                    Path = e.Path,
-                    Category = e.Category,
-                    NormalizedName = e.NormalizedName
+                    var size = TryGetFileSize(e.Path);
+                    return new FamilyItem
+                    {
+                        Name = e.Name,
+                        Path = e.Path,
+                        Category = e.Category,
+                        NormalizedName = e.NormalizedName,
+                        FileSizeBytes = size,
+                        FileSizeText = FormatFileSize(size)
+                    };
                 }).ToList();
 
-                BeginPaging(items);
+                BeginPaging(ApplyInteractiveSorting(items));
                 return;
             }
             else
@@ -405,9 +644,10 @@ namespace Famille
                 if (!string.IsNullOrEmpty(txt))
                     baseSet = baseSet.Where(f => f.NormalizedName.Contains(txt));
 
-                BeginPaging(baseSet.ToList());
+                BeginPaging(ApplyInteractiveSorting(baseSet.ToList()));
             }
         }
+
 
         private void BeginPaging(List<FamilyItem> fullResult)
         {
@@ -546,7 +786,7 @@ namespace Famille
             if (_globalSearchMode)
             {
                 _globalSearchMode = false;
-                BeginPaging(new List<FamilyItem>());
+                BeginPaging(ApplyInteractiveSorting(new List<FamilyItem>()));
                 PagingStatusText.Text = "Tape au moins 2 caractères pour rechercher partout.";
                 UpdateCount(0);
                 RefreshTop8_UsageOnly();
@@ -710,7 +950,10 @@ namespace Famille
                     ? null
                     : meta.OmniClassCode.Trim();
 
-                fam.FileSizeText = FormatFileSize(meta?.FileSizeBytes);
+                if (meta?.FileSizeBytes.HasValue == true)
+                    fam.FileSizeBytes = meta.FileSizeBytes;
+
+                fam.FileSizeText = FormatFileSize(meta?.FileSizeBytes ?? fam.FileSizeBytes);
 
                 if (meta != null)
                 {
@@ -745,7 +988,14 @@ namespace Famille
                     fam.RevitSavedVersion = null;
                     if (string.IsNullOrWhiteSpace(fam.Category))
                         fam.Category = null;
-                    fam.FileSizeText = null;
+                }
+
+                if (!_isResorting &&
+                    (_sizeSortDescending ||
+                     !string.IsNullOrEmpty(ActiveCategoryFilter) ||
+                     !string.IsNullOrEmpty(ActiveVersionFilter)))
+                {
+                    ResortCurrentView();
                 }
             }
 
@@ -754,6 +1004,7 @@ namespace Famille
             else
                 Dispatcher.Invoke(Apply);
         }
+
 
         private static string FormatFileSize(long? bytes)
         {
@@ -1327,15 +1578,31 @@ namespace Famille
 
         #region Modèle
 
+        private long? TryGetFileSize(string path)
+        {
+            try
+            {
+                var info = new FileInfo(path);
+                return info.Exists ? info.Length : (long?)null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         private FamilyItem CreateFamilyItemFromPath(string path)
         {
             var name = System.IO.Path.GetFileNameWithoutExtension(path);
+            var size = TryGetFileSize(path);
             return new FamilyItem
             {
                 Name = name,
                 Path = path,
                 Icon = null,
-                NormalizedName = StripDiacritics(name).ToLowerInvariant()
+                NormalizedName = StripDiacritics(name).ToLowerInvariant(),
+                FileSizeBytes = size,
+                FileSizeText = FormatFileSize(size)
             };
         }
 
@@ -1397,6 +1664,14 @@ namespace Famille
             get => _fileSizeText;
             set { if (_fileSizeText != value) { _fileSizeText = value; OnPropertyChanged(nameof(FileSizeText)); } }
         }
+        private long? _fileSizeBytes;
+        public long? FileSizeBytes
+        {
+            get => _fileSizeBytes;
+            set { if (_fileSizeBytes != value) { _fileSizeBytes = value; OnPropertyChanged(nameof(FileSizeBytes)); } }
+        }
+
+
 
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged(string propName)
