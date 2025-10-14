@@ -501,7 +501,9 @@
     </Window.Resources>
 
     <Grid Background="{DynamicResource BackgroundGradient}">
-        <TabControl Background="{DynamicResource TabBackground}">
+        <TabControl x:Name="MainTabControl"
+                    Background="{DynamicResource TabBackground}"
+                    SelectionChanged="MainTabControl_SelectionChanged">
 
             <!-- Onglet Dossiers -->
             <TabItem Header="Dossiers" Background="{DynamicResource TabBackground}">
@@ -663,8 +665,10 @@
             </TabItem>
 
             <!-- Onglet Paramètres -->
-            <TabItem Header="Paramètres" Background="{DynamicResource TabBackground}">
-                <Grid Margin="12,10,8,10" Background="Transparent">
+            <TabItem x:Name="SettingsTabItem"
+                     Header="Paramètres"
+                     Background="{DynamicResource TabBackground}">
+                <Grid x:Name="SettingsPanelRoot" Margin="12,10,8,10" Background="Transparent">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -726,9 +730,12 @@
 
                     <StackPanel Orientation="Horizontal" Grid.Row="8" Margin="0,6,0,5">
                         <TextBlock Text="Toujours au-dessus :" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource PrimaryText}"/>
-                        <CheckBox x:Name="AlwaysOnTopCheckBox"
-                                  Checked="AlwaysOnTopCheckBox_Changed"
-                                  Unchecked="AlwaysOnTopCheckBox_Changed"/>
+                        <ui:GhostSwitch x:Name="AlwaysOnTopSwitch"
+                                        Width="130"
+                                        Height="46"
+                                        EyeFollowGlobal="False"
+                                        AutoPauseWhenHidden="True"
+                                        Toggled="AlwaysOnTopSwitch_Toggled"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" Grid.Row="9" Margin="0,10,0,10">

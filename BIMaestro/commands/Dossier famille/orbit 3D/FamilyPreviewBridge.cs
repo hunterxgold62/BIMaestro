@@ -29,6 +29,8 @@ namespace Famille.Orbit3D
         private static int _revitMajor;                 // cache version
         private static IntPtr _ownerHwnd = IntPtr.Zero; // owner Revit
 
+        public static event EventHandler<bool> PreviewVisibilityChanged;
+
         // ------------- Public API -------------
 
         public static void ShowPreview(UIApplication uiapp, string familyPath)
@@ -50,6 +52,7 @@ namespace Famille.Orbit3D
                     _host.Window.ClearScene(); // nettoie l'ancien contenu si besoin
                     _host.Window.ShowBusy(true, "Chargement de la famille…");
                     if (!_host.Window.IsVisible) _host.Window.Show();
+                    RaisePreviewVisibilityChanged(_host.Window.IsVisible);
                     _host.Window.Activate();
                 }
                 catch { /* ignore */ }
@@ -135,6 +138,12 @@ namespace Famille.Orbit3D
                 _host = CreatePreviewWindowOnRevitThread(_ownerHwnd);
         }
 
+        private static void RaisePreviewVisibilityChanged(bool isVisible)
+        {
+            try { PreviewVisibilityChanged?.Invoke(null, isVisible); }
+            catch { }
+        }
+
         private static PreviewHost CreatePreviewWindowOnSta(IntPtr ownerHwnd)
         {
             var host = new PreviewHost { IsStaThreadWindow = true };
@@ -156,7 +165,10 @@ namespace Famille.Orbit3D
                     host.Window = win;
                     host.Dispatcher = win.Dispatcher;
 
+                    win.IsVisibleChanged += (s, e) => RaisePreviewVisibilityChanged(win.IsVisible);
+
                     win.Show();               // modeless
+                    RaisePreviewVisibilityChanged(win.IsVisible);
                     ready.Set();              // signal prêt
                     Dispatcher.Run();         // boucle WPF du thread
                 }
@@ -182,6 +194,8 @@ namespace Famille.Orbit3D
                 var win = new Family3DPreviewWindow();
                 new WindowInteropHelper(win) { Owner = ownerHwnd };
                 win.Show();
+                win.IsVisibleChanged += (s, e) => RaisePreviewVisibilityChanged(win.IsVisible);
+                RaisePreviewVisibilityChanged(win.IsVisible);
                 // flush visuel pour que "Chargement…" apparaisse même si Revit va mouliner ensuite
                 win.Dispatcher.Invoke(DispatcherPriority.Render, new Action(() => { }));
                 host.Window = win;
