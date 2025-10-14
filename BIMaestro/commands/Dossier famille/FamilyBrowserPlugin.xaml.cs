@@ -1639,7 +1639,7 @@ namespace Famille
 
             if (!Dispatcher.CheckAccess())
             {
-                Dispatcher.BeginInvoke((Action)Apply);
+                Dispatcher.BeginInvoke(DispatcherPriority.Send, (Action)Apply);
             }
             else
             {
@@ -1650,6 +1650,23 @@ namespace Famille
         #endregion
 
         #region Modèle
+
+        private static bool TryParseRevitMajorVersion(string version, out int major)
+        {
+            major = 0;
+            if (string.IsNullOrWhiteSpace(version)) return false;
+
+            int i = 0;
+            while (i < version.Length && !char.IsDigit(version[i])) i++;
+            if (i == version.Length) return false;
+
+            int start = i;
+            while (i < version.Length && char.IsDigit(version[i])) i++;
+            if (start == i) return false;
+
+            var digits = version.Substring(start, i - start);
+            return int.TryParse(digits, out major);
+        }
 
         private long? TryGetFileSize(string path)
         {
