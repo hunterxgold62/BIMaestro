@@ -96,12 +96,29 @@ namespace BIMaestro.UI
         private double _eyeBaseX; // yeux centrés en hauteur
         private double _armBaseX;
         private Window? _hostWindow;
+        private FrameworkElement? _followScope;
 
-        private bool _appHooked;     // InputManager PreProcessInput (global)
+        private bool _windowHooked;  // MouseMove hook on the host window
+        private bool _scopeHooked;   // MouseMove hook on le scope suivi
         private bool _localHooked;   // sur ToggleHit (local)
+        private bool _trackingSuspended;
         private DateTime _lastEyeUpdate = DateTime.MinValue;
 
         public CornerRadius TrackCornerRadius => new CornerRadius(TrackHeight / 2.0);
+
+        public FrameworkElement? FollowScope
+        {
+            get => _followScope;
+            set
+            {
+                if (ReferenceEquals(_followScope, value)) return;
+                _followScope = value;
+                if (IsLoaded)
+                {
+                    ConfigureMouseHooks(reset: true);
+                }
+            }
+        }
 
         // ----- lifecycle -----
         private static void OnSizeDpChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -153,11 +170,27 @@ namespace BIMaestro.UI
         {
             if (reset)
             {
-                if (_appHooked)
+                if (_windowHooked && _hostWindow != null)
                 {
-                    try { InputManager.Current.PreProcessInput -= OnPreProcessInput; } catch { }
-                    _appHooked = false;
+                    try
+                    {
+                        WeakEventManager<Window, MouseEventArgs>.RemoveHandler(_hostWindow, nameof(_hostWindow.MouseMove), OnWindowMouseMove);
+                        WeakEventManager<Window, MouseEventArgs>.RemoveHandler(_hostWindow, nameof(_hostWindow.MouseLeave), OnWindowMouseLeave);
+                    }
+                    catch { }
+                    _windowHooked = false;
                 }
+                if (_scopeHooked && _followScope != null)
+                {
+                    try
+                    {
+                        WeakEventManager<UIElement, MouseEventArgs>.RemoveHandler(_followScope, nameof(UIElement.MouseMove), OnScopeMouseMove);
+                        WeakEventManager<UIElement, MouseEventArgs>.RemoveHandler(_followScope, nameof(UIElement.MouseLeave), OnScopeMouseLeave);
+                    }
+                    catch { }
+                    _scopeHooked = false;
+                }
+
                 if (_localHooked)
                 {
                     try
@@ -170,18 +203,49 @@ namespace BIMaestro.UI
                 }
             }
 
-            if (!attach || !IsVisible) return; // <<< ne rien accrocher si pas visible
+            if (!attach || !IsVisible || _trackingSuspended) return; // <<< ne rien accrocher si pas visible ou suspendu
 
             if (EyeFollowGlobal)
             {
-                InputManager.Current.PreProcessInput += OnPreProcessInput;
-                _appHooked = true;
+                if (_followScope != null)
+                {
+                    WeakEventManager<UIElement, MouseEventArgs>.AddHandler(_followScope, nameof(UIElement.MouseMove), OnScopeMouseMove);
+                    WeakEventManager<UIElement, MouseEventArgs>.AddHandler(_followScope, nameof(UIElement.MouseLeave), OnScopeMouseLeave);
+                    _scopeHooked = true;
+                }
+                else
+                {
+                    _hostWindow ??= Window.GetWindow(this);
+                    if (_hostWindow != null)
+                    {
+                        WeakEventManager<Window, MouseEventArgs>.AddHandler(_hostWindow, nameof(_hostWindow.MouseMove), OnWindowMouseMove);
+                        WeakEventManager<Window, MouseEventArgs>.AddHandler(_hostWindow, nameof(_hostWindow.MouseLeave), OnWindowMouseLeave);
+                        _windowHooked = true;
+                    }
+                }
             }
             else if (EyeFollowCursor)
             {
                 WeakEventManager<UIElement, MouseEventArgs>.AddHandler(ToggleHit, nameof(ToggleHit.MouseMove), OnLocalMouseMove);
                 WeakEventManager<UIElement, MouseEventArgs>.AddHandler(ToggleHit, nameof(ToggleHit.MouseLeave), OnLocalMouseLeave);
                 _localHooked = true;
+            }
+        }
+
+        public void SetTrackingSuspended(bool suspended)
+        {
+            if (_trackingSuspended == suspended) return;
+
+            _trackingSuspended = suspended;
+
+            if (suspended)
+            {
+                ConfigureMouseHooks(reset: true, attach: false);
+                ResetEyes();
+            }
+            else if (IsLoaded)
+            {
+                ConfigureMouseHooks(reset: true, attach: true);
             }
         }
 
@@ -290,8 +354,8 @@ namespace BIMaestro.UI
             { To = +_armBaseX + armLag, Duration = TimeSpan.FromMilliseconds(280), EasingFunction = ease2 });
         }
 
-        // ====== Suivi global via InputManager (application) ======
-        private void OnPreProcessInput(object? sender, PreProcessInputEventArgs e)
+        // ====== Suivi global via événements de la fenêtre ======
+        private void OnWindowMouseMove(object? sender, MouseEventArgs e)
         {
             if (!EyeFollowGlobal || (EyeLookAmount <= 0 && EyeLookAmountY <= 0)) return;
 
@@ -301,11 +365,11 @@ namespace BIMaestro.UI
 
             if (!IsLoaded || !IsVisible) return;
 
-            var win = _hostWindow ?? Window.GetWindow(this);
+            var win = (sender as Window) ?? _hostWindow ?? Window.GetWindow(this);
             if (win == null) return;
 
             Point p;
-            try { p = Mouse.GetPosition(win); } catch { return; }
+            try { p = e.GetPosition(win); } catch { return; }
 
             if (p.X < 0 || p.Y < 0 || p.X > win.ActualWidth || p.Y > win.ActualHeight)
             {
@@ -313,8 +377,37 @@ namespace BIMaestro.UI
                 return;
             }
 
-            UpdateEyeTargetFromPointInWindow(p, win);
+            UpdateEyeTargetFromRelativePoint(win, p);
         }
+
+        private void OnWindowMouseLeave(object? sender, MouseEventArgs e) => ResetEyes();
+
+        private void OnScopeMouseMove(object? sender, MouseEventArgs e)
+        {
+            if (!EyeFollowGlobal || (EyeLookAmount <= 0 && EyeLookAmountY <= 0)) return;
+
+            var now = DateTime.UtcNow;
+            if ((now - _lastEyeUpdate).TotalMilliseconds < 16) return;
+            _lastEyeUpdate = now;
+
+            if (!IsLoaded || !IsVisible) return;
+
+            if (sender is not FrameworkElement scope) return;
+
+            Point p;
+            try { p = e.GetPosition(scope); }
+            catch { return; }
+
+            if (p.X < 0 || p.Y < 0 || p.X > scope.ActualWidth || p.Y > scope.ActualHeight)
+            {
+                ResetEyes();
+                return;
+            }
+
+            UpdateEyeTargetFromRelativePoint(scope, p);
+        }
+
+        private void OnScopeMouseLeave(object? sender, MouseEventArgs e) => ResetEyes();
 
         // ====== Fallback local (survol) ======
         private void OnLocalMouseMove(object? sender, MouseEventArgs e)
@@ -332,14 +425,14 @@ namespace BIMaestro.UI
         private void OnLocalMouseLeave(object? s, MouseEventArgs e) => ResetEyes();
 
         // ====== Utilitaires regard ======
-        private void UpdateEyeTargetFromPointInWindow(Point pWindow, Window win)
+        private void UpdateEyeTargetFromRelativePoint(Visual relativeTo, Point point)
         {
             try
             {
-                var gt = Ghost.TransformToAncestor(win);
+                var gt = Ghost.TransformToAncestor(relativeTo);
                 var rect = gt.TransformBounds(new Rect(0, 0, Ghost.ActualWidth, Ghost.ActualHeight));
                 var center = new Point(rect.Left + rect.Width / 2.0, rect.Top + rect.Height / 2.0);
-                UpdateEyesFromVector(new Point(pWindow.X - center.X, pWindow.Y - center.Y), rect.Width, rect.Height);
+                UpdateEyesFromVector(new Point(point.X - center.X, point.Y - center.Y), rect.Width, rect.Height);
             }
             catch { /* visuel pas dans l’arbre → ignorer */ }
         }

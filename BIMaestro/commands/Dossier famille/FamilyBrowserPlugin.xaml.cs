@@ -57,6 +57,8 @@ namespace Famille
         private List<FamilyItem> allFamilies = new();
         private List<FamilyItem> displayedFamilies = new();
         private string currentFolderPath;
+        private readonly int _revitMajorVersion;
+        private readonly bool _useGhostSwitch;
 
         public string RootFolderName => System.IO.Path.GetFileName(rootFolderPath);
 
@@ -117,6 +119,38 @@ namespace Famille
             InitializeComponent();
             DataContext = this;
 
+            if (FamilyBrowserCommand.uiapp?.Application?.VersionNumber != null &&
+                int.TryParse(FamilyBrowserCommand.uiapp.Application.VersionNumber, out var major))
+            {
+                _revitMajorVersion = major;
+            }
+
+            _useGhostSwitch = _revitMajorVersion == 0 || _revitMajorVersion <= 2024;
+
+            if (_useGhostSwitch)
+            {
+                if (AlwaysOnTopSwitch != null)
+                {
+                    AlwaysOnTopSwitch.Visibility = Visibility.Visible;
+                    AlwaysOnTopSwitch.FollowScope = SettingsPanelRoot;
+                }
+
+                FamilyPreviewBridge.PreviewVisibilityChanged += OnPreviewVisibilityChanged;
+                UpdateGhostFollowMode();
+            }
+            else
+            {
+                if (AlwaysOnTopSwitch != null)
+                {
+                    AlwaysOnTopSwitch.Visibility = Visibility.Collapsed;
+                }
+
+                if (AlwaysOnTopCheckBox != null)
+                {
+                    AlwaysOnTopCheckBox.Visibility = Visibility.Visible;
+                }
+            }
+
             LoadSavedPaths();
 
 
@@ -138,6 +172,13 @@ namespace Famille
 
             _index = new FamilyIndexService(familiesFolder, imagesFolder);
             _index.IndexUpdated += OnIndexUpdated;
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            if (_useGhostSwitch)
+                FamilyPreviewBridge.PreviewVisibilityChanged -= OnPreviewVisibilityChanged;
+            base.OnClosed(e);
         }
 
         private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -162,6 +203,7 @@ namespace Famille
             PlaceholderText.Visibility = Visibility.Visible;
 
             // Index
+            UpdateGhostFollowMode();
             await _index.StartAsync();
         }
 
@@ -1202,6 +1244,25 @@ namespace Famille
             }
         }
 
+        private void SetAlwaysOnTopState(bool isOn)
+        {
+            if (AlwaysOnTopSwitch != null)
+                AlwaysOnTopSwitch.IsOn = isOn;
+
+            if (AlwaysOnTopCheckBox != null)
+                AlwaysOnTopCheckBox.IsChecked = isOn;
+
+            this.Topmost = isOn;
+        }
+
+        private bool GetAlwaysOnTopState()
+        {
+            if (_useGhostSwitch)
+                return AlwaysOnTopSwitch?.IsOn == true;
+
+            return AlwaysOnTopCheckBox?.IsChecked == true;
+        }
+
         private void LoadConfig()
         {
             string top = "#FFF2F2F2", bottom = "#FFFFFFFF", panel = "#F0F0F0",
@@ -1238,11 +1299,10 @@ namespace Famille
             TabBackgroundPicker.SelectedColor = ColorFromHex(tabBg);
             if (DarkModeCheckBox != null) DarkModeCheckBox.IsChecked = dark;
             if (ShowTop8CheckBox != null) ShowTop8CheckBox.IsChecked = showTop8;
-            if (AlwaysOnTopCheckBox != null) AlwaysOnTopCheckBox.IsChecked = alwaysOnTop;
+            SetAlwaysOnTopState(alwaysOnTop);
             detailedViewMode = detailedView;
             if (DetailedViewCheckBox != null) DetailedViewCheckBox.IsChecked = detailedViewMode;
 
-            this.Topmost = alwaysOnTop;
             UpdateFamilyListViewMode();
         }
 
@@ -1258,7 +1318,7 @@ namespace Famille
                 "TabBackground="      + (TabBackgroundPicker.SelectedColor   == Colors.Transparent ? "Transparent" : ColorToHex(TabBackgroundPicker.SelectedColor.Value)),
                 "DarkMode="   + ((DarkModeCheckBox?.IsChecked == true) ? "true" : "false"),
                 "ShowTop8="   + ((ShowTop8CheckBox?.IsChecked == true) ? "true" : "false"),
-                "AlwaysOnTop="+ ((AlwaysOnTopCheckBox?.IsChecked == true) ? "true" : "false"),
+                "AlwaysOnTop="+ (GetAlwaysOnTopState() ? "true" : "false"),
                 "DetailedView=" + ((DetailedViewCheckBox?.IsChecked == true) ? "true" : "false"),
                 "UseShellThumbs="  + (useShellThumbs  ? "true" : "false"),
                 "UseRevitPreview=" + (useRevitPreview ? "true" : "false"),
@@ -1278,9 +1338,8 @@ namespace Famille
             TabBackgroundPicker.SelectedColor = Colors.Transparent;
             if (DarkModeCheckBox != null) DarkModeCheckBox.IsChecked = false;
             if (ShowTop8CheckBox != null) ShowTop8CheckBox.IsChecked = false;
-            if (AlwaysOnTopCheckBox != null) AlwaysOnTopCheckBox.IsChecked = false;
+            SetAlwaysOnTopState(false);
             if (DetailedViewCheckBox != null) DetailedViewCheckBox.IsChecked = false;
-            this.Topmost = false;
             UpdateTheme();
             SaveConfig_Click(s, e);
         }
@@ -1569,9 +1628,59 @@ namespace Famille
             }
         }
 
+        private void AlwaysOnTopSwitch_Toggled(object sender, RoutedPropertyChangedEventArgs<bool> e)
+        {
+            if (!_useGhostSwitch) return;
+
+            bool isOn = AlwaysOnTopSwitch?.IsOn == true;
+            this.Topmost = isOn;
+
+            if (AlwaysOnTopCheckBox != null)
+                AlwaysOnTopCheckBox.IsChecked = isOn;
+        }
+
         private void AlwaysOnTopCheckBox_Changed(object sender, RoutedEventArgs e)
         {
-            this.Topmost = AlwaysOnTopCheckBox?.IsChecked == true;
+            if (_useGhostSwitch) return;
+
+            bool isOn = AlwaysOnTopCheckBox?.IsChecked == true;
+            this.Topmost = isOn;
+
+            if (AlwaysOnTopSwitch != null)
+                AlwaysOnTopSwitch.IsOn = isOn;
+        }
+
+        private void MainTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (!ReferenceEquals(sender, e.OriginalSource)) return;
+            UpdateGhostFollowMode();
+        }
+
+        private void UpdateGhostFollowMode()
+        {
+            if (!_useGhostSwitch || AlwaysOnTopSwitch == null) return;
+            bool isSettingsTabVisible = SettingsTabItem?.IsSelected == true;
+            AlwaysOnTopSwitch.EyeFollowGlobal = isSettingsTabVisible;
+        }
+
+        private void OnPreviewVisibilityChanged(object sender, bool isVisible)
+        {
+            if (!_useGhostSwitch || AlwaysOnTopSwitch == null) return;
+
+            void Apply()
+            {
+                bool shouldSuspend = isVisible && _revitMajorVersion >= 2025;
+                AlwaysOnTopSwitch.SetTrackingSuspended(shouldSuspend);
+            }
+
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke((Action)Apply);
+            }
+            else
+            {
+                Apply();
+            }
         }
 
         #endregion
