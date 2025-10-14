@@ -58,8 +58,6 @@ namespace Famille
         private List<FamilyItem> displayedFamilies = new();
         private string currentFolderPath;
         private readonly int _revitMajorVersion;
-        private readonly bool _supportsGhostTracking;
-        private readonly bool _subscribedToPreviewVisibility;
 
         public string RootFolderName => System.IO.Path.GetFileName(rootFolderPath);
 
@@ -120,39 +118,17 @@ namespace Famille
             InitializeComponent();
             DataContext = this;
 
-            bool supportsGhostTracking = true;
-
-            if (FamilyBrowserCommand.uiapp?.Application?.VersionNumber != null)
+            if (FamilyBrowserCommand.uiapp?.Application?.VersionNumber != null &&
+                int.TryParse(FamilyBrowserCommand.uiapp.Application.VersionNumber, out var major))
             {
-                var versionNumber = FamilyBrowserCommand.uiapp.Application.VersionNumber;
-                if (TryParseRevitMajorVersion(versionNumber, out var major))
-                {
-                    _revitMajorVersion = major;
-                }
-
-                if (_revitMajorVersion >= 2025)
-                {
-                    supportsGhostTracking = false;
-                }
+                _revitMajorVersion = major;
             }
 
-            _supportsGhostTracking = supportsGhostTracking;
-
-            if (_supportsGhostTracking)
-            {
-                FamilyPreviewBridge.PreviewVisibilityChanged += OnPreviewVisibilityChanged;
-                _subscribedToPreviewVisibility = true;
-            }
+            FamilyPreviewBridge.PreviewVisibilityChanged += OnPreviewVisibilityChanged;
 
             if (AlwaysOnTopSwitch != null)
             {
                 AlwaysOnTopSwitch.FollowScope = SettingsPanelRoot;
-                if (!_supportsGhostTracking)
-                {
-                    AlwaysOnTopSwitch.EyeFollowGlobal = false;
-                    AlwaysOnTopSwitch.EyeFollowCursor = false;
-                    AlwaysOnTopSwitch.SetTrackingSuspended(true);
-                }
             }
 
             UpdateGhostFollowMode();
@@ -182,8 +158,7 @@ namespace Famille
 
         protected override void OnClosed(EventArgs e)
         {
-            if (_subscribedToPreviewVisibility)
-                FamilyPreviewBridge.PreviewVisibilityChanged -= OnPreviewVisibilityChanged;
+            FamilyPreviewBridge.PreviewVisibilityChanged -= OnPreviewVisibilityChanged;
             base.OnClosed(e);
         }
 
@@ -1632,12 +1607,12 @@ namespace Famille
         {
             if (AlwaysOnTopSwitch == null) return;
             bool isSettingsTabVisible = SettingsTabItem?.IsSelected == true;
-            AlwaysOnTopSwitch.EyeFollowGlobal = _supportsGhostTracking && isSettingsTabVisible;
+            AlwaysOnTopSwitch.EyeFollowGlobal = isSettingsTabVisible;
         }
 
         private void OnPreviewVisibilityChanged(object sender, bool isVisible)
         {
-            if (!_supportsGhostTracking || AlwaysOnTopSwitch == null) return;
+            if (AlwaysOnTopSwitch == null) return;
 
             void Apply()
             {
