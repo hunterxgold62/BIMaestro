@@ -58,7 +58,6 @@ namespace Famille
         private List<FamilyItem> displayedFamilies = new();
         private string currentFolderPath;
         private readonly int _revitMajorVersion;
-        private readonly bool _useGhostSwitch;
 
         public string RootFolderName => System.IO.Path.GetFileName(rootFolderPath);
 
@@ -125,31 +124,14 @@ namespace Famille
                 _revitMajorVersion = major;
             }
 
-            _useGhostSwitch = _revitMajorVersion == 0 || _revitMajorVersion <= 2024;
+            FamilyPreviewBridge.PreviewVisibilityChanged += OnPreviewVisibilityChanged;
 
-            if (_useGhostSwitch)
+            if (AlwaysOnTopSwitch != null)
             {
-                if (AlwaysOnTopSwitch != null)
-                {
-                    AlwaysOnTopSwitch.Visibility = Visibility.Visible;
-                    AlwaysOnTopSwitch.FollowScope = SettingsPanelRoot;
-                }
-
-                FamilyPreviewBridge.PreviewVisibilityChanged += OnPreviewVisibilityChanged;
-                UpdateGhostFollowMode();
+                AlwaysOnTopSwitch.FollowScope = SettingsPanelRoot;
             }
-            else
-            {
-                if (AlwaysOnTopSwitch != null)
-                {
-                    AlwaysOnTopSwitch.Visibility = Visibility.Collapsed;
-                }
 
-                if (AlwaysOnTopCheckBox != null)
-                {
-                    AlwaysOnTopCheckBox.Visibility = Visibility.Visible;
-                }
-            }
+            UpdateGhostFollowMode();
 
             LoadSavedPaths();
 
@@ -176,8 +158,7 @@ namespace Famille
 
         protected override void OnClosed(EventArgs e)
         {
-            if (_useGhostSwitch)
-                FamilyPreviewBridge.PreviewVisibilityChanged -= OnPreviewVisibilityChanged;
+            FamilyPreviewBridge.PreviewVisibilityChanged -= OnPreviewVisibilityChanged;
             base.OnClosed(e);
         }
 
@@ -1299,7 +1280,7 @@ namespace Famille
             TabBackgroundPicker.SelectedColor = ColorFromHex(tabBg);
             if (DarkModeCheckBox != null) DarkModeCheckBox.IsChecked = dark;
             if (ShowTop8CheckBox != null) ShowTop8CheckBox.IsChecked = showTop8;
-            SetAlwaysOnTopState(alwaysOnTop);
+            if (AlwaysOnTopSwitch != null) AlwaysOnTopSwitch.IsOn = alwaysOnTop;
             detailedViewMode = detailedView;
             if (DetailedViewCheckBox != null) DetailedViewCheckBox.IsChecked = detailedViewMode;
 
@@ -1318,7 +1299,7 @@ namespace Famille
                 "TabBackground="      + (TabBackgroundPicker.SelectedColor   == Colors.Transparent ? "Transparent" : ColorToHex(TabBackgroundPicker.SelectedColor.Value)),
                 "DarkMode="   + ((DarkModeCheckBox?.IsChecked == true) ? "true" : "false"),
                 "ShowTop8="   + ((ShowTop8CheckBox?.IsChecked == true) ? "true" : "false"),
-                "AlwaysOnTop="+ (GetAlwaysOnTopState() ? "true" : "false"),
+                "AlwaysOnTop="+ ((AlwaysOnTopSwitch?.IsOn == true) ? "true" : "false"),
                 "DetailedView=" + ((DetailedViewCheckBox?.IsChecked == true) ? "true" : "false"),
                 "UseShellThumbs="  + (useShellThumbs  ? "true" : "false"),
                 "UseRevitPreview=" + (useRevitPreview ? "true" : "false"),
@@ -1338,7 +1319,7 @@ namespace Famille
             TabBackgroundPicker.SelectedColor = Colors.Transparent;
             if (DarkModeCheckBox != null) DarkModeCheckBox.IsChecked = false;
             if (ShowTop8CheckBox != null) ShowTop8CheckBox.IsChecked = false;
-            SetAlwaysOnTopState(false);
+            if (AlwaysOnTopSwitch != null) AlwaysOnTopSwitch.IsOn = false;
             if (DetailedViewCheckBox != null) DetailedViewCheckBox.IsChecked = false;
             UpdateTheme();
             SaveConfig_Click(s, e);
@@ -1630,24 +1611,7 @@ namespace Famille
 
         private void AlwaysOnTopSwitch_Toggled(object sender, RoutedPropertyChangedEventArgs<bool> e)
         {
-            if (!_useGhostSwitch) return;
-
-            bool isOn = AlwaysOnTopSwitch?.IsOn == true;
-            this.Topmost = isOn;
-
-            if (AlwaysOnTopCheckBox != null)
-                AlwaysOnTopCheckBox.IsChecked = isOn;
-        }
-
-        private void AlwaysOnTopCheckBox_Changed(object sender, RoutedEventArgs e)
-        {
-            if (_useGhostSwitch) return;
-
-            bool isOn = AlwaysOnTopCheckBox?.IsChecked == true;
-            this.Topmost = isOn;
-
-            if (AlwaysOnTopSwitch != null)
-                AlwaysOnTopSwitch.IsOn = isOn;
+            this.Topmost = AlwaysOnTopSwitch?.IsOn == true;
         }
 
         private void MainTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1658,14 +1622,14 @@ namespace Famille
 
         private void UpdateGhostFollowMode()
         {
-            if (!_useGhostSwitch || AlwaysOnTopSwitch == null) return;
+            if (AlwaysOnTopSwitch == null) return;
             bool isSettingsTabVisible = SettingsTabItem?.IsSelected == true;
             AlwaysOnTopSwitch.EyeFollowGlobal = isSettingsTabVisible;
         }
 
         private void OnPreviewVisibilityChanged(object sender, bool isVisible)
         {
-            if (!_useGhostSwitch || AlwaysOnTopSwitch == null) return;
+            if (AlwaysOnTopSwitch == null) return;
 
             void Apply()
             {
@@ -1686,6 +1650,23 @@ namespace Famille
         #endregion
 
         #region Modèle
+
+        private static bool TryParseRevitMajorVersion(string version, out int major)
+        {
+            major = 0;
+            if (string.IsNullOrWhiteSpace(version)) return false;
+
+            int i = 0;
+            while (i < version.Length && !char.IsDigit(version[i])) i++;
+            if (i == version.Length) return false;
+
+            int start = i;
+            while (i < version.Length && char.IsDigit(version[i])) i++;
+            if (start == i) return false;
+
+            var digits = version.Substring(start, i - start);
+            return int.TryParse(digits, out major);
+        }
 
         private long? TryGetFileSize(string path)
         {

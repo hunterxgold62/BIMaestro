@@ -730,20 +730,12 @@
 
                     <StackPanel Orientation="Horizontal" Grid.Row="8" Margin="0,6,0,5" VerticalAlignment="Center">
                         <TextBlock Text="Toujours au-dessus :" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource PrimaryText}"/>
-                        <Grid>
-                            <ui:GhostSwitch x:Name="AlwaysOnTopSwitch"
-                                            Width="130"
-                                            Height="46"
-                                            Visibility="Collapsed"
-                                            EyeFollowGlobal="False"
-                                            AutoPauseWhenHidden="True"
-                                            Toggled="AlwaysOnTopSwitch_Toggled"/>
-                            <CheckBox x:Name="AlwaysOnTopCheckBox"
-                                      Visibility="Collapsed"
-                                      VerticalAlignment="Center"
-                                      Checked="AlwaysOnTopCheckBox_Changed"
-                                      Unchecked="AlwaysOnTopCheckBox_Changed"/>
-                        </Grid>
+                        <ui:GhostSwitch x:Name="AlwaysOnTopSwitch"
+                                        Width="130"
+                                        Height="46"
+                                        EyeFollowGlobal="False"
+                                        AutoPauseWhenHidden="True"
+                                        Toggled="AlwaysOnTopSwitch_Toggled"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" Grid.Row="9" Margin="0,10,0,10">
