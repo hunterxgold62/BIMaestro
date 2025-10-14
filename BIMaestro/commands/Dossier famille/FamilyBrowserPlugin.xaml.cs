@@ -1259,8 +1259,7 @@ namespace Famille
             TreeViewBackgroundPicker.SelectedColor = ColorFromHex(treeBg);
             ItemsBackgroundPicker.SelectedColor = ColorFromHex(itemsBg);
             TabBackgroundPicker.SelectedColor = ColorFromHex(tabBg);
-            if (DarkModeCheckBox != null) DarkModeCheckBox.IsChecked = dark;
-            if (ShowTop8CheckBox != null) ShowTop8CheckBox.IsChecked = showTop8;
+            if (DarkModeSwitch != null) DarkModeSwitch.IsOn = dark; if (ShowTop8CheckBox != null) ShowTop8CheckBox.IsChecked = showTop8;
             if (AlwaysOnTopSwitch != null) AlwaysOnTopSwitch.IsOn = alwaysOnTop;
             detailedViewMode = detailedView;
             if (DetailedViewCheckBox != null) DetailedViewCheckBox.IsChecked = detailedViewMode;
@@ -1279,7 +1278,7 @@ namespace Famille
                 "TreeViewBackground=" + ColorToHex(TreeViewBackgroundPicker.SelectedColor ?? Colors.Transparent),
                 "ItemsBackground="    + (ItemsBackgroundPicker.SelectedColor == Colors.Transparent ? "Transparent" : ColorToHex(ItemsBackgroundPicker.SelectedColor.Value)),
                 "TabBackground="      + (TabBackgroundPicker.SelectedColor   == Colors.Transparent ? "Transparent" : ColorToHex(TabBackgroundPicker.SelectedColor.Value)),
-                "DarkMode="   + ((DarkModeCheckBox?.IsChecked == true) ? "true" : "false"),
+                "DarkMode="   + ((DarkModeSwitch?.IsOn == true) ? "true" : "false"),
                 "ShowTop8="   + ((ShowTop8CheckBox?.IsChecked == true) ? "true" : "false"),
                 "AlwaysOnTop="+ ((AlwaysOnTopSwitch?.IsOn == true) ? "true" : "false"),
                 "DetailedView=" + ((DetailedViewCheckBox?.IsChecked == true) ? "true" : "false"),
@@ -1299,7 +1298,7 @@ namespace Famille
             TreeViewBackgroundPicker.SelectedColor = ColorFromHex("#F0F0F0");
             ItemsBackgroundPicker.SelectedColor = Colors.Transparent;
             TabBackgroundPicker.SelectedColor = Colors.Transparent;
-            if (DarkModeCheckBox != null) DarkModeCheckBox.IsChecked = false;
+            if (DarkModeSwitch != null) DarkModeSwitch.IsOn = false;
             if (ShowTop8CheckBox != null) ShowTop8CheckBox.IsChecked = false;
             if (AlwaysOnTopSwitch != null) AlwaysOnTopSwitch.IsOn = false;
             if (DetailedViewCheckBox != null) DetailedViewCheckBox.IsChecked = false;
@@ -1308,11 +1307,13 @@ namespace Famille
             SaveConfig_Click(s, e);
         }
 
+        private void DarkModeSwitch_Toggled(object sender, RoutedPropertyChangedEventArgs<bool> e) => UpdateTheme();
+
         private void ApplyColors_Click(object sender, RoutedEventArgs e) => UpdateTheme();
 
         private void UpdateTheme()
         {
-            bool isDark = (DarkModeCheckBox?.IsChecked == true);
+            bool isDark = (DarkModeSwitch?.IsOn == true);
 
             if (isDark)
             {

@@ -715,10 +715,17 @@
                         <xctk:ColorPicker x:Name="TabBackgroundPicker" Width="150" Height="25" SelectedColor="Transparent"/>
                     </StackPanel>
 
-                    <StackPanel Orientation="Horizontal" Grid.Row="6" Margin="0,0,0,5">
-                        <TextBlock Text="Mode sombre :" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource PrimaryText}"/>
-                        <CheckBox x:Name="DarkModeCheckBox"/>
+                    <StackPanel Orientation="Horizontal" Grid.Row="6" Margin="0,0,0,5" VerticalAlignment="Center"
+            xmlns:ui="clr-namespace:BIMaestro.UI">
+                        <TextBlock Text="Mode sombre :" VerticalAlignment="Center" Margin="0,0,10,0"
+             Foreground="{DynamicResource PrimaryText}"/>
+                        <ui:EyeToggleSwitch x:Name="DarkModeSwitch"
+                      BaseSize="18"                
+                      TransitionMs="420"
+                      VerticalAlignment="Center"
+                      Toggled="DarkModeSwitch_Toggled" Width="169"/>
                     </StackPanel>
+
 
                     <StackPanel Orientation="Horizontal" Grid.Row="7" Margin="0,6,0,5">
                         <TextBlock Text="Afficher le Top-8 :" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource PrimaryText}"/>
