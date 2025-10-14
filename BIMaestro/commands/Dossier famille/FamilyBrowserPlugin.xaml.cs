@@ -1622,7 +1622,7 @@ namespace Famille
 
             if (!Dispatcher.CheckAccess())
             {
-                Dispatcher.BeginInvoke((Action)Apply);
+                Dispatcher.BeginInvoke(DispatcherPriority.Send, (Action)Apply);
             }
             else
             {

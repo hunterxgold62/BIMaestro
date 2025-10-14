@@ -12,7 +12,8 @@ namespace Famille.Orbit3D
     /// <summary>
     /// Contrôleur de preview 3D : une seule fenêtre réutilisée (singleton).
     /// - 2023/2024 : fenêtre sur thread STA dédié (reste fluide pendant upgrade).
-    /// - 2025+     : fenêtre sur thread Revit (plus robuste sur certaines configs).
+    /// - 2025+     : on privilégie également le STA pour conserver la même expérience,
+    ///               avec un repli automatique sur le thread Revit si nécessaire.
     /// La fenêtre n'est jamais réellement fermée : on la cache et on réutilise.
     /// </summary>
     public static class FamilyPreviewBridge
@@ -28,6 +29,7 @@ namespace Famille.Orbit3D
         private static PreviewHost _host;               // singleton (multi-ouvertures sans crash)
         private static int _revitMajor;                 // cache version
         private static IntPtr _ownerHwnd = IntPtr.Zero; // owner Revit
+        private static Dispatcher _uiDispatcher;        // dispatcher WPF principal (browser)
 
         public static event EventHandler<bool> PreviewVisibilityChanged;
 
@@ -58,8 +60,10 @@ namespace Famille.Orbit3D
                 catch { /* ignore */ }
             });
 
-            DB.Document famDoc = null;
+            // Flush visuel immédiat (utile si la fenêtre est hébergée sur le thread Revit)
+            try { _host.Dispatcher.Invoke(DispatcherPriority.Render, new Action(() => { })); } catch { }
 
+            DB.Document famDoc = null;
             try
             {
                 var app = uiapp.Application;
@@ -112,10 +116,15 @@ namespace Famille.Orbit3D
         {
             _ownerHwnd = uiapp.MainWindowHandle;
 
+            if (_uiDispatcher == null || _uiDispatcher.HasShutdownStarted)
+            {
+                _uiDispatcher = Dispatcher.FromThread(Thread.CurrentThread) ?? Dispatcher.CurrentDispatcher;
+            }
+
             if (_revitMajor == 0)
                 int.TryParse(uiapp.Application.VersionNumber, out _revitMajor);
 
-            bool preferSta = _revitMajor <= 2024;
+            bool preferSta = true; // essaye toujours STA en premier (2023 → 2025+)
 
             // Si host existant et vivant → ok
             if (_host != null && _host.IsAlive)
@@ -129,17 +138,41 @@ namespace Famille.Orbit3D
             }
 
             // Sinon créer un nouveau host
-            _host = preferSta
-                ? CreatePreviewWindowOnSta(_ownerHwnd)
-                : CreatePreviewWindowOnRevitThread(_ownerHwnd);
-
-            // Si STA a échoué (rare), fallback sur Revit thread
-            if (_host == null || !_host.IsAlive)
+            if (preferSta)
+            {
+                _host = CreatePreviewWindowOnSta(_ownerHwnd);
+                if (_host == null || !_host.IsAlive)
+                    _host = CreatePreviewWindowOnRevitThread(_ownerHwnd);
+            }
+            else
+            {
                 _host = CreatePreviewWindowOnRevitThread(_ownerHwnd);
+            }
         }
 
         private static void RaisePreviewVisibilityChanged(bool isVisible)
         {
+            var dispatcher = _uiDispatcher;
+
+            if (dispatcher != null && !dispatcher.CheckAccess())
+            {
+                try
+                {
+                    dispatcher.BeginInvoke(DispatcherPriority.Send, new Action(() =>
+                    {
+                        try { PreviewVisibilityChanged?.Invoke(null, isVisible); }
+                        catch { }
+                    }));
+                }
+                catch
+                {
+                    // en dernier recours (dispatcher arrêté ?)
+                    try { PreviewVisibilityChanged?.Invoke(null, isVisible); }
+                    catch { }
+                }
+                return;
+            }
+
             try { PreviewVisibilityChanged?.Invoke(null, isVisible); }
             catch { }
         }

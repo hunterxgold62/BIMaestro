@@ -258,6 +258,12 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="animation touche\chargement et salto\StuntSpinner.xaml.cs">
+      <DependentUpon>StuntSpinner.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="animation touche\oui-non mignion\EyeToggleSwitch.xaml.cs">
+      <DependentUpon>EyeToggleSwitch.xaml</DependentUpon>
+    </Compile>
     <Compile Include="animation touche\touche poubelle\AnimatedMenuIcon.xaml.cs">
       <DependentUpon>AnimatedMenuIcon.xaml</DependentUpon>
     </Compile>
@@ -481,6 +487,14 @@
     <Compile Include="commands\renuméroté élément\ElementRenameWindow.xaml.cs">
       <DependentUpon>ElementRenameWindow.xaml</DependentUpon>
     </Compile>
+    <Page Include="animation touche\chargement et salto\StuntSpinner.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="animation touche\oui-non mignion\EyeToggleSwitch.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="animation touche\touche poubelle\AnimatedMenuIcon.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -783,5 +797,6 @@
   <ItemGroup>
     <EmbeddedResource Include="Resources\bride suppresion.png" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

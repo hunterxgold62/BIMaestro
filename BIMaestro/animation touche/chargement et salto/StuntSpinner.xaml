@@ -1,0 +1,34 @@
+﻿<UserControl x:Class="BIMaestro.UI.StuntSpinner"
+             x:Name="root"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Width="{Binding Diameter, ElementName=root}"
+             Height="{Binding Diameter, ElementName=root}"
+             SnapsToDevicePixels="True"
+             Background="Transparent">
+
+    <Grid>
+        <!-- Anneau de fond -->
+        <Ellipse x:Name="Ring"
+                 StrokeThickness="{Binding Thickness, ElementName=root}"
+                 Stroke="{Binding RingBrush, ElementName=root}"
+                 Fill="Transparent"/>
+
+        <!-- Le “ver” = un trait court qui parcourt le cercle -->
+        <Path x:Name="Worm"
+              StrokeThickness="{Binding Thickness, ElementName=root}"
+              Stroke="{Binding WormBrush, ElementName=root}"
+              StrokeStartLineCap="Round"
+              StrokeEndLineCap="Round"
+              StrokeDashCap="Round"
+              Fill="Transparent"
+              Data="{Binding WormGeometry, ElementName=root}">
+            <Path.RenderTransform>
+                <!-- Pour le petit “salto” en haut, on décale Y négatif ponctuellement -->
+                <TransformGroup>
+                    <TranslateTransform x:Name="WormOffset"/>
+                </TransformGroup>
+            </Path.RenderTransform>
+        </Path>
+    </Grid>
+</UserControl>
