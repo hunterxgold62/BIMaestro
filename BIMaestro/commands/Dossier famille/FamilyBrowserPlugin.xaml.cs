@@ -57,6 +57,9 @@ namespace Famille
         private List<FamilyItem> allFamilies = new();
         private List<FamilyItem> displayedFamilies = new();
         private string currentFolderPath;
+        private readonly int _revitMajorVersion;
+        private readonly bool _supportsGhostTracking;
+        private readonly bool _subscribedToPreviewVisibility;
 
         public string RootFolderName => System.IO.Path.GetFileName(rootFolderPath);
 
@@ -117,6 +120,43 @@ namespace Famille
             InitializeComponent();
             DataContext = this;
 
+            bool supportsGhostTracking = true;
+
+            if (FamilyBrowserCommand.uiapp?.Application?.VersionNumber != null)
+            {
+                var versionNumber = FamilyBrowserCommand.uiapp.Application.VersionNumber;
+                if (TryParseRevitMajorVersion(versionNumber, out var major))
+                {
+                    _revitMajorVersion = major;
+                }
+
+                if (_revitMajorVersion >= 2025)
+                {
+                    supportsGhostTracking = false;
+                }
+            }
+
+            _supportsGhostTracking = supportsGhostTracking;
+
+            if (_supportsGhostTracking)
+            {
+                FamilyPreviewBridge.PreviewVisibilityChanged += OnPreviewVisibilityChanged;
+                _subscribedToPreviewVisibility = true;
+            }
+
+            if (AlwaysOnTopSwitch != null)
+            {
+                AlwaysOnTopSwitch.FollowScope = SettingsPanelRoot;
+                if (!_supportsGhostTracking)
+                {
+                    AlwaysOnTopSwitch.EyeFollowGlobal = false;
+                    AlwaysOnTopSwitch.EyeFollowCursor = false;
+                    AlwaysOnTopSwitch.SetTrackingSuspended(true);
+                }
+            }
+
+            UpdateGhostFollowMode();
+
             LoadSavedPaths();
 
 
@@ -138,6 +178,13 @@ namespace Famille
 
             _index = new FamilyIndexService(familiesFolder, imagesFolder);
             _index.IndexUpdated += OnIndexUpdated;
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            if (_subscribedToPreviewVisibility)
+                FamilyPreviewBridge.PreviewVisibilityChanged -= OnPreviewVisibilityChanged;
+            base.OnClosed(e);
         }
 
         private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -162,6 +209,7 @@ namespace Famille
             PlaceholderText.Visibility = Visibility.Visible;
 
             // Index
+            UpdateGhostFollowMode();
             await _index.StartAsync();
         }
 
@@ -1238,7 +1286,7 @@ namespace Famille
             TabBackgroundPicker.SelectedColor = ColorFromHex(tabBg);
             if (DarkModeCheckBox != null) DarkModeCheckBox.IsChecked = dark;
             if (ShowTop8CheckBox != null) ShowTop8CheckBox.IsChecked = showTop8;
-            if (AlwaysOnTopCheckBox != null) AlwaysOnTopCheckBox.IsChecked = alwaysOnTop;
+            if (AlwaysOnTopSwitch != null) AlwaysOnTopSwitch.IsOn = alwaysOnTop;
             detailedViewMode = detailedView;
             if (DetailedViewCheckBox != null) DetailedViewCheckBox.IsChecked = detailedViewMode;
 
@@ -1258,7 +1306,7 @@ namespace Famille
                 "TabBackground="      + (TabBackgroundPicker.SelectedColor   == Colors.Transparent ? "Transparent" : ColorToHex(TabBackgroundPicker.SelectedColor.Value)),
                 "DarkMode="   + ((DarkModeCheckBox?.IsChecked == true) ? "true" : "false"),
                 "ShowTop8="   + ((ShowTop8CheckBox?.IsChecked == true) ? "true" : "false"),
-                "AlwaysOnTop="+ ((AlwaysOnTopCheckBox?.IsChecked == true) ? "true" : "false"),
+                "AlwaysOnTop="+ ((AlwaysOnTopSwitch?.IsOn == true) ? "true" : "false"),
                 "DetailedView=" + ((DetailedViewCheckBox?.IsChecked == true) ? "true" : "false"),
                 "UseShellThumbs="  + (useShellThumbs  ? "true" : "false"),
                 "UseRevitPreview=" + (useRevitPreview ? "true" : "false"),
@@ -1278,7 +1326,7 @@ namespace Famille
             TabBackgroundPicker.SelectedColor = Colors.Transparent;
             if (DarkModeCheckBox != null) DarkModeCheckBox.IsChecked = false;
             if (ShowTop8CheckBox != null) ShowTop8CheckBox.IsChecked = false;
-            if (AlwaysOnTopCheckBox != null) AlwaysOnTopCheckBox.IsChecked = false;
+            if (AlwaysOnTopSwitch != null) AlwaysOnTopSwitch.IsOn = false;
             if (DetailedViewCheckBox != null) DetailedViewCheckBox.IsChecked = false;
             this.Topmost = false;
             UpdateTheme();
@@ -1569,14 +1617,64 @@ namespace Famille
             }
         }
 
-        private void AlwaysOnTopCheckBox_Changed(object sender, RoutedEventArgs e)
+        private void AlwaysOnTopSwitch_Toggled(object sender, RoutedPropertyChangedEventArgs<bool> e)
         {
-            this.Topmost = AlwaysOnTopCheckBox?.IsChecked == true;
+            this.Topmost = AlwaysOnTopSwitch?.IsOn == true;
+        }
+
+        private void MainTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (!ReferenceEquals(sender, e.OriginalSource)) return;
+            UpdateGhostFollowMode();
+        }
+
+        private void UpdateGhostFollowMode()
+        {
+            if (AlwaysOnTopSwitch == null) return;
+            bool isSettingsTabVisible = SettingsTabItem?.IsSelected == true;
+            AlwaysOnTopSwitch.EyeFollowGlobal = _supportsGhostTracking && isSettingsTabVisible;
+        }
+
+        private void OnPreviewVisibilityChanged(object sender, bool isVisible)
+        {
+            if (!_supportsGhostTracking || AlwaysOnTopSwitch == null) return;
+
+            void Apply()
+            {
+                bool shouldSuspend = isVisible && _revitMajorVersion >= 2025;
+                AlwaysOnTopSwitch.SetTrackingSuspended(shouldSuspend);
+            }
+
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke((Action)Apply);
+            }
+            else
+            {
+                Apply();
+            }
         }
 
         #endregion
 
         #region Modèle
+
+        private static bool TryParseRevitMajorVersion(string version, out int major)
+        {
+            major = 0;
+            if (string.IsNullOrWhiteSpace(version)) return false;
+
+            int i = 0;
+            while (i < version.Length && !char.IsDigit(version[i])) i++;
+            if (i == version.Length) return false;
+
+            int start = i;
+            while (i < version.Length && char.IsDigit(version[i])) i++;
+            if (start == i) return false;
+
+            var digits = version.Substring(start, i - start);
+            return int.TryParse(digits, out major);
+        }
 
         private long? TryGetFileSize(string path)
         {
