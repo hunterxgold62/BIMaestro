@@ -728,7 +728,7 @@
                                   Unchecked="ShowTop8CheckBox_Changed" Height="16"/>
                     </StackPanel>
 
-                    <StackPanel Orientation="Horizontal" Grid.Row="8" Margin="0,6,0,5">
+                    <StackPanel Orientation="Horizontal" Grid.Row="8" Margin="0,6,0,5" VerticalAlignment="Center">
                         <TextBlock Text="Toujours au-dessus :" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource PrimaryText}"/>
                         <ui:GhostSwitch x:Name="AlwaysOnTopSwitch"
                                         Width="130"
