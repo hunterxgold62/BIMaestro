@@ -258,6 +258,9 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="animation touche\bouche avec dents\ToothedToggleSwitch.xaml.cs">
+      <DependentUpon>ToothedToggleSwitch.xaml</DependentUpon>
+    </Compile>
     <Compile Include="animation touche\chargement et salto\StuntSpinner.xaml.cs">
       <DependentUpon>StuntSpinner.xaml</DependentUpon>
     </Compile>
@@ -487,6 +490,10 @@
     <Compile Include="commands\renuméroté élément\ElementRenameWindow.xaml.cs">
       <DependentUpon>ElementRenameWindow.xaml</DependentUpon>
     </Compile>
+    <Page Include="animation touche\bouche avec dents\ToothedToggleSwitch.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="animation touche\chargement et salto\StuntSpinner.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
