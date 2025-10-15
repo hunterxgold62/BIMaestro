@@ -1225,6 +1225,25 @@ namespace Famille
             }
         }
 
+        private void SetAlwaysOnTopState(bool isOn)
+        {
+            if (AlwaysOnTopSwitch != null)
+                AlwaysOnTopSwitch.IsOn = isOn;
+
+            if (AlwaysOnTopCheckBox != null)
+                AlwaysOnTopCheckBox.IsChecked = isOn;
+
+            this.Topmost = isOn;
+        }
+
+        private bool GetAlwaysOnTopState()
+        {
+            if (_useGhostSwitch)
+                return AlwaysOnTopSwitch?.IsOn == true;
+
+            return AlwaysOnTopCheckBox?.IsChecked == true;
+        }
+
         private void LoadConfig()
         {
             string top = "#FFF2F2F2", bottom = "#FFFFFFFF", panel = "#F0F0F0",
@@ -1264,7 +1283,6 @@ namespace Famille
             detailedViewMode = detailedView;
             if (DetailedViewCheckBox != null) DetailedViewCheckBox.IsChecked = detailedViewMode;
 
-            this.Topmost = alwaysOnTop;
             UpdateFamilyListViewMode();
         }
 
@@ -1302,7 +1320,6 @@ namespace Famille
             if (ShowTop8CheckBox != null) ShowTop8CheckBox.IsChecked = false;
             if (AlwaysOnTopSwitch != null) AlwaysOnTopSwitch.IsOn = false;
             if (DetailedViewCheckBox != null) DetailedViewCheckBox.IsChecked = false;
-            this.Topmost = false;
             UpdateTheme();
             SaveConfig_Click(s, e);
         }
