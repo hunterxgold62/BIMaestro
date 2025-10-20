@@ -1,9 +1,11 @@
-﻿using System;
+﻿using DocumentFormat.OpenXml.Office2019.Presentation;
+using NPOI.HPSF;
+using System;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
-using System.Windows.Media.Effects;
 
 namespace BIMaestro.UI
 {
@@ -16,34 +18,51 @@ namespace BIMaestro.UI
             SizeChanged += (_, __) => ApplyLayout();
         }
 
-        // ========== API réutilisable ==========
-
-        // Échelle globale (équiv. --sz). Piste = 4*sz x 2*sz ; Pouce = 2*sz
+        // -------- API ----------
         public static readonly DependencyProperty BaseSizeProperty =
             DependencyProperty.Register(nameof(BaseSize), typeof(double), typeof(EyeToggleSwitch),
-                new PropertyMetadata(28d, OnLayoutDpChanged));
+                new PropertyMetadata(28d, OnLayoutChanged));
         public double BaseSize { get => (double)GetValue(BaseSizeProperty); set => SetValue(BaseSizeProperty, value); }
 
-        // État ON/OFF (bindable)
         public static readonly DependencyProperty IsOnProperty =
             DependencyProperty.Register(nameof(IsOn), typeof(bool), typeof(EyeToggleSwitch),
                 new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault, OnIsOnChanged));
         public bool IsOn { get => (bool)GetValue(IsOnProperty); set => SetValue(IsOnProperty, value); }
 
-        // Durée transitions (ms)
         public static readonly DependencyProperty TransitionMsProperty =
             DependencyProperty.Register(nameof(TransitionMs), typeof(int), typeof(EyeToggleSwitch),
-                new PropertyMetadata(500));
+                new PropertyMetadata(420));
         public int TransitionMs { get => (int)GetValue(TransitionMsProperty); set => SetValue(TransitionMsProperty, value); }
 
-        // Couleurs thème (fidèles au CSS)
-        public Color ColorOn1 { get; set; } = (Color)ColorConverter.ConvertFromString("#fed501");
-        public Color ColorOn2 { get; set; } = (Color)ColorConverter.ConvertFromString("#e4bf00");
-        public Color ColorOff1 { get; set; } = (Color)ColorConverter.ConvertFromString("#224056");
-        public Color ColorOff2 { get; set; } = (Color)ColorConverter.ConvertFromString("#172c3c");
-        public Color ColorW3 { get; set; } = (Color)ColorConverter.ConvertFromString("#ccd2d5");
+        // réglages anneau et liseré (plus fins par défaut)
+        public static readonly DependencyProperty RingThicknessRatioProperty =
+            DependencyProperty.Register(nameof(RingThicknessRatio), typeof(double), typeof(EyeToggleSwitch),
+                new PropertyMetadata(0.10, OnLayoutChanged));
+        public double RingThicknessRatio { get => (double)GetValue(RingThicknessRatioProperty); set => SetValue(RingThicknessRatioProperty, value); }
 
-        // Événement comme une CheckBox
+        public static readonly DependencyProperty EyeRimRatioProperty =
+            DependencyProperty.Register(nameof(EyeRimRatio), typeof(double), typeof(EyeToggleSwitch),
+                new PropertyMetadata(0.06, OnLayoutChanged));
+        public double EyeRimRatio { get => (double)GetValue(EyeRimRatioProperty); set => SetValue(EyeRimRatioProperty, value); }
+
+        // couverture de paupière OFF : hauteur à gauche/droite (0..1 du diamètre)
+        public static readonly DependencyProperty EyelidLeftCoverProperty =
+            DependencyProperty.Register(nameof(EyelidLeftCover), typeof(double), typeof(EyeToggleSwitch),
+                new PropertyMetadata(0.62, OnLayoutChanged));
+        public double EyelidLeftCover { get => (double)GetValue(EyelidLeftCoverProperty); set => SetValue(EyelidLeftCoverProperty, value); }
+
+        public static readonly DependencyProperty EyelidRightCoverProperty =
+            DependencyProperty.Register(nameof(EyelidRightCover), typeof(double), typeof(EyeToggleSwitch),
+                new PropertyMetadata(0.48, OnLayoutChanged));
+        public double EyelidRightCover { get => (double)GetValue(EyelidRightCoverProperty); set => SetValue(EyelidRightCoverProperty, value); }
+
+        // couleurs
+        public Color TrackOff { get; set; } = (Color)ColorConverter.ConvertFromString("#224056");
+        public Color RingOff { get; set; } = (Color)ColorConverter.ConvertFromString("#172C3C");
+        public Color TrackOn { get; set; } = (Color)ColorConverter.ConvertFromString("#FED501");
+        public Color RingOn { get; set; } = (Color)ColorConverter.ConvertFromString("#E4BF00");
+
+        // event "Toggled"
         public static readonly RoutedEvent ToggledEvent =
             EventManager.RegisterRoutedEvent("Toggled", RoutingStrategy.Bubble,
                 typeof(RoutedPropertyChangedEventHandler<bool>), typeof(EyeToggleSwitch));
@@ -53,14 +72,12 @@ namespace BIMaestro.UI
             remove => RemoveHandler(ToggledEvent, value);
         }
 
-        // ========== internals ==========
-        double _sz, _trackW, _trackH, _thumb, _slide, _ringThick;
-        SolidColorBrush _trackBrush = new();
-        SolidColorBrush _ringBrush = new();
-        SolidColorBrush _offBrush = new();
-        SolidColorBrush _onBrush = new();
+        // -------- internals ----------
+        double _sz, _trackW, _trackH, _ringThick, _innerW, _innerH, _thumb, _slide, _startX;
+        readonly SolidColorBrush _trackBrush = new();
+        readonly SolidColorBrush _ringBrush = new();
 
-        static void OnLayoutDpChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        static void OnLayoutChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             var c = (EyeToggleSwitch)d;
             if (c.IsLoaded) c.ApplyLayout();
@@ -71,15 +88,16 @@ namespace BIMaestro.UI
             var c = (EyeToggleSwitch)d;
             if (!c.IsLoaded) return;
             c.AnimateState((bool)e.NewValue);
-            var args = new RoutedPropertyChangedEventArgs<bool>((bool)e.OldValue, (bool)e.NewValue) { RoutedEvent = ToggledEvent };
+            var args = new RoutedPropertyChangedEventArgs<bool>((bool)e.OldValue, (bool)e.NewValue)
+            { RoutedEvent = ToggledEvent };
             c.RaiseEvent(args);
         }
 
-        void OnLoaded(object sender, RoutedEventArgs e)
+        void OnLoaded(object? sender, RoutedEventArgs e)
         {
             ApplyLayout();
-            PlayIntro();                 // “go-back” au chargement
-            AnimateState(IsOn, true);    // appliquer l’état courant
+            PlayIntro();
+            AnimateState(IsOn, instant: true);
         }
 
         void ApplyLayout()
@@ -87,111 +105,142 @@ namespace BIMaestro.UI
             _sz = BaseSize;
             _trackW = 4 * _sz;
             _trackH = 2 * _sz;
-            _thumb = 2 * _sz;
-            _slide = _trackW - _thumb;
-            _ringThick = _sz / 7.0;
+            _ringThick = Math.Max(2.0, Math.Round(_trackH * RingThicknessRatio));
 
-            // Taille hôte + positions labels (≈ CSS: left:-2*sz / +4.65*sz)
-            Host.Width = _trackW + 2 * _sz * 2.2;
-            Host.Height = Math.Max(_trackH, _thumb);
+            _innerW = _trackW - 2 * _ringThick;
+            _innerH = _trackH - 2 * _ringThick;
 
-            OffText.FontSize = 0.7 * _sz;
-            OffText.Margin = new Thickness(-2.0 * _sz, 0, 0, 0);
-            OffText.HorizontalAlignment = HorizontalAlignment.Left;
+            _thumb = _innerH;
+            _slide = _innerW - _thumb;
+            _startX = _ringThick;
 
-            OnText.FontSize = 0.7 * _sz;
-            OnText.Margin = new Thickness(_trackW + 0.65 * _sz, 0, 0, 0);
-            OnText.HorizontalAlignment = HorizontalAlignment.Left;
-
-            // Piste + anneau
-            SwitchCanvas.Width = _trackW; SwitchCanvas.Height = _trackH;
-
-            Track.Width = _trackW; Track.Height = _trackH;
-            Track.CornerRadius = new CornerRadius(_trackH / 2.0);
-
+            // Track
+            TrackHost.Width = _trackW; TrackHost.Height = _trackH;
             TrackRing.Width = _trackW; TrackRing.Height = _trackH;
             TrackRing.CornerRadius = new CornerRadius(_trackH / 2.0);
             TrackRing.BorderThickness = new Thickness(_ringThick);
 
-            _trackBrush.Color = ColorOff1; Track.Background = _trackBrush;
-            _ringBrush.Color = ColorOff2; TrackRing.BorderBrush = _ringBrush;
+            TrackBody.Margin = new Thickness(_ringThick);
+            Track.Width = _innerW; Track.Height = _innerH; Track.CornerRadius = new CornerRadius(_innerH / 2.0);
+            TrackBevel.Width = _innerW; TrackBevel.Height = _innerH; TrackBevel.CornerRadius = new CornerRadius(_innerH / 2.0);
 
-            _offBrush.Color = ColorOff2; OffText.Foreground = _offBrush;
-            _onBrush.Color = ColorW3; OnText.Foreground = _onBrush;
+            // Couleurs
+            _trackBrush.Color = TrackOff; Track.Background = _trackBrush;
+            _ringBrush.Color = RingOff; TrackRing.BorderBrush = _ringBrush;
+            RingGlow.BlurRadius = 0; RingGlow.Opacity = 0;
 
-            // Pouce / œil
+            // Thumb / Eye
             Thumb.Width = _thumb; Thumb.Height = _thumb;
 
-            // œil bien gros + liseré gris
-            EyeWhite.Width = _thumb * 0.92;
-            EyeWhite.Height = _thumb * 0.92;
-            EyeWhite.StrokeThickness = Math.Max(2.0, _sz * 0.18);
+            EyeWhite.Width = _thumb * 0.95;
+            EyeWhite.Height = _thumb * 0.95;
+            EyeWhite.StrokeThickness = Math.Max(1.0, Math.Round(_thumb * EyeRimRatio));
 
-            // Pupil taille
-            PupilBox.Width = PupilBox.Height = Math.Max(8.0, _sz * 0.65);
+            // Pupille + reflet (échelle fiable petites tailles)
+            var pupil = Math.Max(6.0, Math.Round(_thumb * 0.42));
+            Pupil.Width = Pupil.Height = pupil;
+            PupilShape.Width = PupilShape.Height = pupil;
 
-            // Clip de la paupière = même cercle que l’œil
+            var spec = Math.Max(2.0, Math.Round(pupil * 0.26));
+            Spec.Width = spec; Spec.Height = spec;
+            Spec.Margin = new Thickness(Math.Round(pupil * 0.18), Math.Round(pupil * 0.18), 0, 0);
+
+            // Clip de la paupière = cercle de l’œil
             Eyelid.Width = EyeWhite.Width; Eyelid.Height = EyeWhite.Height;
             EyelidClip.Center = new Point(Eyelid.Width / 2.0, Eyelid.Height / 2.0);
-            EyelidClip.RadiusX = Eyelid.Width / 2.0;
-            EyelidClip.RadiusY = Eyelid.Height / 2.0;
+            EyelidClip.RadiusX = Eyelid.Width / 2.0; EyelidClip.RadiusY = Eyelid.Height / 2.0;
 
-            // Taille globale du contrôle
-            Width = Host.Width;
-            Height = Host.Height;
+            // (re)construit la géométrie de la paupière OFF
+            RebuildEyelidGeometry();
+
+            // Taille globale
+            Width = _trackW; Height = _trackH;
+
+            // OFF par défaut : pupille visible + paupière inclinée
+            ThumbX.X = _startX;
+            PupilOffset.X = -_thumb * 0.12;
+            PupilOffset.Y = _thumb * 0.18;
+            EyelidShift.Y = 0;                 // wedge posé sur l’œil en OFF
+        }
+
+        void RebuildEyelidGeometry()
+        {
+            // wedge (polygone) coupant l’œil : plus bas à gauche que à droite
+            var w = Eyelid.Width; var h = Eyelid.Height;
+            if (w <= 0 || h <= 0) return;
+
+            var leftY = EyelidLeftCover * h;   // hauteur où la paupière coupe à gauche
+            var rightY = EyelidRightCover * h;   // hauteur à droite
+            var m = Math.Max(w, h);              // marge pour sortir largement au-dessus
+
+            var geo = new StreamGeometry();
+            using (var gc = geo.Open())
+            {
+                // Un quadrilatère qui couvre tout le haut de l’œil et descend jusqu’aux coupes
+                gc.BeginFigure(new Point(-m, -m), true, true);
+                gc.LineTo(new Point(w + m, -m), true, false);
+                gc.LineTo(new Point(w + m, rightY), true, false);
+                gc.LineTo(new Point(-m, leftY), true, false);
+            }
+            geo.Freeze();
+            Eyelid.Data = geo;
         }
 
         void PlayIntro()
         {
-            var dur = TimeSpan.FromMilliseconds(Math.Max(TransitionMs * 0.9, 250));
+            var dur = TimeSpan.FromMilliseconds(Math.Max(TransitionMs * 0.9, 220));
             ThumbX.BeginAnimation(TranslateTransform.XProperty,
-                new DoubleAnimation(_slide, 0, dur) { EasingFunction = new QuarticEase { EasingMode = EasingMode.EaseOut } });
+                new DoubleAnimation(_startX + _slide, _startX, dur)
+                { EasingFunction = new QuarticEase { EasingMode = EasingMode.EaseOut } });
 
-            // œil vers OFF, paupière qui monte → descend (comme le CSS)
             var ease = new QuadraticEase { EasingMode = EasingMode.EaseOut };
-            PupilOffset.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(_sz * 0.10, _sz * 0.00, dur) { EasingFunction = ease });
-            PupilOffset.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(-_sz * 0.10, _sz * 0.00, dur) { EasingFunction = ease });
-            EyelidShift.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(_sz * 0.45, _sz * 0.10, dur) { EasingFunction = ease });
+            PupilOffset.BeginAnimation(TranslateTransform.XProperty,
+                new DoubleAnimation(_thumb * 0.06, -_thumb * 0.12, dur) { EasingFunction = ease });
+            PupilOffset.BeginAnimation(TranslateTransform.YProperty,
+                new DoubleAnimation(-_thumb * 0.06, _thumb * 0.18, dur) { EasingFunction = ease });
+
+            // recalcul si layout a bougé
+            RebuildEyelidGeometry();
         }
 
         void AnimateState(bool on, bool instant = false)
         {
-            var ease = new CubicEase { EasingMode = EasingMode.EaseInOut };
             var dur = TimeSpan.FromMilliseconds(instant ? 0 : TransitionMs);
+            var ease = new CubicEase { EasingMode = EasingMode.EaseInOut };
 
-            // 1) déplacement du pouce
-            ThumbX.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation
-            { To = on ? _slide : 0, Duration = dur, EasingFunction = ease });
+            // glisse de l’œil
+            var x = on ? (_startX + _slide) : _startX;
+            ThumbX.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation { To = x, Duration = dur, EasingFunction = ease });
 
-            // 2) couleurs piste + anneau (OFF -> ON)
-            _trackBrush.BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation
-            { To = on ? ColorOn1 : ColorOff1, Duration = dur });
-            _ringBrush.BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation
-            { To = on ? ColorOn2 : ColorOff2, Duration = dur });
+            // couleurs + halo
+            _trackBrush.BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(on ? TrackOn : TrackOff, dur));
+            _ringBrush.BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(on ? RingOn : RingOff, dur));
+            RingGlow.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.BlurRadiusProperty,
+                new DoubleAnimation(on ? 8.0 : 0.0, dur));
+            RingGlow.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.OpacityProperty,
+                new DoubleAnimation(on ? 0.55 : 0.0, dur));
 
-            // 3) libellés & halo ON
-            _offBrush.BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation
-            { To = on ? ColorW3 : ColorOff2, Duration = dur });
-            _onBrush.BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation
-            { To = on ? ColorOn2 : ColorW3, Duration = dur });
+            // pupille + paupière
+            if (on)
+            {
+                // œil grand ouvert, pupille haut-gauche
+                PupilOffset.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(-_thumb * 0.20, dur) { EasingFunction = ease });
+                PupilOffset.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(-_thumb * 0.20, dur) { EasingFunction = ease });
 
-            // halo ON (glow)
-            var glowTo = on ? 10.0 : 0.0;           // BlurRadius
-            var glowOp = on ? 0.90 : 0.0;           // Opacité
-            OnGlow.BeginAnimation(DropShadowEffect.BlurRadiusProperty, new DoubleAnimation(glowTo, dur));
-            OnGlow.BeginAnimation(DropShadowEffect.OpacityProperty, new DoubleAnimation(glowOp, dur));
+                // sortir la paupière vers le haut (hors cercle)
+                EyelidShift.BeginAnimation(TranslateTransform.YProperty,
+                    new DoubleAnimation(-_thumb * 1.10, dur) { EasingFunction = ease });
+            }
+            else
+            {
+                // OFF : mi-clos, pupille visible
+                PupilOffset.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(-_thumb * 0.12, dur) { EasingFunction = ease });
+                PupilOffset.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(_thumb * 0.18, dur) { EasingFunction = ease });
 
-            // 4) pupille (direction)
-            // OFF : sceptique, en bas-gauche (yeux mi-clos)
-            // ON  : joyeux, en haut-gauche (regarde le label ON)
-            double px = on ? -_sz * 0.12 : -_sz * 0.08;
-            double py = on ? -_sz * 0.12 : _sz * 0.18;
-            PupilOffset.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(px, dur) { EasingFunction = ease });
-            PupilOffset.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(py, dur) { EasingFunction = ease });
-
-            // 5) paupière : inclinée -12°, glisse vers le haut quand ON (œil grand ouvert)
-            double eyelidY = on ? -_sz * 0.90 : _sz * 0.10; // hors du cercle quand ON
-            EyelidShift.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(eyelidY, dur) { EasingFunction = ease });
+                // repositionner la paupière sur l’œil
+                EyelidShift.BeginAnimation(TranslateTransform.YProperty,
+                    new DoubleAnimation(0, dur) { EasingFunction = ease });
+            }
         }
     }
 }

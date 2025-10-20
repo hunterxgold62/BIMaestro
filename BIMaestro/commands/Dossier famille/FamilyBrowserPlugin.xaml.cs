@@ -112,6 +112,7 @@ namespace Famille
         // ===== Collections =====
         private ObservableCollection<Collection> _collections = new();
         private Collection _selectedCollection;
+        private bool _useGhostSwitch;
 
         public FamilyBrowserWindow()
         {
@@ -1230,19 +1231,16 @@ namespace Famille
             if (AlwaysOnTopSwitch != null)
                 AlwaysOnTopSwitch.IsOn = isOn;
 
-            if (AlwaysOnTopCheckBox != null)
-                AlwaysOnTopCheckBox.IsChecked = isOn;
+          
 
             this.Topmost = isOn;
         }
 
         private bool GetAlwaysOnTopState()
         {
-            if (_useGhostSwitch)
-                return AlwaysOnTopSwitch?.IsOn == true;
-
-            return AlwaysOnTopCheckBox?.IsChecked == true;
+            return AlwaysOnTopSwitch?.IsOn == true;
         }
+
 
         private void LoadConfig()
         {
