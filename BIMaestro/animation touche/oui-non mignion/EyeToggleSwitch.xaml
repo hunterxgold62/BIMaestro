@@ -2,119 +2,96 @@
              x:Name="root"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             SnapsToDevicePixels="True"
              Background="Transparent"
+             SnapsToDevicePixels="True"
+             UseLayoutRounding="True"
              MinWidth="120" MinHeight="48">
     <Grid x:Name="LayoutRoot" Background="Transparent">
-        <Grid x:Name="Host" Background="Transparent">
 
-            <!-- Libellés OFF/ON -->
-            <TextBlock x:Name="OffText"
-                       Text="OFF"
-                       FontFamily="Segoe UI"
-                       FontWeight="SemiBold"
-                       Foreground="#172C3C"
-                       VerticalAlignment="Center"
-                       TextOptions.TextFormattingMode="Display"
-                       TextOptions.TextRenderingMode="Auto"
-                       IsHitTestVisible="False"/>
-            <TextBlock x:Name="OnText"
-                       Text="ON"
-                       FontFamily="Segoe UI"
-                       FontWeight="SemiBold"
-                       Foreground="#CCD2D5"
-                       VerticalAlignment="Center"
-                       TextOptions.TextFormattingMode="Display"
-                       TextOptions.TextRenderingMode="Auto"
-                       IsHitTestVisible="False">
-                <TextBlock.Effect>
-                    <!-- halo activé quand ON -->
-                    <DropShadowEffect x:Name="OnGlow" Color="#fed501" BlurRadius="0" ShadowDepth="0" Opacity="0"/>
-                </TextBlock.Effect>
-            </TextBlock>
+        <!-- TRACK -->
+        <Grid x:Name="TrackHost" HorizontalAlignment="Left" VerticalAlignment="Center">
+            <Border x:Name="TrackRing"
+              Background="Transparent"
+              BorderBrush="#172C3C"
+              BorderThickness="6"
+              CornerRadius="1000">
+                <Border.Effect>
+                    <DropShadowEffect x:Name="RingGlow" Color="#FED501" BlurRadius="0" ShadowDepth="0" Opacity="0"/>
+                </Border.Effect>
+            </Border>
 
-            <!-- Switch -->
-            <Grid x:Name="SwitchCanvas" Background="Transparent" HorizontalAlignment="Left" VerticalAlignment="Center">
+            <Grid x:Name="TrackBody" Margin="0">
+                <Border x:Name="Track" CornerRadius="1000" Background="#224056"/>
+                <Border x:Name="TrackBevel" CornerRadius="1000" IsHitTestVisible="False" Opacity="0.14">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                            <GradientStop Color="#FFFFFFFF" Offset="0.00"/>
+                            <GradientStop Color="#00FFFFFF" Offset="0.55"/>
+                            <GradientStop Color="#22000000" Offset="1.00"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+                </Border>
+            </Grid>
+        </Grid>
 
-                <!-- Anneau extérieur (épais) -->
-                <Border x:Name="TrackRing"
-                        Background="Transparent"
-                        BorderBrush="#172C3C"
-                        BorderThickness="5"
-                        CornerRadius="1000"
-                        HorizontalAlignment="Left"
-                        VerticalAlignment="Center"/>
+        <!-- THUMB (l'œil) -->
+        <Grid x:Name="Thumb"
+          HorizontalAlignment="Left" VerticalAlignment="Center"
+          RenderTransformOrigin="0.5,0.5"
+          ClipToBounds="True">
+            <Grid.RenderTransform>
+                <TransformGroup>
+                    <TranslateTransform x:Name="ThumbX"/>
+                </TransformGroup>
+            </Grid.RenderTransform>
 
-                <!-- Piste -->
-                <Border x:Name="Track"
-                        CornerRadius="1000"
-                        Background="#224056"
-                        HorizontalAlignment="Left"
-                        VerticalAlignment="Center"/>
+            <Grid x:Name="EyeBox" ClipToBounds="True">
+                <!-- blanc + fin liseré gris -->
+                <Ellipse x:Name="EyeWhite" Fill="#FFFFFF" Stroke="#E5E7ED" StrokeThickness="4"/>
 
-                <!-- Pouce -->
-                <Grid x:Name="Thumb"
-                      HorizontalAlignment="Left"
-                      VerticalAlignment="Center"
-                      RenderTransformOrigin="0.5,0.5">
+                <!-- Pupille + reflet -->
+                <Grid x:Name="Pupil"
+              Width="18" Height="18"
+              HorizontalAlignment="Center" VerticalAlignment="Center"
+              RenderTransformOrigin="0.5,0.5">
                     <Grid.RenderTransform>
                         <TransformGroup>
-                            <TranslateTransform x:Name="ThumbX"/>
+                            <TranslateTransform x:Name="PupilOffset"/>
                         </TransformGroup>
                     </Grid.RenderTransform>
-
-                    <!-- Œil (blanc + liseré gris clair) -->
-                    <Grid x:Name="EyeBox" Margin="0">
-                        <Ellipse x:Name="EyeWhite" Fill="White" Stroke="#E5E7ED" StrokeThickness="6"/>
-                        <!-- PUPILLE + reflet -->
-                        <Grid x:Name="PupilBox"
-                              Width="20" Height="20"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"
-                              RenderTransformOrigin="0.5,0.5">
-                            <Grid.RenderTransform>
-                                <TransformGroup>
-                                    <TranslateTransform x:Name="PupilOffset"/>
-                                </TransformGroup>
-                            </Grid.RenderTransform>
-                            <Ellipse Fill="#000000"/>
-                            <Ellipse Width="6" Height="6" Fill="White" Opacity="0.9"
-                                     HorizontalAlignment="Left" VerticalAlignment="Top"
-                                     Margin="3,3,0,0"/>
-                        </Grid>
-
-                        <!-- PAUPIÈRE (rectangle masqué dans le cercle, légèrement incliné) -->
-                        <Rectangle x:Name="Eyelid"
-                                   Fill="#F3F3F8"
-                                   RenderTransformOrigin="0.5,0.5">
-                            <Rectangle.RenderTransform>
-                                <TransformGroup>
-                                    <RotateTransform x:Name="EyelidRot" Angle="-12"/>
-                                    <TranslateTransform x:Name="EyelidShift" X="0" Y="0"/>
-                                </TransformGroup>
-                            </Rectangle.RenderTransform>
-                            <Rectangle.Clip>
-                                <EllipseGeometry x:Name="EyelidClip" Center="0,0" RadiusX="0" RadiusY="0"/>
-                            </Rectangle.Clip>
-                        </Rectangle>
-                    </Grid>
+                    <Ellipse x:Name="PupilShape" Fill="#000000"/>
+                    <Ellipse x:Name="Spec" Fill="#FFFFFF" Opacity="0.9"
+                   HorizontalAlignment="Left" VerticalAlignment="Top"/>
                 </Grid>
+
+                <!-- PAUPIÈRE inclinée (Path, clipée dans l’œil) -->
+                <Path x:Name="Eyelid"
+              Fill="#ECECF7"
+              RenderTransformOrigin="0.5,0.5">
+                    <Path.RenderTransform>
+                        <TransformGroup>
+                            <RotateTransform x:Name="EyelidRot" Angle="-12"/>
+                            <TranslateTransform x:Name="EyelidShift" X="0" Y="0"/>
+                        </TransformGroup>
+                    </Path.RenderTransform>
+                    <Path.Clip>
+                        <EllipseGeometry x:Name="EyelidClip" Center="0,0" RadiusX="0" RadiusY="0"/>
+                    </Path.Clip>
+                </Path>
             </Grid>
-
-            <!-- Couche clic 100% transparente (pas de focus bleu) -->
-            <ToggleButton x:Name="Hit"
-                          Background="Transparent"
-                          BorderThickness="0"
-                          Focusable="False"
-                          IsTabStop="False"
-                          FocusVisualStyle="{x:Null}"
-                          IsChecked="{Binding IsOn, ElementName=root, Mode=TwoWay}">
-                <ToggleButton.Template>
-                    <ControlTemplate TargetType="ToggleButton">
-                        <Border Background="Transparent"/>
-                    </ControlTemplate>
-                </ToggleButton.Template>
-            </ToggleButton>
-
         </Grid>
+
+        <!-- couche de clic (sans focus bleu) -->
+        <ToggleButton x:Name="Hit"
+                  Background="Transparent" BorderThickness="0"
+                  Focusable="False" IsTabStop="False" FocusVisualStyle="{x:Null}"
+                  IsChecked="{Binding IsOn, ElementName=root, Mode=TwoWay}">
+            <ToggleButton.Template>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border Background="Transparent"/>
+                </ControlTemplate>
+            </ToggleButton.Template>
+        </ToggleButton>
+
     </Grid>
 </UserControl>
