@@ -178,7 +178,8 @@ namespace Modification
                                 else
                                 {
                                     CreateRectangularReservationFromElements(
-                                        doc, wall, symbol, elementsSel, normeEnabled, level);
+                                        doc, wall, symbol, elementsSel, normeEnabled, level,
+                                        GetOversizeForType(objType));
                                 }
 
                                 trans.Commit();
@@ -317,7 +318,7 @@ namespace Modification
                                     if (diam <= 0.0)
                                     {
                                         double w, h;
-                                        GetOrientedXYDimensions(selElem, out w, out h);
+                                        GetOrientedXYDimensions(selElem, objType, out w, out h);
                                         diam = Math.Max(w, h);
                                     }
                                     if (normeEnabled)
@@ -349,7 +350,7 @@ namespace Modification
                                     else
                                     {
                                         double w, h;
-                                        GetOrientedXYDimensions(selElem, out w, out h);
+                                        GetOrientedXYDimensions(selElem, objType, out w, out h);
                                         if (normeEnabled)
                                         {
                                             w = RoundToNearest10cm(w);
@@ -462,7 +463,7 @@ namespace Modification
                     if (finalDiam <= 0.0)
                     {
                         double w, h;
-                        GetOrientedXYDimensions(elem, out w, out h);
+                        GetOrientedXYDimensions(elem, objType, out w, out h);
                         finalDiam = Math.Max(w, h);
                     }
                     if (normeEnabled)
@@ -505,7 +506,7 @@ namespace Modification
                 if (bbElem == null) continue;
 
                 double w, h;
-                GetOrientedXYDimensions(elem, out w, out h);
+                GetOrientedXYDimensions(elem, objType, out w, out h);
                                 XYZ fallbackCenter = (bbElem.Min + bbElem.Max) * 0.5;
                                 XYZ center = GetPlacementPointOnWall(wallHost, elem, fallbackCenter);
 
@@ -664,9 +665,17 @@ namespace Modification
 
             // 4) Centre & création de l’instance réservation
             XYZ centroid = (bbAll.Min + bbAll.Max) * 0.5;
-            var referencePipe = pipes.FirstOrDefault();
-            if (referencePipe != null)
-                centroid = GetPlacementPointOnWall(wall, referencePipe, centroid);
+            var projectedCenter = ProjectPointOntoWallPlane(wall, centroid);
+            if (projectedCenter != null)
+            {
+                centroid = projectedCenter;
+            }
+            else
+            {
+                var referencePipe = pipes.FirstOrDefault();
+                if (referencePipe != null)
+                    centroid = GetPlacementPointOnWall(wall, referencePipe, centroid);
+            }
             FamilyInstance fi = doc.Create.NewFamilyInstance(
                 centroid,
                 symbol,
@@ -737,7 +746,8 @@ namespace Modification
             FamilySymbol symbol,
             List<Element> elements,
             bool normeEnabled,
-            Level level)
+            Level level,
+            double oversize)
         {
             if (!symbol.IsActive) symbol.Activate();
 
@@ -766,9 +776,17 @@ namespace Modification
             };
 
             XYZ centroid = (bbAll.Min + bbAll.Max) * 0.5;
-            var referenceElement = elements.FirstOrDefault();
-            if (referenceElement != null)
-                centroid = GetPlacementPointOnWall(wall, referenceElement, centroid);
+            var projectedCenter = ProjectPointOntoWallPlane(wall, centroid);
+            if (projectedCenter != null)
+            {
+                centroid = projectedCenter;
+            }
+            else
+            {
+                var referenceElement = elements.FirstOrDefault();
+                if (referenceElement != null)
+                    centroid = GetPlacementPointOnWall(wall, referenceElement, centroid);
+            }
             FamilyInstance fi = doc.Create.NewFamilyInstance(
                 centroid,
                 symbol,
@@ -793,8 +811,8 @@ namespace Modification
             double minProj = projs.Min();
             double maxProj = projs.Max();
 
-            double widthRaw = (maxProj - minProj) + OVERSIZE_FT;
-            double heightRaw = (maxZ - minZ) + OVERSIZE_FT;
+            double widthRaw = (maxProj - minProj) + oversize;
+            double heightRaw = (maxZ - minZ) + oversize;
 
             if (normeEnabled)
             {
@@ -886,6 +904,29 @@ namespace Modification
             }
 
             return fallbackCenter;
+        }
+
+        private XYZ ProjectPointOntoWallPlane(Wall wall, XYZ point)
+        {
+            if (wall == null || point == null)
+                return null;
+
+            if (!(wall.Location is LocationCurve wallLocCurve))
+                return null;
+
+            Curve wallCurve = wallLocCurve.Curve;
+            if (wallCurve == null)
+                return null;
+
+            XYZ wallNormal = wall.Orientation;
+            if (wallNormal == null || wallNormal.IsZeroLength())
+                return null;
+
+            XYZ planeOrigin = wallCurve.Evaluate(0.5, true);
+            XYZ normalized = wallNormal.Normalize();
+            double offset = normalized.DotProduct(point - planeOrigin);
+
+            return point - normalized * offset;
         }
 
         private XYZ? TryGetIntersectionOnWallPlane(Wall wall, Element intersectingElement)
@@ -986,6 +1027,7 @@ namespace Modification
 
         private double CalculateDiameterForElement(Element elem, ExtendedReservationWindow.ObjectType objType)
         {
+            double oversize = GetOversizeForType(objType);
             double finalDiam = 0.0;
             if (objType == ExtendedReservationWindow.ObjectType.Canalisation && elem is Pipe pipe)
             {
@@ -993,7 +1035,7 @@ namespace Modification
                 var diamVal = pDiam != null ? pDiam.AsDouble() : 0.0;
                 var pIso = pipe.LookupParameter("Epaisseur d'isolation");
                 var isoVal = pIso != null ? pIso.AsDouble() : 0.0;
-                finalDiam = diamVal + 2 * isoVal + OVERSIZE_FT;
+                finalDiam = diamVal + 2 * isoVal + oversize;
             }
             else if (objType == ExtendedReservationWindow.ObjectType.Gaine && elem is Duct duct)
             {
@@ -1001,7 +1043,7 @@ namespace Modification
                 var diamVal = pDiam != null ? pDiam.AsDouble() : 0.0;
                 var pIso = duct.LookupParameter("Epaisseur d'isolation");
                 var isoVal = pIso != null ? pIso.AsDouble() : 0.0;
-                finalDiam = diamVal + 2 * isoVal + OVERSIZE_FT;
+                finalDiam = diamVal + 2 * isoVal + oversize;
             }
             return finalDiam;
         }
@@ -1020,7 +1062,7 @@ namespace Modification
             return mRounded / 0.3048;
         }
 
-        private void GetOrientedXYDimensions(Element elem, out double width, out double height)
+        private void GetOrientedXYDimensions(Element elem, ExtendedReservationWindow.ObjectType objType, out double width, out double height)
         {
             var bb = elem.get_BoundingBox(null);
             if (bb == null)
@@ -1028,7 +1070,8 @@ namespace Modification
                 width = height = 0;
                 return;
             }
-            height = (bb.Max.Z - bb.Min.Z) + OVERSIZE_FT;
+            double oversize = GetOversizeForType(objType);
+            height = (bb.Max.Z - bb.Min.Z) + oversize;
 
             if (elem is FamilyInstance fi)
             {
@@ -1050,7 +1093,7 @@ namespace Modification
                         minProj = Math.Min(minProj, proj);
                         maxProj = Math.Max(maxProj, proj);
                     }
-                    width = (maxProj - minProj) + OVERSIZE_FT;
+                    width = (maxProj - minProj) + oversize;
                     return;
                 }
                 if (fi.Location is LocationPoint lp)
@@ -1066,11 +1109,19 @@ namespace Modification
                     };
                     var t = Transform.CreateRotation(XYZ.BasisZ, -rot);
                     var ptsLocal = corners.Select(c => t.OfPoint(c - new XYZ(basePt.X, basePt.Y, 0))).ToList();
-                    width = (ptsLocal.Max(p => p.X) - ptsLocal.Min(p => p.X)) + OVERSIZE_FT;
+                    width = (ptsLocal.Max(p => p.X) - ptsLocal.Min(p => p.X)) + oversize;
                     return;
                 }
             }
-            width = (bb.Max.X - bb.Min.X) + OVERSIZE_FT;
+            width = (bb.Max.X - bb.Min.X) + oversize;
+        }
+
+        private double GetOversizeForType(ExtendedReservationWindow.ObjectType objType)
+        {
+            return objType == ExtendedReservationWindow.ObjectType.Canalisation
+                || objType == ExtendedReservationWindow.ObjectType.Gaine
+                ? OVERSIZE_FT
+                : 0.0;
         }
         #endregion
     }
