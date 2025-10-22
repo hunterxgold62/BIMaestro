@@ -371,9 +371,6 @@
     </Compile>
     <Compile Include="commands\page de mise à jour en direct\MiseAJourCommand.cs" />
     <Compile Include="commands\page de mise à jour en direct\Page d%27explication projet\GuideCommand.cs" />
-    <Compile Include="commands\page de mise à jour en direct\Page d%27explication projet\GuideWindow.xaml.cs">
-      <DependentUpon>GuideWindow.xaml</DependentUpon>
-    </Compile>
     <Compile Include="commands\page de mise à jour en direct\UpdateWindow.xaml.cs">
       <DependentUpon>UpdateWindow.xaml</DependentUpon>
     </Compile>
@@ -574,10 +571,6 @@
     <Page Include="commands\menu contextuel\MenuContextuel.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
-    </Page>
-    <Page Include="commands\page de mise à jour en direct\Page d%27explication projet\GuideWindow.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="commands\page de mise à jour en direct\UpdateWindow.xaml">
       <Generator>MSBuild:Compile</Generator>

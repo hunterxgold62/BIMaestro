@@ -29,9 +29,9 @@ namespace Famille
         private const string FavoritesCollectionName = "Favoris";
 
         // ===== Chemins =====
-        private string rootFolderPath = @"P:\0-Boîte à outils Revit\0-Bibliothèque\A-Famille Revit";
-        private string familiesFolder = @"P:\0-Boîte à outils Revit\0-Bibliothèque\A-Famille Revit";
-        private string imagesFolder = @"P:\0-Boîte à outils Revit\0-Bibliothèque\B-Famille Revit Image";
+        private string rootFolderPath = @"\\intranet.cabinet-merlin.fr\groupe-merlin\Gerland-Energie\Affaires\0-Boîte à outils Revit\0-Bibliothèque\A-Famille Revit";
+        private string familiesFolder = @"\\intranet.cabinet-merlin.fr\groupe-merlin\Gerland-Energie\Affaires\0-Boîte à outils Revit\0-Bibliothèque\A-Famille Revit";
+        private string imagesFolder = @"\\intranet.cabinet-merlin.fr\groupe-merlin\Gerland-Energie\Affaires\0-Boîte à outils Revit\0-Bibliothèque\B-Famille Revit Image";
 
         private readonly string favoritesFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "SauvegardePréférence", "Favorites.txt");
         private readonly string configFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "SauvegardePréférence", "Config.txt");
@@ -1133,34 +1133,63 @@ namespace Famille
                 "Le dossier par défaut n'a pas été trouvé.\n\n" +
                 "1) Choisis d'abord le dossier qui contient tes familles Revit (.rfa).\n" +
                 "2) Ensuite sélectionne le dossier des images (.png) avec le même nom que les familles.\n\n" +
-                "Ces chemins seront enregistrés pour ne plus te le demander.",
+                "Tu pourras modifier ces chemins plus tard depuis l'onglet Paramètres.",
                 "Chemins introuvables",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
 
-            var famDialog = new WinForms.FolderBrowserDialog { Description = "Choisis le dossier avec les fichiers .rfa puis clique sur OK." };
+            if (!TrySelectFolders(out var selectedFamilies, out var selectedImages))
+                return false;
+
+            ApplySelectedFolders(selectedFamilies, selectedImages, showSuccessMessage: true);
+            return true;
+        }
+
+        private bool TrySelectFolders(out string selectedFamilies, out string selectedImages)
+        {
+            selectedFamilies = null;
+            selectedImages = null;
+
+            var famDialog = new WinForms.FolderBrowserDialog
+            {
+                Description = "Choisis le dossier avec les fichiers .rfa puis clique sur OK.",
+                SelectedPath = Directory.Exists(familiesFolder) ? familiesFolder : string.Empty
+            };
             if (famDialog.ShowDialog() != WinForms.DialogResult.OK)
                 return false;
-            familiesFolder = famDialog.SelectedPath;
-            rootFolderPath = familiesFolder;
 
-            var imgDialog = new WinForms.FolderBrowserDialog { Description = "Choisis le dossier avec les images (.png) nommées comme les fichiers .rfa, puis clique sur OK." };
+            selectedFamilies = famDialog.SelectedPath;
+
+            var imgDialog = new WinForms.FolderBrowserDialog
+            {
+                Description = "Choisis le dossier avec les images (.png) nommées comme les fichiers .rfa, puis clique sur OK.",
+                SelectedPath = Directory.Exists(imagesFolder) ? imagesFolder : selectedFamilies
+            };
             if (imgDialog.ShowDialog() == WinForms.DialogResult.OK)
             {
-                imagesFolder = imgDialog.SelectedPath;
+                selectedImages = imgDialog.SelectedPath;
             }
             else
             {
-                MessageBox.Show(this, "Aucun dossier d'images choisi. Les vignettes ne seront pas affichées.", "Information",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
-                imagesFolder = familiesFolder;
+                MessageBox.Show(this,
+                    "Aucun dossier d'images choisi. Les vignettes ne seront pas affichées.",
+                    "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                selectedImages = selectedFamilies;
             }
 
-            SavePaths();
-            MessageBox.Show(this,
-                "Les dossiers sont enregistrés. Pour les modifier plus tard, supprime le fichier 'CheminsFamille.json' dans Documents/RevitLogs/SauvegardePréférence.",
-                "Chemins enregistrés", MessageBoxButton.OK, MessageBoxImage.Information);
+            return true;
+        }
 
+        private void ApplySelectedFolders(string newFamiliesFolder, string newImagesFolder, bool showSuccessMessage)
+        {
+            familiesFolder = newFamiliesFolder;
+            imagesFolder = newImagesFolder;
+            rootFolderPath = familiesFolder;
+
+            SavePaths();
+            NotifyPropertyChanged(nameof(RootFolderName));
+
+            CatalogImageResolver.Initialize(familiesFolder, imagesFolder);
             ImageResolver.ClearCaches();
             _bitmapCache.Clear();
 
@@ -1169,7 +1198,17 @@ namespace Famille
             _index.IndexUpdated += OnIndexUpdated;
             _ = _index.StartAsync();
 
-            return true;
+            LoadFolderTree();
+            _globalSearchMode = false;
+            if (SearchBox != null) SearchBox.Text = string.Empty;
+            if (PlaceholderText != null) PlaceholderText.Visibility = Visibility.Visible;
+
+            if (showSuccessMessage)
+            {
+                MessageBox.Show(this,
+                    "Les dossiers sont enregistrés. Tu peux les modifier à tout moment dans l'onglet Paramètres.",
+                    "Chemins enregistrés", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
         }
 
         private void LoadSavedPaths()
@@ -1185,6 +1224,7 @@ namespace Famille
                         familiesFolder = cfg.FamiliesFolder;
                         imagesFolder = cfg.ImagesFolder;
                         rootFolderPath = familiesFolder;
+                        NotifyPropertyChanged(nameof(RootFolderName));
                     }
                 }
             }
@@ -1321,7 +1361,13 @@ namespace Famille
             UpdateTheme();
             SaveConfig_Click(s, e);
         }
+        private void ChangePaths_Click(object sender, RoutedEventArgs e)
+        {
+            if (!TrySelectFolders(out var selectedFamilies, out var selectedImages))
+                return;
 
+            ApplySelectedFolders(selectedFamilies, selectedImages, showSuccessMessage: true);
+        }
         private void DarkModeSwitch_Toggled(object sender, RoutedPropertyChangedEventArgs<bool> e) => UpdateTheme();
 
         private void ApplyColors_Click(object sender, RoutedEventArgs e) => UpdateTheme();

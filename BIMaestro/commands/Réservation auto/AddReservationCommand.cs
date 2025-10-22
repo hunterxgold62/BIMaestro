@@ -909,24 +909,41 @@ namespace Modification
         private XYZ ProjectPointOntoWallPlane(Wall wall, XYZ point)
         {
             if (wall == null || point == null)
-                return null;
-
-            if (!(wall.Location is LocationCurve wallLocCurve))
-                return null;
-
-            Curve wallCurve = wallLocCurve.Curve;
-            if (wallCurve == null)
-                return null;
+                return point;
 
             XYZ wallNormal = wall.Orientation;
             if (wallNormal == null || wallNormal.IsZeroLength())
-                return null;
+                return point;
 
-            XYZ planeOrigin = wallCurve.Evaluate(0.5, true);
-            XYZ normalized = wallNormal.Normalize();
-            double offset = normalized.DotProduct(point - planeOrigin);
+            wallNormal = wallNormal.Normalize();
 
-            return point - normalized * offset;
+            XYZ planeOrigin = null;
+
+            if (wall.Location is LocationCurve wallLocCurve)
+            {
+                Curve wallCurve = wallLocCurve.Curve;
+                if (wallCurve != null)
+                {
+                    planeOrigin = wallCurve.Evaluate(0.5, true);
+                }
+            }
+
+            if (planeOrigin == null)
+            {
+                BoundingBoxXYZ bbWall = wall.get_BoundingBox(null);
+                BoundingBoxXYZ worldBb = ToWorldBoundingBox(bbWall);
+                if (worldBb != null)
+                {
+                    planeOrigin = (worldBb.Min + worldBb.Max) * 0.5;
+                }
+            }
+
+            if (planeOrigin == null)
+                planeOrigin = point;
+
+            double offset = wallNormal.DotProduct(point - planeOrigin);
+
+            return point - wallNormal * offset;
         }
 
         private XYZ? TryGetIntersectionOnWallPlane(Wall wall, Element intersectingElement)

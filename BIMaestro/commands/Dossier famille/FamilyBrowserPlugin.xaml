@@ -680,6 +680,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
@@ -749,6 +750,12 @@
                         <Button Content="Appliquer" Click="ApplyColors_Click" Margin="0,0,10,0" Width="100"/>
                         <Button Content="Enregistrer" Click="SaveConfig_Click" Margin="0,0,10,0" Width="100"/>
                         <Button Content="Réinitialiser" Click="ResetConfig_Click" Width="100"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Grid.Row="10" Margin="0,0,0,10">
+                        <Button Content="Modifier les chemins…"
+                                Width="180"
+                                Click="ChangePaths_Click"/>
                     </StackPanel>
                 </Grid>
             </TabItem>

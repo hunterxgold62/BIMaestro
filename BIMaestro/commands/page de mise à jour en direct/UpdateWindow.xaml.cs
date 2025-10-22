@@ -10,6 +10,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Interop;
 
 namespace Page
 {
@@ -37,11 +38,33 @@ namespace Page
 
         private bool _externalOpenedOnce;
 
+        private const double ResizeBorderThickness = 10d;
+
+        private const int WmNcHitTest = 0x0084;
+        private const int HtLeft = 10;
+        private const int HtRight = 11;
+        private const int HtTop = 12;
+        private const int HtTopLeft = 13;
+        private const int HtTopRight = 14;
+        private const int HtBottom = 15;
+        private const int HtBottomLeft = 16;
+        private const int HtBottomRight = 17;
+
         public UpdateWindow()
         {
             InitializeComponent();
             SetCurrentVersionChip();     // v locale depuis AssemblyFileVersion
             _ = InitAsync();             // tente WebView2 + fallback auto
+        }
+
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+
+            if (PresentationSource.FromVisual(this) is HwndSource source)
+            {
+                source.AddHook(WindowProc);
+            }
         }
 
         // ======== VERSION LOCALE (AssemblyInfo.cs) ========
@@ -116,7 +139,79 @@ namespace Page
                 LatestText.Text = "MàJ dispo v" + _latest;
             }
         }
+        private IntPtr WindowProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (msg == WmNcHitTest)
+            {
+                Point screenPoint = GetMousePosition(lParam);
+                Point windowPoint = PointFromScreen(screenPoint);
 
+                double width = ActualWidth;
+                double height = ActualHeight;
+
+                bool onLeft = windowPoint.X >= 0 && windowPoint.X <= ResizeBorderThickness;
+                bool onRight = windowPoint.X <= width && windowPoint.X >= width - ResizeBorderThickness;
+                bool onTop = windowPoint.Y >= 0 && windowPoint.Y <= ResizeBorderThickness;
+                bool onBottom = windowPoint.Y <= height && windowPoint.Y >= height - ResizeBorderThickness;
+
+                if (onLeft && onTop)
+                {
+                    handled = true;
+                    return (IntPtr)HtTopLeft;
+                }
+
+                if (onRight && onTop)
+                {
+                    handled = true;
+                    return (IntPtr)HtTopRight;
+                }
+
+                if (onLeft && onBottom)
+                {
+                    handled = true;
+                    return (IntPtr)HtBottomLeft;
+                }
+
+                if (onRight && onBottom)
+                {
+                    handled = true;
+                    return (IntPtr)HtBottomRight;
+                }
+
+                if (onLeft)
+                {
+                    handled = true;
+                    return (IntPtr)HtLeft;
+                }
+
+                if (onRight)
+                {
+                    handled = true;
+                    return (IntPtr)HtRight;
+                }
+
+                if (onTop)
+                {
+                    handled = true;
+                    return (IntPtr)HtTop;
+                }
+
+                if (onBottom)
+                {
+                    handled = true;
+                    return (IntPtr)HtBottom;
+                }
+            }
+
+            return IntPtr.Zero;
+        }
+
+        private static Point GetMousePosition(IntPtr lParam)
+        {
+            int x = unchecked((short)((long)lParam & 0xFFFF));
+            int y = unchecked((short)(((long)lParam >> 16) & 0xFFFF));
+            return new Point(x, y);
+        }
         // ======== INIT WEBVIEW2 (compat .NET Framework) ========
         private async Task InitAsync()
         {
