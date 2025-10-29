@@ -39,6 +39,11 @@ namespace Modification
             BuiltInCategory.OST_PlumbingFixtures,
             BuiltInCategory.OST_SpecialityEquipment
         };
+        static readonly BuiltInCategory[] OBSTACLE_FALLBACK_CATEGORIES = OBSTACLE_CATEGORIES
+            .Where(c => c != BuiltInCategory.OST_Floors
+                     && c != BuiltInCategory.OST_Ceilings
+                     && c != BuiltInCategory.OST_Roofs)
+            .ToArray();
         private static bool _teePlacedThisRun = false;
         protected override string ButtonId => "ConnectPipesCommand";
 
@@ -851,7 +856,12 @@ namespace Modification
                 new XYZ(Math.Max(a.X,b.X)+inf, Math.Max(a.Y,b.Y)+inf, Math.Max(a.Z,b.Z)+inf));
         }
 
-        private static List<BoundingBoxXYZ> CollectObstacleAabbsInOutline(Document doc, Outline global, IEnumerable<ElementId> ignoreIds = null)
+        private static List<BoundingBoxXYZ> CollectObstacleAabbsInOutline(
+            Document doc,
+            Outline global,
+            IEnumerable<ElementId> ignoreIds = null,
+            BuiltInCategory[] categoriesOverride = null,
+            bool allowAutoDiscover = true)
         {
             var filter = new BoundingBoxIntersectsFilter(global);
             var collector = new FilteredElementCollector(doc)
