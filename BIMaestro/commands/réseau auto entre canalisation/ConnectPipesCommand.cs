@@ -850,6 +850,13 @@ namespace Modification
 
                 list.Add(clone);
             }
+
+            foreach (var cat in categories)
+                AppendCategory(cat);
+
+            if (list.Count == 0)
+                AppendCategory(BuiltInCategory.OST_Walls);
+
             return list;
         }
 
