@@ -110,87 +110,60 @@ namespace Modification
                 // ---- 4) Routes candidates ----
                 var routes = new List<RouteCandidate>();
 
-                void AppendRoutesForObstacles(List<BoundingBoxXYZ> obsRaw, List<BoundingBoxXYZ> obsSnap, string suffix)
+                var fastRoute = TryComputeAStarRoute(
+                    start,
+                    end,
+                    obstaclesRaw,
+                    obstaclesForSnap,
+                    gridFastMm,
+                    stepsFast,
+                    heuristicBias: 1.0,
+                    zStepMm,
+                    clearMm,
+                    clearFt,
+                    snapTolMm,
+                    jogTolMm,
+                    minSegMm,
+                    exemptMm);
+                if (fastRoute != null)
                 {
-                    if (obsRaw == null)
-                        obsRaw = new List<BoundingBoxXYZ>();
-                    if (obsSnap == null)
-                        obsSnap = obsRaw;
-
-                    string WithSuffix(string baseLabel) => string.IsNullOrEmpty(suffix) ? baseLabel : baseLabel + suffix;
-
-                    var fastRoute = TryComputeAStarRoute(
-                        start,
-                        end,
-                        obsRaw,
-                        obsSnap,
-                        gridFastMm,
-                        stepsFast,
-                        heuristicBias: 1.0,
-                        zStepMm,
-                        clearMm,
-                        clearFt,
-                        snapTolMm,
-                        jogTolMm,
-                        minSegMm,
-                        exemptMm);
-                    if (fastRoute != null)
-                    {
-                        fastRoute.Label = WithSuffix("Recherche rapide (A*)");
-                        routes.Add(fastRoute);
-                    }
-
-                    var fineRoute = TryComputeAStarRoute(
-                        start,
-                        end,
-                        obsRaw,
-                        obsSnap,
-                        gridFineMm,
-                        stepsFine,
-                        heuristicBias: 1.06,
-                        zStepMm,
-                        clearMm,
-                        clearFt,
-                        snapTolMm,
-                        jogTolMm,
-                        minSegMm,
-                        exemptMm);
-                    if (fineRoute != null)
-                    {
-                        fineRoute.Label = WithSuffix("Recherche fine (A*)");
-                        routes.Add(fineRoute);
-                    }
-
-                    var detours = BuildDetoursAroundBlockingWalls(start, end, obsRaw, clearMm, detourPadMm);
-                    foreach (var detour in detours)
-                    {
-                        var fixedPts = ForceEndpoints(detour.Points, start, end);
-                        var processed = PostProcess(fixedPts, obsRaw, obsSnap, clearMm, snapTolMm, jogTolMm, minSegMm);
-                        if (processed != null && processed.Count > 1 && IsPolylineClear(processed, obsRaw, clearFt))
-                        {
-                            routes.Add(new RouteCandidate
-                            {
-                                Label = WithSuffix(detour.Label),
-                                Points = processed
-                            });
-                        }
-                    }
+                    fastRoute.Label = "Recherche rapide (A*)";
+                    routes.Add(fastRoute);
                 }
 
-                AppendRoutesForObstacles(obstaclesRaw, obstaclesForSnap, suffix: null);
-
-                if (routes.Count == 0)
+                var fineRoute = TryComputeAStarRoute(
+                    start,
+                    end,
+                    obstaclesRaw,
+                    obstaclesForSnap,
+                    gridFineMm,
+                    stepsFine,
+                    heuristicBias: 1.06,
+                    zStepMm,
+                    clearMm,
+                    clearFt,
+                    snapTolMm,
+                    jogTolMm,
+                    minSegMm,
+                    exemptMm);
+                if (fineRoute != null)
                 {
-                    var fallbackRaw = CollectObstacleAabbsInOutline(
-                        doc,
-                        bboxGlobal,
-                        new[] { p1.Id, p2.Id },
-                        OBSTACLE_FALLBACK_CATEGORIES,
-                        allowAutoDiscover: false);
+                    fineRoute.Label = "Recherche fine (A*)";
+                    routes.Add(fineRoute);
+                }
 
-                    if (fallbackRaw.Count > 0)
+                var detours = BuildDetoursAroundBlockingWalls(start, end, obstaclesRaw, clearMm, detourPadMm);
+                foreach (var detour in detours)
+                {
+                    var fixedPts = ForceEndpoints(detour.Points, start, end);
+                    var processed = PostProcess(fixedPts, obstaclesRaw, obstaclesForSnap, clearMm, snapTolMm, jogTolMm, minSegMm);
+                    if (processed != null && processed.Count > 1 && IsPolylineClear(processed, obstaclesRaw, clearFt))
                     {
-                        AppendRoutesForObstacles(fallbackRaw, fallbackRaw, suffix: " – mode tolérant");
+                        routes.Add(new RouteCandidate
+                        {
+                            Label = detour.Label,
+                            Points = processed
+                        });
                     }
                 }
 
@@ -899,7 +872,7 @@ namespace Modification
             if (ignoreIds != null)
                 ignore = new HashSet<ElementId>(ignoreIds.Where(id => id != null && id != ElementId.InvalidElementId));
 
-            var allowedCategories = new HashSet<int>((categoriesOverride ?? OBSTACLE_CATEGORIES).Select(c => (int)c));
+            var allowedCategories = new HashSet<int>(OBSTACLE_CATEGORIES.Select(c => (int)c));
             var list = new List<BoundingBoxXYZ>();
 
             foreach (var element in collector)
@@ -907,7 +880,7 @@ namespace Modification
                 if (ignore != null && ignore.Contains(element.Id))
                     continue;
 
-                if (!IsPhysicalObstacle(element, allowedCategories, allowAutoDiscover))
+                if (!IsPhysicalObstacle(element, allowedCategories))
                     continue;
 
                 var bb = element.get_BoundingBox(null);
@@ -940,7 +913,7 @@ namespace Modification
                 .ToArray();
         }
 
-        private static bool IsPhysicalObstacle(Element element, HashSet<int> allowedCategories, bool allowAutoDiscover)
+        private static bool IsPhysicalObstacle(Element element, HashSet<int> allowedCategories)
         {
             if (element == null)
                 return false;
@@ -952,9 +925,6 @@ namespace Modification
             int catId = category.Id.IntegerValue;
             if (allowedCategories.Contains(catId))
                 return true;
-
-            if (!allowAutoDiscover)
-                return false;
 
             if (!HasSolidGeometry(element))
                 return false;
