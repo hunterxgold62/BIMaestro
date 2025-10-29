@@ -14,36 +14,6 @@ namespace Modification
     {
         // Marges XY (mm) pour l’exploration A*
         static readonly double[] XY_MARGINS_MM = { 1600, 3200, 5600 };
-        static readonly BuiltInCategory[] OBSTACLE_CATEGORIES = new[]
-        {
-            BuiltInCategory.OST_Walls,
-            BuiltInCategory.OST_Floors,
-            BuiltInCategory.OST_Ceilings,
-            BuiltInCategory.OST_Roofs,
-            BuiltInCategory.OST_Columns,
-            BuiltInCategory.OST_StructuralColumns,
-            BuiltInCategory.OST_StructuralFraming,
-            BuiltInCategory.OST_StructuralFoundation,
-            BuiltInCategory.OST_GenericModel,
-            BuiltInCategory.OST_MechanicalEquipment,
-            BuiltInCategory.OST_PipeCurves,
-            BuiltInCategory.OST_PipeFitting,
-            BuiltInCategory.OST_PipeAccessory,
-            BuiltInCategory.OST_DuctCurves,
-            BuiltInCategory.OST_DuctFitting,
-            BuiltInCategory.OST_DuctAccessory,
-            BuiltInCategory.OST_CableTray,
-            BuiltInCategory.OST_CableTrayFitting,
-            BuiltInCategory.OST_Conduit,
-            BuiltInCategory.OST_ConduitFitting,
-            BuiltInCategory.OST_PlumbingFixtures,
-            BuiltInCategory.OST_SpecialityEquipment
-        };
-        static readonly BuiltInCategory[] OBSTACLE_FALLBACK_CATEGORIES = OBSTACLE_CATEGORIES
-            .Where(c => c != BuiltInCategory.OST_Floors
-                     && c != BuiltInCategory.OST_Ceilings
-                     && c != BuiltInCategory.OST_Roofs)
-            .ToArray();
         private static bool _teePlacedThisRun = false;
         protected override string ButtonId => "ConnectPipesCommand";
 
@@ -52,7 +22,7 @@ namespace Modification
             var commandData = data;
             var uiapp = data.Application;
             var uidoc = uiapp.ActiveUIDocument;
-            var doc   = uidoc.Document;
+            var doc = uidoc.Document;
             _teePlacedThisRun = false;
 
             try
@@ -70,17 +40,16 @@ namespace Modification
                 var ref2 = PipeRefInfo.FromPipe(doc, p2);
                 double dnMm = FtToMm(ref1.Diameter);
 
-                double clearMm     = Math.Max(25, dnMm * 0.5 + Clamp(dnMm * 0.05, 15, 50));
-                double snapTolMm   = Clamp(dnMm * 0.06, 20, 60);
-                double minSegMm    = Math.Max(120, dnMm * 1.5);
-                double jogTolMm    = Math.Max(80,  dnMm * 0.8);
-                double detourPadMm = Math.Max(80,  dnMm * 0.25);
-                double exemptMm    = Math.Max(250, dnMm * 1.0);
-                double gridFastMm  = Clamp(dnMm * 0.9,  250, 450);
-                double gridFineMm  = Clamp(dnMm * 0.65, 180, 320);
-                double zStepMm     = Clamp(dnMm * 0.75, 200, 400);
-                double corridorMm  = Math.Max(2500, dnMm * 6);
-                double clearFt     = MmToFt(clearMm);
+                double clearMm = Math.Max(25, dnMm * 0.5 + Clamp(dnMm * 0.05, 15, 50));
+                double snapTolMm = Clamp(dnMm * 0.06, 20, 60);
+                double minSegMm = Math.Max(120, dnMm * 1.5);
+                double jogTolMm = Math.Max(80, dnMm * 0.8);
+                double detourPadMm = Math.Max(80, dnMm * 0.25);
+                double exemptMm = Math.Max(250, dnMm * 1.0);
+                double gridFastMm = Clamp(dnMm * 0.9, 250, 450);
+                double gridFineMm = Clamp(dnMm * 0.65, 180, 320);
+                double zStepMm = Clamp(dnMm * 0.75, 200, 400);
+                double corridorMm = Math.Max(2500, dnMm * 6);
 
                 // ---- 2) Ancrages (Té si tronc sinon connecteur) ----
                 var c1 = GetBestConnector(p1, GetPipeCenter(p2));
@@ -93,78 +62,51 @@ namespace Modification
 
                 bool startIsTee, endIsTee; XYZ startFoot, endFoot; Connector _;
                 var start = GetRoutingAnchor(doc, p1, c2.Origin, ref1.Diameter, out startIsTee, out startFoot, out _);
-                var end   = GetRoutingAnchor(doc, p2, c1.Origin, ref2.Diameter, out endIsTee,   out endFoot,   out _);
+                var end = GetRoutingAnchor(doc, p2, c1.Origin, ref2.Diameter, out endIsTee, out endFoot, out _);
 
-                var anchorStart = (pipe:p1, isTee:startIsTee, foot:startFoot, conn:c1);
-                var anchorEnd   = (pipe:p2, isTee:endIsTee,   foot:endFoot,   conn:c2);
+                var anchorStart = (pipe: p1, isTee: startIsTee, foot: startFoot, conn: c1);
+                var anchorEnd = (pipe: p2, isTee: endIsTee, foot: endFoot, conn: c2);
 
                 // ---- 3) Obstacles ----
                 double expandGlobalMm = Math.Max(1600, XY_MARGINS_MM.Max() + corridorMm + 3000);
                 var bboxGlobal = MakeOutline(start, end, expandGlobalMm);
-                var obstaclesRaw = CollectObstacleAabbsInOutline(doc, bboxGlobal, new[] { p1.Id, p2.Id });
-                var obstaclesForSnap = obstaclesRaw;
-
-                var stepsFast = ComputeMarginSteps(gridFastMm);
-                var stepsFine = ComputeMarginSteps(gridFineMm);
+                var wallsRaw = CollectWallAabbsInOutline(doc, bboxGlobal);
 
                 // ---- 4) Routes candidates ----
-                var routes = new List<RouteCandidate>();
-
-                var fastRoute = TryComputeAStarRoute(
-                    start,
-                    end,
-                    obstaclesRaw,
-                    obstaclesForSnap,
-                    gridFastMm,
-                    stepsFast,
-                    heuristicBias: 1.0,
-                    zStepMm,
-                    clearMm,
-                    clearFt,
-                    snapTolMm,
-                    jogTolMm,
-                    minSegMm,
-                    exemptMm);
-                if (fastRoute != null)
+                var routes = new List<RouteCandidate>
                 {
-                    fastRoute.Label = "Recherche rapide (A*)";
-                    routes.Add(fastRoute);
+                    new RouteCandidate { Label = "Route rapide (X→Y→Z)", Points = ForceEndpoints(BuildOrthogonalRoute(start,end,true ).Points, start, end) },
+                    new RouteCandidate { Label = "Route rapide (Y→X→Z)", Points = ForceEndpoints(BuildOrthogonalRoute(start,end,false).Points, start, end) }
+                };
+
+                int[] stepsFast = XYMarginsToSteps(gridFastMm);
+                int[] stepsFine = XYMarginsToSteps(gridFineMm);
+
+                var aFast = AStarMulti(start, end, wallsRaw, gridFastMm, zStepMm, clearMm, exemptMm, stepsFast, 1.0);
+                if (aFast != null)
+                {
+                    aFast.Points = PostProcess(aFast.Points, wallsRaw, clearMm, snapTolMm, jogTolMm, minSegMm);
+                    aFast.Points = ForceEndpoints(aFast.Points, start, end);
+                    routes.Add(aFast);
                 }
 
-                var fineRoute = TryComputeAStarRoute(
-                    start,
-                    end,
-                    obstaclesRaw,
-                    obstaclesForSnap,
-                    gridFineMm,
-                    stepsFine,
-                    heuristicBias: 1.06,
-                    zStepMm,
-                    clearMm,
-                    clearFt,
-                    snapTolMm,
-                    jogTolMm,
-                    minSegMm,
-                    exemptMm);
-                if (fineRoute != null)
+                var aFine = AStarMulti(start, end, wallsRaw, gridFineMm, zStepMm, clearMm, exemptMm, stepsFine, 1.06);
+                if (aFine != null)
                 {
-                    fineRoute.Label = "Recherche fine (A*)";
-                    routes.Add(fineRoute);
+                    aFine.Points = PostProcess(aFine.Points, wallsRaw, clearMm, snapTolMm, jogTolMm, minSegMm);
+                    aFine.Points = ForceEndpoints(aFine.Points, start, end);
+                    routes.Add(aFine);
                 }
 
-                var detours = BuildDetoursAroundBlockingWalls(start, end, obstaclesRaw, clearMm, detourPadMm);
-                foreach (var detour in detours)
+                var detours = BuildDetoursAroundBlockingWalls(start, end, wallsRaw, clearMm, detourPadMm);
+                foreach (var d in detours)
                 {
-                    var fixedPts = ForceEndpoints(detour.Points, start, end);
-                    var processed = PostProcess(fixedPts, obstaclesRaw, obstaclesForSnap, clearMm, snapTolMm, jogTolMm, minSegMm);
-                    if (processed != null && processed.Count > 1 && IsPolylineClear(processed, obstaclesRaw, clearFt))
+                    var fixedPts = ForceEndpoints(d.Points, start, end);
+                    routes.Add(new RouteCandidate
                     {
-                        routes.Add(new RouteCandidate
-                        {
-                            Label = detour.Label,
-                            Points = processed
-                        });
-                    }
+                        Label = "Contournement direct",
+                        Points = PostProcess(fixedPts, wallsRaw, clearMm, snapTolMm, jogTolMm, minSegMm)
+                    });
                 }
 
                 if (routes.Count == 0)
@@ -174,7 +116,7 @@ namespace Modification
                 }
 
                 // ---- 5) Aperçu & choix ----
-                var colors   = new[] { new Color(255,0,0), new Color(0,180,0), new Color(0,110,255), new Color(255,180,0) };
+                var colors = new[] { new Color(255, 0, 0), new Color(0, 180, 0), new Color(0, 110, 255), new Color(255, 180, 0) };
                 var previews = new List<List<ElementId>>();
                 using (var tPrev = new Transaction(doc, "Aperçu itinéraires"))
                 {
@@ -188,7 +130,7 @@ namespace Modification
                 if (chosen < 0)
                 {
                     using (var tDel = new Transaction(doc, "Nettoyage aperçu"))
-                    { tDel.Start(); foreach (var set in previews) if (set.Count>0) doc.Delete(set); tDel.Commit(); }
+                    { tDel.Start(); foreach (var set in previews) if (set.Count > 0) doc.Delete(set); tDel.Commit(); }
                     return Result.Cancelled;
                 }
                 var route = routes[chosen];
@@ -198,7 +140,7 @@ namespace Modification
                 {
                     t.Start();
 
-                    foreach (var set in previews) if (set.Count>0) doc.Delete(set);
+                    foreach (var set in previews) if (set.Count > 0) doc.Delete(set);
 
                     var pts = new List<XYZ>(route.Points);
                     pts[0] = start; pts[pts.Count - 1] = end;
@@ -212,7 +154,7 @@ namespace Modification
 
                     // --- Un seul côté pose un Té s’il y a un fût ---
                     bool startWantsTee = anchorStart.isTee;
-                    bool endWantsTee   = anchorEnd.isTee;
+                    bool endWantsTee = anchorEnd.isTee;
 
                     if (startWantsTee && !endWantsTee)
                     {
@@ -225,16 +167,16 @@ namespace Modification
                     {
                         TryElbowTransitionOrLink(doc, created.FirstOrDefault(), start, anchorStart.pipe, anchorStart.conn,
                                                  PipeRefInfo.FromPipe(doc, created.FirstOrDefault() ?? p1));
-                        FinishAtAnchor(doc, created.LastOrDefault(),  end,   anchorEnd,
-                                       PipeRefInfo.FromPipe(doc, created.LastOrDefault()  ?? p2));
+                        FinishAtAnchor(doc, created.LastOrDefault(), end, anchorEnd,
+                                       PipeRefInfo.FromPipe(doc, created.LastOrDefault() ?? p2));
                     }
                     else
                     {
                         // cas normal : aucun fût → 2 liaisons ; cas rare : 2 fûts → Té côté 'end'
                         TryElbowTransitionOrLink(doc, created.FirstOrDefault(), start, anchorStart.pipe, anchorStart.conn,
                                                  PipeRefInfo.FromPipe(doc, created.FirstOrDefault() ?? p1));
-                        FinishAtAnchor(doc, created.LastOrDefault(),  end,   anchorEnd,
-                                       PipeRefInfo.FromPipe(doc, created.LastOrDefault()  ?? p2));
+                        FinishAtAnchor(doc, created.LastOrDefault(), end, anchorEnd,
+                                       PipeRefInfo.FromPipe(doc, created.LastOrDefault() ?? p2));
                     }
 
                     t.Commit();
@@ -327,7 +269,7 @@ namespace Modification
             {
                 var lc0 = main.Location as LocationCurve;
                 if (lc0?.Curve == null) return false;
-                foot  = lc0.Curve.Evaluate(0.5, true);
+                foot = lc0.Curve.Evaluate(0.5, true);
                 partId = PlumbingUtils.BreakCurve(doc, main.Id, foot);
             }
             if (partId == ElementId.InvalidElementId) return false;
@@ -578,7 +520,7 @@ namespace Modification
             double dnMain = mainInfo.Diameter;
 
             XYZ dirMain = GetCurveDirection(mainA ?? mainB);
-            XYZ tgtDir  = (branchHintDir != null && branchHintDir.GetLength() > 1e-9)
+            XYZ tgtDir = (branchHintDir != null && branchHintDir.GetLength() > 1e-9)
                             ? branchHintDir
                             : (branchEnd != null ? (branchEnd.Origin - foot) : GetCurveDirection(branchPipe));
 
@@ -601,8 +543,8 @@ namespace Modification
 
             var cMainA = GetEndConnectorClosestToPoint(mainA, foot);
             var cMainB = GetEndConnectorClosestToPoint(mainB, foot);
-            var cNear  = GetEndConnectorClosestToPoint(stub, foot);
-            var cFar   = GetEndConnectorClosestToPoint(stub, stubEnd);
+            var cNear = GetEndConnectorClosestToPoint(stub, foot);
+            var cFar = GetEndConnectorClosestToPoint(stub, stubEnd);
 
             try { doc.Create.NewTeeFitting(cMainA, cMainB, cNear); }
             catch { return false; }
@@ -686,7 +628,7 @@ namespace Modification
             var c2 = GetEndConnectorClosestToPoint(link, fromBranch.Origin + dir * L);
 
             try { doc.Create.NewElbowFitting(fromBranch, c1); } catch { try { fromBranch.ConnectTo(c1); } catch { } }
-            try { doc.Create.NewElbowFitting(c2, toStub); }    catch { try { c2.ConnectTo(toStub); } catch { } }
+            try { doc.Create.NewElbowFitting(c2, toStub); } catch { try { c2.ConnectTo(toStub); } catch { } }
         }
 
         private static void BackOffPipeEnd(Pipe p, XYZ toward, double backOffFt)
@@ -697,15 +639,15 @@ namespace Modification
             var b = lc.Curve.GetEndPoint(1);
             bool endIsB = b.DistanceTo(toward) <= a.DistanceTo(toward);
             var from = endIsB ? a : b;
-            var to   = endIsB ? b : a;
-            var dir  = (to - from);
+            var to = endIsB ? b : a;
+            var dir = (to - from);
             double len = dir.GetLength();
             if (len < 1e-9 || backOffFt <= 0 || backOffFt >= len * 0.5) return;
             dir = dir / len;
 
             var newEnd = from + dir * (len - backOffFt);
             if (endIsB) lc.Curve = Line.CreateBound(a, newEnd);
-            else        lc.Curve = Line.CreateBound(newEnd, b);
+            else lc.Curve = Line.CreateBound(newEnd, b);
         }
 
         private static XYZ SafeAxisZ(Connector c)
@@ -815,8 +757,8 @@ namespace Modification
                 var info = new PipeRefInfo
                 {
                     PipeTypeId = p.GetTypeId(),
-                    LevelId    = p.ReferenceLevel?.Id ?? FindNearestLevelId(doc, (p.Location as LocationCurve)?.Curve?.GetEndPoint(0) ?? XYZ.Zero),
-                    Diameter   = p.get_Parameter(BuiltInParameter.RBS_PIPE_DIAMETER_PARAM)?.AsDouble() ?? 0.05,
+                    LevelId = p.ReferenceLevel?.Id ?? FindNearestLevelId(doc, (p.Location as LocationCurve)?.Curve?.GetEndPoint(0) ?? XYZ.Zero),
+                    Diameter = p.get_Parameter(BuiltInParameter.RBS_PIPE_DIAMETER_PARAM)?.AsDouble() ?? 0.05,
                     SystemTypeId = p.MEPSystem?.GetTypeId()
                         ?? new FilteredElementCollector(doc).OfClass(typeof(PipingSystemType)).FirstElementId()
                 };
@@ -852,293 +794,114 @@ namespace Modification
         {
             double inf = MmToFt(inflateMm);
             return new Outline(
-                new XYZ(Math.Min(a.X,b.X)-inf, Math.Min(a.Y,b.Y)-inf, Math.Min(a.Z,b.Z)-inf),
-                new XYZ(Math.Max(a.X,b.X)+inf, Math.Max(a.Y,b.Y)+inf, Math.Max(a.Z,b.Z)+inf));
+                new XYZ(Math.Min(a.X, b.X) - inf, Math.Min(a.Y, b.Y) - inf, Math.Min(a.Z, b.Z) - inf),
+                new XYZ(Math.Max(a.X, b.X) + inf, Math.Max(a.Y, b.Y) + inf, Math.Max(a.Z, b.Z) + inf));
         }
 
-        private static List<BoundingBoxXYZ> CollectObstacleAabbsInOutline(
-            Document doc,
-            Outline global,
-            IEnumerable<ElementId> ignoreIds = null,
-            BuiltInCategory[] categoriesOverride = null,
-            bool allowAutoDiscover = true)
+        private static List<BoundingBoxXYZ> CollectWallAabbsInOutline(Document doc, Outline global)
         {
             var filter = new BoundingBoxIntersectsFilter(global);
-            var collector = new FilteredElementCollector(doc)
+            var walls = new FilteredElementCollector(doc)
+                .OfCategory(BuiltInCategory.OST_Walls)
                 .WherePasses(filter)
                 .WhereElementIsNotElementType();
 
-            HashSet<ElementId> ignore = null;
-            if (ignoreIds != null)
-                ignore = new HashSet<ElementId>(ignoreIds.Where(id => id != null && id != ElementId.InvalidElementId));
-
-            var allowedCategories = new HashSet<int>(OBSTACLE_CATEGORIES.Select(c => (int)c));
             var list = new List<BoundingBoxXYZ>();
-
-            foreach (var element in collector)
+            foreach (var w in walls)
             {
-                if (ignore != null && ignore.Contains(element.Id))
-                    continue;
-
-                if (!IsPhysicalObstacle(element, allowedCategories))
-                    continue;
-
-                var bb = element.get_BoundingBox(null);
-                if (bb == null)
-                    continue;
-
-                // Copie défensive + léger tampon pour éviter les collisions tangentes
-                double pad = MmToFt(10);
-                var clone = new BoundingBoxXYZ
+                var bb = w.get_BoundingBox(null);
+                if (bb == null) continue;
+                list.Add(new BoundingBoxXYZ
                 {
-                    Min = new XYZ(bb.Min.X - pad, bb.Min.Y - pad, bb.Min.Z - pad),
-                    Max = new XYZ(bb.Max.X + pad, bb.Max.Y + pad, bb.Max.Z + pad)
-                };
-
-                list.Add(clone);
+                    Min = new XYZ(bb.Min.X, bb.Min.Y, bb.Min.Z),
+                    Max = new XYZ(bb.Max.X, bb.Max.Y, bb.Max.Z)
+                });
             }
-
             return list;
         }
 
-        private static int[] ComputeMarginSteps(double gridStepMm)
-        {
-            if (gridStepMm <= 0)
-                return new[] { 1 };
-
-            return XY_MARGINS_MM
-                .Select(mm => Math.Max(1, (int)Math.Round(mm / gridStepMm)))
-                .Distinct()
-                .OrderBy(v => v)
-                .ToArray();
-        }
-
-        private static bool IsPhysicalObstacle(Element element, HashSet<int> allowedCategories)
-        {
-            if (element == null)
-                return false;
-
-            var category = element.Category;
-            if (category == null || category.CategoryType != CategoryType.Model)
-                return false;
-
-            int catId = category.Id.IntegerValue;
-            if (allowedCategories.Contains(catId))
-                return true;
-
-            if (!HasSolidGeometry(element))
-                return false;
-
-            allowedCategories.Add(catId);
-            return true;
-        }
-
-        private static bool HasSolidGeometry(Element element)
-        {
-            try
-            {
-                var options = new Options
-                {
-                    ComputeReferences = false,
-                    IncludeNonVisibleObjects = false,
-                    DetailLevel = ViewDetailLevel.Fine
-                };
-
-                var geom = element.get_Geometry(options);
-                if (geom == null)
-                    return false;
-
-                foreach (var obj in geom)
-                {
-                    if (obj is Solid solid && solid.Volume > 1e-6)
-                        return true;
-
-                    if (obj is GeometryInstance inst)
-                    {
-                        var instGeom = inst.GetInstanceGeometry();
-                        if (instGeom == null)
-                            continue;
-
-                        foreach (var instObj in instGeom)
-                            if (instObj is Solid instSolid && instSolid.Volume > 1e-6)
-                                return true;
-                    }
-                }
-            }
-            catch
-            {
-                // En cas de géométrie inaccessible on considère que l'élément n'est pas bloquant
-            }
-
-            return false;
-        }
-
-        private static RouteCandidate TryComputeAStarRoute(
-            XYZ start,
-            XYZ end,
-            List<BoundingBoxXYZ> obstaclesRaw,
-            List<BoundingBoxXYZ> obstaclesForSnap,
-            double gridStepMm,
-            int[] xySteps,
-            double heuristicBias,
-            double zStepMm,
-            double clearMm,
-            double clearFt,
-            double snapTolMm,
-            double jogTolMm,
-            double minSegMm,
-            double exemptMm)
-        {
-            var primary = ProcessAStarCandidate(
-                AStarMulti(start, end, obstaclesRaw, gridStepMm, zStepMm, clearMm, exemptMm, xySteps, heuristicBias),
-                start,
-                end,
-                obstaclesRaw,
-                obstaclesForSnap,
-                clearMm,
-                clearFt,
-                snapTolMm,
-                jogTolMm,
-                minSegMm);
-            if (primary != null)
-                return primary;
-
-            if (!ReferenceEquals(obstaclesForSnap, obstaclesRaw) &&
-                obstaclesForSnap != null &&
-                obstaclesForSnap.Count > 0)
-            {
-                return ProcessAStarCandidate(
-                    AStarMulti(start, end, obstaclesForSnap, gridStepMm, zStepMm, clearMm, exemptMm, xySteps, heuristicBias),
-                    start,
-                    end,
-                    obstaclesRaw,
-                    obstaclesForSnap,
-                    clearMm,
-                    clearFt,
-                    snapTolMm,
-                    jogTolMm,
-                    minSegMm);
-            }
-
-            return null;
-        }
-
-        private static RouteCandidate ProcessAStarCandidate(
-            RouteCandidate candidate,
-            XYZ start,
-            XYZ end,
-            List<BoundingBoxXYZ> obstaclesRaw,
-            List<BoundingBoxXYZ> obstaclesForSnap,
-            double clearMm,
-            double clearFt,
-            double snapTolMm,
-            double jogTolMm,
-            double minSegMm)
-        {
-            if (candidate == null)
-                return null;
-
-            var processed = PostProcess(
-                candidate.Points,
-                obstaclesRaw,
-                obstaclesForSnap,
-                clearMm,
-                snapTolMm,
-                jogTolMm,
-                minSegMm);
-            if (processed == null || processed.Count == 0)
-                return null;
-
-            processed = ForceEndpoints(processed, start, end);
-            if (!IsPolylineClear(processed, obstaclesRaw, clearFt))
-                return null;
-
-            candidate.Points = processed;
-            return candidate;
-        }
-
-        private class Node { public XYZ P; public double G; public double F; public Node(XYZ p,double g,double f){P=p;G=g;F=f;} }
+        private class Node { public XYZ P; public double G; public double F; public Node(XYZ p, double g, double f) { P = p; G = g; F = f; } }
         private class XyzEq : IEqualityComparer<XYZ>
         {
-            const double Eps=1e-06; public bool Equals(XYZ a, XYZ b)=>a!=null&&b!=null&&a.DistanceTo(b)<=Eps;
-            public int GetHashCode(XYZ p){ long qx=(long)Math.Round(p.X*1e6), qy=(long)Math.Round(p.Y*1e6), qz=(long)Math.Round(p.Z*1e6); unchecked{ return (int)(qx ^ (qy<<1) ^ (qz<<2)); } }
+            const double Eps = 1e-06; public bool Equals(XYZ a, XYZ b) => a != null && b != null && a.DistanceTo(b) <= Eps;
+            public int GetHashCode(XYZ p) { long qx = (long)Math.Round(p.X * 1e6), qy = (long)Math.Round(p.Y * 1e6), qz = (long)Math.Round(p.Z * 1e6); unchecked { return (int)(qx ^ (qy << 1) ^ (qz << 2)); } }
         }
 
         private static RouteCandidate AStarMulti(
-            XYZ start, XYZ end, List<BoundingBoxXYZ> obstaclesRaw,
+            XYZ start, XYZ end, List<BoundingBoxXYZ> wallsRaw,
             double gridStepMm, double zStepMm, double clearMm, double exRadMm,
             int[] xyMarginSteps, double heuristicBias)
         {
             foreach (int m in xyMarginSteps)
             {
-                var r = AStarTry(start, end, obstaclesRaw, gridStepMm, zStepMm, clearMm, exRadMm, heuristicBias, m);
+                var r = AStarTry(start, end, wallsRaw, gridStepMm, zStepMm, clearMm, exRadMm, heuristicBias, m);
                 if (r != null) return r;
             }
             return null;
         }
 
         private static RouteCandidate AStarTry(
-            XYZ start, XYZ end, List<BoundingBoxXYZ> obstaclesRaw,
+            XYZ start, XYZ end, List<BoundingBoxXYZ> wallsRaw,
             double gridStepMm, double zStepMm, double clearMm, double exRadMm, double heuristicBias, int xyMarginSteps)
         {
-            double step  = MmToFt(gridStepMm);
+            double step = MmToFt(gridStepMm);
             double zStep = MmToFt(zStepMm);
             double clear = MmToFt(clearMm);
             double exRad = MmToFt(exRadMm);
 
-            double minZ = Math.Min(start.Z, end.Z) - 2*zStep - clear;
-            double maxZ = Math.Max(start.Z, end.Z) + 2*zStep + clear;
+            double minZ = Math.Min(start.Z, end.Z) - 2 * zStep - clear;
+            double maxZ = Math.Max(start.Z, end.Z) + 2 * zStep + clear;
 
-            var min = new XYZ(Math.Min(start.X,end.X)-xyMarginSteps*step, Math.Min(start.Y,end.Y)-xyMarginSteps*step, minZ);
-            var max = new XYZ(Math.Max(start.X,end.X)+xyMarginSteps*step, Math.Max(start.Y,end.Y)+xyMarginSteps*step, maxZ);
+            var min = new XYZ(Math.Min(start.X, end.X) - xyMarginSteps * step, Math.Min(start.Y, end.Y) - xyMarginSteps * step, minZ);
+            var max = new XYZ(Math.Max(start.X, end.X) + xyMarginSteps * step, Math.Max(start.Y, end.Y) + xyMarginSteps * step, maxZ);
 
-            var searchObs = FilterAabbsToRange(obstaclesRaw, min, max, clear);
+            var searchObs = FilterAabbsToRange(wallsRaw, min, max, clear);
 
             XYZ Snap(XYZ p) => new XYZ(
-                Math.Round((p.X - min.X)/step)*step + min.X,
-                Math.Round((p.Y - min.Y)/step)*step + min.Y,
-                Math.Round((p.Z - min.Z)/zStep)*zStep + min.Z);
+                Math.Round((p.X - min.X) / step) * step + min.X,
+                Math.Round((p.Y - min.Y) / step) * step + min.Y,
+                Math.Round((p.Z - min.Z) / zStep) * zStep + min.Z);
 
             var s = Snap(start); var g = Snap(end);
 
-            var open = new List<Node> { new Node(s,0,s.DistanceTo(g)) };
-            var came = new Dictionary<XYZ,XYZ>(new XyzEq());
-            var gsc  = new Dictionary<XYZ,double>(new XyzEq()) { { s, 0 } };
-            var moves = new[] { new XYZ(step,0,0), new XYZ(-step,0,0), new XYZ(0,step,0), new XYZ(0,-step,0), new XYZ(0,0,zStep), new XYZ(0,0,-zStep) };
-            var eq = new XyzEq(); int it=0, itMax=70000;
+            var open = new List<Node> { new Node(s, 0, s.DistanceTo(g)) };
+            var came = new Dictionary<XYZ, XYZ>(new XyzEq());
+            var gsc = new Dictionary<XYZ, double>(new XyzEq()) { { s, 0 } };
+            var moves = new[] { new XYZ(step, 0, 0), new XYZ(-step, 0, 0), new XYZ(0, step, 0), new XYZ(0, -step, 0), new XYZ(0, 0, zStep), new XYZ(0, 0, -zStep) };
+            var eq = new XyzEq(); int it = 0, itMax = 70000;
 
             while (open.Count > 0 && it++ < itMax)
             {
-                open.Sort((a,b)=>a.F.CompareTo(b.F));
+                open.Sort((a, b) => a.F.CompareTo(b.F));
                 var cur = open[0]; open.RemoveAt(0);
 
                 if (eq.Equals(cur.P, g))
                 {
                     var path = Reconstruct(came, cur.P); path.Insert(0, s);
-                    path[0]=start; path[path.Count-1]=end; CleanupCollinear(path);
-                    return new RouteCandidate{ Label="Route évite-objets (A*)", Points=path };
+                    path[0] = start; path[path.Count - 1] = end; CleanupCollinear(path);
+                    return new RouteCandidate { Label = "Route évite-objets (A*)", Points = path };
                 }
 
                 foreach (var d in moves)
                 {
                     var np = cur.P + d;
-                    if (np.X<min.X || np.X>max.X || np.Y<min.Y || np.Y>max.Y || np.Z<min.Z || np.Z>max.Z) continue;
+                    if (np.X < min.X || np.X > max.X || np.Y < min.Y || np.Y > max.Y || np.Z < min.Z || np.Z > max.Z) continue;
 
-                    bool exempt = (np.DistanceTo(start)<=exRad) || (np.DistanceTo(end)<=exRad);
+                    bool exempt = (np.DistanceTo(start) <= exRad) || (np.DistanceTo(end) <= exRad);
                     if (!exempt && !IsFree(np, searchObs, clear)) continue;
 
                     double gTent = gsc[cur.P] + d.GetLength();
                     if (!gsc.TryGetValue(np, out double prev) || gTent < prev)
                     {
                         came[np] = cur.P; gsc[np] = gTent;
-                        double f = gTent + heuristicBias*np.DistanceTo(g);
+                        double f = gTent + heuristicBias * np.DistanceTo(g);
                         open.Add(new Node(np, gTent, f));
                     }
                 }
             }
             return null;
 
-            static List<XYZ> Reconstruct(Dictionary<XYZ,XYZ> came, XYZ cur)
+            static List<XYZ> Reconstruct(Dictionary<XYZ, XYZ> came, XYZ cur)
             {
                 var list = new List<XYZ> { cur };
                 while (came.TryGetValue(cur, out var prev)) { list.Add(prev); cur = prev; }
@@ -1173,21 +936,21 @@ namespace Modification
         {
             var pts = new List<XYZ> { start }; XYZ p = start;
             if (preferXY) { p = new XYZ(end.X, p.Y, p.Z); pts.Add(p); p = new XYZ(p.X, end.Y, p.Z); pts.Add(p); }
-            else          { p = new XYZ(p.X, end.Y, p.Z); pts.Add(p); p = new XYZ(end.X, p.Y, p.Z); pts.Add(p); }
+            else { p = new XYZ(p.X, end.Y, p.Z); pts.Add(p); p = new XYZ(end.X, p.Y, p.Z); pts.Add(p); }
             p = new XYZ(p.X, p.Y, end.Z); pts.Add(p);
             CleanupCollinear(pts);
             return new RouteCandidate { Label = preferXY ? "Route rapide (X→Y→Z)" : "Route rapide (Y→X→Z)", Points = pts };
         }
 
-        private static List<RouteCandidate> BuildDetoursAroundBlockingWalls(XYZ start, XYZ end, List<BoundingBoxXYZ> obstaclesRaw, double clearMm, double padMm)
+        private static List<RouteCandidate> BuildDetoursAroundBlockingWalls(XYZ start, XYZ end, List<BoundingBoxXYZ> wallsRaw, double clearMm, double padMm)
         {
             var list = new List<RouteCandidate>();
-            if (obstaclesRaw == null || obstaclesRaw.Count == 0) return list;
+            if (wallsRaw == null || wallsRaw.Count == 0) return list;
 
             double clear = MmToFt(clearMm);
 
             var blockers = new List<BoundingBoxXYZ>();
-            foreach (var w in obstaclesRaw)
+            foreach (var w in wallsRaw)
             {
                 var min = new XYZ(w.Min.X - clear, w.Min.Y - clear, w.Min.Z);
                 var max = new XYZ(w.Max.X + clear, w.Max.Y + clear, w.Max.Z);
@@ -1200,23 +963,26 @@ namespace Modification
 
             double yBelow = union.Min.Y - clear - pad;
             double yAbove = union.Max.Y + clear + pad;
-            var optBelow  = new List<XYZ> { start, new XYZ(start.X, yBelow, start.Z), new XYZ(end.X, yBelow, end.Z), end };
-            var optAbove  = new List<XYZ> { start, new XYZ(start.X, yAbove, start.Z), new XYZ(end.X, yAbove, end.Z), end };
+            var optBelow = new List<XYZ> { start, new XYZ(start.X, yBelow, start.Z), new XYZ(end.X, yBelow, end.Z), end };
+            var optAbove = new List<XYZ> { start, new XYZ(start.X, yAbove, start.Z), new XYZ(end.X, yAbove, end.Z), end };
 
-            double xLeft  = union.Min.X - clear - pad;
+            double xLeft = union.Min.X - clear - pad;
             double xRight = union.Max.X + clear + pad;
-            var optLeft   = new List<XYZ> { start, new XYZ(xLeft, start.Y, start.Z), new XYZ(xLeft, end.Y, end.Z), end };
-            var optRight  = new List<XYZ> { start, new XYZ(xRight, start.Y, start.Z), new XYZ(xRight, end.Y, end.Z), end };
+            var optLeft = new List<XYZ> { start, new XYZ(xLeft, start.Y, start.Z), new XYZ(xLeft, end.Y, end.Z), end };
+            var optRight = new List<XYZ> { start, new XYZ(xRight, start.Y, start.Z), new XYZ(xRight, end.Y, end.Z), end };
 
-            void add(List<XYZ> opt){ CleanupDuplicates(opt); CleanupCollinear(opt); if (IsPolylineClear(opt, obstaclesRaw, MmToFt(clearMm))) list.Add(new RouteCandidate{ Label="Contournement direct", Points=opt}); }
+            void add(List<XYZ> opt) { CleanupDuplicates(opt); CleanupCollinear(opt); if (IsPolylineClear(opt, wallsRaw, MmToFt(clearMm))) list.Add(new RouteCandidate { Label = "Contournement direct", Points = opt }); }
             add(optBelow); add(optAbove); add(optLeft); add(optRight);
             return list;
         }
 
         private static BoundingBoxXYZ UnionAabbs(List<BoundingBoxXYZ> boxes)
         {
-            var u = new BoundingBoxXYZ { Min = new XYZ(double.MaxValue, double.MaxValue, double.MaxValue),
-                                         Max = new XYZ(double.MinValue, double.MinValue, double.MinValue) };
+            var u = new BoundingBoxXYZ
+            {
+                Min = new XYZ(double.MaxValue, double.MaxValue, double.MaxValue),
+                Max = new XYZ(double.MinValue, double.MinValue, double.MinValue)
+            };
             foreach (var b in boxes)
             {
                 u.Min = new XYZ(Math.Min(u.Min.X, b.Min.X), Math.Min(u.Min.Y, b.Min.Y), Math.Min(u.Min.Z, b.Min.Z));
@@ -1227,23 +993,16 @@ namespace Modification
 
         // ======================== LISSAGE / SNAP / CLEAR ========================
 
-        private static List<XYZ> PostProcess(
-            List<XYZ> pts,
-            List<BoundingBoxXYZ> obstaclesRaw,
-            List<BoundingBoxXYZ> obstaclesForSnap,
-            double clearMm,
-            double snapTolMm,
-            double jogTolMm,
-            double minSegMm)
+        private static List<XYZ> PostProcess(List<XYZ> pts, List<BoundingBoxXYZ> wallsRaw, double clearMm, double snapTolMm, double jogTolMm, double minSegMm)
         {
             if (pts == null || pts.Count == 0) return pts;
 
             double clearFt = MmToFt(clearMm);
-            var p = SmoothRectilinear(pts, obstaclesRaw, clearFt);
+            var p = SmoothRectilinear(pts, wallsRaw, clearFt);
             p = AxisAlignAndFlatten(p); // pas de mini-pentes
-            p = SnapPolylineToObstacleOffsets(p, obstaclesForSnap ?? obstaclesRaw, clearMm, snapTolMm);
-            p = CollapseAdjacentCorners(p, obstaclesRaw, clearFt, jogTolMm);
-            p = CollapseZigZagDoglegs(p, obstaclesRaw, clearFt, doglegTolMm: Math.Max(120, jogTolMm)); // supprime les “Z”
+            p = SnapPolylineToWallOffsets(p, wallsRaw, clearMm, snapTolMm);
+            p = CollapseAdjacentCorners(p, wallsRaw, clearFt, jogTolMm);
+            p = CollapseZigZagDoglegs(p, wallsRaw, clearFt, doglegTolMm: Math.Max(120, jogTolMm)); // supprime les “Z”
 
             CleanupDuplicates(p); CleanupCollinear(p);
             RemoveShortSegments(p, MmToFt(minSegMm));
@@ -1272,13 +1031,13 @@ namespace Modification
                 if (dz < flatEps && (dx > 1e-9 || dy > 1e-9))
                 {
                     if (dx >= dy) nb = new XYZ(b.X, a.Y, a.Z);
-                    else          nb = new XYZ(a.X, b.Y, a.Z);
+                    else nb = new XYZ(a.X, b.Y, a.Z);
                 }
                 else
                 {
-                    if (dx >= dy && dx >= dz)      nb = new XYZ(b.X, a.Y, a.Z);
+                    if (dx >= dy && dx >= dz) nb = new XYZ(b.X, a.Y, a.Z);
                     else if (dy >= dx && dy >= dz) nb = new XYZ(a.X, b.Y, a.Z);
-                    else                            nb = new XYZ(a.X, a.Y, b.Z);
+                    else nb = new XYZ(a.X, a.Y, b.Z);
                 }
 
                 outPts.Add(nb);
@@ -1292,7 +1051,7 @@ namespace Modification
         // Supprime les “Z” courts (deux coudes rapprochés) en un seul coin
         private static List<XYZ> CollapseZigZagDoglegs(
             List<XYZ> pts,
-            List<BoundingBoxXYZ> obstaclesRaw,
+            List<BoundingBoxXYZ> wallsRaw,
             double clearFt,
             double doglegTolMm = 120)
         {
@@ -1321,8 +1080,8 @@ namespace Modification
                     var p1 = new List<XYZ> { a, new XYZ(a.X, d.Y, z), d };
                     var p2 = new List<XYZ> { a, new XYZ(d.X, a.Y, z), d };
 
-                    if (IsPolylineClear(p1, obstaclesRaw, clearFt)) { pts[i + 1] = p1[1]; pts.RemoveAt(i + 2); continue; }
-                    if (IsPolylineClear(p2, obstaclesRaw, clearFt)) { pts[i + 1] = p2[1]; pts.RemoveAt(i + 2); continue; }
+                    if (IsPolylineClear(p1, wallsRaw, clearFt)) { pts[i + 1] = p1[1]; pts.RemoveAt(i + 2); continue; }
+                    if (IsPolylineClear(p2, wallsRaw, clearFt)) { pts[i + 1] = p2[1]; pts.RemoveAt(i + 2); continue; }
                 }
                 i++;
             }
@@ -1332,7 +1091,7 @@ namespace Modification
             return pts;
         }
 
-        private static List<XYZ> SmoothRectilinear(List<XYZ> path, List<BoundingBoxXYZ> obstaclesRaw, double clearFt)
+        private static List<XYZ> SmoothRectilinear(List<XYZ> path, List<BoundingBoxXYZ> wallsRaw, double clearFt)
         {
             if (path == null || path.Count <= 2) return path;
             CleanupDuplicates(path); CleanupCollinear(path);
@@ -1344,7 +1103,7 @@ namespace Modification
                 int bestJ = i + 1; List<XYZ> bestPatch = null;
                 for (int j = path.Count - 1; j > i; j--)
                 {
-                    var patch = RectilinearVisiblePatch(path[i], path[j], obstaclesRaw, clearFt);
+                    var patch = RectilinearVisiblePatch(path[i], path[j], wallsRaw, clearFt);
                     if (patch != null) { bestJ = j; bestPatch = patch; break; }
                 }
                 if (bestPatch != null) { for (int k = 1; k < bestPatch.Count; k++) result.Add(bestPatch[k]); i = bestJ; }
@@ -1354,7 +1113,7 @@ namespace Modification
             return result;
         }
 
-        private static List<XYZ> SnapPolylineToObstacleOffsets(List<XYZ> pts, List<BoundingBoxXYZ> obstaclesRaw, double clearMm, double tolMm)
+        private static List<XYZ> SnapPolylineToWallOffsets(List<XYZ> pts, List<BoundingBoxXYZ> wallsRaw, double clearMm, double tolMm)
         {
             if (pts.Count < 3) return pts;
             double clear = MmToFt(clearMm), tol = MmToFt(tolMm);
@@ -1362,7 +1121,7 @@ namespace Modification
             for (int i = 1; i < pts.Count - 1; i++)
             {
                 var p = pts[i];
-                foreach (var w in obstaclesRaw)
+                foreach (var w in wallsRaw)
                 {
                     double x1 = w.Min.X - clear, x2 = w.Max.X + clear;
                     if (Math.Abs(p.X - x1) <= tol) p = new XYZ(x1, p.Y, p.Z);
@@ -1378,7 +1137,7 @@ namespace Modification
             return pts;
         }
 
-        private static List<XYZ> CollapseAdjacentCorners(List<XYZ> pts, List<BoundingBoxXYZ> obstaclesRaw, double clearFt, double jogTolMm)
+        private static List<XYZ> CollapseAdjacentCorners(List<XYZ> pts, List<BoundingBoxXYZ> wallsRaw, double clearFt, double jogTolMm)
         {
             if (pts.Count < 4) return pts;
             double tol = MmToFt(jogTolMm);
@@ -1395,8 +1154,8 @@ namespace Modification
                     var p1 = new XYZ(b.X, c.Y, (b.Z + c.Z) * 0.5);
                     var p2 = new XYZ(c.X, b.Y, (b.Z + c.Z) * 0.5);
 
-                    if (IsPolylineClear(new List<XYZ> { a, p1, d }, obstaclesRaw, clearFt)) { pts[i] = p1; pts.RemoveAt(i + 1); continue; }
-                    if (IsPolylineClear(new List<XYZ> { a, p2, d }, obstaclesRaw, clearFt)) { pts[i] = p2; pts.RemoveAt(i + 1); continue; }
+                    if (IsPolylineClear(new List<XYZ> { a, p1, d }, wallsRaw, clearFt)) { pts[i] = p1; pts.RemoveAt(i + 1); continue; }
+                    if (IsPolylineClear(new List<XYZ> { a, p2, d }, wallsRaw, clearFt)) { pts[i] = p2; pts.RemoveAt(i + 1); continue; }
                 }
                 i++;
             }
@@ -1413,7 +1172,7 @@ namespace Modification
 
         private static List<XYZ> RectilinearVisiblePatch(XYZ a, XYZ b, List<BoundingBoxXYZ> obstaclesRaw, double clearFt)
         {
-            var perms = new[] { new[] {0,1,2}, new[] {0,2,1}, new[] {1,0,2}, new[] {1,2,0}, new[] {2,0,1}, new[] {2,1,0} };
+            var perms = new[] { new[] { 0, 1, 2 }, new[] { 0, 2, 1 }, new[] { 1, 0, 2 }, new[] { 1, 2, 0 }, new[] { 2, 0, 1 }, new[] { 2, 1, 0 } };
             foreach (var p in perms)
             {
                 var pts = BuildRectilinear(a, b, p[0], p[1], p[2]);
@@ -1458,35 +1217,35 @@ namespace Modification
             {
                 if (Math.Abs(p) < 1e-12) return q >= 0; double r = q / p;
                 if (p < 0) { if (r > tt1) return false; if (r > tt0) tt0 = r; }
-                else       { if (r < tt0) return false; if (r < tt1) tt1 = r; }
+                else { if (r < tt0) return false; if (r < tt1) tt1 = r; }
                 return true;
             }
 
             if (!Clip(-dx, p0.X - bmin.X, ref t0, ref t1)) return false;
-            if (!Clip( dx, bmax.X - p0.X, ref t0, ref t1)) return false;
+            if (!Clip(dx, bmax.X - p0.X, ref t0, ref t1)) return false;
             if (!Clip(-dy, p0.Y - bmin.Y, ref t0, ref t1)) return false;
-            if (!Clip( dy, bmax.Y - p0.Y, ref t0, ref t1)) return false;
+            if (!Clip(dy, bmax.Y - p0.Y, ref t0, ref t1)) return false;
             if (!Clip(-dz, p0.Z - bmin.Z, ref t0, ref t1)) return false;
-            if (!Clip( dz, bmax.Z - p0.Z, ref t0, ref t1)) return false;
+            if (!Clip(dz, bmax.Z - p0.Z, ref t0, ref t1)) return false;
             return t1 >= t0;
         }
 
         private static bool SegmentAabbIntersect2D(XYZ p0, XYZ p1, XYZ bmin, XYZ bmax)
         {
-            double x0=p0.X, y0=p0.Y, x1=p1.X, y1=p1.Y;
-            const int INSIDE=0, LEFT=1, RIGHT=2, BOTTOM=4, TOP=8;
-            int Code(double x,double y){ int c=INSIDE; if(x<bmin.X)c|=LEFT; else if(x>bmax.X)c|=RIGHT; if(y<bmin.Y)c|=BOTTOM; else if(y>bmax.Y)c|=TOP; return c; }
-            int c0=Code(x0,y0), c1=Code(x1,y1);
-            while(true)
+            double x0 = p0.X, y0 = p0.Y, x1 = p1.X, y1 = p1.Y;
+            const int INSIDE = 0, LEFT = 1, RIGHT = 2, BOTTOM = 4, TOP = 8;
+            int Code(double x, double y) { int c = INSIDE; if (x < bmin.X) c |= LEFT; else if (x > bmax.X) c |= RIGHT; if (y < bmin.Y) c |= BOTTOM; else if (y > bmax.Y) c |= TOP; return c; }
+            int c0 = Code(x0, y0), c1 = Code(x1, y1);
+            while (true)
             {
-                if((c0|c1)==0) return true;
-                if((c0&c1)!=0) return false;
-                double x=0,y=0; int outcode=c0!=0?c0:c1;
-                if((outcode&TOP)!=0){ x=x0+(x1-x0)*(bmax.Y-y0)/(y1-y0); y=bmax.Y; }
-                else if((outcode&BOTTOM)!=0){ x=x0+(x1-x0)*(bmin.Y-y0)/(y1-y0); y=bmin.Y; }
-                else if((outcode&RIGHT)!=0){ y=y0+(y1-y0)*(bmax.X-x0)/(x1-x0); x=bmax.X; }
-                else { y=y0+(y1-y0)*(bmin.X-x0)/(x1-x0); x=bmin.X; }
-                if(outcode==c0){ x0=x; y0=y; c0=Code(x0,y0); } else { x1=x; y1=y; c1=Code(x1,y1); }
+                if ((c0 | c1) == 0) return true;
+                if ((c0 & c1) != 0) return false;
+                double x = 0, y = 0; int outcode = c0 != 0 ? c0 : c1;
+                if ((outcode & TOP) != 0) { x = x0 + (x1 - x0) * (bmax.Y - y0) / (y1 - y0); y = bmax.Y; }
+                else if ((outcode & BOTTOM) != 0) { x = x0 + (x1 - x0) * (bmin.Y - y0) / (y1 - y0); y = bmin.Y; }
+                else if ((outcode & RIGHT) != 0) { y = y0 + (y1 - y0) * (bmax.X - x0) / (x1 - x0); x = bmax.X; }
+                else { y = y0 + (y1 - y0) * (bmin.X - x0) / (x1 - x0); x = bmin.X; }
+                if (outcode == c0) { x0 = x; y0 = y; c0 = Code(x0, y0); } else { x1 = x; y1 = y; c1 = Code(x1, y1); }
             }
         }
 
@@ -1524,7 +1283,7 @@ namespace Modification
         private static int PickPreviewRouteIndex(UIDocument uidoc, List<List<ElementId>> sets)
         {
             var accepted = new HashSet<ElementId>(sets.SelectMany(s => s));
-            var filter   = new PreviewSelFilter(accepted);
+            var filter = new PreviewSelFilter(accepted);
             try
             {
                 var r = uidoc.Selection.PickObject(Autodesk.Revit.UI.Selection.ObjectType.Element, filter, "Clique la ligne colorée de l'itinéraire");
@@ -1537,7 +1296,7 @@ namespace Modification
 
         private class PreviewSelFilter : Autodesk.Revit.UI.Selection.ISelectionFilter
         {
-            private readonly HashSet<ElementId> _ok; public PreviewSelFilter(HashSet<ElementId> ok){ _ok = ok; }
+            private readonly HashSet<ElementId> _ok; public PreviewSelFilter(HashSet<ElementId> ok) { _ok = ok; }
             public bool AllowElement(Element e) => _ok.Contains(e.Id);
             public bool AllowReference(Reference r, XYZ p) => true;
         }
