@@ -860,6 +860,90 @@ namespace Modification
             return list;
         }
 
+        private static RouteCandidate TryComputeAStarRoute(
+            XYZ start,
+            XYZ end,
+            List<BoundingBoxXYZ> obstaclesRaw,
+            List<BoundingBoxXYZ> obstaclesForSnap,
+            double gridStepMm,
+            int[] xySteps,
+            double heuristicBias,
+            double zStepMm,
+            double clearMm,
+            double clearFt,
+            double snapTolMm,
+            double jogTolMm,
+            double minSegMm,
+            double exemptMm)
+        {
+            var primary = ProcessAStarCandidate(
+                AStarMulti(start, end, obstaclesRaw, gridStepMm, zStepMm, clearMm, exemptMm, xySteps, heuristicBias),
+                start,
+                end,
+                obstaclesRaw,
+                obstaclesForSnap,
+                clearMm,
+                clearFt,
+                snapTolMm,
+                jogTolMm,
+                minSegMm);
+            if (primary != null)
+                return primary;
+
+            if (!ReferenceEquals(obstaclesForSnap, obstaclesRaw) &&
+                obstaclesForSnap != null &&
+                obstaclesForSnap.Count > 0)
+            {
+                return ProcessAStarCandidate(
+                    AStarMulti(start, end, obstaclesForSnap, gridStepMm, zStepMm, clearMm, exemptMm, xySteps, heuristicBias),
+                    start,
+                    end,
+                    obstaclesRaw,
+                    obstaclesForSnap,
+                    clearMm,
+                    clearFt,
+                    snapTolMm,
+                    jogTolMm,
+                    minSegMm);
+            }
+
+            return null;
+        }
+
+        private static RouteCandidate ProcessAStarCandidate(
+            RouteCandidate candidate,
+            XYZ start,
+            XYZ end,
+            List<BoundingBoxXYZ> obstaclesRaw,
+            List<BoundingBoxXYZ> obstaclesForSnap,
+            double clearMm,
+            double clearFt,
+            double snapTolMm,
+            double jogTolMm,
+            double minSegMm)
+        {
+            if (candidate == null)
+                return null;
+
+            var processed = PostProcess(
+                candidate.Points,
+                obstaclesRaw,
+                obstaclesForSnap,
+                clearMm,
+                snapTolMm,
+                jogTolMm,
+                minSegMm);
+            if (processed == null || processed.Count == 0)
+                return null;
+
+            processed = ForceEndpoints(processed, start, end);
+            if (!IsPolylineClear(processed, obstaclesRaw, clearFt))
+                return null;
+
+            candidate.Points = processed;
+            return candidate;
+        }
+
         private class Node { public XYZ P; public double G; public double F; public Node(XYZ p,double g,double f){P=p;G=g;F=f;} }
         private class XyzEq : IEqualityComparer<XYZ>
         {
