@@ -1,7 +1,4 @@
-﻿using DocumentFormat.OpenXml.Office2019.Presentation;
-using NPOI.HPSF;
-using System;
-using System.Diagnostics;
+﻿using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -48,12 +45,12 @@ namespace BIMaestro.UI
         // couverture de paupière OFF : hauteur à gauche/droite (0..1 du diamètre)
         public static readonly DependencyProperty EyelidLeftCoverProperty =
             DependencyProperty.Register(nameof(EyelidLeftCover), typeof(double), typeof(EyeToggleSwitch),
-                new PropertyMetadata(0.62, OnLayoutChanged));
+                new PropertyMetadata(0.56, OnLayoutChanged));
         public double EyelidLeftCover { get => (double)GetValue(EyelidLeftCoverProperty); set => SetValue(EyelidLeftCoverProperty, value); }
 
         public static readonly DependencyProperty EyelidRightCoverProperty =
             DependencyProperty.Register(nameof(EyelidRightCover), typeof(double), typeof(EyeToggleSwitch),
-                new PropertyMetadata(0.48, OnLayoutChanged));
+                 new PropertyMetadata(0.46, OnLayoutChanged));
         public double EyelidRightCover { get => (double)GetValue(EyelidRightCoverProperty); set => SetValue(EyelidRightCoverProperty, value); }
 
         // couleurs
@@ -73,7 +70,7 @@ namespace BIMaestro.UI
         }
 
         // -------- internals ----------
-        double _sz, _trackW, _trackH, _ringThick, _innerW, _innerH, _thumb, _slide, _startX;
+        double _sz, _trackW, _trackH, _ringThick, _innerW, _innerH, _thumb, _slide, _startX, _eyelidRest;
         readonly SolidColorBrush _trackBrush = new();
         readonly SolidColorBrush _ringBrush = new();
 
@@ -145,42 +142,55 @@ namespace BIMaestro.UI
             Spec.Width = spec; Spec.Height = spec;
             Spec.Margin = new Thickness(Math.Round(pupil * 0.18), Math.Round(pupil * 0.18), 0, 0);
 
-            // Clip de la paupière = cercle de l’œil
             Eyelid.Width = EyeWhite.Width; Eyelid.Height = EyeWhite.Height;
-            EyelidClip.Center = new Point(Eyelid.Width / 2.0, Eyelid.Height / 2.0);
-            EyelidClip.RadiusX = Eyelid.Width / 2.0; EyelidClip.RadiusY = Eyelid.Height / 2.0;
+            var eyelidCenter = new Point(Eyelid.Width / 2.0, Eyelid.Height / 2.0);
+            EyelidClip.Center = eyelidCenter;
+            EyelidClip.RadiusX = Eyelid.Width / 2.0;
+            EyelidClip.RadiusY = Eyelid.Height / 2.0;
 
-            // (re)construit la géométrie de la paupière OFF
             RebuildEyelidGeometry();
+
+            _eyelidRest = _thumb * 0.10;
+            EyelidShift.X = -_thumb * 0.02;
+            EyelidShift.Y = _eyelidRest;
+
+            var tilt = (EyelidLeftCover - EyelidRightCover) * 65.0;
+            if (tilt < -16.0) tilt = -16.0;
+            if (tilt > 16.0) tilt = 16.0;
+            EyelidRot.Angle = -tilt;
 
             // Taille globale
             Width = _trackW; Height = _trackH;
 
-            // OFF par défaut : pupille visible + paupière inclinée
+            // OFF par défaut : pupille visible
             ThumbX.X = _startX;
             PupilOffset.X = -_thumb * 0.12;
-            PupilOffset.Y = _thumb * 0.18;
-            EyelidShift.Y = 0;                 // wedge posé sur l’œil en OFF
+            PupilOffset.Y = _thumb * 0.10;
+            EyelidShift.Y = _eyelidRest;
         }
 
         void RebuildEyelidGeometry()
         {
-            // wedge (polygone) coupant l’œil : plus bas à gauche que à droite
             var w = Eyelid.Width; var h = Eyelid.Height;
             if (w <= 0 || h <= 0) return;
 
-            var leftY = EyelidLeftCover * h;   // hauteur où la paupière coupe à gauche
-            var rightY = EyelidRightCover * h;   // hauteur à droite
-            var m = Math.Max(w, h);              // marge pour sortir largement au-dessus
+            var leftCover = Math.Max(0, Math.Min(1, EyelidLeftCover));
+            var rightCover = Math.Max(0, Math.Min(1, EyelidRightCover));
+
+            var leftY = leftCover * h;
+            var rightY = rightCover * h;
+            var margin = Math.Max(w, h);
+
+            const double arcRatio = 0.28;
+            var control = new Point(w * 0.5, Math.Min(leftY, rightY) - (h * arcRatio));
 
             var geo = new StreamGeometry();
             using (var gc = geo.Open())
             {
-                // Un quadrilatère qui couvre tout le haut de l’œil et descend jusqu’aux coupes
-                gc.BeginFigure(new Point(-m, -m), true, true);
-                gc.LineTo(new Point(w + m, -m), true, false);
-                gc.LineTo(new Point(w + m, rightY), true, false);
-                gc.LineTo(new Point(-m, leftY), true, false);
+                gc.BeginFigure(new Point(-margin, -margin), true, true);
+                gc.LineTo(new Point(w + margin, -margin), true, false);
+                gc.LineTo(new Point(w + margin, rightY), true, false);
+                gc.QuadraticBezierTo(control, new Point(-margin, leftY), true, false);
             }
             geo.Freeze();
             Eyelid.Data = geo;
@@ -197,9 +207,17 @@ namespace BIMaestro.UI
             PupilOffset.BeginAnimation(TranslateTransform.XProperty,
                 new DoubleAnimation(_thumb * 0.06, -_thumb * 0.12, dur) { EasingFunction = ease });
             PupilOffset.BeginAnimation(TranslateTransform.YProperty,
-                new DoubleAnimation(-_thumb * 0.06, _thumb * 0.18, dur) { EasingFunction = ease });
+                new DoubleAnimation(-_thumb * 0.06, _thumb * 0.10, dur) { EasingFunction = ease });
 
-            // recalcul si layout a bougé
+            EyelidShift.BeginAnimation(TranslateTransform.YProperty,
+                new DoubleAnimation
+                {
+                    From = _eyelidRest - _thumb * 0.35,
+                    To = _eyelidRest,
+                    Duration = dur,
+                    EasingFunction = ease
+                });
+
             RebuildEyelidGeometry();
         }
 
@@ -220,26 +238,27 @@ namespace BIMaestro.UI
             RingGlow.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.OpacityProperty,
                 new DoubleAnimation(on ? 0.55 : 0.0, dur));
 
-            // pupille + paupière
+            // pupille
             if (on)
             {
                 // œil grand ouvert, pupille haut-gauche
                 PupilOffset.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(-_thumb * 0.20, dur) { EasingFunction = ease });
                 PupilOffset.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(-_thumb * 0.20, dur) { EasingFunction = ease });
 
-                // sortir la paupière vers le haut (hors cercle)
+                var target = -_thumb * 1.05;
+                if (instant) EyelidShift.Y = target;
                 EyelidShift.BeginAnimation(TranslateTransform.YProperty,
-                    new DoubleAnimation(-_thumb * 1.10, dur) { EasingFunction = ease });
+                    new DoubleAnimation { To = target, Duration = dur, EasingFunction = ease });
             }
             else
             {
                 // OFF : mi-clos, pupille visible
                 PupilOffset.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(-_thumb * 0.12, dur) { EasingFunction = ease });
-                PupilOffset.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(_thumb * 0.18, dur) { EasingFunction = ease });
+                PupilOffset.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(_thumb * 0.10, dur) { EasingFunction = ease });
 
-                // repositionner la paupière sur l’œil
+                if (instant) EyelidShift.Y = _eyelidRest;
                 EyelidShift.BeginAnimation(TranslateTransform.YProperty,
-                    new DoubleAnimation(0, dur) { EasingFunction = ease });
+                    new DoubleAnimation { To = _eyelidRest, Duration = dur, EasingFunction = ease });
             }
         }
     }

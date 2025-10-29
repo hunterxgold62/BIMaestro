@@ -81,6 +81,10 @@
                     MouseLeftButtonDown="FamilyItem_DoubleClick">
                 <Border.ContextMenu>
                     <ContextMenu>
+                        <MenuItem Header="Documentation"
+                                  Click="DocumentationMenuItem_Click"
+                                  DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                        <Separator/>
                         <MenuItem Header="Rentrer dans la famille"
                                   Click="OpenFamilyFile_Click"
                                   DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
@@ -172,6 +176,10 @@
                     HorizontalAlignment="Stretch">
                 <Border.ContextMenu>
                     <ContextMenu>
+                        <MenuItem Header="Documentation"
+                                  Click="DocumentationMenuItem_Click"
+                                  DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                        <Separator/>
                         <MenuItem Header="Rentrer dans la famille"
                                   Click="OpenFamilyFile_Click"
                                   DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>

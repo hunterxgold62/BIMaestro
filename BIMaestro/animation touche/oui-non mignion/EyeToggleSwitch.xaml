@@ -64,13 +64,13 @@
                    HorizontalAlignment="Left" VerticalAlignment="Top"/>
                 </Grid>
 
-                <!-- PAUPIÈRE inclinée (Path, clipée dans l’œil) -->
+                <!-- Paupière supérieure (clipée dans l’œil) -->
                 <Path x:Name="Eyelid"
-              Fill="#ECECF7"
-              RenderTransformOrigin="0.5,0.5">
+              Fill="#F1F2FB"
+              RenderTransformOrigin="0.5,0.85">
                     <Path.RenderTransform>
                         <TransformGroup>
-                            <RotateTransform x:Name="EyelidRot" Angle="-12"/>
+                            <RotateTransform x:Name="EyelidRot" Angle="-8"/>
                             <TranslateTransform x:Name="EyelidShift" X="0" Y="0"/>
                         </TransformGroup>
                     </Path.RenderTransform>

@@ -118,7 +118,7 @@ public class AppUI : IExternalApplication
                 ("Couleur de maquette", "Couleur reset", "Couleur.ResetTabItemRandomColorsCommand", "safeimagekit-bouton reset4.png","Réinitialise les couleurs appliquées"),
                 ("papa Noël", "papa\nNoël", "Couleur.PapanoelCommand", "Père Noël.png","Fait apparaître des couleurs comme des guirlandes\nDouble clic pour revenir à la normale.\n\nAttention désactiver <couleur Oui/Non> avant activation.")
             });
-        AddPushButton(panelCouleur, "MAJ Projet", "MAJ\nProjet", assemblyPath, "Page.MiseAJourCommand", "safeimagekit-Information.png", "Page de mise à jour");
+        AddPushButton(panelCouleur, "NOTE MAJ", "Note\nMAJ", assemblyPath, "Page.MiseAJourCommand", "safeimagekit-Information.png", "Page de mise à jour");
         AddPushButton(panelCouleur, "Info Projet", "BIMaestro\nExemple", assemblyPath, "Page.GuideCommand", "safeimagekit-Texte maj.png", "Page d'information sur le plugin'");
 
 

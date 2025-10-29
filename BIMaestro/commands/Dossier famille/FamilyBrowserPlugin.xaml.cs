@@ -5,6 +5,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
@@ -19,6 +20,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using WinForms = System.Windows.Forms;
+using Microsoft.Win32;
 
 namespace Famille
 {
@@ -108,6 +110,9 @@ namespace Famille
         private static readonly HashSet<string> _metadataPending =
             new(StringComparer.OrdinalIgnoreCase);
         private static readonly object _metadataLock = new();
+        private static readonly object _documentationLock = new();
+        private static readonly Dictionary<string, List<FamilyDocumentLink>> _documentationCache =
+            new(StringComparer.OrdinalIgnoreCase);
 
         // ===== Collections =====
         private ObservableCollection<Collection> _collections = new();
@@ -733,6 +738,446 @@ namespace Famille
         {
             if (CountTextBlock == null) return;
             CountTextBlock.Text = (c ?? displayedFamilies.Count).ToString();
+        }
+
+        #endregion
+
+        #region Documentation
+
+        private void DocumentationMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as MenuItem)?.DataContext is not FamilyItem fam)
+                return;
+
+            EnsureDocumentationLoaded(fam);
+
+            if (!fam.HasDocumentation)
+            {
+                if (!PromptAddDocumentation(fam))
+                {
+                    return;
+                }
+            }
+
+            if (!fam.HasDocumentation)
+            {
+                MessageBox.Show(this,
+                    "Aucun document n'a été associé à cette famille.",
+                    "Documentation",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            if (fam.DocumentationLinks.Count == 1)
+            {
+                OpenDocument(fam.DocumentationLinks[0]);
+                return;
+            }
+
+            ShowDocumentationPicker(fam);
+        }
+
+        private void EnsureDocumentationLoaded(FamilyItem fam)
+        {
+            if (fam == null || string.IsNullOrWhiteSpace(fam.Path))
+                return;
+
+            List<FamilyDocumentLink> docs;
+
+            lock (_documentationLock)
+            {
+                if (!_documentationCache.TryGetValue(fam.Path, out docs))
+                {
+                    docs = LoadDocumentationFromDisk(fam.Path);
+                    _documentationCache[fam.Path] = docs;
+                }
+            }
+
+            fam.DocumentationLinks.Clear();
+            foreach (var link in docs)
+            {
+                fam.DocumentationLinks.Add(link.Clone());
+            }
+        }
+
+        private List<FamilyDocumentLink> LoadDocumentationFromDisk(string familyPath)
+        {
+            var docFile = GetDocumentationFilePath(familyPath);
+            if (string.IsNullOrWhiteSpace(docFile) || !File.Exists(docFile))
+                return new List<FamilyDocumentLink>();
+
+            try
+            {
+                var json = File.ReadAllText(docFile, Encoding.UTF8);
+                var payload = JsonConvert.DeserializeObject<FamilyDocumentationPayload>(json);
+                var docs = new List<FamilyDocumentLink>();
+
+                if (payload?.Documents != null)
+                {
+                    foreach (var link in payload.Documents)
+                    {
+                        if (link == null || string.IsNullOrWhiteSpace(link.FilePath))
+                            continue;
+
+                        if (string.IsNullOrWhiteSpace(link.Label))
+                            link.Label = System.IO.Path.GetFileName(link.FilePath);
+
+                        if (string.IsNullOrWhiteSpace(link.Type))
+                        {
+                            var ext = System.IO.Path.GetExtension(link.FilePath)?.TrimStart('.');
+                            link.Type = string.IsNullOrWhiteSpace(ext) ? null : ext.ToUpperInvariant();
+                        }
+
+                        docs.Add(link);
+                    }
+                }
+
+                return docs
+                    .OrderBy(l => l.DisplayName, StringComparer.CurrentCultureIgnoreCase)
+                    .ToList();
+            }
+            catch
+            {
+                return new List<FamilyDocumentLink>();
+            }
+        }
+
+        private static string GetDocumentationFilePath(string familyPath)
+            => string.IsNullOrWhiteSpace(familyPath) ? null : familyPath + ".docs.json";
+
+        private bool PromptAddDocumentation(FamilyItem fam)
+        {
+            if (fam == null || string.IsNullOrWhiteSpace(fam.Path))
+                return false;
+
+            EnsureDocumentationLoaded(fam);
+
+            var dialog = new OpenFileDialog
+            {
+                Title = "Sélectionner des documents",
+                Filter = "Tous les fichiers|*.*",
+                Multiselect = true,
+                CheckFileExists = true,
+                CheckPathExists = true
+            };
+
+            try
+            {
+                var familyDirectory = System.IO.Path.GetDirectoryName(fam.Path);
+                if (!string.IsNullOrWhiteSpace(familyDirectory) && Directory.Exists(familyDirectory))
+                {
+                    dialog.InitialDirectory = familyDirectory;
+                }
+            }
+            catch
+            {
+                // ignore
+            }
+
+            if (dialog.ShowDialog(this) != true || dialog.FileNames.Length == 0)
+                return false;
+
+            bool added = false;
+
+            foreach (var selected in dialog.FileNames)
+            {
+                if (string.IsNullOrWhiteSpace(selected))
+                    continue;
+
+                var normalized = selected.Trim();
+
+                if (fam.DocumentationLinks.Any(d => string.Equals(d.FilePath, normalized, StringComparison.OrdinalIgnoreCase)))
+                    continue;
+
+                fam.DocumentationLinks.Add(new FamilyDocumentLink
+                {
+                    FilePath = normalized,
+                    Label = System.IO.Path.GetFileName(normalized),
+                    Type = System.IO.Path.GetExtension(normalized)?.TrimStart('.')?.ToUpperInvariant()
+                });
+                added = true;
+            }
+
+            if (!added)
+                return false;
+
+            SortDocumentationLinks(fam);
+
+            if (!PersistDocumentation(fam))
+            {
+                EnsureDocumentationLoaded(fam);
+                return false;
+            }
+
+            return true;
+        }
+
+        private void SortDocumentationLinks(FamilyItem fam)
+        {
+            if (fam?.DocumentationLinks == null || fam.DocumentationLinks.Count <= 1)
+                return;
+
+            var existing = fam.DocumentationLinks.ToList();
+            var ordered = existing
+                .OrderBy(l => l.DisplayName, StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
+
+            bool alreadyOrdered = existing.SequenceEqual(ordered);
+            if (alreadyOrdered)
+                return;
+
+            fam.DocumentationLinks.Clear();
+            foreach (var link in ordered)
+            {
+                fam.DocumentationLinks.Add(link);
+            }
+        }
+
+        private bool PersistDocumentation(FamilyItem fam)
+        {
+            if (fam == null || string.IsNullOrWhiteSpace(fam.Path))
+                return false;
+
+            var snapshot = fam.DocumentationLinks.Select(l => l.Clone()).ToList();
+
+            lock (_documentationLock)
+            {
+                _documentationCache[fam.Path] = snapshot.Select(l => l.Clone()).ToList();
+            }
+
+            var docFile = GetDocumentationFilePath(fam.Path);
+            if (string.IsNullOrWhiteSpace(docFile))
+                return false;
+
+            try
+            {
+                if (snapshot.Count == 0)
+                {
+                    if (File.Exists(docFile))
+                        File.Delete(docFile);
+                }
+                else
+                {
+                    var payload = new FamilyDocumentationPayload { Documents = snapshot };
+                    var json = JsonConvert.SerializeObject(payload, Formatting.Indented);
+                    File.WriteAllText(docFile, json, Encoding.UTF8);
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this,
+                    "Impossible d'enregistrer la documentation :\n" + ex.Message,
+                    "Documentation",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+                return false;
+            }
+        }
+
+        private void ShowDocumentationPicker(FamilyItem fam)
+        {
+            if (fam == null)
+                return;
+
+            EnsureDocumentationLoaded(fam);
+
+            var dialog = new Window
+            {
+                Title = $"Documentation - {fam.Name}",
+                Owner = this,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                ResizeMode = ResizeMode.NoResize,
+                SizeToContent = SizeToContent.WidthAndHeight,
+                MinWidth = 420,
+                MinHeight = 260
+            };
+
+            var root = new Grid { Margin = new Thickness(16) };
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            var listBox = new ListBox
+            {
+                ItemsSource = fam.DocumentationLinks,
+                DisplayMemberPath = nameof(FamilyDocumentLink.DisplayName),
+                MinWidth = 380,
+                MinHeight = 220,
+                SelectionMode = SelectionMode.Extended
+            };
+            dialog.Loaded += (_, __) => listBox.Focus();
+            listBox.KeyDown += (s, args) =>
+            {
+                if (args.Key == Key.A && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+                {
+                    listBox.SelectAll();
+                    args.Handled = true;
+                }
+            };
+            Grid.SetRow(listBox, 0);
+            root.Children.Add(listBox);
+
+            var buttonsPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 16, 0, 0)
+            };
+            Grid.SetRow(buttonsPanel, 1);
+            root.Children.Add(buttonsPanel);
+
+            List<FamilyDocumentLink> selectedLinks = null;
+            bool openAll = false;
+
+            var closeButton = new Button
+            {
+                Content = "Fermer",
+                MinWidth = 90,
+                Margin = new Thickness(8, 0, 0, 0),
+                IsCancel = true
+            };
+            closeButton.Click += (_, __) => dialog.DialogResult = false;
+
+            var openSelectedButton = new Button
+            {
+                Content = "Ouvrir la sélection",
+                MinWidth = 140,
+                Margin = new Thickness(8, 0, 0, 0),
+                IsDefault = true
+            };
+            openSelectedButton.Click += (_, __) =>
+            {
+                if (listBox.SelectedItems.Count == 0)
+                {
+                    MessageBox.Show(dialog,
+                        "Sélectionne au moins un document.",
+                        "Documentation",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                    return;
+                }
+
+                selectedLinks = listBox.SelectedItems.Cast<FamilyDocumentLink>().ToList();
+                dialog.DialogResult = true;
+            };
+
+            listBox.MouseDoubleClick += (_, __) =>
+            {
+                if (listBox.SelectedItems.Count == 1)
+                {
+                    selectedLinks = new List<FamilyDocumentLink> { (FamilyDocumentLink)listBox.SelectedItem };
+                    dialog.DialogResult = true;
+                }
+            };
+
+            var openAllButton = new Button
+            {
+                Content = "Tout ouvrir",
+                MinWidth = 110,
+                Margin = new Thickness(8, 0, 0, 0)
+            };
+            openAllButton.Click += (_, __) =>
+            {
+                openAll = true;
+                dialog.DialogResult = true;
+            };
+
+            var addButton = new Button
+            {
+                Content = "Ajouter...",
+                MinWidth = 100
+            };
+            addButton.Click += (_, __) =>
+            {
+                if (PromptAddDocumentation(fam))
+                {
+                    listBox.Items.Refresh();
+                }
+            };
+
+            buttonsPanel.Children.Add(addButton);
+            buttonsPanel.Children.Add(openAllButton);
+            buttonsPanel.Children.Add(openSelectedButton);
+            buttonsPanel.Children.Add(closeButton);
+
+            dialog.Content = root;
+
+            if (dialog.ShowDialog() == true)
+            {
+                if (openAll)
+                {
+                    foreach (var link in fam.DocumentationLinks)
+                    {
+                        OpenDocument(link);
+                    }
+                }
+                else if (selectedLinks != null)
+                {
+                    foreach (var link in selectedLinks)
+                    {
+                        OpenDocument(link);
+                    }
+                }
+            }
+        }
+
+        private void OpenDocument(FamilyDocumentLink link)
+        {
+            if (link == null)
+                return;
+
+            var rawPath = link.FilePath;
+            if (string.IsNullOrWhiteSpace(rawPath))
+            {
+                MessageBox.Show(this,
+                    "Le chemin du document est vide.",
+                    "Documentation",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            string expanded;
+            try
+            {
+                expanded = Environment.ExpandEnvironmentVariables(rawPath.Trim());
+            }
+            catch
+            {
+                expanded = rawPath.Trim();
+            }
+
+            bool isUrl = Uri.TryCreate(expanded, UriKind.Absolute, out var uri)
+                         && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeFtp);
+
+            if (!isUrl && !File.Exists(expanded) && !Directory.Exists(expanded))
+            {
+                MessageBox.Show(this,
+                    $"Le document \"{link.DisplayName}\" est introuvable :\n{expanded}",
+                    "Documentation",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = expanded,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this,
+                    $"Impossible d'ouvrir \"{link.DisplayName}\" :\n{ex.Message}",
+                    "Documentation",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
         }
 
         #endregion
@@ -1748,6 +2193,12 @@ namespace Famille
 
     public class FamilyItem : INotifyPropertyChanged
     {
+        public FamilyItem()
+        {
+            DocumentationLinks = new ObservableCollection<FamilyDocumentLink>();
+            DocumentationLinks.CollectionChanged += DocumentationLinks_CollectionChanged;
+        }
+
         public string Name { get; set; }
         public string Path { get; set; }
         private string _category;
@@ -1806,10 +2257,62 @@ namespace Famille
             set { if (_fileSizeBytes != value) { _fileSizeBytes = value; OnPropertyChanged(nameof(FileSizeBytes)); } }
         }
 
+        public ObservableCollection<FamilyDocumentLink> DocumentationLinks { get; }
+
+        public bool HasDocumentation => DocumentationLinks?.Count > 0;
+
+        private void DocumentationLinks_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        {
+            OnPropertyChanged(nameof(DocumentationLinks));
+            OnPropertyChanged(nameof(HasDocumentation));
+        }
+
 
 
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged(string propName)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propName));
+    }
+
+    public class FamilyDocumentLink
+    {
+        public string Label { get; set; }
+        public string FilePath { get; set; }
+        public string Type { get; set; }
+
+        [JsonIgnore]
+        public string DisplayName
+        {
+            get
+            {
+                if (!string.IsNullOrWhiteSpace(Label))
+                    return Label;
+                if (string.IsNullOrWhiteSpace(FilePath))
+                    return string.Empty;
+                try
+                {
+                    return System.IO.Path.GetFileName(FilePath);
+                }
+                catch
+                {
+                    return FilePath;
+                }
+            }
+        }
+
+        public FamilyDocumentLink Clone()
+            => new FamilyDocumentLink
+            {
+                Label = Label,
+                FilePath = FilePath,
+                Type = Type
+            };
+
+        public override string ToString() => DisplayName;
+    }
+
+    internal class FamilyDocumentationPayload
+    {
+        public List<FamilyDocumentLink> Documents { get; set; } = new();
     }
 }

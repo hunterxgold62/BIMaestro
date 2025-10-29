@@ -114,6 +114,8 @@ namespace Visualisation
                 int nHeaderCols = header.NumberOfColumns;
                 int nBodyCols = body.NumberOfColumns;
                 int nCols = Math.Max(nHeaderCols, nBodyCols);
+                bool shouldMergeTitle = ShouldMergeHeaderTitle(schedule, nHeaderCols);
+
 
                 // En-têtes (1ère ligne du header Revit)
                 for (int c = 0; c < nHeaderCols; c++)
@@ -139,6 +141,15 @@ namespace Visualisation
 
                 // Header pastel
                 headerRange = ws.Range[ws.Cells[firstRow, 1], ws.Cells[firstRow, totalCols]];
+                if (shouldMergeTitle)
+                {
+                    if (totalCols > 1)
+                    {
+                        headerRange.Merge();
+                    }
+                    headerRange.HorizontalAlignment = Excel.XlHAlign.xlHAlignCenter;
+                    headerRange.VerticalAlignment = Excel.XlVAlign.xlVAlignCenter;
+                }
                 headerRange.Interior.Color = System.Drawing.ColorTranslator.ToOle(
                     System.Drawing.Color.FromArgb(198, 217, 241));
                 headerRange.Font.Bold = true;
@@ -198,6 +209,7 @@ namespace Visualisation
                 int nHeaderCols = header.NumberOfColumns;
                 int nBodyCols = body.NumberOfColumns;
                 int nCols = Math.Max(nHeaderCols, nBodyCols);
+                bool shouldMergeTitle = ShouldMergeHeaderTitle(schedule, nHeaderCols);
 
                 for (int c = 0; c < nHeaderCols; c++)
                     ws.Cells[firstRow, c + 1] = schedule.GetCellText(SectionType.Header, 0, c);
@@ -219,6 +231,15 @@ namespace Visualisation
                 fullRange.Borders.Weight = Excel.XlBorderWeight.xlThin;
 
                 headerRange = ws.Range[ws.Cells[firstRow, 1], ws.Cells[firstRow, totalCols]];
+                if (shouldMergeTitle)
+                {
+                    if (totalCols > 1)
+                    {
+                        headerRange.Merge();
+                    }
+                    headerRange.HorizontalAlignment = Excel.XlHAlign.xlHAlignCenter;
+                    headerRange.VerticalAlignment = Excel.XlVAlign.xlVAlignCenter;
+                }
                 headerRange.Interior.Color = System.Drawing.ColorTranslator.ToOle(
                     System.Drawing.Color.FromArgb(198, 217, 241));
                 headerRange.Font.Bold = true;
@@ -308,6 +329,30 @@ namespace Visualisation
             {
                 Process.Start(new ProcessStartInfo(filePath) { UseShellExecute = true });
             }
+        }
+        private static bool ShouldMergeHeaderTitle(ViewSchedule schedule, int headerColumnCount)
+        {
+            if (headerColumnCount <= 0)
+            {
+                return false;
+            }
+
+            string firstCellText = schedule.GetCellText(SectionType.Header, 0, 0);
+            if (string.IsNullOrWhiteSpace(firstCellText))
+            {
+                return false;
+            }
+
+            for (int c = 1; c < headerColumnCount; c++)
+            {
+                string cellText = schedule.GetCellText(SectionType.Header, 0, c);
+                if (!string.IsNullOrWhiteSpace(cellText))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
     }
 }

@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Http;
@@ -41,7 +42,6 @@ namespace Licensing
         private static HttpClient _http;
 
         private static string _queueFile;
-        private static string _logFile;
 
         public static bool FlushImmediatelyForDebug { get; set; } = false;
 
@@ -65,7 +65,6 @@ namespace Licensing
             _fallbackLicenseKey = fallbackLicenseKey;
 
             var logDir = Paths.RevitLogsDir;
-            _logFile = Path.Combine(logDir, "telemetry.log");
             _queueFile = Path.Combine(logDir, "telemetry.queue.json");
 
             _http = NetSupport.CreateHttpClient(TimeSpan.FromSeconds(10));
@@ -229,9 +228,7 @@ namespace Licensing
         {
             try
             {
-                if (string.IsNullOrEmpty(_logFile))
-                    _logFile = Path.Combine(Paths.RevitLogsDir, "telemetry.log");
-                File.AppendAllText(_logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {line}\n");
+                Debug.WriteLine($"[Telemetry] {line}");
             }
             catch { /* ignore */ }
         }
