@@ -14,12 +14,9 @@ namespace Modification
     {
         // Marges XY (mm) pour l’exploration A*
         static readonly double[] XY_MARGINS_MM = { 1600, 3200, 5600 };
-        static readonly BuiltInCategory[] WALL_CATEGORIES = new[]
-        {
-            BuiltInCategory.OST_Walls
-        };
         static readonly BuiltInCategory[] OBSTACLE_CATEGORIES = new[]
         {
+            BuiltInCategory.OST_Walls,
             BuiltInCategory.OST_Floors,
             BuiltInCategory.OST_Ceilings,
             BuiltInCategory.OST_Roofs,
@@ -99,112 +96,37 @@ namespace Modification
                 // ---- 3) Obstacles ----
                 double expandGlobalMm = Math.Max(1600, XY_MARGINS_MM.Max() + corridorMm + 3000);
                 var bboxGlobal = MakeOutline(start, end, expandGlobalMm);
-                var wallBoxes = CollectObstacleAabbsInOutline(doc, bboxGlobal, null, WALL_CATEGORIES);
-                var extraBoxes = CollectObstacleAabbsInOutline(doc, bboxGlobal, new[] { p1.Id, p2.Id }, OBSTACLE_CATEGORIES);
-                var wallObstacles = wallBoxes ?? new List<BoundingBoxXYZ>();
-                var obstaclesRaw = new List<BoundingBoxXYZ>(wallObstacles);
-                if (extraBoxes != null && extraBoxes.Count > 0)
-                    obstaclesRaw.AddRange(extraBoxes);
-                var obstaclesForSnap = wallObstacles.Count > 0 ? wallObstacles : obstaclesRaw;
+                var obstaclesRaw = CollectObstacleAabbsInOutline(doc, bboxGlobal, new[] { p1.Id, p2.Id });
 
                 // ---- 4) Routes candidates ----
                 var routes = new List<RouteCandidate>();
 
-                void TryAddDirectRoute(bool preferXY)
+                var aFast = AStarMulti(start, end, obstaclesRaw, gridFastMm, zStepMm, clearMm, exemptMm, stepsFast, 1.0);
+                if (aFast != null)
                 {
-                    var direct = BuildOrthogonalRoute(start, end, preferXY);
-                    direct.Points = ForceEndpoints(direct.Points, start, end);
-                    if (IsPolylineClear(direct.Points, obstaclesRaw, clearFt))
-                        routes.Add(direct);
+                    aFast.Points = PostProcess(aFast.Points, obstaclesRaw, clearMm, snapTolMm, jogTolMm, minSegMm);
+                    aFast.Points = ForceEndpoints(aFast.Points, start, end);
+                    routes.Add(aFast);
                 }
 
-                TryAddDirectRoute(true);
-                TryAddDirectRoute(false);
-
-                RouteCandidate TryComputeAStar(double gridStepMm, int[] xySteps, double heuristicBias)
+                var aFine = AStarMulti(start, end, obstaclesRaw, gridFineMm, zStepMm, clearMm, exemptMm, stepsFine, 1.06);
+                if (aFine != null)
                 {
-                    RouteCandidate Process(RouteCandidate candidate)
-                    {
-                        if (candidate == null) return null;
-                        var processed = PostProcess(
-                            candidate.Points,
-                            obstaclesRaw,
-                            obstaclesForSnap,
-                            clearMm,
-                            snapTolMm,
-                            jogTolMm,
-                            minSegMm);
-                        if (processed == null || processed.Count == 0) return null;
-                        processed = ForceEndpoints(processed, start, end);
-                        if (!IsPolylineClear(processed, obstaclesRaw, clearFt))
-                            return null;
-                        candidate.Points = processed;
-                        return candidate;
-                    }
-
-                    var primary = Process(
-                        AStarMulti(
-                            start,
-                            end,
-                            obstaclesRaw,
-                            gridStepMm,
-                            zStepMm,
-                            clearMm,
-                            exemptMm,
-                            xySteps,
-                            heuristicBias));
-                    if (primary != null) return primary;
-
-                    if (!ReferenceEquals(obstaclesForSnap, obstaclesRaw) &&
-                        obstaclesForSnap != null &&
-                        obstaclesForSnap.Count > 0)
-                    {
-                        return Process(
-                            AStarMulti(
-                                start,
-                                end,
-                                obstaclesForSnap,
-                                gridStepMm,
-                                zStepMm,
-                                clearMm,
-                                exemptMm,
-                                xySteps,
-                                heuristicBias));
-                    }
-
-                    return null;
+                    aFine.Points = PostProcess(aFine.Points, obstaclesRaw, clearMm, snapTolMm, jogTolMm, minSegMm);
+                    aFine.Points = ForceEndpoints(aFine.Points, start, end);
+                    routes.Add(aFine);
                 }
 
-                int[] stepsFast = XYMarginsToSteps(gridFastMm);
-                int[] stepsFine = XYMarginsToSteps(gridFineMm);
-
-                var aFast = TryComputeAStar(gridFastMm, stepsFast, 1.0);
-                if (aFast != null) routes.Add(aFast);
-
-                var aFine = TryComputeAStar(gridFineMm, stepsFine, 1.06);
-                if (aFine != null) routes.Add(aFine);
-
-                var detourBasis = obstaclesForSnap ?? obstaclesRaw;
-                var detours = BuildDetoursAroundBlockingWalls(start, end, detourBasis, clearMm, detourPadMm);
+                var detours = BuildDetoursAroundBlockingWalls(start, end, obstaclesRaw, clearMm, detourPadMm);
                 foreach (var d in detours)
                 {
                     var fixedPts = ForceEndpoints(d.Points, start, end);
-                    var processed = PostProcess(
-                        fixedPts,
-                        obstaclesRaw,
-                        obstaclesForSnap,
-                        clearMm,
-                        snapTolMm,
-                        jogTolMm,
-                        minSegMm);
+                    var processed = PostProcess(fixedPts, obstaclesRaw, obstaclesForSnap, clearMm, snapTolMm, jogTolMm, minSegMm);
                     if (processed != null && processed.Count > 1 && IsPolylineClear(processed, obstaclesRaw, clearFt))
                     {
-                        routes.Add(new RouteCandidate
-                        {
-                            Label  = "Contournement direct",
-                            Points = processed
-                        });
-                    }
+                        Label  = "Contournement direct",
+                        Points = PostProcess(fixedPts, obstaclesRaw, clearMm, snapTolMm, jogTolMm, minSegMm)
+                    });
                 }
 
                 if (routes.Count == 0)
@@ -896,16 +818,15 @@ namespace Modification
                 new XYZ(Math.Max(a.X,b.X)+inf, Math.Max(a.Y,b.Y)+inf, Math.Max(a.Z,b.Z)+inf));
         }
 
-        private static List<BoundingBoxXYZ> CollectObstacleAabbsInOutline(Document doc, Outline global, IEnumerable<ElementId> ignoreIds = null, BuiltInCategory[] categories = null)
+        private static List<BoundingBoxXYZ> CollectObstacleAabbsInOutline(Document doc, Outline global, IEnumerable<ElementId> ignoreIds = null)
         {
             var filter = new BoundingBoxIntersectsFilter(global);
             var collector = new FilteredElementCollector(doc)
                 .WherePasses(filter)
                 .WhereElementIsNotElementType();
 
-            var cats = categories ?? OBSTACLE_CATEGORIES;
-            if (cats != null && cats.Length > 0)
-                collector = collector.WherePasses(new ElementMulticategoryFilter(cats));
+            if (OBSTACLE_CATEGORIES.Length > 0)
+                collector = collector.WherePasses(new ElementMulticategoryFilter(OBSTACLE_CATEGORIES));
 
             HashSet<ElementId> ignore = null;
             if (ignoreIds != null)
@@ -929,6 +850,13 @@ namespace Modification
 
                 list.Add(clone);
             }
+
+            foreach (var cat in categories)
+                AppendCategory(cat);
+
+            if (list.Count == 0)
+                AppendCategory(BuiltInCategory.OST_Walls);
+
             return list;
         }
 
@@ -1102,19 +1030,16 @@ namespace Modification
 
         // ======================== LISSAGE / SNAP / CLEAR ========================
 
-        private static List<XYZ> PostProcess(List<XYZ> pts, List<BoundingBoxXYZ> obstaclesRaw, List<BoundingBoxXYZ> snapObstacles, double clearMm, double snapTolMm, double jogTolMm, double minSegMm)
+        private static List<XYZ> PostProcess(List<XYZ> pts, List<BoundingBoxXYZ> obstaclesRaw, double clearMm, double snapTolMm, double jogTolMm, double minSegMm)
         {
             if (pts == null || pts.Count == 0) return pts;
 
             double clearFt = MmToFt(clearMm);
-            var navObs = obstaclesRaw ?? new List<BoundingBoxXYZ>();
-            var snapObs = (snapObstacles != null && snapObstacles.Count > 0) ? snapObstacles : navObs;
-
-            var p = SmoothRectilinear(pts, navObs, clearFt);
+            var p = SmoothRectilinear(pts, obstaclesRaw, clearFt);
             p = AxisAlignAndFlatten(p); // pas de mini-pentes
-            p = SnapPolylineToWallOffsets(p, snapObs, clearMm, snapTolMm);
-            p = CollapseAdjacentCorners(p, navObs, clearFt, jogTolMm);
-            p = CollapseZigZagDoglegs(p, navObs, clearFt, doglegTolMm: Math.Max(120, jogTolMm)); // supprime les “Z”
+            p = SnapPolylineToWallOffsets(p, obstaclesRaw, clearMm, snapTolMm);
+            p = CollapseAdjacentCorners(p, obstaclesRaw, clearFt, jogTolMm);
+            p = CollapseZigZagDoglegs(p, obstaclesRaw, clearFt, doglegTolMm: Math.Max(120, jogTolMm)); // supprime les “Z”
 
             CleanupDuplicates(p); CleanupCollinear(p);
             RemoveShortSegments(p, MmToFt(minSegMm));
