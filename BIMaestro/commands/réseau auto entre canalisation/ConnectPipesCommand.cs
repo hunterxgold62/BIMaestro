@@ -75,6 +75,7 @@ namespace Modification
                 double gridFineMm  = Clamp(dnMm * 0.65, 180, 320);
                 double zStepMm     = Clamp(dnMm * 0.75, 200, 400);
                 double corridorMm  = Math.Max(2500, dnMm * 6);
+                double clearFt     = MmToFt(clearMm);
 
                 // ---- 2) Ancrages (Té si tronc sinon connecteur) ----
                 var c1 = GetBestConnector(p1, GetPipeCenter(p2));
@@ -98,14 +99,7 @@ namespace Modification
                 var obstaclesRaw = CollectObstacleAabbsInOutline(doc, bboxGlobal, new[] { p1.Id, p2.Id });
 
                 // ---- 4) Routes candidates ----
-                var routes = new List<RouteCandidate>
-                {
-                    new RouteCandidate { Label = "Route rapide (X→Y→Z)", Points = ForceEndpoints(BuildOrthogonalRoute(start,end,true ).Points, start, end) },
-                    new RouteCandidate { Label = "Route rapide (Y→X→Z)", Points = ForceEndpoints(BuildOrthogonalRoute(start,end,false).Points, start, end) }
-                };
-
-                int[] stepsFast = XYMarginsToSteps(gridFastMm);
-                int[] stepsFine = XYMarginsToSteps(gridFineMm);
+                var routes = new List<RouteCandidate>();
 
                 var aFast = AStarMulti(start, end, obstaclesRaw, gridFastMm, zStepMm, clearMm, exemptMm, stepsFast, 1.0);
                 if (aFast != null)
@@ -127,7 +121,8 @@ namespace Modification
                 foreach (var d in detours)
                 {
                     var fixedPts = ForceEndpoints(d.Points, start, end);
-                    routes.Add(new RouteCandidate
+                    var processed = PostProcess(fixedPts, obstaclesRaw, obstaclesForSnap, clearMm, snapTolMm, jogTolMm, minSegMm);
+                    if (processed != null && processed.Count > 1 && IsPolylineClear(processed, obstaclesRaw, clearFt))
                     {
                         Label  = "Contournement direct",
                         Points = PostProcess(fixedPts, obstaclesRaw, clearMm, snapTolMm, jogTolMm, minSegMm)
