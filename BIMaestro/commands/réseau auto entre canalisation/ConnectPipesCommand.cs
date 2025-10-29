@@ -75,6 +75,7 @@ namespace Modification
                 double gridFineMm  = Clamp(dnMm * 0.65, 180, 320);
                 double zStepMm     = Clamp(dnMm * 0.75, 200, 400);
                 double corridorMm  = Math.Max(2500, dnMm * 6);
+                double clearFt     = MmToFt(clearMm);
 
                 // ---- 2) Ancrages (Té si tronc sinon connecteur) ----
                 var c1 = GetBestConnector(p1, GetPipeCenter(p2));
@@ -98,14 +99,7 @@ namespace Modification
                 var obstaclesRaw = CollectObstacleAabbsInOutline(doc, bboxGlobal, new[] { p1.Id, p2.Id });
 
                 // ---- 4) Routes candidates ----
-                var routes = new List<RouteCandidate>
-                {
-                    new RouteCandidate { Label = "Route rapide (X→Y→Z)", Points = ForceEndpoints(BuildOrthogonalRoute(start,end,true ).Points, start, end) },
-                    new RouteCandidate { Label = "Route rapide (Y→X→Z)", Points = ForceEndpoints(BuildOrthogonalRoute(start,end,false).Points, start, end) }
-                };
-
-                int[] stepsFast = XYMarginsToSteps(gridFastMm);
-                int[] stepsFine = XYMarginsToSteps(gridFineMm);
+                var routes = new List<RouteCandidate>();
 
                 var aFast = AStarMulti(start, end, obstaclesRaw, gridFastMm, zStepMm, clearMm, exemptMm, stepsFast, 1.0);
                 if (aFast != null)
@@ -127,7 +121,8 @@ namespace Modification
                 foreach (var d in detours)
                 {
                     var fixedPts = ForceEndpoints(d.Points, start, end);
-                    routes.Add(new RouteCandidate
+                    var processed = PostProcess(fixedPts, obstaclesRaw, obstaclesForSnap, clearMm, snapTolMm, jogTolMm, minSegMm);
+                    if (processed != null && processed.Count > 1 && IsPolylineClear(processed, obstaclesRaw, clearFt))
                     {
                         Label  = "Contournement direct",
                         Points = PostProcess(fixedPts, obstaclesRaw, clearMm, snapTolMm, jogTolMm, minSegMm)
@@ -826,48 +821,34 @@ namespace Modification
         private static List<BoundingBoxXYZ> CollectObstacleAabbsInOutline(Document doc, Outline global, IEnumerable<ElementId> ignoreIds = null)
         {
             var filter = new BoundingBoxIntersectsFilter(global);
+            var collector = new FilteredElementCollector(doc)
+                .WherePasses(filter)
+                .WhereElementIsNotElementType();
+
+            if (OBSTACLE_CATEGORIES.Length > 0)
+                collector = collector.WherePasses(new ElementMulticategoryFilter(OBSTACLE_CATEGORIES));
+
             HashSet<ElementId> ignore = null;
             if (ignoreIds != null)
                 ignore = new HashSet<ElementId>(ignoreIds.Where(id => id != null && id != ElementId.InvalidElementId));
 
-            var categories = new HashSet<BuiltInCategory>(OBSTACLE_CATEGORIES ?? Array.Empty<BuiltInCategory>())
-            {
-                BuiltInCategory.OST_Walls
-            };
-
-            double pad = MmToFt(10);
             var list = new List<BoundingBoxXYZ>();
-
-            void AppendCategory(BuiltInCategory cat)
+            foreach (var element in collector)
             {
-                try
+                if (ignore != null && ignore.Contains(element.Id)) continue;
+
+                var bb = element.get_BoundingBox(null);
+                if (bb == null) continue;
+
+                // Copie défensive + léger tampon pour éviter les collisions tangentes
+                double pad = MmToFt(10);
+                var clone = new BoundingBoxXYZ
                 {
-                    var collector = new FilteredElementCollector(doc)
-                        .OfCategory(cat)
-                        .WherePasses(filter)
-                        .WhereElementIsNotElementType();
+                    Min = new XYZ(bb.Min.X - pad, bb.Min.Y - pad, bb.Min.Z - pad),
+                    Max = new XYZ(bb.Max.X + pad, bb.Max.Y + pad, bb.Max.Z + pad)
+                };
 
-                    foreach (var element in collector)
-                    {
-                        if (ignore != null && ignore.Contains(element.Id)) continue;
-
-                        var bb = element.get_BoundingBox(null);
-                        if (bb == null) continue;
-
-                        var clone = new BoundingBoxXYZ
-                        {
-                            Min = new XYZ(bb.Min.X - pad, bb.Min.Y - pad, bb.Min.Z - pad),
-                            Max = new XYZ(bb.Max.X + pad, bb.Max.Y + pad, bb.Max.Z + pad),
-                            Transform = bb.Transform
-                        };
-
-                        list.Add(clone);
-                    }
-                }
-                catch
-                {
-                    // Certaines catégories peuvent ne pas être valides dans ce document ; on les ignore simplement.
-                }
+                list.Add(clone);
             }
 
             foreach (var cat in categories)
