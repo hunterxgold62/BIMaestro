@@ -72,52 +72,18 @@
         </Style>
 
         <Style x:Key="DocumentationBadgeStyle" TargetType="Button">
-            <Setter Property="Visibility" Value="Collapsed"/>
+            <Setter Property="Content" Value="DOC"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Padding" Value="6,3"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Background" Value="#FF0063B1"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="Visibility" Value="Collapsed"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="ToolTip" Value="Ouvrir la documentation"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="BadgeBorder"
-                                Background="#FF21527A"
-                                BorderBrush="#FF9AC5FF"
-                                BorderThickness="1"
-                                CornerRadius="10"
-                                Padding="6,3"
-                                SnapsToDevicePixels="True">
-                            <Border.Effect>
-                                <DropShadowEffect ShadowDepth="1" BlurRadius="5" Opacity="0.4"/>
-                            </Border.Effect>
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <Path Data="M1,1 L6.3,1 L9,3.7 L9,11 L1,11 Z"
-                                      Fill="White"
-                                      Stretch="Uniform"
-                                      Width="9"
-                                      Height="10"
-                                      Margin="0,0,4,0"/>
-                                <TextBlock Text="DOC"
-                                           FontSize="11"
-                                           FontWeight="SemiBold"
-                                           Foreground="White"
-                                           VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="BadgeBorder" Property="Background" Value="#FF2D7DDB"/>
-                                <Setter TargetName="BadgeBorder" Property="BorderBrush" Value="#FFE6F0FF"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="BadgeBorder" Property="Background" Value="#FF1B4F8C"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="BadgeBorder" Property="Opacity" Value="0.6"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding DocumentationAvailable}" Value="True">
                     <Setter Property="Visibility" Value="Visible"/>
@@ -486,7 +452,7 @@
                             </StackPanel>
                         </Border>
 
-                        
+
                     </Grid>
                 </Grid>
             </Border>
@@ -683,8 +649,8 @@
                         <DockPanel Grid.Row="3">
                             <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
                                 <Button x:Name="DateSortButton"
-                                        Content="Date de MAJ"
-                                        Click="DateSortButton_Click">
+        Content="Date de MAJ"
+        Click="DateSortButton_Click">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource PillButtonStyle}">
                                             <Setter Property="Margin" Value="0,0,12,0"/>
@@ -692,16 +658,22 @@
                                             <Setter Property="Background" Value="#FFF2F5FC"/>
                                             <Setter Property="BorderBrush" Value="#FFDCE6FA"/>
                                             <Setter Property="Foreground" Value="#FF2A3F6A"/>
-                                            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=IsDateSortActive}" Value="True">
-                                                <Setter Property="Background" Value="#FFE0F2FF"/>
-                                                <Setter Property="BorderBrush" Value="#FF5AA0FF"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding IsChecked, ElementName=DetailedViewCheckBox}" Value="False">
-                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                            </DataTrigger>
+
+                                            <!-- ✅ Les triggers doivent être dans Style.Triggers -->
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=IsDateSortActive}" Value="True">
+                                                    <Setter Property="Background" Value="#FFE0F2FF"/>
+                                                    <Setter Property="BorderBrush" Value="#FF5AA0FF"/>
+                                                </DataTrigger>
+
+                                                <DataTrigger Binding="{Binding IsChecked, ElementName=DetailedViewCheckBox}" Value="False">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
                                         </Style>
                                     </Button.Style>
                                 </Button>
+
                                 <CheckBox x:Name="DetailedViewCheckBox"
                                           Content="Vue détaillée"
                                           Margin="0,0,20,0"
@@ -748,9 +720,6 @@
                                     Click="CollectionActionsButton_Click">
                                 <Button.ContextMenu>
                                     <ContextMenu>
-                                        <MenuItem Header="Importer une collection…"
-                                                  Click="CollectionImportMenuItem_Click"/>
-                                        <Separator/>
                                         <MenuItem Header="Partager la collection…"
                                                   Click="CollectionShareMenuItem_Click"/>
                                         <MenuItem Header="Télécharger les familles…"

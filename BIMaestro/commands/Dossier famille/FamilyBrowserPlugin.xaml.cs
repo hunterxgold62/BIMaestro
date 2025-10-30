@@ -329,7 +329,7 @@ namespace Famille
                 LoadThumbnailForFamilyItem(it);
                 LoadMetadataForFamilyItem(it);
             }
-          
+
         }
 
         private void ShowTop8CheckBox_Changed(object sender, RoutedEventArgs e)
@@ -1355,78 +1355,6 @@ namespace Famille
             button.ContextMenu.IsOpen = true;
         }
 
-        private void CollectionImportMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            var dialog = new OpenFileDialog
-            {
-                Title = "Importer une collection",
-                Filter = "Fichier JSON (*.json)|*.json|Tous les fichiers (*.*)|*.*",
-                CheckFileExists = true,
-                CheckPathExists = true,
-                Multiselect = false
-            };
-
-            if (dialog.ShowDialog(this) != true)
-                return;
-
-            try
-            {
-                var json = File.ReadAllText(dialog.FileName, Encoding.UTF8);
-                var payload = JsonConvert.DeserializeObject<CollectionExportPayload>(json);
-
-                if (payload == null)
-                {
-                    MessageBox.Show(this,
-                        "Le fichier sélectionné ne contient pas de collection valide.",
-                        "Import collection",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
-                    return;
-                }
-
-                var baseName = string.IsNullOrWhiteSpace(payload.Name)
-                    ? Path.GetFileNameWithoutExtension(dialog.FileName)
-                    : payload.Name.Trim();
-
-                var importedCollection = new Collection
-                {
-                    Name = GetUniqueCollectionName(baseName)
-                };
-
-                if (payload.Paths != null)
-                {
-                    var unique = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                    foreach (var path in payload.Paths)
-                    {
-                        if (string.IsNullOrWhiteSpace(path))
-                            continue;
-
-                        var cleaned = path.Trim();
-                        if (unique.Add(cleaned))
-                            importedCollection.Paths.Add(cleaned);
-                    }
-                }
-
-                _collections.Add(importedCollection);
-                SaveCollections();
-                CollectionCombo.SelectedItem = importedCollection;
-
-                MessageBox.Show(this,
-                    $"Collection « {importedCollection.Name} » importée ({importedCollection.Paths.Count} éléments).",
-                    "Import collection",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(this,
-                    "Impossible d'importer la collection :\n" + ex.Message,
-                    "Import collection",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
-        }
-
         private void CollectionShareMenuItem_Click(object sender, RoutedEventArgs e)
         {
             if (_selectedCollection == null || _selectedCollection.Paths.Count == 0)
@@ -1453,7 +1381,7 @@ namespace Famille
 
             try
             {
-                var payload = new CollectionExportPayload
+                var payload = new
                 {
                     Name = _selectedCollection.Name,
                     Paths = _selectedCollection.Paths.ToList()
@@ -2028,7 +1956,7 @@ namespace Famille
             if (AlwaysOnTopSwitch != null)
                 AlwaysOnTopSwitch.IsOn = isOn;
 
-          
+
 
             this.Topmost = isOn;
         }
@@ -2516,29 +2444,6 @@ namespace Famille
                 result = fallback;
 
             return result;
-        }
-
-        private string GetUniqueCollectionName(string desiredName)
-        {
-            if (string.IsNullOrWhiteSpace(desiredName))
-                desiredName = "Collection importée";
-
-            desiredName = desiredName.Trim();
-
-            var existingNames = _collections != null
-                ? new HashSet<string>(_collections.Select(c => c.Name), StringComparer.OrdinalIgnoreCase)
-                : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var baseName = desiredName;
-            int suffix = 2;
-
-            while (existingNames.Contains(desiredName)
-                   || string.Equals(desiredName, FavoritesCollectionName, StringComparison.OrdinalIgnoreCase))
-            {
-                desiredName = $"{baseName} ({suffix})";
-                suffix++;
-            }
-
-            return desiredName;
         }
 
         private static string GetUniqueDestinationPath(string folder, string fileName)
