@@ -115,6 +115,27 @@
                                VerticalAlignment="Center"
                                Style="{StaticResource ImageStyle}"/>
                     </Border>
+                    <Button Content="DOC"
+                            Width="34" Height="20" FontSize="10" Padding="0"
+                            HorizontalAlignment="Left" VerticalAlignment="Top" Margin="4"
+                            Click="DocumentationBadge_Click"
+                            ToolTip="Afficher la documentation"
+                            Background="#FF2A3F6A"
+                            Foreground="White"
+                            BorderBrush="Transparent"
+                            BorderThickness="0"
+                            FocusVisualStyle="{x:Null}">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding DocumentationAvailable}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
                     <Button Content="3D"
                             Width="28" Height="20" FontSize="10" Padding="0"
                             HorizontalAlignment="Right" VerticalAlignment="Top" Margin="4"
@@ -224,6 +245,27 @@
 
                         <DockPanel Grid.Row="0" LastChildFill="True">
                             <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                                <Button Content="DOC"
+                                        Width="38" Height="22" FontSize="10" Padding="0"
+                                        Margin="0,0,8,0"
+                                        Click="DocumentationBadge_Click"
+                                        ToolTip="Afficher la documentation"
+                                        Background="#FF2A3F6A"
+                                        Foreground="White"
+                                        BorderBrush="Transparent"
+                                        BorderThickness="0"
+                                        FocusVisualStyle="{x:Null}">
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding DocumentationAvailable}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
                                 <Button Content="3D"
                                         Width="32" Height="22" FontSize="10" Padding="0"
                                         Margin="0,0,8,0"
@@ -609,6 +651,33 @@
 
                         <DockPanel Grid.Row="3">
                             <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                                <Button x:Name="DateSortButton"
+                                        Content="Date de MAJ"
+                                        Margin="0,0,12,0"
+                                        Click="DateSortButton_Click"
+                                        Cursor="Hand"
+                                        Padding="10,4"
+                                        ToolTip="Trier les familles par date de mise à jour">
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Setter Property="Background" Value="#FFE9EEF6"/>
+                                            <Setter Property="BorderBrush" Value="#FFC9D7F5"/>
+                                            <Setter Property="BorderThickness" Value="1"/>
+                                            <Setter Property="FontWeight" Value="Normal"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsChecked, ElementName=DetailedViewCheckBox}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsDateSortActive}" Value="True">
+                                                    <Setter Property="Background" Value="#FFD9E8FF"/>
+                                                    <Setter Property="BorderBrush" Value="#FF8AB4F8"/>
+                                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
                                 <CheckBox x:Name="DetailedViewCheckBox"
                                           Content="Vue détaillée"
                                           Margin="0,0,20,0"
@@ -651,6 +720,17 @@
                             <Button Content="Charger la collection"
                                     Width="160"
                                     Click="CollectionLoad_Click"/>
+                            <Button Content="⋯"
+                                    Width="36" Height="28" Margin="6,0,0,0"
+                                    Click="CollectionOptionsButton_Click"
+                                    ToolTip="Plus d'options">
+                                <Button.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="Partager…" Click="CollectionShare_Click"/>
+                                        <MenuItem Header="Télécharger…" Click="CollectionDownload_Click"/>
+                                    </ContextMenu>
+                                </Button.ContextMenu>
+                            </Button>
                         </StackPanel>
                     </DockPanel>
 
