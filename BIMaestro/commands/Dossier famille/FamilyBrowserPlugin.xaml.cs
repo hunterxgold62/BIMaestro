@@ -1367,42 +1367,16 @@ namespace Famille
                 return;
             }
 
-            var defaultName = MakeSafeFileName(_selectedCollection.Name, "collection");
-
-            var dialog = new SaveFileDialog
+            if (TrySaveCollectionAsJson(_selectedCollection,
+                    "Exporter la collection",
+                    "collection",
+                    out var savedPath))
             {
-                Title = "Exporter la collection",
-                Filter = "Fichier JSON (*.json)|*.json|Tous les fichiers (*.*)|*.*",
-                FileName = defaultName + ".json"
-            };
-
-            if (dialog.ShowDialog(this) != true)
-                return;
-
-            try
-            {
-                var payload = new
-                {
-                    Name = _selectedCollection.Name,
-                    Paths = _selectedCollection.Paths.ToList()
-                };
-
-                var json = JsonConvert.SerializeObject(payload, Formatting.Indented);
-                File.WriteAllText(dialog.FileName, json, Encoding.UTF8);
-
                 MessageBox.Show(this,
-                    $"Collection exportée vers :\n{dialog.FileName}",
+                    $"Collection exportée vers :\n{savedPath}",
                     "Export collection",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(this,
-                    "Impossible d'exporter la collection :\n" + ex.Message,
-                    "Export collection",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
             }
         }
 
