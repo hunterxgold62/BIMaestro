@@ -165,24 +165,36 @@ namespace Famille
                         string text = Latin1.GetString(buffer, 0, total);
 
                         // OmniClass (code + titre à proximité)
-                        if (meta.OmniClassCode == null)
+                        if (meta.OmniClassCode == null || meta.OmniClassTitle == null)
                         {
-                            int idx = text.IndexOf("omniclass", StringComparison.OrdinalIgnoreCase);
-                            if (idx >= 0)
+                            int searchIndex = 0;
+                            while (true)
                             {
+                                int idx = text.IndexOf("omniclass", searchIndex, StringComparison.OrdinalIgnoreCase);
+                                if (idx < 0) break;
+
                                 int start = Math.Max(0, idx - 4096);
                                 int len = Math.Min(8192, text.Length - start);
                                 string window = text.Substring(start, len);
 
-                                var m = RxOmniCode.Match(window);
-                                if (m.Success) meta.OmniClassCode = m.Groups[1].Value;
+                                if (meta.OmniClassCode == null)
+                                {
+                                    var codeMatch = RxOmniCode.Match(window);
+                                    if (codeMatch.Success)
+                                        meta.OmniClassCode = codeMatch.Groups[1].Value;
+                                }
 
                                 if (meta.OmniClassTitle == null)
                                 {
-                                    var t = RxOmniTitle.Match(window);
-                                    if (t.Success)
-                                        meta.OmniClassTitle = FixUtf8Mojibake(t.Groups[2].Value.Trim());
+                                    var titleMatch = RxOmniTitle.Match(window);
+                                    if (titleMatch.Success)
+                                        meta.OmniClassTitle = FixUtf8Mojibake(titleMatch.Groups[2].Value.Trim());
                                 }
+
+                                if (meta.OmniClassCode != null && meta.OmniClassTitle != null)
+                                    break;
+
+                                searchIndex = idx + 9; // «omniclass».Length
                             }
                         }
 

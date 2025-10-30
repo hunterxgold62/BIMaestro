@@ -461,7 +461,7 @@
                                                Text="Numéro OmniClass"/>
                                     <TextBlock Grid.Column="2"
                                                Foreground="#FF1F3B57"
-                                               Text="{Binding OmniClassNumber, TargetNullValue=—}"/>
+                                              Text="{Binding OmniClassDisplay, TargetNullValue=—}"/>
                                 </Grid>
                             </StackPanel>
                         </Border>

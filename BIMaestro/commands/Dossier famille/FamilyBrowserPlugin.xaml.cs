@@ -1657,15 +1657,22 @@ namespace Famille
             });
         }
 
+
         private void UpdateMetadataBinding(FamilyItem fam, FamilyPartAtomMeta meta)
         {
             if (fam == null) return;
 
             void Apply()
             {
-                fam.OmniClassNumber = string.IsNullOrWhiteSpace(meta?.OmniClassCode)
+                string omniCode = string.IsNullOrWhiteSpace(meta?.OmniClassCode)
                     ? null
                     : meta.OmniClassCode.Trim();
+                string omniTitle = string.IsNullOrWhiteSpace(meta?.OmniClassTitle)
+                    ? null
+                    : meta.OmniClassTitle.Trim();
+
+                fam.OmniClassNumber = omniCode;
+                fam.OmniClassTitle = omniCode == null ? null : omniTitle;
 
                 if (meta?.FileSizeBytes.HasValue == true)
                     fam.FileSizeBytes = meta.FileSizeBytes;
@@ -2522,7 +2529,43 @@ namespace Famille
         public string OmniClassNumber
         {
             get => _omniClassNumber;
-            set { if (_omniClassNumber != value) { _omniClassNumber = value; OnPropertyChanged(nameof(OmniClassNumber)); } }
+            set
+            {
+                if (_omniClassNumber != value)
+                {
+                    _omniClassNumber = value;
+                    OnPropertyChanged(nameof(OmniClassNumber));
+                    OnPropertyChanged(nameof(OmniClassDisplay));
+                }
+            }
+        }
+
+        private string _omniClassTitle;
+        public string OmniClassTitle
+        {
+            get => _omniClassTitle;
+            set
+            {
+                if (_omniClassTitle != value)
+                {
+                    _omniClassTitle = value;
+                    OnPropertyChanged(nameof(OmniClassTitle));
+                    OnPropertyChanged(nameof(OmniClassDisplay));
+                }
+            }
+        }
+
+        public string OmniClassDisplay
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(OmniClassNumber))
+                    return null;
+
+                return string.IsNullOrWhiteSpace(OmniClassTitle)
+                    ? OmniClassNumber
+                    : string.Format(CultureInfo.CurrentCulture, "{0} - {1}", OmniClassNumber, OmniClassTitle);
+            }
         }
 
         private ImageSource _icon;
