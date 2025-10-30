@@ -530,15 +530,6 @@ namespace Famille
 
             result.Sort((a, b) =>
             {
-                if (hasDateSort)
-                {
-                    var aDate = a?.LastUpdatedUtc ?? DateTime.MinValue;
-                    var bDate = b?.LastUpdatedUtc ?? DateTime.MinValue;
-                    int dateCmp = bDate.CompareTo(aDate);
-                    if (dateCmp != 0)
-                        return dateCmp;
-                }
-
                 if (hasCategory)
                 {
                     int catCmp = CategoryMatches(b).CompareTo(CategoryMatches(a));
@@ -551,6 +542,15 @@ namespace Famille
                     int verCmp = VersionMatches(b).CompareTo(VersionMatches(a));
                     if (verCmp != 0)
                         return verCmp;
+                }
+
+                if (hasDateSort)
+                {
+                    var aDate = a?.LastUpdatedUtc ?? DateTime.MinValue;
+                    var bDate = b?.LastUpdatedUtc ?? DateTime.MinValue;
+                    int dateCmp = bDate.CompareTo(aDate);
+                    if (dateCmp != 0)
+                        return dateCmp;
                 }
 
                 if (hasSizeSort)
@@ -1382,85 +1382,101 @@ namespace Famille
 
         private void CollectionDownloadMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new OpenFileDialog
+            if (_selectedCollection == null || _selectedCollection.Paths.Count == 0)
             {
-                Title = "Importer une collection",
-                Filter = "Fichier JSON (*.json)|*.json|Tous les fichiers (*.*)|*.*",
-                Multiselect = false,
-                CheckFileExists = true,
-                CheckPathExists = true
-            };
-
-            if (dialog.ShowDialog(this) != true)
-                return;
-
-            try
-            {
-                var json = File.ReadAllText(dialog.FileName, Encoding.UTF8);
-                var payload = JsonConvert.DeserializeObject<SharedCollectionData>(json);
-
-                if (payload?.Paths == null || payload.Paths.Count == 0)
-                {
-                    MessageBox.Show(this,
-                        "Le fichier sélectionné ne contient aucune collection valide.",
-                        "Import de collection",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
-                    return;
-                }
-
-                var sanitizedPaths = payload.Paths
-                    .Where(p => !string.IsNullOrWhiteSpace(p))
-                    .Select(p => p.Trim())
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-
-                if (sanitizedPaths.Count == 0)
-                {
-                    MessageBox.Show(this,
-                        "Aucun chemin exploitable n'a été trouvé dans ce fichier.",
-                        "Import de collection",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
-                    return;
-                }
-
-                var desiredName = string.IsNullOrWhiteSpace(payload.Name)
-                    ? "Collection importée"
-                    : payload.Name.Trim();
-
-                if (string.Equals(desiredName, FavoritesCollectionName, StringComparison.OrdinalIgnoreCase))
-                    desiredName = desiredName + " (importée)";
-
-                var finalName = GenerateUniqueCollectionName(desiredName);
-
-                var imported = new Collection
-                {
-                    Name = finalName,
-                    Paths = sanitizedPaths
-                };
-
-                _collections.Add(imported);
-                SaveCollections();
-
-                _selectedCollection = imported;
-                CollectionCombo.SelectedItem = imported;
-                RefreshCollectionContent();
-
                 MessageBox.Show(this,
-                    $"Collection « {finalName} » importée ({sanitizedPaths.Count} élément(s)).",
-                    "Import de collection",
+                    "Sélectionne une collection non vide avant de télécharger les familles.",
+                    "Collections",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
+                return;
+            }
+
+            using var dialog = new WinForms.FolderBrowserDialog
+            {
+                Description = "Choisir le dossier de destination"
+            };
+
+            if (dialog.ShowDialog() != WinForms.DialogResult.OK || string.IsNullOrWhiteSpace(dialog.SelectedPath))
+                return;
+
+            var targetFolder = dialog.SelectedPath;
+            try
+            {
+                Directory.CreateDirectory(targetFolder);
             }
             catch (Exception ex)
             {
                 MessageBox.Show(this,
-                    "Impossible d'importer la collection :\n" + ex.Message,
-                    "Import de collection",
+                    "Impossible de créer le dossier de destination :\n" + ex.Message,
+                    "Téléchargement de la collection",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
+                return;
             }
+            int copied = 0;
+            var missing = new List<string>();
+            var errors = new List<string>();
+
+            foreach (var path in _selectedCollection.Paths)
+            {
+                if (string.IsNullOrWhiteSpace(path))
+                    continue;
+
+                try
+                {
+                    if (!File.Exists(path))
+                    {
+                        missing.Add(Path.GetFileName(path));
+                        continue;
+                    }
+
+                    var fileName = Path.GetFileName(path);
+                    var destination = GetUniqueDestinationPath(targetFolder, fileName);
+                    if (destination == null)
+                    {
+                        errors.Add(fileName + " (chemin invalide)");
+                        continue;
+                    }
+
+                    File.Copy(path, destination, overwrite: false);
+                    copied++;
+                }
+                catch (Exception ex)
+                {
+                    errors.Add(Path.GetFileName(path) + " : " + ex.Message);
+                }
+            }
+
+            var summary = new StringBuilder();
+            summary.AppendLine($"Familles copiées : {copied}");
+            summary.AppendLine($"Destination : {targetFolder}");
+
+            if (missing.Count > 0)
+            {
+                summary.AppendLine();
+                summary.AppendLine("Introuvables :");
+                foreach (var name in missing.Take(10))
+                    summary.AppendLine(" - " + name);
+                if (missing.Count > 10)
+                    summary.AppendLine($" - (+ {missing.Count - 10} autres)");
+            }
+
+            if (errors.Count > 0)
+            {
+                summary.AppendLine();
+                summary.AppendLine("Erreurs de copie :");
+                foreach (var err in errors.Take(10))
+                    summary.AppendLine(" - " + err);
+                if (errors.Count > 10)
+                    summary.AppendLine($" - (+ {errors.Count - 10} autres)");
+            }
+
+            MessageBox.Show(this,
+                summary.ToString(),
+                "Téléchargement de la collection",
+                MessageBoxButton.OK,
+                errors.Count > 0 || missing.Count > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
         }
 
         private void CollectionLoad_Click(object sender, RoutedEventArgs e)
@@ -2266,26 +2282,6 @@ namespace Famille
             }
         }
 
-        private string GenerateUniqueCollectionName(string desiredName)
-        {
-            if (string.IsNullOrWhiteSpace(desiredName))
-                desiredName = "Collection importée";
-
-            var baseName = desiredName.Trim();
-            if (string.Equals(baseName, FavoritesCollectionName, StringComparison.OrdinalIgnoreCase))
-                baseName += " (importée)";
-
-            string candidate = baseName;
-            int suffix = 2;
-            while (_collections.Any(c => string.Equals(c.Name, candidate, StringComparison.OrdinalIgnoreCase)))
-            {
-                candidate = $"{baseName} ({suffix})";
-                suffix++;
-            }
-
-            return candidate;
-        }
-
         // Ajout express -> collection active
         private void AddToActiveCollection_Click(object sender, RoutedEventArgs e)
         {
@@ -2422,6 +2418,31 @@ namespace Famille
                 result = fallback;
 
             return result;
+        }
+
+        private static string GetUniqueDestinationPath(string folder, string fileName)
+        {
+            if (string.IsNullOrWhiteSpace(folder))
+                return null;
+
+            if (string.IsNullOrWhiteSpace(fileName))
+                fileName = "fichier.rfa";
+
+            var baseName = Path.GetFileNameWithoutExtension(fileName);
+            var extension = Path.GetExtension(fileName) ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(baseName))
+                baseName = "fichier";
+
+            var candidate = Path.Combine(folder, baseName + extension);
+            int counter = 1;
+            while (File.Exists(candidate))
+            {
+                candidate = Path.Combine(folder, $"{baseName} ({counter}){extension}");
+                counter++;
+            }
+
+            return candidate;
         }
 
         private FamilyItem CreateFamilyItemFromPath(string path)
