@@ -530,6 +530,15 @@ namespace Famille
 
             result.Sort((a, b) =>
             {
+                if (hasDateSort)
+                {
+                    var aDate = a?.LastUpdatedUtc ?? DateTime.MinValue;
+                    var bDate = b?.LastUpdatedUtc ?? DateTime.MinValue;
+                    int dateCmp = bDate.CompareTo(aDate);
+                    if (dateCmp != 0)
+                        return dateCmp;
+                }
+
                 if (hasCategory)
                 {
                     int catCmp = CategoryMatches(b).CompareTo(CategoryMatches(a));
@@ -542,15 +551,6 @@ namespace Famille
                     int verCmp = VersionMatches(b).CompareTo(VersionMatches(a));
                     if (verCmp != 0)
                         return verCmp;
-                }
-
-                if (hasDateSort)
-                {
-                    var aDate = a?.LastUpdatedUtc ?? DateTime.MinValue;
-                    var bDate = b?.LastUpdatedUtc ?? DateTime.MinValue;
-                    int dateCmp = bDate.CompareTo(aDate);
-                    if (dateCmp != 0)
-                        return dateCmp;
                 }
 
                 if (hasSizeSort)
@@ -1379,27 +1379,18 @@ namespace Famille
             if (dialog.ShowDialog(this) != true)
                 return;
 
-            try
+            if (TrySaveCollectionAsJson(dialog.FileName, _selectedCollection, out var errorMessage))
             {
-                var payload = new
-                {
-                    Name = _selectedCollection.Name,
-                    Paths = _selectedCollection.Paths.ToList()
-                };
-
-                var json = JsonConvert.SerializeObject(payload, Formatting.Indented);
-                File.WriteAllText(dialog.FileName, json, Encoding.UTF8);
-
                 MessageBox.Show(this,
                     $"Collection exportée vers :\n{dialog.FileName}",
                     "Export collection",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
             }
-            catch (Exception ex)
+            else
             {
                 MessageBox.Show(this,
-                    "Impossible d'exporter la collection :\n" + ex.Message,
+                    "Impossible d'exporter la collection :\n" + errorMessage,
                     "Export collection",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
@@ -1408,101 +1399,120 @@ namespace Famille
 
         private void CollectionDownloadMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            if (_selectedCollection == null || _selectedCollection.Paths.Count == 0)
+            var dialog = new OpenFileDialog
             {
-                MessageBox.Show(this,
-                    "Sélectionne une collection non vide avant de télécharger les familles.",
-                    "Collections",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-                return;
-            }
-
-            using var dialog = new WinForms.FolderBrowserDialog
-            {
-                Description = "Choisir le dossier de destination"
+                Title = "Importer une collection",
+                Filter = "Fichier JSON (*.json)|*.json|Tous les fichiers (*.*)|*.*",
+                Multiselect = false,
+                CheckFileExists = true,
+                CheckPathExists = true
             };
 
-            if (dialog.ShowDialog() != WinForms.DialogResult.OK || string.IsNullOrWhiteSpace(dialog.SelectedPath))
+            if (dialog.ShowDialog(this) != true)
                 return;
 
-            var targetFolder = dialog.SelectedPath;
             try
             {
-                Directory.CreateDirectory(targetFolder);
+                var json = File.ReadAllText(dialog.FileName, Encoding.UTF8);
+                var payload = JsonConvert.DeserializeObject<CollectionExportPayload>(json);
+
+                if (payload?.Paths == null || payload.Paths.Count == 0)
+                {
+                    MessageBox.Show(this,
+                        "Le fichier sélectionné ne contient aucune collection valide.",
+                        "Import de collection",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                var sanitizedPaths = payload.Paths
+                    .Where(p => !string.IsNullOrWhiteSpace(p))
+                    .Select(p => p.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                if (sanitizedPaths.Count == 0)
+                {
+                    MessageBox.Show(this,
+                        "Aucun chemin exploitable n'a été trouvé dans ce fichier.",
+                        "Import de collection",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                var desiredName = string.IsNullOrWhiteSpace(payload.Name)
+                    ? "Collection importée"
+                    : payload.Name.Trim();
+
+                if (string.Equals(desiredName, FavoritesCollectionName, StringComparison.OrdinalIgnoreCase))
+                    desiredName = desiredName + " (importée)";
+
+                var finalName = GenerateUniqueCollectionName(desiredName);
+
+                var imported = new Collection
+                {
+                    Name = finalName,
+                    Paths = sanitizedPaths
+                };
+
+                _collections.Add(imported);
+                SaveCollections();
+
+                _selectedCollection = imported;
+                CollectionCombo.SelectedItem = imported;
+                RefreshCollectionContent();
+
+                MessageBox.Show(this,
+                    $"Collection « {finalName} » importée ({sanitizedPaths.Count} élément(s)).",
+                    "Import de collection",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
                 MessageBox.Show(this,
-                    "Impossible de créer le dossier de destination :\n" + ex.Message,
-                    "Téléchargement de la collection",
+                    "Impossible d'importer la collection :\n" + ex.Message,
+                    "Import de collection",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
-                return;
             }
-            int copied = 0;
-            var missing = new List<string>();
-            var errors = new List<string>();
+        }
 
-            foreach (var path in _selectedCollection.Paths)
+        private bool TrySaveCollectionAsJson(string filePath, Collection collection, out string errorMessage)
+        {
+            errorMessage = null;
+
+            if (string.IsNullOrWhiteSpace(filePath))
             {
-                if (string.IsNullOrWhiteSpace(path))
-                    continue;
+                errorMessage = "Chemin de fichier invalide.";
+                return false;
+            }
 
-                try
+            if (collection == null)
+            {
+                errorMessage = "Aucune collection n'est disponible.";
+                return false;
+            }
+
+            try
+            {
+                var payload = new CollectionExportPayload
                 {
-                    if (!File.Exists(path))
-                    {
-                        missing.Add(Path.GetFileName(path));
-                        continue;
-                    }
+                    Name = collection.Name,
+                    Paths = collection.Paths?.ToList() ?? new List<string>()
+                };
 
-                    var fileName = Path.GetFileName(path);
-                    var destination = GetUniqueDestinationPath(targetFolder, fileName);
-                    if (destination == null)
-                    {
-                        errors.Add(fileName + " (chemin invalide)");
-                        continue;
-                    }
-
-                    File.Copy(path, destination, overwrite: false);
-                    copied++;
-                }
-                catch (Exception ex)
-                {
-                    errors.Add(Path.GetFileName(path) + " : " + ex.Message);
-                }
+                var json = JsonConvert.SerializeObject(payload, Formatting.Indented);
+                File.WriteAllText(filePath, json, Encoding.UTF8);
+                return true;
             }
-
-            var summary = new StringBuilder();
-            summary.AppendLine($"Familles copiées : {copied}");
-            summary.AppendLine($"Destination : {targetFolder}");
-
-            if (missing.Count > 0)
+            catch (Exception ex)
             {
-                summary.AppendLine();
-                summary.AppendLine("Introuvables :");
-                foreach (var name in missing.Take(10))
-                    summary.AppendLine(" - " + name);
-                if (missing.Count > 10)
-                    summary.AppendLine($" - (+ {missing.Count - 10} autres)");
+                errorMessage = ex.Message;
+                return false;
             }
-
-            if (errors.Count > 0)
-            {
-                summary.AppendLine();
-                summary.AppendLine("Erreurs de copie :");
-                foreach (var err in errors.Take(10))
-                    summary.AppendLine(" - " + err);
-                if (errors.Count > 10)
-                    summary.AppendLine($" - (+ {errors.Count - 10} autres)");
-            }
-
-            MessageBox.Show(this,
-                summary.ToString(),
-                "Téléchargement de la collection",
-                MessageBoxButton.OK,
-                errors.Count > 0 || missing.Count > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
         }
 
         private void CollectionLoad_Click(object sender, RoutedEventArgs e)
@@ -2179,7 +2189,7 @@ namespace Famille
         private sealed class CollectionExportPayload
         {
             public string Name { get; set; }
-            public List<string> Paths { get; set; }
+            public List<string> Paths { get; set; } = new();
         }
 
         private void LoadCollections()
@@ -2306,6 +2316,26 @@ namespace Famille
                 CollectionCombo.ItemsSource = _collections;
                 CollectionCombo.SelectedIndex = Math.Max(0, Math.Min(idx - 1, _collections.Count - 1));
             }
+        }
+
+        private string GenerateUniqueCollectionName(string desiredName)
+        {
+            if (string.IsNullOrWhiteSpace(desiredName))
+                desiredName = "Collection importée";
+
+            var baseName = desiredName.Trim();
+            if (string.Equals(baseName, FavoritesCollectionName, StringComparison.OrdinalIgnoreCase))
+                baseName += " (importée)";
+
+            string candidate = baseName;
+            int suffix = 2;
+            while (_collections.Any(c => string.Equals(c.Name, candidate, StringComparison.OrdinalIgnoreCase)))
+            {
+                candidate = $"{baseName} ({suffix})";
+                suffix++;
+            }
+
+            return candidate;
         }
 
         // Ajout express -> collection active
@@ -2444,31 +2474,6 @@ namespace Famille
                 result = fallback;
 
             return result;
-        }
-
-        private static string GetUniqueDestinationPath(string folder, string fileName)
-        {
-            if (string.IsNullOrWhiteSpace(folder))
-                return null;
-
-            if (string.IsNullOrWhiteSpace(fileName))
-                fileName = "fichier.rfa";
-
-            var baseName = Path.GetFileNameWithoutExtension(fileName);
-            var extension = Path.GetExtension(fileName) ?? string.Empty;
-
-            if (string.IsNullOrWhiteSpace(baseName))
-                baseName = "fichier";
-
-            var candidate = Path.Combine(folder, baseName + extension);
-            int counter = 1;
-            while (File.Exists(candidate))
-            {
-                candidate = Path.Combine(folder, $"{baseName} ({counter}){extension}");
-                counter++;
-            }
-
-            return candidate;
         }
 
         private FamilyItem CreateFamilyItemFromPath(string path)
