@@ -15,6 +15,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -53,6 +54,7 @@ namespace Famille
         private string _activeCategoryFilter;
         private string _activeVersionFilter;
         private bool _sizeSortDescending;
+        private bool _dateSortDescending;
         private bool _isResorting;
 
         // ===== Données UI =====
@@ -86,6 +88,7 @@ namespace Famille
         }
 
         public bool IsSizeSortActive => _sizeSortDescending;
+        public bool IsDateSortActive => _dateSortDescending;
 
         public event PropertyChangedEventHandler PropertyChanged;
         private void NotifyPropertyChanged(string propertyName)
@@ -421,6 +424,14 @@ namespace Famille
             ToggleSizeSorting();
         }
 
+        private void DateSortButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (DetailedViewCheckBox?.IsChecked != true)
+                return;
+
+            ToggleDateSorting();
+        }
+
         private void SetCategoryFilter(string category)
         {
             string normalized = string.IsNullOrWhiteSpace(category) ? null : category.Trim();
@@ -456,6 +467,13 @@ namespace Famille
             ApplyFilters();
         }
 
+        private void ToggleDateSorting()
+        {
+            _dateSortDescending = !_dateSortDescending;
+            NotifyPropertyChanged(nameof(IsDateSortActive));
+            ApplyFilters();
+        }
+
         private void ResetInteractiveFilters()
         {
             ActiveCategoryFilter = null;
@@ -465,6 +483,12 @@ namespace Famille
             {
                 _sizeSortDescending = false;
                 NotifyPropertyChanged(nameof(IsSizeSortActive));
+            }
+
+            if (_dateSortDescending)
+            {
+                _dateSortDescending = false;
+                NotifyPropertyChanged(nameof(IsDateSortActive));
             }
         }
         private List<FamilyItem> ApplyInteractiveSorting(List<FamilyItem> source)
@@ -481,8 +505,9 @@ namespace Famille
             bool hasCategory = !string.IsNullOrEmpty(categoryFilter);
             bool hasVersion = !string.IsNullOrEmpty(versionFilter);
             bool hasSizeSort = _sizeSortDescending;
+            bool hasDateSort = _dateSortDescending;
 
-            if (!hasCategory && !hasVersion && !hasSizeSort)
+            if (!hasCategory && !hasVersion && !hasSizeSort && !hasDateSort)
                 return result;
 
             bool CategoryMatches(FamilyItem item)
@@ -517,6 +542,15 @@ namespace Famille
                     int verCmp = VersionMatches(b).CompareTo(VersionMatches(a));
                     if (verCmp != 0)
                         return verCmp;
+                }
+
+                if (hasDateSort)
+                {
+                    var aDate = a?.LastUpdatedUtc ?? DateTime.MinValue;
+                    var bDate = b?.LastUpdatedUtc ?? DateTime.MinValue;
+                    int dateCmp = bDate.CompareTo(aDate);
+                    if (dateCmp != 0)
+                        return dateCmp;
                 }
 
                 if (hasSizeSort)
@@ -660,7 +694,8 @@ namespace Famille
                         Category = e.Category,
                         NormalizedName = e.NormalizedName,
                         FileSizeBytes = size,
-                        FileSizeText = FormatFileSize(size)
+                        FileSizeText = FormatFileSize(size),
+                        DocumentationAvailable = HasDocumentationFile(e.Path)
                     };
                 }).ToList();
 
@@ -749,24 +784,54 @@ namespace Famille
             if ((sender as MenuItem)?.DataContext is not FamilyItem fam)
                 return;
 
+            OpenDocumentationForFamily(fam, allowPrompt: true);
+        }
+
+        private void DocumentationBadge_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is not FamilyItem fam)
+                return;
+
+            OpenDocumentationForFamily(fam, allowPrompt: false);
+            e.Handled = true;
+        }
+
+        private void OpenDocumentationForFamily(FamilyItem fam, bool allowPrompt)
+        {
+            if (fam == null)
+                return;
+
             EnsureDocumentationLoaded(fam);
 
             if (!fam.HasDocumentation)
             {
-                if (!PromptAddDocumentation(fam))
+                if (allowPrompt)
                 {
+                    if (!PromptAddDocumentation(fam))
+                    {
+                        return;
+                    }
+
+                    if (!fam.HasDocumentation)
+                    {
+                        MessageBox.Show(this,
+                            "Aucun document n'a été associé à cette famille.",
+                            "Documentation",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information);
+                        return;
+                    }
+                }
+                else
+                {
+                    fam.DocumentationAvailable = fam.HasDocumentation;
+                    MessageBox.Show(this,
+                        "Aucun document n'a été associé à cette famille.",
+                        "Documentation",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
                     return;
                 }
-            }
-
-            if (!fam.HasDocumentation)
-            {
-                MessageBox.Show(this,
-                    "Aucun document n'a été associé à cette famille.",
-                    "Documentation",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-                return;
             }
 
             if (fam.DocumentationLinks.Count == 1)
@@ -799,6 +864,8 @@ namespace Famille
             {
                 fam.DocumentationLinks.Add(link.Clone());
             }
+
+            fam.DocumentationAvailable = fam.DocumentationLinks.Count > 0;
         }
 
         private List<FamilyDocumentLink> LoadDocumentationFromDisk(string familyPath)
@@ -845,6 +912,12 @@ namespace Famille
 
         private static string GetDocumentationFilePath(string familyPath)
             => string.IsNullOrWhiteSpace(familyPath) ? null : familyPath + ".docs.json";
+
+        private static bool HasDocumentationFile(string familyPath)
+        {
+            var docFile = GetDocumentationFilePath(familyPath);
+            return !string.IsNullOrWhiteSpace(docFile) && File.Exists(docFile);
+        }
 
         private bool PromptAddDocumentation(FamilyItem fam)
         {
@@ -1269,6 +1342,169 @@ namespace Famille
             RefreshTop8_UsageOnly();
         }
 
+        private void CollectionActionsButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button button)
+                return;
+
+            if (button.ContextMenu == null)
+                return;
+
+            button.ContextMenu.PlacementTarget = button;
+            button.ContextMenu.Placement = PlacementMode.Bottom;
+            button.ContextMenu.IsOpen = true;
+        }
+
+        private void CollectionShareMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedCollection == null || _selectedCollection.Paths.Count == 0)
+            {
+                MessageBox.Show(this,
+                    "Sélectionne une collection non vide avant de la partager.",
+                    "Collections",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var defaultName = MakeSafeFileName(_selectedCollection.Name, "collection");
+
+            var dialog = new SaveFileDialog
+            {
+                Title = "Exporter la collection",
+                Filter = "Fichier JSON (*.json)|*.json|Tous les fichiers (*.*)|*.*",
+                FileName = defaultName + ".json"
+            };
+
+            if (dialog.ShowDialog(this) != true)
+                return;
+
+            try
+            {
+                var payload = new
+                {
+                    Name = _selectedCollection.Name,
+                    Paths = _selectedCollection.Paths.ToList()
+                };
+
+                var json = JsonConvert.SerializeObject(payload, Formatting.Indented);
+                File.WriteAllText(dialog.FileName, json, Encoding.UTF8);
+
+                MessageBox.Show(this,
+                    $"Collection exportée vers :\n{dialog.FileName}",
+                    "Export collection",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this,
+                    "Impossible d'exporter la collection :\n" + ex.Message,
+                    "Export collection",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        private void CollectionDownloadMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedCollection == null || _selectedCollection.Paths.Count == 0)
+            {
+                MessageBox.Show(this,
+                    "Sélectionne une collection non vide avant de télécharger les familles.",
+                    "Collections",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            using var dialog = new WinForms.FolderBrowserDialog
+            {
+                Description = "Choisir le dossier de destination"
+            };
+
+            if (dialog.ShowDialog() != WinForms.DialogResult.OK || string.IsNullOrWhiteSpace(dialog.SelectedPath))
+                return;
+
+            var targetFolder = dialog.SelectedPath;
+            try
+            {
+                Directory.CreateDirectory(targetFolder);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this,
+                    "Impossible de créer le dossier de destination :\n" + ex.Message,
+                    "Téléchargement de la collection",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+                return;
+            }
+            int copied = 0;
+            var missing = new List<string>();
+            var errors = new List<string>();
+
+            foreach (var path in _selectedCollection.Paths)
+            {
+                if (string.IsNullOrWhiteSpace(path))
+                    continue;
+
+                try
+                {
+                    if (!File.Exists(path))
+                    {
+                        missing.Add(Path.GetFileName(path));
+                        continue;
+                    }
+
+                    var fileName = Path.GetFileName(path);
+                    var destination = GetUniqueDestinationPath(targetFolder, fileName);
+                    if (destination == null)
+                    {
+                        errors.Add(fileName + " (chemin invalide)");
+                        continue;
+                    }
+
+                    File.Copy(path, destination, overwrite: false);
+                    copied++;
+                }
+                catch (Exception ex)
+                {
+                    errors.Add(Path.GetFileName(path) + " : " + ex.Message);
+                }
+            }
+
+            var summary = new StringBuilder();
+            summary.AppendLine($"Familles copiées : {copied}");
+            summary.AppendLine($"Destination : {targetFolder}");
+
+            if (missing.Count > 0)
+            {
+                summary.AppendLine();
+                summary.AppendLine("Introuvables :");
+                foreach (var name in missing.Take(10))
+                    summary.AppendLine(" - " + name);
+                if (missing.Count > 10)
+                    summary.AppendLine($" - (+ {missing.Count - 10} autres)");
+            }
+
+            if (errors.Count > 0)
+            {
+                summary.AppendLine();
+                summary.AppendLine("Erreurs de copie :");
+                foreach (var err in errors.Take(10))
+                    summary.AppendLine(" - " + err);
+                if (errors.Count > 10)
+                    summary.AppendLine($" - (+ {errors.Count - 10} autres)");
+            }
+
+            MessageBox.Show(this,
+                summary.ToString(),
+                "Téléchargement de la collection",
+                MessageBoxButton.OK,
+                errors.Count > 0 || missing.Count > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
+        }
+
         private void CollectionLoad_Click(object sender, RoutedEventArgs e)
         {
             if (_selectedCollection == null || _selectedCollection.Paths.Count == 0) return;
@@ -1436,6 +1672,7 @@ namespace Famille
 
                     if (meta.UpdatedUtc.HasValue)
                     {
+                        fam.LastUpdatedUtc = meta.UpdatedUtc.Value;
                         try
                         {
                             var local = TimeZoneInfo.ConvertTimeFromUtc(meta.UpdatedUtc.Value, TimeZoneInfo.Local);
@@ -1448,11 +1685,13 @@ namespace Famille
                     }
                     else
                     {
+                        fam.LastUpdatedUtc = null;
                         fam.LastUpdatedText = null;
                     }
                 }
                 else
                 {
+                    fam.LastUpdatedUtc = null;
                     fam.LastUpdatedText = null;
                     fam.RevitSavedVersion = null;
                     if (string.IsNullOrWhiteSpace(fam.Category))
@@ -1461,6 +1700,7 @@ namespace Famille
 
                 if (!_isResorting &&
                     (_sizeSortDescending ||
+                     _dateSortDescending ||
                      !string.IsNullOrEmpty(ActiveCategoryFilter) ||
                      !string.IsNullOrEmpty(ActiveVersionFilter)))
                 {
@@ -1859,8 +2099,18 @@ namespace Famille
 
         private void DetailedViewCheckBox_Changed(object sender, RoutedEventArgs e)
         {
-            detailedViewMode = DetailedViewCheckBox?.IsChecked == true;
+            bool newMode = DetailedViewCheckBox?.IsChecked == true;
+            bool wasDateSortActive = _dateSortDescending;
+
+            detailedViewMode = newMode;
             UpdateFamilyListViewMode();
+
+            if (!newMode && wasDateSortActive)
+            {
+                _dateSortDescending = false;
+                NotifyPropertyChanged(nameof(IsDateSortActive));
+                ApplyFilters();
+            }
         }
 
         private void UpdateFamilyListViewMode()
@@ -2171,6 +2421,50 @@ namespace Famille
             }
         }
 
+        private static string MakeSafeFileName(string name, string fallback)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                name = fallback;
+
+            var invalid = Path.GetInvalidFileNameChars();
+            var sb = new StringBuilder(name.Length);
+            foreach (var ch in name)
+            {
+                sb.Append(invalid.Contains(ch) ? '_' : ch);
+            }
+
+            var result = sb.ToString().Trim();
+            if (string.IsNullOrEmpty(result))
+                result = fallback;
+
+            return result;
+        }
+
+        private static string GetUniqueDestinationPath(string folder, string fileName)
+        {
+            if (string.IsNullOrWhiteSpace(folder))
+                return null;
+
+            if (string.IsNullOrWhiteSpace(fileName))
+                fileName = "fichier.rfa";
+
+            var baseName = Path.GetFileNameWithoutExtension(fileName);
+            var extension = Path.GetExtension(fileName) ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(baseName))
+                baseName = "fichier";
+
+            var candidate = Path.Combine(folder, baseName + extension);
+            int counter = 1;
+            while (File.Exists(candidate))
+            {
+                candidate = Path.Combine(folder, $"{baseName} ({counter}){extension}");
+                counter++;
+            }
+
+            return candidate;
+        }
+
         private FamilyItem CreateFamilyItemFromPath(string path)
         {
             var name = System.IO.Path.GetFileNameWithoutExtension(path);
@@ -2182,7 +2476,8 @@ namespace Famille
                 Icon = null,
                 NormalizedName = StripDiacritics(name).ToLowerInvariant(),
                 FileSizeBytes = size,
-                FileSizeText = FormatFileSize(size)
+                FileSizeText = FormatFileSize(size),
+                DocumentationAvailable = HasDocumentationFile(path)
             };
         }
 
@@ -2237,6 +2532,13 @@ namespace Famille
             set { if (_revitSavedVersion != value) { _revitSavedVersion = value; OnPropertyChanged(nameof(RevitSavedVersion)); } }
         }
 
+        private DateTime? _lastUpdatedUtc;
+        public DateTime? LastUpdatedUtc
+        {
+            get => _lastUpdatedUtc;
+            set { if (_lastUpdatedUtc != value) { _lastUpdatedUtc = value; OnPropertyChanged(nameof(LastUpdatedUtc)); } }
+        }
+
         private string _lastUpdatedText;
         public string LastUpdatedText
         {
@@ -2257,6 +2559,13 @@ namespace Famille
             set { if (_fileSizeBytes != value) { _fileSizeBytes = value; OnPropertyChanged(nameof(FileSizeBytes)); } }
         }
 
+        private bool _documentationAvailable;
+        public bool DocumentationAvailable
+        {
+            get => _documentationAvailable;
+            set { if (_documentationAvailable != value) { _documentationAvailable = value; OnPropertyChanged(nameof(DocumentationAvailable)); } }
+        }
+
         public ObservableCollection<FamilyDocumentLink> DocumentationLinks { get; }
 
         public bool HasDocumentation => DocumentationLinks?.Count > 0;
@@ -2265,6 +2574,7 @@ namespace Famille
         {
             OnPropertyChanged(nameof(DocumentationLinks));
             OnPropertyChanged(nameof(HasDocumentation));
+            DocumentationAvailable = DocumentationLinks?.Count > 0;
         }
 
 
