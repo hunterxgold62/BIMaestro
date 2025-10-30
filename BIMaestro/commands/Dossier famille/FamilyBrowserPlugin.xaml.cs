@@ -1367,33 +1367,16 @@ namespace Famille
                 return;
             }
 
-            var defaultName = MakeSafeFileName(_selectedCollection.Name, "collection");
-
-            var dialog = new SaveFileDialog
-            {
-                Title = "Exporter la collection",
-                Filter = "Fichier JSON (*.json)|*.json|Tous les fichiers (*.*)|*.*",
-                FileName = defaultName + ".json"
-            };
-
-            if (dialog.ShowDialog(this) != true)
-                return;
-
-            if (TrySaveCollectionAsJson(dialog.FileName, _selectedCollection, out var errorMessage))
+            if (TrySaveCollectionAsJson(_selectedCollection,
+                    "Exporter la collection",
+                    "collection",
+                    out var savedPath))
             {
                 MessageBox.Show(this,
-                    $"Collection exportée vers :\n{dialog.FileName}",
+                    $"Collection exportée vers :\n{savedPath}",
                     "Export collection",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
-            }
-            else
-            {
-                MessageBox.Show(this,
-                    "Impossible d'exporter la collection :\n" + errorMessage,
-                    "Export collection",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
             }
         }
 
@@ -1414,7 +1397,7 @@ namespace Famille
             try
             {
                 var json = File.ReadAllText(dialog.FileName, Encoding.UTF8);
-                var payload = JsonConvert.DeserializeObject<CollectionExportPayload>(json);
+                var payload = JsonConvert.DeserializeObject<SharedCollectionData>(json);
 
                 if (payload?.Paths == null || payload.Paths.Count == 0)
                 {
@@ -1477,41 +1460,6 @@ namespace Famille
                     "Import de collection",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
-            }
-        }
-
-        private bool TrySaveCollectionAsJson(string filePath, Collection collection, out string errorMessage)
-        {
-            errorMessage = null;
-
-            if (string.IsNullOrWhiteSpace(filePath))
-            {
-                errorMessage = "Chemin de fichier invalide.";
-                return false;
-            }
-
-            if (collection == null)
-            {
-                errorMessage = "Aucune collection n'est disponible.";
-                return false;
-            }
-
-            try
-            {
-                var payload = new CollectionExportPayload
-                {
-                    Name = collection.Name,
-                    Paths = collection.Paths?.ToList() ?? new List<string>()
-                };
-
-                var json = JsonConvert.SerializeObject(payload, Formatting.Indented);
-                File.WriteAllText(filePath, json, Encoding.UTF8);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                errorMessage = ex.Message;
-                return false;
             }
         }
 
