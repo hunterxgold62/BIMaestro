@@ -74,16 +74,30 @@
         <Style x:Key="DocumentationBadgeStyle" TargetType="Button">
             <Setter Property="Content" Value="DOC"/>
             <Setter Property="FontSize" Value="10"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Padding" Value="6,3"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="8,4"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Background" Value="#FF0063B1"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="Background" Value="#F0FFFFFF"/>
+            <Setter Property="Foreground" Value="#FF0F6EB8"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#FF0F6EB8"/>
             <Setter Property="Visibility" Value="Collapsed"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="ToolTip" Value="Ouvrir la documentation"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="12"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding DocumentationAvailable}" Value="True">
                     <Setter Property="Visibility" Value="Visible"/>
@@ -722,7 +736,7 @@
                                     <ContextMenu>
                                         <MenuItem Header="Partager la collection…"
                                                   Click="CollectionShareMenuItem_Click"/>
-                                        <MenuItem Header="Télécharger les familles…"
+                                        <MenuItem Header="Télécharger la collection…"
                                                   Click="CollectionDownloadMenuItem_Click"/>
                                     </ContextMenu>
                                 </Button.ContextMenu>
@@ -784,12 +798,12 @@
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" Grid.Row="2" Margin="0,0,0,5">
-                        <TextBlock Text="PanelBackground :" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource PrimaryText}"/>
+                        <TextBlock Text="Arrière-plan des familles :" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource PrimaryText}"/>
                         <xctk:ColorPicker x:Name="PanelBackgroundPicker" Width="150" Height="25" SelectedColor="#F0F0F0"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" Grid.Row="3" Margin="0,0,0,5">
-                        <TextBlock Text="TreeViewBackground :" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource PrimaryText}"/>
+                        <TextBlock Text="Arrière-plan de l'arborescence :" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource PrimaryText}"/>
                         <xctk:ColorPicker x:Name="TreeViewBackgroundPicker" Width="150" Height="25" SelectedColor="#F0F0F0"/>
                     </StackPanel>
 
@@ -799,7 +813,7 @@
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" Grid.Row="5" Margin="0,0,0,5">
-                        <TextBlock Text="TabBackground :" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource PrimaryText}"/>
+                        <TextBlock Text="Arrière-plan générale :" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource PrimaryText}"/>
                         <xctk:ColorPicker x:Name="TabBackgroundPicker" Width="150" Height="25" SelectedColor="Transparent"/>
                     </StackPanel>
 
