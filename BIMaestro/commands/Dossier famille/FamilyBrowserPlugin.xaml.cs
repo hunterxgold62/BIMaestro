@@ -1382,68 +1382,84 @@ namespace Famille
 
         private void CollectionDownloadMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            if (_selectedCollection == null || _selectedCollection.Paths.Count == 0)
+            var dialog = new OpenFileDialog
             {
-                MessageBox.Show(this,
-                    "Sélectionne une collection non vide avant de télécharger la collection.",
-                    "Collections",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-                return;
-            }
-
-            if (TrySaveCollectionAsJson(_selectedCollection,
-                    "Télécharger la collection",
-                    "collection",
-                    out var savedPath))
-            {
-                MessageBox.Show(this,
-                    $"Collection téléchargée vers :\n{savedPath}",
-                    "Téléchargement de la collection",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-            }
-        }
-
-        private bool TrySaveCollectionAsJson(Collection collection, string dialogTitle, string defaultSuffix, out string savedPath)
-        {
-            savedPath = null;
-            if (collection == null)
-                return false;
-
-            var defaultName = MakeSafeFileName(collection.Name, defaultSuffix);
-
-            var dialog = new SaveFileDialog
-            {
-                Title = dialogTitle,
+                Title = "Importer une collection",
                 Filter = "Fichier JSON (*.json)|*.json|Tous les fichiers (*.*)|*.*",
-                FileName = defaultName + ".json"
+                Multiselect = false,
+                CheckFileExists = true,
+                CheckPathExists = true
             };
 
             if (dialog.ShowDialog(this) != true)
-                return false;
+                return;
 
             try
             {
-                var payload = new CollectionExportPayload
+                var json = File.ReadAllText(dialog.FileName, Encoding.UTF8);
+                var payload = JsonConvert.DeserializeObject<SharedCollectionData>(json);
+
+                if (payload?.Paths == null || payload.Paths.Count == 0)
                 {
-                    Name = collection.Name,
-                    Paths = collection.Paths.ToList()
+                    MessageBox.Show(this,
+                        "Le fichier sélectionné ne contient aucune collection valide.",
+                        "Import de collection",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                var sanitizedPaths = payload.Paths
+                    .Where(p => !string.IsNullOrWhiteSpace(p))
+                    .Select(p => p.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                if (sanitizedPaths.Count == 0)
+                {
+                    MessageBox.Show(this,
+                        "Aucun chemin exploitable n'a été trouvé dans ce fichier.",
+                        "Import de collection",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                var desiredName = string.IsNullOrWhiteSpace(payload.Name)
+                    ? "Collection importée"
+                    : payload.Name.Trim();
+
+                if (string.Equals(desiredName, FavoritesCollectionName, StringComparison.OrdinalIgnoreCase))
+                    desiredName = desiredName + " (importée)";
+
+                var finalName = GenerateUniqueCollectionName(desiredName);
+
+                var imported = new Collection
+                {
+                    Name = finalName,
+                    Paths = sanitizedPaths
                 };
 
-                var json = JsonConvert.SerializeObject(payload, Formatting.Indented);
-                File.WriteAllText(dialog.FileName, json, Encoding.UTF8);
-                savedPath = dialog.FileName;
-                return true;
+                _collections.Add(imported);
+                SaveCollections();
+
+                _selectedCollection = imported;
+                CollectionCombo.SelectedItem = imported;
+                RefreshCollectionContent();
+
+                MessageBox.Show(this,
+                    $"Collection « {finalName} » importée ({sanitizedPaths.Count} élément(s)).",
+                    "Import de collection",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
                 MessageBox.Show(this,
-                    "Impossible d'exporter la collection :\n" + ex.Message,
-                    dialogTitle,
+                    "Impossible d'importer la collection :\n" + ex.Message,
+                    "Import de collection",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
-                return false;
             }
         }
 
@@ -2250,6 +2266,26 @@ namespace Famille
             }
         }
 
+        private string GenerateUniqueCollectionName(string desiredName)
+        {
+            if (string.IsNullOrWhiteSpace(desiredName))
+                desiredName = "Collection importée";
+
+            var baseName = desiredName.Trim();
+            if (string.Equals(baseName, FavoritesCollectionName, StringComparison.OrdinalIgnoreCase))
+                baseName += " (importée)";
+
+            string candidate = baseName;
+            int suffix = 2;
+            while (_collections.Any(c => string.Equals(c.Name, candidate, StringComparison.OrdinalIgnoreCase)))
+            {
+                candidate = $"{baseName} ({suffix})";
+                suffix++;
+            }
+
+            return candidate;
+        }
+
         // Ajout express -> collection active
         private void AddToActiveCollection_Click(object sender, RoutedEventArgs e)
         {
@@ -2386,31 +2422,6 @@ namespace Famille
                 result = fallback;
 
             return result;
-        }
-
-        private static string GetUniqueDestinationPath(string folder, string fileName)
-        {
-            if (string.IsNullOrWhiteSpace(folder))
-                return null;
-
-            if (string.IsNullOrWhiteSpace(fileName))
-                fileName = "fichier.rfa";
-
-            var baseName = Path.GetFileNameWithoutExtension(fileName);
-            var extension = Path.GetExtension(fileName) ?? string.Empty;
-
-            if (string.IsNullOrWhiteSpace(baseName))
-                baseName = "fichier";
-
-            var candidate = Path.Combine(folder, baseName + extension);
-            int counter = 1;
-            while (File.Exists(candidate))
-            {
-                candidate = Path.Combine(folder, $"{baseName} ({counter}){extension}");
-                counter++;
-            }
-
-            return candidate;
         }
 
         private FamilyItem CreateFamilyItemFromPath(string path)
