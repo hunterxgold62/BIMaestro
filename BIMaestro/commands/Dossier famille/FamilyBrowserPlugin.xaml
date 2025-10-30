@@ -238,7 +238,7 @@
 
                 <Grid Margin="10">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="220"/>
+                        <ColumnDefinition Width="180"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
@@ -765,7 +765,7 @@
                 </Grid>
             </TabItem>
 
-            <!-- Onglet Paramètres -->
+             <!-- Onglet Paramètres -->
             <TabItem x:Name="SettingsTabItem"
                      Header="Paramètres"
                      Background="{DynamicResource TabBackground}">
@@ -779,85 +779,172 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <TextBlock Text="Paramètres d'apparence"
-                               FontSize="14" FontWeight="Bold"
-                               Grid.Row="0" Margin="0,0,0,10"
-                               Foreground="{DynamicResource PrimaryText}"/>
+                    <Grid.Resources>
+                        <Style x:Key="SettingLabelStyle" TargetType="TextBlock">
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                            <Setter Property="Foreground" Value="{DynamicResource PrimaryText}"/>
+                            <Setter Property="FontSize" Value="12"/>
+                            <Setter Property="Margin" Value="0,0,16,0"/>
+                        </Style>
+                        <Style x:Key="SettingSectionTitleStyle" TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="{DynamicResource PrimaryText}"/>
+                            <Setter Property="FontSize" Value="14"/>
+                            <Setter Property="FontWeight" Value="SemiBold"/>
+                            <Setter Property="Margin" Value="0,0,0,10"/>
+                        </Style>
+                        <Style x:Key="SettingSectionBorderStyle" TargetType="Border">
+                            <Setter Property="Background" Value="#19FFFFFF"/>
+                            <Setter Property="BorderBrush" Value="#22000000"/>
+                            <Setter Property="BorderThickness" Value="1"/>
+                            <Setter Property="CornerRadius" Value="6"/>
+                            <Setter Property="Padding" Value="14"/>
+                            <Setter Property="Margin" Value="0,0,0,12"/>
+                        </Style>
+                    </Grid.Resources>
 
-                    <StackPanel Orientation="Horizontal" Grid.Row="1" Margin="0,0,0,5">
-                        <TextBlock Text="Couleur du haut :" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource PrimaryText}"/>
-                        <xctk:ColorPicker x:Name="TopColorPicker" Width="150" Height="25" SelectedColor="#FFF2F2F2"/>
-                        <TextBlock Text="  Couleur du bas :" VerticalAlignment="Center" Margin="20,0,10,0" Foreground="{DynamicResource PrimaryText}"/>
-                        <xctk:ColorPicker x:Name="BottomColorPicker" Width="150" Height="25" SelectedColor="#FFFFFFFF"/>
+                    <TextBlock Grid.Row="0"
+                               Text="Paramètres d'apparence"
+                               Style="{StaticResource SettingSectionTitleStyle}"/>
+
+                    <Border Grid.Row="1"
+                            Style="{StaticResource SettingSectionBorderStyle}">
+                        <Grid Grid.IsSharedSizeScope="True">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="SettingLabel"/>
+                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="32"/>
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="SettingLabel"/>
+                                <ColumnDefinition Width="180"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Couleur du haut" Style="{StaticResource SettingLabelStyle}"/>
+                            <xctk:ColorPicker Grid.Row="0" Grid.Column="1"
+                                              x:Name="TopColorPicker"
+                                              Height="26"
+                                              SelectedColor="#FFF2F2F2"/>
+
+                            <TextBlock Grid.Row="0" Grid.Column="3" Text="Couleur du bas" Style="{StaticResource SettingLabelStyle}"/>
+                            <xctk:ColorPicker Grid.Row="0" Grid.Column="4"
+                                              x:Name="BottomColorPicker"
+                                              Height="26"
+                                              SelectedColor="#FFFFFFFF"/>
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Arrière-plan des familles" Style="{StaticResource SettingLabelStyle}" Margin="0,12,16,0"/>
+                            <xctk:ColorPicker Grid.Row="1" Grid.Column="1"
+                                              Margin="0,12,0,0"
+                                              x:Name="PanelBackgroundPicker"
+                                              Height="26"
+                                              SelectedColor="#F0F0F0"/>
+
+                            <TextBlock Grid.Row="1" Grid.Column="3" Text="Arrière-plan de l'arborescence" Style="{StaticResource SettingLabelStyle}" Margin="0,12,16,0"/>
+                            <xctk:ColorPicker Grid.Row="1" Grid.Column="4"
+                                              Margin="0,12,0,0"
+                                              x:Name="TreeViewBackgroundPicker"
+                                              Height="26"
+                                              SelectedColor="#F0F0F0"/>
+                        </Grid>
+                    </Border>
+
+                    <TextBlock Grid.Row="2"
+                               Text="Couleurs secondaires"
+                               Style="{StaticResource SettingSectionTitleStyle}"/>
+
+                    <Border Grid.Row="3"
+                            Style="{StaticResource SettingSectionBorderStyle}">
+                        <Grid Grid.IsSharedSizeScope="True">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="SettingLabel"/>
+                                <ColumnDefinition Width="180"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="ItemsBackground" Style="{StaticResource SettingLabelStyle}"/>
+                            <xctk:ColorPicker Grid.Row="0" Grid.Column="1"
+                                              x:Name="ItemsBackgroundPicker"
+                                              Height="26"
+                                              SelectedColor="Transparent"/>
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Arrière-plan général" Style="{StaticResource SettingLabelStyle}" Margin="0,12,16,0"/>
+                            <xctk:ColorPicker Grid.Row="1" Grid.Column="1"
+                                              Margin="0,12,0,0"
+                                              x:Name="TabBackgroundPicker"
+                                              Height="26"
+                                              SelectedColor="Transparent"/>
+                        </Grid>
+                    </Border>
+
+                    <TextBlock Grid.Row="4"
+                               Text="Comportement"
+                               Style="{StaticResource SettingSectionTitleStyle}"/>
+
+                    <Border Grid.Row="5"
+                            Style="{StaticResource SettingSectionBorderStyle}">
+                        <Grid Grid.IsSharedSizeScope="True">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="SettingLabel"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Mode sombre" Style="{StaticResource SettingLabelStyle}"/>
+                            <ui:EyeToggleSwitch Grid.Row="0" Grid.Column="1"
+                                                x:Name="DarkModeSwitch"
+                                                Width="200"
+                                                BaseSize="18"
+                                                TransitionMs="420"
+                                                VerticalAlignment="Center"
+                                                Toggled="DarkModeSwitch_Toggled"/>
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Afficher le Top-8" Style="{StaticResource SettingLabelStyle}" Margin="0,12,16,0"/>
+                            <CheckBox Grid.Row="1" Grid.Column="1"
+                                      Margin="0,12,0,0"
+                                      x:Name="ShowTop8CheckBox"
+                                      VerticalAlignment="Center"
+                                      IsChecked="False"
+                                      Checked="ShowTop8CheckBox_Changed"
+                                      Unchecked="ShowTop8CheckBox_Changed"/>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Toujours au-dessus" Style="{StaticResource SettingLabelStyle}" Margin="0,12,16,0"/>
+                            <ui:GhostSwitch Grid.Row="2" Grid.Column="1"
+                                            Margin="0,12,0,0"
+                                            x:Name="AlwaysOnTopSwitch"
+                                            Width="160"
+                                            Height="46"
+                                            EyeFollowGlobal="False"
+                                            AutoPauseWhenHidden="True"
+                                            Toggled="AlwaysOnTopSwitch_Toggled"/>
+                        </Grid>
+                    </Border>
+
+                    <StackPanel Orientation="Horizontal"
+                                Grid.Row="6"
+                                Margin="0,8,0,0"
+                                HorizontalAlignment="Right">
+                        <Button Content="Appliquer" Width="120" Margin="0,0,8,0" Click="ApplyColors_Click"/>
+                        <Button Content="Enregistrer" Width="120" Margin="0,0,8,0" Click="SaveConfig_Click"/>
+                        <Button Content="Réinitialiser" Width="120" Click="ResetConfig_Click"/>
                     </StackPanel>
 
-                    <StackPanel Orientation="Horizontal" Grid.Row="2" Margin="0,0,0,5">
-                        <TextBlock Text="Arrière-plan des familles :" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource PrimaryText}"/>
-                        <xctk:ColorPicker x:Name="PanelBackgroundPicker" Width="150" Height="25" SelectedColor="#F0F0F0"/>
-                    </StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Grid.Row="3" Margin="0,0,0,5">
-                        <TextBlock Text="Arrière-plan de l'arborescence :" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource PrimaryText}"/>
-                        <xctk:ColorPicker x:Name="TreeViewBackgroundPicker" Width="150" Height="25" SelectedColor="#F0F0F0"/>
-                    </StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Grid.Row="4" Margin="0,0,0,5">
-                        <TextBlock Text="ItemsBackground :" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource PrimaryText}"/>
-                        <xctk:ColorPicker x:Name="ItemsBackgroundPicker" Width="150" Height="25" SelectedColor="Transparent"/>
-                    </StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Grid.Row="5" Margin="0,0,0,5">
-                        <TextBlock Text="Arrière-plan générale :" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource PrimaryText}"/>
-                        <xctk:ColorPicker x:Name="TabBackgroundPicker" Width="150" Height="25" SelectedColor="Transparent"/>
-                    </StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Grid.Row="6" Margin="0,0,0,5" VerticalAlignment="Center"
-            xmlns:ui="clr-namespace:BIMaestro.UI">
-                        <TextBlock Text="Mode sombre :" VerticalAlignment="Center" Margin="0,0,10,0"
-             Foreground="{DynamicResource PrimaryText}"/>
-                        <ui:EyeToggleSwitch x:Name="DarkModeSwitch"
-                      BaseSize="18"                
-                      TransitionMs="420"
-                      VerticalAlignment="Center"
-                      Toggled="DarkModeSwitch_Toggled" Width="169"/>
-                    </StackPanel>
-
-
-                    <StackPanel Orientation="Horizontal" Grid.Row="7" Margin="0,6,0,5">
-                        <TextBlock Text="Afficher le Top-8 :" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource PrimaryText}"/>
-                        <CheckBox x:Name="ShowTop8CheckBox"
-                                  IsChecked="False"
-                                  Checked="ShowTop8CheckBox_Changed"
-                                  Unchecked="ShowTop8CheckBox_Changed" Height="16"/>
-                    </StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Grid.Row="8" Margin="0,6,0,5" VerticalAlignment="Center">
-                        <TextBlock Text="Toujours au-dessus :" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource PrimaryText}"/>
-                        <ui:GhostSwitch x:Name="AlwaysOnTopSwitch"
-                                        Width="130"
-                                        Height="46"
-                                        EyeFollowGlobal="False"
-                                        AutoPauseWhenHidden="True"
-                                        Toggled="AlwaysOnTopSwitch_Toggled"/>
-                    </StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Grid.Row="9" Margin="0,10,0,10">
-                        <Button Content="Appliquer" Click="ApplyColors_Click" Margin="0,0,10,0" Width="100"/>
-                        <Button Content="Enregistrer" Click="SaveConfig_Click" Margin="0,0,10,0" Width="100"/>
-                        <Button Content="Réinitialiser" Click="ResetConfig_Click" Width="100"/>
-                    </StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Grid.Row="10" Margin="0,0,0,10">
-                        <Button Content="Modifier les chemins…"
-                                Width="180"
-                                Click="ChangePaths_Click"/>
-                    </StackPanel>
+                    <Button Grid.Row="7"
+                            Content="Modifier les chemins…"
+                            Width="220"
+                            HorizontalAlignment="Left"
+                            Margin="0,2,0,10"
+                            Click="ChangePaths_Click"/>
                 </Grid>
             </TabItem>
 
