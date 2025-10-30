@@ -71,6 +71,60 @@
             </Setter>
         </Style>
 
+        <Style x:Key="DocumentationBadgeStyle" TargetType="Button">
+            <Setter Property="Visibility" Value="Collapsed"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="ToolTip" Value="Ouvrir la documentation"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="BadgeBorder"
+                                Background="#FF21527A"
+                                BorderBrush="#FF9AC5FF"
+                                BorderThickness="1"
+                                CornerRadius="10"
+                                Padding="6,3"
+                                SnapsToDevicePixels="True">
+                            <Border.Effect>
+                                <DropShadowEffect ShadowDepth="1" BlurRadius="5" Opacity="0.4"/>
+                            </Border.Effect>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Path Data="M1,1 L6.3,1 L9,3.7 L9,11 L1,11 Z"
+                                      Fill="White"
+                                      Stretch="Uniform"
+                                      Width="9"
+                                      Height="10"
+                                      Margin="0,0,4,0"/>
+                                <TextBlock Text="DOC"
+                                           FontSize="11"
+                                           FontWeight="SemiBold"
+                                           Foreground="White"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="BadgeBorder" Property="Background" Value="#FF2D7DDB"/>
+                                <Setter TargetName="BadgeBorder" Property="BorderBrush" Value="#FFE6F0FF"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="BadgeBorder" Property="Background" Value="#FF1B4F8C"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="BadgeBorder" Property="Opacity" Value="0.6"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DocumentationAvailable}" Value="True">
+                    <Setter Property="Visibility" Value="Visible"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <!-- Vignette famille (onglet Dossiers) -->
         <DataTemplate x:Key="FamilyItemTemplate" DataType="{x:Type local:FamilyItem}">
             <Border Margin="5" Width="200"
@@ -107,14 +161,21 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <Border Background="{DynamicResource ImageBackground}" Padding="3" Grid.Row="0">
-                        <Image Source="{Binding Icon}"
-                               Width="180" Height="180"
-                               Stretch="UniformToFill"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               Style="{StaticResource ImageStyle}"/>
-                    </Border>
+                    <Grid Grid.Row="0">
+                        <Border Background="{DynamicResource ImageBackground}" Padding="3">
+                            <Image Source="{Binding Icon}"
+                                   Width="180" Height="180"
+                                   Stretch="UniformToFill"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Style="{StaticResource ImageStyle}"/>
+                        </Border>
+                        <Button Style="{StaticResource DocumentationBadgeStyle}"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Top"
+                                Margin="6"
+                                Click="DocumentationBadge_Click"/>
+                    </Grid>
                     <Button Content="3D"
                             Width="28" Height="20" FontSize="10" Padding="0"
                             HorizontalAlignment="Right" VerticalAlignment="Top" Margin="4"
@@ -201,17 +262,22 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <Border Background="{DynamicResource ImageBackground}"
-                            Padding="3"
-                            Grid.Column="0"
-                            HorizontalAlignment="Left">
-                        <Image Source="{Binding Icon}"
-                               Width="200" Height="200"
-                               Stretch="Uniform"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               Style="{StaticResource ImageStyle}"/>
-                    </Border>
+                    <Grid Grid.Column="0" HorizontalAlignment="Left">
+                        <Border Background="{DynamicResource ImageBackground}"
+                                Padding="3">
+                            <Image Source="{Binding Icon}"
+                                   Width="200" Height="200"
+                                   Stretch="Uniform"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Style="{StaticResource ImageStyle}"/>
+                        </Border>
+                        <Button Style="{StaticResource DocumentationBadgeStyle}"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Top"
+                                Margin="6"
+                                Click="DocumentationBadge_Click"/>
+                    </Grid>
 
                     <Grid Grid.Column="1" Margin="20,0,10,0">
                         <Grid.RowDefinitions>
@@ -449,14 +515,21 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <Border Background="{DynamicResource ImageBackground}" Padding="3" Grid.Row="0">
-                        <Image Source="{Binding Icon}"
-                               Width="180" Height="180"
-                               Stretch="UniformToFill"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               Style="{StaticResource ImageStyle}"/>
-                    </Border>
+                    <Grid Grid.Row="0">
+                        <Border Background="{DynamicResource ImageBackground}" Padding="3">
+                            <Image Source="{Binding Icon}"
+                                   Width="180" Height="180"
+                                   Stretch="UniformToFill"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Style="{StaticResource ImageStyle}"/>
+                        </Border>
+                        <Button Style="{StaticResource DocumentationBadgeStyle}"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Top"
+                                Margin="6"
+                                Click="DocumentationBadge_Click"/>
+                    </Grid>
 
                     <Grid Grid.Row="1">
                         <Grid.ColumnDefinitions>
@@ -609,6 +682,26 @@
 
                         <DockPanel Grid.Row="3">
                             <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                                <Button x:Name="DateSortButton"
+                                        Content="Date de MAJ"
+                                        Click="DateSortButton_Click">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource PillButtonStyle}">
+                                            <Setter Property="Margin" Value="0,0,12,0"/>
+                                            <Setter Property="Padding" Value="12,4"/>
+                                            <Setter Property="Background" Value="#FFF2F5FC"/>
+                                            <Setter Property="BorderBrush" Value="#FFDCE6FA"/>
+                                            <Setter Property="Foreground" Value="#FF2A3F6A"/>
+                                            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=IsDateSortActive}" Value="True">
+                                                <Setter Property="Background" Value="#FFE0F2FF"/>
+                                                <Setter Property="BorderBrush" Value="#FF5AA0FF"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsChecked, ElementName=DetailedViewCheckBox}" Value="False">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
                                 <CheckBox x:Name="DetailedViewCheckBox"
                                           Content="Vue détaillée"
                                           Margin="0,0,20,0"
@@ -648,6 +741,23 @@
                         </StackPanel>
 
                         <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                            <Button x:Name="CollectionActionsButton"
+                                    Content="Partager"
+                                    Width="120"
+                                    Margin="0,0,10,0"
+                                    Click="CollectionActionsButton_Click">
+                                <Button.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="Importer une collection…"
+                                                  Click="CollectionImportMenuItem_Click"/>
+                                        <Separator/>
+                                        <MenuItem Header="Partager la collection…"
+                                                  Click="CollectionShareMenuItem_Click"/>
+                                        <MenuItem Header="Télécharger les familles…"
+                                                  Click="CollectionDownloadMenuItem_Click"/>
+                                    </ContextMenu>
+                                </Button.ContextMenu>
+                            </Button>
                             <Button Content="Charger la collection"
                                     Width="160"
                                     Click="CollectionLoad_Click"/>
