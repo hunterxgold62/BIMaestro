@@ -687,6 +687,7 @@ namespace Famille
                 var items = hits.Select(e =>
                 {
                     var size = TryGetFileSize(e.Path);
+                    var lastUpdated = TryGetLastWriteTimeUtc(e.Path);
                     return new FamilyItem
                     {
                         Name = e.Name,
@@ -977,6 +978,8 @@ namespace Famille
 
             SortDocumentationLinks(fam);
 
+            fam.DocumentationAvailable = fam.DocumentationLinks.Count > 0;
+
             if (!PersistDocumentation(fam))
             {
                 EnsureDocumentationLoaded(fam);
@@ -1037,6 +1040,7 @@ namespace Famille
                     File.WriteAllText(docFile, json, Encoding.UTF8);
                 }
 
+                fam.DocumentationAvailable = snapshot.Count > 0;
                 return true;
             }
             catch (Exception ex)
@@ -1513,6 +1517,146 @@ namespace Famille
             FamilyBrowserCommand.LoadCollectionEventInstance.Raise();
         }
 
+        private void CollectionOptionsButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn || btn.ContextMenu == null)
+                return;
+
+            btn.ContextMenu.PlacementTarget = btn;
+            btn.ContextMenu.IsOpen = true;
+        }
+
+        private void CollectionShare_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedCollection == null || _selectedCollection.Paths.Count == 0)
+            {
+                MessageBox.Show(this,
+                    "Sélectionne une collection contenant au moins une famille avant de partager.",
+                    "Partager la collection",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var dialog = new SaveFileDialog
+            {
+                Title = "Exporter la collection",
+                Filter = "Collection BIMaestro (*.json)|*.json|Tous les fichiers (*.*)|*.*",
+                FileName = _selectedCollection.Name + ".json"
+            };
+
+            if (dialog.ShowDialog(this) != true)
+                return;
+
+            try
+            {
+                var export = new
+                {
+                    _selectedCollection.Name,
+                    _selectedCollection.Id,
+                    Paths = _selectedCollection.Paths.ToList(),
+                    ExportedAtUtc = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture)
+                };
+
+                var json = JsonConvert.SerializeObject(export, Formatting.Indented);
+                File.WriteAllText(dialog.FileName, json, Encoding.UTF8);
+
+                MessageBox.Show(this,
+                    "La collection a été exportée avec succès.",
+                    "Partager la collection",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this,
+                    "Impossible d'exporter la collection :\n" + ex.Message,
+                    "Partager la collection",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        private void CollectionDownload_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedCollection == null || _selectedCollection.Paths.Count == 0)
+            {
+                MessageBox.Show(this,
+                    "Sélectionne une collection contenant au moins une famille avant de télécharger.",
+                    "Télécharger la collection",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            using var folderDialog = new WinForms.FolderBrowserDialog
+            {
+                Description = "Sélectionner le dossier de destination pour la collection"
+            };
+
+            if (folderDialog.ShowDialog() != WinForms.DialogResult.OK || string.IsNullOrWhiteSpace(folderDialog.SelectedPath))
+                return;
+
+            Directory.CreateDirectory(folderDialog.SelectedPath);
+
+            int copied = 0;
+            var errors = new List<string>();
+
+            foreach (var path in _selectedCollection.Paths.Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                if (string.IsNullOrWhiteSpace(path))
+                    continue;
+
+                if (!File.Exists(path))
+                {
+                    errors.Add("Introuvable : " + path);
+                    continue;
+                }
+
+                try
+                {
+                    var fileName = System.IO.Path.GetFileName(path);
+                    var target = System.IO.Path.Combine(folderDialog.SelectedPath, fileName);
+                    File.Copy(path, target, overwrite: true);
+                    copied++;
+                }
+                catch (Exception ex)
+                {
+                    errors.Add(System.IO.Path.GetFileName(path) + " : " + ex.Message);
+                }
+            }
+
+            var builder = new StringBuilder();
+            builder.AppendLine(string.Format(CultureInfo.CurrentCulture,
+                "{0} fichier(s) copié(s) dans {1}.",
+                copied,
+                folderDialog.SelectedPath));
+
+            if (errors.Count > 0)
+            {
+                builder.AppendLine();
+                builder.AppendLine("Certains fichiers n'ont pas pu être copiés :");
+
+                foreach (var err in errors.Take(5))
+                {
+                    builder.AppendLine("- " + err);
+                }
+
+                if (errors.Count > 5)
+                {
+                    builder.AppendLine(string.Format(CultureInfo.CurrentCulture,
+                        "... ({0} erreur(s) supplémentaire(s))",
+                        errors.Count - 5));
+                }
+            }
+
+            MessageBox.Show(this,
+                builder.ToString(),
+                "Télécharger la collection",
+                MessageBoxButton.OK,
+                errors.Count > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
+        }
+
         #endregion
 
         #region Vignettes (catalogue -> cache -> Shell -> placeholder)
@@ -1688,6 +1832,8 @@ namespace Famille
                         fam.LastUpdatedUtc = null;
                         fam.LastUpdatedText = null;
                     }
+
+                    fam.LastUpdatedText = FormatLastUpdated(fam.LastUpdatedUtc);
                 }
                 else
                 {
@@ -1733,6 +1879,22 @@ namespace Famille
                 "{0} octet{1}",
                 bytes.Value,
                 bytes.Value > 1 ? "s" : string.Empty);
+        }
+
+        private static string FormatLastUpdated(DateTime? utc)
+        {
+            if (!utc.HasValue)
+                return null;
+
+            try
+            {
+                var local = TimeZoneInfo.ConvertTimeFromUtc(utc.Value, TimeZoneInfo.Local);
+                return local.ToString("g", CultureInfo.CurrentCulture);
+            }
+            catch
+            {
+                return utc.Value.ToString("u", CultureInfo.InvariantCulture);
+            }
         }
 
 
@@ -2469,6 +2631,7 @@ namespace Famille
         {
             var name = System.IO.Path.GetFileNameWithoutExtension(path);
             var size = TryGetFileSize(path);
+            var lastUpdatedUtc = TryGetLastWriteTimeUtc(path);
             return new FamilyItem
             {
                 Name = name,
