@@ -72,18 +72,44 @@
         </Style>
 
         <Style x:Key="DocumentationBadgeStyle" TargetType="Button">
-            <Setter Property="Content" Value="DOC"/>
-            <Setter Property="FontSize" Value="10"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Padding" Value="6,3"/>
+            <Setter Property="Content" Value="Doc"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="10,4"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Background" Value="#FF0063B1"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="Background" Value="#FFF1F7FF"/>
+            <Setter Property="Foreground" Value="#FF1F3B57"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#FFC7DFFF"/>
             <Setter Property="Visibility" Value="Collapsed"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="ToolTip" Value="Ouvrir la documentation"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="12"
+                                Padding="{TemplateBinding Padding}">
+                            <StackPanel Orientation="Horizontal"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Margin="0">
+                                <TextBlock Text="&#xE8A5;"
+                                           FontFamily="Segoe MDL2 Assets"
+                                           FontSize="{TemplateBinding FontSize}"
+                                           Margin="0,0,4,0"
+                                           Foreground="{TemplateBinding Foreground}"/>
+                                <ContentPresenter HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"
+                                                  RecognizesAccessKey="True"
+                                                  Foreground="{TemplateBinding Foreground}"/>
+                            </StackPanel>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding DocumentationAvailable}" Value="True">
                     <Setter Property="Visibility" Value="Visible"/>
@@ -722,7 +748,7 @@
                                     <ContextMenu>
                                         <MenuItem Header="Partager la collection…"
                                                   Click="CollectionShareMenuItem_Click"/>
-                                        <MenuItem Header="Télécharger les familles…"
+                                        <MenuItem Header="Télécharger la collection…"
                                                   Click="CollectionDownloadMenuItem_Click"/>
                                     </ContextMenu>
                                 </Button.ContextMenu>

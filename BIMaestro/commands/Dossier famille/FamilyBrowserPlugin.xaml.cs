@@ -530,6 +530,15 @@ namespace Famille
 
             result.Sort((a, b) =>
             {
+                if (hasDateSort)
+                {
+                    var aDate = a?.LastUpdatedUtc ?? DateTime.MinValue;
+                    var bDate = b?.LastUpdatedUtc ?? DateTime.MinValue;
+                    int dateCmp = bDate.CompareTo(aDate);
+                    if (dateCmp != 0)
+                        return dateCmp;
+                }
+
                 if (hasCategory)
                 {
                     int catCmp = CategoryMatches(b).CompareTo(CategoryMatches(a));
@@ -542,15 +551,6 @@ namespace Famille
                     int verCmp = VersionMatches(b).CompareTo(VersionMatches(a));
                     if (verCmp != 0)
                         return verCmp;
-                }
-
-                if (hasDateSort)
-                {
-                    var aDate = a?.LastUpdatedUtc ?? DateTime.MinValue;
-                    var bDate = b?.LastUpdatedUtc ?? DateTime.MinValue;
-                    int dateCmp = bDate.CompareTo(aDate);
-                    if (dateCmp != 0)
-                        return dateCmp;
                 }
 
                 if (hasSizeSort)
@@ -1367,42 +1367,16 @@ namespace Famille
                 return;
             }
 
-            var defaultName = MakeSafeFileName(_selectedCollection.Name, "collection");
-
-            var dialog = new SaveFileDialog
+            if (TrySaveCollectionAsJson(_selectedCollection,
+                    "Exporter la collection",
+                    "collection",
+                    out var savedPath))
             {
-                Title = "Exporter la collection",
-                Filter = "Fichier JSON (*.json)|*.json|Tous les fichiers (*.*)|*.*",
-                FileName = defaultName + ".json"
-            };
-
-            if (dialog.ShowDialog(this) != true)
-                return;
-
-            try
-            {
-                var payload = new
-                {
-                    Name = _selectedCollection.Name,
-                    Paths = _selectedCollection.Paths.ToList()
-                };
-
-                var json = JsonConvert.SerializeObject(payload, Formatting.Indented);
-                File.WriteAllText(dialog.FileName, json, Encoding.UTF8);
-
                 MessageBox.Show(this,
-                    $"Collection exportée vers :\n{dialog.FileName}",
+                    $"Collection exportée vers :\n{savedPath}",
                     "Export collection",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(this,
-                    "Impossible d'exporter la collection :\n" + ex.Message,
-                    "Export collection",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
             }
         }
 
@@ -1411,98 +1385,66 @@ namespace Famille
             if (_selectedCollection == null || _selectedCollection.Paths.Count == 0)
             {
                 MessageBox.Show(this,
-                    "Sélectionne une collection non vide avant de télécharger les familles.",
+                    "Sélectionne une collection non vide avant de télécharger la collection.",
                     "Collections",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 return;
             }
 
-            using var dialog = new WinForms.FolderBrowserDialog
+            if (TrySaveCollectionAsJson(_selectedCollection,
+                    "Télécharger la collection",
+                    "collection",
+                    out var savedPath))
             {
-                Description = "Choisir le dossier de destination"
+                MessageBox.Show(this,
+                    $"Collection téléchargée vers :\n{savedPath}",
+                    "Téléchargement de la collection",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+        }
+
+        private bool TrySaveCollectionAsJson(Collection collection, string dialogTitle, string defaultSuffix, out string savedPath)
+        {
+            savedPath = null;
+            if (collection == null)
+                return false;
+
+            var defaultName = MakeSafeFileName(collection.Name, defaultSuffix);
+
+            var dialog = new SaveFileDialog
+            {
+                Title = dialogTitle,
+                Filter = "Fichier JSON (*.json)|*.json|Tous les fichiers (*.*)|*.*",
+                FileName = defaultName + ".json"
             };
 
-            if (dialog.ShowDialog() != WinForms.DialogResult.OK || string.IsNullOrWhiteSpace(dialog.SelectedPath))
-                return;
+            if (dialog.ShowDialog(this) != true)
+                return false;
 
-            var targetFolder = dialog.SelectedPath;
             try
             {
-                Directory.CreateDirectory(targetFolder);
+                var payload = new CollectionExportPayload
+                {
+                    Name = collection.Name,
+                    Paths = collection.Paths.ToList()
+                };
+
+                var json = JsonConvert.SerializeObject(payload, Formatting.Indented);
+                File.WriteAllText(dialog.FileName, json, Encoding.UTF8);
+                savedPath = dialog.FileName;
+                return true;
             }
             catch (Exception ex)
             {
                 MessageBox.Show(this,
-                    "Impossible de créer le dossier de destination :\n" + ex.Message,
-                    "Téléchargement de la collection",
+                    "Impossible d'exporter la collection :\n" + ex.Message,
+                    dialogTitle,
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
-                return;
+                return false;
             }
-            int copied = 0;
-            var missing = new List<string>();
-            var errors = new List<string>();
-
-            foreach (var path in _selectedCollection.Paths)
-            {
-                if (string.IsNullOrWhiteSpace(path))
-                    continue;
-
-                try
-                {
-                    if (!File.Exists(path))
-                    {
-                        missing.Add(Path.GetFileName(path));
-                        continue;
-                    }
-
-                    var fileName = Path.GetFileName(path);
-                    var destination = GetUniqueDestinationPath(targetFolder, fileName);
-                    if (destination == null)
-                    {
-                        errors.Add(fileName + " (chemin invalide)");
-                        continue;
-                    }
-
-                    File.Copy(path, destination, overwrite: false);
-                    copied++;
-                }
-                catch (Exception ex)
-                {
-                    errors.Add(Path.GetFileName(path) + " : " + ex.Message);
-                }
-            }
-
-            var summary = new StringBuilder();
-            summary.AppendLine($"Familles copiées : {copied}");
-            summary.AppendLine($"Destination : {targetFolder}");
-
-            if (missing.Count > 0)
-            {
-                summary.AppendLine();
-                summary.AppendLine("Introuvables :");
-                foreach (var name in missing.Take(10))
-                    summary.AppendLine(" - " + name);
-                if (missing.Count > 10)
-                    summary.AppendLine($" - (+ {missing.Count - 10} autres)");
-            }
-
-            if (errors.Count > 0)
-            {
-                summary.AppendLine();
-                summary.AppendLine("Erreurs de copie :");
-                foreach (var err in errors.Take(10))
-                    summary.AppendLine(" - " + err);
-                if (errors.Count > 10)
-                    summary.AppendLine($" - (+ {errors.Count - 10} autres)");
-            }
-
-            MessageBox.Show(this,
-                summary.ToString(),
-                "Téléchargement de la collection",
-                MessageBoxButton.OK,
-                errors.Count > 0 || missing.Count > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
         }
 
         private void CollectionLoad_Click(object sender, RoutedEventArgs e)
