@@ -224,27 +224,6 @@
 
                         <DockPanel Grid.Row="0" LastChildFill="True">
                             <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
-                                <Button Content="DOC"
-                                        Width="38" Height="22" FontSize="10" Padding="0"
-                                        Margin="0,0,8,0"
-                                        Click="DocumentationBadge_Click"
-                                        ToolTip="Afficher la documentation"
-                                        Background="#FF2A3F6A"
-                                        Foreground="White"
-                                        BorderBrush="Transparent"
-                                        BorderThickness="0"
-                                        FocusVisualStyle="{x:Null}">
-                                    <Button.Style>
-                                        <Style TargetType="Button">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding DocumentationAvailable}" Value="True">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                </Button>
                                 <Button Content="3D"
                                         Width="32" Height="22" FontSize="10" Padding="0"
                                         Margin="0,0,8,0"
@@ -672,17 +651,6 @@
                             <Button Content="Charger la collection"
                                     Width="160"
                                     Click="CollectionLoad_Click"/>
-                            <Button Content="⋯"
-                                    Width="36" Height="28" Margin="6,0,0,0"
-                                    Click="CollectionOptionsButton_Click"
-                                    ToolTip="Plus d'options">
-                                <Button.ContextMenu>
-                                    <ContextMenu>
-                                        <MenuItem Header="Partager…" Click="CollectionShare_Click"/>
-                                        <MenuItem Header="Télécharger…" Click="CollectionDownload_Click"/>
-                                    </ContextMenu>
-                                </Button.ContextMenu>
-                            </Button>
                         </StackPanel>
                     </DockPanel>
 
