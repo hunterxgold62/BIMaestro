@@ -2176,6 +2176,12 @@ namespace Famille
 
         #region Collections
 
+        private sealed class CollectionExportPayload
+        {
+            public string Name { get; set; }
+            public List<string> Paths { get; set; }
+        }
+
         private void LoadCollections()
         {
             _collections = new ObservableCollection<Collection>(CollectionStore.Load());
