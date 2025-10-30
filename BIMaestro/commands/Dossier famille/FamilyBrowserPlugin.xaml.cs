@@ -2153,7 +2153,7 @@ namespace Famille
         private sealed class CollectionExportPayload
         {
             public string Name { get; set; }
-            public List<string> Paths { get; set; }
+            public List<string> Paths { get; set; } = new();
         }
 
         private void LoadCollections()
