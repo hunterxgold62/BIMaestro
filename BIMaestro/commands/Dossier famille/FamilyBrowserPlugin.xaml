@@ -14,6 +14,11 @@
     <Window.Resources>
         <!-- Thème -->
         <SolidColorBrush x:Key="PrimaryText" Color="Black"/>
+        <SolidColorBrush x:Key="TabInactiveForeground" Color="Black"/>
+        <SolidColorBrush x:Key="TabActiveForeground" Color="Black"/>
+        <SolidColorBrush x:Key="SearchBoxBackground" Color="#FFFFFFFF"/>
+        <SolidColorBrush x:Key="SearchBoxForeground" Color="#FF000000"/>
+        <SolidColorBrush x:Key="SearchBoxBorder" Color="#FFCCCCCC"/>
         <LinearGradientBrush x:Key="BackgroundGradient" StartPoint="0,0" EndPoint="0,1">
             <GradientStop Offset="0" Color="#FFEB0F0F"/>
             <GradientStop Offset="1" Color="#FFFFFFFF"/>
@@ -564,7 +569,18 @@
     <Grid Background="{DynamicResource BackgroundGradient}">
         <TabControl x:Name="MainTabControl"
                     Background="{DynamicResource TabBackground}"
+                    Foreground="{DynamicResource PrimaryText}"
                     SelectionChanged="MainTabControl_SelectionChanged">
+            <TabControl.Resources>
+                <Style TargetType="TabItem">
+                    <Setter Property="Foreground" Value="{DynamicResource TabInactiveForeground}"/>
+                    <Style.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter Property="Foreground" Value="{DynamicResource TabActiveForeground}"/>
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </TabControl.Resources>
 
             <!-- Onglet Dossiers -->
             <TabItem Header="Dossiers" Background="{DynamicResource TabBackground}">
@@ -608,9 +624,9 @@
                                      TextChanged="SearchBox_TextChanged"
                                      GotKeyboardFocus="SearchBox_GotKeyboardFocus"
                                      LostKeyboardFocus="SearchBox_LostKeyboardFocus"
-                                     Background="#FFFFFF"
-                                     Foreground="{DynamicResource PrimaryText}"
-                                     BorderBrush="#CCCCCC"
+                                     Background="{DynamicResource SearchBoxBackground}"
+                                     Foreground="{DynamicResource SearchBoxForeground}"
+                                     BorderBrush="{DynamicResource SearchBoxBorder}"
                                      Padding="5"
                                      Margin="5,0,0,0"/>
                             <TextBlock x:Name="PlaceholderText"
@@ -930,21 +946,39 @@
                         </Grid>
                     </Border>
 
-                    <StackPanel Orientation="Horizontal"
-                                Grid.Row="6"
-                                Margin="0,8,0,0"
-                                HorizontalAlignment="Right">
-                        <Button Content="Appliquer" Width="120" Margin="0,0,8,0" Click="ApplyColors_Click"/>
-                        <Button Content="Enregistrer" Width="120" Margin="0,0,8,0" Click="SaveConfig_Click"/>
-                        <Button Content="Réinitialiser" Width="120" Click="ResetConfig_Click"/>
-                    </StackPanel>
+                    <Grid Grid.Row="6" Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
 
-                    <Button Grid.Row="7"
-                            Content="Modifier les chemins…"
-                            Width="220"
-                            HorizontalAlignment="Left"
-                            Margin="0,2,0,10"
-                            Click="ChangePaths_Click"/>
+                        <!-- Bouton à gauche -->
+                        <Button Content="Modifier les chemins…" 
+            Width="220" 
+            HorizontalAlignment="Left"
+            Margin="0,0,16,0"
+            Click="ChangePaths_Click"/>
+
+                        <!-- Trois boutons à droite -->
+                        <StackPanel Orientation="Horizontal"
+                Grid.Column="1"
+                HorizontalAlignment="Right">
+
+                            <Button Content="Appliquer" 
+                Width="120" 
+                Margin="0,0,8,0" 
+                Click="ApplyColors_Click"/>
+
+                            <Button Content="Enregistrer" 
+                Width="120" 
+                Margin="0,0,8,0" 
+                Click="SaveConfig_Click"/>
+
+                            <Button Content="Réinitialiser" 
+                Width="120" 
+                Click="ResetConfig_Click"/>
+                        </StackPanel>
+                    </Grid>
                 </Grid>
             </TabItem>
 

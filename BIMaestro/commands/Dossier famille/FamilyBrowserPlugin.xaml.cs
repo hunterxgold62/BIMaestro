@@ -2093,6 +2093,11 @@ namespace Famille
                 Resources["TabBackground"] = new SolidColorBrush(Color.FromRgb(68, 68, 68));
                 Resources["ImageBackground"] = new SolidColorBrush(Color.FromRgb(30, 30, 30));
                 Resources["PrimaryText"] = new SolidColorBrush(Colors.White);
+                Resources["TabInactiveForeground"] = new SolidColorBrush(Colors.White);
+                Resources["TabActiveForeground"] = new SolidColorBrush(Colors.Black);
+                Resources["SearchBoxBackground"] = new SolidColorBrush(Colors.White);
+                Resources["SearchBoxForeground"] = new SolidColorBrush(Colors.Black);
+                Resources["SearchBoxBorder"] = new SolidColorBrush(Color.FromRgb(102, 102, 102));
             }
             else
             {
@@ -2113,6 +2118,11 @@ namespace Famille
                 Resources["TabBackground"] = new SolidColorBrush(tabBg);
                 Resources["ImageBackground"] = new SolidColorBrush(Colors.Transparent);
                 Resources["PrimaryText"] = new SolidColorBrush(Colors.Black);
+                Resources["TabInactiveForeground"] = new SolidColorBrush(Colors.Black);
+                Resources["TabActiveForeground"] = new SolidColorBrush(Colors.Black);
+                Resources["SearchBoxBackground"] = new SolidColorBrush(Colors.White);
+                Resources["SearchBoxForeground"] = new SolidColorBrush(Colors.Black);
+                Resources["SearchBoxBorder"] = new SolidColorBrush(Color.FromRgb(204, 204, 204));
             }
         }
 

@@ -94,7 +94,7 @@ public class AppUI : IExternalApplication
            });
         AddPushButton(panelEditing, "GestionExcelCmd", "Gestion\nExcel", assemblyPath, "ScheduleIO.ScheduleExcelIOCommand", "export import Excel.png", "Exporter ou importer une nomenclature au format Excel");
         AddPushButton(panelEditing, "Purge du plan", "Purge du\nplan", assemblyPath, "Modification.CombinedCleanupCommand", "purge.png", "Supprime les vues non placées, les familles et les nomenclatures inutilisées afin d'alléger le projet.\r\nUne fenêtre permet de choisir précisément les éléments à purger avant exécution.\r\n");
-        AddPushButton(panelEditing, "Auto canalisation", "(Béta)Auto\ncanalisation", assemblyPath, "Modification.ConnectPipesCommand", "cana auto.png", "Connecte automatiquement les canalisations sélectionnées, évite les murs sur son passage.");
+      //  AddPushButton(panelEditing, "Auto canalisation", "(Béta)Auto\ncanalisation", assemblyPath, "Modification.ConnectPipesCommand", "cana auto.png", "Connecte automatiquement les canalisations sélectionnées, évite les murs sur son passage.");
 
 
 
