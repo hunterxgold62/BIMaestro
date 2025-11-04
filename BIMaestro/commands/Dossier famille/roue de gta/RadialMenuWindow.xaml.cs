@@ -20,7 +20,7 @@ namespace BIMaestro.UI
         public event Action<RadialItem> ReloadRequested; // clic droit → "Recharger"
 
         // ======== Données / pagination ========
-        private readonly List<RadialItem> _items; // 24 attendus (Top8 + récents 16)
+        private List<RadialItem> _items; // multiples de 8 (complétés dynamiquement)
         private int _pageIndex = 0;
         private const int PAGE_SIZE = 8;
         private readonly RadialItem[] _currentPageItems = new RadialItem[PAGE_SIZE];
@@ -52,6 +52,14 @@ namespace BIMaestro.UI
         private Polygon _rightArrow;
         private TextBlock _centerLabel;
 
+        // ======== Collections ========
+        private Func<IReadOnlyList<(string Id, string Name)>> _collectionOptionsProvider;
+        private Action<string> _collectionSelectionCallback;
+        private Action _collectionClearCallback;
+        private bool _collectionModeActive;
+        private string _activeCollectionId;
+        private Func<int, int, string> _pageLabelFactory;
+
         // ======== Cache images ========
         private static readonly Dictionary<string, BitmapImage> s_ImageCache =
             new Dictionary<string, BitmapImage>(StringComparer.OrdinalIgnoreCase);
@@ -81,7 +89,7 @@ namespace BIMaestro.UI
             InitializeComponent();
 
             _items = items ?? new List<RadialItem>();
-            while (_items.Count < 24) _items.Add(new RadialItem()); // complète à 24
+            NormalizeItems();
 
             _screenXpx = screenXpx;
             _screenYpx = screenYpx;
@@ -89,6 +97,8 @@ namespace BIMaestro.UI
             double diameter = OUTER_R * 2 + 8;
             this.Width = diameter;
             this.Height = diameter;
+
+            _pageLabelFactory = DefaultPageLabelFactory;
 
             Loaded += Window_Loaded;
             Unloaded += Window_Unloaded;
@@ -98,6 +108,7 @@ namespace BIMaestro.UI
         }
 
         // ===================== Cycle de vie =====================
+
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
@@ -251,16 +262,17 @@ namespace BIMaestro.UI
                 Stroke = new SolidColorBrush(Color.FromArgb(120, 180, 180, 190)),
                 StrokeThickness = 1.2
             };
-            _centerDisk.Effect = new DropShadowEffect { Color = Colors.Black, BlurRadius = 8, ShadowDepth = 0, Opacity = 0.20 };
             Canvas.SetLeft(_centerDisk, cx - INNER_R);
             Canvas.SetTop(_centerDisk, cy - INNER_R);
             RootCanvas.Children.Add(_centerDisk);
+            _centerDisk.MouseRightButtonUp += OnCenterRightButtonUp;
 
             // Aperçu centre
             _centerPreview = new Image { Width = INNER_R * 0.9, Height = INNER_R * 0.9, Stretch = Stretch.Uniform };
             Canvas.SetLeft(_centerPreview, cx - _centerPreview.Width / 2.0);
             Canvas.SetTop(_centerPreview, cy - _centerPreview.Height / 2.0);
             RootCanvas.Children.Add(_centerPreview);
+            _centerPreview.MouseRightButtonUp += OnCenterRightButtonUp;
 
             // Label centre
             _centerLabel = new TextBlock
@@ -277,6 +289,7 @@ namespace BIMaestro.UI
             double labelTop = cy - (_centerPreview.Height / 2.0) - 16;
             Canvas.SetTop(_centerLabel, labelTop);
             RootCanvas.Children.Add(_centerLabel);
+            _centerLabel.MouseRightButtonUp += OnCenterRightButtonUp;
 
             // Flèche gauche/droite (pagination)
             _leftArrow = MakeArrowPolygon(isRight: false, size: 18);
@@ -396,7 +409,15 @@ namespace BIMaestro.UI
             return cm;
         }
 
-        private int PageCount => 3;
+        private int PageCount
+        {
+            get
+            {
+                int count = _items?.Count ?? 0;
+                int pages = (int)Math.Ceiling(count / (double)PAGE_SIZE);
+                return Math.Max(1, pages);
+            }
+        }
 
         private void PrevPage()
         {
@@ -443,18 +464,154 @@ namespace BIMaestro.UI
         private void UpdatePageLabel()
         {
             if (_centerLabel == null) return;
-            _centerLabel.Text = _pageIndex switch
-            {
-                0 => "Top-8",
-                1 => "Récents (1/2)",
-                2 => "Récents (2/2)",
-                _ => ""
-            };
+
+            var factory = _pageLabelFactory ?? DefaultPageLabelFactory;
+            string text = factory(_pageIndex, PageCount) ?? string.Empty;
+            _centerLabel.Text = text;
 
             _centerLabel.Opacity = 0;
             var fade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(120))
             { EasingFunction = new QuadraticEase() };
             _centerLabel.BeginAnimation(UIElement.OpacityProperty, fade);
+        }
+
+        private string DefaultPageLabelFactory(int index, int pageCount)
+        {
+            return index switch
+            {
+                0 => "Top-8",
+                1 => "Récents (1/2)",
+                2 => "Récents (2/2)",
+                _ => $"Page {index + 1}/{pageCount}",
+            };
+        }
+
+        public void SetPageLabelFactory(Func<int, int, string> factory)
+        {
+            _pageLabelFactory = factory ?? DefaultPageLabelFactory;
+            UpdatePageLabel();
+        }
+
+        public void UpdateCollectionState(bool isActive, string collectionName, string collectionId)
+        {
+            _collectionModeActive = isActive;
+            _activeCollectionId = collectionId;
+            if (_centerLabel != null)
+            {
+                if (isActive && !string.IsNullOrWhiteSpace(collectionName))
+                    _centerLabel.ToolTip = $"Collection : {collectionName}";
+                else
+                    _centerLabel.ToolTip = null;
+            }
+            UpdatePageLabel();
+        }
+
+        public void ConfigureCollectionActions(
+            Func<IReadOnlyList<(string Id, string Name)>> optionsProvider,
+            Action<string> onSelection,
+            Action onClear)
+        {
+            _collectionOptionsProvider = optionsProvider;
+            _collectionSelectionCallback = onSelection;
+            _collectionClearCallback = onClear;
+        }
+
+        public void ReplaceItems(List<RadialItem> items)
+        {
+            _items = items ?? new List<RadialItem>();
+            NormalizeItems();
+
+            _pageIndex = 0;
+            LoadPage(0);
+            UpdatePageLabel();
+            UpdateHoverFromMouse();
+        }
+
+        private void NormalizeItems()
+        {
+            if (_items == null)
+            {
+                _items = new List<RadialItem>();
+            }
+
+            if (_items.Count == 0)
+            {
+                for (int i = 0; i < PAGE_SIZE; i++)
+                    _items.Add(new RadialItem());
+                return;
+            }
+
+            int remainder = _items.Count % PAGE_SIZE;
+            if (remainder == 0) return;
+
+            int needed = PAGE_SIZE - remainder;
+            for (int i = 0; i < needed; i++)
+                _items.Add(new RadialItem());
+        }
+
+        private void OnCenterRightButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_closing) return;
+            ResetIdleTimer();
+            e.Handled = true;
+
+            var menu = BuildCenterContextMenu();
+            if (menu == null || menu.Items.Count == 0) return;
+
+            menu.PlacementTarget = _centerDisk;
+            menu.IsOpen = true;
+        }
+
+        private ContextMenu BuildCenterContextMenu()
+        {
+            var provider = _collectionOptionsProvider;
+            if (provider == null && !_collectionModeActive) return null;
+
+            var cm = new ContextMenu();
+
+            if (provider != null)
+            {
+                var loadItem = new MenuItem { Header = "Charger une collection" };
+                var options = provider() ?? Array.Empty<(string Id, string Name)>();
+                foreach (var option in options)
+                {
+                    if (string.IsNullOrWhiteSpace(option.Id)) continue;
+                    var sub = new MenuItem { Header = option.Name ?? option.Id, Tag = option.Id };
+                    sub.IsCheckable = true;
+                    if (!string.IsNullOrEmpty(_activeCollectionId) &&
+                        string.Equals(option.Id, _activeCollectionId, StringComparison.OrdinalIgnoreCase))
+                        sub.IsChecked = true;
+                    sub.Click += (s, e) =>
+                    {
+                        try
+                        {
+                            _collectionSelectionCallback?.Invoke((string)((MenuItem)s).Tag);
+                        }
+                        catch { }
+                    };
+                    loadItem.Items.Add(sub);
+                }
+
+                if (loadItem.Items.Count == 0)
+                {
+                    loadItem.IsEnabled = false;
+                    loadItem.Items.Add(new MenuItem { Header = "Aucune collection disponible", IsEnabled = false });
+                }
+
+                cm.Items.Add(loadItem);
+            }
+
+            if (_collectionModeActive && _collectionClearCallback != null)
+            {
+                var cancelItem = new MenuItem { Header = "Annuler la collection" };
+                cancelItem.Click += (s, e) =>
+                {
+                    try { _collectionClearCallback?.Invoke(); } catch { }
+                };
+                cm.Items.Add(cancelItem);
+            }
+
+            return cm;
         }
 
         // ===================== Survol / sélection =====================

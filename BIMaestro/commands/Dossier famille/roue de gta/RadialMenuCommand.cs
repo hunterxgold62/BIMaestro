@@ -32,37 +32,66 @@ namespace BIMaestro.UI
 
                 var (screenX, screenY) = OwnerWindowHelper.GetCursorPosPx();
 
-                // === 1) Source familles : Top-8 + 16 récents ===
-                var usage = FamilyUsageManager.Load();
-                var top8 = usage.OrderByDescending(kv => kv.Value)
-                                .Select(kv => kv.Key)
-                                .Where(File.Exists)
-                                .Distinct(StringComparer.OrdinalIgnoreCase)
-                                .Take(8)
-                                .ToList();
+                var state = RadialMenuCollectionStateStore.Load();
+                var collections = CollectionStore.Load() ?? new List<Collection>();
 
-                var recent16 = FamilyRecentManager.LoadMostRecentDistinct(16, File.Exists);
-                var allPathsForInference = top8.Concat(recent16).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                var standardData = BuildStandardData();
+                RadialMenuData activeData = standardData;
+                Collection activeCollection = null;
 
-                foreach (var p in recent16)
+                if (state != null && state.UseCollection && !string.IsNullOrWhiteSpace(state.ActiveCollectionId))
                 {
-                    if (top8.Count >= 8) break;
-                    if (!top8.Contains(p, StringComparer.OrdinalIgnoreCase)) top8.Add(p);
+                    activeCollection = collections.FirstOrDefault(c => string.Equals(c.Id, state.ActiveCollectionId, StringComparison.OrdinalIgnoreCase));
+                    if (activeCollection != null)
+                    {
+                        activeData = BuildCollectionData(activeCollection);
+                    }
+                    else
+                    {
+                        state.UseCollection = false;
+                        state.ActiveCollectionId = null;
+                        RadialMenuCollectionStateStore.Save(state);
+                    }
                 }
-                var recentA = recent16.Take(8).ToList();
-                var recentB = recent16.Skip(8).Take(8).ToList();
 
-                // === 2) Initialiser les racines images (JSON si présent, sinon inférence) ===
-                InitRootsForPhotos(allPathsForInference);
+                var win = new RadialMenuWindow(activeData.Items, screenX, screenY);
+                win.SetPageLabelFactory(activeData.PageLabelFactory);
+                win.UpdateCollectionState(activeData.IsCollectionMode, activeData.CollectionName, activeCollection?.Id);
 
-                // === 3) Construire les 24 items ===
-                var items = new List<RadialItem>(24);
-                items.AddRange(BuildItems(top8));
-                items.AddRange(BuildItems(recentA));
-                items.AddRange(BuildItems(recentB));
-                while (items.Count < 24) items.Add(new RadialItem());
+                win.ConfigureCollectionActions(
+                    () =>
+                    {
+                        var fresh = CollectionStore.Load() ?? new List<Collection>();
+                        return fresh.Select(c => (c.Id, c.Name)).ToList();
+                    },
+                    id =>
+                    {
+                        if (string.IsNullOrWhiteSpace(id)) return;
+                        var freshCollections = CollectionStore.Load() ?? new List<Collection>();
+                        var selected = freshCollections.FirstOrDefault(c => string.Equals(c.Id, id, StringComparison.OrdinalIgnoreCase));
+                        if (selected == null) return;
 
-                var win = new RadialMenuWindow(items, screenX, screenY);
+                        var updated = BuildCollectionData(selected);
+                        state.UseCollection = true;
+                        state.ActiveCollectionId = selected.Id;
+                        state.LastCollectionId = selected.Id;
+                        RadialMenuCollectionStateStore.Save(state);
+
+                        win.ReplaceItems(updated.Items);
+                        win.SetPageLabelFactory(updated.PageLabelFactory);
+                        win.UpdateCollectionState(true, selected.Name, selected.Id);
+                    },
+                    () =>
+                    {
+                        state.UseCollection = false;
+                        state.ActiveCollectionId = null;
+                        RadialMenuCollectionStateStore.Save(state);
+
+                        var updated = BuildStandardData();
+                        win.ReplaceItems(updated.Items);
+                        win.SetPageLabelFactory(updated.PageLabelFactory);
+                        win.UpdateCollectionState(false, null, null);
+                    });
 
                 // Gauche = placer (load keep + placement)
                 win.Completed += (accepted, _, item) =>
@@ -89,6 +118,89 @@ namespace BIMaestro.UI
                 message = ex.ToString();
                 return Result.Failed;
             }
+        }
+
+        private static RadialMenuData BuildStandardData()
+        {
+            var usage = FamilyUsageManager.Load();
+            var top8 = usage.OrderByDescending(kv => kv.Value)
+                            .Select(kv => kv.Key)
+                            .Where(File.Exists)
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .Take(8)
+                            .ToList();
+
+            var recent16 = FamilyRecentManager.LoadMostRecentDistinct(16, File.Exists);
+
+            foreach (var p in recent16)
+            {
+                if (top8.Count >= 8) break;
+                if (!top8.Contains(p, StringComparer.OrdinalIgnoreCase)) top8.Add(p);
+            }
+
+            var recentA = recent16.Take(8).ToList();
+            var recentB = recent16.Skip(8).Take(8).ToList();
+
+            var samplePaths = top8.Concat(recent16).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            InitRootsForPhotos(samplePaths);
+
+            var items = new List<RadialItem>(24);
+            items.AddRange(BuildItems(top8));
+            items.AddRange(BuildItems(recentA));
+            items.AddRange(BuildItems(recentB));
+            while (items.Count < 24) items.Add(new RadialItem());
+
+            return new RadialMenuData
+            {
+                Items = items,
+                IsCollectionMode = false,
+                CollectionName = null,
+                PageLabelFactory = (index, count) => index switch
+                {
+                    0 => "Top-8",
+                    1 => "Récents (1/2)",
+                    2 => "Récents (2/2)",
+                    _ => $"Page {index + 1}/{count}",
+                }
+            };
+        }
+
+        private static RadialMenuData BuildCollectionData(Collection collection)
+        {
+            var paths = collection?.Paths ?? new List<string>();
+            var normalized = paths
+                .Where(p => !string.IsNullOrWhiteSpace(p) && File.Exists(p))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            InitRootsForPhotos(normalized);
+
+            var items = BuildItems(normalized).ToList();
+
+            return new RadialMenuData
+            {
+                Items = items,
+                IsCollectionMode = true,
+                CollectionName = collection?.Name,
+                PageLabelFactory = CreateCollectionPageLabelFactory(collection?.Name)
+            };
+        }
+
+        private static Func<int, int, string> CreateCollectionPageLabelFactory(string collectionName)
+        {
+            string displayName = string.IsNullOrWhiteSpace(collectionName) ? string.Empty : collectionName.Trim();
+            return (index, count) =>
+            {
+                if (count <= 1)
+                {
+                    return string.IsNullOrEmpty(displayName) ? string.Empty : displayName;
+                }
+
+                if (string.IsNullOrEmpty(displayName))
+                    return $"Page {index + 1}/{count}";
+
+                return $"{displayName}\n({index + 1}/{count})";
+            };
         }
 
         // ==== PHOTOS (même logique que le navigateur) ====
@@ -121,6 +233,14 @@ namespace BIMaestro.UI
                     Label = Path.GetFileNameWithoutExtension(p)
                 };
             }
+        }
+
+        private sealed class RadialMenuData
+        {
+            public List<RadialItem> Items { get; set; } = new();
+            public bool IsCollectionMode { get; set; }
+            public string CollectionName { get; set; }
+            public Func<int, int, string> PageLabelFactory { get; set; }
         }
 
         private static void InitRootsForPhotos(List<string> sampleFamilyPaths)

@@ -2256,6 +2256,8 @@ namespace Famille
         private void CollectionCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             _selectedCollection = CollectionCombo.SelectedItem as Collection;
+            RadialMenuCollectionStateStore.UpdateLastSelection(_selectedCollection?.Id);
+
             RefreshCollectionContent();
         }
 

@@ -344,6 +344,7 @@
     <Compile Include="commands\Dossier famille\LoadFamilyHandler.cs" />
     <Compile Include="commands\Dossier famille\orbit 3D\FamilyMeshExtractor.cs" />
     <Compile Include="commands\Dossier famille\orbit 3D\FamilyPreviewBridge.cs" />
+    <Compile Include="commands\Dossier famille\roue de gta\RadialMenuCollectionStateStore.cs" />
     <Compile Include="commands\Dossier famille\orbit 3D\MeshData.cs" />
     <Compile Include="commands\Dossier famille\orbit 3D\Family3DPreviewWindow.xaml.cs">
       <DependentUpon>Family3DPreviewWindow.xaml</DependentUpon>
