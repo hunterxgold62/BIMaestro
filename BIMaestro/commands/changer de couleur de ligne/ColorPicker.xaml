@@ -3,134 +3,237 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:xctk="http://schemas.xceed.com/wpf/xaml/toolkit"
         Title="Sélectionner la couleur"
-        Height="650" Width="550"
-        WindowStartupLocation="CenterScreen">
+        Height="700" Width="720"
+        WindowStartupLocation="CenterScreen"
+        Background="#FFFAFBFC">
     <Window.Resources>
         <Style TargetType="GroupBox">
             <Setter Property="Margin" Value="10"/>
-            <Setter Property="Padding" Value="10"/>
+            <Setter Property="Padding" Value="12"/>
             <Setter Property="FontSize" Value="14"/>
+            <Setter Property="BorderBrush" Value="#FFCED4DA"/>
+            <Setter Property="BorderThickness" Value="1"/>
         </Style>
         <Style TargetType="Button">
-            <Setter Property="Margin" Value="5"/>
-            <Setter Property="Padding" Value="5,2"/>
+            <Setter Property="Margin" Value="6"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="MinWidth" Value="110"/>
         </Style>
         <Style TargetType="CheckBox">
-            <Setter Property="Margin" Value="5"/>
+            <Setter Property="Margin" Value="4"/>
         </Style>
+
+        <DataTemplate x:Key="FillPatternTemplate">
+            <StackPanel Orientation="Horizontal" Margin="2" VerticalAlignment="Center">
+                <Border Width="64" Height="36" BorderBrush="#FFB9C1CA" BorderThickness="1" CornerRadius="4"
+                        Background="#FFFDFEFF">
+                    <Rectangle Fill="{Binding PreviewBrush}" RadiusX="3" RadiusY="3"/>
+                </Border>
+                <TextBlock Text="{Binding Name}" Margin="10,0,0,0" VerticalAlignment="Center"/>
+            </StackPanel>
+        </DataTemplate>
+
+        <DataTemplate x:Key="LinePatternTemplate">
+            <StackPanel Orientation="Horizontal" Margin="2" VerticalAlignment="Center">
+                <Border Width="96" Height="32" BorderBrush="#FFB9C1CA" BorderThickness="1" CornerRadius="4" Background="White">
+                    <Canvas Margin="6,0" Width="84" Height="32">
+                        <Line X1="4" X2="80" Y1="16" Y2="16" StrokeThickness="3"
+                              Stroke="#FF2A2E37"
+                              StrokeDashCap="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                              StrokeDashArray="{Binding DashArray}"/>
+                    </Canvas>
+                </Border>
+                <TextBlock Text="{Binding Name}" Margin="10,0,0,0" VerticalAlignment="Center"/>
+            </StackPanel>
+        </DataTemplate>
     </Window.Resources>
-    <Grid>
-        <TabControl>
 
-            <!-- Options générales -->
-            <TabItem x:Name="GeneralOptionsTab" Header="Options générales">
-                <StackPanel Margin="10">
-                    <StackPanel Orientation="Horizontal">
-                        <CheckBox x:Name="HalftoneCheckBox"
-                                  Content="Appliquer la demi-teinte"/>
-                        <CheckBox x:Name="HideInViewCheckBox"
-                                  Content="Masquer dans la vue"
-                                  Margin="20,0,0,0"/>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Label Content="Transparence :" Width="150"/>
-                        <Slider x:Name="TransparencySlider"
-                                Minimum="0" Maximum="100" Value="0"
-                                Width="200" TickFrequency="10"
-                                IsSnapToTickEnabled="True"/>
-                        <TextBlock Text="{Binding ElementName=TransparencySlider, Path=Value, StringFormat=F0}"
-                                   Margin="10,0,0,0"/>
-                    </StackPanel>
-                </StackPanel>
-            </TabItem>
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
 
-            <!-- Couleurs et motifs -->
-            <TabItem x:Name="ColorsTab" Header="Couleurs et Motifs">
-                <StackPanel Margin="10">
-                    <Label Content="Couleur des motifs:"/>
-                    <xctk:ColorPicker x:Name="ColorPickerControl"
-                                      SelectedColor="Red"
-                                      Width="200" Margin="5"/>
-                    <GroupBox Header="Motifs de surface">
-                        <StackPanel>
-                            <ComboBox x:Name="SurfacePatternComboBox" Margin="5"/>
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                <CheckBox x:Name="SurfaceForegroundCheckBox" Content="Premier plan" IsChecked="True"/>
-                                <CheckBox x:Name="SurfaceBackgroundCheckBox" Content="Arrière-plan" IsChecked="False" Margin="20,0,0,0"/>
+        <Border Grid.Row="0" Background="White" CornerRadius="8" BorderBrush="#FFD8DEE6" BorderThickness="1">
+            <TabControl Margin="12">
+
+                <!-- Options générales -->
+                <TabItem x:Name="GeneralOptionsTab" Header="Options générales">
+                    <StackPanel Margin="15">
+                        <TextBlock Text="Affinage des réglages graphiques" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                        <UniformGrid Columns="2" Margin="0,0,0,10">
+                            <CheckBox x:Name="HalftoneCheckBox" Content="Appliquer la demi-teinte"/>
+                            <CheckBox x:Name="HideInViewCheckBox" Content="Masquer dans la vue"/>
+                        </UniformGrid>
+                        <GroupBox Header="Transparence">
+                            <StackPanel>
+                                <TextBlock Text="Définissez la transparence générale appliquée aux éléments sélectionnés." Margin="0,0,0,6"/>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Slider x:Name="TransparencySlider"
+                                            Minimum="0" Maximum="100" Value="0"
+                                            Width="260" TickFrequency="10"
+                                            IsSnapToTickEnabled="True"/>
+                                    <Border Margin="12,0,0,0" Padding="10,4" Background="#FFEFF2F6" CornerRadius="4">
+                                        <TextBlock Text="{Binding ElementName=TransparencySlider, Path=Value, StringFormat={} {0}%}"/>
+                                    </Border>
+                                </StackPanel>
                             </StackPanel>
-                        </StackPanel>
-                    </GroupBox>
-                    <GroupBox Header="Motifs de coupe">
-                        <StackPanel>
-                            <ComboBox x:Name="CutPatternComboBox" Margin="5"/>
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                <CheckBox x:Name="CutForegroundCheckBox" Content="Premier plan" IsChecked="True"/>
-                                <CheckBox x:Name="CutBackgroundCheckBox" Content="Arrière-plan" IsChecked="False" Margin="20,0,0,0"/>
+                        </GroupBox>
+                    </StackPanel>
+                </TabItem>
+
+                <!-- Couleurs et motifs -->
+                <TabItem x:Name="ColorsTab" Header="Couleurs et motifs">
+                    <StackPanel Margin="15">
+                        <TextBlock Text="Couleurs de remplissage" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,10"/>
+                        <DockPanel Margin="0,0,0,12">
+                            <StackPanel Orientation="Vertical" DockPanel.Dock="Left">
+                                <TextBlock Text="Sélection de la couleur" FontWeight="Bold"/>
+                                <xctk:ColorPicker x:Name="ColorPickerControl"
+                                                  SelectedColor="Red"
+                                                  Width="230" Margin="0,6,0,0"
+                                                  ShowDropDownButton="True"
+                                                  StandardColorsHeader="Palette"/>
                             </StackPanel>
+                            <Border Margin="24,0,0,0" Padding="12" Background="#FFEFF2F6" CornerRadius="6" Width="240" Height="180">
+                                <StackPanel>
+                                    <TextBlock Text="Aperçu" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                    <UniformGrid Rows="2" Margin="0,12,0,0">
+                                        <StackPanel>
+                                            <TextBlock Text="Surface" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                                            <Border Margin="0,6,0,0" Width="180" Height="64" CornerRadius="6"
+                                                    BorderBrush="#FFC3C8D1" BorderThickness="1" Background="White">
+                                                <Rectangle x:Name="SurfacePreviewRectangle" RadiusX="5" RadiusY="5"/>
+                                            </Border>
+                                        </StackPanel>
+                                        <StackPanel>
+                                            <TextBlock Text="Coupe" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                                            <Border Margin="0,6,0,0" Width="180" Height="64" CornerRadius="6"
+                                                    BorderBrush="#FFC3C8D1" BorderThickness="1" Background="White">
+                                                <Rectangle x:Name="CutPreviewRectangle" RadiusX="5" RadiusY="5"/>
+                                            </Border>
+                                        </StackPanel>
+                                    </UniformGrid>
+                                </StackPanel>
+                            </Border>
+                        </DockPanel>
+
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <GroupBox Header="Motifs de surface" Grid.Column="0">
+                                <StackPanel>
+                                    <ComboBox x:Name="SurfacePatternComboBox" Margin="0,0,0,8"
+                                              ItemTemplate="{StaticResource FillPatternTemplate}"/>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                        <CheckBox x:Name="SurfaceForegroundCheckBox" Content="Premier plan" IsChecked="True"/>
+                                        <CheckBox x:Name="SurfaceBackgroundCheckBox" Content="Arrière-plan" IsChecked="False" Margin="20,0,0,0"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </GroupBox>
+
+                            <GroupBox Header="Motifs de coupe" Grid.Column="1">
+                                <StackPanel>
+                                    <ComboBox x:Name="CutPatternComboBox" Margin="0,0,0,8"
+                                              ItemTemplate="{StaticResource FillPatternTemplate}"/>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                        <CheckBox x:Name="CutForegroundCheckBox" Content="Premier plan" IsChecked="True"/>
+                                        <CheckBox x:Name="CutBackgroundCheckBox" Content="Arrière-plan" IsChecked="False" Margin="20,0,0,0"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </GroupBox>
+                        </Grid>
+                    </StackPanel>
+                </TabItem>
+
+                <!-- Lignes et contours -->
+                <TabItem x:Name="LinesTab" Header="Lignes et contours">
+                    <StackPanel Margin="15">
+                        <CheckBox x:Name="ModifyLineColorCheckBox"
+                                  Content="Modifier lignes et contours" Margin="0,0,0,10"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12" VerticalAlignment="Center">
+                            <StackPanel>
+                                <TextBlock Text="Couleur des lignes" FontWeight="Bold"/>
+                                <xctk:ColorPicker x:Name="LineColorPicker"
+                                                  SelectedColor="Blue"
+                                                  Width="230" Margin="0,6,0,0"
+                                                  ShowDropDownButton="True"
+                                                  StandardColorsHeader="Palette"/>
+                            </StackPanel>
+                            <Border Margin="24,0,0,0" Padding="12" Background="#FFEFF2F6" CornerRadius="6" Width="220" Height="120"
+                                    IsEnabled="{Binding ElementName=ModifyLineColorCheckBox, Path=IsChecked}">
+                                <StackPanel>
+                                    <TextBlock Text="Aperçu" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                    <Canvas Margin="0,16,0,0" Width="180" Height="60" HorizontalAlignment="Center">
+                                        <Line x:Name="LinePreview"
+                                              X1="10" X2="170" Y1="30" Y2="30"
+                                              StrokeThickness="{Binding ElementName=ProjectionLineWeightSlider, Path=Value}"
+                                              Stroke="#FF2A2E37" StrokeDashCap="Round"
+                                              StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                    </Canvas>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
-                    </GroupBox>
-                </StackPanel>
-            </TabItem>
 
-            <!-- Lignes et contours -->
-            <TabItem x:Name="LinesTab" Header="Lignes et Contours">
-                <StackPanel Margin="10">
-                    <CheckBox x:Name="ModifyLineColorCheckBox"
-                              Content="Modifier lignes et contours"/>
-                    <Label Content="Couleur des lignes et contours:"/>
-                    <xctk:ColorPicker x:Name="LineColorPicker"
-                                      SelectedColor="Blue"
-                                      Width="200" Margin="5"/>
-                    <StackPanel Orientation="Horizontal" Margin="5">
-                        <Label Content="Type de ligne :" VerticalAlignment="Center"/>
-                        <ComboBox x:Name="ProjectionLinePatternComboBox" Width="150" Margin="5"/>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="5">
-                        <Label Content="Épaisseur :" VerticalAlignment="Center"/>
-                        <ComboBox x:Name="ProjectionLineWeightComboBox" Width="100" Margin="5">
-                            <ComboBoxItem Content="1"/>
-                            <ComboBoxItem Content="2"/>
-                            <ComboBoxItem Content="3"/>
-                            <ComboBoxItem Content="4"/>
-                            <ComboBoxItem Content="5"/>
-                            <ComboBoxItem Content="6"/>
-                            <ComboBoxItem Content="7"/>
-                            <ComboBoxItem Content="8"/>
-                            <ComboBoxItem Content="9"/>
-                            <ComboBoxItem Content="10"/>
-                        </ComboBox>
-                    </StackPanel>
-                </StackPanel>
-            </TabItem>
+                        <GroupBox Header="Style des lignes" Margin="0,0,0,12">
+                            <Grid Margin="4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
 
-            <!-- Sélection des vues -->
-            <TabItem x:Name="ViewsTab" Header="Sélection des vues">
-                <StackPanel Margin="10">
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <Button x:Name="SelectAllViewsButton"
-                                Content="Tout sélectionner"
-                                Click="SelectAllViewsButton_Click"/>
-                        <Button x:Name="DeselectAllViewsButton"
-                                Content="Tout désélectionner"
-                                Click="DeselectAllViewsButton_Click"/>
-                    </StackPanel>
-                    <TreeView x:Name="ViewsTreeView" Margin="5" Height="450"/>
-                </StackPanel>
-            </TabItem>
+                                <StackPanel Grid.Column="0" IsEnabled="{Binding ElementName=ModifyLineColorCheckBox, Path=IsChecked}">
+                                    <TextBlock Text="Type de ligne" FontWeight="Bold" Margin="0,0,0,4"/>
+                                    <ComboBox x:Name="ProjectionLinePatternComboBox"
+                                              ItemTemplate="{StaticResource LinePatternTemplate}"/>
+                                </StackPanel>
 
-        </TabControl>
+                                <StackPanel Grid.Column="1" Margin="12,0,0,0" IsEnabled="{Binding ElementName=ModifyLineColorCheckBox, Path=IsChecked}">
+                                    <TextBlock Text="Épaisseur" FontWeight="Bold" Margin="0,0,0,4"/>
+                                    <Slider x:Name="ProjectionLineWeightSlider"
+                                            Minimum="1" Maximum="16" Value="1"
+                                            TickFrequency="1" IsSnapToTickEnabled="True"/>
+                                    <TextBlock Text="{Binding ElementName=ProjectionLineWeightSlider, Path=Value, StringFormat={}Épaisseur : {0:F0}}" Margin="0,6,0,0"/>
+                                </StackPanel>
+                            </Grid>
+                        </GroupBox>
+                    </StackPanel>
+                </TabItem>
+
+                <!-- Sélection des vues -->
+                <TabItem x:Name="ViewsTab" Header="Sélection des vues">
+                    <DockPanel Margin="15" LastChildFill="True">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,12" DockPanel.Dock="Top">
+                            <Button x:Name="SelectAllViewsButton"
+                                    Content="Tout sélectionner"
+                                    Click="SelectAllViewsButton_Click"/>
+                            <Button x:Name="DeselectAllViewsButton"
+                                    Content="Tout désélectionner"
+                                    Click="DeselectAllViewsButton_Click"/>
+                        </StackPanel>
+                        <Border BorderBrush="#FFD8DEE6" BorderThickness="1" CornerRadius="6">
+                            <TreeView x:Name="ViewsTreeView" Margin="5"
+                                      ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                      ScrollViewer.CanContentScroll="True"/>
+                        </Border>
+                    </DockPanel>
+                </TabItem>
+
+            </TabControl>
+        </Border>
 
         <!-- Actions -->
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"
-                    VerticalAlignment="Bottom" Margin="10">
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,18,0,0">
             <Button x:Name="ApplyButton"
                     Content="Appliquer"
-                    Click="Apply_Click"
-                    Width="100"/>
+                    Click="Apply_Click"/>
             <Button x:Name="ResetButton"
                     Content="Réinitialiser"
-                    Click="Reset_Click"
-                    Width="100"/>
+                    Click="Reset_Click"/>
         </StackPanel>
     </Grid>
 </Window>

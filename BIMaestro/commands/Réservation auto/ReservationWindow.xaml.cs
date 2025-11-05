@@ -1,6 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;  // <-- pour MouseButtonEventArgs
 using Autodesk.Revit.DB;
 
 namespace Modification
@@ -16,7 +18,6 @@ namespace Modification
             Autre
         }
 
-        // Propriétés pour récupérer le choix final
         public ObjectType SelectedObjectType { get; private set; }
         public FamilySymbol SelectedReservationSymbol { get; private set; }
         public bool NormeEnabled { get; private set; }
@@ -38,21 +39,38 @@ namespace Modification
             };
             comboObjectType.SelectedIndex = 0;
 
-            comboFamily.ItemsSource = reservationFamilies;
+            reservationFamilies ??= new List<FamilySymbol>();
+            comboFamily.ItemsSource = reservationFamilies.OrderBy(fs => fs?.Name).ToList();
             if (reservationFamilies.Any())
                 comboFamily.SelectedIndex = 0;
+
+            Loaded += (_, __) => comboObjectType.Focus();
         }
 
-        // Dès que l'utilisateur change type ou famille, on active/désactive "Multi"
-        private void OnCriteriaChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        // Clic gauche : toggle du popup
+        private void BtnOptions_Click(object sender, RoutedEventArgs e)
+        {
+            popupOptions.IsOpen = !popupOptions.IsOpen;
+        }
+
+        // Clic droit : toggle du popup + on consomme l'événement
+        private void BtnOptions_RightClick(object sender, MouseButtonEventArgs e)
+        {
+            e.Handled = true;
+            popupOptions.IsOpen = !popupOptions.IsOpen;
+        }
+
+        // Logique existante
+        private void OnCriteriaChanged(object sender, SelectionChangedEventArgs e)
         {
             var typeSel = comboObjectType.SelectedItem as string;
             bool isCanal = typeSel == "Canalisation";
             bool isAutre = typeSel == "Autre";
+
             var fam = comboFamily.SelectedItem as FamilySymbol;
             bool isRect = fam != null &&
-                          (fam.Name.IndexOf("rect", System.StringComparison.OrdinalIgnoreCase) >= 0
-                        || fam.Family.Name.IndexOf("rect", System.StringComparison.OrdinalIgnoreCase) >= 0);
+                          ((fam.Name?.IndexOf("rect", System.StringComparison.OrdinalIgnoreCase) ?? -1) >= 0
+                           || (fam.Family?.Name?.IndexOf("rect", System.StringComparison.OrdinalIgnoreCase) ?? -1) >= 0);
 
             chkMulti.IsEnabled = (isCanal || isAutre) && isRect;
             if (!chkMulti.IsEnabled)
@@ -66,7 +84,6 @@ namespace Modification
             AutomatiqueEnabled = chkAutomatique.IsChecked == true;
             MultiEnabled = chkMulti.IsChecked == true;
 
-            // Type d'objet choisi
             switch (comboObjectType.SelectedItem as string)
             {
                 case "Canalisation": SelectedObjectType = ObjectType.Canalisation; break;
@@ -77,6 +94,7 @@ namespace Modification
             }
 
             SelectedReservationSymbol = comboFamily.SelectedItem as FamilySymbol;
+
             DialogResult = true;
             Close();
         }
