@@ -133,8 +133,8 @@ namespace Modification
             if (ogs == null || !ogs.IsValidObject) return false;
 
             // Lignes (projection/coupe)
-            if (ogs.ProjectionLineColor != null) return true;
-            if (ogs.CutLineColor != null) return true;
+            if (HasColorOverride(ogs.ProjectionLineColor)) return true;
+            if (HasColorOverride(ogs.CutLineColor)) return true;
             if (ogs.ProjectionLinePatternId != ElementId.InvalidElementId) return true;
             if (ogs.CutLinePatternId != ElementId.InvalidElementId) return true;
             if (ogs.ProjectionLineWeight != OverrideGraphicSettings.InvalidPenNumber) return true;
@@ -145,10 +145,10 @@ namespace Modification
             if (ogs.SurfaceForegroundPatternId != ElementId.InvalidElementId) return true;
             if (ogs.CutBackgroundPatternId != ElementId.InvalidElementId) return true;
             if (ogs.CutForegroundPatternId != ElementId.InvalidElementId) return true;
-            if (ogs.SurfaceBackgroundPatternColor != null) return true;
-            if (ogs.SurfaceForegroundPatternColor != null) return true;
-            if (ogs.CutBackgroundPatternColor != null) return true;
-            if (ogs.CutForegroundPatternColor != null) return true;
+            if (HasColorOverride(ogs.SurfaceBackgroundPatternColor)) return true;
+            if (HasColorOverride(ogs.SurfaceForegroundPatternColor)) return true;
+            if (HasColorOverride(ogs.CutBackgroundPatternColor)) return true;
+            if (HasColorOverride(ogs.CutForegroundPatternColor)) return true;
 
             // Détail & trame
             if (ogs.DetailLevel != ViewDetailLevel.Undefined) return true;
@@ -164,6 +164,11 @@ namespace Modification
 #endif
 
             return false;
+        }
+
+        private static bool HasColorOverride(Color color)
+        {
+            return color != null && color.IsValid;
         }
     }
 }

@@ -2,18 +2,20 @@
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using Licensing;
 using System;
 using System.Diagnostics;
 
 namespace Page
 {
     [Transaction(TransactionMode.Manual)]
-    public class GuideCommand : IExternalCommand
+    public class GuideCommand : BaseTrackedCommand
     {
         private const string GuideUrl = "https://sites.google.com/view/guide-bimaestro";
-
-        public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        protected override string ButtonId => "GuideCommand";
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
+            var commandData = data;
             try
             {
                 var psi = new ProcessStartInfo

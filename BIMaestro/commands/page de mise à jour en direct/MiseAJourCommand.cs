@@ -2,15 +2,18 @@
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using Licensing;
 using System;
 
 namespace Page
 {
     [Transaction(TransactionMode.Manual)]
-    public class MiseAJourCommand : IExternalCommand
+    public class MiseAJourCommand : BaseTrackedCommand
     {
-        public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        protected override string ButtonId => "MiseAJourCommand";
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
+            var commandData = data;
             try
             {
                 var win = new UpdateWindow();

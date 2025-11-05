@@ -199,7 +199,7 @@ namespace BIMaestro.UI
                 if (string.IsNullOrEmpty(displayName))
                     return $"Page {index + 1}/{count}";
 
-                return $"{displayName}\n({index + 1}/{count})";
+                return $"{displayName}({index + 1}/{count})";
             };
         }
 
