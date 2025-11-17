@@ -148,6 +148,18 @@ namespace BIMaestro.Dashboard
             }
         }
 
+        private void OpenLocation_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_uiReady) return;
+            TryOpenLocation();
+        }
+
+        private void SelectAll_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_uiReady) return;
+            _lvProjects.SelectAll();
+        }
+
         private void Chip7_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; SetRange(DateTime.Today.AddDays(-7), DateTime.Today); }
         private void Chip30_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; SetRange(DateTime.Today.AddDays(-30), DateTime.Today); }
         private void ChipYtd_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; SetRange(new DateTime(DateTime.Today.Year, 1, 1), DateTime.Today); }
@@ -631,6 +643,17 @@ namespace BIMaestro.Dashboard
                 File.WriteAllText(PrefsPath, JsonConvert.SerializeObject(_prefs, Formatting.Indented), Encoding.UTF8);
             }
             catch { }
+        }
+
+        private List<ProjectItem> GetActiveProjectScope()
+        {
+            if (!string.IsNullOrWhiteSpace(_tbSearch?.Text) && _filteredProjects?.Count > 0)
+                return _filteredProjects.ToList();
+
+            if (_lvProjects?.SelectedItems?.Count > 0)
+                return _lvProjects.SelectedItems.Cast<ProjectItem>().ToList();
+
+            return (_filteredProjects?.Count > 0 ? _filteredProjects : _projects)?.ToList() ?? new List<ProjectItem>();
         }
 
         private int GetTopN() { if (!int.TryParse(_tbTopN.Text, out int n)) n = DEFAULT_TOP_N; return ClampInt(n, TOP_N_MIN, TOP_N_MAX); }
