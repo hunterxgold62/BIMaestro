@@ -1,9 +1,9 @@
-﻿<Window x:Class="BIMaestro.Dashboard.TimeSeriesDashboardWindow"
+<Window x:Class="BIMaestro.Dashboard.TimeSeriesDashboardWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:oxy="clr-namespace:OxyPlot.Wpf;assembly=OxyPlot.Wpf"
-        Title="BIMaestro — Temps par projet"
-        Width="1220" Height="780" MinWidth="1080" MinHeight="660"
+        Title="BIMaestro — Temps par type de document"
+        Width="1280" Height="820" MinWidth="1100" MinHeight="680"
         WindowStartupLocation="CenterScreen"
         Background="#F8F9FB">
 
@@ -71,14 +71,20 @@
 
         <Style x:Key="SegmentToggle" TargetType="{x:Type ToggleButton}">
             <Setter Property="Height" Value="32"/>
-            <Setter Property="Margin" Value="0,0,6,0"/>
+            <Setter Property="MinWidth" Value="130"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="Padding" Value="10,0"/>
             <Setter Property="Background" Value="{StaticResource NeutralBg}"/>
             <Setter Property="BorderBrush" Value="{StaticResource NeutralBorder}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource PrimaryText}"/>
+            <Setter Property="CornerRadius" Value="8"/>
             <Style.Triggers>
                 <Trigger Property="IsChecked" Value="True">
                     <Setter Property="Background" Value="#E2ECF7"/>
+                    <Setter Property="BorderBrush" Value="#7FB1F6"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -155,168 +161,177 @@
         </Grid>
 
         <!-- ===== TOOLBAR ===== -->
-        <Grid Grid.Row="1" Margin="0,0,0,10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="430"/>
-                <ColumnDefinition Width="340"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-
-            <!-- Dates -->
-            <StackPanel Grid.Column="0" Orientation="Vertical">
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                    <DatePicker x:Name="_dpFrom" Width="130" Margin="0,0,6,0" SelectedDateChanged="OnDateChanged"/>
-                    <DatePicker x:Name="_dpTo" Width="130" SelectedDateChanged="OnDateChanged"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <Button Style="{StaticResource ChipButton}" Content="7 j" Click="Chip7_Click"/>
-                    <Button Style="{StaticResource ChipButton}" Content="30 j" Click="Chip30_Click"/>
-                    <Button Style="{StaticResource ChipButton}" Content="YTD" Click="ChipYtd_Click"/>
-                    <Button Style="{StaticResource ChipButton}" Content="12 mois" Click="Chip12m_Click"/>
-                    <Button Style="{StaticResource ChipButton}" Content="Tout" Click="ChipAll_Click"/>
-                </StackPanel>
-            </StackPanel>
-
-            <!-- Mode + tri + Top N -->
-            <StackPanel Grid.Column="1" Orientation="Vertical" Margin="8,0">
+        <Border Grid.Row="1" Style="{StaticResource CardBorder}" Margin="0,0,0,10">
+            <StackPanel Margin="16,14" Orientation="Vertical">
                 <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition/>
-                        <ColumnDefinition/>
-                    </Grid.ColumnDefinitions>
-                    <ToggleButton x:Name="_tgOverview" Grid.Column="0" Style="{StaticResource SegmentToggle}" Content="Aperçu (barres)" Checked="Mode_Checked"/>
-                    <ToggleButton x:Name="_tgCompare"  Grid.Column="1" Style="{StaticResource SegmentToggle}" Content="Comparer (courbes)" Checked="Mode_Checked"/>
-                </Grid>
-
-                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                    <TextBlock Text="Trier :" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                    <ComboBox x:Name="_cbSort" Width="121.5" SelectionChanged="OnSortChanged">
-                        <ComboBoxItem Content="Heures ↓" IsSelected="True"/>
-                        <ComboBoxItem Content="Nom A→Z"/>
-                    </ComboBox>
-
-                    <TextBlock Text="  Top N :" VerticalAlignment="Center" Margin="4,0,6,0"/>
-                    <Button x:Name="_btnTopNMinus" Style="{StaticResource TinyButton}" Content="–" Click="BtnTopNMinus_Click"/>
-                    <TextBox x:Name="_tbTopN" Width="44" Height="26" Text="20" HorizontalContentAlignment="Center"
-                             PreviewTextInput="TopN_PreviewTextInput" TextChanged="TopN_TextChanged"/>
-                    <Button x:Name="_btnTopNPlus" Style="{StaticResource TinyButton}" Content="+" Click="BtnTopNPlus_Click"/>
-                </StackPanel>
-
-                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                    <Button x:Name="_chipTop5"   Style="{StaticResource ChipButton}" Content="5"   Click="ChipTop_Click"/>
-                    <Button x:Name="_chipTop10"  Style="{StaticResource ChipButton}" Content="10"  Click="ChipTop_Click"/>
-                    <Button x:Name="_chipTop20"  Style="{StaticResource ChipButton}" Content="20"  Click="ChipTop_Click"/>
-                    <Button x:Name="_chipTop50"  Style="{StaticResource ChipButton}" Content="50"  Click="ChipTop_Click"/>
-                    <Button x:Name="_chipTop100" Style="{StaticResource ChipButton}" Content="100" Click="ChipTop_Click"/>
-                </StackPanel>
-            </StackPanel>
-
-            <!-- Recherche + actions -->
-            <Grid Grid.Column="2" Margin="8,0,0,0">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-
-                <Grid Grid.Row="0" Margin="0,0,0,6">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <StackPanel>
-                        <TextBlock Text="Recherche (nom, dossier, fin de chemin)" Margin="0,0,0,4"/>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBox x:Name="_tbSearch" Height="28" MinWidth="300"
-                                     ToolTip="Ctrl+F. Échap pour effacer. Accent-insensible."
-                                     KeyDown="Search_KeyDown" TextChanged="Search_TextChanged"/>
-                            <Button x:Name="_btnClearSearch" Grid.Column="1" Style="{StaticResource TinyButton}" Content="✕" Click="ClearSearch_Click"/>
-                        </Grid>
+
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="Temps par type de document" FontWeight="SemiBold" FontSize="16" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <ToggleButton x:Name="_tgRvt" Style="{StaticResource SegmentToggle}" Content="Maquettes (.rvt)" Checked="DocTypeToggle_Click"/>
+                        <ToggleButton x:Name="_tgRfa" Style="{StaticResource SegmentToggle}" Content="Familles (.rfa)" Checked="DocTypeToggle_Click"/>
+
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
+                            <TextBlock Text="Légende" VerticalAlignment="Center"/>
+                            <CheckBox x:Name="_cbLegend" Content="Afficher" Margin="6,0,0,0" IsChecked="True" Checked="Legend_Checked" Unchecked="Legend_Checked"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Style="{StaticResource GhostButton}" Content="Exporter PNG" Click="ExportPng_Click"/>
+                        <Button Style="{StaticResource GhostButton}" Content="Exporter CSV" Click="ExportCsv_Click"/>
+                        <Button Style="{StaticResource PrimaryButton}" Content="Ouvrir Excel" Click="OpenExcel_Click"/>
+                        <Button Style="{StaticResource GhostButton}" Content="Réinitialiser" Click="Reset_Click"/>
                     </StackPanel>
                 </Grid>
 
-                <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Left">
-                    <Button Style="{StaticResource PrimaryButton}" Content="Ouvrir Excel" Click="OpenExcel_Click"/>
-                    <Button Style="{StaticResource GhostButton}" Content="Exporter CSV" Click="ExportCsv_Click"/>
-                    <Button Style="{StaticResource GhostButton}" Content="Exporter PNG" Click="ExportPng_Click"/>
-                    <Button Style="{StaticResource GhostButton}" Content="Réinitialiser" Click="Reset_Click"/>
-                </StackPanel>
-            </Grid>
-        </Grid>
+                <Grid Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.4*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Dates -->
+                    <StackPanel Grid.Column="0" Orientation="Vertical">
+                        <TextBlock Text="Période" FontWeight="SemiBold"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                            <DatePicker x:Name="_dpFrom" Width="150" SelectedDateChanged="OnDateChanged"/>
+                            <DatePicker x:Name="_dpTo" Width="150" SelectedDateChanged="OnDateChanged"/>
+                        </StackPanel>
+                        <WrapPanel Margin="0,6,0,0" ItemWidth="70" ItemHeight="32">
+                            <Button Style="{StaticResource ChipButton}" Content="7 j" Click="Chip7_Click"/>
+                            <Button Style="{StaticResource ChipButton}" Content="30 j" Click="Chip30_Click"/>
+                            <Button Style="{StaticResource ChipButton}" Content="YTD" Click="ChipYtd_Click"/>
+                            <Button Style="{StaticResource ChipButton}" Content="12 m" Click="Chip12m_Click"/>
+                            <Button Style="{StaticResource ChipButton}" Content="Tout" Click="ChipAll_Click"/>
+                        </WrapPanel>
+                    </StackPanel>
+
+                    <!-- Mode + tri + Top N -->
+                    <StackPanel Grid.Column="1" Orientation="Vertical" Margin="12,0">
+                        <TextBlock Text="Affichage" FontWeight="SemiBold"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                            <ToggleButton x:Name="_tgOverview" Style="{StaticResource SegmentToggle}" Content="Aperçu" Checked="Mode_Checked"/>
+                            <ToggleButton x:Name="_tgCompare"  Style="{StaticResource SegmentToggle}" Content="Comparer" Checked="Mode_Checked"/>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,6,0,0">
+                            <TextBlock Text="Trier" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            <ComboBox x:Name="_cbSort" Width="140" SelectionChanged="OnSortChanged">
+                                <ComboBoxItem Content="Heures ↓" IsSelected="True"/>
+                                <ComboBoxItem Content="Nom A→Z"/>
+                            </ComboBox>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" Orientation="Vertical">
+                        <TextBlock Text="Top N" FontWeight="SemiBold"/>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,6,0,0">
+                            <Button x:Name="_btnTopNMinus" Style="{StaticResource TinyButton}" Content="–" Click="BtnTopNMinus_Click"/>
+                            <TextBox x:Name="_tbTopN" Width="48" Height="28" Text="20" HorizontalContentAlignment="Center"
+                                     PreviewTextInput="TopN_PreviewTextInput" TextChanged="TopN_TextChanged"/>
+                            <Button x:Name="_btnTopNPlus" Style="{StaticResource TinyButton}" Content="+" Click="BtnTopNPlus_Click"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Border>
 
         <!-- ===== BODY ===== -->
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="440"/>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="300"/>
+                <ColumnDefinition Width="380"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Liste projets -->
+            <!-- Visualisation -->
             <Border Grid.Column="0" Style="{StaticResource CardBorder}" Margin="12">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-                    <StackPanel Orientation="Horizontal" Margin="12,12,12,0">
-                        <TextBlock Text="Projets" FontWeight="SemiBold" FontSize="14" Margin="0,0,8,0"/>
-                        <CheckBox x:Name="_cbShowFolder" Content="Afficher dossier" IsChecked="False"
-                                  Checked="ShowFolder_Checked" Unchecked="ShowFolder_Checked"/>
+                <Grid Margin="16" ColumnDefinitions="3* 1.1*" RowDefinitions="Auto *">
+                    <TextBlock Text="Temps par type de document" FontWeight="SemiBold" FontSize="15" Grid.ColumnSpan="2" Margin="0,0,0,10"/>
+
+                    <Border Grid.Row="1" Grid.Column="0" BorderBrush="{StaticResource NeutralBorder}" BorderThickness="1" Background="White" CornerRadius="10">
+                        <oxy:PlotView x:Name="_plotView" Background="White" />
+                    </Border>
+
+                    <Border Grid.Row="1" Grid.Column="1" BorderBrush="{StaticResource NeutralBorder}" BorderThickness="1" CornerRadius="10" Background="#FDFEFE" Padding="10" Margin="12,0,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Légende" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" Height="260">
+                                <ItemsControl x:Name="_legendList" ItemTemplate="{StaticResource LegendItemTemplate}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Vertical"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- Panneau latéral -->
+            <Grid Grid.Column="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" Style="{StaticResource CardBorder}" Margin="12,12,12,6">
+                    <StackPanel Margin="14">
+                        <TextBlock Text="Recherche rapide" FontWeight="SemiBold" FontSize="14"/>
+                        <TextBlock Text="Tapez pour trouver un projet/famille et ouvrir son dossier sans impacter les graphiques." Foreground="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="_tbSearch" Height="32" MinWidth="260"
+                                     ToolTip="Ctrl+F. Échap pour effacer. Accent-insensible."
+                                     KeyDown="Search_KeyDown" TextChanged="Search_TextChanged"/>
+                            <Button x:Name="_btnClearSearch" Grid.Column="1" Style="{StaticResource TinyButton}" Content="✕" Click="ClearSearch_Click"/>
+                        </Grid>
+
+                        <TextBlock x:Name="_lblCount" Margin="0,4,0,0" Foreground="{StaticResource MutedText}"/>
+
+                        <Border BorderBrush="{StaticResource NeutralBorder}" BorderThickness="1" CornerRadius="8" Background="#FDFEFE" Padding="10" Margin="0,8,0,8">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" Height="160">
+                                <ItemsControl x:Name="_icSuggestions">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Style="{StaticResource ChipButton}" Padding="12,6" Margin="0,4,6,4"
+                                                    Content="{Binding BaseName}"
+                                                    Tag="{Binding DocumentId}" Click="Suggestion_Click"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Border>
+
+                        <Button Style="{StaticResource PrimaryButton}" Content="Ouvrir l'emplacement" HorizontalAlignment="Right" Click="OpenLocation_Click"/>
                     </StackPanel>
+                </Border>
 
-                    <ListView x:Name="_lvProjects" Grid.Row="1" Margin="12" SelectionMode="Extended"
-                              AlternationCount="2" BorderThickness="0" Background="Transparent"
-                              ItemContainerStyle="{StaticResource ProjectItemStyle}"
-                              SelectionChanged="Projects_SelectionChanged" MouseDoubleClick="Projects_MouseDoubleClick">
-                        <ListView.View>
-                            <GridView>
-                                <GridViewColumn Header="Projet" Width="260" DisplayMemberBinding="{Binding BaseName}"/>
-                                <GridViewColumn x:Name="_colFolder" Header="Dossier" Width="0" DisplayMemberBinding="{Binding Folder}"/>
-                                <GridViewColumn Header="h" Width="60">
-                                    <GridViewColumn.DisplayMemberBinding>
-                                        <Binding Path="Hours" StringFormat="0.0"/>
-                                    </GridViewColumn.DisplayMemberBinding>
-                                </GridViewColumn>
-                            </GridView>
-                        </ListView.View>
-                    </ListView>
-
-                    <TextBlock x:Name="_lblCount" Grid.Row="2" Margin="12,0,12,12" Text="0 projet(s)"/>
-                </Grid>
-            </Border>
-
-            <!-- plus de Viewbox ni rotation -->
-            <Border Grid.Column="1" Style="{StaticResource CardBorder}" Margin="12">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-                    <TextBlock Text="Visualisation du temps" FontWeight="SemiBold" FontSize="14" Margin="16,12,16,8"/>
-                    <oxy:PlotView x:Name="_plotView" Grid.Row="1" Background="White" />
-                </Grid>
-            </Border>
-
-
-            <!-- Légende -->
-            <Border Grid.Column="2" Style="{StaticResource CardBorder}" Margin="12">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-                    <StackPanel Orientation="Horizontal" Margin="16,12,16,0">
-                        <TextBlock Text="Légende" FontWeight="SemiBold" FontSize="14"/>
-                        <CheckBox x:Name="_cbLegend" Content="Afficher" Margin="12,0,0,0" IsChecked="False" Checked="Legend_Checked" Unchecked="Legend_Checked"/>
+                <Border Grid.Row="1" Style="{StaticResource CardBorder}" Margin="12,6,12,12">
+                    <StackPanel Margin="14">
+                        <TextBlock Text="Astuces" FontWeight="SemiBold" FontSize="14"/>
+                        <TextBlock Foreground="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,6,0,0">
+• Utilisez la barre de recherche pour filtrer les maquettes/familles.
+• Cliquez sur un résultat pour ouvrir rapidement son dossier.
+• Ajustez le Top N et le tri pour épurer les graphiques.
+                        </TextBlock>
                     </StackPanel>
-                    <ListView x:Name="_legendList" Grid.Row="1" Margin="12" ItemTemplate="{StaticResource LegendItemTemplate}"/>
-                </Grid>
-            </Border>
+                </Border>
+            </Grid>
         </Grid>
     </Grid>
 </Window>
