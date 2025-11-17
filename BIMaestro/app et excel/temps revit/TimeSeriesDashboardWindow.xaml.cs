@@ -77,8 +77,7 @@ namespace BIMaestro.Dashboard
             _dpTo.SelectedDate = DateTime.Today;
             _tgOverview.IsChecked = true;
             _tgCompare.IsChecked = false;
-            _tgRvt.IsChecked = true;
-            _tgRfa.IsChecked = false;
+            _tabDocType.SelectedIndex = 0;
 
             Environment.SetEnvironmentVariable("EPPlusLicenseContext", "NonCommercial", EnvironmentVariableTarget.Process);
 
@@ -118,21 +117,10 @@ namespace BIMaestro.Dashboard
             DrawChart();
         }
 
-        private void DocTypeToggle_Click(object sender, RoutedEventArgs e)
+        private void DocType_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (!_uiReady) return;
-            if (sender == _tgRvt)
-            {
-                _tgRvt.IsChecked = true;
-                _tgRfa.IsChecked = false;
-            }
-            else if (sender == _tgRfa)
-            {
-                _tgRfa.IsChecked = true;
-                _tgRvt.IsChecked = false;
-            }
             RefreshAll();
-            RefreshSearch();
         }
 
         private void Legend_Checked(object sender, RoutedEventArgs e) { if (!_uiReady) return; DrawChart(); }
@@ -160,6 +148,20 @@ namespace BIMaestro.Dashboard
                 string path = btn.Tag?.ToString();
                 TryOpenLocation(path);
             }
+        }
+        private void Search_TextChanged(object sender, TextChangedEventArgs e) { if (!_uiReady) return; _searchDebounce.Start(); }
+        private void ClearSearch_Click(object sender, RoutedEventArgs e) { if (!_uiReady) return; _tbSearch.Text = ""; _tbSearch.Focus(); }
+
+        private void OpenLocation_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_uiReady) return;
+            TryOpenLocation();
+        }
+
+        private void SelectAll_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_uiReady) return;
+            _lvProjects.SelectAll();
         }
 
         private void Chip7_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; SetRange(DateTime.Today.AddDays(-7), DateTime.Today); }
@@ -216,7 +218,7 @@ namespace BIMaestro.Dashboard
             }
         }
 
-        private DocumentKind GetActiveKind() => (_tgRfa?.IsChecked == true) ? DocumentKind.Rfa : DocumentKind.Rvt;
+        private DocumentKind GetActiveKind() => (_tabDocType?.SelectedIndex == 1) ? DocumentKind.Rfa : DocumentKind.Rvt;
 
         private static DocumentKind GetKind(string documentId, string documentName)
         {
@@ -280,20 +282,6 @@ namespace BIMaestro.Dashboard
 
             IEnumerable<ProjectItem> seq = _projects ?? Enumerable.Empty<ProjectItem>();
             seq = seq.Where(MatchesDocumentKind);
-
-            foreach (var p in seq)
-                p.Hours = _hoursByProject.TryGetValue(p.DocumentId, out double h) ? h : 0.0;
-
-            _displayProjects = (sm == SortMode.HoursDesc)
-                ? seq.OrderByDescending(p => p.Hours).ThenBy(p => p.BaseName).ToList()
-                : seq.OrderBy(p => p.BaseName).ThenBy(p => p.Folder).ToList();
-        }
-
-        private void RefreshSearch()
-        {
-            string q = RemoveDiacritics((_tbSearch?.Text ?? "").Trim());
-            IEnumerable<ProjectItem> seq = (_projects ?? Enumerable.Empty<ProjectItem>()).Where(MatchesDocumentKind);
-
             foreach (var p in seq)
                 p.Hours = _hoursByProject.TryGetValue(p.DocumentId, out double h) ? h : 0.0;
 
@@ -306,16 +294,14 @@ namespace BIMaestro.Dashboard
                          .OrderByDescending(p => p.Hours)
                          .ThenBy(p => p.BaseName);
 
-                _filteredProjects = seq.Take(30).ToList();
-                if (_lblCount != null) _lblCount.Text = _filteredProjects.Count + " résultat(s)";
-                if (_icSuggestions != null) _icSuggestions.ItemsSource = _filteredProjects.Take(15).ToList();
-            }
-            else
-            {
-                _filteredProjects = new List<ProjectItem>();
-                if (_lblCount != null) _lblCount.Text = "Commencez à taper pour afficher des raccourcis";
-                if (_icSuggestions != null) _icSuggestions.ItemsSource = null;
-            }
+            _filteredProjects = (sm == SortMode.HoursDesc)
+                ? seq.OrderByDescending(p => p.Hours).ThenBy(p => p.BaseName).ToList()
+                : seq.OrderBy(p => p.BaseName).ThenBy(p => p.Folder).ToList();
+
+            _lblCount.Text = _filteredProjects.Count + " résultat(s)";
+
+            if (_icSuggestions != null)
+                _icSuggestions.ItemsSource = _filteredProjects.Take(10).ToList();
         }
 
         // ===== CHART =====
@@ -325,7 +311,7 @@ namespace BIMaestro.Dashboard
 
             var model = new PlotModel();
 
-            var selected = (_displayProjects?.Count > 0 ? _displayProjects : _projects.Where(MatchesDocumentKind)).ToList();
+            var selected = (_filteredProjects?.Count > 0 ? _filteredProjects : _projects).ToList();
 
             DateTime? d0 = _dpFrom.SelectedDate;
             DateTime? d1 = _dpTo.SelectedDate?.AddDays(1).AddTicks(-1);
@@ -478,7 +464,7 @@ namespace BIMaestro.Dashboard
         // ===== KPI =====
         private void UpdateKpis()
         {
-            var selectedItems = (_displayProjects?.Count > 0 ? _displayProjects : _projects.Where(MatchesDocumentKind)).ToList();
+            var selectedItems = (_filteredProjects?.Count > 0 ? _filteredProjects : _projects).ToList();
             if (selectedItems.Count == 0) return;
 
             var selected = new HashSet<string>(selectedItems.Select(p => p.DocumentId));
@@ -522,7 +508,7 @@ namespace BIMaestro.Dashboard
             var dlg = new Microsoft.Win32.SaveFileDialog { FileName = "dashboard_temps.csv", Filter = "CSV|*.csv" };
             if (dlg.ShowDialog() != true) return;
 
-            var selected = new HashSet<string>((_displayProjects?.Count > 0 ? _displayProjects : _projects.Where(MatchesDocumentKind)).Select(p => p.DocumentId));
+            var selected = new HashSet<string>((_filteredProjects?.Count > 0 ? _filteredProjects : _projects).Select(p => p.DocumentId));
             DateTime d0 = _dpFrom.SelectedDate ?? DateTime.MinValue;
             DateTime d1 = _dpTo.SelectedDate.HasValue ? _dpTo.SelectedDate.Value.AddDays(1).AddTicks(-1) : DateTime.MaxValue;
 
@@ -613,7 +599,7 @@ namespace BIMaestro.Dashboard
             _dpTo.SelectedDate = DateTime.Today;
             _tgOverview.IsChecked = true; _tgCompare.IsChecked = false;
             _cbLegend.IsChecked = true;
-            _tgRvt.IsChecked = true; _tgRfa.IsChecked = false;
+            _tabDocType.SelectedIndex = 0;
             _hiddenBars.Clear();
             RefreshAll();
             RefreshSearch();
@@ -642,8 +628,7 @@ namespace BIMaestro.Dashboard
                 _tgOverview.IsChecked = _prefs.Mode != "Compare";
                 _tgCompare.IsChecked = _prefs.Mode == "Compare";
                 _cbLegend.IsChecked = _prefs.LegendShown;
-                _tgRfa.IsChecked = _prefs.DocType == "Rfa";
-                _tgRvt.IsChecked = _prefs.DocType != "Rfa";
+                _tabDocType.SelectedIndex = _prefs.DocType == "Rfa" ? 1 : 0;
             }
             catch { }
         }
@@ -663,6 +648,17 @@ namespace BIMaestro.Dashboard
                 File.WriteAllText(PrefsPath, JsonConvert.SerializeObject(_prefs, Formatting.Indented), Encoding.UTF8);
             }
             catch { }
+        }
+
+        private List<ProjectItem> GetActiveProjectScope()
+        {
+            if (!string.IsNullOrWhiteSpace(_tbSearch?.Text) && _filteredProjects?.Count > 0)
+                return _filteredProjects.ToList();
+
+            if (_lvProjects?.SelectedItems?.Count > 0)
+                return _lvProjects.SelectedItems.Cast<ProjectItem>().ToList();
+
+            return (_filteredProjects?.Count > 0 ? _filteredProjects : _projects)?.ToList() ?? new List<ProjectItem>();
         }
 
         private int GetTopN() { if (!int.TryParse(_tbTopN.Text, out int n)) n = DEFAULT_TOP_N; return ClampInt(n, TOP_N_MIN, TOP_N_MAX); }
