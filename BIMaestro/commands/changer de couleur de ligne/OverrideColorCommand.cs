@@ -17,9 +17,9 @@ namespace Modification
             var uiapp = data.Application;
             var uidoc = uiapp.ActiveUIDocument;
             var doc = uidoc.Document;
-            var selectedElementIds = uidoc.Selection.GetElementIds();
+            var selIds = uidoc.Selection.GetElementIds();
 
-            if (selectedElementIds.Count == 0)
+            if (selIds.Count == 0)
             {
                 TaskDialog.Show("Erreur", "Veuillez sélectionner au moins un élément avant d’appliquer une opération.");
                 return Result.Failed;
@@ -28,7 +28,7 @@ namespace Modification
             var activeView = uidoc.ActiveView;
 
             // Détecte s’il existe déjà des overrides sur l’un des éléments sélectionnés
-            var (hasExistingOverrides, referenceOverrides, referenceElementId) = TryGetExistingOverrides(activeView, selectedElementIds);
+            var (hasExistingOverrides, referenceOverrides, referenceElementId) = TryGetExistingOverrides(activeView, selIds);
 
             bool useExistingOverrides = false;
             if (hasExistingOverrides)
@@ -78,7 +78,7 @@ namespace Modification
                     if (view == null || !view.AreGraphicsOverridesAllowed())
                         continue;
 
-                    foreach (var id in selectedElementIds)
+                    foreach (var id in selIds)
                     {
                         try
                         {

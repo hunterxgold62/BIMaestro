@@ -1,7 +1,6 @@
 ﻿using Autodesk.Revit.UI;
 using BIMaestro.UI;
 using Famille.Orbit3D;
-using Microsoft.Win32;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -12,7 +11,6 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
@@ -23,6 +21,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using WinForms = System.Windows.Forms;
+using Microsoft.Win32;
 
 namespace Famille
 {
@@ -221,9 +220,7 @@ namespace Famille
             }
 
             var root = new DirectoryInfo(familiesFolder);
-
-            // Tri naturel des sous-dossiers (9.xxx < 10.xxx)
-            foreach (var sub in root.EnumerateDirectories().OrderBy(d => d, NaturalSort.Directories))
+            foreach (var sub in root.GetDirectories())
             {
                 var node = CreateDirectoryNode(sub);
                 node.IsExpanded = false;
@@ -244,18 +241,13 @@ namespace Famille
                 ((TreeViewItem)FolderTreeView.Items[0]).IsSelected = true;
         }
 
-
         private TreeViewItem CreateDirectoryNode(DirectoryInfo dir)
         {
             var item = new TreeViewItem { Header = dir.Name, Tag = dir.FullName };
-
-            // Tri naturel récursif pour l’arborescence entière
-            foreach (var sub in dir.EnumerateDirectories().OrderBy(d => d, NaturalSort.Directories))
+            foreach (var sub in dir.GetDirectories())
                 item.Items.Add(CreateDirectoryNode(sub));
-
             return item;
         }
-
 
         private void FolderTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
@@ -277,27 +269,6 @@ namespace Famille
 
             TopFamiliesView.Visibility = Visibility.Collapsed;
             TopSeparator.Visibility = Visibility.Collapsed;
-        }
-
-        // --- Comparateurs "tri naturel" façon Explorateur Windows ---
-        static class NaturalSort
-        {
-            [DllImport("shlwapi.dll", CharSet = CharSet.Unicode)]
-            private static extern int StrCmpLogicalW(string x, string y);
-
-            public sealed class StringComparer : IComparer<string>
-            {
-                public int Compare(string x, string y) => StrCmpLogicalW(x ?? string.Empty, y ?? string.Empty);
-            }
-
-            public sealed class DirectoryInfoComparer : IComparer<DirectoryInfo>
-            {
-                private static readonly StringComparer _cmp = new();
-                public int Compare(DirectoryInfo a, DirectoryInfo b) => _cmp.Compare(a?.Name, b?.Name);
-            }
-
-            public static readonly StringComparer Strings = new();
-            public static readonly DirectoryInfoComparer Directories = new();
         }
 
         private void LoadFamilies(string path, bool recursive)
