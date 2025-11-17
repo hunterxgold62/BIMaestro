@@ -5,6 +5,7 @@ using OxyPlot.Axes;
 using OxyPlot.Series;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -42,6 +43,8 @@ namespace BIMaestro.Dashboard
         // Debounce recherche
         private DispatcherTimer _searchDebounce;
 
+        private readonly string _currentDocumentPath;
+
         // ===== Data =====
         private List<LogRow> _rows = new();
         private List<ProjectItem> _projects = new();
@@ -54,14 +57,16 @@ namespace BIMaestro.Dashboard
 
         private enum SortMode { HoursDesc, NameAZ }
         private enum AutoGran { Day, Week, Month }
+        private enum DocumentKind { Rvt, Rfa }
 
         private Prefs _prefs = new();
 
-        public TimeSeriesDashboardWindow()
+        public TimeSeriesDashboardWindow(string currentDocumentPath = null)
         {
             InitializeComponent();
 
-            Title = "BIMaestro — Temps par projet";
+            _currentDocumentPath = currentDocumentPath;
+            Title = "BIMaestro — Temps par type de document";
             AddHotkeys();
 
             _searchDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(220) };
@@ -71,6 +76,7 @@ namespace BIMaestro.Dashboard
             _dpTo.SelectedDate = DateTime.Today;
             _tgOverview.IsChecked = true;
             _tgCompare.IsChecked = false;
+            _tabDocType.SelectedIndex = 0;
 
             Environment.SetEnvironmentVariable("EPPlusLicenseContext", "NonCommercial", EnvironmentVariableTarget.Process);
 
@@ -95,7 +101,6 @@ namespace BIMaestro.Dashboard
             InputBindings.Add(new KeyBinding(new RelayCommand(_ => CopyChartToClipboard()), new KeyGesture(Key.C, ModifierKeys.Control)));
             InputBindings.Add(new KeyBinding(new RelayCommand(_ => ExportCsv()), new KeyGesture(Key.C, ModifierKeys.Control | ModifierKeys.Shift)));
             InputBindings.Add(new KeyBinding(new RelayCommand(_ => ResetFilters()), new KeyGesture(Key.R, ModifierKeys.Control)));
-            InputBindings.Add(new KeyBinding(new RelayCommand(_ => _lvProjects.SelectAll()), new KeyGesture(Key.A, ModifierKeys.Control)));
         }
 
         // ===== Handlers XAML (ils doivent garder leur NOM exact) =====
@@ -110,32 +115,13 @@ namespace BIMaestro.Dashboard
             DrawChart();
         }
 
+        private void DocType_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (!_uiReady) return;
+            RefreshAll();
+        }
+
         private void Legend_Checked(object sender, RoutedEventArgs e) { if (!_uiReady) return; DrawChart(); }
-
-        private void Projects_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (!_uiReady) return;
-            DrawChart();
-            UpdateKpis();
-        }
-
-        private void Projects_MouseDoubleClick(object sender, MouseButtonEventArgs e)
-        {
-            if (!_uiReady) return;
-            if (_lvProjects.SelectedItem is ProjectItem it)
-            {
-                _lvProjects.SelectedItems.Clear();
-                _lvProjects.SelectedItems.Add(it);
-                DrawChart();
-                UpdateKpis();
-            }
-        }
-
-        private void ShowFolder_Checked(object sender, RoutedEventArgs e)
-        {
-            if (!_uiReady) return;
-            _colFolder.Width = (_cbShowFolder.IsChecked == true) ? 140 : 0;
-        }
 
         private void Search_KeyDown(object sender, KeyEventArgs e)
         {
@@ -144,6 +130,23 @@ namespace BIMaestro.Dashboard
         }
         private void Search_TextChanged(object sender, TextChangedEventArgs e) { if (!_uiReady) return; _searchDebounce.Start(); }
         private void ClearSearch_Click(object sender, RoutedEventArgs e) { if (!_uiReady) return; _tbSearch.Text = ""; _tbSearch.Focus(); }
+
+        private void OpenLocation_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_uiReady) return;
+            TryOpenLocation();
+        }
+
+        private void Suggestion_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_uiReady) return;
+            if (sender is Button btn)
+            {
+                _tbSearch.Text = btn.Content?.ToString() ?? string.Empty;
+                string path = btn.Tag?.ToString();
+                TryOpenLocation(path);
+            }
+        }
 
         private void Chip7_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; SetRange(DateTime.Today.AddDays(-7), DateTime.Today); }
         private void Chip30_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; SetRange(DateTime.Today.AddDays(-30), DateTime.Today); }
@@ -199,6 +202,24 @@ namespace BIMaestro.Dashboard
             }
         }
 
+        private DocumentKind GetActiveKind() => (_tabDocType?.SelectedIndex == 1) ? DocumentKind.Rfa : DocumentKind.Rvt;
+
+        private static DocumentKind GetKind(string documentId, string documentName)
+        {
+            string id = (documentId ?? string.Empty).ToLowerInvariant();
+            string name = (documentName ?? string.Empty).ToLowerInvariant();
+            if (id.EndsWith(".rfa") || name.EndsWith(".rfa")) return DocumentKind.Rfa;
+            return DocumentKind.Rvt;
+        }
+
+        private bool MatchesDocumentKind(ProjectItem item) => MatchesDocumentKind(item?.DocumentId, item?.Name);
+
+        private bool MatchesDocumentKind(string documentId, string documentName)
+        {
+            var active = GetActiveKind();
+            return GetKind(documentId, documentName) == active;
+        }
+
         private void BuildProjectList()
         {
             var closed = _rows.Where(r => string.Equals(r.Event, "Fermé", StringComparison.OrdinalIgnoreCase));
@@ -228,6 +249,7 @@ namespace BIMaestro.Dashboard
 
             _hoursByProject = _rows
                 .Where(r => r.Event.Equals("Fermé", StringComparison.OrdinalIgnoreCase))
+                .Where(r => MatchesDocumentKind(r.DocumentId, r.DocumentName))
                 .Where(r => !d0.HasValue || r.When >= d0.Value)
                 .Where(r => !d1.HasValue || r.When <= d1.Value)
                 .GroupBy(r => r.DocumentId)
@@ -244,6 +266,7 @@ namespace BIMaestro.Dashboard
             SortMode sm = (_cbSort != null && _cbSort.SelectedIndex == 1) ? SortMode.NameAZ : SortMode.HoursDesc;
 
             IEnumerable<ProjectItem> seq = _projects ?? Enumerable.Empty<ProjectItem>();
+            seq = seq.Where(MatchesDocumentKind);
             foreach (var p in seq)
                 p.Hours = _hoursByProject.TryGetValue(p.DocumentId, out double h) ? h : 0.0;
 
@@ -259,14 +282,10 @@ namespace BIMaestro.Dashboard
                 ? seq.OrderByDescending(p => p.Hours).ThenBy(p => p.BaseName).ToList()
                 : seq.OrderBy(p => p.BaseName).ThenBy(p => p.Folder).ToList();
 
-            if (_lvProjects != null)
-            {
-                _lvProjects.ItemsSource = _filteredProjects;
-                _lblCount.Text = _filteredProjects.Count + " projet(s)";
+            _lblCount.Text = _filteredProjects.Count + " résultat(s)";
 
-                if (string.IsNullOrEmpty(q) && _filteredProjects.Count > 0 && _lvProjects.SelectedItems.Count == 0)
-                    _lvProjects.SelectAll();
-            }
+            if (_icSuggestions != null)
+                _icSuggestions.ItemsSource = _filteredProjects.Take(10).ToList();
         }
 
         // ===== CHART =====
@@ -276,15 +295,14 @@ namespace BIMaestro.Dashboard
 
             var model = new PlotModel();
 
-            var selected = _lvProjects?.SelectedItems.Cast<ProjectItem>().ToList()
-                           ?? new List<ProjectItem>();
-            if (selected.Count == 0)
-                selected = (_filteredProjects?.Count > 0 ? _filteredProjects : _projects).ToList();
+            var selected = (_filteredProjects?.Count > 0 ? _filteredProjects : _projects).ToList();
 
             DateTime? d0 = _dpFrom.SelectedDate;
             DateTime? d1 = _dpTo.SelectedDate?.AddDays(1).AddTicks(-1);
 
-            IEnumerable<LogRow> closed = _rows.Where(r => r.Event.Equals("Fermé", StringComparison.OrdinalIgnoreCase));
+            IEnumerable<LogRow> closed = _rows
+                .Where(r => r.Event.Equals("Fermé", StringComparison.OrdinalIgnoreCase))
+                .Where(r => MatchesDocumentKind(r.DocumentId, r.DocumentName));
             if (d0.HasValue) closed = closed.Where(r => r.When >= d0.Value);
             if (d1.HasValue) closed = closed.Where(r => r.When <= d1.Value);
 
@@ -430,9 +448,10 @@ namespace BIMaestro.Dashboard
         // ===== KPI =====
         private void UpdateKpis()
         {
-            if (_lvProjects == null) return;
+            var selectedItems = (_filteredProjects?.Count > 0 ? _filteredProjects : _projects).ToList();
+            if (selectedItems.Count == 0) return;
 
-            var selected = new HashSet<string>(_lvProjects.SelectedItems.Cast<ProjectItem>().Select(p => p.DocumentId));
+            var selected = new HashSet<string>(selectedItems.Select(p => p.DocumentId));
             DateTime d0 = _dpFrom.SelectedDate ?? DateTime.MinValue;
             DateTime d1 = _dpTo.SelectedDate.HasValue ? _dpTo.SelectedDate.Value.AddDays(1).AddTicks(-1) : DateTime.MaxValue;
 
@@ -448,7 +467,7 @@ namespace BIMaestro.Dashboard
             int workedWeekdays = inRangeWeekdays.Select(r => r.When.Date).Distinct().Count();
             double avg = workedWeekdays == 0 ? 0.0 : totalH / workedWeekdays;
 
-            int projects = _lvProjects.SelectedItems.Count;
+            int projects = selectedItems.Count;
             _kpiHours.Text = totalH.ToString("0.0") + " h";
             _kpiProjects.Text = projects.ToString();
             _kpiAvg.Text = avg.ToString("0.0") + " h";
@@ -473,7 +492,7 @@ namespace BIMaestro.Dashboard
             var dlg = new Microsoft.Win32.SaveFileDialog { FileName = "dashboard_temps.csv", Filter = "CSV|*.csv" };
             if (dlg.ShowDialog() != true) return;
 
-            var selected = new HashSet<string>(_lvProjects.SelectedItems.Cast<ProjectItem>().Select(p => p.DocumentId));
+            var selected = new HashSet<string>((_filteredProjects?.Count > 0 ? _filteredProjects : _projects).Select(p => p.DocumentId));
             DateTime d0 = _dpFrom.SelectedDate ?? DateTime.MinValue;
             DateTime d1 = _dpTo.SelectedDate.HasValue ? _dpTo.SelectedDate.Value.AddDays(1).AddTicks(-1) : DateTime.MaxValue;
 
@@ -518,6 +537,43 @@ namespace BIMaestro.Dashboard
             catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
+        private void TryOpenLocation(string preferredPath = null)
+        {
+            try
+            {
+                string path = null;
+                if (!string.IsNullOrWhiteSpace(preferredPath))
+                    path = preferredPath;
+                else
+                {
+                    var firstMatch = _filteredProjects?.FirstOrDefault();
+                    if (!string.IsNullOrWhiteSpace(_tbSearch?.Text) && firstMatch != null)
+                        path = firstMatch.DocumentId;
+                    else if (!string.IsNullOrWhiteSpace(_currentDocumentPath))
+                        path = _currentDocumentPath;
+                }
+
+                if (string.IsNullOrWhiteSpace(path))
+                {
+                    MessageBox.Show("Aucun chemin détecté pour ouvrir l'emplacement.");
+                    return;
+                }
+
+                string folder = Directory.Exists(path) ? path : Path.GetDirectoryName(path);
+                if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder))
+                {
+                    MessageBox.Show("Dossier introuvable pour : " + path);
+                    return;
+                }
+
+                Process.Start(new ProcessStartInfo { FileName = folder, UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
+        }
+
         private void ResetFilters()
         {
             _tbSearch.Text = "";
@@ -526,10 +582,9 @@ namespace BIMaestro.Dashboard
             _dpFrom.SelectedDate = DateTime.Today.AddMonths(-1);
             _dpTo.SelectedDate = DateTime.Today;
             _tgOverview.IsChecked = true; _tgCompare.IsChecked = false;
-            _cbLegend.IsChecked = false;
-            _cbShowFolder.IsChecked = false;
+            _cbLegend.IsChecked = true;
+            _tabDocType.SelectedIndex = 0;
             _hiddenBars.Clear();
-            _lvProjects.SelectAll();
             RefreshAll();
         }
 
@@ -556,8 +611,7 @@ namespace BIMaestro.Dashboard
                 _tgOverview.IsChecked = _prefs.Mode != "Compare";
                 _tgCompare.IsChecked = _prefs.Mode == "Compare";
                 _cbLegend.IsChecked = _prefs.LegendShown;
-                _cbShowFolder.IsChecked = _prefs.ShowFolder;
-                _colFolder.Width = (_prefs.ShowFolder ? 140 : 0);
+                _tabDocType.SelectedIndex = _prefs.DocType == "Rfa" ? 1 : 0;
             }
             catch { }
         }
@@ -573,7 +627,7 @@ namespace BIMaestro.Dashboard
                 _prefs.TopN = GetTopN();
                 _prefs.Mode = _tgCompare.IsChecked == true ? "Compare" : "Overview";
                 _prefs.LegendShown = _cbLegend.IsChecked == true;
-                _prefs.ShowFolder = _cbShowFolder.IsChecked == true;
+                _prefs.DocType = GetActiveKind() == DocumentKind.Rfa ? "Rfa" : "Rvt";
                 File.WriteAllText(PrefsPath, JsonConvert.SerializeObject(_prefs, Formatting.Indented), Encoding.UTF8);
             }
             catch { }
@@ -781,8 +835,8 @@ namespace BIMaestro.Dashboard
             public string Sort { get; set; } = "HoursDesc";
             public int TopN { get; set; } = DEFAULT_TOP_N;
             public string Mode { get; set; } = "Overview";
-            public bool LegendShown { get; set; } = false;
-            public bool ShowFolder { get; set; } = false;
+            public bool LegendShown { get; set; } = true;
+            public string DocType { get; set; } = "Rvt";
         }
 
         [Obfuscation(Exclude = true, ApplyToMembers = true, StripAfterObfuscation = false)]
