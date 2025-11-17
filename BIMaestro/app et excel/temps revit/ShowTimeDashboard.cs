@@ -13,7 +13,8 @@ namespace BIMaestro.Dashboard
             try
             {
                 Environment.SetEnvironmentVariable("EPPlusLicenseContext", "NonCommercial", EnvironmentVariableTarget.Process);
-                new TimeSeriesDashboardWindow().Show();
+                string activePath = cdata.Application?.ActiveUIDocument?.Document?.PathName;
+                new TimeSeriesDashboardWindow(activePath).Show();
                 return Result.Succeeded;
             }
             catch (Exception ex)
