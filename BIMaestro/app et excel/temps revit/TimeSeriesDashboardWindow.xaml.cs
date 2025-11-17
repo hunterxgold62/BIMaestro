@@ -48,6 +48,7 @@ namespace BIMaestro.Dashboard
         // ===== Data =====
         private List<LogRow> _rows = new();
         private List<ProjectItem> _projects = new();
+        private List<ProjectItem> _displayProjects = new();
         private List<ProjectItem> _filteredProjects = new();
         private Dictionary<string, double> _hoursByProject = new(StringComparer.Ordinal);
 
@@ -70,7 +71,7 @@ namespace BIMaestro.Dashboard
             AddHotkeys();
 
             _searchDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(220) };
-            _searchDebounce.Tick += (s, e) => { _searchDebounce.Stop(); RefreshAll(); };
+            _searchDebounce.Tick += (s, e) => { _searchDebounce.Stop(); RefreshSearch(); };
 
             _dpFrom.SelectedDate = DateTime.Today.AddMonths(-1);
             _dpTo.SelectedDate = DateTime.Today;
@@ -90,6 +91,7 @@ namespace BIMaestro.Dashboard
 
             _uiReady = true;
             RefreshAll();
+            RefreshSearch();
 
             Closing += (s, e) => SavePrefs();
         }
@@ -147,6 +149,8 @@ namespace BIMaestro.Dashboard
                 TryOpenLocation(path);
             }
         }
+        private void Search_TextChanged(object sender, TextChangedEventArgs e) { if (!_uiReady) return; _searchDebounce.Start(); }
+        private void ClearSearch_Click(object sender, RoutedEventArgs e) { if (!_uiReady) return; _tbSearch.Text = ""; _tbSearch.Focus(); }
 
         private void OpenLocation_Click(object sender, RoutedEventArgs e)
         {
@@ -267,14 +271,13 @@ namespace BIMaestro.Dashboard
                 .GroupBy(r => r.DocumentId)
                 .ToDictionary(g => g.Key, g => g.Sum(x => x.Duration.TotalHours), StringComparer.Ordinal);
 
-            ApplyProjectSearchFilterAndSort();
+            BuildDisplayProjects();
             DrawChart();
             UpdateKpis();
         }
 
-        private void ApplyProjectSearchFilterAndSort()
+        private void BuildDisplayProjects()
         {
-            string q = RemoveDiacritics((_tbSearch?.Text ?? "").Trim());
             SortMode sm = (_cbSort != null && _cbSort.SelectedIndex == 1) ? SortMode.NameAZ : SortMode.HoursDesc;
 
             IEnumerable<ProjectItem> seq = _projects ?? Enumerable.Empty<ProjectItem>();
@@ -287,8 +290,9 @@ namespace BIMaestro.Dashboard
                 seq = seq.Where(p =>
                     RemoveDiacritics(p.BaseName ?? "").IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0 ||
                     RemoveDiacritics(p.Folder ?? "").IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    RemoveDiacritics(p.Tail ?? "").IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0);
-            }
+                    RemoveDiacritics(p.Tail ?? "").IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
+                         .OrderByDescending(p => p.Hours)
+                         .ThenBy(p => p.BaseName);
 
             _filteredProjects = (sm == SortMode.HoursDesc)
                 ? seq.OrderByDescending(p => p.Hours).ThenBy(p => p.BaseName).ToList()
@@ -598,6 +602,7 @@ namespace BIMaestro.Dashboard
             _tabDocType.SelectedIndex = 0;
             _hiddenBars.Clear();
             RefreshAll();
+            RefreshSearch();
         }
 
         private void LoadPrefs()

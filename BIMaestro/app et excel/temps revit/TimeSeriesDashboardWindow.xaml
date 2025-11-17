@@ -71,14 +71,20 @@
 
         <Style x:Key="SegmentToggle" TargetType="{x:Type ToggleButton}">
             <Setter Property="Height" Value="32"/>
-            <Setter Property="Margin" Value="0,0,6,0"/>
+            <Setter Property="MinWidth" Value="130"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="Padding" Value="10,0"/>
             <Setter Property="Background" Value="{StaticResource NeutralBg}"/>
             <Setter Property="BorderBrush" Value="{StaticResource NeutralBorder}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource PrimaryText}"/>
+            <Setter Property="CornerRadius" Value="8"/>
             <Style.Triggers>
                 <Trigger Property="IsChecked" Value="True">
                     <Setter Property="Background" Value="#E2ECF7"/>
+                    <Setter Property="BorderBrush" Value="#7FB1F6"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -210,7 +216,6 @@
                         <Button Style="{StaticResource PrimaryButton}" Content="Ouvrir Excel" Click="OpenExcel_Click"/>
                         <Button Style="{StaticResource GhostButton}" Content="Réinitialiser" Click="Reset_Click"/>
                     </StackPanel>
-                </Grid>
 
                 <StackPanel Orientation="Horizontal" Margin="0,2,0,0" HorizontalAlignment="Stretch">
                     <TextBlock Text="Temps par type de document" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"/>
