@@ -218,13 +218,7 @@
                             <ToggleButton x:Name="_tgCompare"  Style="{StaticResource SegmentToggle}" Content="Comparer" Checked="Mode_Checked"/>
                         </StackPanel>
 
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,6,0,0">
-                            <TextBlock Text="Trier" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                            <ComboBox x:Name="_cbSort" Width="140" SelectionChanged="OnSortChanged">
-                                <ComboBoxItem Content="Heures ↓" IsSelected="True"/>
-                                <ComboBoxItem Content="Nom A→Z"/>
-                            </ComboBox>
-                        </StackPanel>
+                        
                     </StackPanel>
 
                     <StackPanel Grid.Column="2" Orientation="Vertical">
@@ -315,7 +309,8 @@
                                     </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Button Style="{StaticResource ChipButton}" Padding="12,6" Margin="0,4,6,4"
+                                            <Button Style="{StaticResource ChipButton}" Height="32" Padding="12,6" Margin="0,4,6,4"
+                                                    VerticalContentAlignment="Center"
                                                     Content="{Binding BaseName}"
                                                     Tag="{Binding DocumentId}" Click="Suggestion_Click"/>
                                         </DataTemplate>
@@ -334,7 +329,7 @@
                         <TextBlock Foreground="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,6,0,0">
 • Utilisez la barre de recherche pour filtrer les maquettes/familles.
 • Cliquez sur un résultat pour ouvrir rapidement son dossier.
-• Ajustez le Top N et le tri pour épurer les graphiques.
+• Ajustez le Top N pour épurer les graphiques.
                         </TextBlock>
                     </StackPanel>
                 </Border>

@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using OxyPlot.Wpf;
 using System.Linq;
 using System.Reflection;            // <-- IMPORTANT
 using System.Text;
@@ -56,7 +57,6 @@ namespace BIMaestro.Dashboard
         private const int TOP_N_MIN = 1;
         private const int TOP_N_MAX = 100;
 
-        private enum SortMode { HoursDesc, NameAZ }
         private enum AutoGran { Day, Week, Month }
         private enum DocumentKind { Rvt, Rfa }
 
@@ -108,7 +108,6 @@ namespace BIMaestro.Dashboard
 
         // ===== Handlers XAML (ils doivent garder leur NOM exact) =====
         private void OnDateChanged(object sender, SelectionChangedEventArgs e) { if (!_uiReady) return; RefreshAll(); }
-        private void OnSortChanged(object sender, SelectionChangedEventArgs e) { if (!_uiReady) return; RefreshAll(); }
 
         private void Mode_Checked(object sender, RoutedEventArgs e)
         {
@@ -276,18 +275,18 @@ namespace BIMaestro.Dashboard
 
         private void BuildDisplayProjects()
         {
-            SortMode sm = (_cbSort != null && _cbSort.SelectedIndex == 1) ? SortMode.NameAZ : SortMode.HoursDesc;
-
             IEnumerable<ProjectItem> seq = _projects ?? Enumerable.Empty<ProjectItem>();
             seq = seq.Where(MatchesDocumentKind);
 
             foreach (var p in seq)
                 p.Hours = _hoursByProject.TryGetValue(p.DocumentId, out double h) ? h : 0.0;
 
-            _displayProjects = (sm == SortMode.HoursDesc)
-                ? seq.OrderByDescending(p => p.Hours).ThenBy(p => p.BaseName).ToList()
-                : seq.OrderBy(p => p.BaseName).ThenBy(p => p.Folder).ToList();
+            _displayProjects = seq.OrderByDescending(p => p.Hours)
+                                  .ThenBy(p => p.BaseName)
+                                  .ThenBy(p => p.Folder)
+                                  .ToList();
         }
+
 
         private void RefreshSearch()
         {
@@ -507,7 +506,27 @@ namespace BIMaestro.Dashboard
         {
             var dlg = new Microsoft.Win32.SaveFileDialog { FileName = "dashboard_temps.png", Filter = "Image PNG|*.png" };
             if (dlg.ShowDialog() != true) return;
-            SaveVisualToPng(_plotView, dlg.FileName);
+
+            _plotView.UpdateLayout();
+            _plotModel?.InvalidatePlot(true);
+
+            int width = (int)Math.Max(400, _plotView.ActualWidth > 0 ? _plotView.ActualWidth : _plotView.DesiredSize.Width);
+            int height = (int)Math.Max(260, _plotView.ActualHeight > 0 ? _plotView.ActualHeight : _plotView.DesiredSize.Height);
+
+            // Ensure a solid background while exporting with the resolution-only overload
+            var originalBackground = _plotModel?.Background;
+            if (_plotModel != null)
+            {
+                _plotModel.Background = OxyColors.White;
+            }
+
+            PngExporter.Export(_plotModel, dlg.FileName, width, height, 96);
+
+            if (_plotModel != null)
+            {
+                _plotModel.Background = (OxyColor)originalBackground;
+            }
+
             MessageBox.Show("Exporté : " + dlg.FileName);
         }
 
@@ -607,7 +626,6 @@ namespace BIMaestro.Dashboard
         private void ResetFilters()
         {
             _tbSearch.Text = "";
-            _cbSort.SelectedIndex = 0;
             SetTopN(DEFAULT_TOP_N);
             _dpFrom.SelectedDate = DateTime.Today.AddMonths(-1);
             _dpTo.SelectedDate = DateTime.Today;
@@ -637,7 +655,6 @@ namespace BIMaestro.Dashboard
             {
                 if (_prefs.From.HasValue) _dpFrom.SelectedDate = _prefs.From.Value;
                 if (_prefs.To.HasValue) _dpTo.SelectedDate = _prefs.To.Value;
-                _cbSort.SelectedIndex = _prefs.Sort == "NameAZ" ? 1 : 0;
                 SetTopN(ClampInt(_prefs.TopN <= 0 ? DEFAULT_TOP_N : _prefs.TopN, TOP_N_MIN, TOP_N_MAX));
                 _tgOverview.IsChecked = _prefs.Mode != "Compare";
                 _tgCompare.IsChecked = _prefs.Mode == "Compare";
@@ -655,7 +672,6 @@ namespace BIMaestro.Dashboard
                 Directory.CreateDirectory(_prefsDir);
                 _prefs.From = _dpFrom.SelectedDate;
                 _prefs.To = _dpTo.SelectedDate;
-                _prefs.Sort = _cbSort.SelectedIndex == 1 ? "NameAZ" : "HoursDesc";
                 _prefs.TopN = GetTopN();
                 _prefs.Mode = _tgCompare.IsChecked == true ? "Compare" : "Overview";
                 _prefs.LegendShown = _cbLegend.IsChecked == true;
