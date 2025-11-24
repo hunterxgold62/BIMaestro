@@ -226,16 +226,29 @@ namespace Modification
                                 try
                                 {
                                     elemRef = uiDoc.Selection.PickObject(
-                                        ObjectType.Element,
+                                        ObjectType.LinkedElement,
                                         $"Sélectionnez {objetLabel} (ESC pour annuler)");
                                 }
                                 catch
                                 {
+                                    try
+                                    {
+                                        elemRef = uiDoc.Selection.PickObject(
+                                            ObjectType.Element,
+                                            $"Sélectionnez {objetLabel} (ESC pour annuler)");
+                                    }
+                                    catch
+                                    {
+                                        trans.RollBack();
+                                        break;
+                                    }
+                                }
+
+                                if (!TryResolveReference(uiDoc, elemRef, out var selElem, out var transformToHost))
+                                {
                                     trans.RollBack();
                                     break;
                                 }
-
-                                Element selElem = doc.GetElement(elemRef);
                                 if (!CheckSelectedElementType(selElem, objType))
                                 {
                                     trans.RollBack();
@@ -294,7 +307,7 @@ namespace Modification
 
                                 // 3) Intersection de bounding boxes
                                 var bbHost = selHost.get_BoundingBox(null);
-                                var bbElem = selElem.get_BoundingBox(null);
+                                var bbElem = GetBoundingBoxInHostCoordinates(selElem, transformToHost);
                                 if (bbHost == null || bbElem == null)
                                 {
                                     trans.RollBack();
@@ -332,11 +345,13 @@ namespace Modification
                                     }
                                 }
 
+                                var intersectionSize = GetIntersectionFootprint(bbIntersect, selHost, GetOversizeForType(objType));
+
                                 // 4) Centre et niveau
                                 XYZ fallbackCenter = (bbIntersect.Min + bbIntersect.Max) * 0.5;
                                 XYZ center = selHost is Floor floorHost
-                                    ? GetPlacementPointOnFloor(floorHost, selElem, fallbackCenter)
-                                    : GetPlacementPointOnWall(selHost as Wall, selElem, fallbackCenter);
+                                    ? GetPlacementPointOnFloor(floorHost, selElem, fallbackCenter, transformToHost)
+                                    : GetPlacementPointOnWall(selHost as Wall, selElem, fallbackCenter, transformToHost);
                                 var usedLevel = doc.GetElement(selHost.LevelId) as Level
                                               ?? new FilteredElementCollector(doc)
                                                      .OfClass(typeof(Level))
@@ -357,8 +372,11 @@ namespace Modification
                                     double diam = CalculateDiameterForElement(selElem, objType);
                                     if (diam <= 0.0)
                                     {
-                                        double w, h;
-                                        GetOrientedXYDimensions(selElem, objType, out w, out h);
+                                        double w = intersectionSize.width;
+                                        double h = intersectionSize.height;
+                                        if (w <= 0 || h <= 0)
+                                            GetOrientedXYDimensions(selElem, objType, out w, out h);
+
                                         diam = Math.Max(w, h);
                                     }
                                     if (normeEnabled)
@@ -379,6 +397,10 @@ namespace Modification
                                      || objType == ExtendedReservationWindow.ObjectType.Gaine)
                                     {
                                         double d = CalculateDiameterForElement(selElem, objType);
+                                        if (d <= 0.0)
+                                        {
+                                            d = Math.Max(intersectionSize.width, intersectionSize.height);
+                                        }
                                         if (normeEnabled)
                                             d = RoundToNearest50mm(d);
 
@@ -390,7 +412,15 @@ namespace Modification
                                     else
                                     {
                                         double w, h;
-                                        GetOrientedXYDimensions(selElem, objType, out w, out h);
+                                        if (intersectionSize.width > 0 && intersectionSize.height > 0)
+                                        {
+                                            w = intersectionSize.width;
+                                            h = intersectionSize.height;
+                                        }
+                                        else
+                                        {
+                                            GetOrientedXYDimensions(selElem, objType, out w, out h);
+                                        }
                                         if (normeEnabled)
                                         {
                                             w = RoundToNearest10cm(w);
@@ -1074,7 +1104,105 @@ namespace Modification
                 Max = new XYZ(maxX, maxY, maxZ)
             };
         }
-        private XYZ GetPlacementPointOnFloor(Floor floor, Element intersectingElement, XYZ fallbackCenter)
+
+        private BoundingBoxXYZ GetBoundingBoxInHostCoordinates(Element elem, Transform transformToHost)
+        {
+            if (elem == null)
+                return null;
+
+            BoundingBoxXYZ bb = elem.get_BoundingBox(null);
+            if (bb == null)
+                return null;
+
+            if (transformToHost == null || transformToHost.IsIdentity)
+                return bb;
+
+            var corners = new List<XYZ>
+            {
+                new XYZ(bb.Min.X, bb.Min.Y, bb.Min.Z),
+                new XYZ(bb.Min.X, bb.Min.Y, bb.Max.Z),
+                new XYZ(bb.Min.X, bb.Max.Y, bb.Min.Z),
+                new XYZ(bb.Min.X, bb.Max.Y, bb.Max.Z),
+                new XYZ(bb.Max.X, bb.Min.Y, bb.Min.Z),
+                new XYZ(bb.Max.X, bb.Min.Y, bb.Max.Z),
+                new XYZ(bb.Max.X, bb.Max.Y, bb.Min.Z),
+                new XYZ(bb.Max.X, bb.Max.Y, bb.Max.Z)
+            }
+            .Select(p => transformToHost.OfPoint(p))
+            .ToList();
+
+            double minX = corners.Min(p => p.X);
+            double minY = corners.Min(p => p.Y);
+            double minZ = corners.Min(p => p.Z);
+            double maxX = corners.Max(p => p.X);
+            double maxY = corners.Max(p => p.Y);
+            double maxZ = corners.Max(p => p.Z);
+
+            return new BoundingBoxXYZ
+            {
+                Min = new XYZ(minX, minY, minZ),
+                Max = new XYZ(maxX, maxY, maxZ)
+            };
+        }
+
+        private (double width, double height) GetIntersectionFootprint(BoundingBoxXYZ bbIntersect, Element host, double oversize)
+        {
+            if (bbIntersect == null || host == null)
+                return (0.0, 0.0);
+
+            var worldBb = ToWorldBoundingBox(bbIntersect);
+            if (worldBb == null)
+                return (0.0, 0.0);
+
+            var corners = new List<XYZ>
+            {
+                new XYZ(worldBb.Min.X, worldBb.Min.Y, worldBb.Min.Z),
+                new XYZ(worldBb.Min.X, worldBb.Min.Y, worldBb.Max.Z),
+                new XYZ(worldBb.Min.X, worldBb.Max.Y, worldBb.Min.Z),
+                new XYZ(worldBb.Min.X, worldBb.Max.Y, worldBb.Max.Z),
+                new XYZ(worldBb.Max.X, worldBb.Min.Y, worldBb.Min.Z),
+                new XYZ(worldBb.Max.X, worldBb.Min.Y, worldBb.Max.Z),
+                new XYZ(worldBb.Max.X, worldBb.Max.Y, worldBb.Min.Z),
+                new XYZ(worldBb.Max.X, worldBb.Max.Y, worldBb.Max.Z)
+            };
+
+            XYZ axisH;
+            XYZ axisV;
+            if (host is Wall wall)
+            {
+                axisV = XYZ.BasisZ;
+                axisH = wall.Orientation.CrossProduct(XYZ.BasisZ);
+                axisH = axisH.GetLength() < 1e-6 ? XYZ.BasisX : axisH.Normalize();
+            }
+            else if (host is Floor)
+            {
+                axisH = XYZ.BasisX;
+                axisV = XYZ.BasisY;
+            }
+            else
+            {
+                axisH = XYZ.BasisX;
+                axisV = XYZ.BasisZ;
+            }
+
+            double minH = double.MaxValue, maxH = double.MinValue;
+            double minV = double.MaxValue, maxV = double.MinValue;
+
+            foreach (var c in corners)
+            {
+                double projH = c.DotProduct(axisH);
+                double projV = c.DotProduct(axisV);
+                minH = Math.Min(minH, projH);
+                maxH = Math.Max(maxH, projH);
+                minV = Math.Min(minV, projV);
+                maxV = Math.Max(maxV, projV);
+            }
+
+            double width = (maxH - minH) + oversize;
+            double height = (maxV - minV) + oversize;
+            return (width, height);
+        }
+        private XYZ GetPlacementPointOnFloor(Floor floor, Element intersectingElement, XYZ fallbackCenter, Transform transformToHost = null)
         {
             if (floor == null)
                 return fallbackCenter;
@@ -1088,7 +1216,7 @@ namespace Modification
 
             if (intersectingElement != null)
             {
-                var bbElem = intersectingElement.get_BoundingBox(null);
+                var bbElem = GetBoundingBoxInHostCoordinates(intersectingElement, transformToHost);
                 if (bbElem != null)
                     source = (bbElem.Min + bbElem.Max) * 0.5;
             }
@@ -1096,12 +1224,12 @@ namespace Modification
             return new XYZ(source.X, source.Y, targetZ);
         }
 
-        private XYZ GetPlacementPointOnWall(Wall wall, Element intersectingElement, XYZ fallbackCenter)
+        private XYZ GetPlacementPointOnWall(Wall wall, Element intersectingElement, XYZ fallbackCenter, Transform transformToHost = null)
         {
             if (wall == null || intersectingElement == null)
                 return fallbackCenter;
 
-            var intersection = TryGetIntersectionOnWallPlane(wall, intersectingElement);
+            var intersection = TryGetIntersectionOnWallPlane(wall, intersectingElement, transformToHost);
             if (intersection != null)
             {
                 XYZ point = intersection;
@@ -1152,7 +1280,7 @@ namespace Modification
             return point - wallNormal * offset;
         }
 
-        private XYZ? TryGetIntersectionOnWallPlane(Wall wall, Element intersectingElement)
+        private XYZ? TryGetIntersectionOnWallPlane(Wall wall, Element intersectingElement, Transform transformToHost = null)
         {
             if (!(wall.Location is LocationCurve wallLocCurve))
                 return null;
@@ -1170,7 +1298,7 @@ namespace Modification
 
             if (intersectingElement is FamilyInstance fi && fi.Location is LocationPoint lp)
             {
-                XYZ point = lp.Point;
+                XYZ point = transformToHost != null ? transformToHost.OfPoint(lp.Point) : lp.Point;
                 double distance = wallNormal.DotProduct(point - planeOrigin);
                 return point - wallNormal * distance;
             }
@@ -1183,7 +1311,14 @@ namespace Modification
 
                 if (elemCurve is Line elemLine)
                 {
-                    return IntersectLineWithPlane(elemLine, planeOrigin, wallNormal);
+                    Line lineToUse = elemLine;
+                    if (transformToHost != null)
+                    {
+                        XYZ p0 = transformToHost.OfPoint(elemLine.GetEndPoint(0));
+                        XYZ p1 = transformToHost.OfPoint(elemLine.GetEndPoint(1));
+                        lineToUse = Line.CreateBound(p0, p1);
+                    }
+                    return IntersectLineWithPlane(lineToUse, planeOrigin, wallNormal);
                 }
 
                 XYZ start = elemCurve.GetEndPoint(0);
@@ -1233,11 +1368,41 @@ namespace Modification
             return intersection;
         }
 
+        private bool TryResolveReference(UIDocument uiDoc, Reference reference, out Element element, out Transform transformToHost)
+        {
+            element = null;
+            transformToHost = Transform.Identity;
+
+            if (reference == null)
+                return false;
+
+            if (reference.LinkedElementId != ElementId.InvalidElementId)
+            {
+                var linkInstance = uiDoc.Document.GetElement(reference.ElementId) as RevitLinkInstance;
+                if (linkInstance == null)
+                    return false;
+
+                Document linkDoc = linkInstance.GetLinkDocument();
+                if (linkDoc == null)
+                    return false;
+
+                element = linkDoc.GetElement(reference.LinkedElementId);
+                transformToHost = linkInstance.GetTotalTransform();
+                return element != null;
+            }
+
+            element = uiDoc.Document.GetElement(reference);
+            transformToHost = Transform.Identity;
+            return element != null;
+        }
+
         private bool CheckSelectedElementType(Element elem, ExtendedReservationWindow.ObjectType objType)
         {
             return objType switch
             {
-                ExtendedReservationWindow.ObjectType.Canalisation => elem is Pipe,
+                ExtendedReservationWindow.ObjectType.Canalisation => elem is Pipe
+                    || elem is ImportInstance
+                    || elem is DirectShape,
                 ExtendedReservationWindow.ObjectType.Gaine => elem is Duct,
                 ExtendedReservationWindow.ObjectType.Porte => elem is FamilyInstance fi1
                     && fi1.Category.Id.IntegerValue == (int)BuiltInCategory.OST_Doors,

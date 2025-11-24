@@ -146,6 +146,7 @@ namespace Modification
                 return;
             }
 
+            var previousSelection = comboFamily.SelectedItem as FamilySymbol;
             bool isSol = (comboHostType?.SelectedItem as string) == "Sol";
 
             var filtered = _allReservationFamilies
@@ -159,7 +160,13 @@ namespace Modification
             comboFamily.ItemsSource = filtered;
 
             if (filtered.Any())
-                comboFamily.SelectedIndex = 0;
+            {
+                var keepSelection = previousSelection != null
+                    ? filtered.FirstOrDefault(fs => fs.Id == previousSelection.Id)
+                    : null;
+
+                comboFamily.SelectedItem = keepSelection ?? filtered.First();
+            }
             else
                 comboFamily.SelectedIndex = -1;
         }
