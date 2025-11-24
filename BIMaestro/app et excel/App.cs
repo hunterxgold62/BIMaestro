@@ -7,6 +7,7 @@ using System;
 using System.IO;
 using System.Reflection;
 
+
 public class App : IExternalApplication
 {
     public static UIControlledApplication UIControlledApp { get; private set; }
@@ -68,7 +69,7 @@ public class App : IExternalApplication
             ExcelLogger.Initialize();
             ExcelLogger.ConfigureActivity(
                 idleThreshold: TimeSpan.FromMinutes(15),
-                unfocusedThreshold: TimeSpan.FromMinutes(3),
+                unfocusedThreshold: TimeSpan.FromMinutes(8),
                 busyGapThreshold: TimeSpan.FromSeconds(15),
                 cpuBusyThreshold: 0.30,
                 countBusyWhenUnfocused: false

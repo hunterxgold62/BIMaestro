@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Créer des réservations"
-        Height="420"
+        Height="463"
         Width="560"
         MinWidth="520"
         WindowStartupLocation="CenterScreen"
@@ -218,6 +218,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="12"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
@@ -229,8 +230,17 @@
 
                 <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Text="Cibles" Style="{StaticResource SectionTitle}"/>
 
-                <TextBlock Grid.Row="1" Grid.Column="0" Text="Type d’objet :" Style="{StaticResource FieldLabel}"/>
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Support :" Style="{StaticResource FieldLabel}"/>
                 <ComboBox Grid.Row="1" Grid.Column="1"
+                          x:Name="comboHostType"
+                          Height="28"
+                          Style="{StaticResource FieldBox}"
+                          MaxDropDownHeight="120"
+                          SelectionChanged="OnHostTypeChanged"
+                          ToolTip="Choisissez si la réservation est créée dans un mur ou un sol." />
+
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="Type d’objet :" Style="{StaticResource FieldLabel}"/>
+                <ComboBox Grid.Row="2" Grid.Column="1"
                           x:Name="comboObjectType"
                           Height="28"
                           Style="{StaticResource FieldBox}"
@@ -238,8 +248,8 @@
                           SelectionChanged="OnCriteriaChanged"
                           ToolTip="Sélectionnez le type d’objet concerné." />
 
-                <TextBlock Grid.Row="2" Grid.Column="0" Text="Famille de réservation :" Style="{StaticResource FieldLabel}"/>
-                <ComboBox Grid.Row="2" Grid.Column="1"
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="Famille de réservation :" Style="{StaticResource FieldLabel}"/>
+                <ComboBox Grid.Row="3" Grid.Column="1"
                           x:Name="comboFamily"
                           Height="28"
                           DisplayMemberPath="Name"
@@ -248,9 +258,9 @@
                           SelectionChanged="OnCriteriaChanged"
                           ToolTip="Choisissez la famille utilisée pour créer les réservations."/>
 
-                <Rectangle Grid.Row="3" Grid.ColumnSpan="2" Height="1" Fill="{StaticResource Divider}"/>
+                <Rectangle Grid.Row="4" Grid.ColumnSpan="2" Height="1" Fill="{StaticResource Divider}"/>
 
-                <CheckBox Grid.Row="4" Grid.ColumnSpan="2"
+                <CheckBox Grid.Row="5" Grid.ColumnSpan="2"
                           x:Name="chkMulti"
                           Content="Multi-sélection canalisations (rectangle)"
                           IsChecked="False"
@@ -258,7 +268,7 @@
                           ToolTip="Disponible pour canalisations (ou 'Autre') avec famille rectangulaire."/>
 
                 <!-- Bas de carte : rosace + popup -->
-                <Grid Grid.Row="5" Grid.ColumnSpan="2">
+                <Grid Grid.Row="6" Grid.ColumnSpan="2">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>

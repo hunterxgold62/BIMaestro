@@ -1,5 +1,7 @@
-﻿using System.Windows;
-using System.Windows.Controls; // pour SelectionChangedEventArgs
+﻿using System;
+using System.IO;
+using System.Windows;
+using System.Windows.Controls;
 using Microsoft.Win32;
 
 namespace Modification
@@ -8,23 +10,30 @@ namespace Modification
     {
         public int SelectedButtonIndex { get; private set; }
         public string SelectedPath { get; private set; }
+        public string SelectedLabel { get; private set; }
 
         public ConfigureDynamoWindow()
         {
             InitializeComponent();
 
-            // On branche l'événement après avoir construit tous les contrôles
             ButtonComboBox.SelectionChanged += ButtonComboBox_SelectionChanged;
-
-            // Initialise le TextBox avec le chemin du bouton 1
-            PathTextBox.Text = DynamoSettings.GetPath(0);
+            UpdateSelectionFields(0);
         }
 
-        // Met à jour le TextBox à chaque changement de sélection
         private void ButtonComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            int idx = ButtonComboBox.SelectedIndex;
+            UpdateSelectionFields(ButtonComboBox.SelectedIndex);
+        }
+
+        private void UpdateSelectionFields(int idx)
+        {
+            if (idx < 0)
+                return;
+
             PathTextBox.Text = DynamoSettings.GetPath(idx);
+            LabelTextBox.Text = DynamoSettings.GetLabel(idx)
+                .Replace("\n", Environment.NewLine);
+            UpdatePreview();
         }
 
         private void BrowseButton_Click(object sender, RoutedEventArgs e)
@@ -33,11 +42,27 @@ namespace Modification
             {
                 Title = "Choisir un fichier Dynamo (.dyn)",
                 Filter = "Fichiers Dynamo (*.dyn)|*.dyn",
-                InitialDirectory = System.IO.Path.GetDirectoryName(
-                    DynamoSettings.GetPath(ButtonComboBox.SelectedIndex))
+                InitialDirectory = GetInitialDirectory()
             };
             if (dlg.ShowDialog() == true)
                 PathTextBox.Text = dlg.FileName;
+        }
+
+        private string GetInitialDirectory()
+        {
+            string currentPath = PathTextBox.Text;
+            if (!string.IsNullOrWhiteSpace(currentPath))
+            {
+                var directory = Path.GetDirectoryName(currentPath);
+                if (!string.IsNullOrWhiteSpace(directory) && Directory.Exists(directory))
+                    return directory;
+            }
+
+            var fallback = Path.GetDirectoryName(DynamoSettings.GetPath(ButtonComboBox.SelectedIndex));
+            if (!string.IsNullOrWhiteSpace(fallback) && Directory.Exists(fallback))
+                return fallback;
+
+            return Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
         }
 
         private void OkButton_Click(object sender, RoutedEventArgs e)
@@ -52,8 +77,22 @@ namespace Modification
             }
 
             SelectedButtonIndex = ButtonComboBox.SelectedIndex;
-            SelectedPath = PathTextBox.Text;
+            SelectedPath = PathTextBox.Text.Trim();
+            SelectedLabel = LabelTextBox.Text;
             DialogResult = true;
+        }
+
+        private void LabelTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            UpdatePreview();
+        }
+
+        private void UpdatePreview()
+        {
+            string previewText = string.IsNullOrWhiteSpace(LabelTextBox.Text)
+                ? DynamoSettings.GetLabel(ButtonComboBox.SelectedIndex).Replace("\n", Environment.NewLine)
+                : LabelTextBox.Text;
+            PreviewTextBlock.Text = previewText;
         }
     }
 }

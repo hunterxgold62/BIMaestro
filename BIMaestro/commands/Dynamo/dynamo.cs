@@ -1,44 +1,79 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Diagnostics;
 using System.Windows.Interop;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.DB;
 using Dynamo.Applications;
 using Dynamo.Applications.Properties;
+using Newtonsoft.Json;
 
 namespace Modification
 {
     public static class DynamoSettings
     {
-        // Chemin vers Documents\RevitLogs\SauvegardePréférence\DynamoPaths.txt
+        private const int ButtonCount = 5;
         private static readonly string ConfigFolder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
             "RevitLogs",
             "SauvegardePréférence");
-        private static readonly string ConfigFile = Path.Combine(ConfigFolder, "DynamoPaths.txt");
+        private static readonly string ConfigFile = Path.Combine(ConfigFolder, "DynamoButtons.json");
+        private static readonly string LegacyConfigFile = Path.Combine(ConfigFolder, "DynamoPaths.txt");
         private static readonly string DefaultPath =
             @"P:\0-Boîte à outils Revit\1-Dynamo\CML_LOD_200.dyn";
 
-        // Tableau mémoire pour 5 chemins
-        private static readonly string[] userPaths = new string[5];
+        private static readonly string[] DefaultLabels = new[]
+        {
+            "Auto\nDynamo 1",
+            "Auto\nDynamo 2",
+            "Auto\nDynamo 3",
+            "Auto\nDynamo 4",
+            "Auto\nDynamo 5"
+        };
+
+        private class ButtonConfig
+        {
+            public string Path { get; set; }
+            public string Label { get; set; }
+        }
+
+        private static readonly ButtonConfig[] buttons = new ButtonConfig[ButtonCount];
 
         static DynamoSettings()
         {
+            for (int i = 0; i < ButtonCount; i++)
+                buttons[i] = new ButtonConfig();
+
             try
             {
                 // Crée le dossier si besoin
                 if (!Directory.Exists(ConfigFolder))
                     Directory.CreateDirectory(ConfigFolder);
 
-                // Charge le fichier si présent
                 if (File.Exists(ConfigFile))
                 {
-                    var lines = File.ReadAllLines(ConfigFile);
-                    for (int i = 0; i < Math.Min(lines.Length, 5); i++)
+                    var json = File.ReadAllText(ConfigFile);
+                    var data = JsonConvert.DeserializeObject<List<ButtonConfig>>(json);
+                    if (data != null)
+                    {
+                        for (int i = 0; i < Math.Min(data.Count, ButtonCount); i++)
+                        {
+                            var cfg = data[i];
+                            if (cfg == null) continue;
+                            buttons[i].Path = cfg.Path;
+                            buttons[i].Label = NormalizeLabel(cfg.Label);
+                        }
+                    }
+                }
+                else if (File.Exists(LegacyConfigFile))
+                {
+                    var lines = File.ReadAllLines(LegacyConfigFile);
+                    for (int i = 0; i < Math.Min(lines.Length, ButtonCount); i++)
+                    {
                         if (!string.IsNullOrWhiteSpace(lines[i]))
-                            userPaths[i] = lines[i];
+                            buttons[i].Path = lines[i];
+                    }
+                    Save();
                 }
             }
             catch
@@ -51,10 +86,8 @@ namespace Modification
         {
             try
             {
-                var lines = new string[5];
-                for (int i = 0; i < 5; i++)
-                    lines[i] = userPaths[i] ?? string.Empty;
-                File.WriteAllLines(ConfigFile, lines);
+                var json = JsonConvert.SerializeObject(buttons, Formatting.Indented);
+                File.WriteAllText(ConfigFile, json);
             }
             catch (Exception ex)
             {
@@ -62,13 +95,53 @@ namespace Modification
             }
         }
 
+        private static string NormalizeLabel(string label)
+        {
+            if (string.IsNullOrWhiteSpace(label))
+                return null;
+
+            string normalized = label.Replace("\r\n", "\n").Replace('\r', '\n');
+            normalized = normalized.Trim();
+            return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
+        }
+
+        private static void ValidateIndex(int index)
+        {
+            if (index < 0 || index >= ButtonCount)
+                throw new ArgumentOutOfRangeException(nameof(index));
+        }
+
         public static string GetPath(int index)
-            => !string.IsNullOrWhiteSpace(userPaths[index]) ? userPaths[index] : DefaultPath;
+        {
+            ValidateIndex(index);
+            return !string.IsNullOrWhiteSpace(buttons[index].Path) ? buttons[index].Path : DefaultPath;
+        }
+
+        public static string GetLabel(int index)
+        {
+            ValidateIndex(index);
+            string label = buttons[index].Label;
+            return !string.IsNullOrWhiteSpace(label) ? label : DefaultLabels[index];
+        }
+
+        public static void SetConfiguration(int index, string path, string label)
+        {
+            ValidateIndex(index);
+            buttons[index].Path = path;
+            string normalized = NormalizeLabel(label);
+            if (!string.IsNullOrWhiteSpace(normalized) &&
+                string.Equals(normalized, DefaultLabels[index], StringComparison.Ordinal))
+            {
+                normalized = null;
+            }
+            buttons[index].Label = normalized;
+            Save();
+        }
 
         public static void SetPath(int index, string path)
         {
-            userPaths[index] = path;
-            Save();
+            ValidateIndex(index);
+            SetConfiguration(index, path, buttons[index].Label);
         }
     }
 
@@ -162,10 +235,12 @@ namespace Modification
                 if (result != true)
                     return Result.Cancelled;
 
-                // 4. Sauvegarde du choix
-                DynamoSettings.SetPath(wnd.SelectedButtonIndex, wnd.SelectedPath);
+                // 4. Sauvegarde du choix (chemin + libellé)
+                DynamoSettings.SetConfiguration(wnd.SelectedButtonIndex, wnd.SelectedPath, wnd.SelectedLabel);
+
+                string labelPreview = DynamoSettings.GetLabel(wnd.SelectedButtonIndex).Replace("\n", " / ");
                 TaskDialog.Show("Fait",
-                    $"Le bouton {wnd.SelectedButtonIndex + 1} utilisera :\n{wnd.SelectedPath}");
+                    $"Le bouton \"{labelPreview}\" utilisera :\n{wnd.SelectedPath}");
                 return Result.Succeeded;
             }
             catch (Exception ex)
@@ -176,4 +251,4 @@ namespace Modification
             }
         }
     }
-    }
+}

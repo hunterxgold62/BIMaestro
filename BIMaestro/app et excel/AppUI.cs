@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Windows.Media.Imaging;
+using Modification;
+
 
 public class AppUI : IExternalApplication
 {
@@ -83,15 +85,15 @@ public class AppUI : IExternalApplication
             });
 
         AddSplitButton(panelEditing, "chatbot IA", "Outils Canalisations", assemblyPath,
-           new List<(string buttonName, string buttonText, string className, string resourceImageName, string toolTip)>
-           {
-                ("dynamo 1", "Auto\nDynamo 1", "Modification.RunDynamo1Command", "dynamo 1.png","Lance le script Dynamo n°1."),
-                ("dynamo 2", "Auto\nDynamo 2", "Modification.RunDynamo2Command", "dynamo 2.png","Lance le script Dynamo n°2."),
-                ("dynamo 3", "Auto\nDynamo 3", "Modification.RunDynamo3Command", "dynamo 3.png","Lance le script Dynamo n°3."),
-                ("dynamo 4", "Auto\nDynamo 4", "Modification.RunDynamo4Command", "dynamo 4.png","Lance le script Dynamo n°4."),
-                ("dynamo 5", "Auto\nDynamo 5", "Modification.RunDynamo5Command", "dynamo 5.png","Lance le script Dynamo n°5."),
+            new List<(string buttonName, string buttonText, string className, string resourceImageName, string toolTip)>
+            {
+                ("dynamo 1", DynamoSettings.GetLabel(0), "Modification.RunDynamo1Command", "dynamo 1.png","Lance le script Dynamo n°1."),
+                ("dynamo 2", DynamoSettings.GetLabel(1), "Modification.RunDynamo2Command", "dynamo 2.png","Lance le script Dynamo n°2."),
+                ("dynamo 3", DynamoSettings.GetLabel(2), "Modification.RunDynamo3Command", "dynamo 3.png","Lance le script Dynamo n°3."),
+                ("dynamo 4", DynamoSettings.GetLabel(3), "Modification.RunDynamo4Command", "dynamo 4.png","Lance le script Dynamo n°4."),
+                ("dynamo 5", DynamoSettings.GetLabel(4), "Modification.RunDynamo5Command", "dynamo 5.png","Lance le script Dynamo n°5."),
                 ("dynamo réglage", "Auto dynamo\nréglage", "Modification.ConfigureDynamoButtonCommand", "réglage.png","Configure les paramètres Dynamo"),
-           });
+            });
         AddPushButton(panelEditing, "GestionExcelCmd", "Gestion\nExcel", assemblyPath, "ScheduleIO.ScheduleExcelIOCommand", "export import Excel.png", "Exporter ou importer une nomenclature au format Excel");
         AddPushButton(panelEditing, "Purge du plan", "Purge du\nplan", assemblyPath, "Modification.CombinedCleanupCommand", "purge.png", "Supprime les vues non placées, les familles et les nomenclatures inutilisées afin d'alléger le projet.\r\nUne fenêtre permet de choisir précisément les éléments à purger avant exécution.\r\n");
       //  AddPushButton(panelEditing, "Auto canalisation", "(Béta)Auto\ncanalisation", assemblyPath, "Modification.ConnectPipesCommand", "cana auto.png", "Connecte automatiquement les canalisations sélectionnées, évite les murs sur son passage.");

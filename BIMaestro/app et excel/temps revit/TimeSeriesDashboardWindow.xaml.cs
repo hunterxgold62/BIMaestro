@@ -318,11 +318,28 @@ namespace BIMaestro.Dashboard
         }
 
         // ===== CHART =====
+        private void UpdateLegendLayout()
+        {
+            bool showLegend = _cbLegend?.IsChecked == true;
+
+            if (_legendBorder != null)
+                _legendBorder.Visibility = showLegend ? Visibility.Visible : Visibility.Collapsed;
+
+            if (_colLegend != null)
+                _colLegend.Width = showLegend ? new GridLength(1.1, GridUnitType.Star) : new GridLength(0);
+
+            if (_chartBorder != null)
+                _chartBorder.SetValue(Grid.ColumnSpanProperty, showLegend ? 1 : 2);
+        }
+
         private void DrawChart()
         {
             if (_plotView == null) return;
 
+            UpdateLegendLayout();
+
             var model = new PlotModel();
+
 
             var selected = (_displayProjects?.Count > 0 ? _displayProjects : _projects.Where(MatchesDocumentKind)).ToList();
 

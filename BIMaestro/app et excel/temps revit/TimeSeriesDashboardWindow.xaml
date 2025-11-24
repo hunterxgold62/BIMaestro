@@ -245,8 +245,8 @@
             <Border Grid.Column="0" Style="{StaticResource CardBorder}" Margin="12">
                 <Grid Margin="16">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="3*"/>
-                        <ColumnDefinition Width="1.1*"/>
+                        <ColumnDefinition x:Name="_colChart" Width="3*"/>
+                        <ColumnDefinition x:Name="_colLegend" Width="1.1*"/>
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -254,11 +254,11 @@
                     </Grid.RowDefinitions>
                     <TextBlock Text="Temps par type de document" FontWeight="SemiBold" FontSize="15" Grid.ColumnSpan="2" Margin="0,0,0,10"/>
 
-                    <Border Grid.Row="1" Grid.Column="0" BorderBrush="{StaticResource NeutralBorder}" BorderThickness="1" Background="White" CornerRadius="10">
+                    <Border x:Name="_chartBorder" Grid.Row="1" Grid.Column="0" BorderBrush="{StaticResource NeutralBorder}" BorderThickness="1" Background="White" CornerRadius="10">
                         <oxy:PlotView x:Name="_plotView" Background="White" />
                     </Border>
 
-                    <Border Grid.Row="1" Grid.Column="1" BorderBrush="{StaticResource NeutralBorder}" BorderThickness="1" CornerRadius="10" Background="#FDFEFE" Padding="10" Margin="12,0,0,0">
+                    <Border x:Name="_legendBorder" Grid.Row="1" Grid.Column="1" BorderBrush="{StaticResource NeutralBorder}" BorderThickness="1" CornerRadius="10" Background="#FDFEFE" Padding="10" Margin="12,0,0,0">
                         <StackPanel>
                             <TextBlock Text="Légende" FontWeight="SemiBold" Margin="0,0,0,6"/>
                             <ScrollViewer VerticalScrollBarVisibility="Auto" Height="260">

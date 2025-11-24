@@ -1,14 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Drawing;
-using System.Drawing.Imaging;
-using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Xceed.Wpf.Toolkit;
@@ -34,6 +30,7 @@ namespace Modification
         public ElementId SelectedProjectionLinePatternId { get; private set; }
         public int SelectedProjectionLineWeight { get; private set; }
         public bool IsResetRequested { get; private set; } = false;
+        public static double PatternPreviewCellsAcross { get; private set; }
 
         private readonly UIApplication _uiapp;
         private readonly UIDocument _uidoc;
@@ -45,6 +42,10 @@ namespace Modification
         private readonly List<FillPatternOption> _surfacePatternOptions = new List<FillPatternOption>();
         private readonly List<FillPatternOption> _cutPatternOptions = new List<FillPatternOption>();
         private readonly List<LinePatternOption> _linePatternOptions = new List<LinePatternOption>();
+
+        private const double PatternPreviewTileSize = 32.0;      // taille de la tuile en DIP
+        private const double PatternPreviewDesiredMinSpacingDip = 5.0;  // zone "réelle" couverte : 6 ft x 6 ft
+
 
         public ColorPickerWindow(UIApplication uiapp, bool allowOverrideEditing = true)
         {
@@ -117,7 +118,7 @@ namespace Modification
             _cutPatternOptions.Clear();
 
             var neutralForeground = Color.FromRgb(64, 70, 82);
-            var neutralBackground = Color.FromRgb(253, 254, 255);
+            var neutralBackground = Colors.White;
 
             var defaultPreview = CreateFillPatternPreview(null, null, neutralForeground, neutralBackground);
             _surfacePatternOptions.Add(new FillPatternOption("(Aucun)", ElementId.InvalidElementId, null, null, defaultPreview));
@@ -442,23 +443,23 @@ namespace Modification
         }
 
         private Brush BuildFillPreviewBrush(
-            FillPatternOption option,
-            bool showForeground,
-            bool showBackground,
-            Color baseColor)
+         FillPatternOption option,
+         bool showForeground,
+         bool showBackground,
+         Color baseColor)
         {
-            var neutralBackground = Color.FromRgb(253, 254, 255);
+            var neutralBackground = Colors.White;
 
             if (option == null || option.Pattern == null)
             {
                 if (showForeground && showBackground)
                 {
-                    return CreateSolidBrush(baseColor, 0.85);
+                    return CreateLinePreviewBrush(baseColor, AdjustBackgroundColor(baseColor));
                 }
 
                 if (showForeground)
                 {
-                    return CreateSolidBrush(baseColor, 0.75);
+                    return CreateLinePreviewBrush(baseColor, neutralBackground);
                 }
 
                 if (showBackground)
@@ -489,96 +490,50 @@ namespace Modification
             Color? foregroundColor,
             Color? backgroundColor)
         {
-            var brush = TryCreatePatternPreviewBrush(element, foregroundColor, backgroundColor);
-            if (brush != null)
-                return brush;
-
             return CreateFallbackFillPatternBrush(pattern, foregroundColor, backgroundColor);
         }
 
-        private Brush TryCreatePatternPreviewBrush(
-    FillPatternElement element,
-    Color? foregroundColor,
-    Color? backgroundColor)
+        private Brush CreateLinePreviewBrush(Color lineColor, Color backgroundColor)
         {
-            if (element == null || foregroundColor == null)
-                return null;
+            const double tile = 48.0;
 
-            var methods = element.GetType()
-                                 .GetMethods(BindingFlags.Public | BindingFlags.Instance)
-                                 .Where(m => m.Name == "GetPreviewImage");
+            var drawingGroup = new DrawingGroup();
 
-            foreach (var method in methods)
+            var backgroundBrush = new SolidColorBrush(backgroundColor);
+            if (backgroundBrush.CanFreeze)
+                backgroundBrush.Freeze();
+            drawingGroup.Children.Add(new GeometryDrawing(backgroundBrush, null, new RectangleGeometry(new Rect(0, 0, tile, tile))));
+
+            var stroke = new SolidColorBrush(lineColor);
+            if (stroke.CanFreeze)
+                stroke.Freeze();
+
+            var pen = new System.Windows.Media.Pen(stroke, 2.2);
+            if (pen.CanFreeze)
+                pen.Freeze();
+
+            var geometryGroup = new GeometryGroup();
+            geometryGroup.Children.Add(new LineGeometry(new System.Windows.Point(6, tile / 3.0), new System.Windows.Point(tile - 6, tile / 3.0)));
+            geometryGroup.Children.Add(new LineGeometry(new System.Windows.Point(6, 2 * tile / 3.0), new System.Windows.Point(tile - 6, 2 * tile / 3.0)));
+            geometryGroup.Children.Add(new LineGeometry(new System.Windows.Point(6, 6), new System.Windows.Point(tile - 6, tile - 6)));
+
+            drawingGroup.Children.Add(new GeometryDrawing(null, pen, geometryGroup));
+
+            var brush = new DrawingBrush(drawingGroup)
             {
-                var parameters = method.GetParameters();
-                try
-                {
-                    Bitmap bitmap = null;
-                    if (parameters.Length == 1 && parameters[0].ParameterType == typeof(Size))
-                    {
-                        bitmap = method.Invoke(element, new object[] { new Size(96, 96) }) as Bitmap;
-                    }
-                    else if (parameters.Length == 3 &&
-                             parameters[0].ParameterType == typeof(Size) &&
-                             parameters[1].ParameterType == typeof(Autodesk.Revit.DB.Color) &&
-                             parameters[2].ParameterType == typeof(Autodesk.Revit.DB.Color))
-                    {
-                        var fg = ToRevitColor(foregroundColor.Value);
-                        var bgColor = backgroundColor ?? Colors.White; // Color (non-nullable)
-                        var bg = ToRevitColor(bgColor);                // pas .Value
-                        bitmap = method.Invoke(element, new object[] { new Size(96, 96), fg, bg }) as Bitmap;
-                    }
+                TileMode = TileMode.Tile,
+                Viewport = new Rect(0, 0, tile, tile),
+                ViewportUnits = BrushMappingMode.Absolute,
+                Viewbox = new Rect(0, 0, tile, tile),
+                ViewboxUnits = BrushMappingMode.Absolute,
+                Stretch = Stretch.Fill
+            };
 
-                    if (bitmap != null)
-                    {
-                        using (bitmap)
-                        {
-                            var brush = CreateBrushFromBitmap(bitmap);
-                            if (brush != null)
-                                return brush;
-                        }
-                    }
-                }
-                catch
-                {
-                    // ignore et essaie l’overload suivant
-                }
-            }
+            if (brush.CanFreeze)
+                brush.Freeze();
 
-            return null;
+            return brush;
         }
-
-
-        private static Brush CreateBrushFromBitmap(Bitmap bitmap)
-        {
-            using (var stream = new MemoryStream())
-            {
-                bitmap.Save(stream, ImageFormat.Png);
-                stream.Position = 0;
-
-                var image = new BitmapImage();
-                image.BeginInit();
-                image.CacheOption = BitmapCacheOption.OnLoad;
-                image.StreamSource = stream;
-                image.EndInit();
-                image.Freeze();
-
-                var brush = new ImageBrush(image)
-                {
-                    Stretch = Stretch.UniformToFill,
-                    AlignmentX = AlignmentX.Center,
-                    AlignmentY = AlignmentY.Center
-                };
-
-                if (brush.CanFreeze)
-                    brush.Freeze();
-
-                return brush;
-            }
-        }
-
-        private static Autodesk.Revit.DB.Color ToRevitColor(Color color)
-            => new Autodesk.Revit.DB.Color(color.R, color.G, color.B);
 
         private static Brush CreateSolidBrush(Color color, double opacity = 1.0)
         {
@@ -617,16 +572,14 @@ namespace Modification
         }
 
         private static Brush CreateFallbackFillPatternBrush(
-            FillPattern pattern,
-            Color? foregroundColor,
-            Color? backgroundColor)
+     FillPattern pattern,
+     Color? foregroundColor,
+     Color? backgroundColor)
         {
-            var neutralBackground = backgroundColor ?? Color.FromRgb(253, 254, 255);
+            var neutralBackground = backgroundColor ?? Colors.White;
 
             if (pattern == null)
-            {
                 return CreateSolidBrush(neutralBackground);
-            }
 
             if (pattern.IsSolidFill)
             {
@@ -635,42 +588,52 @@ namespace Modification
             }
 
             if (foregroundColor == null)
-            {
                 return CreateSolidBrush(neutralBackground);
-            }
 
-            const double tile = 48.0;
+            double tile = PatternPreviewTileSize;
+
             var drawingGroup = new DrawingGroup();
 
             var backgroundBrush = new SolidColorBrush(neutralBackground);
             if (backgroundBrush.CanFreeze)
                 backgroundBrush.Freeze();
-            drawingGroup.Children.Add(new GeometryDrawing(backgroundBrush, null, new RectangleGeometry(new Rect(0, 0, tile, tile))));
+
+            drawingGroup.Children.Add(
+                new GeometryDrawing(
+                    backgroundBrush,
+                    null,
+                    new RectangleGeometry(new Rect(0, 0, tile, tile))));
 
             var grids = pattern.GetFillGrids();
             if (grids == null || grids.Count == 0)
-            {
                 return CreateSolidBrush(neutralBackground);
-            }
 
             var strokeBrush = new SolidColorBrush(foregroundColor.Value);
             if (strokeBrush.CanFreeze)
                 strokeBrush.Freeze();
 
+            // 🔹 échelle commune calculée à partir du plus petit espacement du motif
+            double patternScale = ComputePatternPreviewScale(grids);
+
             foreach (var grid in grids)
             {
                 var geometryGroup = new GeometryGroup();
-                var spacing = System.Math.Max(GetFillGridSpacing(grid), 1.0);
-                var lineCount = (int)(tile / spacing) + 4;
 
-                for (var i = -lineCount; i <= lineCount; i++)
+                double spacing = ComputePreviewSpacing(grid, patternScale);
+                if (spacing <= 0.0)
+                    continue;
+
+                int lineCount = (int)(tile / spacing) + 4;
+
+                for (int i = -lineCount; i <= lineCount; i++)
                 {
-                    var offset = i * spacing + GetFillGridShift(grid);
+                    double offset = i * spacing + ComputePreviewShift(grid, spacing, patternScale);
+
                     var start = new System.Windows.Point(-tile, offset);
                     var end = new System.Windows.Point(tile * 2, offset);
 
                     var matrix = new Matrix();
-                    matrix.Rotate(GetFillGridAngle(grid) * 180 / System.Math.PI);
+                    matrix.Rotate(GetFillGridAngle(grid) * 180.0 / System.Math.PI);
                     matrix.Translate(tile / 2.0, tile / 2.0);
 
                     start = matrix.Transform(start);
@@ -679,9 +642,12 @@ namespace Modification
                     geometryGroup.Children.Add(new LineGeometry(start, end));
                 }
 
-                var pen = new System.Windows.Media.Pen(strokeBrush, 0.9);
+                double penThickness = ComputePreviewPenThickness(spacing);
+
+                var pen = new System.Windows.Media.Pen(strokeBrush, penThickness);
                 if (pen.CanFreeze)
                     pen.Freeze();
+
                 drawingGroup.Children.Add(new GeometryDrawing(null, pen, geometryGroup));
             }
 
@@ -700,6 +666,7 @@ namespace Modification
 
             return drawingBrush;
         }
+
 
         private static DoubleCollection CreateDashArray(LinePattern pattern)
         {
@@ -759,6 +726,88 @@ namespace Modification
 
         private static double GetLinePatternSegmentLength(LinePatternSegment segment)
             => GetDoubleValue(segment, 1.0, "Length", "GetLength");
+        /// <summary>
+        /// Calcule un facteur d'échelle tel que le plus petit espacement du motif
+        /// ait environ PatternPreviewDesiredMinSpacingDip pixels.
+        /// </summary>
+        private static double ComputePatternPreviewScale(IList<FillGrid> grids)
+        {
+            if (grids == null || grids.Count == 0)
+                return 1.0;
+
+            var spacingsFeet = grids
+                .Select(g => GetFillGridSpacing(g))
+                .Where(s => s > 1e-9)
+                .ToList();
+
+            if (spacingsFeet.Count == 0)
+                return 1.0;
+
+            double minSpacingFeet = spacingsFeet.Min();
+            double minSpacingDiu = FeetToDiu(minSpacingFeet);   // DIP "brut" pour le plus petit espacement
+
+            if (minSpacingDiu < 1e-6)
+                return 1.0;
+
+            // On vise un espacement voulu (en DIP) mais on évite de dépasser 1/3 de la tuile
+            double target = System.Math.Min(
+                PatternPreviewDesiredMinSpacingDip,
+                PatternPreviewTileSize / 3.0);
+
+            double scale = target / minSpacingDiu;
+
+            // Garde-fous : évite des échelles complètement délirantes
+            if (scale < 0.005) scale = 0.005;
+            if (scale > 50.0) scale = 50.0;
+
+            return scale;
+        }
+
+        private static double ComputePreviewSpacing(FillGrid grid, double patternScale)
+        {
+            const double minSpacing = 0.5;                           // ~1/2 px mini
+            double maxSpacing = PatternPreviewTileSize * 0.9;        // pas plus large que la tuile
+
+            double spacingFeet = System.Math.Max(GetFillGridSpacing(grid), 1e-9);
+            double spacingDip = FeetToDiu(spacingFeet) * patternScale;
+
+            if (spacingDip < minSpacing) spacingDip = minSpacing;
+            if (spacingDip > maxSpacing) spacingDip = maxSpacing;
+
+            return spacingDip;
+        }
+
+        private static double ComputePreviewShift(FillGrid grid, double spacing, double patternScale)
+        {
+            if (spacing <= 0.0)
+                return 0.0;
+
+            double shiftFeet = System.Math.Max(GetFillGridShift(grid), 0.0);
+            double shiftDip = FeetToDiu(shiftFeet) * patternScale;
+
+            shiftDip %= spacing;
+            if (shiftDip < 0)
+                shiftDip += spacing;
+
+            return shiftDip;
+        }
+
+        private static double ComputePreviewPenThickness(double spacing)
+        {
+            const double minThickness = 0.35;
+            const double maxThickness = 1.6;
+
+            if (spacing <= 0.0)
+                return minThickness;
+
+            // Traits plus fins pour motifs denses, un peu plus épais sinon
+            double t = spacing * 0.12;
+            if (t < minThickness) t = minThickness;
+            if (t > maxThickness) t = maxThickness;
+
+            return t;
+        }
+
 
         private static LinePatternSegmentType GetLinePatternSegmentType(LinePatternSegment segment)
         {
@@ -884,7 +933,7 @@ namespace Modification
 
         private static Color AdjustBackgroundColor(Color color)
         {
-            const double blendFactor = 0.65;
+            const double blendFactor = 0.3;
             byte Blend(byte component)
             {
                 return (byte)(component * blendFactor + 255 * (1 - blendFactor));

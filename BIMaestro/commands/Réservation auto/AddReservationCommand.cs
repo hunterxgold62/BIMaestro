@@ -39,10 +39,12 @@ namespace Modification
                     .Cast<FamilySymbol>()
                     .Where(sym =>
                         sym.Family != null &&
-                        (sym.Family.Name.Equals("CML_Réservation circulaire murale", StringComparison.OrdinalIgnoreCase)
-                      || (sym.Family.Name.Equals("Réservation circulaire murale", StringComparison.OrdinalIgnoreCase))
-                      || (sym.Family.Name.Equals("Réservation rectangulaire murale", StringComparison.OrdinalIgnoreCase))
-                      || sym.Family.Name.Equals("CML_Réservation rectangulaire murale", StringComparison.OrdinalIgnoreCase))
+                        (sym.Family.Name.IndexOf("Réservation circulaire murale", StringComparison.OrdinalIgnoreCase) >= 0
+                      || sym.Family.Name.IndexOf("Réservation rectangulaire murale", StringComparison.OrdinalIgnoreCase) >= 0
+                      || sym.Family.Name.IndexOf("Réservation circulaire sol", StringComparison.OrdinalIgnoreCase) >= 0
+                      || sym.Family.Name.IndexOf("Réservation rectangulaire sol", StringComparison.OrdinalIgnoreCase) >= 0
+                      || sym.Family.Name.IndexOf("CML_Réservation circulaire murale", StringComparison.OrdinalIgnoreCase) >= 0
+                      || sym.Family.Name.IndexOf("CML_Réservation rectangulaire murale", StringComparison.OrdinalIgnoreCase) >= 0)
                     )
                     .OrderBy(sym => sym.Name)
                     .ToList();
@@ -63,6 +65,7 @@ namespace Modification
                 bool dynamoAutoEnabled = window.DynamoAutoEnabled;
                 bool automatiqueEnabled = window.AutomatiqueEnabled;
                 bool multiEnabled = window.MultiEnabled;
+                var hostTarget = window.SelectedHostTarget;
                 var objType = window.SelectedObjectType;
                 var symbol = window.SelectedReservationSymbol;
                 bool reservationsCreated = false;
@@ -79,6 +82,8 @@ namespace Modification
                 bool isRectangulaire = symbol.Name.IndexOf("rect", StringComparison.OrdinalIgnoreCase) >= 0
                                     || symbol.Family.Name.IndexOf("rect", StringComparison.OrdinalIgnoreCase) >= 0;
 
+                string hostLabel = hostTarget == ExtendedReservationWindow.HostTarget.Sol ? "sol" : "mur";
+
                 // 3) Mode manuel vs automatique
                 if (!automatiqueEnabled)
                 {
@@ -93,7 +98,7 @@ namespace Modification
                     };
 
                     TaskDialog.Show("Mode manuel",
-                        $"Vous allez sélectionner {(multiEnabled ? "plusieurs " : "")}{objetLabel}, puis un mur.\n\n" +
+                        $"Vous allez sélectionner {(multiEnabled ? "plusieurs " : "")}{objetLabel}, puis un {hostLabel}.\n\n" +
                         "Répétez autant de fois que nécessaire.\n" +
                         "Cliquez sur Non pour terminer.");
 
@@ -133,11 +138,25 @@ namespace Modification
                                     break;
                                 }
 
+                                if (elemRefs == null || elemRefs.Count == 0)
+                                {
+                                    trans.RollBack();
+                                    userCancelled = true;
+                                    break;
+                                }
+
                                 // Liste des éléments sélectionnés
                                 var elementsSel = elemRefs
                                     .Select(r => doc.GetElement(r))
                                     .Where(el => el != null)
                                     .ToList();
+
+                                if (elementsSel == null || elementsSel.Count == 0)
+                                {
+                                    trans.RollBack();
+                                    userCancelled = true;
+                                    break;
+                                }
 
                                 // Sélection du mur
                                 Reference wallRef;
@@ -145,7 +164,9 @@ namespace Modification
                                 {
                                     wallRef = uiDoc.Selection.PickObject(
                                         ObjectType.Element,
-                                        "Sélectionnez le mur (ESC pour annuler)");
+                                        hostTarget == ExtendedReservationWindow.HostTarget.Sol
+                                            ? "Sélectionnez le sol (ESC pour annuler)"
+                                            : "Sélectionnez le mur (ESC pour annuler)");
                                 }
                                 catch
                                 {
@@ -154,16 +175,19 @@ namespace Modification
                                     break;
                                 }
 
-                                var wall = doc.GetElement(wallRef) as Wall;
-                                if (wall == null)
+                                Element hostElem = doc.GetElement(wallRef);
+                                if (hostTarget == ExtendedReservationWindow.HostTarget.Mur && hostElem is not Wall ||
+                                    hostTarget == ExtendedReservationWindow.HostTarget.Sol && hostElem is not Floor)
                                 {
                                     trans.RollBack();
                                     userCancelled = true;
-                                    TaskDialog.Show("Erreur", "Veuillez sélectionner un mur valide.");
+                                    TaskDialog.Show("Erreur", hostTarget == ExtendedReservationWindow.HostTarget.Sol
+                                        ? "Veuillez sélectionner un sol valide."
+                                        : "Veuillez sélectionner un mur valide.");
                                     break;
                                 }
 
-                                var level = doc.GetElement(wall.LevelId) as Level
+                                var level = doc.GetElement(hostElem.LevelId) as Level
                                            ?? new FilteredElementCollector(doc)
                                                   .OfClass(typeof(Level))
                                                   .Cast<Level>()
@@ -172,14 +196,23 @@ namespace Modification
                                 if (objType == ExtendedReservationWindow.ObjectType.Canalisation)
                                 {
                                     var pipes = elementsSel.OfType<Pipe>().ToList();
-                                    CreateRectangularReservationFromPipes(
-                                        doc, wall, symbol, pipes, normeEnabled, level);
+                                    if (hostTarget == ExtendedReservationWindow.HostTarget.Sol)
+                                        CreateRectangularReservationFromPipesOnFloor(
+                                            doc, hostElem as Floor, symbol, pipes, normeEnabled, level);
+                                    else
+                                        CreateRectangularReservationFromPipes(
+                                            doc, hostElem as Wall, symbol, pipes, normeEnabled, level);
                                 }
                                 else
                                 {
-                                    CreateRectangularReservationFromElements(
-                                        doc, wall, symbol, elementsSel, normeEnabled, level,
-                                        GetOversizeForType(objType));
+                                    if (hostTarget == ExtendedReservationWindow.HostTarget.Sol)
+                                        CreateRectangularReservationFromElementsOnFloor(
+                                            doc, hostElem as Floor, symbol, elementsSel, normeEnabled, level,
+                                            GetOversizeForType(objType));
+                                    else
+                                        CreateRectangularReservationFromElements(
+                                            doc, hostElem as Wall, symbol, elementsSel, normeEnabled, level,
+                                            GetOversizeForType(objType));
                                 }
 
                                 trans.Commit();
@@ -221,13 +254,15 @@ namespace Modification
                                     }
                                 }
 
-                                // 2) Sélection du mur
+                                // 2) Sélection du support
                                 Reference wallRef2;
                                 try
                                 {
                                     wallRef2 = uiDoc.Selection.PickObject(
                                         ObjectType.Element,
-                                        "Sélectionnez le mur (ESC pour annuler)");
+                                        hostTarget == ExtendedReservationWindow.HostTarget.Sol
+                                            ? "Sélectionnez le sol (ESC pour annuler)"
+                                            : "Sélectionnez le mur (ESC pour annuler)");
                                 }
                                 catch
                                 {
@@ -235,13 +270,16 @@ namespace Modification
                                     break;
                                 }
 
-                                Wall selWall = doc.GetElement(wallRef2) as Wall;
-                                if (selWall == null)
+                                Element selHost = doc.GetElement(wallRef2);
+                                if (hostTarget == ExtendedReservationWindow.HostTarget.Mur && selHost is not Wall ||
+                                    hostTarget == ExtendedReservationWindow.HostTarget.Sol && selHost is not Floor)
                                 {
                                     trans.RollBack();
                                     var tdErr = new TaskDialog("Erreur")
                                     {
-                                        MainInstruction = "Ce n'est pas un mur.",
+                                        MainInstruction = hostTarget == ExtendedReservationWindow.HostTarget.Sol
+                                            ? "Ce n'est pas un sol."
+                                            : "Ce n'est pas un mur.",
                                         MainContent = "Réessayer ?",
                                         CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No
                                     };
@@ -255,9 +293,9 @@ namespace Modification
                                 }
 
                                 // 3) Intersection de bounding boxes
-                                var bbWall = selWall.get_BoundingBox(null);
+                                var bbHost = selHost.get_BoundingBox(null);
                                 var bbElem = selElem.get_BoundingBox(null);
-                                if (bbWall == null || bbElem == null)
+                                if (bbHost == null || bbElem == null)
                                 {
                                     trans.RollBack();
                                     var tdErr = new TaskDialog("Erreur")
@@ -275,7 +313,7 @@ namespace Modification
                                     }
                                 }
 
-                                var bbIntersect = IntersectBoundingBoxes(bbWall, bbElem);
+                                var bbIntersect = IntersectBoundingBoxes(bbHost, bbElem);
                                 if (bbIntersect == null)
                                 {
                                     trans.RollBack();
@@ -296,8 +334,10 @@ namespace Modification
 
                                 // 4) Centre et niveau
                                 XYZ fallbackCenter = (bbIntersect.Min + bbIntersect.Max) * 0.5;
-                                XYZ center = GetPlacementPointOnWall(selWall, selElem, fallbackCenter);
-                                var usedLevel = doc.GetElement(selWall.LevelId) as Level
+                                XYZ center = selHost is Floor floorHost
+                                    ? GetPlacementPointOnFloor(floorHost, selElem, fallbackCenter)
+                                    : GetPlacementPointOnWall(selHost as Wall, selElem, fallbackCenter);
+                                var usedLevel = doc.GetElement(selHost.LevelId) as Level
                                               ?? new FilteredElementCollector(doc)
                                                      .OfClass(typeof(Level))
                                                      .Cast<Level>()
@@ -307,7 +347,7 @@ namespace Modification
                                 FamilyInstance fiRes = doc.Create.NewFamilyInstance(
                                     center,
                                     symbol,
-                                    selWall,
+                                    selHost,
                                     usedLevel,
                                     Autodesk.Revit.DB.Structure.StructuralType.NonStructural);
 
@@ -387,10 +427,17 @@ namespace Modification
                         return Result.Cancelled;
                     }
 
+                    if (hostTarget == ExtendedReservationWindow.HostTarget.Sol)
+                    {
+                        TaskDialog.Show("Info",
+                            "Le mode automatique pour les sols n'est pas disponible. Utilisez le mode manuel.");
+                        return Result.Cancelled;
+                    }
+
                     List<Element> targetElements = new List<Element>();
-    switch (objType)
-    {
-        case ExtendedReservationWindow.ObjectType.Canalisation:
+                    switch (objType)
+                    {
+                        case ExtendedReservationWindow.ObjectType.Canalisation:
             targetElements = new FilteredElementCollector(doc)
                 .OfClass(typeof(Pipe))
                 .ToList<Element>();
@@ -634,6 +681,9 @@ namespace Modification
             bool normeEnabled,
             Level level)
         {
+            if (wall == null || symbol == null || pipes == null || !pipes.Any())
+                return;
+
             if (!symbol.IsActive) symbol.Activate();
 
             // 1) Bounding-box du mur
@@ -749,6 +799,9 @@ namespace Modification
             Level level,
             double oversize)
         {
+            if (wall == null || symbol == null || elements == null || !elements.Any())
+                return;
+
             if (!symbol.IsActive) symbol.Activate();
 
             BoundingBoxXYZ bbWall = wall.get_BoundingBox(null);
@@ -830,7 +883,139 @@ namespace Modification
             if (pHCom != null && !pHCom.IsReadOnly) pHCom.Set(heightRaw);
         }
 
+        private void CreateRectangularReservationFromPipesOnFloor(
+           Document doc,
+           Floor floor,
+           FamilySymbol symbol,
+           List<Pipe> pipes,
+           bool normeEnabled,
+           Level level)
+        {
+            if (floor == null || symbol == null || pipes == null || !pipes.Any())
+                return;
 
+            if (!symbol.IsActive) symbol.Activate();
+
+            var pipeBbs = pipes
+                .Select(p => p.get_BoundingBox(null))
+                .Where(bb => bb != null)
+                .ToList();
+            if (!pipeBbs.Any()) return;
+
+            double minX = pipeBbs.Min(bb => bb.Min.X);
+            double minY = pipeBbs.Min(bb => bb.Min.Y);
+            double minZ = pipeBbs.Min(bb => bb.Min.Z);
+            double maxX = pipeBbs.Max(bb => bb.Max.X);
+            double maxY = pipeBbs.Max(bb => bb.Max.Y);
+            double maxZ = pipeBbs.Max(bb => bb.Max.Z);
+
+            BoundingBoxXYZ bbAll = new BoundingBoxXYZ
+            {
+                Min = new XYZ(minX, minY, minZ),
+                Max = new XYZ(maxX, maxY, maxZ)
+            };
+
+            XYZ centroid = (bbAll.Min + bbAll.Max) * 0.5;
+            centroid = GetPlacementPointOnFloor(floor, pipes.FirstOrDefault(), centroid);
+
+            FamilyInstance fi = doc.Create.NewFamilyInstance(
+                centroid,
+                symbol,
+                floor,
+                level,
+                Autodesk.Revit.DB.Structure.StructuralType.NonStructural);
+
+            double maxIso = pipes
+                .Select(pipe => pipe.LookupParameter("Epaisseur d'isolation")?.AsDouble() ?? 0.0)
+                .DefaultIfEmpty(0.0)
+                .Max();
+
+            double oversize = GetOversizeForType(ExtendedReservationWindow.ObjectType.Canalisation);
+            double maxRadius = pipes
+                .Select(p => CalculateDiameterForElement(p, ExtendedReservationWindow.ObjectType.Canalisation) / 2.0 + maxIso + oversize)
+                .DefaultIfEmpty(0.0)
+                .Max();
+
+            double width = maxRadius * 2.0;
+            double height = maxRadius * 2.0;
+
+            if (normeEnabled)
+            {
+                width = RoundToNearest50mm(width);
+                height = width;
+            }
+
+            Parameter pH = fi.LookupParameter("Hauteur");
+            Parameter pL = fi.LookupParameter("Largeur");
+            Parameter pHCom = fi.LookupParameter("COM_Hauteur");
+            Parameter pLCom = fi.LookupParameter("COM_Largeur");
+            if (pH != null && !pH.IsReadOnly) pH.Set(height);
+            if (pHCom != null && !pHCom.IsReadOnly) pHCom.Set(height);
+            if (pL != null && !pL.IsReadOnly) pL.Set(width);
+            if (pLCom != null && !pLCom.IsReadOnly) pLCom.Set(width);
+        }
+
+        private void CreateRectangularReservationFromElementsOnFloor(
+            Document doc,
+            Floor floor,
+            FamilySymbol symbol,
+            List<Element> elements,
+            bool normeEnabled,
+            Level level,
+            double oversize)
+        {
+            if (floor == null || symbol == null || elements == null || !elements.Any())
+                return;
+
+            if (!symbol.IsActive) symbol.Activate();
+
+            var clippedBbs = elements
+                .Select(e => e.get_BoundingBox(null))
+                .Where(bb => bb != null)
+                .ToList();
+            if (!clippedBbs.Any()) return;
+
+            double minX = clippedBbs.Min(bb => bb.Min.X);
+            double minY = clippedBbs.Min(bb => bb.Min.Y);
+            double minZ = clippedBbs.Min(bb => bb.Min.Z);
+            double maxX = clippedBbs.Max(bb => bb.Max.X);
+            double maxY = clippedBbs.Max(bb => bb.Max.Y);
+            double maxZ = clippedBbs.Max(bb => bb.Max.Z);
+
+            var bbAll = new BoundingBoxXYZ
+            {
+                Min = new XYZ(minX, minY, minZ),
+                Max = new XYZ(maxX, maxY, maxZ)
+            };
+
+            XYZ centroid = (bbAll.Min + bbAll.Max) * 0.5;
+            centroid = GetPlacementPointOnFloor(floor, elements.FirstOrDefault(), centroid);
+
+            FamilyInstance fi = doc.Create.NewFamilyInstance(
+                centroid,
+                symbol,
+                floor,
+                level,
+                Autodesk.Revit.DB.Structure.StructuralType.NonStructural);
+
+            double widthRaw = (maxX - minX) + oversize;
+            double heightRaw = (maxZ - minZ) + oversize;
+
+            if (normeEnabled)
+            {
+                widthRaw = RoundToNearest50mm(widthRaw);
+                heightRaw = RoundToNearest50mm(heightRaw);
+            }
+
+            var pW = fi.LookupParameter("Largeur");
+            var pH = fi.LookupParameter("Hauteur");
+            var pWCom = fi.LookupParameter("COM_Largeur");
+            var pHCom = fi.LookupParameter("COM_Hauteur");
+            if (pW != null && !pW.IsReadOnly) pW.Set(widthRaw);
+            if (pWCom != null && !pWCom.IsReadOnly) pWCom.Set(widthRaw);
+            if (pH != null && !pH.IsReadOnly) pH.Set(heightRaw);
+            if (pHCom != null && !pHCom.IsReadOnly) pHCom.Set(heightRaw);
+        }
 
         private BoundingBoxXYZ IntersectBoundingBoxes(BoundingBoxXYZ bb1, BoundingBoxXYZ bb2)
         {
@@ -888,6 +1073,27 @@ namespace Modification
                 Min = new XYZ(minX, minY, minZ),
                 Max = new XYZ(maxX, maxY, maxZ)
             };
+        }
+        private XYZ GetPlacementPointOnFloor(Floor floor, Element intersectingElement, XYZ fallbackCenter)
+        {
+            if (floor == null)
+                return fallbackCenter;
+
+            BoundingBoxXYZ bbFloor = floor.get_BoundingBox(null);
+            if (bbFloor == null)
+                return fallbackCenter;
+
+            double targetZ = (bbFloor.Min.Z + bbFloor.Max.Z) * 0.5;
+            XYZ source = fallbackCenter;
+
+            if (intersectingElement != null)
+            {
+                var bbElem = intersectingElement.get_BoundingBox(null);
+                if (bbElem != null)
+                    source = (bbElem.Min + bbElem.Max) * 0.5;
+            }
+
+            return new XYZ(source.X, source.Y, targetZ);
         }
 
         private XYZ GetPlacementPointOnWall(Wall wall, Element intersectingElement, XYZ fallbackCenter)
