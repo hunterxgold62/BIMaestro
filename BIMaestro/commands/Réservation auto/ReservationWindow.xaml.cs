@@ -34,12 +34,18 @@ namespace Modification
 
         private readonly List<FamilySymbol> _allReservationFamilies;
 
+        private readonly List<ReservationSymbolItem> _reservationItems;
+
         public ExtendedReservationWindow(List<FamilySymbol> reservationFamilies)
         {
             InitializeComponent();
 
             // 1) Initialiser d'abord la source
             _allReservationFamilies = reservationFamilies ?? new List<FamilySymbol>();
+            _reservationItems = _allReservationFamilies
+                .Where(fs => fs != null)
+                .Select(fs => new ReservationSymbolItem(fs, BuildDisplayName(fs)))
+                .ToList();
 
             // 2) Config host type
             comboHostType.ItemsSource = new List<string>
@@ -61,7 +67,7 @@ namespace Modification
     };
             comboObjectType.SelectedIndex = 0; // déclenche OnCriteriaChanged, OK aussi
 
-           
+
 
             Loaded += (_, __) => comboObjectType.Focus();
         }
@@ -87,10 +93,8 @@ namespace Modification
             bool isCanal = typeSel == "Canalisation";
             bool isAutre = typeSel == "Autre";
 
-            var fam = comboFamily.SelectedItem as FamilySymbol;
-            bool isRect = fam != null &&
-                          ((fam.Name?.IndexOf("rect", System.StringComparison.OrdinalIgnoreCase) ?? -1) >= 0
-                           || (fam.Family?.Name?.IndexOf("rect", System.StringComparison.OrdinalIgnoreCase) ?? -1) >= 0);
+            var famItem = comboFamily.SelectedItem as ReservationSymbolItem;
+            bool isRect = famItem != null && famItem.IsRectangular;
 
             chkMulti.IsEnabled = (isCanal || isAutre) && isRect;
             if (!chkMulti.IsEnabled)
@@ -119,7 +123,7 @@ namespace Modification
                 default: SelectedObjectType = ObjectType.Autre; break;
             }
 
-            SelectedReservationSymbol = comboFamily.SelectedItem as FamilySymbol;
+            SelectedReservationSymbol = (comboFamily.SelectedItem as ReservationSymbolItem)?.Symbol;
 
             DialogResult = true;
             Close();
@@ -138,7 +142,7 @@ namespace Modification
 
         private void UpdateFamilyFilter()
         {
-            if (comboFamily == null || _allReservationFamilies == null)
+            if (comboFamily == null || _reservationItems == null)
             {
                 // Rien à filtrer pour le moment
                 comboFamily.ItemsSource = null;
@@ -146,15 +150,15 @@ namespace Modification
                 return;
             }
 
-            var previousSelection = comboFamily.SelectedItem as FamilySymbol;
+            var previousSelection = comboFamily.SelectedItem as ReservationSymbolItem;
             bool isSol = (comboHostType?.SelectedItem as string) == "Sol";
 
-            var filtered = _allReservationFamilies
-                .Where(fs => fs?.Family?.Name != null)
-                .Where(fs => isSol
-                    ? fs.Family.Name.IndexOf("sol", System.StringComparison.OrdinalIgnoreCase) >= 0
-                    : fs.Family.Name.IndexOf("mur", System.StringComparison.OrdinalIgnoreCase) >= 0)
-                .OrderBy(fs => fs.Name)
+            var filtered = _reservationItems
+                .Where(item => item?.Symbol?.Family?.Name != null)
+                .Where(item => isSol
+                    ? item.Symbol.Family.Name.IndexOf("sol", System.StringComparison.OrdinalIgnoreCase) >= 0
+                    : item.Symbol.Family.Name.IndexOf("mur", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                .OrderBy(item => item.DisplayName)
                 .ToList();
 
             comboFamily.ItemsSource = filtered;
@@ -162,13 +166,46 @@ namespace Modification
             if (filtered.Any())
             {
                 var keepSelection = previousSelection != null
-                    ? filtered.FirstOrDefault(fs => fs.Id == previousSelection.Id)
+                    ? filtered.FirstOrDefault(fs => fs.Symbol.Id == previousSelection.Symbol.Id)
                     : null;
 
                 comboFamily.SelectedItem = keepSelection ?? filtered.First();
             }
             else
                 comboFamily.SelectedIndex = -1;
+        }
+
+        private static string BuildDisplayName(FamilySymbol fs)
+        {
+            return fs?.Family?.Name ?? string.Empty;
+        }
+
+        private static bool IsCircular(FamilySymbol fs)
+        {
+            string name = ($"{fs?.Name} {fs?.Family?.Name}").ToLowerInvariant();
+            return name.Contains("circ") || name.Contains("ø") || name.Contains("diam");
+        }
+
+        private static bool IsRectangular(FamilySymbol fs)
+        {
+            string name = ($"{fs?.Name} {fs?.Family?.Name}").ToLowerInvariant();
+            return name.Contains("rect") || name.Contains("rectangle");
+        }
+
+        private class ReservationSymbolItem
+        {
+            public ReservationSymbolItem(FamilySymbol symbol, string displayName)
+            {
+                Symbol = symbol;
+                DisplayName = displayName;
+                IsCircular = IsCircular(symbol);
+                IsRectangular = IsRectangular(symbol);
+            }
+
+            public FamilySymbol Symbol { get; }
+            public string DisplayName { get; }
+            public bool IsCircular { get; }
+            public bool IsRectangular { get; }
         }
 
     }

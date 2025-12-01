@@ -119,10 +119,7 @@ namespace Modification
                                 {
                                     if (objType == ExtendedReservationWindow.ObjectType.Canalisation)
                                     {
-                                        elemRefs = uiDoc.Selection.PickObjects(
-                                            ObjectType.Element,
-                                            new PipeSelectionFilter(),
-                                            "Sélectionnez plusieurs canalisations (CTRL+clic)");
+                                        elemRefs = PickPipeReferencesAllowingLinks(uiDoc);
                                     }
                                     else
                                     {
@@ -130,6 +127,8 @@ namespace Modification
                                             ObjectType.Element,
                                             "Sélectionnez plusieurs éléments (CTRL+clic)");
                                     }
+
+
                                 }
                                 catch
                                 {
@@ -146,10 +145,19 @@ namespace Modification
                                 }
 
                                 // Liste des éléments sélectionnés
-                                var elementsSel = elemRefs
-                                    .Select(r => doc.GetElement(r))
+                                var resolvedSelections = elemRefs
+                                    .Select(r => TryResolveReference(uiDoc, r, out var el, out var tr) ? (el, tr) : (null, Transform.Identity))
+                                    .Where(t => t.el != null)
+                                    .ToList();
+
+                                var elementsSel = resolvedSelections
+                                    .Select(t => t.el)
                                     .Where(el => el != null)
                                     .ToList();
+
+                                var transformMap = resolvedSelections
+                                    .Where(t => t.el != null && t.tr != null && !t.tr.IsIdentity)
+                                    .ToDictionary(t => t.el.Id, t => t.tr);
 
                                 if (elementsSel == null || elementsSel.Count == 0)
                                 {
@@ -198,21 +206,21 @@ namespace Modification
                                     var pipes = elementsSel.OfType<Pipe>().ToList();
                                     if (hostTarget == ExtendedReservationWindow.HostTarget.Sol)
                                         CreateRectangularReservationFromPipesOnFloor(
-                                            doc, hostElem as Floor, symbol, pipes, normeEnabled, level);
+                                            doc, hostElem as Floor, symbol, pipes, normeEnabled, level, transformMap);
                                     else
                                         CreateRectangularReservationFromPipes(
-                                            doc, hostElem as Wall, symbol, pipes, normeEnabled, level);
+                                            doc, hostElem as Wall, symbol, pipes, normeEnabled, level, transformMap);
                                 }
                                 else
                                 {
                                     if (hostTarget == ExtendedReservationWindow.HostTarget.Sol)
                                         CreateRectangularReservationFromElementsOnFloor(
                                             doc, hostElem as Floor, symbol, elementsSel, normeEnabled, level,
-                                            GetOversizeForType(objType));
+                                            GetOversizeForType(objType), transformMap);
                                     else
                                         CreateRectangularReservationFromElements(
                                             doc, hostElem as Wall, symbol, elementsSel, normeEnabled, level,
-                                            GetOversizeForType(objType));
+                                            GetOversizeForType(objType), transformMap);
                                 }
 
                                 trans.Commit();
@@ -226,7 +234,7 @@ namespace Modification
                                 try
                                 {
                                     elemRef = uiDoc.Selection.PickObject(
-                                        ObjectType.LinkedElement,
+                                        ObjectType.Element,
                                         $"Sélectionnez {objetLabel} (ESC pour annuler)");
                                 }
                                 catch
@@ -234,7 +242,7 @@ namespace Modification
                                     try
                                     {
                                         elemRef = uiDoc.Selection.PickObject(
-                                            ObjectType.Element,
+                                            ObjectType.LinkedElement,
                                             $"Sélectionnez {objetLabel} (ESC pour annuler)");
                                     }
                                     catch
@@ -388,11 +396,6 @@ namespace Modification
                                 }
                                 else
                                 {
-                                    Parameter pH = fiRes.LookupParameter("Hauteur");
-                                    Parameter pL = fiRes.LookupParameter("Largeur");
-                                    Parameter pHCom = fiRes.LookupParameter("COM_Hauteur");
-                                    Parameter pLCom = fiRes.LookupParameter("COM_Largeur");
-
                                     if (objType == ExtendedReservationWindow.ObjectType.Canalisation
                                      || objType == ExtendedReservationWindow.ObjectType.Gaine)
                                     {
@@ -404,10 +407,7 @@ namespace Modification
                                         if (normeEnabled)
                                             d = RoundToNearest50mm(d);
 
-                                        if (pH != null && !pH.IsReadOnly) pH.Set(d);
-                                        if (pHCom != null && !pHCom.IsReadOnly) pHCom.Set(d);
-                                        if (pL != null && !pL.IsReadOnly) pL.Set(d);
-                                        if (pLCom != null && !pLCom.IsReadOnly) pLCom.Set(d);
+                                        SetRectangularParameters(fiRes, d, d, hostTarget == ExtendedReservationWindow.HostTarget.Sol);
                                     }
                                     else
                                     {
@@ -426,10 +426,8 @@ namespace Modification
                                             w = RoundToNearest10cm(w);
                                             h = RoundToNearest10cm(h);
                                         }
-                                        if (pL != null && !pL.IsReadOnly) pL.Set(w);
-                                        if (pLCom != null && !pLCom.IsReadOnly) pLCom.Set(w);
-                                        if (pH != null && !pH.IsReadOnly) pH.Set(h);
-                                        if (pHCom != null && !pHCom.IsReadOnly) pHCom.Set(h);
+
+                                        SetRectangularParameters(fiRes, w, h, hostTarget == ExtendedReservationWindow.HostTarget.Sol);
                                     }
                                 }
 
@@ -554,14 +552,7 @@ namespace Modification
                     }
                     else
                                     {
-                                        Parameter pH = fiRes.LookupParameter("Hauteur");
-                                        Parameter pL = fiRes.LookupParameter("Largeur");
-                                        Parameter pHCom = fiRes.LookupParameter("COM_Hauteur");
-                                        Parameter pLCom = fiRes.LookupParameter("COM_Largeur");
-                                        if (pH != null && !pH.IsReadOnly) pH.Set(finalDiam);
-                                        if (pHCom != null && !pHCom.IsReadOnly) pHCom.Set(finalDiam);
-                                        if (pL != null && !pL.IsReadOnly) pL.Set(finalDiam);
-                                        if (pLCom != null && !pLCom.IsReadOnly) pLCom.Set(finalDiam);
+                                        SetRectangularParameters(fiRes, finalDiam, finalDiam, false);
                                     }
 
                                     countCreated++;
@@ -600,43 +591,33 @@ namespace Modification
                     hostLevel,
                     Autodesk.Revit.DB.Structure.StructuralType.NonStructural);
 
-                if (isCirculaire)
-                {
-                    double finalDiam = Math.Max(w, h);
-                    if (normeEnabled) finalDiam = RoundToNearest50mm(finalDiam);
-
-                    Parameter pDiamRes = fiRes.LookupParameter("COM_Diamètre");
-                    if (pDiamRes != null && !pDiamRes.IsReadOnly)
-                        pDiamRes.Set(finalDiam);
-                }
-                else
+                                if (isCirculaire)
                                 {
-                                    Parameter pH = fiRes.LookupParameter("Hauteur");
-                                    Parameter pL = fiRes.LookupParameter("Largeur");
-                                    Parameter pHCom = fiRes.LookupParameter("COM_Hauteur");
-                                    Parameter pLCom = fiRes.LookupParameter("COM_Largeur");
+                                    double finalDiam = Math.Max(w, h);
+                                    if (normeEnabled) finalDiam = RoundToNearest50mm(finalDiam);
+
+                                    Parameter pDiamRes = fiRes.LookupParameter("COM_Diamètre");
+                                    if (pDiamRes != null && !pDiamRes.IsReadOnly)
+                                        pDiamRes.Set(finalDiam);
+                                }
+                                else
+                                {
                                     if (normeEnabled)
                                     {
                                         double newW = RoundToNearest10cm(w);
                                         double newH = RoundToNearest10cm(h);
-                                        if (pL != null && !pL.IsReadOnly) pL.Set(newW);
-                                        if (pLCom != null && !pLCom.IsReadOnly) pLCom.Set(newW);
-                                        if (pH != null && !pH.IsReadOnly) pH.Set(newH);
-                                        if (pHCom != null && !pHCom.IsReadOnly) pHCom.Set(newH);
+                                        SetRectangularParameters(fiRes, newW, newH, false);
                                     }
                                     else
                                     {
-                                        if (pL != null && !pL.IsReadOnly) pL.Set(w);
-                                        if (pLCom != null && !pLCom.IsReadOnly) pLCom.Set(w);
-                                        if (pH != null && !pH.IsReadOnly) pH.Set(h);
-                                        if (pHCom != null && !pHCom.IsReadOnly) pHCom.Set(h);
+                                        SetRectangularParameters(fiRes, w, h, false);
                                     }
                                 }
-                countCreated++;
-            }
-        }
+                                countCreated++;
+                            }
+                        }
 
-        trans.Commit();
+                        trans.Commit();
                         if (countCreated > 0) reservationsCreated = true;
                         TaskDialog.Show("Réservations créées",
             $"Nombre total de réservations placées : {countCreated}");
@@ -691,12 +672,89 @@ namespace Modification
         }
 
         #region Méthodes utilitaires
+        private void SetRectangularParameters(FamilyInstance fi, double width, double height, bool isFloor)
+        {
+            if (fi == null) return;
+
+            bool TrySetParameter(string paramName, double value)
+            {
+                var param = fi.LookupParameter(paramName);
+                if (param != null && !param.IsReadOnly)
+                {
+                    param.Set(value);
+                    return true;
+                }
+
+                return false;
+            }
+
+            TrySetParameter("Largeur", width);
+            TrySetParameter("COM_Largeur", width);
+
+            if (isFloor)
+            {
+                bool longueurSet = TrySetParameter("Longueur", height);
+                bool comLongueurSet = TrySetParameter("COM_Longueur", height);
+
+                if (!longueurSet)
+                    TrySetParameter("Hauteur", height);
+                if (!comLongueurSet)
+                    TrySetParameter("COM_Hauteur", height);
+            }
+            else
+            {
+                TrySetParameter("Hauteur", height);
+                TrySetParameter("COM_Hauteur", height);
+            }
+        }
+        private IList<Reference> PickPipeReferencesAllowingLinks(UIDocument uiDoc)
+        {
+            var refs = new List<Reference>();
+
+            // 1) Pipes du projet courant
+            try
+            {
+                var currentDocRefs = uiDoc.Selection.PickObjects(
+                    ObjectType.Element,
+                    new PipeSelectionFilter(),
+                    "Sélectionnez plusieurs canalisations du projet courant (CTRL+clic)");
+                if (currentDocRefs != null)
+                    refs.AddRange(currentDocRefs);
+            }
+            catch (Autodesk.Revit.Exceptions.OperationCanceledException)
+            {
+                // L'utilisateur annule → on renvoie null
+                return null;
+            }
+
+            // 2) Pipes dans les liens RVT/IFC (optionnel)
+            try
+            {
+                var linkedRefs = uiDoc.Selection.PickObjects(
+                    ObjectType.LinkedElement,
+                    new PipeSelectionFilter(),
+                    "Sélectionnez les canalisations dans les fichiers liés IFC/RVT (ESC pour passer)");
+                if (linkedRefs != null)
+                    refs.AddRange(linkedRefs);
+            }
+            catch (Autodesk.Revit.Exceptions.OperationCanceledException)
+            {
+                // Il a juste appuyé sur ESC pour passer : on garde ce qu'on a déjà
+            }
+            catch
+            {
+                // On ignore les autres erreurs
+            }
+
+            return refs;
+        }
 
         private class PipeSelectionFilter : ISelectionFilter
         {
-            public bool AllowElement(Element elem) => elem is Pipe;
-            public bool AllowReference(Reference reference, XYZ position) => false;
+            public bool AllowElement(Element elem) => elem is Pipe || elem is RevitLinkInstance;
+            public bool AllowReference(Reference reference, XYZ position) => true;
         }
+
 
         /// <summary>
         /// Crée une réservation rectangulaire pour plusieurs tuyaux,
@@ -709,7 +767,8 @@ namespace Modification
             FamilySymbol symbol,
             List<Pipe> pipes,
             bool normeEnabled,
-            Level level)
+            Level level,
+            Dictionary<ElementId, Transform> transformMap = null)
         {
             if (wall == null || symbol == null || pipes == null || !pipes.Any())
                 return;
@@ -722,7 +781,7 @@ namespace Modification
 
             // 2) Clippez chaque bbox de tuyau à celle du mur
             var clippedBbs = pipes
-                .Select(p => p.get_BoundingBox(null))
+                .Select(p => GetBoundingBoxInHostCoordinates(p, GetTransform(transformMap, p.Id)))
                 .Where(bb => bb != null)
                 .Select(bb => IntersectBoundingBoxes(bb, bbWall))
                 .Where(bb => bb != null)
@@ -806,14 +865,7 @@ namespace Modification
             }
 
             // 10) Affectation aux paramètres famille
-            var pW = fi.LookupParameter("Largeur");
-            var pH = fi.LookupParameter("Hauteur");
-            var pWCom = fi.LookupParameter("COM_Largeur");
-            var pHCom = fi.LookupParameter("COM_Hauteur");
-            if (pW != null && !pW.IsReadOnly) pW.Set(widthRaw);
-            if (pWCom != null && !pWCom.IsReadOnly) pWCom.Set(widthRaw);
-            if (pH != null && !pH.IsReadOnly) pH.Set(heightRaw);
-            if (pHCom != null && !pHCom.IsReadOnly) pHCom.Set(heightRaw);
+            SetRectangularParameters(fi, widthRaw, heightRaw, false);
         }
 
         /// <summary>
@@ -827,7 +879,8 @@ namespace Modification
             List<Element> elements,
             bool normeEnabled,
             Level level,
-            double oversize)
+            double oversize,
+            Dictionary<ElementId, Transform> transformMap = null)
         {
             if (wall == null || symbol == null || elements == null || !elements.Any())
                 return;
@@ -838,7 +891,7 @@ namespace Modification
             if (bbWall == null) return;
 
             var clippedBbs = elements
-                .Select(e => e.get_BoundingBox(null))
+                .Select(e => GetBoundingBoxInHostCoordinates(e, GetTransform(transformMap, e.Id)))
                 .Where(bb => bb != null)
                 .Select(bb => IntersectBoundingBoxes(bb, bbWall))
                 .Where(bb => bb != null)
@@ -903,14 +956,7 @@ namespace Modification
                 heightRaw = RoundToNearest50mm(heightRaw);
             }
 
-            var pW = fi.LookupParameter("Largeur");
-            var pH = fi.LookupParameter("Hauteur");
-            var pWCom = fi.LookupParameter("COM_Largeur");
-            var pHCom = fi.LookupParameter("COM_Hauteur");
-            if (pW != null && !pW.IsReadOnly) pW.Set(widthRaw);
-            if (pWCom != null && !pWCom.IsReadOnly) pWCom.Set(widthRaw);
-            if (pH != null && !pH.IsReadOnly) pH.Set(heightRaw);
-            if (pHCom != null && !pHCom.IsReadOnly) pHCom.Set(heightRaw);
+            SetRectangularParameters(fi, widthRaw, heightRaw, false);
         }
 
         private void CreateRectangularReservationFromPipesOnFloor(
@@ -919,7 +965,8 @@ namespace Modification
            FamilySymbol symbol,
            List<Pipe> pipes,
            bool normeEnabled,
-           Level level)
+           Level level,
+           Dictionary<ElementId, Transform> transformMap = null)
         {
             if (floor == null || symbol == null || pipes == null || !pipes.Any())
                 return;
@@ -927,7 +974,7 @@ namespace Modification
             if (!symbol.IsActive) symbol.Activate();
 
             var pipeBbs = pipes
-                .Select(p => p.get_BoundingBox(null))
+                .Select(p => GetBoundingBoxInHostCoordinates(p, GetTransform(transformMap, p.Id)))
                 .Where(bb => bb != null)
                 .ToList();
             if (!pipeBbs.Any()) return;
@@ -975,14 +1022,7 @@ namespace Modification
                 height = width;
             }
 
-            Parameter pH = fi.LookupParameter("Hauteur");
-            Parameter pL = fi.LookupParameter("Largeur");
-            Parameter pHCom = fi.LookupParameter("COM_Hauteur");
-            Parameter pLCom = fi.LookupParameter("COM_Largeur");
-            if (pH != null && !pH.IsReadOnly) pH.Set(height);
-            if (pHCom != null && !pHCom.IsReadOnly) pHCom.Set(height);
-            if (pL != null && !pL.IsReadOnly) pL.Set(width);
-            if (pLCom != null && !pLCom.IsReadOnly) pLCom.Set(width);
+            SetRectangularParameters(fi, width, height, true);
         }
 
         private void CreateRectangularReservationFromElementsOnFloor(
@@ -992,7 +1032,8 @@ namespace Modification
             List<Element> elements,
             bool normeEnabled,
             Level level,
-            double oversize)
+            double oversize,
+            Dictionary<ElementId, Transform> transformMap = null)
         {
             if (floor == null || symbol == null || elements == null || !elements.Any())
                 return;
@@ -1000,7 +1041,7 @@ namespace Modification
             if (!symbol.IsActive) symbol.Activate();
 
             var clippedBbs = elements
-                .Select(e => e.get_BoundingBox(null))
+                .Select(e => GetBoundingBoxInHostCoordinates(e, GetTransform(transformMap, e.Id)))
                 .Where(bb => bb != null)
                 .ToList();
             if (!clippedBbs.Any()) return;
@@ -1037,14 +1078,7 @@ namespace Modification
                 heightRaw = RoundToNearest50mm(heightRaw);
             }
 
-            var pW = fi.LookupParameter("Largeur");
-            var pH = fi.LookupParameter("Hauteur");
-            var pWCom = fi.LookupParameter("COM_Largeur");
-            var pHCom = fi.LookupParameter("COM_Hauteur");
-            if (pW != null && !pW.IsReadOnly) pW.Set(widthRaw);
-            if (pWCom != null && !pWCom.IsReadOnly) pWCom.Set(widthRaw);
-            if (pH != null && !pH.IsReadOnly) pH.Set(heightRaw);
-            if (pHCom != null && !pHCom.IsReadOnly) pHCom.Set(heightRaw);
+            SetRectangularParameters(fi, widthRaw, heightRaw, true);
         }
 
         private BoundingBoxXYZ IntersectBoundingBoxes(BoundingBoxXYZ bb1, BoundingBoxXYZ bb2)
@@ -1143,6 +1177,13 @@ namespace Modification
                 Min = new XYZ(minX, minY, minZ),
                 Max = new XYZ(maxX, maxY, maxZ)
             };
+        }
+          private Transform GetTransform(Dictionary<ElementId, Transform> map, ElementId id)
+        {
+            if (map != null && id != null && map.TryGetValue(id, out var transform))
+                return transform;
+
+            return Transform.Identity;
         }
 
         private (double width, double height) GetIntersectionFootprint(BoundingBoxXYZ bbIntersect, Element host, double oversize)

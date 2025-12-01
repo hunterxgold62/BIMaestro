@@ -300,7 +300,11 @@ namespace Visualisation
                         .SetSurfaceForegroundPatternColor(rc)
                         .SetSurfaceBackgroundPatternId(solidPatternId)
                         .SetSurfaceBackgroundPatternColor(rc)
-                        .SetSurfaceTransparency(50);
+                        .SetCutForegroundPatternId(solidPatternId)
+                        .SetCutForegroundPatternColor(rc)
+                        .SetCutBackgroundPatternId(solidPatternId)
+                        .SetCutBackgroundPatternColor(rc)
+                        .SetSurfaceTransparency(0);
 
                     view.SetElementOverrides(id, ogs);
 

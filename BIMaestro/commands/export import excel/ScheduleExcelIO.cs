@@ -18,6 +18,9 @@ using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using NPOI.SS.UserModel;
 using NPOI.XSSF.UserModel;
+using NPOI.SS.Util;
+using CellType = NPOI.SS.UserModel.CellType;
+
 
 namespace ScheduleIO
 {
@@ -74,7 +77,27 @@ namespace ScheduleIO
         public StorageType Storage { get; set; } = StorageType.None;
         public string SpecTypeId { get; set; }
         public bool IsYesNo { get; set; }
+
+        // === NOUVEAU : infos de nomenclature ===
+        /// <summary>Index du champ dans ScheduleDefinition.</summary>
+        public int FieldIndex { get; set; } = -1;
+
+        /// <summary>Vrai si ce champ est utilisé dans le tri/groupe de la nomenclature.</summary>
+        public bool IsGroupingKey { get; set; }
+
+        /// <summary>DisplayType Revit du champ (Standard, Totals, ...).</summary>
+        public ScheduleFieldDisplayType DisplayType { get; set; } = ScheduleFieldDisplayType.Standard;
+
+        /// <summary>Texte utilisé par Revit pour "plusieurs valeurs".</summary>
+        public string MultipleValuesText { get; set; }
+
+        /// <summary>Vrai si le champ est configuré en "Totaux" dans la nomenclature.</summary>
+        public bool IsTotalized
+        {
+            get { return DisplayType == ScheduleFieldDisplayType.Totals; }
+        }
     }
+
 
     internal static class ParamUtils
     {
@@ -287,13 +310,31 @@ namespace ScheduleIO
                 if (schedule.Definition.IsKeySchedule) { TaskDialog.Show("Export Excel", "Nomenclatures de clés non gérées."); return Result.Failed; }
 
                 var def = schedule.Definition;
+                // Champs utilisés pour le tri/groupe dans la nomenclature
+                var groupingFieldIndices = new HashSet<int>();
+                try
+                {
+                    int sortCount = def.GetSortGroupFieldCount();
+                    for (int i = 0; i < sortCount; i++)
+                    {
+                        var sg = def.GetSortGroupField(i);
+                        int idx = def.GetFieldIndex(sg.FieldId);
+                        if (def.IsValidFieldIndex(idx))
+                            groupingFieldIndices.Add(idx);
+                    }
+                }
+                catch
+                {
+                    // Si jamais une version exotique casse ça, on retombe sur le comportement "ancien"
+                }
 
-                // Colonnes visibles (ordre)
+
+                // Colonnes (ordre de la nomenclature)
                 var fieldOrder = def.GetFieldOrder();
                 var cols = new List<ColumnMap>();
-                foreach (var fieldIdx in fieldOrder)
+                foreach (var fieldId in fieldOrder)
                 {
-                    var field = def.GetField(fieldIdx);
+                    var field = def.GetField(fieldId);
                     var isCalc = field.IsCalculatedField || field.IsCombinedParameterField;
                     var pid = field.HasSchedulableField ? field.ParameterId : ElementId.InvalidElementId;
 
@@ -301,8 +342,10 @@ namespace ScheduleIO
                     string heading = original;
                     try
                     {
+                        // Compat : certaines versions ne publient pas directement ColumnHeading
                         var prop = field.GetType().GetProperty("ColumnHeading");
-                        if (prop != null) heading = prop.GetValue(field, null) as string ?? original;
+                        if (prop != null)
+                            heading = prop.GetValue(field, null) as string ?? original;
                     }
                     catch { }
 
@@ -310,16 +353,25 @@ namespace ScheduleIO
                     if (!string.Equals(heading, original, StringComparison.Ordinal))
                         header = $"{heading} ({original})";
 
-                    cols.Add(new ColumnMap
+                    var cm = new ColumnMap
                     {
                         Header = header,
                         OriginalName = original,
                         ColumnHeading = heading,
                         ParameterId = pid,
                         IsCalculatedOrCombined = isCalc,
-                        IsHidden = field.IsHidden
-                    });
+                        IsHidden = field.IsHidden,
+
+                        // === NOUVEAU : infos de regroupement ===
+                        FieldIndex = field.FieldIndex,
+                        IsGroupingKey = groupingFieldIndices.Contains(field.FieldIndex),
+                        DisplayType = field.DisplayType,
+                        MultipleValuesText = field.MultipleValuesText
+                    };
+
+                    cols.Add(cm);
                 }
+
 
                 // Collecte éléments (hôte + fallback + liens)
                 var all = CollectElementsForSchedule(doc, schedule, def);
@@ -334,6 +386,7 @@ namespace ScheduleIO
                 ProbeTypesForColumns(all.FirstOrDefault()?.Document, all.FirstOrDefault(), cols);
                 AssessEditability(all.FirstOrDefault()?.Document, all, cols);
 
+                // Données (utilise la valeur affichée fiabilisée pour Famille/Type)
                 // Données (utilise la valeur affichée fiabilisée pour Famille/Type)
                 var rowsEdition = new List<Dictionary<string, string>>();
                 foreach (var e in all)
@@ -359,9 +412,22 @@ namespace ScheduleIO
                 var fileName = PathUtil.SanitizeFileName(schedule.Name) + ".xlsx";
                 var path = Path.Combine(exportDir, fileName);
 
+                // Flag "Détailler chaque occurrence" de la nomenclature
+                bool isItemized = def.IsItemized;
+
+                var summaryCols = cols.Where(c => !c.IsHidden).ToList();
+                var (rowsSummary, summaryLink) = BuildGroupedRows(cols, summaryCols, rowsEdition, isItemized);
+
+
                 IWorkbook wb = NpoiStyles.CreateWorkbook();
-                CreateEditionSheetModern(wb, cols, rowsEdition);
+                string summarySheetName = "Nomenclature";
+                CreateSummarySheet(wb, summarySheetName, summaryCols, rowsSummary);
+
+                // ⚠ On passe aussi summaryCols pour mapper les colonnes correctement
+                CreateEditionSheetModern(wb, cols, rowsEdition, summarySheetName, summaryLink, summaryCols);
                 WriteMetaSheet(wb, cols);
+
+
 
                 using (var fs = new FileStream(path, FileMode.Create, FileAccess.Write)) wb.Write(fs);
 
@@ -414,7 +480,8 @@ namespace ScheduleIO
 
                     var meta = wb.GetSheet("Meta");
                     mapByHeader = (meta != null) ? ReadMeta(meta) : BuildHeaderMapFromActiveSchedule(((ViewSchedule)ui.Document.ActiveView).Definition);
-                    dataRows = ReadSheetToRows(ws);
+                    var evaluator = wb.GetCreationHelper().CreateFormulaEvaluator();
+                    dataRows = ReadSheetToRows(ws, evaluator);
                 }
 
                 if (!dataRows.Any() || !dataRows[0].ContainsKey("UniqueId"))
@@ -752,32 +819,244 @@ namespace ScheduleIO
         // ==========================================================
         // Excel
         // ==========================================================
-        private static (ISheet, ICellStyle) CreateEditionSheetModern(IWorkbook wb, List<ColumnMap> cols, List<Dictionary<string, string>> rowsEdition)
+        private struct AggregateState
         {
-            var sheet = wb.CreateSheet("Edition");
+            public double Sum;
+            public int Count;
+            public char DecimalChar;
+            public int Decimals;
+            public string Suffix;
+            public bool HasTemplate;
+            public bool IntegersOnly;
+        }
+       
+
+        /// <summary>
+        /// Construit les lignes "Nomenclature" (résumé) à partir des lignes d'édition,
+        /// en reproduisant le comportement de Revit :
+        /// - Si IsItemized = true : aucune agrégation, 1 ligne par occurrence.
+        /// - Si IsItemized = false : regroupement sur les champs de tri/groupe,
+        ///   totaux sur les champs DisplayType = Totals, "plusieurs valeurs" sinon.
+        /// </summary>
+        private static (List<Dictionary<string, string>>, List<int>) BuildGroupedRows(
+            List<ColumnMap> allCols,
+            List<ColumnMap> summaryCols,
+            List<Dictionary<string, string>> rowsEdition,
+            bool isItemized)
+        {
+            var summary = new List<Dictionary<string, string>>();
+            var summaryIndexByRow = new List<int>(rowsEdition.Count);
+
+            if (rowsEdition == null || rowsEdition.Count == 0 || summaryCols.Count == 0)
+                return (summary, summaryIndexByRow);
+
+            // ----- Cas 1 : "Détailler chaque occurrence" coché → aucun regroupement -----
+            if (isItemized)
+            {
+                for (int i = 0; i < rowsEdition.Count; i++)
+                {
+                    var src = rowsEdition[i];
+                    var dst = new Dictionary<string, string>();
+                    foreach (var c in summaryCols)
+                    {
+                        src.TryGetValue(c.Header, out string v);
+                        dst[c.Header] = v ?? string.Empty;
+                    }
+                    summary.Add(dst);
+                    summaryIndexByRow.Add(i);
+                }
+                return (summary, summaryIndexByRow);
+            }
+
+            // ----- Cas 2 : "Détailler chaque occurrence" décoché → agrégation -----
+
+            // Colonnes utilisées pour la clé de regroupement : celles du tri/groupe Revit
+            var groupingCols = allCols.Where(c => c.IsGroupingKey).ToList();
+            bool hasGroupingCols = groupingCols.Count > 0;
+
+            var keyToIndex = new Dictionary<string, int>(StringComparer.Ordinal);
+            var aggregates = new List<Dictionary<string, AggregateState>>();
+            var multiValueFlags = new List<Dictionary<string, bool>>(rowsEdition.Count);
+
+            bool TryParseNumeric(string raw, bool integersOnly, out double val, out char decChar, out int decimals, out string suffix)
+            {
+                val = 0; decChar = '.'; decimals = 0; suffix = string.Empty;
+                if (string.IsNullOrWhiteSpace(raw)) return false;
+
+                string cleaned = CleanNumeric(raw, integersOnly);
+                if (!double.TryParse(cleaned, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out val))
+                    return false;
+
+                var trimmed = raw.Trim();
+                if (!integersOnly)
+                {
+                    int idxComma = trimmed.LastIndexOf(',');
+                    int idxDot = trimmed.LastIndexOf('.');
+                    int idx = Math.Max(idxComma, idxDot);
+                    if (idx >= 0 && idx < trimmed.Length - 1)
+                    {
+                        decChar = trimmed[idx];
+                        decimals = Math.Min(6, Math.Max(0, trimmed.Length - idx - 1));
+                    }
+                }
+
+                suffix = ExtractSuffix(trimmed);
+                return true;
+            }
+
+            string FormatAggregate(AggregateState st)
+            {
+                string fmt = st.IntegersOnly ? "0" : $"F{Math.Max(0, st.Decimals)}";
+                string number = st.Sum.ToString(fmt, CultureInfo.InvariantCulture);
+                if (st.DecimalChar == ',') number = number.Replace('.', ',');
+                return string.IsNullOrWhiteSpace(st.Suffix) ? number : (number + st.Suffix);
+            }
+
+            foreach (var row in rowsEdition)
+            {
+                // --- Clé de groupe : valeurs des champs de tri/groupe ---
+                string key;
+                if (hasGroupingCols)
+                {
+                    key = string.Join("\u001F", groupingCols.Select(c =>
+                    {
+                        row.TryGetValue(c.Header, out string v);
+                        return v ?? string.Empty;
+                    }));
+                }
+                else
+                {
+                    // Aucun tri/groupe défini : un seul groupe pour toute la nomenclature
+                    key = "__ALL__";
+                }
+
+                if (!keyToIndex.TryGetValue(key, out int idx))
+                {
+                    idx = summary.Count;
+                    keyToIndex[key] = idx;
+
+                    var copy = new Dictionary<string, string>();
+                    foreach (var c in summaryCols)
+                    {
+                        row.TryGetValue(c.Header, out string v);
+                        copy[c.Header] = v ?? string.Empty;
+                    }
+                    summary.Add(copy);
+                    aggregates.Add(new Dictionary<string, AggregateState>(StringComparer.OrdinalIgnoreCase));
+                    multiValueFlags.Add(new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase));
+                }
+
+                summaryIndexByRow.Add(idx);
+
+                var aggForGroup = aggregates[idx];
+                var multiFlags = multiValueFlags[idx];
+
+                // --- Mise à jour des colonnes du groupe ---
+                foreach (var c in summaryCols)
+                {
+                    row.TryGetValue(c.Header, out string raw);
+                    raw ??= string.Empty;
+                    bool integersOnly = c.Storage == StorageType.Integer || c.IsYesNo;
+
+                    if (c.IsTotalized)
+                    {
+                        // Colonne configurée en "Totaux" dans la nomenclature Revit → on somme
+                        if (!TryParseNumeric(raw, integersOnly, out double val, out char decChar, out int decimals, out string suffix))
+                            continue;
+
+                        if (!aggForGroup.TryGetValue(c.Header, out var st))
+                        {
+                            st = new AggregateState
+                            {
+                                Sum = 0,
+                                Count = 0,
+                                DecimalChar = decChar,
+                                Decimals = decimals,
+                                Suffix = suffix,
+                                HasTemplate = !string.IsNullOrWhiteSpace(raw),
+                                IntegersOnly = integersOnly
+                            };
+                        }
+
+                        st.Sum += val;
+                        st.Count++;
+
+                        if (!st.HasTemplate && !string.IsNullOrWhiteSpace(raw))
+                        {
+                            st.DecimalChar = decChar;
+                            st.Decimals = decimals;
+                            st.Suffix = suffix;
+                            st.HasTemplate = true;
+                        }
+
+                        aggForGroup[c.Header] = st;
+                    }
+                    else
+                    {
+                        // Colonne "Standard" : si plusieurs valeurs différentes dans le groupe, afficher "plusieurs valeurs"
+                        if (!multiFlags.TryGetValue(c.Header, out bool alreadyMulti))
+                        {
+                            multiFlags[c.Header] = false; // 1ère valeur pour cette colonne dans ce groupe
+                        }
+                        else if (!alreadyMulti)
+                        {
+                            string existing = summary[idx].TryGetValue(c.Header, out var ex) ? (ex ?? string.Empty) : string.Empty;
+                            if (!string.Equals(existing, raw, StringComparison.OrdinalIgnoreCase))
+                            {
+                                multiFlags[c.Header] = true;
+                                string mv = !string.IsNullOrEmpty(c.MultipleValuesText)
+                                    ? c.MultipleValuesText
+                                    : "<plusieurs valeurs>";
+                                summary[idx][c.Header] = mv;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Application finale des totaux dans les lignes de résumé
+            for (int i = 0; i < summary.Count; i++)
+            {
+                var agg = aggregates[i];
+                if (agg == null || agg.Count == 0) continue;
+
+                var dict = summary[i];
+                foreach (var kvp in agg)
+                {
+                    var st = kvp.Value;
+                    if (st.Count == 0) continue;
+                    dict[kvp.Key] = FormatAggregate(st);
+                }
+            }
+
+            return (summary, summaryIndexByRow);
+        }
+
+
+        private static ISheet CreateSummarySheet(IWorkbook wb, string name, List<ColumnMap> cols, List<Dictionary<string, string>> rowsSummary)
+        {
+            var sheet = wb.CreateSheet(name);
             var text = NpoiStyles.Text(wb);
             var headerOk = NpoiStyles.Header(wb, 216, 245, 209);
             var headerLock = NpoiStyles.Header(wb, 255, 214, 214);
             var zebra = NpoiStyles.Zebra(wb, 248, 249, 253);
 
             var headerRow = sheet.CreateRow(0); headerRow.HeightInPoints = 20f;
-
-            var headers = new List<string> { "UniqueId", "ElementId" };
-            headers.AddRange(cols.Select(c => c.Header));
+            var headers = cols.Select(c => c.Header).ToList();
 
             for (int j = 0; j < headers.Count; j++)
             {
                 var cell = headerRow.CreateCell(j);
                 cell.SetCellValue(headers[j]);
                 var cm = cols.FirstOrDefault(c => c.Header.Equals(headers[j], StringComparison.OrdinalIgnoreCase));
-                cell.CellStyle = (j >= 2 && cm != null && cm.IsWritable) ? headerOk : headerLock;
+                cell.CellStyle = (cm != null && cm.IsWritable) ? headerOk : headerLock;
             }
 
-            for (int i = 0; i < rowsEdition.Count; i++)
+            for (int i = 0; i < rowsSummary.Count; i++)
             {
                 var r = sheet.CreateRow(i + 1);
                 r.HeightInPoints = 17f;
-                var dict = rowsEdition[i];
+                var dict = rowsSummary[i];
                 for (int j = 0; j < headers.Count; j++)
                 {
                     dict.TryGetValue(headers[j], out string val);
@@ -787,15 +1066,125 @@ namespace ScheduleIO
                 }
             }
 
+            sheet.CreateFreezePane(0, 1);
+            int max = Math.Min(headers.Count, 30);
+            for (int c = 0; c < max; c++) { try { sheet.AutoSizeColumn(c); } catch { } }
+
+            return sheet;
+        }
+
+        private static (ISheet, ICellStyle) CreateEditionSheetModern(
+     IWorkbook wb,
+     List<ColumnMap> cols,
+     List<Dictionary<string, string>> rowsEdition,
+     string summarySheetName = null,
+     List<int> summaryIndexByRow = null,
+     List<ColumnMap> summaryCols = null)
+        {
+            var sheet = wb.CreateSheet("Edition");
+            var text = NpoiStyles.Text(wb);
+            var headerOk = NpoiStyles.Header(wb, 216, 245, 209);
+            var headerLock = NpoiStyles.Header(wb, 255, 214, 214);
+            var zebra = NpoiStyles.Zebra(wb, 248, 249, 253);
+
+            var headerRow = sheet.CreateRow(0);
+            headerRow.HeightInPoints = 20f;
+
+            // Colonnes de l’onglet Edition
+            var headers = new List<string> { "UniqueId", "ElementId" };
+            headers.AddRange(cols.Select(c => c.Header));
+
+            // Mapping : Header -> index de colonne dans "Nomenclature"
+            Dictionary<string, int> summaryColIndex = null;
+            // Ensemble des colonnes configurées en "Totaux" dans Revit
+            HashSet<string> totalizedHeaders = null;
+
+            if (!string.IsNullOrEmpty(summarySheetName) && summaryCols != null)
+            {
+                summaryColIndex = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                totalizedHeaders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                for (int i = 0; i < summaryCols.Count; i++)
+                {
+                    var sc = summaryCols[i];
+                    summaryColIndex[sc.Header] = i;
+                    if (sc.IsTotalized)
+                        totalizedHeaders.Add(sc.Header);
+                }
+            }
+        
+
+            // Ligne d’en-têtes
+            for (int j = 0; j < headers.Count; j++)
+            {
+                var cell = headerRow.CreateCell(j);
+                cell.SetCellValue(headers[j]);
+
+                var cm = cols.FirstOrDefault(c => c.Header.Equals(headers[j], StringComparison.OrdinalIgnoreCase));
+                // UniqueId / ElementId verrouillés
+                cell.CellStyle = (j >= 2 && cm != null && cm.IsWritable) ? headerOk : headerLock;
+            }
+
+            // Lignes de données
+            for (int i = 0; i < rowsEdition.Count; i++)
+            {
+                var r = sheet.CreateRow(i + 1);
+                r.HeightInPoints = 17f;
+                var dict = rowsEdition[i];
+
+                for (int j = 0; j < headers.Count; j++)
+                {
+                    dict.TryGetValue(headers[j], out string val);
+                    var c = r.CreateCell(j);
+
+                    int summaryColIdx = -1;
+
+                    bool canLinkToSummary =
+                        !string.IsNullOrEmpty(summarySheetName) &&
+                        summaryIndexByRow != null &&
+                        summaryIndexByRow.Count > i &&
+                        j >= 2 && // pas UniqueId / ElementId
+                        summaryColIndex != null &&
+                        summaryColIndex.TryGetValue(headers[j], out summaryColIdx);
+
+                    // Colonne en "Totaux" dans la nomenclature ?
+                    bool isTotalized =
+                        totalizedHeaders != null &&
+                        totalizedHeaders.Contains(headers[j]);
+
+                    // ⚠ Si la colonne est en "Totaux" dans Revit, on NE fait PAS de lien :
+                    // on garde la valeur brute de l’élément.
+                    if (canLinkToSummary && !isTotalized)
+                    {
+                        var escapedSheet = summarySheetName.Replace("'", "''");
+                        string colRef = CellReference.ConvertNumToColString(summaryColIdx);
+                        int summaryRow = summaryIndexByRow[i] + 2; // +1 entête +1 car 1-based
+                        c.SetCellFormula($"'{escapedSheet}'!{colRef}{summaryRow}");
+                    }
+                    else
+                    {
+                        c.SetCellValue((val ?? "").StartsWith("=") ? "'" + val : (val ?? ""));
+                    }
+
+                    c.CellStyle = (i % 2 == 1) ? zebra : text;
+                }
+            }
+
+            // Cacher UniqueId / ElementId
             sheet.SetColumnHidden(0, true);
             sheet.SetColumnHidden(1, true);
             sheet.CreateFreezePane(0, 1);
 
             int max = Math.Min(headers.Count, 30);
-            for (int c = 0; c < max; c++) { try { sheet.AutoSizeColumn(c); } catch { } }
+            for (int cIdx = 0; cIdx < max; cIdx++)
+            {
+                try { sheet.AutoSizeColumn(cIdx); } catch { }
+            }
 
             return (sheet, text);
         }
+
+
 
         private static void WriteMetaSheet(IWorkbook wb, List<ColumnMap> cols)
         {
@@ -834,7 +1223,29 @@ namespace ScheduleIO
         // ==========================================================
         // Utilitaires communs
         // ==========================================================
-        private static List<Dictionary<string, string>> ReadSheetToRows(ISheet sheet)
+        private static string GetCellText(ICell cell, IFormulaEvaluator evaluator)
+        {
+            if (cell == null) return string.Empty;
+
+            if (evaluator != null && cell.CellType == CellType.Formula)
+            {
+                var v = evaluator.Evaluate(cell);
+                if (v != null)
+                {
+                    switch (v.CellType)
+                    {
+                        case CellType.String: return v.StringValue ?? string.Empty;
+                        case CellType.Numeric: return v.NumberValue.ToString(CultureInfo.InvariantCulture);
+                        case CellType.Boolean: return v.BooleanValue ? "TRUE" : "FALSE";
+                        default: return cell.ToString();
+                    }
+                }
+            }
+
+            return cell.ToString();
+        }
+
+        private static List<Dictionary<string, string>> ReadSheetToRows(ISheet sheet, IFormulaEvaluator evaluator)
         {
             var rows = new List<Dictionary<string, string>>();
             if (sheet == null) return rows;
@@ -856,7 +1267,7 @@ namespace ScheduleIO
                 for (int c = 0; c < lastCol; c++)
                 {
                     string key = headers[c];
-                    string val = row.GetCell(c)?.ToString() ?? "";
+                    string val = GetCellText(row.GetCell(c), evaluator);
                     if (!string.IsNullOrEmpty(val)) any = true;
                     dict[key] = val;
                 }
@@ -957,7 +1368,19 @@ namespace ScheduleIO
             if (string.IsNullOrEmpty(t) || t == "+" || t == "-") t = "0";
             return t;
         }
+        private static string ExtractSuffix(string s)
+        {
+            if (string.IsNullOrWhiteSpace(s)) return string.Empty;
+            var trimmed = s.TrimEnd();
+            int lastDigit = -1;
+            for (int i = 0; i < trimmed.Length; i++)
+            {
+                if (char.IsDigit(trimmed[i])) lastDigit = i;
+            }
 
+            if (lastDigit == -1 || lastDigit == trimmed.Length - 1) return string.Empty;
+            return trimmed.Substring(lastDigit + 1);
+        }
         private static bool TryParseYesNo(string s, out int value)
         {
             value = 0;

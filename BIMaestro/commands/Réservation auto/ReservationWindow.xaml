@@ -252,13 +252,19 @@
                 <ComboBox Grid.Row="3" Grid.Column="1"
                           x:Name="comboFamily"
                           Height="28"
-                          DisplayMemberPath="Name"
                           Style="{StaticResource FieldBox}"
                           MaxDropDownHeight="300"
                           SelectionChanged="OnCriteriaChanged"
-                          ToolTip="Choisissez la famille utilisée pour créer les réservations."/>
+                          ToolTip="Choisissez la famille utilisée pour créer les réservations.">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding DisplayName}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
 
                 <Rectangle Grid.Row="4" Grid.ColumnSpan="2" Height="1" Fill="{StaticResource Divider}"/>
+
 
                 <CheckBox Grid.Row="5" Grid.ColumnSpan="2"
                           x:Name="chkMulti"
