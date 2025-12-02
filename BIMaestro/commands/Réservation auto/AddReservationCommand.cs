@@ -68,6 +68,7 @@ namespace Modification
                 var hostTarget = window.SelectedHostTarget;
                 var objType = window.SelectedObjectType;
                 var symbol = window.SelectedReservationSymbol;
+                var pipeSource = window.SelectedPipeSource;
                 bool reservationsCreated = false;
                 bool userCancelled = false;
 
@@ -111,15 +112,16 @@ namespace Modification
 
                             // --- MULTI-SÉLECTION pour canalisations ou autres éléments rectangulaires ---
                             if (multiEnabled && isRectangulaire &&
-                                (objType == ExtendedReservationWindow.ObjectType.Canalisation ||
-                                 objType == ExtendedReservationWindow.ObjectType.Autre))
+    (objType == ExtendedReservationWindow.ObjectType.Canalisation ||
+     objType == ExtendedReservationWindow.ObjectType.Autre))
                             {
                                 IList<Reference> elemRefs;
                                 try
                                 {
                                     if (objType == ExtendedReservationWindow.ObjectType.Canalisation)
                                     {
-                                        elemRefs = PickPipeReferencesAllowingLinks(uiDoc);
+                                        // Utilise la source choisie dans la fenêtre (Maquette / Lien IFC / Lien RVT)
+                                        elemRefs = GetPipeReferencesBySource(uiDoc, doc, pipeSource);
                                     }
                                     else
                                     {
@@ -127,8 +129,6 @@ namespace Modification
                                             ObjectType.Element,
                                             "Sélectionnez plusieurs éléments (CTRL+clic)");
                                     }
-
-
                                 }
                                 catch
                                 {
@@ -144,9 +144,11 @@ namespace Modification
                                     break;
                                 }
 
-                                // Liste des éléments sélectionnés
+                                // Résolution des éléments + transform vers la maquette hôte
                                 var resolvedSelections = elemRefs
-                                    .Select(r => TryResolveReference(uiDoc, r, out var el, out var tr) ? (el, tr) : (null, Transform.Identity))
+                                    .Select(r => TryResolveReference(uiDoc, r, out var el, out var tr)
+                                        ? (el, tr)
+                                        : (null, Transform.Identity))
                                     .Where(t => t.el != null)
                                     .ToList();
 
@@ -166,7 +168,7 @@ namespace Modification
                                     break;
                                 }
 
-                                // Sélection du mur
+                                // Sélection du mur ou du sol (toujours dans la maquette)
                                 Reference wallRef;
                                 try
                                 {
@@ -189,9 +191,10 @@ namespace Modification
                                 {
                                     trans.RollBack();
                                     userCancelled = true;
-                                    TaskDialog.Show("Erreur", hostTarget == ExtendedReservationWindow.HostTarget.Sol
-                                        ? "Veuillez sélectionner un sol valide."
-                                        : "Veuillez sélectionner un mur valide.");
+                                    TaskDialog.Show("Erreur",
+                                        hostTarget == ExtendedReservationWindow.HostTarget.Sol
+                                            ? "Veuillez sélectionner un sol valide."
+                                            : "Veuillez sélectionner un mur valide.");
                                     break;
                                 }
 
@@ -204,6 +207,7 @@ namespace Modification
                                 if (objType == ExtendedReservationWindow.ObjectType.Canalisation)
                                 {
                                     var pipes = elementsSel.OfType<Pipe>().ToList();
+
                                     if (hostTarget == ExtendedReservationWindow.HostTarget.Sol)
                                         CreateRectangularReservationFromPipesOnFloor(
                                             doc, hostElem as Floor, symbol, pipes, normeEnabled, level, transformMap);
@@ -226,6 +230,7 @@ namespace Modification
                                 trans.Commit();
                                 userCancelled = true;
                             }
+
                             else
                             {
                                 // --- CAS SINGLE (votre code existant, inchangé) ---
@@ -707,52 +712,103 @@ namespace Modification
                 TrySetParameter("COM_Hauteur", height);
             }
         }
-        private IList<Reference> PickPipeReferencesAllowingLinks(UIDocument uiDoc)
+
+
+        // --- Sélection des canalisations suivant la source choisie dans la fenêtre ---
+
+        /// <summary>
+        /// Canalisations dans la maquette (document courant uniquement).
+        /// </summary>
+        private class HostPipeSelectionFilter : ISelectionFilter
         {
-            var refs = new List<Reference>();
-
-            // 1) Pipes du projet courant
-            try
-            {
-                var currentDocRefs = uiDoc.Selection.PickObjects(
-                    ObjectType.Element,
-                    new PipeSelectionFilter(),
-                    "Sélectionnez plusieurs canalisations du projet courant (CTRL+clic)");
-                if (currentDocRefs != null)
-                    refs.AddRange(currentDocRefs);
-            }
-            catch (Autodesk.Revit.Exceptions.OperationCanceledException)
-            {
-                // L'utilisateur annule → on renvoie null
-                return null;
-            }
-
-            // 2) Pipes dans les liens RVT/IFC (optionnel)
-            try
-            {
-                var linkedRefs = uiDoc.Selection.PickObjects(
-                    ObjectType.LinkedElement,
-                    new PipeSelectionFilter(),
-                    "Sélectionnez les canalisations dans les fichiers liés IFC/RVT (ESC pour passer)");
-                if (linkedRefs != null)
-                    refs.AddRange(linkedRefs);
-            }
-            catch (Autodesk.Revit.Exceptions.OperationCanceledException)
-            {
-                // Il a juste appuyé sur ESC pour passer : on garde ce qu'on a déjà
-            }
-            catch
-            {
-                // On ignore les autres erreurs
-            }
-
-            return refs;
+            public bool AllowElement(Element elem) => elem is Pipe;
+            public bool AllowReference(Reference reference, XYZ position) => false;
         }
 
-        private class PipeSelectionFilter : ISelectionFilter
+        /// <summary>
+        /// Canalisations dans un lien RVT/IFC.
+        /// </summary>
+        private class LinkPipeSelectionFilter : ISelectionFilter
         {
-            public bool AllowElement(Element elem) => elem is Pipe || elem is RevitLinkInstance;
-            public bool AllowReference(Reference reference, XYZ position) => true;
+            private readonly Document _doc;
+            private readonly ExtendedReservationWindow.PipeSource _pipeSource;
+
+            public LinkPipeSelectionFilter(Document doc, ExtendedReservationWindow.PipeSource pipeSource)
+            {
+                _doc = doc;
+                _pipeSource = pipeSource;
+            }
+
+            public bool AllowElement(Element elem)
+            {
+                var linkInstance = elem as RevitLinkInstance;
+                if (linkInstance == null)
+                    return false;
+
+                var linkDoc = linkInstance.GetLinkDocument();
+                if (linkDoc == null)
+                    return false;
+
+                string path = linkDoc.PathName ?? string.Empty;
+
+                // Filtre IFC / RVT selon le choix de l'utilisateur
+                if (_pipeSource == ExtendedReservationWindow.PipeSource.LienIFC &&
+                    !path.EndsWith(".ifc", StringComparison.OrdinalIgnoreCase))
+                    return false;
+
+                if (_pipeSource == ExtendedReservationWindow.PipeSource.LienRVT &&
+                    !path.EndsWith(".rvt", StringComparison.OrdinalIgnoreCase))
+                    return false;
+
+                return true;
+            }
+
+            public bool AllowReference(Reference reference, XYZ position)
+            {
+                if (reference == null)
+                    return false;
+
+                Element linkElem = _doc.GetElement(reference.ElementId);
+                var linkInstance = linkElem as RevitLinkInstance;
+                if (linkInstance == null)
+                    return false;
+
+                Document linkDoc = linkInstance.GetLinkDocument();
+                if (linkDoc == null)
+                    return false;
+
+                Element linkedElem = linkDoc.GetElement(reference.LinkedElementId);
+                return linkedElem is Pipe;
+            }
+        }
+
+        /// <summary>
+        /// Demande à l'utilisateur de sélectionner des canalisations en fonction
+        /// de la source choisie dans la fenêtre WPF.
+        /// </summary>
+        private IList<Reference> GetPipeReferencesBySource(
+            UIDocument uiDoc,
+            Document doc,
+            ExtendedReservationWindow.PipeSource pipeSource)
+        {
+            switch (pipeSource)
+            {
+                case ExtendedReservationWindow.PipeSource.Maquette:
+                    return uiDoc.Selection.PickObjects(
+                        ObjectType.Element,
+                        new HostPipeSelectionFilter(),
+                        "Sélectionnez les canalisations dans la maquette (CTRL+clic, ESC pour terminer)");
+
+                case ExtendedReservationWindow.PipeSource.LienIFC:
+                case ExtendedReservationWindow.PipeSource.LienRVT:
+                    return uiDoc.Selection.PickObjects(
+                        ObjectType.LinkedElement,
+                        new LinkPipeSelectionFilter(doc, pipeSource),
+                        "Sélectionnez les canalisations dans le lien (CTRL+clic, ESC pour terminer)");
+
+                default:
+                    return null;
+            }
         }
 
 

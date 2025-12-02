@@ -176,11 +176,13 @@ namespace Visualisation
         {
             // Vue principale si la règle cible "Vues"
             View primaryView = null;
+            Viewport viewport = null;
             var vpId = sheet.GetAllViewports().FirstOrDefault();
             if (vpId != ElementId.InvalidElementId)
             {
-                if (doc.GetElement(vpId) is Viewport vp)
-                    primaryView = doc.GetElement(vp.ViewId) as View;
+                viewport = doc.GetElement(vpId) as Viewport;
+                if (viewport != null)
+                    primaryView = doc.GetElement(viewport.ViewId) as View;
             }
 
             var sb = new StringBuilder();
@@ -201,7 +203,12 @@ namespace Visualisation
 
                 if (target != null && cell.ParamId != null && cell.ParamId != ElementId.InvalidElementId)
                 {
-                    value = GetParamValue(doc, target, cell.ParamId);
+                    // Pour les paramètres de "Vue", privilégier la valeur affichée sur le viewport
+                    // (ex : "Titre sur feuille") puis retomber sur la vue elle-même.
+                    if (target is View)
+                        value = GetParamValue(doc, target, cell.ParamId, viewport);
+                    else
+                        value = GetParamValue(doc, target, cell.ParamId);
                 }
 
                 if (string.IsNullOrWhiteSpace(value))
@@ -221,7 +228,20 @@ namespace Visualisation
         /// Résout un ParamId de la règle PDF : BuiltInParameter ou ParameterElement.
         /// Essaie sur l’instance puis sur le type. Retourne AsString() ou AsValueString().
         /// </summary>
-        private static string GetParamValue(Document doc, Element target, ElementId paramId)
+        private static string GetParamValue(Document doc, Element target, ElementId paramId, Viewport viewport = null)
+        {
+            // Vue : d'abord ce qui est réellement affiché sur la feuille (viewport), puis la vue
+            if (viewport != null && target is View)
+            {
+                string fromViewport = ResolveParam(doc, viewport, paramId);
+                if (!string.IsNullOrWhiteSpace(fromViewport))
+                    return fromViewport;
+            }
+
+            return ResolveParam(doc, target, paramId);
+        }
+
+        private static string ResolveParam(Document doc, Element target, ElementId paramId)
         {
             // 1) – Cas BuiltInParameter (enum)
             try

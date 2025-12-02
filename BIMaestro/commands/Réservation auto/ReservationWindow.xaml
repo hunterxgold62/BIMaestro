@@ -216,21 +216,36 @@
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
+                    <!-- 0 : titre "Cibles" -->
                     <RowDefinition Height="Auto"/>
+                    <!-- 1 : Support -->
                     <RowDefinition Height="Auto"/>
+                    <!-- 2 : Type d'objet -->
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="12"/>
+                    <!-- 3 : Source cana -->
                     <RowDefinition Height="Auto"/>
+                    <!-- 4 : Famille -->
+                    <RowDefinition Height="Auto"/>
+                    <!-- 5 : séparateur -->
+                    <RowDefinition Height="Auto"/>
+                    <!-- 6 : Multi -->
                     <RowDefinition Height="*"/>
+                    <!-- 7 : bas de carte -->
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="170"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Text="Cibles" Style="{StaticResource SectionTitle}"/>
+                <!-- Titre "Cibles" -->
+                <TextBlock Grid.Row="0" Grid.ColumnSpan="2"
+                           Text="Cibles"
+                           Style="{StaticResource SectionTitle}"/>
 
-                <TextBlock Grid.Row="1" Grid.Column="0" Text="Support :" Style="{StaticResource FieldLabel}"/>
+                <!-- Support -->
+                <TextBlock Grid.Row="1" Grid.Column="0"
+                           Text="Support :"
+                           Style="{StaticResource FieldLabel}"/>
                 <ComboBox Grid.Row="1" Grid.Column="1"
                           x:Name="comboHostType"
                           Height="28"
@@ -239,7 +254,10 @@
                           SelectionChanged="OnHostTypeChanged"
                           ToolTip="Choisissez si la réservation est créée dans un mur ou un sol." />
 
-                <TextBlock Grid.Row="2" Grid.Column="0" Text="Type d’objet :" Style="{StaticResource FieldLabel}"/>
+                <!-- Type d'objet -->
+                <TextBlock Grid.Row="2" Grid.Column="0"
+                           Text="Type d’objet :"
+                           Style="{StaticResource FieldLabel}"/>
                 <ComboBox Grid.Row="2" Grid.Column="1"
                           x:Name="comboObjectType"
                           Height="28"
@@ -248,8 +266,26 @@
                           SelectionChanged="OnCriteriaChanged"
                           ToolTip="Sélectionnez le type d’objet concerné." />
 
-                <TextBlock Grid.Row="3" Grid.Column="0" Text="Famille de réservation :" Style="{StaticResource FieldLabel}"/>
+                <!-- Source des canalisations -->
+                <TextBlock Grid.Row="3" Grid.Column="0"
+                           Text="Source canalisations :"
+                           Style="{StaticResource FieldLabel}"/>
                 <ComboBox Grid.Row="3" Grid.Column="1"
+                          x:Name="comboPipeSource"
+                          Height="28"
+                          Style="{StaticResource FieldBox}"
+                          MaxDropDownHeight="120"
+                          ToolTip="Choisissez si les canalisations à sélectionner sont dans la maquette ou dans un lien.">
+                    <ComboBoxItem Content="Maquette" />
+                    <ComboBoxItem Content="Lien IFC" />
+                    <ComboBoxItem Content="Lien RVT" />
+                </ComboBox>
+
+                <!-- Famille -->
+                <TextBlock Grid.Row="4" Grid.Column="0"
+                           Text="Famille de réservation :"
+                           Style="{StaticResource FieldLabel}"/>
+                <ComboBox Grid.Row="4" Grid.Column="1"
                           x:Name="comboFamily"
                           Height="28"
                           Style="{StaticResource FieldBox}"
@@ -263,18 +299,21 @@
                     </ComboBox.ItemTemplate>
                 </ComboBox>
 
-                <Rectangle Grid.Row="4" Grid.ColumnSpan="2" Height="1" Fill="{StaticResource Divider}"/>
+                <!-- Séparateur -->
+                <Rectangle Grid.Row="5" Grid.ColumnSpan="2"
+                           Height="1"
+                           Fill="{StaticResource Divider}"/>
 
-
-                <CheckBox Grid.Row="5" Grid.ColumnSpan="2"
+                <!-- Multi sélection -->
+                <CheckBox Grid.Row="6" Grid.ColumnSpan="2"
                           x:Name="chkMulti"
                           Content="Multi-sélection canalisations (rectangle)"
                           IsChecked="False"
                           IsEnabled="False"
                           ToolTip="Disponible pour canalisations (ou 'Autre') avec famille rectangulaire."/>
 
-                <!-- Bas de carte : rosace + popup -->
-                <Grid Grid.Row="6" Grid.ColumnSpan="2">
+                <!-- Bas de carte : bouton options + popup -->
+                <Grid Grid.Row="7" Grid.ColumnSpan="2">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
@@ -298,7 +337,10 @@
                            PopupAnimation="Fade">
                         <Border Style="{StaticResource PopupCard}" MaxWidth="320">
                             <StackPanel>
-                                <TextBlock Text="Options avancées" Margin="0,0,0,6" FontWeight="SemiBold" Foreground="{StaticResource Text.Primary}"/>
+                                <TextBlock Text="Options avancées"
+                                           Margin="0,0,0,6"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource Text.Primary}"/>
                                 <CheckBox x:Name="chkNorme"
                                           Content="Appliquer la norme (incréments de 50 mm)"
                                           IsChecked="True"
@@ -313,6 +355,7 @@
                 </Grid>
             </Grid>
         </Border>
+
 
         <!-- Boutons -->
         <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">

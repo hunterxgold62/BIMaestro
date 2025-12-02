@@ -1,8 +1,9 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;  // <-- pour MouseButtonEventArgs
+using System.Windows.Input;
 using Autodesk.Revit.DB;
 
 namespace Modification
@@ -24,6 +25,13 @@ namespace Modification
             Autre
         }
 
+        public enum PipeSource
+        {
+            Maquette,
+            LienIFC,
+            LienRVT
+        }
+
         public ObjectType SelectedObjectType { get; private set; }
         public HostTarget SelectedHostTarget { get; private set; }
         public FamilySymbol SelectedReservationSymbol { get; private set; }
@@ -32,46 +40,72 @@ namespace Modification
         public bool AutomatiqueEnabled { get; private set; }
         public bool MultiEnabled { get; private set; }
 
-        private readonly List<FamilySymbol> _allReservationFamilies;
+        /// <summary>
+        /// Source des canalisations, calculée directement à partir du ComboBox.
+        /// (Pas de setter : on lit l'état réel de la fenêtre au moment où la commande le demande.)
+        /// </summary>
+        public PipeSource SelectedPipeSource
+        {
+            get
+            {
+                if (comboPipeSource == null)
+                    return PipeSource.Maquette;
 
+                string src = null;
+
+                if (comboPipeSource.SelectedItem is ComboBoxItem item)
+                    src = item.Content as string;
+                else if (comboPipeSource.SelectedItem is string s)
+                    src = s;
+
+                return src switch
+                {
+                    "Lien IFC" => PipeSource.LienIFC,
+                    "Lien RVT" => PipeSource.LienRVT,
+                    _ => PipeSource.Maquette
+                };
+            }
+        }
+
+        private readonly List<FamilySymbol> _allReservationFamilies;
         private readonly List<ReservationSymbolItem> _reservationItems;
 
         public ExtendedReservationWindow(List<FamilySymbol> reservationFamilies)
         {
             InitializeComponent();
 
-            // 1) Initialiser d'abord la source
+            // 1) On stocke toutes les familles et on prépare les items pour le ComboBox
             _allReservationFamilies = reservationFamilies ?? new List<FamilySymbol>();
             _reservationItems = _allReservationFamilies
                 .Where(fs => fs != null)
                 .Select(fs => new ReservationSymbolItem(fs, BuildDisplayName(fs)))
                 .ToList();
 
-            // 2) Config host type
+            // 2) Support : mur / sol
             comboHostType.ItemsSource = new List<string>
-    {
-        "Mur",
-        "Sol"
-    };
-            comboHostType.SelectedIndex = 0;  // déclenche OnHostTypeChanged -> UpdateFamilyFilter,
-                                              // mais maintenant _allReservationFamilies n'est plus null
+            {
+                "Mur",
+                "Sol"
+            };
+            comboHostType.SelectedIndex = 0;
 
-            // 3) Config object type
+            // 3) Type d'objet
             comboObjectType.ItemsSource = new List<string>
-    {
-        "Canalisation",
-        "Gaine",
-        "Porte",
-        "Fenêtre",
-        "Autre"
-    };
-            comboObjectType.SelectedIndex = 0; // déclenche OnCriteriaChanged, OK aussi
+            {
+                "Canalisation",
+                "Gaine",
+                "Porte",
+                "Fenêtre",
+                "Autre"
+            };
+            comboObjectType.SelectedIndex = 0;
 
-
+            // 4) Source des canalisations (items définis dans le XAML)
+            if (comboPipeSource != null && comboPipeSource.Items.Count > 0)
+                comboPipeSource.SelectedIndex = 0; // Maquette par défaut
 
             Loaded += (_, __) => comboObjectType.Focus();
         }
-
 
         // Clic gauche : toggle du popup
         private void BtnOptions_Click(object sender, RoutedEventArgs e)
@@ -86,12 +120,19 @@ namespace Modification
             popupOptions.IsOpen = !popupOptions.IsOpen;
         }
 
-        // Logique existante
         private void OnCriteriaChanged(object sender, SelectionChangedEventArgs e)
         {
             var typeSel = comboObjectType.SelectedItem as string;
             bool isCanal = typeSel == "Canalisation";
             bool isAutre = typeSel == "Autre";
+
+            // Le choix de source n'a de sens que pour les canalisations
+            if (comboPipeSource != null)
+            {
+                comboPipeSource.IsEnabled = isCanal;
+                if (!isCanal)
+                    comboPipeSource.SelectedIndex = 0; // On revient à "Maquette"
+            }
 
             var famItem = comboFamily.SelectedItem as ReservationSymbolItem;
             bool isRect = famItem != null && famItem.IsRectangular;
@@ -110,19 +151,32 @@ namespace Modification
             AutomatiqueEnabled = chkAutomatique.IsChecked == true;
             MultiEnabled = chkMulti.IsChecked == true;
 
+            // Support mur / sol
             SelectedHostTarget = (comboHostType.SelectedItem as string) == "Sol"
                 ? HostTarget.Sol
                 : HostTarget.Mur;
 
+            // Type d'objet
             switch (comboObjectType.SelectedItem as string)
             {
-                case "Canalisation": SelectedObjectType = ObjectType.Canalisation; break;
-                case "Gaine": SelectedObjectType = ObjectType.Gaine; break;
-                case "Porte": SelectedObjectType = ObjectType.Porte; break;
-                case "Fenêtre": SelectedObjectType = ObjectType.Fenetre; break;
-                default: SelectedObjectType = ObjectType.Autre; break;
+                case "Canalisation":
+                    SelectedObjectType = ObjectType.Canalisation;
+                    break;
+                case "Gaine":
+                    SelectedObjectType = ObjectType.Gaine;
+                    break;
+                case "Porte":
+                    SelectedObjectType = ObjectType.Porte;
+                    break;
+                case "Fenêtre":
+                    SelectedObjectType = ObjectType.Fenetre;
+                    break;
+                default:
+                    SelectedObjectType = ObjectType.Autre;
+                    break;
             }
 
+            // Famille de réservation
             SelectedReservationSymbol = (comboFamily.SelectedItem as ReservationSymbolItem)?.Symbol;
 
             DialogResult = true;
@@ -144,7 +198,6 @@ namespace Modification
         {
             if (comboFamily == null || _reservationItems == null)
             {
-                // Rien à filtrer pour le moment
                 comboFamily.ItemsSource = null;
                 comboFamily.SelectedIndex = -1;
                 return;
@@ -156,8 +209,8 @@ namespace Modification
             var filtered = _reservationItems
                 .Where(item => item?.Symbol?.Family?.Name != null)
                 .Where(item => isSol
-                    ? item.Symbol.Family.Name.IndexOf("sol", System.StringComparison.OrdinalIgnoreCase) >= 0
-                    : item.Symbol.Family.Name.IndexOf("mur", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                    ? item.Symbol.Family.Name.IndexOf("sol", StringComparison.OrdinalIgnoreCase) >= 0
+                    : item.Symbol.Family.Name.IndexOf("mur", StringComparison.OrdinalIgnoreCase) >= 0)
                 .OrderBy(item => item.DisplayName)
                 .ToList();
 
@@ -172,7 +225,9 @@ namespace Modification
                 comboFamily.SelectedItem = keepSelection ?? filtered.First();
             }
             else
+            {
                 comboFamily.SelectedIndex = -1;
+            }
         }
 
         private static string BuildDisplayName(FamilySymbol fs)
@@ -207,6 +262,5 @@ namespace Modification
             public bool IsCircular { get; }
             public bool IsRectangular { get; }
         }
-
     }
 }
