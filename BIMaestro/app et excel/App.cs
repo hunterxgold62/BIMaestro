@@ -69,7 +69,7 @@ public class App : IExternalApplication
             ExcelLogger.Initialize();
             ExcelLogger.ConfigureActivity(
                 idleThreshold: TimeSpan.FromMinutes(15),
-                unfocusedThreshold: TimeSpan.FromMinutes(8),
+                unfocusedThreshold: TimeSpan.FromMinutes(10),
                 busyGapThreshold: TimeSpan.FromSeconds(15),
                 cpuBusyThreshold: 0.30,
                 countBusyWhenUnfocused: false

@@ -240,8 +240,9 @@ namespace BIMaestro.Dashboard
                 .GroupBy(r => r.DocumentId)
                 .Select(g =>
                 {
+                    var last = g.OrderByDescending(r => r.When).FirstOrDefault();
                     string id = g.Key;
-                    string name = string.IsNullOrWhiteSpace(g.First().DocumentName) ? "(sans nom)" : g.First().DocumentName;
+                    string name = string.IsNullOrWhiteSpace(last?.DocumentName) ? "(sans nom)" : last.DocumentName;
                     return new ProjectItem
                     {
                         DocumentId = id,
@@ -249,7 +250,8 @@ namespace BIMaestro.Dashboard
                         BaseName = GetBaseName(name, id),
                         Folder = GetLastFolder(id),
                         Tail = SafeDocIdTail(id),
-                        Hours = 0
+                        Hours = 0,
+                        LastSeen = last?.When ?? DateTime.MinValue
                     };
                 }).ToList();
         }
@@ -302,7 +304,8 @@ namespace BIMaestro.Dashboard
                     RemoveDiacritics(p.BaseName ?? "").IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0 ||
                     RemoveDiacritics(p.Folder ?? "").IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0 ||
                     RemoveDiacritics(p.Tail ?? "").IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
-                         .OrderByDescending(p => p.Hours)
+                         .OrderByDescending(p => p.LastSeen)
+                         .ThenByDescending(p => p.Hours)
                          .ThenBy(p => p.BaseName);
 
                 _filteredProjects = seq.Take(30).ToList();
@@ -878,6 +881,7 @@ namespace BIMaestro.Dashboard
             public string Folder { get; set; }
             public string Tail { get; set; }
             public double Hours { get; set; }
+            public DateTime LastSeen { get; set; }
         }
 
         [Obfuscation(Exclude = true, ApplyToMembers = true, StripAfterObfuscation = false)]

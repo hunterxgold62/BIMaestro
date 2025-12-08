@@ -28,7 +28,9 @@ namespace Visualisation
                 .Cast<ViewSheetSet>()
                 .ToList();
 
-            SheetSetComboBox.ItemsSource = _sheetSets.Select(s => s.Name).OrderBy(n => n);
+            SheetSetComboBox.ItemsSource = _sheetSets
+                .Select(s => s.Name)
+                .OrderBy(n => n);
         }
 
         private void BrowseButton_Click(object sender, RoutedEventArgs e)
@@ -57,7 +59,9 @@ namespace Visualisation
                 return;
             }
 
-            var sheetSet = _sheetSets.FirstOrDefault(s => s.Name.Equals(setName, StringComparison.OrdinalIgnoreCase));
+            var sheetSet = _sheetSets
+                .FirstOrDefault(s => s.Name.Equals(setName, StringComparison.OrdinalIgnoreCase));
+
             if (sheetSet == null)
             {
                 MessageBox.Show($"Le jeu '{setName}' n'existe pas.", "Erreur",
@@ -97,11 +101,13 @@ namespace Visualisation
             var sw = Stopwatch.StartNew();
             foreach (var vs in sheets)
             {
-                string nameFromPdf = pdfRule != null ? BuildNameFromPdfRule(_doc, vs, pdfRule) : null;
+                string nameFromPdf = pdfRule != null
+                    ? BuildNameFromPdfRule(_doc, vs, pdfRule)
+                    : null;
 
                 string candidate = !string.IsNullOrWhiteSpace(nameFromPdf)
                     ? nameFromPdf
-                    : BuildNameFromCmlParams(vs); // fallback
+                    : BuildNameFromCmlParams(vs); // fallback CML_*
 
                 candidate = SanitizeFileName(candidate);
                 string unique = EnsureUnique(exportDir, candidate, "dwg");
@@ -109,7 +115,11 @@ namespace Visualisation
                 bool success = TryExport(vs, exportDir, unique, options);
                 if (!success)
                 {
-                    string fallback = EnsureUnique(exportDir, SanitizeFileName(vs.SheetNumber), "dwg");
+                    string fallback = EnsureUnique(
+                        exportDir,
+                        SanitizeFileName(vs.SheetNumber),
+                        "dwg");
+
                     TryExport(vs, exportDir, fallback, options);
                 }
             }
@@ -172,47 +182,62 @@ namespace Visualisation
             return (rule != null && rule.Count > 0) ? rule : null;
         }
 
-        private static string BuildNameFromPdfRule(Document doc, ViewSheet sheet, IList<TableCellCombinedParameterData> rule)
+        private static string BuildNameFromPdfRule(
+            Document doc,
+            ViewSheet sheet,
+            IList<TableCellCombinedParameterData> rule)
         {
-            // Vue principale si la règle cible "Vues"
-            View primaryView = null;
-            Viewport viewport = null;
-            var vpId = sheet.GetAllViewports().FirstOrDefault();
-            if (vpId != ElementId.InvalidElementId)
-            {
-                viewport = doc.GetElement(vpId) as Viewport;
-                if (viewport != null)
-                    primaryView = doc.GetElement(viewport.ViewId) as View;
-            }
+            // Viewport principal pour les paramètres "titre sur feuille", n° de détail, etc.
+            var viewports = sheet.GetAllViewports()
+                .Select(id => doc.GetElement(id) as Viewport)
+                .Where(vp => vp != null)
+                .ToList();
+
+            Viewport primaryViewport = viewports.FirstOrDefault();
+            View primaryView = primaryViewport != null
+                ? doc.GetElement(primaryViewport.ViewId) as View
+                : null;
 
             var sb = new StringBuilder();
+            bool hasRealParamValue = false;
 
             for (int i = 0; i < rule.Count; i++)
             {
                 var cell = rule[i];
-                string value = "";
+                string value = string.Empty;
 
-                Element target = null;
-                if (cell.CategoryId != null && cell.CategoryId != ElementId.InvalidElementId)
+                // 1) Cellule liée à un paramètre : on essaie VRAIMENT de le lire
+                if (cell.ParamId != null && cell.ParamId != ElementId.InvalidElementId)
                 {
-                    var bic = (BuiltInCategory)cell.CategoryId.IntegerValue;
-                    if (bic == BuiltInCategory.OST_Sheets) target = sheet;
-                    else if (bic == BuiltInCategory.OST_ProjectInformation) target = doc.ProjectInformation;
-                    else if (bic == BuiltInCategory.OST_Views) target = (Element)primaryView ?? sheet;
+                    ElementId pid = cell.ParamId;
+
+                    // Ordre : viewport -> vue -> feuille -> infos projet
+                    if (primaryViewport != null)
+                        value = ResolveParam(doc, primaryViewport, pid);
+
+                    if (string.IsNullOrWhiteSpace(value) && primaryView != null)
+                        value = ResolveParam(doc, primaryView, pid);
+
+                    if (string.IsNullOrWhiteSpace(value))
+                        value = ResolveParam(doc, sheet, pid);
+
+                    if (string.IsNullOrWhiteSpace(value) && doc.ProjectInformation != null)
+                        value = ResolveParam(doc, doc.ProjectInformation, pid);
+
+                    if (!string.IsNullOrWhiteSpace(value))
+                        hasRealParamValue = true;
                 }
 
-                if (target != null && cell.ParamId != null && cell.ParamId != ElementId.InvalidElementId)
+                // 2) Cellule "texte fixe" (pas de paramètre) → SampleValue
+                if (string.IsNullOrWhiteSpace(value) &&
+                    (cell.ParamId == null || cell.ParamId == ElementId.InvalidElementId) &&
+                    !string.IsNullOrEmpty(cell.SampleValue))
                 {
-                    // Pour les paramètres de "Vue", privilégier la valeur affichée sur le viewport
-                    // (ex : "Titre sur feuille") puis retomber sur la vue elle-même.
-                    if (target is View)
-                        value = GetParamValue(doc, target, cell.ParamId, viewport);
-                    else
-                        value = GetParamValue(doc, target, cell.ParamId);
+                    value = cell.SampleValue;
                 }
 
-                if (string.IsNullOrWhiteSpace(value))
-                    value = cell.SampleValue ?? "";
+                if (string.IsNullOrEmpty(value))
+                    continue;
 
                 if (!string.IsNullOrEmpty(cell.Prefix)) sb.Append(cell.Prefix);
                 sb.Append(value);
@@ -221,6 +246,11 @@ namespace Visualisation
                     sb.Append(cell.Separator);
             }
 
+            // Si on n'a JAMAIS lu de vrai paramètre, on considère que la règle est inutilisable
+            // → on renvoie "" pour déclencher le fallback CML_*
+            if (!hasRealParamValue)
+                return string.Empty;
+
             return sb.ToString();
         }
 
@@ -228,26 +258,15 @@ namespace Visualisation
         /// Résout un ParamId de la règle PDF : BuiltInParameter ou ParameterElement.
         /// Essaie sur l’instance puis sur le type. Retourne AsString() ou AsValueString().
         /// </summary>
-        private static string GetParamValue(Document doc, Element target, ElementId paramId, Viewport viewport = null)
-        {
-            // Vue : d'abord ce qui est réellement affiché sur la feuille (viewport), puis la vue
-            if (viewport != null && target is View)
-            {
-                string fromViewport = ResolveParam(doc, viewport, paramId);
-                if (!string.IsNullOrWhiteSpace(fromViewport))
-                    return fromViewport;
-            }
-
-            return ResolveParam(doc, target, paramId);
-        }
-
         private static string ResolveParam(Document doc, Element target, ElementId paramId)
         {
+            if (target == null || paramId == null || paramId == ElementId.InvalidElementId)
+                return string.Empty;
+
             // 1) – Cas BuiltInParameter (enum)
             try
             {
                 var bip = (BuiltInParameter)paramId.IntegerValue;
-                // Enum.IsDefined n’est pas obligatoire : certains BIP ne sont pas déclarés mais restent valides.
                 Parameter p = target.get_Parameter(bip);
                 if (p == null)
                 {
@@ -256,7 +275,10 @@ namespace Visualisation
                 }
                 if (p != null) return p.AsString() ?? p.AsValueString() ?? "";
             }
-            catch { /* pas un BIP valide → on tente ParameterElement */ }
+            catch
+            {
+                // pas un BIP valide → on tente ParameterElement
+            }
 
             // 2) – Cas ParameterElement (paramètre partagé/projet)
             if (doc.GetElement(paramId) is ParameterElement pe)
@@ -272,9 +294,10 @@ namespace Visualisation
                     }
                     if (p != null) return p.AsString() ?? p.AsValueString() ?? "";
 
-                    // dernier filet : Lookup par nom (selon def.Name)
+                    // Dernier filet : Lookup par nom (selon def.Name)
                     var byName = target.LookupParameter(def.Name) ??
-                                 (doc.GetElement(target.GetTypeId()) as ElementType)?.LookupParameter(def.Name);
+                                 (doc.GetElement(target.GetTypeId()) as ElementType)?
+                                    .LookupParameter(def.Name);
                     if (byName != null) return byName.AsString() ?? byName.AsValueString() ?? "";
                 }
             }
@@ -286,7 +309,9 @@ namespace Visualisation
         private static string BuildNameFromCmlParams(ViewSheet sheet)
         {
             string P(string n) =>
-                sheet.LookupParameter(n) is Parameter p && p.HasValue ? (p.AsString() ?? "").Trim() : "";
+                sheet.LookupParameter(n) is Parameter p && p.HasValue
+                    ? (p.AsString() ?? "").Trim()
+                    : "";
 
             var parts = new[]
             {
@@ -296,7 +321,9 @@ namespace Visualisation
                 P("CML_Lot"),
                 P("CML_Nature"),
                 P("Numéro de la feuille"),
-                !string.IsNullOrEmpty(P("Révisions sur feuille")) ? P("Révisions sur feuille") : P("Révision actuelle"),
+                !string.IsNullOrEmpty(P("Révisions sur feuille"))
+                    ? P("Révisions sur feuille")
+                    : P("Révision actuelle"),
                 sheet.Name
             }.Where(s => !string.IsNullOrEmpty(s)).ToArray();
 

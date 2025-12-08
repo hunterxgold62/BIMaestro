@@ -353,44 +353,48 @@ namespace Modification
             var ogs = new OverrideGraphicSettings();
 
             // Couleur & motifs
-            if (SelectedColor.HasValue)
-            {
-                var c = new Autodesk.Revit.DB.Color(
-                    SelectedColor.Value.R,
-                    SelectedColor.Value.G,
-                    SelectedColor.Value.B);
+            var hasFillColor = SelectedColor.HasValue;
+            var fillColor = hasFillColor
+                ? new Autodesk.Revit.DB.Color(SelectedColor.Value.R, SelectedColor.Value.G, SelectedColor.Value.B)
+                : null;
 
-                if (SurfaceForegroundCheckBox.IsChecked == true)
+            if (SurfaceForegroundCheckBox.IsChecked == true)
+            {
+                ogs.SetSurfaceForegroundPatternId(SelectedSurfacePatternId);
+                ogs.SetSurfaceForegroundPatternVisible(SelectedSurfacePatternId != ElementId.InvalidElementId);
+                if (hasFillColor && SelectedSurfacePatternId != ElementId.InvalidElementId)
                 {
-                    ogs.SetSurfaceForegroundPatternId(SelectedSurfacePatternId);
-                    if (SelectedSurfacePatternId != ElementId.InvalidElementId)
-                    {
-                        ogs.SetSurfaceForegroundPatternColor(c);
-                    }
+                    ogs.SetSurfaceForegroundPatternColor(fillColor);
                 }
-                if (SurfaceBackgroundCheckBox.IsChecked == true)
+            }
+
+            if (SurfaceBackgroundCheckBox.IsChecked == true)
+            {
+                ogs.SetSurfaceBackgroundPatternId(SelectedSurfacePatternId);
+                ogs.SetSurfaceBackgroundPatternVisible(SelectedSurfacePatternId != ElementId.InvalidElementId);
+                if (hasFillColor && SelectedSurfacePatternId != ElementId.InvalidElementId)
                 {
-                    ogs.SetSurfaceBackgroundPatternId(SelectedSurfacePatternId);
-                    if (SelectedSurfacePatternId != ElementId.InvalidElementId)
-                    {
-                        ogs.SetSurfaceBackgroundPatternColor(c);
-                    }
+                    ogs.SetSurfaceBackgroundPatternColor(fillColor);
                 }
-                if (CutForegroundCheckBox.IsChecked == true)
+            }
+
+            if (CutForegroundCheckBox.IsChecked == true)
+            {
+                ogs.SetCutForegroundPatternId(SelectedCutPatternId);
+                ogs.SetCutForegroundPatternVisible(SelectedCutPatternId != ElementId.InvalidElementId);
+                if (hasFillColor && SelectedCutPatternId != ElementId.InvalidElementId)
                 {
-                    ogs.SetCutForegroundPatternId(SelectedCutPatternId);
-                    if (SelectedCutPatternId != ElementId.InvalidElementId)
-                    {
-                        ogs.SetCutForegroundPatternColor(c);
-                    }
+                    ogs.SetCutForegroundPatternColor(fillColor);
                 }
-                if (CutBackgroundCheckBox.IsChecked == true)
+            }
+
+            if (CutBackgroundCheckBox.IsChecked == true)
+            {
+                ogs.SetCutBackgroundPatternId(SelectedCutPatternId);
+                ogs.SetCutBackgroundPatternVisible(SelectedCutPatternId != ElementId.InvalidElementId);
+                if (hasFillColor && SelectedCutPatternId != ElementId.InvalidElementId)
                 {
-                    ogs.SetCutBackgroundPatternId(SelectedCutPatternId);
-                    if (SelectedCutPatternId != ElementId.InvalidElementId)
-                    {
-                        ogs.SetCutBackgroundPatternColor(c);
-                    }
+                    ogs.SetCutBackgroundPatternColor(fillColor);
                 }
             }
 
