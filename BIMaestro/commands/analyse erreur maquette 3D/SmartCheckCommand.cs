@@ -147,7 +147,7 @@ namespace Analyse
             var linkBBoxes = GetLinkSolidBBoxes(doc, opt).ToList();
             if (linkBBoxes.Count == 0) yield break;
 
-            var seen = new HashSet<string>();
+            var aggregated = new Dictionary<string, (BoundingBoxXYZ Box, int Count, LinkSolidInfo Info, ElementId PipeId)>();
 
             foreach (var pipe in pipes)
             {
@@ -193,20 +193,34 @@ namespace Analyse
 
                     if (!intersects) continue;
 
-                    var key = $"{pipe.Id.IntegerValue}:{link.LinkId.IntegerValue}:{link.LinkedElementId.IntegerValue}";
-                    if (!seen.Add(key)) continue;
-
                     var inter = IntersectBox(padded, link.BBox);
-                    yield return new ModelIssue
+
+                    var key = $"{pipe.Id.IntegerValue}:{link.LinkId.IntegerValue}";
+                    if (aggregated.TryGetValue(key, out var agg))
                     {
-                        ElementId = pipe.Id,
-                        RelatedId = link.LinkId,
-                        Kind = IssueKind.LinkPipeClash,
-                        Category = "Collisions tuyaux/liens",
-                        Message = $"Tuyau #{pipe.Id.IntegerValue} en collision avec lien '{link.Name}' (Id {link.LinkId.IntegerValue})",
-                        BBox = inter ?? padded
-                    };
+                        aggregated[key] = (UnionBoxes(agg.Box, inter ?? padded), agg.Count + 1, agg.Info, agg.PipeId);
+                    }
+                    else
+                    {
+                        aggregated[key] = (inter ?? padded, 1, link, pipe.Id);
+                    }
                 }
+            }
+
+            foreach (var entry in aggregated.Values)
+            {
+                var info = entry.Info;
+                var countSuffix = entry.Count > 1 ? $" ({entry.Count} éléments)" : string.Empty;
+
+                yield return new ModelIssue
+                {
+                    ElementId = entry.PipeId,
+                    RelatedId = info?.LinkId ?? ElementId.InvalidElementId,
+                    Kind = IssueKind.LinkPipeClash,
+                    Category = "Collisions tuyaux/liens",
+                    Message = $"Tuyau #{entry.PipeId.IntegerValue} en collision avec lien '{info?.Name}' (Id {(info?.LinkId.IntegerValue ?? 0)}){countSuffix}",
+                    BBox = entry.Box
+                };
             }
         }
 
@@ -425,11 +439,13 @@ namespace Analyse
             var revitLinks = new FilteredElementCollector(doc).OfClass(typeof(RevitLinkInstance)).Cast<RevitLinkInstance>();
             foreach (var link in revitLinks)
             {
+                var meshBoxes = new Dictionary<string, LinkSolidInfo>();
+
                 try
                 {
                     var tr = link.GetTotalTransform() ?? Transform.Identity;
                     var geo = link.get_Geometry(opt);
-                    CollectSolidBBoxes(geo, tr, link.Name, link.Id, ElementId.InvalidElementId, list);
+                    CollectSolidBBoxes(geo, tr, link.Name, link.Id, ElementId.InvalidElementId, list, meshBoxes);
 
                     var linkDoc = link.GetLinkDocument();
                     if (linkDoc != null)
@@ -441,18 +457,34 @@ namespace Analyse
                         foreach (var e in linkedElems)
                         {
                             var solid = GetMainSolid(e, opt);
-                            if (solid == null) continue;
+                            var ebb = e.get_BoundingBox(null);
+                            var transformedBb = TransformBox(ebb, tr);
 
-                            var tSolid = SolidUtils.CreateTransformed(solid, tr);
-                            var tbb = tSolid?.GetBoundingBox();
-                            if (tbb != null)
+                            if (solid != null)
+                            {
+                                var tSolid = SolidUtils.CreateTransformed(solid, tr);
+                                transformedBb ??= tSolid?.GetBoundingBox();
+
+                                if (transformedBb != null)
+                                {
+                                    list.Add(new LinkSolidInfo
+                                    {
+                                        LinkId = link.Id,
+                                        Name = link.Name,
+                                        BBox = transformedBb,
+                                        Solid = tSolid,
+                                        LinkedElementId = e.Id
+                                    });
+                                }
+                            }
+                            else if (transformedBb != null)
                             {
                                 list.Add(new LinkSolidInfo
                                 {
                                     LinkId = link.Id,
                                     Name = link.Name,
-                                    BBox = tbb,
-                                    Solid = tSolid,
+                                    BBox = transformedBb,
+                                    Solid = null,
                                     LinkedElementId = e.Id
                                 });
                             }
@@ -460,24 +492,37 @@ namespace Analyse
                     }
                 }
                 catch { }
+
+                // Ajout des BB fusionnées issues des maillages du lien
+                foreach (var merged in meshBoxes.Values)
+                {
+                    list.Add(merged);
+                }
             }
 
             var imports = new FilteredElementCollector(doc).OfClass(typeof(ImportInstance)).Cast<ImportInstance>();
             foreach (var imp in imports)
             {
+                var meshBoxes = new Dictionary<string, LinkSolidInfo>();
+
                 try
                 {
                     var tr = imp.GetTransform() ?? Transform.Identity;
                     var geo = imp.get_Geometry(opt);
-                    CollectSolidBBoxes(geo, tr, imp.Name, imp.Id, ElementId.InvalidElementId, list);
+                    CollectSolidBBoxes(geo, tr, imp.Name, imp.Id, ElementId.InvalidElementId, list, meshBoxes);
                 }
                 catch { }
+
+                foreach (var merged in meshBoxes.Values)
+                {
+                    list.Add(merged);
+                }
             }
 
             return list;
         }
 
-        private static void CollectSolidBBoxes(GeometryElement geo, Transform tr, string name, ElementId linkId, ElementId linkedElemId, IList<LinkSolidInfo> target)
+        private static void CollectSolidBBoxes(GeometryElement geo, Transform tr, string name, ElementId linkId, ElementId linkedElemId, IList<LinkSolidInfo> target, IDictionary<string, LinkSolidInfo> meshBoxes)
         {
             if (geo == null || target == null) return;
             var current = tr ?? Transform.Identity;
@@ -501,12 +546,60 @@ namespace Analyse
                         });
                     }
                 }
+                else if (obj is Mesh m)
+                {
+                    var bb = MeshToBoundingBox(m);
+                    bb = TransformBox(bb, current);
+                    if (bb != null)
+                    {
+                        var key = $"{linkId.IntegerValue}:{linkedElemId.IntegerValue}";
+                        if (meshBoxes != null && meshBoxes.TryGetValue(key, out var existing))
+                        {
+                            existing.BBox = UnionBoxes(existing.BBox, bb);
+                        }
+                        else if (meshBoxes != null)
+                        {
+                            var info = new LinkSolidInfo
+                            {
+                                LinkId = linkId,
+                                Name = name,
+                                BBox = bb,
+                                Solid = null,
+                                LinkedElementId = linkedElemId
+                            };
+                            meshBoxes[key] = info;
+                        }
+                    }
+                }
                 else if (obj is GeometryInstance gi)
                 {
                     var nested = current.Multiply(gi.Transform ?? Transform.Identity);
-                    CollectSolidBBoxes(gi.GetInstanceGeometry(), nested, name, linkId, linkedElemId, target);
+                    CollectSolidBBoxes(gi.GetInstanceGeometry(), nested, name, linkId, linkedElemId, target, meshBoxes);
                 }
             }
+        }
+
+        private static BoundingBoxXYZ MeshToBoundingBox(Mesh mesh)
+        {
+            if (mesh == null || mesh.Vertices == null || mesh.Vertices.Count == 0) return null;
+
+            double minX = double.MaxValue, minY = double.MaxValue, minZ = double.MaxValue;
+            double maxX = double.MinValue, maxY = double.MinValue, maxZ = double.MinValue;
+
+            foreach (XYZ v in mesh.Vertices)
+            {
+                minX = Math.Min(minX, v.X); maxX = Math.Max(maxX, v.X);
+                minY = Math.Min(minY, v.Y); maxY = Math.Max(maxY, v.Y);
+                minZ = Math.Min(minZ, v.Z); maxZ = Math.Max(maxZ, v.Z);
+            }
+
+            if (minX == double.MaxValue) return null;
+
+            return new BoundingBoxXYZ
+            {
+                Min = new XYZ(minX, minY, minZ),
+                Max = new XYZ(maxX, maxY, maxZ)
+            };
         }
 
         private static BoundingBoxXYZ TransformBox(BoundingBoxXYZ bb, Transform tr)
@@ -532,6 +625,18 @@ namespace Analyse
             double minZ = tPts.Min(p => p.Z); double maxZ = tPts.Max(p => p.Z);
 
             return new BoundingBoxXYZ { Min = new XYZ(minX, minY, minZ), Max = new XYZ(maxX, maxY, maxZ) };
+        }
+
+        private static BoundingBoxXYZ UnionBoxes(BoundingBoxXYZ a, BoundingBoxXYZ b)
+        {
+            if (a == null) return b;
+            if (b == null) return a;
+
+            return new BoundingBoxXYZ
+            {
+                Min = new XYZ(Math.Min(a.Min.X, b.Min.X), Math.Min(a.Min.Y, b.Min.Y), Math.Min(a.Min.Z, b.Min.Z)),
+                Max = new XYZ(Math.Max(a.Max.X, b.Max.X), Math.Max(a.Max.Y, b.Max.Y), Math.Max(a.Max.Z, b.Max.Z))
+            };
         }
 
 
