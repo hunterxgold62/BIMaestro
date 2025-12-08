@@ -238,23 +238,21 @@ namespace Modification
                                 Reference elemRef;
                                 try
                                 {
-                                    elemRef = uiDoc.Selection.PickObject(
-                                        ObjectType.Element,
-                                        $"Sélectionnez {objetLabel} (ESC pour annuler)");
+                                    if (objType == ExtendedReservationWindow.ObjectType.Canalisation)
+                                    {
+                                        elemRef = PickSinglePipeBySource(uiDoc, doc, pipeSource);
+                                    }
+                                    else
+                                    {
+                                        elemRef = uiDoc.Selection.PickObject(
+                                            ObjectType.Element,
+                                            $"Sélectionnez {objetLabel} (ESC pour annuler)");
+                                    }
                                 }
                                 catch
                                 {
-                                    try
-                                    {
-                                        elemRef = uiDoc.Selection.PickObject(
-                                            ObjectType.LinkedElement,
-                                            $"Sélectionnez {objetLabel} (ESC pour annuler)");
-                                    }
-                                    catch
-                                    {
-                                        trans.RollBack();
-                                        break;
-                                    }
+                                    trans.RollBack();
+                                    break;
                                 }
 
                                 if (!TryResolveReference(uiDoc, elemRef, out var selElem, out var transformToHost))
@@ -739,6 +737,72 @@ namespace Modification
                 _pipeSource = pipeSource;
             }
 
+            private static bool IsIfcLink(RevitLinkInstance linkInstance)
+            {
+                try
+                {
+                    var extRef = linkInstance.GetExternalFileReference();
+                    if (extRef != null)
+                    {
+                        // En 2024/2025+, il existe un membre "IFC" dans l'énum,
+                        // mais comme on compile contre 2023 on NE l'utilise PAS directement.
+                        string kind = extRef.ExternalFileReferenceType.ToString();
+                        if (string.Equals(kind, "IFC", StringComparison.OrdinalIgnoreCase))
+                            return true;
+                    }
+                }
+                catch
+                {
+                    // Ignore et on tombe sur l’heuristique de nom/fichier
+                }
+
+                var linkDoc = linkInstance.GetLinkDocument();
+                string pathOrName = (linkDoc?.PathName ?? linkInstance.Name ?? string.Empty)
+                    .ToLowerInvariant();
+
+                // Les liens IFC sont souvent des .rvt temporaires contenant ".ifc" dans le nom
+                return pathOrName.EndsWith(".ifc") || pathOrName.Contains(".ifc");
+            }
+
+
+            private static bool IsRvtLink(RevitLinkInstance linkInstance)
+            {
+                try
+                {
+                    var extRef = linkInstance.GetExternalFileReference();
+                    if (extRef != null && extRef.ExternalFileReferenceType == ExternalFileReferenceType.RevitLink)
+                        return true;
+                }
+                catch
+                {
+                    // Ignore and fallback to path/name heuristic
+                }
+
+                var linkDoc = linkInstance.GetLinkDocument();
+                string pathOrName = (linkDoc?.PathName ?? linkInstance.Name ?? string.Empty).ToLowerInvariant();
+                bool hasIfc = pathOrName.Contains(".ifc");
+                bool hasRvt = pathOrName.EndsWith(".rvt");
+
+                return hasRvt && !hasIfc;
+            }
+
+            private bool MatchesExpectedLinkType(RevitLinkInstance linkInstance)
+            {
+                return _pipeSource switch
+                {
+                    ExtendedReservationWindow.PipeSource.LienIFC => IsIfcLink(linkInstance),
+                    ExtendedReservationWindow.PipeSource.LienRVT => IsRvtLink(linkInstance),
+                    _ => false
+                };
+            }
+
+            private static bool IsPipeLike(Element linkedElem)
+            {
+                return linkedElem is Pipe
+                    || linkedElem is ImportInstance
+                    || linkedElem is DirectShape;
+            }
+
             public bool AllowElement(Element elem)
             {
                 var linkInstance = elem as RevitLinkInstance;
@@ -749,18 +813,7 @@ namespace Modification
                 if (linkDoc == null)
                     return false;
 
-                string path = linkDoc.PathName ?? string.Empty;
-
-                // Filtre IFC / RVT selon le choix de l'utilisateur
-                if (_pipeSource == ExtendedReservationWindow.PipeSource.LienIFC &&
-                    !path.EndsWith(".ifc", StringComparison.OrdinalIgnoreCase))
-                    return false;
-
-                if (_pipeSource == ExtendedReservationWindow.PipeSource.LienRVT &&
-                    !path.EndsWith(".rvt", StringComparison.OrdinalIgnoreCase))
-                    return false;
-
-                return true;
+                return MatchesExpectedLinkType(linkInstance);
             }
 
             public bool AllowReference(Reference reference, XYZ position)
@@ -778,8 +831,35 @@ namespace Modification
                     return false;
 
                 Element linkedElem = linkDoc.GetElement(reference.LinkedElementId);
-                return linkedElem is Pipe;
+                return MatchesExpectedLinkType(linkInstance) && IsPipeLike(linkedElem);
             }
+        }
+
+        /// <summary>
+        /// Sélectionne une seule canalisation en respectant la source choisie.
+        /// </summary>
+        private Reference PickSinglePipeBySource(
+            UIDocument uiDoc,
+            Document doc,
+            ExtendedReservationWindow.PipeSource pipeSource)
+        {
+            return pipeSource switch
+            {
+                ExtendedReservationWindow.PipeSource.Maquette => uiDoc.Selection.PickObject(
+                    ObjectType.Element,
+                    new HostPipeSelectionFilter(),
+                    "Sélectionnez la canalisation dans la maquette (ESC pour annuler)"),
+
+                ExtendedReservationWindow.PipeSource.LienIFC or ExtendedReservationWindow.PipeSource.LienRVT => uiDoc.Selection.PickObject(
+                    ObjectType.LinkedElement,
+                    new LinkPipeSelectionFilter(doc, pipeSource),
+                    "Sélectionnez la canalisation dans le lien (ESC pour annuler)"),
+
+                _ => uiDoc.Selection.PickObject(
+                    ObjectType.Element,
+                    new HostPipeSelectionFilter(),
+                    "Sélectionnez la canalisation (ESC pour annuler)")
+            };
         }
 
         /// <summary>
