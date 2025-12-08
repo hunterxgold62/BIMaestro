@@ -44,7 +44,7 @@
         <!-- Toolbar -->
         <DockPanel Grid.Row="0" LastChildFill="True" Margin="0,0,0,8">
             <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" Margin="0,0,12,0">
-                <TextBlock Text="Résultats d’analyse — murs &amp; MEP" FontSize="18" FontWeight="Bold" Margin="0,0,12,0"/>
+                <TextBlock Text="Résultats d’analyse — murs, MEP &amp; liens" FontSize="18" FontWeight="Bold" Margin="0,0,12,0"/>
                 <Button Content="Ouvrir/MAJ vue 3D" Padding="10,6" Margin="0,0,8,0" Click="OnEnsure3D"/>
                 <ToggleButton x:Name="BtnShowAll" Content="Afficher toutes les erreurs" Padding="10,6" Margin="0,0,8,0"
                               Checked="OnShowAll" Unchecked="OnShowAll"/>
@@ -123,7 +123,27 @@
                     </DataGrid.Columns>
                 </DataGrid>
             </TabItem>
-
+            <TabItem Header="Collisions liens / tuyaux">
+                <DataGrid x:Name="GridLinks" AutoGenerateColumns="False" IsReadOnly="True"
+                          RowStyle="{StaticResource IssueRowStyle}"
+                          CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Type" Binding="{Binding Category}" Width="220"/>
+                        <DataGridTextColumn Header="Id" Binding="{Binding ElementId.IntegerValue}" Width="80"/>
+                        <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*"/>
+                        <DataGridTemplateColumn Header="Actions" Width="220">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <Button Content="Focus 3D" Padding="8,4" Margin="0,0,6,0" Click="OnFocus"/>
+                                        <Button Padding="8,4" Click="OnIgnore" Style="{StaticResource OkButtonStyle}"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </TabItem>
             <TabItem Header="Raccords ouverts">
                 <DataGrid x:Name="GridOpen" AutoGenerateColumns="False" IsReadOnly="True"
                           RowStyle="{StaticResource IssueRowStyle}"

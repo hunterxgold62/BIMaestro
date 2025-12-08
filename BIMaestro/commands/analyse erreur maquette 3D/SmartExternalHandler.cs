@@ -212,7 +212,7 @@ namespace Analyse
             fade.SetSurfaceTransparency(85);
             fade.SetHalftone(true);
 
-            if (kind == IssueKind.MepThroughWallNoSleeve && ids.Count > 0)
+            if ((kind == IssueKind.MepThroughWallNoSleeve || kind == IssueKind.LinkPipeClash) && ids.Count > 0)
             {
                 foreach (var eid in ids) v.SetElementOverrides(eid, emphasize);
 

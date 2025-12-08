@@ -18,6 +18,7 @@ namespace Analyse
         private readonly List<ModelIssue> _all;
         private readonly List<ModelIssue> _walls;
         private readonly List<ModelIssue> _mepNoSleeve;
+        private readonly List<ModelIssue> _linkClashes;
         private readonly List<ModelIssue> _openConnectors;
         private readonly string _docKey;
         private int _cursor = -1;
@@ -32,6 +33,7 @@ namespace Analyse
             _all = issues.ToList();
             _walls = _all.Where(i => i.Kind == IssueKind.WallFloating || i.Kind == IssueKind.WallOnWall || i.Kind == IssueKind.WallEmbeddedInFloor).ToList();
             _mepNoSleeve = _all.Where(i => i.Kind == IssueKind.MepThroughWallNoSleeve).ToList();
+            _linkClashes = _all.Where(i => i.Kind == IssueKind.LinkPipeClash).ToList();
             _openConnectors = _all.Where(i => i.Kind == IssueKind.MepUnconnected).ToList();
 
             Bind();
@@ -39,6 +41,7 @@ namespace Analyse
             GridAll.MouseDoubleClick += (s, e) => FocusFromGrid(GridAll);
             GridWalls.MouseDoubleClick += (s, e) => FocusFromGrid(GridWalls);
             GridMEP.MouseDoubleClick += (s, e) => FocusFromGrid(GridMEP);
+            GridLinks.MouseDoubleClick += (s, e) => FocusFromGrid(GridLinks);
             GridOpen.MouseDoubleClick += (s, e) => FocusFromGrid(GridOpen);
         }
 
@@ -47,6 +50,7 @@ namespace Analyse
             BindGrid(GridAll, _all);
             BindGrid(GridWalls, _walls);
             BindGrid(GridMEP, _mepNoSleeve);
+            BindGrid(GridLinks, _linkClashes);
             BindGrid(GridOpen, _openConnectors);
         }
 
@@ -67,6 +71,7 @@ namespace Analyse
             {
                 case "Murs": return _walls.Where(i => !i.Ignored);
                 case "Traversées (sans réservation)": return _mepNoSleeve.Where(i => !i.Ignored);
+                case "Collisions liens / tuyaux": return _linkClashes.Where(i => !i.Ignored);
                 case "Raccords ouverts": return _openConnectors.Where(i => !i.Ignored);
                 default: return _all.Where(i => !i.Ignored);
             }
@@ -78,6 +83,7 @@ namespace Analyse
             {
                 case "Murs": return GridWalls.SelectedItem as ModelIssue;
                 case "Traversées (sans réservation)": return GridMEP.SelectedItem as ModelIssue;
+                case "Collisions liens / tuyaux": return GridLinks.SelectedItem as ModelIssue;
                 case "Raccords ouverts": return GridOpen.SelectedItem as ModelIssue;
                 default: return GridAll.SelectedItem as ModelIssue;
             }
@@ -89,6 +95,7 @@ namespace Analyse
             {
                 case "Murs": return GridWalls;
                 case "Traversées (sans réservation)": return GridMEP;
+                case "Collisions liens / tuyaux": return GridLinks;
                 case "Raccords ouverts": return GridOpen;
                 default: return GridAll;
             }
@@ -198,6 +205,7 @@ namespace Analyse
             SelectInGrid(GridAll, issue);
             SelectInGrid(GridWalls, issue);
             SelectInGrid(GridMEP, issue);
+            SelectInGrid(GridLinks, issue);
             SelectInGrid(GridOpen, issue);
 
             var currentGrid = GridForCurrentTab();

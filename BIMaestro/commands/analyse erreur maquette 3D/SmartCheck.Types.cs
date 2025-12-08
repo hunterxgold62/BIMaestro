@@ -8,7 +8,8 @@ namespace Analyse
         WallOnWall,
         WallEmbeddedInFloor,
         MepThroughWallNoSleeve,
-        MepUnconnected
+        MepUnconnected,
+        LinkPipeClash,
     }
 
     public enum SmartAction
