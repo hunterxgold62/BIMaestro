@@ -283,6 +283,7 @@
     <Compile Include="app et excel\temps revit\TimeSeriesDashboardWindow.xaml.cs">
       <DependentUpon>TimeSeriesDashboardWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="commands\analyse erreur maquette 3D\SmartCheckState.cs" />
     <Compile Include="commands\analyse erreur maquette 3D\SmartExternalHandler.cs" />
     <Compile Include="commands\analyse erreur maquette 3D\SmartCheck.Types.cs" />
     <Compile Include="commands\analyse erreur maquette 3D\SmartCheckCommand.cs" />

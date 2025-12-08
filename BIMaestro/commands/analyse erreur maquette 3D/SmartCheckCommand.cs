@@ -34,10 +34,13 @@ namespace Analyse
             try { issues.AddRange(FindUnconnectedMEP(doc)); }
             catch (Exception ex) { TaskDialog.Show("Smart Check", $"Scan raccords ouverts : {ex.Message}"); }
 
+            var docKey = SmartCheckState.GetDocKey(doc);
+            SmartCheckState.RestoreIgnored(docKey, issues);
+
             var handler = new SmartExternalHandler(uiapp);
             var extEvent = ExternalEvent.Create(handler);
 
-            var win = new SmartCheckWindow(issues, extEvent, handler);
+            var win = new SmartCheckWindow(issues, extEvent, handler, docKey);
             win.Show();
             return Result.Succeeded;
         }

@@ -19,13 +19,15 @@ namespace Analyse
         private readonly List<ModelIssue> _walls;
         private readonly List<ModelIssue> _mepNoSleeve;
         private readonly List<ModelIssue> _openConnectors;
+        private readonly string _docKey;
         private int _cursor = -1;
 
-        public SmartCheckWindow(IEnumerable<ModelIssue> issues, ExternalEvent extEvent, SmartExternalHandler handler)
+        public SmartCheckWindow(IEnumerable<ModelIssue> issues, ExternalEvent extEvent, SmartExternalHandler handler, string docKey)
         {
             InitializeComponent();
             _extEvent = extEvent;
             _handler = handler;
+            _docKey = docKey;
 
             _all = issues.ToList();
             _walls = _all.Where(i => i.Kind == IssueKind.WallFloating || i.Kind == IssueKind.WallOnWall || i.Kind == IssueKind.WallEmbeddedInFloor).ToList();
@@ -42,10 +44,16 @@ namespace Analyse
 
         private void Bind()
         {
-            GridAll.ItemsSource = _all.Where(i => !i.Ignored).ToList();
-            GridWalls.ItemsSource = _walls.Where(i => !i.Ignored).ToList();
-            GridMEP.ItemsSource = _mepNoSleeve.Where(i => !i.Ignored).ToList();
-            GridOpen.ItemsSource = _openConnectors.Where(i => !i.Ignored).ToList();
+            BindGrid(GridAll, _all);
+            BindGrid(GridWalls, _walls);
+            BindGrid(GridMEP, _mepNoSleeve);
+            BindGrid(GridOpen, _openConnectors);
+        }
+
+        private static void BindGrid(DataGrid grid, IEnumerable<ModelIssue> source)
+        {
+            grid.ItemsSource = null;
+            grid.ItemsSource = source.ToList();
         }
 
         private static bool IsValidId(ElementId id)
@@ -72,6 +80,17 @@ namespace Analyse
                 case "Traversées (sans réservation)": return GridMEP.SelectedItem as ModelIssue;
                 case "Raccords ouverts": return GridOpen.SelectedItem as ModelIssue;
                 default: return GridAll.SelectedItem as ModelIssue;
+            }
+        }
+
+        private DataGrid GridForCurrentTab()
+        {
+            switch (CurrentTabName())
+            {
+                case "Murs": return GridWalls;
+                case "Traversées (sans réservation)": return GridMEP;
+                case "Raccords ouverts": return GridOpen;
+                default: return GridAll;
             }
         }
 
@@ -120,7 +139,7 @@ namespace Analyse
         {
             var list = IssuesForCurrentTab().ToList();
             if (list.Count == 0) return;
-            _cursor = (_cursor <= 0) ? list.Count - 1 : _cursor - 1;
+            _cursor = (_cursor <= 0 || _cursor >= list.Count) ? list.Count - 1 : _cursor - 1;
             DoFocus(list[_cursor], keepShowAll: BtnShowAll.IsChecked == true);
         }
 
@@ -128,14 +147,13 @@ namespace Analyse
         {
             var list = IssuesForCurrentTab().ToList();
             if (list.Count == 0) return;
-            _cursor = (_cursor + 1) % list.Count;
+            _cursor = (_cursor < 0 || _cursor >= list.Count) ? 0 : (_cursor + 1) % list.Count;
             DoFocus(list[_cursor], keepShowAll: BtnShowAll.IsChecked == true);
         }
 
         private void DoFocus(ModelIssue issue, bool keepShowAll)
         {
-            GridAll.SelectedItem = issue;
-            GridAll.ScrollIntoView(issue);
+            UpdateSelection(issue);
 
             _handler.Action = SmartAction.FocusApply;
             _handler.IssueId = issue.ElementId ?? ElementId.InvalidElementId;
@@ -145,12 +163,15 @@ namespace Analyse
             _handler.ShowAllMode = keepShowAll;
             _handler.AutoSectionBox = true;
             SafeRaise();
+
+            UpdateCursor(issue);
         }
 
         private void OnFocus(object sender, RoutedEventArgs e)
         {
             var issue = ResolveIssueFromSender(sender);
             if (issue == null) return;
+            UpdateCursor(issue);
             DoFocus(issue, keepShowAll: BtnShowAll.IsChecked == true);
         }
 
@@ -158,12 +179,45 @@ namespace Analyse
         {
             var issue = ResolveIssueFromSender(sender);
             if (issue == null) return;
-            issue.Ignored = true;
+
+            issue.Ignored = !issue.Ignored;
+            SmartCheckState.SetIgnored(_docKey, issue, issue.Ignored);
 
             _handler.Action = SmartAction.MarkIgnored;
             SafeRaise();
 
+            var current = issue;
             Bind();
+            UpdateSelection(current);
+        }
+
+        private void UpdateSelection(ModelIssue issue)
+        {
+            if (issue == null) return;
+
+            SelectInGrid(GridAll, issue);
+            SelectInGrid(GridWalls, issue);
+            SelectInGrid(GridMEP, issue);
+            SelectInGrid(GridOpen, issue);
+
+            var currentGrid = GridForCurrentTab();
+            if (currentGrid != GridAll)
+                SelectInGrid(currentGrid, issue);
+        }
+
+        private static void SelectInGrid(DataGrid grid, ModelIssue issue)
+        {
+            if (grid?.ItemsSource == null) return;
+            grid.SelectedItem = issue;
+            grid.ScrollIntoView(issue);
+        }
+
+        private void UpdateCursor(ModelIssue issue)
+        {
+            if (issue == null) return;
+            var list = IssuesForCurrentTab().ToList();
+            var idx = list.IndexOf(issue);
+            if (idx >= 0) _cursor = idx;
         }
 
         /// <summary>

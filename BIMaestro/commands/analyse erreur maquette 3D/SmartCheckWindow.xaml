@@ -5,6 +5,35 @@
         Height="680" Width="980"
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResizeWithGrip">
+    <Window.Resources>
+        <SolidColorBrush x:Key="RowSelectedBrush" Color="#E6F1FF"/>
+        <SolidColorBrush x:Key="RowOkBrush" Color="#F2F2F2"/>
+        <Style x:Key="IssueRowStyle" TargetType="DataGridRow">
+            <Setter Property="Padding" Value="4"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Ignored}" Value="True">
+                    <Setter Property="Background" Value="{StaticResource RowOkBrush}"/>
+                    <Setter Property="Opacity" Value="0.6"/>
+                </DataTrigger>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="{StaticResource RowSelectedBrush}"/>
+                    <Setter Property="BorderBrush" Value="#4A90E2"/>
+                    <Setter Property="BorderThickness" Value="1"/>
+                    <Setter Property="Opacity" Value="1"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="OkButtonStyle" TargetType="Button">
+            <Setter Property="Content" Value="Marquer OK"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Ignored}" Value="True">
+                    <Setter Property="Content" Value="Annuler OK"/>
+                    <Setter Property="Foreground" Value="DimGray"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -31,6 +60,7 @@
         <TabControl Grid.Row="1" x:Name="Tabs">
             <TabItem Header="Toutes">
                 <DataGrid x:Name="GridAll" AutoGenerateColumns="False" IsReadOnly="True"
+                          RowStyle="{StaticResource IssueRowStyle}"
                           CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single">
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="Type" Binding="{Binding Category}" Width="180"/>
@@ -41,7 +71,7 @@
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                         <Button Content="Focus 3D" Padding="8,4" Margin="0,0,6,0" Click="OnFocus"/>
-                                        <Button Content="Marquer OK" Padding="8,4" Click="OnIgnore"/>
+                                        <Button Padding="8,4" Click="OnIgnore" Style="{StaticResource OkButtonStyle}"/>
                                     </StackPanel>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
@@ -52,6 +82,7 @@
 
             <TabItem Header="Murs">
                 <DataGrid x:Name="GridWalls" AutoGenerateColumns="False" IsReadOnly="True"
+                          RowStyle="{StaticResource IssueRowStyle}"
                           CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single">
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="Type" Binding="{Binding Category}" Width="180"/>
@@ -62,7 +93,7 @@
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                         <Button Content="Focus 3D" Padding="8,4" Margin="0,0,6,0" Click="OnFocus"/>
-                                        <Button Content="Marquer OK" Padding="8,4" Click="OnIgnore"/>
+                                        <Button Padding="8,4" Click="OnIgnore" Style="{StaticResource OkButtonStyle}"/>
                                     </StackPanel>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
@@ -73,6 +104,7 @@
 
             <TabItem Header="Traversées (sans réservation)">
                 <DataGrid x:Name="GridMEP" AutoGenerateColumns="False" IsReadOnly="True"
+                          RowStyle="{StaticResource IssueRowStyle}"
                           CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single">
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="Type" Binding="{Binding Category}" Width="220"/>
@@ -83,7 +115,7 @@
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                         <Button Content="Focus 3D" Padding="8,4" Margin="0,0,6,0" Click="OnFocus"/>
-                                        <Button Content="Marquer OK" Padding="8,4" Click="OnIgnore"/>
+                                        <Button Padding="8,4" Click="OnIgnore" Style="{StaticResource OkButtonStyle}"/>
                                     </StackPanel>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
@@ -94,6 +126,7 @@
 
             <TabItem Header="Raccords ouverts">
                 <DataGrid x:Name="GridOpen" AutoGenerateColumns="False" IsReadOnly="True"
+                          RowStyle="{StaticResource IssueRowStyle}"
                           CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single">
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="Type" Binding="{Binding Category}" Width="180"/>
@@ -104,7 +137,7 @@
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                         <Button Content="Focus 3D" Padding="8,4" Margin="0,0,6,0" Click="OnFocus"/>
-                                        <Button Content="Marquer OK" Padding="8,4" Click="OnIgnore"/>
+                                        <Button Padding="8,4" Click="OnIgnore" Style="{StaticResource OkButtonStyle}"/>
                                     </StackPanel>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
