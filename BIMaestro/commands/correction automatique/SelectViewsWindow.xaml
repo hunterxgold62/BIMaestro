@@ -2,7 +2,7 @@
 <Window x:Class="ScanTextRevit.SelectViewsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Sélection de Vues/Feuilles" 
+        Title="BIMaestro - Sélection de Vues/Feuilles" 
         Height="500" Width="400">
 
     <Window.Resources>

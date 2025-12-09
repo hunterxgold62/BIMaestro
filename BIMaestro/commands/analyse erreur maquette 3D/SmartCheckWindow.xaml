@@ -1,7 +1,7 @@
 ﻿<Window x:Class="Analyse.SmartCheckWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="BIMastro – Smart Check (Contradictions invisibles)"
+        Title="BIMaestro – Smart Check"
         Height="680" Width="980"
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResizeWithGrip">

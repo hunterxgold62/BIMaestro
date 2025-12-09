@@ -1,7 +1,7 @@
 ﻿<Window x:Class="IA.CorrectionWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Correction / Reformulation de Texte"
+        Title="BIMaestro - Correction / Reformulation de Texte"
         Width="600" Height="500"
         WindowStartupLocation="CenterScreen">
 

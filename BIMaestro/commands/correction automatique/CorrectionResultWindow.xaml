@@ -1,7 +1,7 @@
 ﻿<Window x:Class="ScanTextRevit.CorrectionResultWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Résultat du Scan de Textes et Corrections (IA)" 
+        Title="BIMaestro - Résultat du Scan de Textes et Corrections (IA)" 
         Height="700" Width="900"
         WindowStartupLocation="CenterOwner"
         Background="Transparent" 

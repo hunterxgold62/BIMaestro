@@ -1,7 +1,7 @@
 ﻿<Window x:Class="Modification.ElementRenamerWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Organisateur d'Éléments" Height="450" Width="400" WindowStartupLocation="CenterScreen">
+        Title="BIMaestro - Organisateur d'Éléments" Height="450" Width="400" WindowStartupLocation="CenterScreen">
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>

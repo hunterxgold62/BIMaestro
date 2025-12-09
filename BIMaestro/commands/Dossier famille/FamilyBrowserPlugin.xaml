@@ -4,7 +4,7 @@
         xmlns:local="clr-namespace:Famille"
         xmlns:ui="clr-namespace:BIMaestro.UI"
         xmlns:xctk="http://schemas.xceed.com/wpf/xaml/toolkit"
-        Title="Navigateur de Familles"
+        Title="BIMaestro - Navigateur de Familles"
         Height="600" Width="1150"
         MinWidth="600" MinHeight="400"
         FontFamily="Segoe UI" FontSize="12"

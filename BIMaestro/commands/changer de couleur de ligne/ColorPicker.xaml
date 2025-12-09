@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:xctk="http://schemas.xceed.com/wpf/xaml/toolkit"
-        Title="Sélectionner la couleur"
+        Title="BIMaestro - Sélectionner la couleur"
         Height="700" Width="720"
         WindowStartupLocation="CenterScreen"
         Background="#FFFAFBFC">
