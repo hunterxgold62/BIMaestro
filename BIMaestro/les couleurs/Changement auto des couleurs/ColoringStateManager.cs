@@ -408,8 +408,17 @@ namespace Couleur
 
         private static string ExtractProjectName(string tt)
         {
-            var idx = tt.IndexOf(" - ");
-            return idx > 0 ? tt.Substring(0, idx).Trim() : tt;
+            // Tenter de récupérer un nom plus précis (incluant une éventuelle version)
+            var parts = tt.Split(new[] { " - " }, StringSplitOptions.None);
+
+            if (parts.Length >= 2)
+            {
+                // Conserver les deux premiers segments pour différencier des variantes
+                // comme "UVE - V3" et "UVE - V4".
+                return string.Join(" - ", parts.Take(2)).Trim();
+            }
+
+            return tt;
         }
 
         private static List<T> FindChildrenByType<T>(DependencyObject parent) where T : DependencyObject

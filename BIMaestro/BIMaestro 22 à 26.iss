@@ -8,7 +8,7 @@
 [Setup]
 AppId={{E3B0C442-98FC-1C14-9AF7-7D7CE11B9A09}}
 AppName=BIMaestro
-AppVersion=1.0.5.7
+AppVersion=1.0.5.8
 PrivilegesRequired=lowest
 DisableProgramGroupPage=yes
 DisableDirPage=yes

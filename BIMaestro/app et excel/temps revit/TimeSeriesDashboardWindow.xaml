@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:oxy="clr-namespace:OxyPlot.Wpf;assembly=OxyPlot.Wpf"
         Title="BIMaestro — Temps par type de document"
-        Width="1280" Height="820" MinWidth="1100" MinHeight="680"
+        Width="1280" Height="840" MinWidth="1100" MinHeight="680"
         WindowStartupLocation="CenterScreen"
         Background="#F8F9FB">
 
