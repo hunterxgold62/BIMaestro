@@ -270,9 +270,9 @@
     <Compile Include="animation touche\Fantome oui-non\fantome.xaml.cs">
       <DependentUpon>fantome.xaml</DependentUpon>
     </Compile>
-    <Compile Include="app et excel\AppUI.cs" />
+    <Compile Include="app et excel\Touche\AppUI.cs" />
     <Compile Include="app et excel\Supabase\ApiKeys.cs" />
-    <None Include="app et excel\copie touche.cs" />
+    <None Include="app et excel\Touche\copie touche.cs" />
     <Compile Include="app et excel\App.cs" />
     <Compile Include="app et excel\Supabase\BaseTrackedCommand.cs" />
     <Compile Include="app et excel\Supabase\LicenseManager.cs" />
@@ -283,6 +283,12 @@
     <Compile Include="app et excel\temps revit\ShowTimeDashboard.cs" />
     <Compile Include="app et excel\temps revit\TimeSeriesDashboardWindow.xaml.cs">
       <DependentUpon>TimeSeriesDashboardWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="app et excel\Touche\RibbonLayoutCommand.cs" />
+    <Compile Include="app et excel\Touche\RibbonLayoutConfigManager.cs" />
+    <Compile Include="app et excel\Touche\RibbonLayoutModels.cs" />
+    <Compile Include="app et excel\Touche\RibbonLayoutWindow.xaml.cs">
+      <DependentUpon>RibbonLayoutWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="commands\analyse erreur maquette 3D\SmartCheckState.cs" />
     <Compile Include="commands\analyse erreur maquette 3D\SmartExternalHandler.cs" />
@@ -508,6 +514,10 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Include="app et excel\temps revit\TimeSeriesDashboardWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="app et excel\Touche\RibbonLayoutWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
