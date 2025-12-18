@@ -278,6 +278,7 @@
     <Compile Include="app et excel\Supabase\LicenseManager.cs" />
     <Compile Include="app et excel\Supabase\NetSupport.cs" />
     <Compile Include="app et excel\Supabase\Paths.cs" />
+    <Compile Include="app et excel\Supabase\PushMessage.cs" />
     <Compile Include="app et excel\Supabase\Telemetry.cs" />
     <Compile Include="app et excel\temps revit\ShowTimeDashboard.cs" />
     <Compile Include="app et excel\temps revit\TimeSeriesDashboardWindow.xaml.cs">
@@ -400,6 +401,10 @@
     <None Include="Test\2024 to 2023\ExportFamilyToJson.cs" />
     <None Include="Test\2024 to 2023\FamilyExchangeModel.cs" />
     <None Include="Test\2024 to 2023\ImportFamilyFromJson.cs" />
+    <Compile Include="Test\perso pixéli\PixelDancerCommand.cs" />
+    <Compile Include="Test\perso pixéli\PixelDancerWindow.xaml.cs">
+      <DependentUpon>PixelDancerWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Themes\app.xaml.cs">
       <DependentUpon>app.xaml</DependentUpon>
     </Compile>
@@ -622,6 +627,10 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </None>
+    <Page Include="Test\perso pixéli\PixelDancerWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="Themes\app.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>

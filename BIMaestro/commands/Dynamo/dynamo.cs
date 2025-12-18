@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Windows.Interop;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.DB;
@@ -33,7 +34,19 @@ namespace Modification
 
         private class ButtonConfig
         {
-            public string Path { get; set; }
+            public List<string> Paths { get; set; } = new List<string>();
+
+            [JsonProperty("Path", NullValueHandling = NullValueHandling.Ignore)]
+            public string LegacyPath
+            {
+                get => null;
+                set
+                {
+                    if (!string.IsNullOrWhiteSpace(value))
+                        Paths = new List<string> { value };
+                }
+            }
+
             public string Label { get; set; }
         }
 
@@ -60,7 +73,7 @@ namespace Modification
                         {
                             var cfg = data[i];
                             if (cfg == null) continue;
-                            buttons[i].Path = cfg.Path;
+                            buttons[i].Paths = NormalizePaths(cfg.Paths);
                             buttons[i].Label = NormalizeLabel(cfg.Label);
                         }
                     }
@@ -71,7 +84,7 @@ namespace Modification
                     for (int i = 0; i < Math.Min(lines.Length, ButtonCount); i++)
                     {
                         if (!string.IsNullOrWhiteSpace(lines[i]))
-                            buttons[i].Path = lines[i];
+                            buttons[i].Paths = NormalizePaths(new[] { lines[i] });
                     }
                     Save();
                 }
@@ -86,6 +99,9 @@ namespace Modification
         {
             try
             {
+                if (!Directory.Exists(ConfigFolder))
+                    Directory.CreateDirectory(ConfigFolder);
+
                 var json = JsonConvert.SerializeObject(buttons, Formatting.Indented);
                 File.WriteAllText(ConfigFile, json);
             }
@@ -105,16 +121,43 @@ namespace Modification
             return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
         }
 
+        private static List<string> NormalizePaths(IEnumerable<string> paths)
+        {
+            var normalized = new List<string>();
+            if (paths != null)
+            {
+                foreach (var path in paths)
+                {
+                    if (string.IsNullOrWhiteSpace(path))
+                        continue;
+
+                    string cleaned = path.Trim();
+                    if (!string.IsNullOrWhiteSpace(cleaned))
+                        normalized.Add(cleaned);
+                }
+            }
+
+            if (normalized.Count == 0)
+                normalized.Add(DefaultPath);
+
+            return normalized;
+        }
+
         private static void ValidateIndex(int index)
         {
             if (index < 0 || index >= ButtonCount)
                 throw new ArgumentOutOfRangeException(nameof(index));
         }
 
-        public static string GetPath(int index)
+        public static IReadOnlyList<string> GetPaths(int index)
         {
             ValidateIndex(index);
-            return !string.IsNullOrWhiteSpace(buttons[index].Path) ? buttons[index].Path : DefaultPath;
+            return NormalizePaths(buttons[index].Paths);
+        }
+
+        public static string GetPath(int index)
+        {
+            return GetPaths(index).FirstOrDefault();
         }
 
         public static string GetLabel(int index)
@@ -124,10 +167,10 @@ namespace Modification
             return !string.IsNullOrWhiteSpace(label) ? label : DefaultLabels[index];
         }
 
-        public static void SetConfiguration(int index, string path, string label)
+        public static void SetConfiguration(int index, IEnumerable<string> paths, string label)
         {
             ValidateIndex(index);
-            buttons[index].Path = path;
+            buttons[index].Paths = NormalizePaths(paths);
             string normalized = NormalizeLabel(label);
             if (!string.IsNullOrWhiteSpace(normalized) &&
                 string.Equals(normalized, DefaultLabels[index], StringComparison.Ordinal))
@@ -141,7 +184,7 @@ namespace Modification
         public static void SetPath(int index, string path)
         {
             ValidateIndex(index);
-            SetConfiguration(index, path, buttons[index].Label);
+            SetConfiguration(index, new[] { path }, buttons[index].Label);
         }
     }
 
@@ -149,29 +192,41 @@ namespace Modification
     {
         public static Result RunDynamo(int buttonIndex, ExternalCommandData commandData)
         {
-            string dynPath = DynamoSettings.GetPath(buttonIndex);
-            if (!File.Exists(dynPath))
+            var dynPaths = DynamoSettings.GetPaths(buttonIndex);
+            foreach (var dynPath in dynPaths)
             {
-                TaskDialog.Show("Erreur", $"Le fichier Dynamo n'existe pas :\n{dynPath}");
-                return Result.Failed;
+                if (!File.Exists(dynPath))
+                {
+                    TaskDialog.Show("Erreur", $"Le fichier Dynamo n'existe pas :\n{dynPath}");
+                    return Result.Failed;
+                }
             }
 
             try
             {
                 var dynamoRevit = new DynamoRevit();
                 var cmdData = new DynamoRevitCommandData(commandData);
-                var journal = new Dictionary<string, string>
+
+                foreach (var dynPath in dynPaths)
                 {
-                    { JournalKeys.ShowUiKey,          false.ToString() },
-                    { JournalKeys.AutomationModeKey,  false.ToString() },
-                    { JournalKeys.DynPathKey,         dynPath },
-                    { JournalKeys.DynPathExecuteKey,  true.ToString() },
-                    { JournalKeys.ForceManualRunKey,  true.ToString() },
-                    { JournalKeys.ModelShutDownKey,   true.ToString() },
-                    { JournalKeys.ModelNodesInfo,     false.ToString() }
-                };
-                cmdData.JournalData = journal;
-                return dynamoRevit.ExecuteCommand(cmdData);
+                    var journal = new Dictionary<string, string>
+                    {
+                        { JournalKeys.ShowUiKey,          false.ToString() },
+                        { JournalKeys.AutomationModeKey,  false.ToString() },
+                        { JournalKeys.DynPathKey,         dynPath },
+                        { JournalKeys.DynPathExecuteKey,  true.ToString() },
+                        { JournalKeys.ForceManualRunKey,  true.ToString() },
+                        { JournalKeys.ModelShutDownKey,   true.ToString() },
+                        { JournalKeys.ModelNodesInfo,     false.ToString() }
+                    };
+                    cmdData.JournalData = journal;
+
+                    var result = dynamoRevit.ExecuteCommand(cmdData);
+                    if (result != Result.Succeeded)
+                        return result;
+                }
+
+                return Result.Succeeded;
             }
             catch (Exception ex)
             {
@@ -236,11 +291,12 @@ namespace Modification
                     return Result.Cancelled;
 
                 // 4. Sauvegarde du choix (chemin + libellé)
-                DynamoSettings.SetConfiguration(wnd.SelectedButtonIndex, wnd.SelectedPath, wnd.SelectedLabel);
+                DynamoSettings.SetConfiguration(wnd.SelectedButtonIndex, wnd.SelectedPaths, wnd.SelectedLabel);
 
                 string labelPreview = DynamoSettings.GetLabel(wnd.SelectedButtonIndex).Replace("\n", " / ");
+                string pathPreview = string.Join("\n", wnd.SelectedPaths);
                 TaskDialog.Show("Fait",
-                    $"Le bouton \"{labelPreview}\" utilisera :\n{wnd.SelectedPath}");
+                    $"Le bouton \"{labelPreview}\" utilisera :\n{pathPreview}");
                 return Result.Succeeded;
             }
             catch (Exception ex)

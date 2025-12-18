@@ -11,7 +11,7 @@ namespace Page
     [Transaction(TransactionMode.Manual)]
     public class GuideCommand : BaseTrackedCommand
     {
-        private const string GuideUrl = "https://sites.google.com/view/guide-bimaestro";
+        private const string GuideUrl = "https://www.bimaestro.fr";
         protected override string ButtonId => "GuideCommand";
         protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {

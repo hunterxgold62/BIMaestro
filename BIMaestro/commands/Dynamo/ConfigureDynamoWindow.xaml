@@ -71,17 +71,49 @@
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <TextBlock Text="Script Dynamo à lancer :"
-                       VerticalAlignment="Center" />
-            <DockPanel Grid.Column="1">
-                <TextBox x:Name="PathTextBox"
-                         IsReadOnly="True"
-                         Margin="0,0,6,0"
-                         MinWidth="260"
-                         ToolTip="Chemin complet du fichier .dyn sélectionné" />
-                <Button Content="Parcourir..."
-                        Click="BrowseButton_Click" />
-            </DockPanel>
+            <StackPanel VerticalAlignment="Top">
+                <TextBlock Text="Scripts Dynamo à lancer :"
+                           Margin="0,0,0,2" />
+                <TextBlock Text="Ils seront exécutés dans l'ordre de la liste."
+                           FontSize="11"
+                           Foreground="Gray" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="1">
+                <ItemsControl x:Name="PathsItemsControl"
+                              AlternationCount="100">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="0,0,0,8">
+                                <TextBlock Text="{Binding Label}"
+                                           FontWeight="SemiBold"
+                                           Margin="0,0,0,2" />
+                                <DockPanel>
+                                    <TextBox Text="{Binding Path, UpdateSourceTrigger=PropertyChanged}"
+                                             IsReadOnly="True"
+                                             Margin="0,0,6,0"
+                                             MinWidth="260"
+                                             ToolTip="Chemin complet du fichier .dyn sélectionné" />
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button Content="Parcourir..."
+                                                Tag="{Binding}"
+                                                Click="BrowsePathButton_Click"
+                                                Margin="0,0,6,0" />
+                                        <Button Content="Supprimer"
+                                                Tag="{Binding}"
+                                                Click="RemovePathButton_Click" />
+                                    </StackPanel>
+                                </DockPanel>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <Button Content="Ajouter un script"
+                        HorizontalAlignment="Left"
+                        Width="150"
+                        Click="AddPathButton_Click" />
+            </StackPanel>
         </Grid>
 
         <Border Grid.Row="4"

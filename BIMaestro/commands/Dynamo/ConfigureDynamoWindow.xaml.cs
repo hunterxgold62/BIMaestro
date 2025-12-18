@@ -1,21 +1,66 @@
-﻿using System;
+﻿using Microsoft.Win32;
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.IO;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using Microsoft.Win32;
 
 namespace Modification
 {
     public partial class ConfigureDynamoWindow : Window
     {
+        private class PathEntry : INotifyPropertyChanged
+        {
+            private string path;
+            private string label;
+
+            public string Path
+            {
+                get => path;
+                set
+                {
+                    if (path == value)
+                        return;
+                    path = value;
+                    OnPropertyChanged(nameof(Path));
+                }
+            }
+
+            public string Label
+            {
+                get => label;
+                set
+                {
+                    if (label == value)
+                        return;
+                    label = value;
+                    OnPropertyChanged(nameof(Label));
+                }
+            }
+
+            public event PropertyChangedEventHandler PropertyChanged;
+
+            private void OnPropertyChanged(string propertyName)
+            {
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            }
+        }
+
+        private readonly ObservableCollection<PathEntry> _paths = new ObservableCollection<PathEntry>();
+        private bool _isUpdatingPaths;
+
         public int SelectedButtonIndex { get; private set; }
-        public string SelectedPath { get; private set; }
+        public ReadOnlyCollection<string> SelectedPaths { get; private set; }
         public string SelectedLabel { get; private set; }
 
         public ConfigureDynamoWindow()
         {
             InitializeComponent();
 
+            PathsItemsControl.ItemsSource = _paths;
             ButtonComboBox.SelectionChanged += ButtonComboBox_SelectionChanged;
             UpdateSelectionFields(0);
         }
@@ -30,27 +75,32 @@ namespace Modification
             if (idx < 0)
                 return;
 
-            PathTextBox.Text = DynamoSettings.GetPath(idx);
+            LoadPaths(DynamoSettings.GetPaths(idx));
             LabelTextBox.Text = DynamoSettings.GetLabel(idx)
                 .Replace("\n", Environment.NewLine);
             UpdatePreview();
         }
 
-        private void BrowseButton_Click(object sender, RoutedEventArgs e)
+        private void LoadPaths(IReadOnlyCollection<string> paths)
         {
-            var dlg = new OpenFileDialog
+            _isUpdatingPaths = true;
+            _paths.Clear();
+
+            if (paths != null)
             {
-                Title = "Choisir un fichier Dynamo (.dyn)",
-                Filter = "Fichiers Dynamo (*.dyn)|*.dyn",
-                InitialDirectory = GetInitialDirectory()
-            };
-            if (dlg.ShowDialog() == true)
-                PathTextBox.Text = dlg.FileName;
+                foreach (var path in paths)
+                    _paths.Add(new PathEntry { Path = path });
+            }
+
+            if (_paths.Count == 0)
+                _paths.Add(new PathEntry());
+
+            _isUpdatingPaths = false;
+            RefreshPathLabels();
         }
 
-        private string GetInitialDirectory()
+        private string GetInitialDirectory(string currentPath)
         {
-            string currentPath = PathTextBox.Text;
             if (!string.IsNullOrWhiteSpace(currentPath))
             {
                 var directory = Path.GetDirectoryName(currentPath);
@@ -58,7 +108,8 @@ namespace Modification
                     return directory;
             }
 
-            var fallback = Path.GetDirectoryName(DynamoSettings.GetPath(ButtonComboBox.SelectedIndex));
+            var currentPaths = DynamoSettings.GetPaths(ButtonComboBox.SelectedIndex);
+            var fallback = Path.GetDirectoryName(currentPaths.FirstOrDefault());
             if (!string.IsNullOrWhiteSpace(fallback) && Directory.Exists(fallback))
                 return fallback;
 
@@ -67,9 +118,14 @@ namespace Modification
 
         private void OkButton_Click(object sender, RoutedEventArgs e)
         {
-            if (string.IsNullOrWhiteSpace(PathTextBox.Text))
+            var selectedPaths = _paths
+                .Select(p => p.Path?.Trim())
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .ToList();
+
+            if (selectedPaths.Count == 0)
             {
-                MessageBox.Show("Veuillez sélectionner un fichier .dyn.",
+                MessageBox.Show("Veuillez sélectionner au moins un fichier .dyn.",
                                 "Attention",
                                 MessageBoxButton.OK,
                                 MessageBoxImage.Warning);
@@ -77,7 +133,7 @@ namespace Modification
             }
 
             SelectedButtonIndex = ButtonComboBox.SelectedIndex;
-            SelectedPath = PathTextBox.Text.Trim();
+            SelectedPaths = selectedPaths.AsReadOnly();
             SelectedLabel = LabelTextBox.Text;
             DialogResult = true;
         }
@@ -93,6 +149,54 @@ namespace Modification
                 ? DynamoSettings.GetLabel(ButtonComboBox.SelectedIndex).Replace("\n", Environment.NewLine)
                 : LabelTextBox.Text;
             PreviewTextBlock.Text = previewText;
+        }
+
+        private void BrowsePathButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement element || element.Tag is not PathEntry entry)
+                return;
+
+            var dlg = new OpenFileDialog
+            {
+                Title = "Choisir un fichier Dynamo (.dyn)",
+                Filter = "Fichiers Dynamo (*.dyn)|*.dyn",
+                InitialDirectory = GetInitialDirectory(entry.Path)
+            };
+
+            if (dlg.ShowDialog() == true)
+                entry.Path = dlg.FileName;
+        }
+
+        private void AddPathButton_Click(object sender, RoutedEventArgs e)
+        {
+            _paths.Add(new PathEntry());
+            RefreshPathLabels();
+        }
+
+        private void RemovePathButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement element || element.Tag is not PathEntry entry)
+                return;
+
+            if (_paths.Count <= 1)
+            {
+                MessageBox.Show("Au moins un chemin est requis.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            _paths.Remove(entry);
+            RefreshPathLabels();
+        }
+
+        private void RefreshPathLabels()
+        {
+            if (_isUpdatingPaths)
+                return;
+
+            for (int i = 0; i < _paths.Count; i++)
+            {
+                _paths[i].Label = $"Chemin {i + 1}";
+            }
         }
     }
 }

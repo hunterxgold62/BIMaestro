@@ -191,9 +191,15 @@ private List<string> GetImportNames(Document doc)
                 ? ModelPathUtils.ConvertModelPathToUserVisiblePath(
                     doc.GetWorksharingCentralModelPath())
                 : doc.PathName;
-            if (!string.IsNullOrEmpty(rvtPath))
+            // Le fichier peut être une famille non enregistrée : dans ce cas PathName est vide
+            // et DirectoryInfo ne doit pas être construit avec une chaîne vide/null.
+            var dirPath = string.IsNullOrEmpty(rvtPath)
+                ? null
+                : Path.GetDirectoryName(rvtPath);
+
+            if (!string.IsNullOrEmpty(dirPath))
             {
-                var dir = new DirectoryInfo(Path.GetDirectoryName(rvtPath));
+                var dir = new DirectoryInfo(dirPath);
                 for (int i = 0; i < 4 && dir != null; i++, dir = dir.Parent)
                     roots.Add(dir.FullName);
             }

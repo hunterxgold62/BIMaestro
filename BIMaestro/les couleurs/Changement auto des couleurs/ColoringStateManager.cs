@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows;
 using System.Windows.Automation;
@@ -408,18 +409,37 @@ namespace Couleur
 
         private static string ExtractProjectName(string tt)
         {
-            // Tenter de récupérer un nom plus précis (incluant une éventuelle version)
             var parts = tt.Split(new[] { " - " }, StringSplitOptions.None);
 
+            // Revit 2025 fournit un second segment correspondant à la version de maquette
+            // (ex. "V3", "V4"), ce qui permet de distinguer des fichiers dupliqués.
+            // En 2023/2024, ce second segment correspond souvent au nom de vue, provoquant
+            // une couleur différente par onglet. On n'inclut donc le deuxième segment que
+            // lorsqu'il ressemble clairement à un identifiant de version.
             if (parts.Length >= 2)
             {
-                // Conserver les deux premiers segments pour différencier des variantes
-                // comme "UVE - V3" et "UVE - V4".
-                return string.Join(" - ", parts.Take(2)).Trim();
+                var second = parts[1].Trim();
+                if (LooksLikeVersionSegment(second))
+                {
+                    return string.Join(" - ", parts.Take(2)).Trim();
+                }
+
+                return parts[0].Trim();
             }
 
-            return tt;
+            return tt.Trim();
         }
+
+        private static bool LooksLikeVersionSegment(string segment)
+        {
+            if (string.IsNullOrWhiteSpace(segment)) return false;
+
+           
+            if (segment.IndexOf(' ') >= 0) return false;
+
+            return Regex.IsMatch(segment, @"V\d+", RegexOptions.IgnoreCase);
+        }
+
 
         private static List<T> FindChildrenByType<T>(DependencyObject parent) where T : DependencyObject
         {
