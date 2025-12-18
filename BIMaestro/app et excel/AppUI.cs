@@ -182,25 +182,24 @@ public class AppUI : IExternalApplication
     }
 
     private static void AddSplitButton(
-     RibbonPanel panel,
-     string splitButtonName,
-     string splitButtonText,
-     string assemblyPath,
-     List<(string buttonName, string buttonText, string className, string resourceImageName, string toolTip)> buttons,
-     string splitToolTip = null,                   // optionnel : info sur le groupe
-     string splitToolTipImageResource = null)       // optionnel : image d'aide
+      RibbonPanel panel,
+      string splitButtonName,
+      string splitButtonText,
+      string assemblyPath,
+      List<(string buttonName, string buttonText, string className, string resourceImageName, string toolTip)> buttons,
+      string splitToolTip = null,                   // optionnel : info sur le groupe
+      string splitToolTipImageResource = null)       // optionnel : image d'aide
 
     {
-        var splitButtonData = new SplitButtonData(splitButtonName, splitButtonText);
-        var splitButton = panel.AddItem(splitButtonData) as SplitButton;
+        var pulldownData = new PulldownButtonData(splitButtonName, splitButtonText);
+        var pulldownButton = panel.AddItem(pulldownData) as PulldownButton;
 
-        // Astuce : petite aide quand on survole le SplitButton (si fournie)
+        // Astuce : petite aide quand on survole le PulldownButton (si fournie)
         if (!string.IsNullOrWhiteSpace(splitToolTip))
         {
-            // SplitButton (ribbon item) expose bien ToolTip
-            splitButton.ToolTip = splitToolTip;
+            pulldownButton.ToolTip = splitToolTip;
 
-            // Image d'aide (facultative) pour la bulle du SplitButton
+            // Image d'aide (facultative) pour la bulle du PulldownButton
             if (!string.IsNullOrWhiteSpace(splitToolTipImageResource))
             {
                 var asm = Assembly.GetExecutingAssembly();
@@ -213,9 +212,19 @@ public class AppUI : IExternalApplication
                         bmp.BeginInit();
                         bmp.StreamSource = stream;
                         bmp.EndInit();
-                        splitButton.ToolTipImage = bmp; // dispo sur 2023+
+                        pulldownButton.ToolTipImage = bmp; // dispo sur 2023+
                     }
                 }
+            }
+        }
+
+        // Utiliser l'image du premier bouton pour l'icône principale du pulldown si disponible
+        if (buttons.Count > 0)
+        {
+            var firstImage = LoadBitmapFromResource(buttons[0].resourceImageName);
+            if (firstImage != null)
+            {
+                pulldownButton.LargeImage = firstImage;
             }
         }
 
@@ -265,7 +274,7 @@ public class AppUI : IExternalApplication
             // string helperImageRes = "MonImageAide.png";
             // buttonData.ToolTipImage = LoadBitmapFromResource(helperImageRes);
 
-            var pb = splitButton.AddPushButton(buttonData);
+            pulldownButton.AddPushButton(buttonData);
 
             // (Option) Lier une aide contextuelle (URL/CHM) par bouton :
             // pb.SetContextualHelp(new ContextualHelp(ContextualHelpType.Url, "https://mon-wiki/bimaestro/couleurs"));
