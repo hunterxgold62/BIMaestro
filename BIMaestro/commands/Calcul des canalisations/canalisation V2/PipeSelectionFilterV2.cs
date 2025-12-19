@@ -19,6 +19,8 @@ using System.Windows;
 using System.Windows.Interop;
 using Autodesk.Revit.DB.Plumbing;
 using Autodesk.Revit.DB.Mechanical;
+using System.Windows.Media;
+
 
 
 namespace Analyse
@@ -99,6 +101,8 @@ namespace Analyse
                 Dictionary<string, NetworkAggregation> networkAggregates = new Dictionary<string, NetworkAggregation>();
                 // Nouveau : couleur de chaque réseau
                 var networkColors = new Dictionary<string, System.Drawing.Color>();
+                var networkElementIds = new Dictionary<string, HashSet<ElementId>>();
+
 
                 // Traitement des éléments
                 foreach (ElementId id in selectedIds)
@@ -124,6 +128,12 @@ namespace Analyse
                         if (!networkAggregates.ContainsKey(networkName))
                             networkAggregates[networkName] = new NetworkAggregation();
                         netAgg = networkAggregates[networkName];
+                        if (!networkElementIds.TryGetValue(networkName, out var ids))
+                        {
+                            ids = new HashSet<ElementId>();
+                            networkElementIds[networkName] = ids;
+                        }
+                        ids.Add(elem.Id);
                     }
                     // Remplir networkColors au premier tuyau rencontré
                     if (!string.IsNullOrEmpty(networkName)
@@ -507,7 +517,12 @@ namespace Analyse
                         Process.Start(new ProcessStartInfo(excelFilePath) { UseShellExecute = true });
                     }
                 }
-
+                ShowNetworkInteractionWindow(
+                   uidoc,
+                   mainWindowHandle,
+                   networkAggregates,
+                   networkColors,
+                   networkElementIds);
                 return Result.Succeeded;
             }
             catch (Exception ex)
@@ -657,6 +672,60 @@ namespace Analyse
             return knownPoints[0].Length;
         }
         // --- FIN NOUVELLE IMPLEMENTATION ---
+        private void ShowNetworkInteractionWindow(
+           UIDocument uidoc,
+           IntPtr mainWindowHandle,
+           Dictionary<string, NetworkAggregation> networkAggregates,
+           Dictionary<string, System.Drawing.Color> networkColors,
+           Dictionary<string, HashSet<ElementId>> networkElementIds)
+        {
+            var items = new List<PipeNetworkDisplayItem>();
+
+            foreach (var kvp in networkAggregates)
+            {
+                if (!networkElementIds.TryGetValue(kvp.Key, out var ids) || ids.Count == 0)
+                    continue;
+
+                double totalLength = kvp.Value.PipeLengths.Values.Sum() + kvp.Value.DuctLengths.Values.Sum();
+
+                var color = networkColors.TryGetValue(kvp.Key, out var clr)
+                    ? clr
+                    : System.Drawing.Color.LightGray;
+
+                items.Add(new PipeNetworkDisplayItem(
+                    kvp.Key,
+                    Math.Round(totalLength, 2),
+                    ToBrush(color),
+                    new HashSet<ElementId>(ids)));
+            }
+
+            if (items.Count == 0)
+                return;
+
+            var interactionWindow = new PipeNetworkInteractionWindow(items, ids => SelectNetworkElements(uidoc, ids));
+            var helper = new WindowInteropHelper(interactionWindow)
+            {
+                Owner = mainWindowHandle
+            };
+            interactionWindow.Show();
+        }
+
+        private SolidColorBrush ToBrush(System.Drawing.Color color)
+        {
+            var mediaColor = System.Windows.Media.Color.FromRgb(color.R, color.G, color.B);
+            var brush = new SolidColorBrush(mediaColor);
+            brush.Freeze();
+            return brush;
+        }
+
+        private void SelectNetworkElements(UIDocument uidoc, HashSet<ElementId> ids)
+        {
+            if (ids == null || ids.Count == 0)
+                return;
+
+            uidoc.Selection.SetElementIds(ids);
+            uidoc.ShowElements(ids);
+        }
 
         // Méthode d'export vers Excel (retourne le chemin complet du fichier généré)
         private string ExportToExcel(

@@ -35,11 +35,11 @@ public class AppUI : IExternalApplication
                 new RibbonItemDefinition("GetPaintedMaterialsButton", "Peinture de matériaux", panel => AddPushButton(panel, "GetPaintedMaterialsButton", "Peinture de\nmatériaux", assemblyPath, "Visualisation.GetPaintedMaterialsCommand", "Peinture et matériaux.png", "Permet d'obtenir une liste des matériaux appliqués à un élément Revit,qu'il s'agisse de matériaux directement associés à l'objet ou de matériaux de peinture appliqués sur ses faces. Une fenêtre d'information affiche les matériaux identifiés pour mieux comprendre la composition de l'élément sélectionné.")),
                 new RibbonItemDefinition("OpenSheetFromViewButton", "Ouvrir la vue du Plan", panel => AddPushButton(panel, "OpenSheetFromViewButton", "Ouvrir la vue\ndu Plan", assemblyPath, "Visualisation.OpenSheetFromView", "safeimagekit-doc.png", "Cette commande permet de basculer entre une vue active (plan, coupe ou 3D) et les feuilles qui la contiennent, ou d'ouvrir une vue directement depuis un viewport sélectionné sur une feuille. \n\nElle simplifie la navigation entre les feuilles et les vues associées dans un projet Revit.")),
                 new RibbonItemDefinition("ReorientViewButton", "Réorienter Vue 3D", panel => AddPushButton(panel, "ReorientViewButton", "Réorienter\nVue 3D", assemblyPath, "Visualisation.ReorientViewCommand", "Element 3D.png", "Permet de réorienter une vue 3D active en fonction de la géométrie d'une face sélectionnée.")),
-                // new RibbonItemDefinition("Information d'élément", "Information d'élément", panel => AddPushButton(panel, "Information d'élément", "Information\nd'élément", assemblyPath, "IA.SelectElementsCommand", "safeimagekit-Information.png", "Ce module utilitaire fournit des méthodes avancées pour :\r\n\r\n- Identifier les matériaux appliqués aux éléments du modèle.\r\n- Obtenir des paramètres personnalisés liés à la géométrie et aux dimensions.\r\nCalculer la surface au sol et le volume des éléments, avec une distinction basée sur la catégorie (toit, plancher, etc.).")),
                 new RibbonItemDefinition("Export Nomenclature", "Export Nomenclature", panel => AddPushButton(panel, "Export Nomenclature", "Export \nNomenclature", assemblyPath, "Visualisation.ExportScheduleCommand", "rvt to excel et pdf.png", "Exporte les nomenclatures Revit sélectionnées en fichier Excel ou PDF.")),
                 new RibbonItemDefinition("ExportDwgBatch", "Export DWG", panel => AddPushButton(panel, "ExportDwgBatch", "Export\nDWG", assemblyPath, "Visualisation.ExportSheetsCommand", "export DWG.png", "Exporte automatiquement plusieurs vues ou feuilles en DWG, en nommant chaque fichier selon le projet et la vue comme pour les PDF.")),
                 new RibbonItemDefinition("Sélection d'objet", "Sélection d'objet", panel => AddPushButton(panel, "Sélection d'objet", "Sélection\nd'objet", assemblyPath, "Visualisation.SelectSimilarCommand", "Sélection d'élément.png", "Sélectionne des éléments similaires dans le projet")),
             }),
+
             new RibbonPanelDefinition("Modification", new List<RibbonItemDefinition>
             {
                 new RibbonItemDefinition("OverrideColor", "Couleur d'élément", panel => AddPushButton(panel, "OverrideColor", "Couleur\nd'élément", assemblyPath, "Modification.OverrideColorCommand", "Pallette de couleur anexe .png", "Cette commande permet :  \r\n- De personnaliser les couleurs, motifs et transparence des éléments.  \r\n- D'appliquer des paramètres graphiques à plusieurs vues simultanément.  \r\n- De réinitialiser les modifications si nécessaire.  \r\n\r\nUtilité : Améliorez le rendu et la lisibilité de vos vues.  ")),
@@ -59,18 +59,18 @@ public class AppUI : IExternalApplication
                     ("dynamo 4", DynamoSettings.GetLabel(3), "Modification.RunDynamo4Command", "dynamo 4.png","Lance le script Dynamo n°4."),
                     ("dynamo 5", DynamoSettings.GetLabel(4), "Modification.RunDynamo5Command", "dynamo 5.png","Lance le script Dynamo n°5."),
                     ("dynamo réglage", "Auto dynamo\nréglage", "Modification.ConfigureDynamoButtonCommand", "réglage.png","Configure les paramètres Dynamo"),
-                    
                 })),
                 new RibbonItemDefinition("GestionExcelCmd", "Gestion Excel", panel => AddPushButton(panel, "GestionExcelCmd", "Gestion\nExcel", assemblyPath, "ScheduleIO.ScheduleExcelIOCommand", "export import Excel.png", "Exporter ou importer une nomenclature au format Excel")),
                 new RibbonItemDefinition("Purge du plan", "Purge du plan", panel => AddPushButton(panel, "Purge du plan", "Purge du\nplan", assemblyPath, "Modification.CombinedCleanupCommand", "purge.png", "Supprime les vues non placées, les familles et les nomenclatures inutilisées afin d'alléger le projet.\r\nUne fenêtre permet de choisir précisément les éléments à purger avant exécution.\r\n")),
-                // new RibbonItemDefinition("Auto canalisation", "(Béta)Auto canalisation", panel => AddPushButton(panel, "Auto canalisation", "(Béta)Auto\ncanalisation", assemblyPath, "Modification.ConnectPipesCommand", "cana auto.png", "Connecte automatiquement les canalisations sélectionnées, évite les murs sur son passage.")),
             }),
+
             new RibbonPanelDefinition("Outils IA", new List<RibbonItemDefinition>
             {
                 new RibbonItemDefinition("GPTBotWindowButton", "Chatbot + élément", panel => AddPushButton(panel, "GPTBotWindowButton", "Chatbot\n+ élément", assemblyPath, "IA.GPTBotWindowCommand", "Image IA.png", "Cette commande permet :  \r\n- D'envoyer des questions ou des demandes d'analyse à un assistant IA basé sur DeepSeek.  \r\n- De récupérer des informations détaillées sur les éléments sélectionnés dans Revit (niveau, matériaux, surface, volume).  \r\n- D'afficher une conversation interactive avec l'IA directement dans une interface dédiée.  \r\n- De personnaliser le profil du chatbot pour s'adapter à différents contextes (BIM Manager, utilisateur Revit, etc.).  \r\n\r\nUtilité :  \r\nOptimisez votre travail dans Revit grâce à un assistant intelligent capable de fournir des conseils, des analyses, et des informations détaillées.")),
                 new RibbonItemDefinition("TextCorrectionButton", "Correction de texte IA", panel => AddPushButton(panel, "TextCorrectionButton", "Correction \nde texte IA", assemblyPath, "IA.TextCorrectionCommand", "safeimagekit-correction de texte IA.png", "Cette commande permet :  \r\n- De corriger les fautes dans les textes sélectionnés dans Revit.  \r\n- De reformuler les textes dans différents styles : professionnel, cool, baratin ou personnalisé.  \r\n- D'interagir avec une interface utilisateur pour accepter, modifier ou ignorer les corrections proposées.  \r\n- D'utiliser une IA avancée (basée sur GPT) pour produire des textes plus clairs et sans erreurs.  \r\n\r\nUtilité :  \r\nAméliorez rapidement la qualité des textes dans vos annotations Revit grâce à une correction automatisée et personnalisable.")),
                 new RibbonItemDefinition("ScanText", "ScanText IA", panel => AddPushButton(panel, "ScanText", "ScanText\nIA", assemblyPath, "ScanTextRevit.SelectViewsCommand", "safeimagekit-qfdfsf.png", "Corrige automatiquement les fautes d'orthographe et de grammaire dans les textes visibles sur les vues ou feuilles du projet. \r\nL'IA analyse les textes scannés par chunk et indique les erreurs ligne par ligne avec explication. \r\nLes corrections sont classées en \"Mineur\" (ponctuation, espaces) ou \"Erreur\" (grammaire, orthographe).\r\n"))
             }),
+
             new RibbonPanelDefinition("Analyse", new List<RibbonItemDefinition>
             {
                 new RibbonItemDefinition("PipeLengthByDiameterV2", "Calcul des canalisations", panel => AddPushButton(panel, "PipeLengthByDiameterV2", "Calcul des\ncanalisations", assemblyPath, "Analyse.PipeLengthByDiameterCommandV2", "Canalisation.png", "Description :\r\n- Calcule les longueurs des canalisations et gaines par diamètre (DN ou dimensions).\r\n- Compte les accessoires de type coudes et tés par diamètre.\r\n- Estime les volumes d'eau par diamètre intérieur.\r\n- Intègre un filtre par type de système pour une analyse précise.\r\n- Permet d'inclure ou non les gaines dans les calculs.\r\n- Exporte les résultats sous forme de tableau Excel détaillé.\r\n\r\nUtilité :\r\nOptimisez votre gestion des systèmes MEP en obtenant rapidement une analyse précise des longueurs, volumes et accessoires, avec possibilité d'exportation.")),
@@ -79,6 +79,7 @@ public class AppUI : IExternalApplication
                 new RibbonItemDefinition("Temps par projet", "Temps par projet", panel => AddPushButton(panel, "Temps par projet", "Temps par\nprojet", assemblyPath, "BIMaestro.Dashboard.ShowTimeDashboard", "analyse de temps.png", "Affiche le temps passé par projet.")),
                 new RibbonItemDefinition("Check 3D", "Check 3D", panel => AddPushButton(panel, "Check 3D", "Check\n3D", assemblyPath, "Analyse.SmartCheckCommand", "correction 3D.png", "Vérifie les éléments 3D sélectionnés pour détecter les incohérences."))
             }),
+
             new RibbonPanelDefinition("Spécifique aux familles", new List<RibbonItemDefinition>
             {
                 new RibbonItemDefinition("FamilyBrowser", "Navigateur de Familles", panel => AddSplitButton(panel, "FamilyBrowser", "Navigateur\nde Familles", assemblyPath, new List<(string, string, string, string, string)>
@@ -98,6 +99,7 @@ public class AppUI : IExternalApplication
                     ("Import d'unité", "Import\nd'unité","Famille.ImportProjectUnitsCommand", "import unité.png","Recharge depuis le fichier JSON les unités et leur précision pour appliquer rapidement vos préférences au projet.")
                 }))
             }),
+
             new RibbonPanelDefinition("Couleur et information", new List<RibbonItemDefinition>
             {
                 new RibbonItemDefinition("Changement de couleur", "Changement de couleur", panel => AddSplitButton(panel, "Changement de couleur", "couleur\nOui/Non", assemblyPath, new List<(string, string, string, string, string)>
@@ -106,11 +108,15 @@ public class AppUI : IExternalApplication
                     ("Couleur de maquette", "Couleur reset", "Couleur.ResetTabItemRandomColorsCommand", "safeimagekit-bouton reset4.png","Réinitialise les couleurs appliquées"),
                     ("papa Noël", "papa\nNoël", "Couleur.PapanoelCommand", "Père Noël.png","Fait apparaître des couleurs comme des guirlandes\nDouble clic pour revenir à la normale.\n\nAttention désactiver <couleur Oui/Non> avant activation.")
                 })),
-                //new RibbonItemDefinition("menu contextuel", "Menu contextuel", panel => AddPushButton(panel, "menu contextuel", "Menu\ncontextuel", assemblyPath, "MenuContextuel.MenuContextuelCommand", "attention bouton.png", "Permet de mettre un menu contextuel sur un élément")),
-               // new RibbonItemDefinition("Rosace des couleurs", "Rosace des couleurs", panel => AddPushButton(panel, "Rosace des couleurs", "Rosace des\ncouleurs", assemblyPath, "BIMaestro.rouletteCouleur.Roulette", "bouton lumière.png", "Sélectionne rapidement vos couleurs préférées en fonction des phases d'études; maintenir la touche Tab pour passer des guirlandes\nDouble clic pour revenir à la normale.\n\nAttention désactiver <couleur Oui/Non> avant activation.")),
-                new RibbonItemDefinition("NOTE MAJ", "Note MAJ", panel => AddPushButton(panel, "NOTE MAJ", "Note\nMAJ", assemblyPath, "Page.MiseAJourCommand", "safeimagekit-Information.png", "Page de mise à jour")),
-                new RibbonItemDefinition("Info Projet", "BIMaestro Exemple", panel => AddPushButton(panel, "Info Projet", "BIMaestro\nExemple", assemblyPath, "Page.GuideCommand", "safeimagekit-Texte maj.png", "Page d'information sur le plugin'")),
-                new RibbonItemDefinition("CustomizeRibbon", "Personnaliser le ruban", panel => AddPushButton(panel, "CustomizeRibbon", "Personnaliser\nle ruban", assemblyPath, "BIMaestro.RibbonLayout.RibbonLayoutCommand", "safeimagekit-Information.png", "Réorganiser les panneaux et boutons BIMaestro et sauvegarder vos préférences dans RevitLogs/SauvegardePréférence."))
+
+                new RibbonItemDefinition("InfoStack", "Infos empilées", panel => AddStackedPushButtons(
+                    panel,
+                    assemblyPath,
+                    // (name, text, className, icon, tooltip)
+                    ("NOTE_MAJ", "Note", "Page.MiseAJourCommand", "safeimagekit-Information.png", "Page de mise à jour"),
+                    ("BIMaestro_Exemple", "Exemple", "Page.GuideCommand", "safeimagekit-Texte maj.png", "Page d'information sur le plugin"),
+                    ("CustomizeRibbon", "Ruban", "BIMaestro.RibbonLayout.RibbonLayoutCommand", "roue ruban.png", "Réorganiser les panneaux et boutons BIMaestro et sauvegarder vos préférences dans RevitLogs/SauvegardePréférence.")
+                ))
             })
         };
     }
@@ -192,33 +198,55 @@ public class AppUI : IExternalApplication
         }
     }
 
+    // ====== NOUVEAU : 3 petits boutons empilés (stack) ======
+    private static void AddStackedPushButtons(
+        RibbonPanel panel,
+        string assemblyPath,
+        (string buttonName, string buttonText, string className, string resourceImageName, string toolTip) b1,
+        (string buttonName, string buttonText, string className, string resourceImageName, string toolTip) b2,
+        (string buttonName, string buttonText, string className, string resourceImageName, string toolTip) b3)
+    {
+        var d1 = CreatePushButtonData(b1.buttonName, b1.buttonText, assemblyPath, b1.className, b1.resourceImageName, b1.toolTip);
+        var d2 = CreatePushButtonData(b2.buttonName, b2.buttonText, assemblyPath, b2.className, b2.resourceImageName, b2.toolTip);
+        var d3 = CreatePushButtonData(b3.buttonName, b3.buttonText, assemblyPath, b3.className, b3.resourceImageName, b3.toolTip);
+
+        // Revit stacke jusqu'à 3 items (petits) dans une colonne
+        panel.AddStackedItems(d1, d2, d3);
+    }
+
     private static void AddPushButton(RibbonPanel panel, string buttonName, string buttonText, string assemblyPath, string className, string resourceImageName, string toolTip)
     {
-        PushButtonData buttonData = new PushButtonData(buttonName, buttonText, assemblyPath, className)
-        {
-            ToolTip = toolTip
-        };
-
-        var assembly = Assembly.GetExecutingAssembly();
-        string resourcePath = $"BIMaestro.Resources.{resourceImageName}";
-
-        using (Stream stream = assembly.GetManifestResourceStream(resourcePath))
-        {
-            if (stream != null)
-            {
-                BitmapImage image = new BitmapImage();
-                image.BeginInit();
-                image.StreamSource = stream;
-                image.EndInit();
-                buttonData.LargeImage = image;
-            }
-            else
-            {
-                TaskDialog.Show("Image introuvable", $"L'image intégrée pour {buttonText} n'a pas été trouvée.");
-            }
-        }
-
+        var buttonData = CreatePushButtonData(buttonName, buttonText, assemblyPath, className, resourceImageName, toolTip);
         panel.AddItem(buttonData);
+    }
+
+    private static PushButtonData CreatePushButtonData(string buttonName, string buttonText, string assemblyPath, string className, string toolTipImageName, string toolTip)
+    {
+        PushButtonData buttonData = new PushButtonData(buttonName, buttonText, assemblyPath, className);
+
+        // ToolTip / LongDescription (comme tu faisais)
+        string tt = toolTip ?? "";
+        string[] parts = tt.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+        string shortTip = parts.Length > 0 ? parts[0] : "";
+        if (string.IsNullOrWhiteSpace(shortTip))
+            shortTip = $"Exécuter {buttonText}";
+        buttonData.ToolTip = shortTip;
+
+        bool hasMultiLine = parts.Length > 1;
+        bool isDifferent = hasMultiLine || (tt.Trim().Length > shortTip.Trim().Length + 5);
+        if (!string.IsNullOrWhiteSpace(tt) && isDifferent)
+            buttonData.LongDescription = tt;
+
+        // ✅ Important :
+        // - Image => 16x16 (boutons "petits" + stacked)
+        // - LargeImage => 32x32 (boutons "gros")
+        var small = LoadBitmapFromResource(toolTipImageName, 16);
+        if (small != null) buttonData.Image = small;
+
+        var large = LoadBitmapFromResource(toolTipImageName, 32);
+        if (large != null) buttonData.LargeImage = large;
+
+        return buttonData;
     }
 
     private static void AddSplitButton(
@@ -229,7 +257,6 @@ public class AppUI : IExternalApplication
       List<(string buttonName, string buttonText, string className, string resourceImageName, string toolTip)> buttons,
       string splitToolTip = null,
       string splitToolTipImageResource = null)
-
     {
         var pulldownData = new PulldownButtonData(splitButtonName, splitButtonText);
         var pulldownButton = panel.AddItem(pulldownData) as PulldownButton;
@@ -240,81 +267,52 @@ public class AppUI : IExternalApplication
 
             if (!string.IsNullOrWhiteSpace(splitToolTipImageResource))
             {
-                var asm = Assembly.GetExecutingAssembly();
-                string resourcePath = $"BIMaestro.Resources.{splitToolTipImageResource}";
-                using (var stream = asm.GetManifestResourceStream(resourcePath))
-                {
-                    if (stream != null)
-                    {
-                        var bmp = new BitmapImage();
-                        bmp.BeginInit();
-                        bmp.StreamSource = stream;
-                        bmp.EndInit();
-                        pulldownButton.ToolTipImage = bmp;
-                    }
-                }
+                var bmp16 = LoadBitmapFromResource(splitToolTipImageResource, 16);
+                if (bmp16 != null) pulldownButton.Image = bmp16;
+
+                var bmp32 = LoadBitmapFromResource(splitToolTipImageResource, 32);
+                if (bmp32 != null) pulldownButton.LargeImage = bmp32;
+
+                if (bmp32 != null) pulldownButton.ToolTipImage = bmp32;
             }
         }
 
         if (buttons.Count > 0)
         {
-            var firstImage = LoadBitmapFromResource(buttons[0].resourceImageName);
-            if (firstImage != null)
-            {
-                pulldownButton.LargeImage = firstImage;
-            }
+            var first16 = LoadBitmapFromResource(buttons[0].resourceImageName, 16);
+            if (first16 != null) pulldownButton.Image = first16;
+
+            var first32 = LoadBitmapFromResource(buttons[0].resourceImageName, 32);
+            if (first32 != null) pulldownButton.LargeImage = first32;
         }
 
         foreach (var (buttonName, buttonText, className, resourceImageName, toolTip) in buttons)
         {
-            var buttonData = new PushButtonData(buttonName, buttonText, assemblyPath, className);
-
-            var asm = Assembly.GetExecutingAssembly();
-            string resourcePath = $"BIMaestro.Resources.{resourceImageName}";
-            using (Stream stream = asm.GetManifestResourceStream(resourcePath))
-            {
-                if (stream != null)
-                {
-                    var image = new BitmapImage();
-                    image.BeginInit();
-                    image.StreamSource = stream;
-                    image.EndInit();
-                    buttonData.LargeImage = image;
-                }
-                else
-                {
-                    TaskDialog.Show("Image introuvable", $"L'image intégrée pour {buttonText} n'a pas été trouvée.");
-                }
-            }
-
-            string tt = toolTip ?? "";
-            string[] parts = tt.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
-            string shortTip = parts[0];
-            if (string.IsNullOrWhiteSpace(shortTip))
-                shortTip = $"Exécuter {buttonText}";
-
-            buttonData.ToolTip = shortTip;
-
-            bool hasMultiLine = parts.Length > 1;
-            bool isDifferent = hasMultiLine || (tt.Trim().Length > shortTip.Trim().Length + 5);
-            if (!string.IsNullOrWhiteSpace(tt) && isDifferent)
-                buttonData.LongDescription = tt;
-
+            var buttonData = CreatePushButtonData(buttonName, buttonText, assemblyPath, className, resourceImageName, toolTip);
             pulldownButton.AddPushButton(buttonData);
         }
     }
 
-    private static BitmapImage LoadBitmapFromResource(string resourceFileName)
+    private static BitmapImage LoadBitmapFromResource(string resourceFileName, int decodeSize)
     {
         var asm = Assembly.GetExecutingAssembly();
         string resourcePath = $"BIMaestro.Resources.{resourceFileName}";
+
         using (var stream = asm.GetManifestResourceStream(resourcePath))
         {
             if (stream == null) return null;
+
             var bmp = new BitmapImage();
             bmp.BeginInit();
+            bmp.CacheOption = BitmapCacheOption.OnLoad;
             bmp.StreamSource = stream;
+
+            // Force un chargement "petit" (utile si tu donnes une image 32/64 mais tu veux 16)
+            if (decodeSize > 0)
+                bmp.DecodePixelWidth = decodeSize;
+
             bmp.EndInit();
+            bmp.Freeze();
             return bmp;
         }
     }

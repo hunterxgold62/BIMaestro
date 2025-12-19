@@ -94,13 +94,7 @@ public class App : IExternalApplication
                     install_id = InstallId,
                     revit_version = revitVersion
                 });
-                PushMessageClient.Init(
-                   edgeFunctionsBaseUrl: functionsBaseUrl,
-                   licenseJwt: LicenseJwt,
-                   machineId: MachineId,
-                   installId: InstallId,
-                   pluginVersion: PluginVersion
-               );
+               
             }
             catch (Exception telEx)
             {
@@ -193,7 +187,6 @@ public class App : IExternalApplication
             }
 
             ExcelLogger.OnIdling(_uiApp);
-            PushMessageClient.OnIdling(_uiApp);
 
         }
         catch (Exception ex)

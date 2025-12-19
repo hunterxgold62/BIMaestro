@@ -1,0 +1,43 @@
+﻿<Window x:Class="Analyse.PipeNetworkInteractionWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Interaction réseaux - Calcul des canalisations"
+        Height="450"
+        Width="520"
+        WindowStartupLocation="CenterScreen">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ListView x:Name="NetworksList"
+                  ItemsSource="{Binding Networks}"
+                  SelectionMode="Single"
+                  SelectionChanged="NetworksList_SelectionChanged">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Width="60" Header="Couleur">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <Rectangle Width="24"
+                                           Height="24"
+                                           StrokeThickness="1"
+                                           Stroke="Black"
+                                           Fill="{Binding ColorBrush}"
+                                           HorizontalAlignment="Center"/>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+                    <GridViewColumn Header="Réseau" DisplayMemberBinding="{Binding Name}" Width="250"/>
+                    <GridViewColumn Header="Longueur totale (m)" DisplayMemberBinding="{Binding TotalLengthFormatted}" Width="140"/>
+                </GridView>
+            </ListView.View>
+        </ListView>
+
+        <TextBlock Grid.Row="1"
+                   Margin="0,10,0,0"
+                   Text="Cliquez sur un réseau pour le sélectionner immédiatement dans Revit."
+                   TextWrapping="Wrap"/>
+    </Grid>
+</Window>

@@ -278,7 +278,7 @@
     <Compile Include="app et excel\Supabase\LicenseManager.cs" />
     <Compile Include="app et excel\Supabase\NetSupport.cs" />
     <Compile Include="app et excel\Supabase\Paths.cs" />
-    <Compile Include="app et excel\Supabase\PushMessage.cs" />
+    <None Include="app et excel\Supabase\PushMessage.cs" />
     <Compile Include="app et excel\Supabase\Telemetry.cs" />
     <Compile Include="app et excel\temps revit\ShowTimeDashboard.cs" />
     <Compile Include="app et excel\temps revit\TimeSeriesDashboardWindow.xaml.cs">
@@ -310,6 +310,10 @@
       <DependentUpon>PickDefaultFlangeWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="commands\bride auto\RemoveFlangesReconnect.cs" />
+    <Compile Include="commands\Calcul des canalisations\canalisation V2\PipeNetworkOverviewWindow.xaml.cs">
+      <DependentUpon>PipeNetworkOverviewWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\Calcul des canalisations\canalisation V2\PipeNetworkSummary.cs" />
     <Compile Include="commands\Calcul des canalisations\canalisation V2\PipeSelectionFilterV2.cs" />
     <Compile Include="commands\Calcul des canalisations\canalisation V2\PipeSystemSelectionWindowV2.xaml.cs">
       <DependentUpon>PipeSystemSelectionWindowV2.xaml</DependentUpon>
@@ -534,6 +538,10 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Include="commands\bride auto\PickDefaultFlangeWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="commands\Calcul des canalisations\canalisation V2\PipeNetworkOverviewWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -811,6 +819,8 @@
   <ItemGroup>
     <EmbeddedResource Include="Resources\bride suppresion.png" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\roue ruban.png" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
