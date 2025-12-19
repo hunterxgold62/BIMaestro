@@ -27,6 +27,9 @@ namespace Famille
         public static LoadCollectionHandler LoadCollectionHandlerInstance;
         public static ExternalEvent LoadCollectionEventInstance;
 
+        public static GeneratePreviewImagesHandler GeneratePreviewHandlerInstance;
+        public static ExternalEvent GeneratePreviewEventInstance;
+
         protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
             uiapp = data.Application;
@@ -49,6 +52,9 @@ namespace Famille
 
             LoadCollectionHandlerInstance = new LoadCollectionHandler();
             LoadCollectionEventInstance = ExternalEvent.Create(LoadCollectionHandlerInstance);
+
+            GeneratePreviewHandlerInstance = new GeneratePreviewImagesHandler();
+            GeneratePreviewEventInstance = ExternalEvent.Create(GeneratePreviewHandlerInstance);
 
             try
             {

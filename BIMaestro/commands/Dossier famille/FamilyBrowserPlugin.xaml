@@ -795,6 +795,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
@@ -979,6 +980,88 @@
                 Click="ResetConfig_Click"/>
                         </StackPanel>
                     </Grid>
+
+                    <TextBlock Grid.Row="7"
+                               Text="Export d'aperçus 3D"
+                               Style="{StaticResource SettingSectionTitleStyle}"/>
+
+                    <Border Grid.Row="8"
+                            Style="{StaticResource SettingSectionBorderStyle}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.ColumnSpan="3"
+                                       Text="Sélectionne le dossier de familles à traiter puis le dossier miroir pour les PNG exportés."
+                                       Foreground="{DynamicResource PrimaryText}"
+                                       Margin="0,0,0,12"/>
+
+                            <TextBlock Grid.Row="1" Grid.Column="0"
+                                       Text="Dossier familles"
+                                       Style="{StaticResource SettingLabelStyle}"/>
+                            <TextBox Grid.Row="1" Grid.Column="1"
+                                     x:Name="PreviewSourceTextBox"
+                                     IsReadOnly="True"
+                                     Margin="0,0,8,6"/>
+                            <Button Grid.Row="1" Grid.Column="2"
+                                    Content="Choisir…"
+                                    Width="100"
+                                    Click="SelectPreviewFolders_Click"/>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0"
+                                       Text="Dossier miroir"
+                                       Style="{StaticResource SettingLabelStyle}"/>
+                            <TextBox Grid.Row="2" Grid.Column="1"
+                                     x:Name="PreviewTargetTextBox"
+                                     IsReadOnly="True"
+                                     Margin="0,0,8,6"/>
+                            <Button Grid.Row="2" Grid.Column="2"
+                                    Content="Choisir…"
+                                    Width="100"
+                                    Click="SelectPreviewFolders_Click"/>
+
+                            <StackPanel Grid.Row="3" Grid.ColumnSpan="3" Orientation="Horizontal" Margin="0,8,0,6">
+                                <Button x:Name="StartPreviewButton"
+                                        Content="Lancer l'export 3D"
+                                        Width="170"
+                                        Click="StartPreviewExport_Click"
+                                        Margin="0,0,12,0"/>
+                                <Button x:Name="CancelPreviewButton"
+                                        Content="Annuler"
+                                        Width="120"
+                                        IsEnabled="False"
+                                        Click="CancelPreviewExport_Click"/>
+                                <TextBlock x:Name="PreviewProgressText"
+                                           Foreground="{DynamicResource PrimaryText}"
+                                           VerticalAlignment="Center"
+                                           Margin="16,0,0,0"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="4" Grid.ColumnSpan="3">
+                                <ProgressBar x:Name="PreviewProgressBar"
+                                             Height="16"
+                                             Minimum="0"
+                                             Maximum="1"
+                                             Visibility="Collapsed"/>
+                                <TextBox x:Name="PreviewLogTextBox"
+                                         Margin="0,10,0,0"
+                                         Height="140"
+                                         TextWrapping="Wrap"
+                                         IsReadOnly="True"
+                                         VerticalScrollBarVisibility="Auto"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
                 </Grid>
             </TabItem>
 

@@ -14,6 +14,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -36,6 +37,8 @@ namespace Famille
         private string rootFolderPath = @"\\intranet.cabinet-merlin.fr\groupe-merlin\Gerland-Energie\Affaires\0-Boîte à outils Revit\0-Bibliothèque\A-Famille Revit";
         private string familiesFolder = @"\\intranet.cabinet-merlin.fr\groupe-merlin\Gerland-Energie\Affaires\0-Boîte à outils Revit\0-Bibliothèque\A-Famille Revit";
         private string imagesFolder = @"\\intranet.cabinet-merlin.fr\groupe-merlin\Gerland-Energie\Affaires\0-Boîte à outils Revit\0-Bibliothèque\B-Famille Revit Image";
+        private string previewSourceFolder;
+        private string previewTargetFolder;
 
         private readonly string favoritesFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "SauvegardePréférence", "Favorites.txt");
         private readonly string configFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "SauvegardePréférence", "Config.txt");
@@ -117,6 +120,8 @@ namespace Famille
         private static readonly object _documentationLock = new();
         private static readonly Dictionary<string, List<FamilyDocumentLink>> _documentationCache =
             new(StringComparer.OrdinalIgnoreCase);
+        private CancellationTokenSource _previewCts;
+        private bool _isGeneratingPreviews;
 
         // ===== Collections =====
         private ObservableCollection<Collection> _collections = new();
@@ -144,6 +149,7 @@ namespace Famille
             UpdateGhostFollowMode();
 
             LoadSavedPaths();
+            SetPreviewFolders(familiesFolder, imagesFolder);
 
 
             _searchDebounce.Tick += (s, e) =>
@@ -169,6 +175,7 @@ namespace Famille
         protected override void OnClosed(EventArgs e)
         {
             FamilyPreviewBridge.PreviewVisibilityChanged -= OnPreviewVisibilityChanged;
+            try { _previewCts?.Cancel(); _previewCts?.Dispose(); } catch { }
             base.OnClosed(e);
         }
 
@@ -1912,6 +1919,48 @@ namespace Famille
 
             return true;
         }
+        private bool TrySelectPreviewFolders(out string selectedFamilies, out string selectedImages)
+        {
+            selectedFamilies = null;
+            selectedImages = null;
+
+            var famDialog = new WinForms.FolderBrowserDialog
+            {
+                Description = "Choisis le dossier avec les familles .rfa à exporter.",
+                SelectedPath = Directory.Exists(previewSourceFolder) ? previewSourceFolder : familiesFolder
+            };
+            if (famDialog.ShowDialog() != WinForms.DialogResult.OK)
+                return false;
+
+            selectedFamilies = famDialog.SelectedPath;
+
+            var imgDialog = new WinForms.FolderBrowserDialog
+            {
+                Description = "Choisis le dossier miroir pour les PNG générés.",
+                SelectedPath = Directory.Exists(previewTargetFolder) ? previewTargetFolder : selectedFamilies
+            };
+
+            if (imgDialog.ShowDialog() != WinForms.DialogResult.OK)
+                return false;
+
+            selectedImages = imgDialog.SelectedPath;
+            return true;
+        }
+
+        private void SetPreviewFolders(string families, string images)
+        {
+            previewSourceFolder = families;
+            previewTargetFolder = images;
+            UpdatePreviewFolderDisplay();
+        }
+
+        private void UpdatePreviewFolderDisplay()
+        {
+            if (PreviewSourceTextBox != null)
+                PreviewSourceTextBox.Text = previewSourceFolder ?? familiesFolder;
+            if (PreviewTargetTextBox != null)
+                PreviewTargetTextBox.Text = previewTargetFolder ?? imagesFolder;
+        }
 
         private void ApplySelectedFolders(string newFamiliesFolder, string newImagesFolder, bool showSuccessMessage)
         {
@@ -1921,6 +1970,7 @@ namespace Famille
 
             SavePaths();
             NotifyPropertyChanged(nameof(RootFolderName));
+            SetPreviewFolders(familiesFolder, imagesFolder);
 
             CatalogImageResolver.Initialize(familiesFolder, imagesFolder);
             ImageResolver.ClearCaches();
@@ -2154,7 +2204,184 @@ namespace Famille
                 Resources["SearchBoxBorder"] = new SolidColorBrush(Color.FromRgb(204, 204, 204));
             }
         }
+        #region Export d'aperçus 3D
 
+        private void SelectPreviewFolders_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isGeneratingPreviews)
+            {
+                MessageBox.Show(this, "Patiente, un export est en cours.", "Export 3D", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            if (TrySelectPreviewFolders(out var selectedFamilies, out var selectedImages))
+                SetPreviewFolders(selectedFamilies, selectedImages);
+        }
+
+        private void StartPreviewExport_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isGeneratingPreviews)
+            {
+                MessageBox.Show(this, "Un export est déjà en cours.", "Export 3D", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            if (!Directory.Exists(previewSourceFolder) || !Directory.Exists(previewTargetFolder))
+            {
+                if (!TrySelectPreviewFolders(out var selectedFamilies, out var selectedImages))
+                    return;
+
+                SetPreviewFolders(selectedFamilies, selectedImages);
+            }
+
+            List<string> families;
+            try
+            {
+                families = Directory.EnumerateFiles(previewSourceFolder, "*.rfa", SearchOption.AllDirectories).ToList();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, "Impossible d'explorer le dossier :\n" + ex.Message, "Export 3D", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            if (families.Count == 0)
+            {
+                MessageBox.Show(this, "Aucun fichier RFA trouvé dans ce dossier.", "Export 3D", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            if (FamilyBrowserCommand.GeneratePreviewEventInstance == null ||
+                FamilyBrowserCommand.GeneratePreviewHandlerInstance == null)
+            {
+                MessageBox.Show(this, "L'événement Revit pour l'export 3D n'est pas initialisé.", "Export 3D", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            _previewCts?.Dispose();
+            _previewCts = new CancellationTokenSource();
+            _isGeneratingPreviews = true;
+
+            if (PreviewProgressBar != null)
+            {
+                PreviewProgressBar.Visibility = Visibility.Visible;
+                PreviewProgressBar.Minimum = 0;
+                PreviewProgressBar.Maximum = families.Count;
+                PreviewProgressBar.Value = 0;
+            }
+
+            if (StartPreviewButton != null) StartPreviewButton.IsEnabled = false;
+            if (CancelPreviewButton != null) CancelPreviewButton.IsEnabled = true;
+            if (PreviewProgressText != null) PreviewProgressText.Text = $"0/{families.Count}";
+            PreviewLogTextBox?.Clear();
+            AppendPreviewLog($"Début de l'export ({families.Count} familles)…");
+
+            var entries = families.Select(f => new PreviewEntry
+            {
+                FamilyPath = f,
+                RelativePath = GetRelativePath(previewSourceFolder, f)
+            }).ToList();
+
+            var request = new PreviewGenerationRequest
+            {
+                Entries = entries,
+                TargetRoot = previewTargetFolder,
+                CancellationToken = _previewCts.Token,
+                ProgressCallback = OnPreviewProgress,
+                LogCallback = AppendPreviewLog
+            };
+
+            try
+            {
+                FamilyBrowserCommand.GeneratePreviewHandlerInstance.Request = request;
+                FamilyBrowserCommand.GeneratePreviewEventInstance.Raise();
+            }
+            catch (Exception ex)
+            {
+                AppendPreviewLog("Impossible de démarrer l'export : " + ex.Message);
+                FinishPreviewExport(isCanceled: true);
+            }
+        }
+
+        private void CancelPreviewExport_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_isGeneratingPreviews)
+                return;
+
+            try { _previewCts?.Cancel(); } catch { }
+            if (CancelPreviewButton != null) CancelPreviewButton.IsEnabled = false;
+        }
+
+        private void OnPreviewProgress(PreviewGenerationProgress progress)
+        {
+            if (progress == null)
+                return;
+
+            void Apply()
+            {
+                if (PreviewProgressBar != null)
+                {
+                    PreviewProgressBar.Visibility = Visibility.Visible;
+                    PreviewProgressBar.Maximum = Math.Max(1, progress.Total);
+                    PreviewProgressBar.Value = Math.Min(progress.Completed, progress.Total);
+                }
+
+                if (PreviewProgressText != null)
+                {
+                    if (progress.IsCanceled)
+                        PreviewProgressText.Text = "Annulé";
+                    else if (progress.IsCompleted)
+                        PreviewProgressText.Text = "Terminé";
+                    else
+                        PreviewProgressText.Text = $"{progress.Completed}/{progress.Total}";
+                }
+
+                if (progress.IsCompleted || progress.IsCanceled)
+                {
+                    bool wasRunning = _isGeneratingPreviews;
+                    FinishPreviewExport(progress.IsCanceled);
+                    if (wasRunning)
+                        AppendPreviewLog(progress.IsCanceled ? "Export annulé." : "Export terminé.");
+                }
+            }
+
+            if (Dispatcher.CheckAccess())
+                Apply();
+            else
+                Dispatcher.Invoke((Action)Apply);
+        }
+
+        private void AppendPreviewLog(string message)
+        {
+            void Apply()
+            {
+                if (PreviewLogTextBox == null || string.IsNullOrWhiteSpace(message))
+                    return;
+
+                PreviewLogTextBox.AppendText($"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}");
+                PreviewLogTextBox.ScrollToEnd();
+            }
+
+            if (Dispatcher.CheckAccess())
+                Apply();
+            else
+                Dispatcher.Invoke((Action)Apply);
+        }
+
+        private void FinishPreviewExport(bool isCanceled)
+        {
+            _isGeneratingPreviews = false;
+            _previewCts?.Dispose();
+            _previewCts = null;
+
+            if (StartPreviewButton != null) StartPreviewButton.IsEnabled = true;
+            if (CancelPreviewButton != null) CancelPreviewButton.IsEnabled = false;
+
+            if (PreviewProgressBar != null && (isCanceled || PreviewProgressBar.Value <= 0))
+                PreviewProgressBar.Visibility = Visibility.Collapsed;
+        }
+
+        #endregion
         private void DetailedViewCheckBox_Changed(object sender, RoutedEventArgs e)
         {
             bool newMode = DetailedViewCheckBox?.IsChecked == true;

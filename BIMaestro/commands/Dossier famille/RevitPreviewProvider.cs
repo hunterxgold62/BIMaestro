@@ -243,7 +243,7 @@ namespace Famille
         }
 
         // ---------- Garde-fou "no upgrade" cross-version ----------
-        private static bool WouldUpgrade(Application app, string rfaPath)
+        internal static bool WouldUpgrade(Application app, string rfaPath)
         {
             try
             {
