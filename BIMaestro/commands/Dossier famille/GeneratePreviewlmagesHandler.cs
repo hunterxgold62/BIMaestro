@@ -6,7 +6,6 @@ using System.Threading;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 
-// ✅ WPF imaging, mais SANS RenderTargetBitmap/DrawingVisual (cause NotImplemented)
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -30,14 +29,24 @@ namespace Famille
         public bool HideNoisyCategoriesByNameHeuristic { get; set; } = true;
         public bool TryImproveViewIfPossible { get; set; } = true;
 
-        // ✅ Post-process demandé : centrer + pad carré sans scaling
+        // Post-process: centrer + pad carré (NO SCALE)
         public bool PostProcessToSquareNoScale { get; set; } = true;
-        public bool TransparentBackground { get; set; } = true;
 
-        // Détection fond/contenu (robuste)
-        public int BackgroundSampleSize { get; set; } = 18;     // coins
-        public byte BackgroundTolerance { get; set; } = 22;     // tolérance couleur
-        public double CropMarginFactor { get; set; } = 0.04;    // marge autour contenu
+        /// <summary>
+        /// IMPORTANT: pour faire un fond transparent propre ensuite, on pad d'abord en BLANC (sinon coins noirs Revit polluent).
+        /// Donc mets ceci à false, puis on rend le fond transparent après.
+        /// </summary>
+        public bool TransparentBackground { get; set; } = false;
+
+        // Détection fond/contenu
+        public int BackgroundSampleSize { get; set; } = 24;
+        public byte BackgroundTolerance { get; set; } = 22;
+        public double CropMarginFactor { get; set; } = 0.04;
+
+        // Fond -> transparent
+        public bool MakeBackgroundTransparent { get; set; } = true;
+        public byte BackgroundTransparencyTolerance { get; set; } = 35;
+        public bool PreserveSemiTransparentPixels { get; set; } = true;
     }
 
     public sealed class PreviewEntry
@@ -136,7 +145,6 @@ namespace Famille
                 return false;
             }
 
-            // Bloque uniquement si famille plus récente
             try
             {
                 if (IsSavedInNewerRevitVersion(uiapp.Application, entry.FamilyPath))
@@ -188,15 +196,24 @@ namespace Famille
                 if (req.PostProcessToSquareNoScale)
                 {
                     if (!CenterContentAndPadToSquare_NoScale_Pixels(
-                            targetPng,
-                            req.TransparentBackground,
-                            req.BackgroundSampleSize,
-                            req.BackgroundTolerance,
-                            req.CropMarginFactor,
-                            req.LogCallback))
+                        targetPng,
+                        req.TransparentBackground,
+                        req.BackgroundSampleSize,
+                        req.BackgroundTolerance,
+                        req.CropMarginFactor,
+                        req.LogCallback))
                     {
                         SafeLog(req.LogCallback, $"⚠️ Post-process 1:1 non appliqué : {Path.GetFileName(targetPng)}");
                     }
+                }
+
+                if (req.MakeBackgroundTransparent)
+                {
+                    ApplyBackgroundTransparency_Pixels(
+                        targetPng,
+                        req.BackgroundTransparencyTolerance,
+                        req.PreserveSemiTransparentPixels,
+                        req.LogCallback);
                 }
 
                 return true;
@@ -500,7 +517,7 @@ namespace Famille
         }
 
         // ==========================================================
-        // ✅ Pixel-only post process: centre contenu + pad au carré (NO SCALE)
+        // Pixel-only: centre contenu + pad carré (NO SCALE)
         // ==========================================================
 
         private struct Rgba { public byte R, G, B, A; }
@@ -525,17 +542,14 @@ namespace Famille
                 var pixels = new byte[h * stride];
                 src.CopyPixels(pixels, stride, 0);
 
+                // Fond pour détecter le contenu : coins OK ici, car on détecte le contenu (pas la transparence finale)
                 var bg = EstimateBackgroundFromCorners(pixels, w, h, stride, Math.Max(2, sampleSize));
 
                 if (!TryFindContentBounds(pixels, w, h, stride, bg, tolerance, out int minX, out int minY, out int maxX, out int maxY))
-                {
-                    SafeLog(log, $"ℹ️ PostProcess: contenu introuvable (image uniforme ?) {Path.GetFileName(pngPath)}");
                     return false;
-                }
 
                 int contentW = maxX - minX + 1;
                 int contentH = maxY - minY + 1;
-
                 int margin = (int)(Math.Max(contentW, contentH) * Clamp(marginFactor, 0, 0.30));
 
                 int cropX = Math.Max(0, minX - margin);
@@ -543,7 +557,6 @@ namespace Famille
                 int cropW = Math.Min(w - cropX, contentW + 2 * margin);
                 int cropH = Math.Min(h - cropY, contentH + 2 * margin);
 
-                // 1) extraire pixels crop (NO SCALE)
                 byte[] cropPixels = new byte[cropH * cropW * 4];
                 for (int y = 0; y < cropH; y++)
                 {
@@ -555,24 +568,20 @@ namespace Famille
                         cropW * 4);
                 }
 
-                // 2) créer canvas carré (size = côté le plus long du crop)
                 int size = Math.Max(cropW, cropH);
                 byte[] outPixels = new byte[size * size * 4];
 
-                // Remplissage fond
                 if (!transparentBackground)
                 {
                     for (int i = 0; i < outPixels.Length; i += 4)
                     {
-                        outPixels[i + 0] = 255; // B
-                        outPixels[i + 1] = 255; // G
-                        outPixels[i + 2] = 255; // R
-                        outPixels[i + 3] = 255; // A
+                        outPixels[i + 0] = 255;
+                        outPixels[i + 1] = 255;
+                        outPixels[i + 2] = 255;
+                        outPixels[i + 3] = 255;
                     }
                 }
-                // sinon transparent => déjà 0
 
-                // 3) coller le crop centré dans le carré
                 int offX = (size - cropW) / 2;
                 int offY = (size - cropH) / 2;
                 int outStride = size * 4;
@@ -588,21 +597,144 @@ namespace Famille
                         cropStride);
                 }
 
-                // 4) écrire PNG (sans Render)
-                var wb = new WriteableBitmap(size, size, src.DpiX > 0 ? src.DpiX : 96, src.DpiY > 0 ? src.DpiY : 96, PixelFormats.Bgra32, null);
-                wb.WritePixels(new Int32Rect(0, 0, size, size), outPixels, outStride, 0);
+                var wb = new WriteableBitmap(size, size,
+                    src.DpiX > 0 ? src.DpiX : 96,
+                    src.DpiY > 0 ? src.DpiY : 96,
+                    PixelFormats.Bgra32, null);
 
+                wb.WritePixels(new Int32Rect(0, 0, size, size), outPixels, outStride, 0);
                 SaveBitmapSourceAsPng(wb, pngPath);
 
-                SafeLog(log, $"✅ PostProcess 1:1 (no-scale) : {Path.GetFileName(pngPath)} ({w}x{h} -> crop {cropW}x{cropH} -> {size}x{size})");
+                SafeLog(log, $"✅ PostProcess 1:1 (no-scale) : {Path.GetFileName(pngPath)} -> {size}x{size}");
                 return true;
             }
             catch (Exception ex)
             {
-                SafeLog(log, $"⚠️ PostProcess 1:1 (no-scale) échec {Path.GetFileName(pngPath)} : {ex.GetType().Name} - {ex.Message}");
+                SafeLog(log, $"⚠️ PostProcess 1:1 échec {Path.GetFileName(pngPath)} : {ex.GetType().Name} - {ex.Message}");
                 return false;
             }
         }
+
+        // ==========================================================
+        // Fond -> transparent (chroma key) basé sur la couleur DOMINANTE
+        // ==========================================================
+
+        private static void ApplyBackgroundTransparency_Pixels(
+            string pngPath,
+            byte tolerance,
+            bool preserveSemiTransparent,
+            Action<string> log)
+        {
+            try
+            {
+                var src = LoadPngAsBgra32(pngPath);
+                if (src == null) return;
+
+                int w = src.PixelWidth;
+                int h = src.PixelHeight;
+                int stride = w * 4;
+
+                byte[] px = new byte[h * stride];
+                src.CopyPixels(px, stride, 0);
+
+                // ✅ IMPORTANT: on estime le fond par couleur DOMINANTE, pas par coins (coins souvent noirs Revit)
+                var bg = EstimateBackgroundByDominantColor(px, w, h, stride);
+
+                const byte alphaBgThreshold = 8;
+                int changed = 0;
+
+                for (int y = 0; y < h; y++)
+                {
+                    int row = y * stride;
+                    for (int x = 0; x < w; x++)
+                    {
+                        int i = row + x * 4;
+                        byte b = px[i + 0];
+                        byte g = px[i + 1];
+                        byte r = px[i + 2];
+                        byte a = px[i + 3];
+
+                        if (preserveSemiTransparent && a < 255 && a > alphaBgThreshold)
+                            continue;
+
+                        bool nearBg =
+                            a <= alphaBgThreshold ||
+                            (Math.Abs(r - bg.R) <= tolerance &&
+                             Math.Abs(g - bg.G) <= tolerance &&
+                             Math.Abs(b - bg.B) <= tolerance);
+
+                        if (nearBg)
+                        {
+                            if (px[i + 3] != 0)
+                            {
+                                px[i + 3] = 0;
+                                changed++;
+                            }
+                        }
+                    }
+                }
+
+                var wb = new WriteableBitmap(w, h,
+                    src.DpiX > 0 ? src.DpiX : 96,
+                    src.DpiY > 0 ? src.DpiY : 96,
+                    PixelFormats.Bgra32, null);
+
+                wb.WritePixels(new Int32Rect(0, 0, w, h), px, stride, 0);
+                SaveBitmapSourceAsPng(wb, pngPath);
+
+                SafeLog(log, $"✅ Fond transparent : {Path.GetFileName(pngPath)} (pixels modifiés: {changed})");
+            }
+            catch (Exception ex)
+            {
+                SafeLog(log, $"ℹ️ Fond transparent : {Path.GetFileName(pngPath)} : {ex.Message}");
+            }
+        }
+
+        // ✅ Nouveau: fond = couleur dominante de l'image (super robuste pour tes exports)
+        private static Rgba EstimateBackgroundByDominantColor(byte[] px, int w, int h, int stride)
+        {
+            var dict = new Dictionary<int, int>(capacity: 4096);
+            int step = 2;
+
+            for (int y = 0; y < h; y += step)
+            {
+                int row = y * stride;
+                for (int x = 0; x < w; x += step)
+                {
+                    int i = row + x * 4;
+                    byte b = px[i + 0];
+                    byte g = px[i + 1];
+                    byte r = px[i + 2];
+                    byte a = px[i + 3];
+
+                    if (a < 10) continue;
+
+                    int qb = b >> 3;
+                    int qg = g >> 3;
+                    int qr = r >> 3;
+
+                    int key = (qr << 10) | (qg << 5) | qb;
+
+                    dict.TryGetValue(key, out int c);
+                    dict[key] = c + 1;
+                }
+            }
+
+            if (dict.Count == 0)
+                return new Rgba { R = 255, G = 255, B = 255, A = 255 };
+
+            int bestKey = dict.OrderByDescending(kv => kv.Value).First().Key;
+
+            byte R = (byte)(((bestKey >> 10) & 31) * 8 + 4);
+            byte G = (byte)(((bestKey >> 5) & 31) * 8 + 4);
+            byte B = (byte)((bestKey & 31) * 8 + 4);
+
+            return new Rgba { R = R, G = G, B = B, A = 255 };
+        }
+
+        // ==========================================================
+        // Helpers pixels
+        // ==========================================================
 
         private static BitmapSource LoadPngAsBgra32(string path)
         {
@@ -691,18 +823,11 @@ namespace Famille
                     byte r = px[i + 2];
                     byte a = px[i + 3];
 
-                    bool isBg;
-                    if (a <= alphaBgThreshold)
-                    {
-                        isBg = true;
-                    }
-                    else
-                    {
-                        isBg =
-                            Math.Abs(r - bg.R) <= tol &&
-                            Math.Abs(g - bg.G) <= tol &&
-                            Math.Abs(b - bg.B) <= tol;
-                    }
+                    bool isBg =
+                        a <= alphaBgThreshold ||
+                        (Math.Abs(r - bg.R) <= tol &&
+                         Math.Abs(g - bg.G) <= tol &&
+                         Math.Abs(b - bg.B) <= tol);
 
                     if (!isBg)
                     {
