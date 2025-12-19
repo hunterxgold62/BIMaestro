@@ -51,6 +51,7 @@ namespace Famille
                 var list = new List<Entry>(capacity: 8192);
                 int n = 0;
 
+
                 foreach (var f in Directory.EnumerateFiles(_familiesRoot, "*.rfa", SearchOption.AllDirectories))
                 {
                     if (ct.IsCancellationRequested) return;
