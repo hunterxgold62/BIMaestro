@@ -45,7 +45,7 @@ namespace Famille
 
         // Fond -> transparent
         public bool MakeBackgroundTransparent { get; set; } = true;
-        public byte BackgroundTransparencyTolerance { get; set; } = 35;
+        public byte BackgroundTransparencyTolerance { get; set; } = 5;
         public bool PreserveSemiTransparentPixels { get; set; } = true;
     }
 
