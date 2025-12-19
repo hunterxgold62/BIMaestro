@@ -1,12 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Drawing;                       // ✅ post-traitement (carré sans crop)
-using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+
+// ✅ WPF imaging, mais SANS RenderTargetBitmap/DrawingVisual (cause NotImplemented)
+using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace Famille
 {
@@ -17,6 +20,24 @@ namespace Famille
         public CancellationToken CancellationToken { get; set; }
         public Action<PreviewGenerationProgress> ProgressCallback { get; set; }
         public Action<string> LogCallback { get; set; }
+
+        // Export Revit
+        public int RevitExportPixelSize { get; set; } = 1600;
+        public ImageResolution RevitImageResolution { get; set; } = ImageResolution.DPI_150;
+
+        // Nettoyage vue
+        public bool HideAllAnnotationCategories { get; set; } = true;
+        public bool HideNoisyCategoriesByNameHeuristic { get; set; } = true;
+        public bool TryImproveViewIfPossible { get; set; } = true;
+
+        // ✅ Post-process demandé : centrer + pad carré sans scaling
+        public bool PostProcessToSquareNoScale { get; set; } = true;
+        public bool TransparentBackground { get; set; } = true;
+
+        // Détection fond/contenu (robuste)
+        public int BackgroundSampleSize { get; set; } = 18;     // coins
+        public byte BackgroundTolerance { get; set; } = 22;     // tolérance couleur
+        public double CropMarginFactor { get; set; } = 0.04;    // marge autour contenu
     }
 
     public sealed class PreviewEntry
@@ -55,16 +76,16 @@ namespace Famille
                     break;
                 }
 
-                PublishProgress(req, done, total, entry?.FamilyPath, isCanceled: false);
+                PublishProgress(req, done, total, entry?.FamilyPath);
 
-                if (!TryExportFamilyPreview(app, entry, req.TargetRoot, req.LogCallback, out var error))
+                if (!TryExportFamilyPreview(app, entry, req, out var error))
                 {
                     if (!string.IsNullOrWhiteSpace(error))
                         SafeLog(req.LogCallback, $"⚠️ {Path.GetFileName(entry?.FamilyPath ?? "")} : {error}");
                 }
 
                 done++;
-                PublishProgress(req, done, total, entry?.FamilyPath, isCanceled: false);
+                PublishProgress(req, done, total, entry?.FamilyPath);
             }
 
             PublishProgress(req, done, total, null, isCompleted: true, isCanceled: req.CancellationToken.IsCancellationRequested);
@@ -72,13 +93,7 @@ namespace Famille
 
         public string GetName() => nameof(GeneratePreviewImagesHandler);
 
-        private static void PublishProgress(
-            PreviewGenerationRequest req,
-            int completed,
-            int total,
-            string current,
-            bool isCompleted = false,
-            bool isCanceled = false)
+        private static void PublishProgress(PreviewGenerationRequest req, int completed, int total, string current, bool isCompleted = false, bool isCanceled = false)
         {
             try
             {
@@ -91,10 +106,7 @@ namespace Famille
                     IsCanceled = isCanceled
                 });
             }
-            catch
-            {
-                // best-effort
-            }
+            catch { }
         }
 
         private static void SafeLog(Action<string> logger, string message)
@@ -102,12 +114,7 @@ namespace Famille
             try { logger?.Invoke(message); } catch { }
         }
 
-        private static bool TryExportFamilyPreview(
-            UIApplication uiapp,
-            PreviewEntry entry,
-            string targetRoot,
-            Action<string> log,
-            out string error)
+        private static bool TryExportFamilyPreview(UIApplication uiapp, PreviewEntry entry, PreviewGenerationRequest req, out string error)
         {
             error = null;
 
@@ -117,7 +124,7 @@ namespace Famille
                 return false;
             }
 
-            if (string.IsNullOrWhiteSpace(targetRoot))
+            if (string.IsNullOrWhiteSpace(req.TargetRoot))
             {
                 error = "Dossier miroir non défini.";
                 return false;
@@ -129,7 +136,7 @@ namespace Famille
                 return false;
             }
 
-            // ✅ Bloque uniquement si famille enregistrée dans une version plus récente que Revit courant
+            // Bloque uniquement si famille plus récente
             try
             {
                 if (IsSavedInNewerRevitVersion(uiapp.Application, entry.FamilyPath))
@@ -140,7 +147,7 @@ namespace Famille
             }
             catch (Exception ex)
             {
-                SafeLog(log, $"ℹ️ Info version ignorée : {ex.Message}");
+                SafeLog(req.LogCallback, $"ℹ️ Info version ignorée : {ex.Message}");
             }
 
             Document famDoc = null;
@@ -154,7 +161,6 @@ namespace Famille
                     return false;
                 }
 
-                // ✅ IMPORTANT : on NE CRÉE PAS de vue (évite 'Modification forbidden')
                 var view = GetExisting3DView(famDoc, out var viewError);
                 if (view == null)
                 {
@@ -162,30 +168,38 @@ namespace Famille
                     return false;
                 }
 
-                // Best-effort : on nettoie/ prépare/oriente seulement si Revit autorise les modifs
-                TryPrepareViewForExport(famDoc, view);
-                CleanViewForThumbnailIfPossible(famDoc, view);
-                ConfigurePreviewOrientationIfPossible(famDoc, view);
-                try { famDoc.Regenerate(); } catch { }
+                if (req.TryImproveViewIfPossible)
+                {
+                    TryPrepareViewForExport(famDoc, view, req.LogCallback);
+                    CleanViewForThumbnailIfPossible(famDoc, view, req, req.LogCallback);
+                    ConfigurePreviewOrientationIfPossible(famDoc, view, req.LogCallback);
+                    try { famDoc.Regenerate(); } catch { }
+                }
 
-                var targetPng = GetTargetPath(entry, targetRoot);
+                var targetPng = GetTargetPath(entry, req.TargetRoot);
                 Directory.CreateDirectory(Path.GetDirectoryName(targetPng));
 
-                if (!ExportViewToPngRobust(famDoc, view, targetPng))
+                if (!ExportViewToPngRobust(famDoc, view, targetPng, req.RevitExportPixelSize, req.RevitImageResolution))
                 {
                     error = "Export PNG impossible (aucun fichier créé).";
                     return false;
                 }
 
-                // ✅ 1:1 SANS COUPER : padding carré (fond transparent)
-                PadPngToSquare(targetPng);
+                if (req.PostProcessToSquareNoScale)
+                {
+                    if (!CenterContentAndPadToSquare_NoScale_Pixels(
+                            targetPng,
+                            req.TransparentBackground,
+                            req.BackgroundSampleSize,
+                            req.BackgroundTolerance,
+                            req.CropMarginFactor,
+                            req.LogCallback))
+                    {
+                        SafeLog(req.LogCallback, $"⚠️ Post-process 1:1 non appliqué : {Path.GetFileName(targetPng)}");
+                    }
+                }
 
                 return true;
-            }
-            catch (IOException io)
-            {
-                error = $"Fichier verrouillé ou inaccessible : {io.Message}";
-                return false;
             }
             catch (Autodesk.Revit.Exceptions.InvalidOperationException ex)
             {
@@ -213,7 +227,6 @@ namespace Famille
             return Path.ChangeExtension(mirrorPath, ".png");
         }
 
-        // ✅ Récupère une vue 3D existante (pas template). On privilégie "{3D}" si elle existe.
         private static View3D GetExisting3DView(Document famDoc, out string error)
         {
             error = null;
@@ -239,16 +252,18 @@ namespace Famille
             return default3d ?? views[0];
         }
 
-        private static bool TryPrepareViewForExport(Document famDoc, View3D view)
+        private static bool TryPrepareViewForExport(Document famDoc, View3D view, Action<string> log)
         {
-            if (famDoc == null || view == null) return false;
-            if (!famDoc.IsModifiable) return false;
-
             try
             {
                 using (var tx = new Transaction(famDoc, "Préparer vue export"))
                 {
-                    if (tx.Start() != TransactionStatus.Started) return false;
+                    var st = tx.Start();
+                    if (st != TransactionStatus.Started)
+                    {
+                        SafeLog(log, $"ℹ️ Préparer vue export : transaction refusée ({st}).");
+                        return false;
+                    }
 
                     try { view.DisplayStyle = DisplayStyle.ShadingWithEdges; } catch { }
                     try { view.DetailLevel = ViewDetailLevel.Fine; } catch { }
@@ -257,80 +272,107 @@ namespace Famille
                     return true;
                 }
             }
-            catch { return false; }
+            catch (Exception ex)
+            {
+                SafeLog(log, $"ℹ️ Préparer vue export : {ex.Message}");
+                return false;
+            }
         }
 
-        // ✅ "Aperçu de la Visibilité" côté API : on reproduit l'effet en masquant annotations/catégories parasites
-        private static void CleanViewForThumbnailIfPossible(Document doc, View3D view)
+        private static void CleanViewForThumbnailIfPossible(Document doc, View3D view, PreviewGenerationRequest req, Action<string> log)
         {
-            if (doc == null || view == null) return;
-            if (!doc.IsModifiable) return;
-
             try
             {
                 using (var tx = new Transaction(doc, "Nettoyage vue thumbnail"))
                 {
-                    if (tx.Start() != TransactionStatus.Started) return;
+                    var st = tx.Start();
+                    if (st != TransactionStatus.Started)
+                    {
+                        SafeLog(log, $"ℹ️ Nettoyage : transaction refusée ({st}).");
+                        return;
+                    }
 
-                    // 1) Certaines versions exposent un bool global
-                    TrySetBoolProperty(view, "AreAnnotationCategoriesHidden", true);
+                    int hidden = 0;
 
-                    // 2) En complément : cache des catégories courantes "bruyantes"
-                    HideCategoryIfExists(doc, view, BuiltInCategory.OST_ReferenceLines);
-                    HideCategoryIfExists(doc, view, BuiltInCategory.OST_Levels);
-                    HideCategoryIfExists(doc, view, BuiltInCategory.OST_Grids);
-                    HideCategoryIfExists(doc, view, BuiltInCategory.OST_Dimensions);
-                    HideCategoryIfExists(doc, view, BuiltInCategory.OST_TextNotes);
-                    HideCategoryIfExists(doc, view, BuiltInCategory.OST_GenericAnnotation);
+                    if (req.HideAllAnnotationCategories)
+                    {
+                        foreach (Category cat in doc.Settings.Categories)
+                        {
+                            if (cat == null) continue;
+                            if (cat.CategoryType != CategoryType.Annotation) continue;
 
-                    // Imports (DWG etc) si jamais
-                    HideCategoryIfExists(doc, view, BuiltInCategory.OST_ImportObjectStyles);
+                            try
+                            {
+                                if (!view.CanCategoryBeHidden(cat.Id)) continue;
+                                if (!view.GetCategoryHidden(cat.Id))
+                                {
+                                    view.SetCategoryHidden(cat.Id, true);
+                                    hidden++;
+                                }
+                            }
+                            catch { }
+                        }
+                    }
+
+                    if (req.HideNoisyCategoriesByNameHeuristic)
+                    {
+                        string[] tokens =
+                        {
+                            "reference", "référence", "ref", "plane", "plan",
+                            "level", "niveau",
+                            "grid", "quadrillage",
+                            "dimension", "cote", "côtes",
+                            "text", "texte",
+                            "annotation", "étiquette", "tag",
+                            "symbol", "symbole"
+                        };
+
+                        foreach (Category cat in doc.Settings.Categories)
+                        {
+                            if (cat == null) continue;
+
+                            string name;
+                            try { name = cat.Name ?? ""; } catch { name = ""; }
+                            if (string.IsNullOrWhiteSpace(name)) continue;
+
+                            if (!tokens.Any(t => name.IndexOf(t, StringComparison.OrdinalIgnoreCase) >= 0))
+                                continue;
+
+                            try
+                            {
+                                if (!view.CanCategoryBeHidden(cat.Id)) continue;
+                                if (!view.GetCategoryHidden(cat.Id))
+                                {
+                                    view.SetCategoryHidden(cat.Id, true);
+                                    hidden++;
+                                }
+                            }
+                            catch { }
+                        }
+                    }
 
                     tx.Commit();
+                    SafeLog(log, $"✅ Nettoyage : {hidden} catégories masquées.");
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // best-effort
+                SafeLog(log, $"ℹ️ Nettoyage : {ex.Message}");
             }
         }
 
-        private static void HideCategoryIfExists(Document doc, View view, BuiltInCategory bic)
+        private static void ConfigurePreviewOrientationIfPossible(Document famDoc, View3D view, Action<string> log)
         {
-            try
-            {
-                var cat = Category.GetCategory(doc, bic);
-                if (cat == null) return;
-                if (!view.CanCategoryBeHidden(cat.Id)) return;
-
-                view.SetCategoryHidden(cat.Id, true);
-            }
-            catch { }
-        }
-
-        private static void TrySetBoolProperty(object obj, string propertyName, bool value)
-        {
-            try
-            {
-                var pi = obj.GetType().GetProperty(propertyName);
-                if (pi == null) return;
-                if (pi.PropertyType != typeof(bool)) return;
-                if (!pi.CanWrite) return;
-                pi.SetValue(obj, value, null);
-            }
-            catch { }
-        }
-
-        private static void ConfigurePreviewOrientationIfPossible(Document famDoc, View3D view)
-        {
-            if (famDoc == null || view == null) return;
-            if (!famDoc.IsModifiable) return; // ✅ évite "Modification forbidden"
-
             try
             {
                 using (var tx = new Transaction(famDoc, "Orientation preview"))
                 {
-                    if (tx.Start() != TransactionStatus.Started) return;
+                    var st = tx.Start();
+                    if (st != TransactionStatus.Started)
+                    {
+                        SafeLog(log, $"ℹ️ Orientation : transaction refusée ({st}).");
+                        return;
+                    }
 
                     var bbox = GetModelBoundingBox(famDoc);
                     if (bbox == null)
@@ -344,43 +386,24 @@ namespace Famille
                     double radius = Math.Max(Math.Max(extents.X, extents.Y), extents.Z);
                     if (radius < 1e-6) radius = 10;
 
-                    var offsetDir = new XYZ(-1, -1, 1);
-                    if (offsetDir.GetLength() < 1e-6) offsetDir = new XYZ(-1, -1, 1);
-                    offsetDir = offsetDir.Normalize();
-
+                    var offsetDir = new XYZ(-1, -1, 1).Normalize();
                     var eye = center + offsetDir.Multiply(radius * 2.5);
-                    var forward = center - eye;
+                    var forward = (center - eye);
                     if (forward.GetLength() < 1e-6) forward = offsetDir.Multiply(-1);
                     forward = forward.Normalize();
 
                     try { view.SetOrientation(new ViewOrientation3D(eye, XYZ.BasisZ, forward)); } catch { }
                     try { view.SaveOrientationAndLock(); } catch { }
 
-                    // Section box best-effort
-                    try
-                    {
-                        double margin = radius * 0.2;
-                        var section = new BoundingBoxXYZ
-                        {
-                            Min = new XYZ(bbox.Min.X - margin, bbox.Min.Y - margin, bbox.Min.Z - margin),
-                            Max = new XYZ(bbox.Max.X + margin, bbox.Max.Y + margin, bbox.Max.Z + margin)
-                        };
-
-                        try { view.SetSectionBox(section); } catch { }
-                        try { view.IsSectionBoxActive = true; } catch { }
-                    }
-                    catch { }
-
                     tx.Commit();
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // best-effort
+                SafeLog(log, $"ℹ️ Orientation : {ex.Message}");
             }
         }
 
-        // ✅ Document n'a pas de BoundingBox : union des bounding boxes d'éléments
         private static BoundingBoxXYZ GetModelBoundingBox(Document doc)
         {
             BoundingBoxXYZ acc = null;
@@ -417,8 +440,7 @@ namespace Famille
             return acc;
         }
 
-        // ✅ Export blindé : on récupère le PNG réellement généré (nom variable selon versions/langue)
-        private static bool ExportViewToPngRobust(Document famDoc, View3D view, string targetPng)
+        private static bool ExportViewToPngRobust(Document famDoc, View3D view, string targetPng, int pixelSize, ImageResolution resolution)
         {
             var outDir = Path.GetDirectoryName(targetPng) ?? string.Empty;
             if (string.IsNullOrWhiteSpace(outDir))
@@ -429,7 +451,6 @@ namespace Famille
             var baseName = Path.GetFileNameWithoutExtension(targetPng);
             var basePath = Path.Combine(outDir, baseName);
 
-            // Snapshot avant export
             var before = new HashSet<string>(Directory.EnumerateFiles(outDir, "*.png"), StringComparer.OrdinalIgnoreCase);
 
             var options = new ImageExportOptions
@@ -438,41 +459,25 @@ namespace Famille
                 FilePath = basePath,
                 HLRandWFViewsFileType = ImageFileType.PNG,
                 ShadowViewsFileType = ImageFileType.PNG,
-                ImageResolution = ImageResolution.DPI_150,
+                ImageResolution = resolution,
                 FitDirection = FitDirectionType.Horizontal,
                 ZoomType = ZoomFitType.FitToPage,
-                PixelSize = 1024
+                PixelSize = Math.Max(256, pixelSize)
             };
 
             options.SetViewsAndSheets(new List<ElementId> { view.Id });
 
-            try
-            {
-                famDoc.ExportImage(options);
-            }
-            catch
-            {
-                return false;
-            }
+            try { famDoc.ExportImage(options); }
+            catch { return false; }
 
             var after = Directory.EnumerateFiles(outDir, "*.png").ToList();
             var created = after.Where(f => !before.Contains(f)).ToList();
 
-            string picked = null;
-
-            if (created.Count > 0)
-            {
-                picked = created
-                    .OrderByDescending(File.GetCreationTimeUtc)
-                    .FirstOrDefault();
-            }
-            else
-            {
-                picked = after
-                    .Where(f => Path.GetFileName(f).StartsWith(baseName, StringComparison.OrdinalIgnoreCase))
-                    .OrderByDescending(File.GetCreationTimeUtc)
-                    .FirstOrDefault();
-            }
+            string picked = created.Count > 0
+                ? created.OrderByDescending(File.GetCreationTimeUtc).FirstOrDefault()
+                : after.Where(f => Path.GetFileName(f).StartsWith(baseName, StringComparison.OrdinalIgnoreCase))
+                       .OrderByDescending(File.GetCreationTimeUtc)
+                       .FirstOrDefault();
 
             if (picked == null || !File.Exists(picked))
                 return false;
@@ -483,14 +488,9 @@ namespace Famille
 
         private static void MoveOrReplace(string source, string target)
         {
-            if (string.IsNullOrWhiteSpace(source) || string.IsNullOrWhiteSpace(target))
-                return;
-
             try
             {
-                if (File.Exists(target))
-                    File.Delete(target);
-
+                if (File.Exists(target)) File.Delete(target);
                 File.Move(source, target);
             }
             catch
@@ -499,43 +499,225 @@ namespace Famille
             }
         }
 
-        // ✅ 1:1 sans couper : on crée un carré et on centre l'image dedans (fond transparent)
-        private static void PadPngToSquare(string pngPath)
-        {
-            if (string.IsNullOrWhiteSpace(pngPath) || !File.Exists(pngPath))
-                return;
+        // ==========================================================
+        // ✅ Pixel-only post process: centre contenu + pad au carré (NO SCALE)
+        // ==========================================================
 
+        private struct Rgba { public byte R, G, B, A; }
+
+        private static bool CenterContentAndPadToSquare_NoScale_Pixels(
+            string pngPath,
+            bool transparentBackground,
+            int sampleSize,
+            byte tolerance,
+            double marginFactor,
+            Action<string> log)
+        {
             try
             {
-                using (var src = Image.FromFile(pngPath))
+                var src = LoadPngAsBgra32(pngPath);
+                if (src == null) return false;
+
+                int w = src.PixelWidth;
+                int h = src.PixelHeight;
+                int stride = w * 4;
+
+                var pixels = new byte[h * stride];
+                src.CopyPixels(pixels, stride, 0);
+
+                var bg = EstimateBackgroundFromCorners(pixels, w, h, stride, Math.Max(2, sampleSize));
+
+                if (!TryFindContentBounds(pixels, w, h, stride, bg, tolerance, out int minX, out int minY, out int maxX, out int maxY))
                 {
-                    int size = Math.Max(src.Width, src.Height);
+                    SafeLog(log, $"ℹ️ PostProcess: contenu introuvable (image uniforme ?) {Path.GetFileName(pngPath)}");
+                    return false;
+                }
 
-                    using (var square = new Bitmap(size, size, PixelFormat.Format32bppArgb))
-                    using (var g = Graphics.FromImage(square))
+                int contentW = maxX - minX + 1;
+                int contentH = maxY - minY + 1;
+
+                int margin = (int)(Math.Max(contentW, contentH) * Clamp(marginFactor, 0, 0.30));
+
+                int cropX = Math.Max(0, minX - margin);
+                int cropY = Math.Max(0, minY - margin);
+                int cropW = Math.Min(w - cropX, contentW + 2 * margin);
+                int cropH = Math.Min(h - cropY, contentH + 2 * margin);
+
+                // 1) extraire pixels crop (NO SCALE)
+                byte[] cropPixels = new byte[cropH * cropW * 4];
+                for (int y = 0; y < cropH; y++)
+                {
+                    Buffer.BlockCopy(
+                        pixels,
+                        ((cropY + y) * stride) + (cropX * 4),
+                        cropPixels,
+                        y * (cropW * 4),
+                        cropW * 4);
+                }
+
+                // 2) créer canvas carré (size = côté le plus long du crop)
+                int size = Math.Max(cropW, cropH);
+                byte[] outPixels = new byte[size * size * 4];
+
+                // Remplissage fond
+                if (!transparentBackground)
+                {
+                    for (int i = 0; i < outPixels.Length; i += 4)
                     {
-                        g.Clear(System.Drawing.Color.Transparent);
+                        outPixels[i + 0] = 255; // B
+                        outPixels[i + 1] = 255; // G
+                        outPixels[i + 2] = 255; // R
+                        outPixels[i + 3] = 255; // A
+                    }
+                }
+                // sinon transparent => déjà 0
 
-                        int x = (size - src.Width) / 2;
-                        int y = (size - src.Height) / 2;
+                // 3) coller le crop centré dans le carré
+                int offX = (size - cropW) / 2;
+                int offY = (size - cropH) / 2;
+                int outStride = size * 4;
+                int cropStride = cropW * 4;
 
-                        g.DrawImage(src, x, y, src.Width, src.Height);
+                for (int y = 0; y < cropH; y++)
+                {
+                    Buffer.BlockCopy(
+                        cropPixels,
+                        y * cropStride,
+                        outPixels,
+                        ((offY + y) * outStride) + (offX * 4),
+                        cropStride);
+                }
 
-                        var tmp = pngPath + ".tmp";
-                        square.Save(tmp, ImageFormat.Png);
+                // 4) écrire PNG (sans Render)
+                var wb = new WriteableBitmap(size, size, src.DpiX > 0 ? src.DpiX : 96, src.DpiY > 0 ? src.DpiY : 96, PixelFormats.Bgra32, null);
+                wb.WritePixels(new Int32Rect(0, 0, size, size), outPixels, outStride, 0);
 
-                        // Remplacement safe
-                        try { File.Delete(pngPath); } catch { }
-                        try { File.Move(tmp, pngPath); } catch { }
-                        try { if (File.Exists(tmp)) File.Delete(tmp); } catch { }
+                SaveBitmapSourceAsPng(wb, pngPath);
+
+                SafeLog(log, $"✅ PostProcess 1:1 (no-scale) : {Path.GetFileName(pngPath)} ({w}x{h} -> crop {cropW}x{cropH} -> {size}x{size})");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                SafeLog(log, $"⚠️ PostProcess 1:1 (no-scale) échec {Path.GetFileName(pngPath)} : {ex.GetType().Name} - {ex.Message}");
+                return false;
+            }
+        }
+
+        private static BitmapSource LoadPngAsBgra32(string path)
+        {
+            if (!File.Exists(path)) return null;
+
+            BitmapSource frame;
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            {
+                var decoder = new PngBitmapDecoder(fs, BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad);
+                frame = decoder.Frames[0];
+            }
+
+            return new FormatConvertedBitmap(frame, PixelFormats.Bgra32, null, 0);
+        }
+
+        private static void SaveBitmapSourceAsPng(BitmapSource source, string path)
+        {
+            var tmp = path + ".tmp";
+            using (var outFs = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                var encoder = new PngBitmapEncoder();
+                encoder.Frames.Add(BitmapFrame.Create(source));
+                encoder.Save(outFs);
+            }
+
+            try { File.Delete(path); } catch { }
+            File.Move(tmp, path);
+        }
+
+        private static Rgba EstimateBackgroundFromCorners(byte[] px, int w, int h, int stride, int sample)
+        {
+            long r = 0, g = 0, b = 0, a = 0;
+            long count = 0;
+
+            void Accum(int startX, int startY)
+            {
+                int endX = Math.Min(w, startX + sample);
+                int endY = Math.Min(h, startY + sample);
+
+                for (int y = startY; y < endY; y++)
+                {
+                    int row = y * stride;
+                    for (int x = startX; x < endX; x++)
+                    {
+                        int i = row + x * 4;
+                        b += px[i + 0];
+                        g += px[i + 1];
+                        r += px[i + 2];
+                        a += px[i + 3];
+                        count++;
                     }
                 }
             }
-            catch
+
+            Accum(0, 0);
+            Accum(Math.Max(0, w - sample), 0);
+            Accum(0, Math.Max(0, h - sample));
+            Accum(Math.Max(0, w - sample), Math.Max(0, h - sample));
+
+            if (count <= 0) return new Rgba { R = 255, G = 255, B = 255, A = 255 };
+
+            return new Rgba
             {
-                // best-effort
-            }
+                R = (byte)(r / count),
+                G = (byte)(g / count),
+                B = (byte)(b / count),
+                A = (byte)(a / count)
+            };
         }
+
+        private static bool TryFindContentBounds(byte[] px, int w, int h, int stride, Rgba bg, byte tol,
+            out int minX, out int minY, out int maxX, out int maxY)
+        {
+            minX = w; minY = h; maxX = -1; maxY = -1;
+
+            const byte alphaBgThreshold = 8;
+
+            for (int y = 0; y < h; y++)
+            {
+                int row = y * stride;
+                for (int x = 0; x < w; x++)
+                {
+                    int i = row + x * 4;
+                    byte b = px[i + 0];
+                    byte g = px[i + 1];
+                    byte r = px[i + 2];
+                    byte a = px[i + 3];
+
+                    bool isBg;
+                    if (a <= alphaBgThreshold)
+                    {
+                        isBg = true;
+                    }
+                    else
+                    {
+                        isBg =
+                            Math.Abs(r - bg.R) <= tol &&
+                            Math.Abs(g - bg.G) <= tol &&
+                            Math.Abs(b - bg.B) <= tol;
+                    }
+
+                    if (!isBg)
+                    {
+                        if (x < minX) minX = x;
+                        if (y < minY) minY = y;
+                        if (x > maxX) maxX = x;
+                        if (y > maxY) maxY = y;
+                    }
+                }
+            }
+
+            return maxX >= 0 && maxY >= 0;
+        }
+
+        private static double Clamp(double v, double min, double max) => v < min ? min : (v > max ? max : v);
 
         private static bool IsSavedInNewerRevitVersion(Autodesk.Revit.ApplicationServices.Application app, string filePath)
         {
