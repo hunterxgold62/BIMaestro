@@ -1,24 +1,45 @@
-﻿using System.Text.RegularExpressions;
+﻿using System;
+using System.Diagnostics;
+using System.Text.RegularExpressions;
 using System.Windows;
 
 namespace BIMaestro.Welcome
 {
     public partial class WelcomeWindow : Window
     {
+        private const string GuideUrl = "https://www.bimaestro.fr";
+
         public WelcomeResultAction ResultAction { get; private set; } = WelcomeResultAction.None;
 
         public string Email => EmailBox?.Text?.Trim();
         public string FirstName => FirstNameBox?.Text?.Trim();
         public string LastName => LastNameBox?.Text?.Trim();
 
-        public WelcomeWindow() => InitializeComponent();
+        public WelcomeWindow()
+        {
+            InitializeComponent();
+        }
 
         private void OpenGuide_Click(object sender, RoutedEventArgs e)
         {
-            ResultAction = WelcomeResultAction.OpenGuide;
-            DialogResult = false;
-            Close();
+            // ✅ Bonus : ouvre le site, mais NE ferme PAS la fenêtre
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = GuideUrl,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, "Impossible d’ouvrir l’exemple : " + ex.Message,
+                    "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+
+            // On ne change pas ResultAction, on ne Close() pas.
         }
+
 
         private void OptIn_Click(object sender, RoutedEventArgs e)
         {

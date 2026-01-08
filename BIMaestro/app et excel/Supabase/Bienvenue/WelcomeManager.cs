@@ -8,7 +8,7 @@ namespace BIMaestro.Welcome
 {
     public static class WelcomeManager
     {
-        private static readonly TimeSpan DelayAfterFirstUse = TimeSpan.FromMinutes(2);
+        private static readonly TimeSpan DelayAfterFirstUse = TimeSpan.FromMinutes(1);
         private static readonly TimeSpan SnoozeDuration = TimeSpan.FromDays(7);
         private static readonly TimeSpan MinAttemptSpacing = TimeSpan.FromHours(6);
 
