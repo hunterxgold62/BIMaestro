@@ -110,6 +110,9 @@ public class App : IExternalApplication
             // --- Ruban ---
             AppUI.CreateRibbonUI(application);
 
+            BIMaestro.Welcome.WelcomeManager.Initialize(application);
+
+
             return Result.Succeeded;
         }
         catch (InvalidOperationException) // licence invalide / expirée et pas de cache

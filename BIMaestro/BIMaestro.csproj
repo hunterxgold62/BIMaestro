@@ -270,6 +270,13 @@
     <Compile Include="animation touche\Fantome oui-non\fantome.xaml.cs">
       <DependentUpon>fantome.xaml</DependentUpon>
     </Compile>
+    <Compile Include="app et excel\Supabase\Bienvenue\WelcomeManager.cs" />
+    <Compile Include="app et excel\Supabase\Bienvenue\WelcomeResultAction.cs" />
+    <Compile Include="app et excel\Supabase\Bienvenue\WelcomeState.cs" />
+    <Compile Include="app et excel\Supabase\Bienvenue\WelcomeStorage.cs" />
+    <Compile Include="app et excel\Supabase\Bienvenue\WelcomeWindow.xaml.cs">
+      <DependentUpon>WelcomeWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="app et excel\Touche\AppUI.cs" />
     <Compile Include="app et excel\Supabase\ApiKeys.cs" />
     <None Include="app et excel\Touche\copie touche.cs" />
@@ -515,6 +522,10 @@
     <Page Include="animation touche\Fantome oui-non\fantome.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
+    </Page>
+    <Page Include="app et excel\Supabase\Bienvenue\WelcomeWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="app et excel\temps revit\TimeSeriesDashboardWindow.xaml">
       <SubType>Designer</SubType>

@@ -20,6 +20,10 @@ namespace Licensing
         private const string ValidateUrl =
             "https://xqovxfgghbqxwsadzhzl.functions.supabase.co/validate";
 
+        // Edge Function “upsert-profile”
+        private const string UpsertProfileUrl =
+            "https://xqovxfgghbqxwsadzhzl.functions.supabase.co/upsert-profile";
+
         // Supabase ANON key (publique)
         private const string ApiKey =
             "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
@@ -58,7 +62,11 @@ namespace Licensing
             Directory.CreateDirectory(Paths.LicenseDir);
             if (File.Exists(InstallIdFile))
             {
-                try { var t = File.ReadAllText(InstallIdFile).Trim(); if (!string.IsNullOrEmpty(t)) return t; }
+                try
+                {
+                    var t = File.ReadAllText(InstallIdFile).Trim();
+                    if (!string.IsNullOrEmpty(t)) return t;
+                }
                 catch { /* ignore */ }
             }
             var id = Guid.NewGuid().ToString("N");
@@ -123,15 +131,82 @@ namespace Licensing
             catch (HttpRequestException ex) { netErr = ex; }
             catch (WebException ex) { netErr = ex; }
 
-            // Si on est ici : réseau KO -> tente le cache
+            // réseau KO -> tente le cache
             string cached = LoadTokenIfValid(licenseKey, machineId);
             if (cached != null) { fromCache = true; return cached; }
 
-            // Sinon, remonte une erreur explicite (corrige le "throw;" illégal)
             fromCache = false;
             var msg = "Impossible de valider la licence et aucun jeton valide en cache."
                     + (netErr != null ? $" Détail réseau : {netErr.Message}" : "");
             throw new InvalidOperationException(msg, netErr);
+        }
+
+        /// <summary>
+        /// Envoie (opt-in) email/prénom/nom pour cette licence.
+        /// Authentification: Authorization: Bearer &lt;jwt_licence&gt;
+        /// </summary>
+        public static void UpsertUserProfile(
+            string jwtLicenseToken,
+            string installId,
+            string email,
+            string firstName,
+            string lastName,
+            string machineIdHash = null)
+        {
+            if (string.IsNullOrWhiteSpace(jwtLicenseToken))
+                throw new InvalidOperationException("JWT licence manquant (impossible de sync le profil).");
+
+            if (string.IsNullOrWhiteSpace(installId))
+                installId = GetOrCreateInstallId();
+
+            if (string.IsNullOrWhiteSpace(email))
+                throw new InvalidOperationException("Email manquant.");
+
+            using var client = NetSupport.CreateHttpClient(TimeSpan.FromSeconds(15));
+
+            // IMPORTANT : ici, PAS ApiKey. L’Edge Function attend le JWT licence.
+            client.DefaultRequestHeaders.Remove("Authorization");
+            client.DefaultRequestHeaders.Add("Authorization", $"Bearer {jwtLicenseToken}");
+
+            var body = new
+            {
+                install_id = installId,
+                email = email,
+                first_name = firstName,
+                last_name = lastName,
+                machine_id_hash = machineIdHash
+            };
+
+            var json = Newtonsoft.Json.JsonConvert.SerializeObject(body);
+            using var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var resp = client.PostAsync(UpsertProfileUrl, content).GetAwaiter().GetResult();
+            if (!resp.IsSuccessStatusCode)
+            {
+                var err = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                throw new InvalidOperationException($"Erreur sync profil : {err}");
+            }
+        }
+
+        /// <summary>
+        /// Variante safe: n’explose jamais l’UX si réseau KO.
+        /// </summary>
+        public static void TryUpsertUserProfileNoThrow(
+            string jwtLicenseToken,
+            string installId,
+            string email,
+            string firstName,
+            string lastName,
+            string machineIdHash = null)
+        {
+            try
+            {
+                UpsertUserProfile(jwtLicenseToken, installId, email, firstName, lastName, machineIdHash);
+            }
+            catch
+            {
+                // ignore volontairement
+            }
         }
 
         private static void SaveToken(string licenseKey, string token)

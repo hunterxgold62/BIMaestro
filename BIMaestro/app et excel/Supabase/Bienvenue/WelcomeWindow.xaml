@@ -1,0 +1,107 @@
+﻿<Window x:Class="BIMaestro.Welcome.WelcomeWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="BIMaestro — Bienvenue"
+        Width="560" Height="430"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="#FF0F172A"
+        Foreground="White"
+        FontFamily="Segoe UI"
+        ShowInTaskbar="False"
+        Topmost="True">
+
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Border CornerRadius="14" Background="#FF111C33" Padding="16" BorderBrush="#22314C" BorderThickness="1">
+            <StackPanel>
+                <TextBlock Text="Bienvenue dans BIMaestro" FontSize="20" FontWeight="SemiBold"/>
+                <TextBlock Text="Un plugin pensé pour simplifier le quotidien des dessinateurs Revit."
+                           Margin="0,4,0,0" Opacity="0.85"/>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="1" Margin="0,12,0,12" CornerRadius="14"
+                Background="#FF0B1220" BorderBrush="#22314C" BorderThickness="1" Padding="16">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" TextWrapping="Wrap" Opacity="0.92" LineHeight="18">
+                    Objectif : gagner du temps, éviter les tâches pénibles, et rendre Revit plus fluide.
+                    <LineBreak/><LineBreak/>
+                    Un <Bold>exemple intégré</Bold> existe pour comprendre rapidement à quoi sert chaque bouton.
+                    <LineBreak/><LineBreak/>
+                    Optionnel : si tu veux, laisse un email pour recevoir parfois des infos de mise à jour
+                    et correctifs importants (désinscription possible).
+                </TextBlock>
+
+                <StackPanel Grid.Row="1" Margin="0,14,0,0">
+                    <TextBlock Text="Email (optionnel)" Opacity="0.85" Margin="2,0,0,6"/>
+                    <TextBox x:Name="EmailBox" Height="34" Padding="10,6"
+                             Background="#FF0F172A" BorderBrush="#334155" BorderThickness="1"
+                             Foreground="White" />
+                </StackPanel>
+
+                <Grid Grid.Row="2" Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Prénom (optionnel)" Opacity="0.85" Margin="2,0,0,6"/>
+                        <TextBox x:Name="FirstNameBox" Height="34" Padding="10,6"
+                                 Background="#FF0F172A" BorderBrush="#334155" BorderThickness="1"
+                                 Foreground="White" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Nom (optionnel)" Opacity="0.85" Margin="2,0,0,6"/>
+                        <TextBox x:Name="LastNameBox" Height="34" Padding="10,6"
+                                 Background="#FF0F172A" BorderBrush="#334155" BorderThickness="1"
+                                 Foreground="White" />
+                    </StackPanel>
+                </Grid>
+
+                <TextBlock Grid.Row="3" Margin="2,10,0,0" Opacity="0.65" TextWrapping="Wrap"
+                           Text="Tu peux le faire plus tard dans Paramètres (très rapide)." />
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <Button Grid.Column="1" Content="Non merci" Margin="8,0,0,0" Padding="14,8"
+                    Background="#00000000" BorderBrush="#334155" BorderThickness="1"
+                    Foreground="White" Click="NoThanks_Click"/>
+
+            <Button Grid.Column="2" Content="Plus tard" Margin="8,0,0,0" Padding="14,8"
+                    Background="#FF0F172A" BorderBrush="#334155" BorderThickness="1"
+                    Foreground="White" Click="Later_Click"/>
+
+            <Button Grid.Column="3" Content="Voir l’exemple" Margin="8,0,0,0" Padding="14,8"
+                    Background="#FF1F2937" BorderBrush="#334155" BorderThickness="1"
+                    Foreground="White" Click="OpenGuide_Click"/>
+
+            <Button Grid.Column="4" Content="Recevoir les infos" Margin="8,0,0,0" Padding="14,8"
+                    Background="#FF2563EB" BorderBrush="#FF2563EB" BorderThickness="1"
+                    Foreground="White" Click="OptIn_Click"/>
+        </Grid>
+    </Grid>
+</Window>
