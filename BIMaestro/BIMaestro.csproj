@@ -416,11 +416,9 @@
     <Compile Include="Test\perso pixéli\PixelDancerWindow.xaml.cs">
       <DependentUpon>PixelDancerWindow.xaml</DependentUpon>
     </Compile>
-    <Compile Include="Themes\app.xaml.cs">
-      <DependentUpon>app.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="Themes\MainWindow.xaml.cs">
-      <DependentUpon>MainWindow.xaml</DependentUpon>
+    <Compile Include="Test\snake\snake.cs" />
+    <Compile Include="Test\snake\SnakeWindow.xaml.cs">
+      <DependentUpon>SnakeWindow.xaml</DependentUpon>
     </Compile>
     <None Include="Test\automatisation de tuyaux\SelectionHelper.cs" />
     <None Include="Test\automatisation de tuyaux\test avec coude qui marche moyen\ConnectPipes.cs" />
@@ -650,27 +648,7 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="Themes\app.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="Themes\Colors.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="Themes\MainWindow.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="Themes\ResourceDictionary.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="Themes\Theme.Dark.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="Themes\Theme.Light.xaml">
+    <Page Include="Test\snake\SnakeWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -823,5 +801,6 @@
   <ItemGroup>
     <EmbeddedResource Include="Resources\roue ruban.png" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

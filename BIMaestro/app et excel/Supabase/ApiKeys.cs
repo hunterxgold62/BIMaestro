@@ -4,6 +4,7 @@ using System;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Licensing
 {
@@ -18,7 +19,7 @@ namespace Licensing
         /// <summary>Appel générique via le proxy (OpenAI par défaut).</summary>
         public static JObject SendOpenAI(string jwtLicense, object openaiRequest)
         {
-            using var client = NetSupport.CreateHttpClient(TimeSpan.FromSeconds(15));
+            using var client = NetSupport.CreateHttpClient(TimeSpan.FromSeconds(60));
             client.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Bearer", jwtLicense);
 
@@ -26,7 +27,15 @@ namespace Licensing
             var jsonBody = JsonConvert.SerializeObject(wrapper);
 
             using var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
-            var resp = client.PostAsync(ProxyUrl, content).GetAwaiter().GetResult();
+            HttpResponseMessage resp;
+            try
+            {
+                resp = client.PostAsync(ProxyUrl, content).GetAwaiter().GetResult();
+            }
+            catch (TaskCanceledException)
+            {
+                throw new InvalidOperationException("La requête IA a expiré (délai de 60 s dépassé). Veuillez réessayer ou reformuler votre demande.");
+            }
             var raw = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
 
             if ((int)resp.StatusCode == 403)
@@ -51,7 +60,7 @@ namespace Licensing
         /// <summary>DeepSeek (si tu l’utilises encore).</summary>
         public static JObject SendDeepSeek(string jwtLicense, string query)
         {
-            using var client = NetSupport.CreateHttpClient(TimeSpan.FromSeconds(15));
+            using var client = NetSupport.CreateHttpClient(TimeSpan.FromSeconds(60));
             client.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Bearer", jwtLicense);
 
@@ -59,7 +68,15 @@ namespace Licensing
             var jsonBody = JsonConvert.SerializeObject(wrapper);
 
             using var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
-            var resp = client.PostAsync(ProxyUrl, content).GetAwaiter().GetResult();
+            HttpResponseMessage resp;
+            try
+            {
+                resp = client.PostAsync(ProxyUrl, content).GetAwaiter().GetResult();
+            }
+            catch (TaskCanceledException)
+            {
+                throw new InvalidOperationException("La requête IA a expiré (délai de 60 s dépassé). Veuillez réessayer ou reformuler votre demande.");
+            }
             var raw = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
 
             if (!resp.IsSuccessStatusCode)

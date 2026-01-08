@@ -12,6 +12,13 @@ using System.Windows.Media.Imaging;
 
 namespace Famille
 {
+    public enum PreviewOverwriteMode
+    {
+        AskUser = 0,
+        OverwriteAll = 1,
+        SkipExisting = 2
+    }
+
     public sealed class PreviewGenerationRequest
     {
         public IReadOnlyList<PreviewEntry> Entries { get; set; } = Array.Empty<PreviewEntry>();
@@ -19,6 +26,9 @@ namespace Famille
         public CancellationToken CancellationToken { get; set; }
         public Action<PreviewGenerationProgress> ProgressCallback { get; set; }
         public Action<string> LogCallback { get; set; }
+
+        // ✅ Overwrite behavior
+        public PreviewOverwriteMode OverwriteMode { get; set; } = PreviewOverwriteMode.AskUser;
 
         // Export Revit
         public int RevitExportPixelSize { get; set; } = 1600;
@@ -45,8 +55,15 @@ namespace Famille
 
         // Fond -> transparent
         public bool MakeBackgroundTransparent { get; set; } = true;
-        public byte BackgroundTransparencyTolerance { get; set; } = 5;
+
+        
+        public byte BackgroundTransparencyTolerance { get; set; } = 3;
+
         public bool PreserveSemiTransparentPixels { get; set; } = true;
+
+        // UI / Visual quality
+        public bool ForceThinLines { get; set; } = true; // ⚠️ toggle global Revit
+        public bool HideConnectors { get; set; } = true; // masque éléments "connecteur" par heuristique de nom
     }
 
     public sealed class PreviewEntry
@@ -68,18 +85,28 @@ namespace Famille
     {
         public PreviewGenerationRequest Request { get; set; }
 
+        // Décision utilisateur pour l'écrasement (appliquée à tout le batch)
+        private PreviewOverwriteMode? _resolvedOverwriteMode = null;
+        private bool _stopRequested = false;
+
         public void Execute(UIApplication app)
         {
             var req = Request;
             if (app == null || req == null || req.Entries == null || req.Entries.Count == 0)
                 return;
 
+            _stopRequested = false;
+            _resolvedOverwriteMode = null;
+
+            if (req.ForceThinLines)
+                EnsureThinLinesOn(app, req.LogCallback);
+
             int total = req.Entries.Count;
             int done = 0;
 
             foreach (var entry in req.Entries)
             {
-                if (req.CancellationToken.IsCancellationRequested)
+                if (_stopRequested || req.CancellationToken.IsCancellationRequested)
                 {
                     PublishProgress(req, done, total, entry?.FamilyPath, isCanceled: true);
                     break;
@@ -97,7 +124,7 @@ namespace Famille
                 PublishProgress(req, done, total, entry?.FamilyPath);
             }
 
-            PublishProgress(req, done, total, null, isCompleted: true, isCanceled: req.CancellationToken.IsCancellationRequested);
+            PublishProgress(req, done, total, null, isCompleted: true, isCanceled: _stopRequested || req.CancellationToken.IsCancellationRequested);
         }
 
         public string GetName() => nameof(GeneratePreviewImagesHandler);
@@ -123,7 +150,7 @@ namespace Famille
             try { logger?.Invoke(message); } catch { }
         }
 
-        private static bool TryExportFamilyPreview(UIApplication uiapp, PreviewEntry entry, PreviewGenerationRequest req, out string error)
+        private bool TryExportFamilyPreview(UIApplication uiapp, PreviewEntry entry, PreviewGenerationRequest req, out string error)
         {
             error = null;
 
@@ -145,6 +172,18 @@ namespace Famille
                 return false;
             }
 
+            // Target path
+            var targetPng = GetTargetPath(entry, req.TargetRoot);
+            Directory.CreateDirectory(Path.GetDirectoryName(targetPng));
+
+            // ✅ Sécurité overwrite (ne touche pas si l'utilisateur refuse)
+            if (!ShouldWriteTarget(targetPng, entry, req, uiapp))
+            {
+                // Si on skip, on ne fait rien, mais c'est un succès "logique"
+                return true;
+            }
+
+            // Bloque uniquement si famille plus récente
             try
             {
                 if (IsSavedInNewerRevitVersion(uiapp.Application, entry.FamilyPath))
@@ -184,15 +223,14 @@ namespace Famille
                     try { famDoc.Regenerate(); } catch { }
                 }
 
-                var targetPng = GetTargetPath(entry, req.TargetRoot);
-                Directory.CreateDirectory(Path.GetDirectoryName(targetPng));
-
+                // Export
                 if (!ExportViewToPngRobust(famDoc, view, targetPng, req.RevitExportPixelSize, req.RevitImageResolution))
                 {
                     error = "Export PNG impossible (aucun fichier créé).";
                     return false;
                 }
 
+                // Post-process carré
                 if (req.PostProcessToSquareNoScale)
                 {
                     if (!CenterContentAndPadToSquare_NoScale_Pixels(
@@ -207,6 +245,7 @@ namespace Famille
                     }
                 }
 
+                // Fond transparent
                 if (req.MakeBackgroundTransparent)
                 {
                     ApplyBackgroundTransparency_Pixels(
@@ -231,6 +270,94 @@ namespace Famille
             finally
             {
                 try { famDoc?.Close(false); } catch { }
+            }
+        }
+
+        private bool ShouldWriteTarget(string targetPng, PreviewEntry entry, PreviewGenerationRequest req, UIApplication uiapp)
+        {
+            // Si le fichier n'existe pas => on écrit
+            if (!File.Exists(targetPng))
+                return true;
+
+            // Si mode déjà résolu (ou imposé)
+            var mode = _resolvedOverwriteMode ?? req.OverwriteMode;
+
+            if (mode == PreviewOverwriteMode.OverwriteAll)
+                return true;
+
+            if (mode == PreviewOverwriteMode.SkipExisting)
+            {
+                SafeLog(req.LogCallback, $"⏭️ Existe déjà (skip) : {Path.GetFileName(targetPng)}");
+                return false;
+            }
+
+            // AskUser : demander UNE FOIS pour tout le batch
+            if (_resolvedOverwriteMode.HasValue)
+            {
+                // sécurité, ne devrait pas arriver
+                return _resolvedOverwriteMode.Value == PreviewOverwriteMode.OverwriteAll;
+            }
+
+            var decision = AskUserOverwriteDecision(uiapp, targetPng, entry, req);
+            if (decision == null)
+            {
+                _stopRequested = true;
+                return false;
+            }
+
+            _resolvedOverwriteMode = decision.Value;
+
+            if (_resolvedOverwriteMode.Value == PreviewOverwriteMode.SkipExisting)
+            {
+                SafeLog(req.LogCallback, $"⏭️ Existe déjà (skip) : {Path.GetFileName(targetPng)}");
+                return false;
+            }
+
+            return _resolvedOverwriteMode.Value == PreviewOverwriteMode.OverwriteAll;
+        }
+
+        /// <summary>
+        /// Retour:
+        /// - OverwriteAll => écraser (pour tout le batch)
+        /// - SkipExisting => ne pas toucher aux fichiers existants (pour tout le batch)
+        /// - null => annuler toute l'opération
+        /// </summary>
+        private PreviewOverwriteMode? AskUserOverwriteDecision(UIApplication uiapp, string targetPng, PreviewEntry entry, PreviewGenerationRequest req)
+        {
+            try
+            {
+                var td = new TaskDialog("BIMaestro – Export des aperçus")
+                {
+                    MainInstruction = "Des images d’aperçu existent déjà.",
+                    MainContent =
+                        $"Exemple : {Path.GetFileName(targetPng)}\n\n" +
+                        "Que veux-tu faire pour les fichiers déjà présents ?\n" +
+                        "• Écraser : recrée toutes les images (et applique le post-traitement).\n" +
+                        "• Ignorer : ne touche pas aux images existantes, mais génère celles manquantes.\n" +
+                        "• Annuler : stoppe l’export.",
+                    CommonButtons = TaskDialogCommonButtons.None,
+                    AllowCancellation = true
+                };
+
+                td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Écraser toutes les images existantes");
+                td.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, "Ignorer les images existantes (générer seulement celles manquantes)");
+                td.AddCommandLink(TaskDialogCommandLinkId.CommandLink3, "Annuler");
+
+                var res = td.Show();
+
+                if (res == TaskDialogResult.CommandLink1)
+                    return PreviewOverwriteMode.OverwriteAll;
+
+                if (res == TaskDialogResult.CommandLink2)
+                    return PreviewOverwriteMode.SkipExisting;
+
+                return null; // cancel
+            }
+            catch
+            {
+                // En cas de souci UI, par sécurité on skip
+                SafeLog(req.LogCallback, "ℹ️ Impossible d’afficher la boîte de dialogue : images existantes ignorées.");
+                return PreviewOverwriteMode.SkipExisting;
             }
         }
 
@@ -333,7 +460,7 @@ namespace Famille
 
                     if (req.HideNoisyCategoriesByNameHeuristic)
                     {
-                        string[] tokens =
+                        var tokens = new List<string>
                         {
                             "reference", "référence", "ref", "plane", "plan",
                             "level", "niveau",
@@ -343,6 +470,15 @@ namespace Famille
                             "annotation", "étiquette", "tag",
                             "symbol", "symbole"
                         };
+
+                        // ✅ Cache connecteurs MEP (nom affiché dans l'UI Revit)
+                        if (req.HideConnectors)
+                        {
+                            tokens.AddRange(new[]
+                            {
+                                "connector", "connecteur", "connexion", "élément de connecteur", "element de connecteur"
+                            });
+                        }
 
                         foreach (Category cat in doc.Settings.Categories)
                         {
@@ -542,7 +678,7 @@ namespace Famille
                 var pixels = new byte[h * stride];
                 src.CopyPixels(pixels, stride, 0);
 
-                // Fond pour détecter le contenu : coins OK ici, car on détecte le contenu (pas la transparence finale)
+                // Fond pour détecter le contenu (coins suffisent)
                 var bg = EstimateBackgroundFromCorners(pixels, w, h, stride, Math.Max(2, sampleSize));
 
                 if (!TryFindContentBounds(pixels, w, h, stride, bg, tolerance, out int minX, out int minY, out int maxX, out int maxY))
@@ -616,7 +752,7 @@ namespace Famille
         }
 
         // ==========================================================
-        // Fond -> transparent (chroma key) basé sur la couleur DOMINANTE
+        // Fond -> transparent basé sur la couleur DOMINANTE (robuste)
         // ==========================================================
 
         private static void ApplyBackgroundTransparency_Pixels(
@@ -637,7 +773,6 @@ namespace Famille
                 byte[] px = new byte[h * stride];
                 src.CopyPixels(px, stride, 0);
 
-                // ✅ IMPORTANT: on estime le fond par couleur DOMINANTE, pas par coins (coins souvent noirs Revit)
                 var bg = EstimateBackgroundByDominantColor(px, w, h, stride);
 
                 const byte alphaBgThreshold = 8;
@@ -690,7 +825,6 @@ namespace Famille
             }
         }
 
-        // ✅ Nouveau: fond = couleur dominante de l'image (super robuste pour tes exports)
         private static Rgba EstimateBackgroundByDominantColor(byte[] px, int w, int h, int stride)
         {
             var dict = new Dictionary<int, int>(capacity: 4096);
@@ -871,6 +1005,26 @@ namespace Famille
 
             if (fileYear <= 0) return false;
             return fileYear > appYear;
+        }
+
+        // ==========================================================
+        // ThinLines (toggle global)
+        // ==========================================================
+        private static void EnsureThinLinesOn(UIApplication uiapp, Action<string> log)
+        {
+            try
+            {
+                var cmdId = RevitCommandId.LookupPostableCommandId(PostableCommand.ThinLines);
+                if (cmdId != null && uiapp.CanPostCommand(cmdId))
+                {
+                    uiapp.PostCommand(cmdId);
+                    SafeLog(log, "✅ Lignes fines (Thin Lines) : commande envoyée.");
+                }
+            }
+            catch (Exception ex)
+            {
+                SafeLog(log, $"ℹ️ ThinLines non activé : {ex.Message}");
+            }
         }
     }
 }
