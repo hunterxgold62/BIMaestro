@@ -57,6 +57,9 @@ public class App : IExternalApplication
 
             bool fromCache;
             LicenseJwt = LicenseManager.ValidateOrUseCache(licenseKey, MachineId, out fromCache, userAgent);
+            // Rend le JWT dispo partout (BaseTrackedCommand, Welcome, etc.)
+            Licensing.LicenseSession.Set(licenseKey, LicenseJwt);
+
 
             // log non bloquant si hors-ligne
             if (fromCache)
@@ -110,7 +113,9 @@ public class App : IExternalApplication
             // --- Ruban ---
             AppUI.CreateRibbonUI(application);
 
+            // "//" à rajouté pour retiré le message de bienvenue 
             BIMaestro.Welcome.WelcomeManager.Initialize(application);
+            BIMaestro.Welcome.WelcomeManager.TrySyncPendingProfile(LicenseJwt);
 
 
             return Result.Succeeded;

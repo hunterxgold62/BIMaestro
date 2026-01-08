@@ -5,7 +5,8 @@ using System;
 namespace Licensing
 {
     /// <summary>
-    /// À hériter pour tracer automatiquement (succès/échec + contexte).
+    /// À hériter pour tracer automatiquement (succès/échec + contexte)
+    /// + hook "Welcome" après premier usage.
     /// </summary>
     public abstract class BaseTrackedCommand : IExternalCommand
     {
@@ -30,6 +31,20 @@ namespace Licensing
 
         public Result Execute(ExternalCommandData data, ref string message, ElementSet elements)
         {
+            // ✅ Hook global : au tout premier bouton BIMaestro, start timer (2 min), puis popup.
+            // Le JWT (si dispo) permet ensuite de sync l'email (opt-in) vers Supabase.
+            try
+            {
+                BIMaestro.Welcome.WelcomeManager.NotifyFirstCommandUsed(
+                    data.Application,
+                    Licensing.LicenseSession.CurrentJwt
+                );
+            }
+            catch
+            {
+                // Jamais bloquer une commande pour ça
+            }
+
             try
             {
                 var res = OnExecute(data, ref message, elements);

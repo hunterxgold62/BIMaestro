@@ -270,6 +270,7 @@
     <Compile Include="animation touche\Fantome oui-non\fantome.xaml.cs">
       <DependentUpon>fantome.xaml</DependentUpon>
     </Compile>
+    <Compile Include="app et excel\Supabase\Bienvenue\LicenseSession.cs" />
     <Compile Include="app et excel\Supabase\Bienvenue\WelcomeManager.cs" />
     <Compile Include="app et excel\Supabase\Bienvenue\WelcomeResultAction.cs" />
     <Compile Include="app et excel\Supabase\Bienvenue\WelcomeState.cs" />
@@ -285,7 +286,6 @@
     <Compile Include="app et excel\Supabase\LicenseManager.cs" />
     <Compile Include="app et excel\Supabase\NetSupport.cs" />
     <Compile Include="app et excel\Supabase\Paths.cs" />
-    <None Include="app et excel\Supabase\PushMessage.cs" />
     <Compile Include="app et excel\Supabase\Telemetry.cs" />
     <Compile Include="app et excel\temps revit\ShowTimeDashboard.cs" />
     <Compile Include="app et excel\temps revit\TimeSeriesDashboardWindow.xaml.cs">
