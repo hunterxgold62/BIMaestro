@@ -423,8 +423,8 @@
     <Compile Include="Test\perso pixéli\PixelDancerWindow.xaml.cs">
       <DependentUpon>PixelDancerWindow.xaml</DependentUpon>
     </Compile>
-    <Compile Include="Test\snake\snake.cs" />
-    <Compile Include="Test\snake\SnakeWindow.xaml.cs">
+    <Compile Include="commands\Snake\snake.cs" />
+    <Compile Include="commands\Snake\SnakeWindow.xaml.cs">
       <DependentUpon>SnakeWindow.xaml</DependentUpon>
     </Compile>
     <None Include="Test\automatisation de tuyaux\SelectionHelper.cs" />
@@ -659,7 +659,7 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="Test\snake\SnakeWindow.xaml">
+    <Page Include="commands\Snake\SnakeWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

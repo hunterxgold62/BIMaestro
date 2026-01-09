@@ -117,8 +117,7 @@ public class AppUI : IExternalApplication
                     // (name, text, className, icon, tooltip)
                     ("NOTE_MAJ", "Note", "Page.MiseAJourCommand", "safeimagekit-Information.png", "Page de mise à jour"),
                     ("BIMaestro_Exemple", "Exemple", "Page.GuideCommand", "safeimagekit-Texte maj.png", "Page d'information sur le plugin"),
-                    ("CustomizeRibbon", "Ruban", "BIMaestro.RibbonLayout.RibbonLayoutCommand", "roue ruban.png", "Réorganiser les panneaux et boutons BIMaestro et sauvegarder vos préférences dans RevitLogs/SauvegardePréférence.")
-                ))
+("CustomizeRibbon", "Option", "BIMaestro.RibbonLayout.RibbonLayoutCommand", "roue ruban.png", "Configurer le ruban BIMaestro et les paramètres utilisateur.")                ))
             })
         };
     }
@@ -260,38 +259,77 @@ public class AppUI : IExternalApplication
       string splitToolTip = null,
       string splitToolTipImageResource = null)
     {
-        var pulldownData = new PulldownButtonData(splitButtonName, splitButtonText);
-        var pulldownButton = panel.AddItem(pulldownData) as PulldownButton;
+        var splitButtonData = new SplitButtonData(splitButtonName, splitButtonText);
+        var splitButton = panel.AddItem(splitButtonData) as SplitButton;
 
         if (!string.IsNullOrWhiteSpace(splitToolTip))
         {
-            pulldownButton.ToolTip = splitToolTip;
+            splitButton.ToolTip = splitToolTip;
 
             if (!string.IsNullOrWhiteSpace(splitToolTipImageResource))
             {
                 var bmp16 = LoadBitmapFromResource(splitToolTipImageResource, 16);
-                if (bmp16 != null) pulldownButton.Image = bmp16;
+                if (bmp16 != null) splitButton.Image = bmp16;
 
                 var bmp32 = LoadBitmapFromResource(splitToolTipImageResource, 32);
-                if (bmp32 != null) pulldownButton.LargeImage = bmp32;
+                if (bmp32 != null) splitButton.LargeImage = bmp32;
 
-                if (bmp32 != null) pulldownButton.ToolTipImage = bmp32;
+                if (bmp32 != null) splitButton.ToolTipImage = bmp32;
             }
         }
 
         if (buttons.Count > 0)
         {
             var first16 = LoadBitmapFromResource(buttons[0].resourceImageName, 16);
-            if (first16 != null) pulldownButton.Image = first16;
+            if (first16 != null) splitButton.Image = first16;
 
             var first32 = LoadBitmapFromResource(buttons[0].resourceImageName, 32);
-            if (first32 != null) pulldownButton.LargeImage = first32;
+            if (first32 != null) splitButton.LargeImage = first32;
         }
 
+        PushButton firstButton = null;
         foreach (var (buttonName, buttonText, className, resourceImageName, toolTip) in buttons)
         {
             var buttonData = CreatePushButtonData(buttonName, buttonText, assemblyPath, className, resourceImageName, toolTip);
-            pulldownButton.AddPushButton(buttonData);
+            var addedButton = splitButton.AddPushButton(buttonData);
+            if (firstButton == null)
+            {
+                firstButton = addedButton;
+            }
+        }
+
+        if (firstButton != null)
+        {
+            KeepSplitButtonDefault(splitButton, firstButton);
+        }
+    }
+
+    private static void KeepSplitButtonDefault(SplitButton splitButton, PushButton defaultButton)
+    {
+        if (splitButton == null || defaultButton == null)
+            return;
+
+        splitButton.CurrentButton = defaultButton;
+
+        try
+        {
+            var syncProp = splitButton.GetType().GetProperty("IsSynchronizedWithCurrentItem");
+            if (syncProp != null && syncProp.CanWrite)
+            {
+                syncProp.SetValue(splitButton, false, null);
+            }
+
+            var eventInfo = splitButton.GetType().GetEvent("CurrentButtonChanged");
+            if (eventInfo != null)
+            {
+                EventHandler handler = (_, __) => splitButton.CurrentButton = defaultButton;
+                var del = Delegate.CreateDelegate(eventInfo.EventHandlerType, handler.Target, handler.Method);
+                eventInfo.AddEventHandler(splitButton, del);
+            }
+        }
+        catch
+        {
+            // Ignore si l'API ne supporte pas ces hooks.
         }
     }
 

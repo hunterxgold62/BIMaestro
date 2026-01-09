@@ -1,0 +1,457 @@
+﻿<Window x:Class="BIMaestro.Bonus.SnakeWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="BIMaestro – Snake (Bonus)"
+        Width="720" Height="760"
+        ResizeMode="NoResize"
+        WindowStyle="SingleBorderWindow"
+        ShowInTaskbar="False"
+        PreviewKeyDown="Window_PreviewKeyDown"
+        Loaded="Window_Loaded"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True">
+
+    <Window.Background>
+        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#FFF7F7F7" Offset="0"/>
+            <GradientStop Color="#FFEEF1F4" Offset="1"/>
+        </LinearGradientBrush>
+    </Window.Background>
+
+    <Window.Resources>
+        <SolidColorBrush x:Key="HudCardBg" Color="#F9FFFFFF"/>
+        <SolidColorBrush x:Key="HudCardBorder" Color="#1A000000"/>
+
+        <DropShadowEffect x:Key="CardShadow"
+                          BlurRadius="18"
+                          ShadowDepth="4"
+                          Opacity="0.22"/>
+
+        <Style x:Key="HudCard" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource HudCardBg}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource HudCardBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="10"/>
+            <Setter Property="Effect" Value="{StaticResource CardShadow}"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+        </Style>
+
+        <Style TargetType="TextBlock">
+            <Setter Property="TextOptions.TextFormattingMode" Value="Display"/>
+            <Setter Property="TextOptions.TextRenderingMode" Value="ClearType"/>
+        </Style>
+
+        <Style x:Key="HintText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="#FF666666"/>
+        </Style>
+
+        <Style x:Key="PillBadge" TargetType="Border">
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="BorderBrush" Value="#18000000"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+        </Style>
+    </Window.Resources>
+
+    <!-- micro motion "noise" -->
+    <Window.Triggers>
+        <EventTrigger RoutedEvent="Window.Loaded">
+            <BeginStoryboard>
+                <Storyboard RepeatBehavior="Forever">
+                    <DoubleAnimation Storyboard.TargetName="NoiseShift"
+                                     Storyboard.TargetProperty="X"
+                                     From="0" To="48"
+                                     Duration="0:0:3" />
+                    <DoubleAnimation Storyboard.TargetName="NoiseShift"
+                                     Storyboard.TargetProperty="Y"
+                                     From="0" To="48"
+                                     Duration="0:0:4" />
+                    <DoubleAnimation Storyboard.TargetName="NoiseOverlay"
+                                     Storyboard.TargetProperty="Opacity"
+                                     From="0.02" To="0.06"
+                                     Duration="0:0:2"
+                                     AutoReverse="True" />
+                </Storyboard>
+            </BeginStoryboard>
+        </EventTrigger>
+    </Window.Triggers>
+
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Top HUD (compact) -->
+        <Grid Grid.Row="0" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="230"/>
+                <ColumnDefinition Width="150"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Score -->
+            <Border Grid.Column="0" Style="{StaticResource HudCard}" Margin="0,0,10,0">
+                <StackPanel>
+                    <TextBlock x:Name="ScoreText"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Foreground="#FF111111"
+                               Text="Score: 0">
+                        <TextBlock.RenderTransform>
+                            <ScaleTransform x:Name="ScorePopScale" ScaleX="1" ScaleY="1"/>
+                        </TextBlock.RenderTransform>
+                        <TextBlock.RenderTransformOrigin>0.5,0.5</TextBlock.RenderTransformOrigin>
+                    </TextBlock>
+
+                    <TextBlock x:Name="TopText"
+                               FontSize="12"
+                               Foreground="#FF444444"
+                               Margin="0,6,0,0"
+                               Text="Top Mode: 0 • Global: 0"/>
+
+                    <!-- Badges -->
+                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+
+                        <Border x:Name="MultiplierBadge"
+                                Style="{StaticResource PillBadge}"
+                                Background="#33219BFF">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="4"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock x:Name="MultiplierText"
+                                           Grid.Row="0"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           Foreground="#FF111111"
+                                           Text="x1"/>
+
+                                <Border Grid.Row="1"
+                                        Margin="0,4,0,0"
+                                        Background="#22000000"
+                                        CornerRadius="2"
+                                        Height="4">
+                                    <Rectangle x:Name="MultiplierBarFill"
+                                               Height="4"
+                                               RadiusX="2" RadiusY="2"
+                                               HorizontalAlignment="Left"
+                                               RenderTransformOrigin="0,0.5">
+                                        <Rectangle.RenderTransform>
+                                            <ScaleTransform x:Name="MultiplierBarScale" ScaleX="0" ScaleY="1"/>
+                                        </Rectangle.RenderTransform>
+                                    </Rectangle>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <Border x:Name="SpeedBadge"
+                                Style="{StaticResource PillBadge}"
+                                Background="#33FF66B3"
+                                Margin="8,0,0,0"
+                                Visibility="Collapsed">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="4"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock x:Name="SpeedText"
+                                           Grid.Row="0"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           Foreground="#FF111111"
+                                           Text="Speed"/>
+
+                                <Border Grid.Row="1"
+                                        Margin="0,4,0,0"
+                                        Background="#22000000"
+                                        CornerRadius="2"
+                                        Height="4">
+                                    <Rectangle x:Name="SpeedBarFill"
+                                               Height="4"
+                                               RadiusX="2" RadiusY="2"
+                                               HorizontalAlignment="Left"
+                                               RenderTransformOrigin="0,0.5">
+                                        <Rectangle.RenderTransform>
+                                            <ScaleTransform x:Name="SpeedBarScale" ScaleX="0" ScaleY="1"/>
+                                        </Rectangle.RenderTransform>
+                                    </Rectangle>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <Border x:Name="RainBadge"
+                                Style="{StaticResource PillBadge}"
+                                Background="#33FFD64D"
+                                Margin="8,0,0,0"
+                                Visibility="Collapsed">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="4"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock x:Name="RainText"
+                                           Grid.Row="0"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           Foreground="#FF111111"
+                                           Text="Pluie"/>
+
+                                <Border Grid.Row="1"
+                                        Margin="0,4,0,0"
+                                        Background="#22000000"
+                                        CornerRadius="2"
+                                        Height="4">
+                                    <Rectangle x:Name="RainBarFill"
+                                               Height="4"
+                                               RadiusX="2" RadiusY="2"
+                                               HorizontalAlignment="Left"
+                                               RenderTransformOrigin="0,0.5">
+                                        <Rectangle.RenderTransform>
+                                            <ScaleTransform x:Name="RainBarScale" ScaleX="0" ScaleY="1"/>
+                                        </Rectangle.RenderTransform>
+                                    </Rectangle>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                    </StackPanel>
+
+                    <TextBlock x:Name="ModeText"
+                               FontSize="12"
+                               Foreground="#FF444444"
+                               Margin="0,10,0,0"
+                               Text="Mode: Classic"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Mode / Skin (compact, peut couper) -->
+            <Border Grid.Column="1" Style="{StaticResource HudCard}" Margin="0,0,10,0">
+                <StackPanel>
+                    <TextBlock Text="Mode :" FontSize="12" Foreground="#FF444444"/>
+                    <ComboBox x:Name="ModeCombo"
+                              Height="28"
+                              Width="200"
+                              Margin="0,6,0,10"
+                              SelectionChanged="ModeCombo_SelectionChanged"/>
+
+                    <TextBlock Text="Skin :" FontSize="12" Foreground="#FF444444"/>
+                    <ComboBox x:Name="SkinCombo"
+                              Height="28"
+                              Width="200"
+                              Margin="0,6,0,0"
+                              SelectionChanged="SkinCombo_SelectionChanged">
+                        <ComboBox.ItemContainerStyle>
+                            <Style TargetType="ComboBoxItem">
+                                <Setter Property="IsEnabled" Value="{Binding IsEnabled}"/>
+                            </Style>
+                        </ComboBox.ItemContainerStyle>
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Display}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+
+                    <!-- Gardé pour compat code, mais invisible -->
+                    <TextBlock x:Name="ModeHintText"
+                               Visibility="Collapsed"
+                               Margin="0,6,0,0"
+                               Style="{StaticResource HintText}"
+                               Text=""/>
+                </StackPanel>
+            </Border>
+
+            <!-- Map -->
+            <Border Grid.Column="2" Style="{StaticResource HudCard}">
+                <StackPanel>
+                    <TextBlock x:Name="MapInfoText"
+                               FontSize="12"
+                               Foreground="#FF666666"
+                               Text="Map: 28×28"/>
+                    <TextBlock Style="{StaticResource HintText}"
+                               Margin="0,6,0,0"
+                               Text="ESC = fermer"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- Help -->
+        <Border Grid.Row="1"
+                Background="#0A000000"
+                CornerRadius="12"
+                Padding="10"
+                Margin="0,0,0,10">
+            <TextBlock FontSize="12"
+                       Foreground="#FF666666"
+                       TextWrapping="Wrap"
+                       Text="Espace = démarrer / restart • Flèches ou ZQSD = bouger • P = pause • Échap = fermer"/>
+        </Border>
+
+        <!-- Game -->
+        <Border x:Name="GameBorder"
+                Grid.Row="2"
+                Background="#FF1A1A1A"
+                CornerRadius="16"
+                Padding="14"
+                SnapsToDevicePixels="True">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="24" ShadowDepth="8" Opacity="0.30"/>
+            </Border.Effect>
+
+            <Grid>
+                <Border x:Name="PlayfieldBorder"
+                        Background="#FF0B0B0B"
+                        BorderBrush="#33FFFFFF"
+                        BorderThickness="2"
+                        CornerRadius="12"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        SnapsToDevicePixels="True">
+                    <Grid ClipToBounds="True">
+
+                        <Image x:Name="GameImage"
+                               SnapsToDevicePixels="True"
+                               Stretch="None"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+
+                        <!-- Scanlines -->
+                        <Rectangle x:Name="ScanlinesOverlay"
+                                   IsHitTestVisible="False"
+                                   Opacity="0.10">
+                            <Rectangle.Fill>
+                                <DrawingBrush TileMode="Tile"
+                                              Viewport="0,0,1,6"
+                                              ViewportUnits="Absolute"
+                                              Viewbox="0,0,1,6"
+                                              ViewboxUnits="Absolute"
+                                              Stretch="Fill">
+                                    <DrawingBrush.Drawing>
+                                        <DrawingGroup>
+                                            <GeometryDrawing Brush="#14FFFFFF">
+                                                <GeometryDrawing.Geometry>
+                                                    <RectangleGeometry Rect="0,0,1,1"/>
+                                                </GeometryDrawing.Geometry>
+                                            </GeometryDrawing>
+                                            <GeometryDrawing Brush="#0A000000">
+                                                <GeometryDrawing.Geometry>
+                                                    <RectangleGeometry Rect="0,3,1,1"/>
+                                                </GeometryDrawing.Geometry>
+                                            </GeometryDrawing>
+                                        </DrawingGroup>
+                                    </DrawingBrush.Drawing>
+                                </DrawingBrush>
+                            </Rectangle.Fill>
+                        </Rectangle>
+
+                        <!-- Noise -->
+                        <Rectangle x:Name="NoiseOverlay"
+                                   IsHitTestVisible="False"
+                                   Opacity="0.04">
+                            <Rectangle.RenderTransform>
+                                <TranslateTransform x:Name="NoiseShift" X="0" Y="0"/>
+                            </Rectangle.RenderTransform>
+                            <Rectangle.Fill>
+                                <DrawingBrush TileMode="Tile"
+                                              Viewport="0,0,24,24"
+                                              ViewportUnits="Absolute"
+                                              Viewbox="0,0,24,24"
+                                              ViewboxUnits="Absolute"
+                                              Stretch="Fill">
+                                    <DrawingBrush.Drawing>
+                                        <DrawingGroup>
+                                            <GeometryDrawing Brush="#22FFFFFF">
+                                                <GeometryDrawing.Geometry>
+                                                    <RectangleGeometry Rect="2,3,1,1"/>
+                                                </GeometryDrawing.Geometry>
+                                            </GeometryDrawing>
+                                            <GeometryDrawing Brush="#14000000">
+                                                <GeometryDrawing.Geometry>
+                                                    <RectangleGeometry Rect="8,10,1,1"/>
+                                                </GeometryDrawing.Geometry>
+                                            </GeometryDrawing>
+                                            <GeometryDrawing Brush="#1AFFFFFF">
+                                                <GeometryDrawing.Geometry>
+                                                    <RectangleGeometry Rect="15,6,1,1"/>
+                                                </GeometryDrawing.Geometry>
+                                            </GeometryDrawing>
+                                            <GeometryDrawing Brush="#12000000">
+                                                <GeometryDrawing.Geometry>
+                                                    <RectangleGeometry Rect="20,18,1,1"/>
+                                                </GeometryDrawing.Geometry>
+                                            </GeometryDrawing>
+                                            <GeometryDrawing Brush="#18FFFFFF">
+                                                <GeometryDrawing.Geometry>
+                                                    <RectangleGeometry Rect="5,20,1,1"/>
+                                                </GeometryDrawing.Geometry>
+                                            </GeometryDrawing>
+                                        </DrawingGroup>
+                                    </DrawingBrush.Drawing>
+                                </DrawingBrush>
+                            </Rectangle.Fill>
+                        </Rectangle>
+
+                        <!-- Vignette -->
+                        <Rectangle x:Name="VignetteOverlay"
+                                   IsHitTestVisible="False"
+                                   Opacity="0.22">
+                            <Rectangle.Fill>
+                                <RadialGradientBrush Center="0.5,0.5"
+                                                     GradientOrigin="0.5,0.5"
+                                                     RadiusX="0.75"
+                                                     RadiusY="0.75">
+                                    <GradientStop Color="#00000000" Offset="0.0"/>
+                                    <GradientStop Color="#7A000000" Offset="1.0"/>
+                                </RadialGradientBrush>
+                            </Rectangle.Fill>
+                        </Rectangle>
+
+                        <!-- Toast -->
+                        <Border x:Name="Toast"
+                                Background="#CC000000"
+                                CornerRadius="10"
+                                Padding="10"
+                                Margin="0,12,0,0"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Top"
+                                Visibility="Collapsed"
+                                Opacity="0"
+                                IsHitTestVisible="False">
+                            <TextBlock x:Name="ToastText"
+                                       Foreground="White"
+                                       FontSize="13"
+                                       FontWeight="SemiBold"
+                                       TextAlignment="Center"
+                                       Text="Toast"/>
+                        </Border>
+
+                        <!-- Overlay -->
+                        <Border x:Name="Overlay"
+                                Background="#66000000"
+                                CornerRadius="10"
+                                Visibility="Collapsed">
+                            <TextBlock x:Name="OverlayText"
+                                       Foreground="White"
+                                       FontSize="18"
+                                       FontWeight="SemiBold"
+                                       TextAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       HorizontalAlignment="Center"
+                                       Text="SNAKE"/>
+                        </Border>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

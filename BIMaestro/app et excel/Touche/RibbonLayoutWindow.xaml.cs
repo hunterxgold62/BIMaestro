@@ -3,19 +3,28 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Windows;
-using BIMaestro.RibbonLayout;
+using BIMaestro.Welcome;
 
 namespace BIMaestro.RibbonLayout
 {
     public partial class RibbonLayoutWindow : Window, INotifyPropertyChanged
     {
         private PanelViewModel? _selectedPanel;
+        private WelcomeState _welcomeState;
+        private string _email = string.Empty;
+        private string _firstName = string.Empty;
+        private string _lastName = string.Empty;
 
         public RibbonLayoutWindow(IEnumerable<RibbonPanelDefinition> definitions, RibbonLayoutConfig layout)
         {
             InitializeComponent();
             Panels = new ObservableCollection<PanelViewModel>(layout.Panels
                 .Select(panel => CreatePanelViewModel(panel, definitions.First(d => d.Name == panel.Name))));
+
+            _welcomeState = WelcomeStorage.LoadOrCreate();
+            Email = _welcomeState.Email ?? string.Empty;
+            FirstName = _welcomeState.FirstName ?? string.Empty;
+            LastName = _welcomeState.LastName ?? string.Empty;
 
             DataContext = this;
             SelectedPanel = Panels.FirstOrDefault();
@@ -24,6 +33,39 @@ namespace BIMaestro.RibbonLayout
         public event PropertyChangedEventHandler? PropertyChanged;
 
         public ObservableCollection<PanelViewModel> Panels { get; }
+
+        public string Email
+        {
+            get => _email;
+            set
+            {
+                if (_email == value) return;
+                _email = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Email)));
+            }
+        }
+
+        public string FirstName
+        {
+            get => _firstName;
+            set
+            {
+                if (_firstName == value) return;
+                _firstName = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(FirstName)));
+            }
+        }
+
+        public string LastName
+        {
+            get => _lastName;
+            set
+            {
+                if (_lastName == value) return;
+                _lastName = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LastName)));
+            }
+        }
 
         public PanelViewModel? SelectedPanel
         {
@@ -99,6 +141,7 @@ namespace BIMaestro.RibbonLayout
 
         private void Save(object sender, RoutedEventArgs e)
         {
+            SaveWelcomeProfile();
             DialogResult = true;
             Close();
         }
@@ -107,6 +150,12 @@ namespace BIMaestro.RibbonLayout
         {
             DialogResult = false;
             Close();
+        }
+
+        private void SaveWelcomeProfile()
+        {
+            WelcomeManager.UpdateProfileFromSettings(Email, FirstName, LastName);
+            _welcomeState = WelcomeStorage.LoadOrCreate();
         }
     }
 

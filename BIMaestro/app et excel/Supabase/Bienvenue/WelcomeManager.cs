@@ -103,7 +103,35 @@ namespace BIMaestro.Welcome
 
             TryUpsertProfileNoThrow();
         }
+        /// <summary>
+        /// Met à jour le profil depuis l'onglet Paramètres et tente la synchro Supabase si possible.
+        /// </summary>
+        public static void UpdateProfileFromSettings(string email, string firstName, string lastName)
+        {
+            lock (_sync)
+            {
+                _state ??= WelcomeStorage.LoadOrCreate();
 
+                _state.Email = NormalizeValue(email);
+                _state.FirstName = NormalizeValue(firstName);
+                _state.LastName = NormalizeValue(lastName);
+
+                var hasEmail = !string.IsNullOrWhiteSpace(_state.Email);
+                _state.EmailOptIn = hasEmail;
+                if (hasEmail)
+                {
+                    _state.OptInUtc ??= DateTime.UtcNow;
+                }
+                else
+                {
+                    _state.OptInUtc = null;
+                }
+
+                WelcomeStorage.Save(_state);
+            }
+
+            TryUpsertProfileNoThrow();
+        }
         private static void ArmTimer()
         {
             _timer?.Dispose();
@@ -253,6 +281,10 @@ namespace BIMaestro.Welcome
                 lastName: s.LastName,
                 machineIdHash: machineHash
             );
+        }
+        private static string NormalizeValue(string value)
+        {
+            return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
         }
     }
 
