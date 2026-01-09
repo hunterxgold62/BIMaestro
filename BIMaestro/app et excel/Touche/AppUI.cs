@@ -38,7 +38,6 @@ public class AppUI : IExternalApplication
                 new RibbonItemDefinition("Export Nomenclature", "Export Nomenclature", panel => AddPushButton(panel, "Export Nomenclature", "Export \nNomenclature", assemblyPath, "Visualisation.ExportScheduleCommand", "rvt to excel et pdf.png", "Exporte les nomenclatures Revit sélectionnées en fichier Excel ou PDF.")),
                 new RibbonItemDefinition("ExportDwgBatch", "Export DWG", panel => AddPushButton(panel, "ExportDwgBatch", "Export\nDWG", assemblyPath, "Visualisation.ExportSheetsCommand", "export DWG.png", "Exporte automatiquement plusieurs vues ou feuilles en DWG, en nommant chaque fichier selon le projet et la vue comme pour les PDF.")),
                 new RibbonItemDefinition("Sélection d'objet", "Sélection d'objet", panel => AddPushButton(panel, "Sélection d'objet", "Sélection\nd'objet", assemblyPath, "Visualisation.SelectSimilarCommand", "Sélection d'élément.png", "Sélectionne des éléments similaires dans le projet")),
-                new RibbonItemDefinition("snake", "snake", panel => AddPushButton(panel, "snake", "snake", assemblyPath, "BIMaestro.Bonus.SnakeCommand", "Sélection d'élément.png", "Sélectionne des éléments similaires dans le projet")),
 
             }),
 
@@ -108,7 +107,9 @@ public class AppUI : IExternalApplication
                 {
                     ("Couleur de projet", "Couleur\nOui/Non", "Couleur.ToggleCombinedColoringCommand", "bouton lumière.png","Active ou désactive les couleurs du projet (simple ou double clic)"),
                     ("Couleur de maquette", "Couleur reset", "Couleur.ResetTabItemRandomColorsCommand", "safeimagekit-bouton reset4.png","Réinitialise les couleurs appliquées"),
-                    ("papa Noël", "papa\nNoël", "Couleur.PapanoelCommand", "Père Noël.png","Fait apparaître des couleurs comme des guirlandes\nDouble clic pour revenir à la normale.\n\nAttention désactiver <couleur Oui/Non> avant activation.")
+                    ("papa Noël", "papa\nNoël", "Couleur.PapanoelCommand", "Père Noël.png","Fait apparaître des couleurs comme des guirlandes\nDouble clic pour revenir à la normale.\n\nAttention désactiver <couleur Oui/Non> avant activation."),
+                    ("Snake", "Snake", "BIMaestro.Bonus.SnakeCommand", "snake.png","Petit jeux snake :P"),
+
                 })),
 
                 new RibbonItemDefinition("InfoStack", "Infos empilées", panel => AddStackedPushButtons(
