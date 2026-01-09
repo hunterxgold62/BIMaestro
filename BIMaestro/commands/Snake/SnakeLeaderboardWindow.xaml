@@ -1,0 +1,46 @@
+﻿<Window x:Class="BIMaestro.Bonus.SnakeLeaderboardWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Classement Snake"
+        Width="360"
+        Height="420"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="12">
+        <TabControl>
+            <TabItem Header="Classic">
+                <ListView ItemsSource="{Binding ClassicEntries}">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Header="#" DisplayMemberBinding="{Binding Rank}" Width="40"/>
+                            <GridViewColumn Header="Joueur" DisplayMemberBinding="{Binding PlayerName}" Width="190"/>
+                            <GridViewColumn Header="Score" DisplayMemberBinding="{Binding Score}" Width="80"/>
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+            </TabItem>
+            <TabItem Header="Arcade">
+                <ListView ItemsSource="{Binding ArcadeEntries}">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Header="#" DisplayMemberBinding="{Binding Rank}" Width="40"/>
+                            <GridViewColumn Header="Joueur" DisplayMemberBinding="{Binding PlayerName}" Width="190"/>
+                            <GridViewColumn Header="Score" DisplayMemberBinding="{Binding Score}" Width="80"/>
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+            </TabItem>
+            <TabItem Header="Hardcore">
+                <ListView ItemsSource="{Binding HardcoreEntries}">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Header="#" DisplayMemberBinding="{Binding Rank}" Width="40"/>
+                            <GridViewColumn Header="Joueur" DisplayMemberBinding="{Binding PlayerName}" Width="190"/>
+                            <GridViewColumn Header="Score" DisplayMemberBinding="{Binding Score}" Width="80"/>
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+            </TabItem>
+        </TabControl>
+    </Grid>
+</Window>

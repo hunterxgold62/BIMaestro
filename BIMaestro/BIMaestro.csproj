@@ -405,6 +405,11 @@
     <Compile Include="commands\purge\DeleteUnusedSchedulesCommand.cs" />
     <Compile Include="commands\purge\sup de famille forte.cs" />
     <Compile Include="commands\réseau auto entre canalisation\ConnectPipesCommand.cs" />
+    <Compile Include="commands\Snake\SnakeLeaderboardClient.cs" />
+    <Compile Include="commands\Snake\SnakeLeaderboardModels.cs" />
+    <Compile Include="commands\Snake\SnakeLeaderboardWindow.xaml.cs">
+      <DependentUpon>SnakeLeaderboardWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="commands\Sélection d%27objet unique\SelectSimilarCommand.cs" />
     <Compile Include="commands\traduction paramètre famille et vue_feuille\TraduireVuesFamilleOpenAl.cs" />
     <Compile Include="commands\unité de famille\ExportProjectUnitsCommand.cs" />
@@ -656,6 +661,10 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </None>
+    <Page Include="commands\Snake\SnakeLeaderboardWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="Test\perso pixéli\PixelDancerWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>

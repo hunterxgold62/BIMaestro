@@ -271,15 +271,41 @@
 
             <!-- Map -->
             <Border Grid.Column="2" Style="{StaticResource HudCard}">
-                <StackPanel>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
                     <TextBlock x:Name="MapInfoText"
+                               Grid.Row="0"
+                               Grid.Column="0"
                                FontSize="12"
                                Foreground="#FF666666"
                                Text="Map: 28×28"/>
-                    <TextBlock Style="{StaticResource HintText}"
+
+                    <Button x:Name="LeaderboardButton"
+                            Grid.Row="0"
+                            Grid.Column="1"
+                            Width="28"
+                            Height="28"
+                            Margin="6,0,0,0"
+                            Padding="0"
+                            FontSize="14"
+                            Content="📊"
+                            ToolTip="Voir le classement global"
+                            Click="LeaderboardButton_Click"/>
+
+                    <TextBlock Grid.Row="1"
+                               Grid.ColumnSpan="2"
+                               Style="{StaticResource HintText}"
                                Margin="0,6,0,0"
                                Text="ESC = fermer"/>
-                </StackPanel>
+                </Grid>
             </Border>
         </Grid>
 

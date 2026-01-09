@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
+using System.Threading.Tasks;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
@@ -65,6 +66,8 @@ namespace BIMaestro.Bonus
 
         private static readonly TimeSpan FlashDuration = TimeSpan.FromMilliseconds(420);
         private static readonly TimeSpan LevelUpMsgDuration = TimeSpan.FromSeconds(1.6);
+
+        private const string SupabaseFunctionsBaseUrl = "https://xqovxfgghbqxwsadzhzl.functions.supabase.co";
 
         private readonly Random _rng = new Random();
 
@@ -149,6 +152,9 @@ namespace BIMaestro.Bonus
         // ✅ Timers en secondes (pause-friendly)
         private int _scoreMultiplier = 1;
         private double _multiplierRemainingSec = 0;
+
+        private bool _recordThisRun;
+        private int _recordScoreThisRun;
 
         private bool _speedActive;
         private double _speedRemainingSec = 0;
@@ -546,6 +552,8 @@ namespace BIMaestro.Bonus
 
             _score = 0;
             _lastHundredsBucket = 0;
+            _recordThisRun = false;
+            _recordScoreThisRun = 0;
 
             _dir = Direction.Right;
             _nextDir = Direction.Right;
@@ -974,6 +982,8 @@ namespace BIMaestro.Bonus
             if (_score > CurrentModeTopScore)
             {
                 SetCurrentModeTopScore(_score);
+                _recordThisRun = true;
+                _recordScoreThisRun = _score;
                 SaveStateSafe();
             }
 
@@ -1597,6 +1607,70 @@ namespace BIMaestro.Bonus
             ShowToast(shortReason + "  (Espace = restart)", TimeSpan.FromSeconds(2.0));
             ShakePlayfield(3.3);
             SaveStateSafe();
+            SubmitRecordIfNeeded();
+        }
+
+        private async void LeaderboardButton_Click(object sender, RoutedEventArgs e)
+        {
+            LeaderboardButton.IsEnabled = false;
+            try
+            {
+                var jwt = Licensing.LicenseSession.CurrentJwt ?? global::App.LicenseJwt;
+                if (string.IsNullOrWhiteSpace(jwt))
+                    throw new InvalidOperationException("JWT manquant.");
+
+                var data = await SnakeLeaderboardClient.FetchLeaderboardAsync(SupabaseFunctionsBaseUrl, jwt)
+                    .ConfigureAwait(true);
+
+                var window = new SnakeLeaderboardWindow(data)
+                {
+                    Owner = this,
+                    WindowStartupLocation = WindowStartupLocation.CenterOwner
+                };
+                window.ShowDialog();
+            }
+            catch
+            {
+                ShowToast("📊 Classement indisponible (réseau).", TimeSpan.FromSeconds(1.6));
+            }
+            finally
+            {
+                LeaderboardButton.IsEnabled = true;
+            }
+        }
+
+        private void SubmitRecordIfNeeded()
+        {
+            if (!_recordThisRun || _recordScoreThisRun <= 0)
+                return;
+
+            var jwt = Licensing.LicenseSession.CurrentJwt ?? global::App.LicenseJwt;
+            if (string.IsNullOrWhiteSpace(jwt))
+                return;
+
+            _recordThisRun = false;
+
+            var mode = GetLeaderboardMode();
+            var playerName = Environment.UserName;
+            var installId = global::App.InstallId ?? global::App.MachineId ?? Environment.MachineName;
+
+            _ = Task.Run(() => SnakeLeaderboardClient.SubmitRecordAsync(
+                SupabaseFunctionsBaseUrl,
+                jwt,
+                mode,
+                _recordScoreThisRun,
+                playerName,
+                installId));
+        }
+
+        private string GetLeaderboardMode()
+        {
+            return _mode switch
+            {
+                GameMode.Arcade => "arcade",
+                GameMode.Hardcore => "hardcore",
+                _ => "classic"
+            };
         }
 
         // -------------------------------
