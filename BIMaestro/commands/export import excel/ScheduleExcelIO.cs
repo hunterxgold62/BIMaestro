@@ -109,7 +109,7 @@ namespace ScheduleIO
 
                 if (c?.ParameterId != null && c.ParameterId != ElementId.InvalidElementId)
                 {
-                    int rawId = c.ParameterId.IntegerValue;
+                    int rawId = c.ParameterId.GetIdValue();
 
                     if (EnumCompat.IsDefinedBip(rawId))
                     {
@@ -157,7 +157,7 @@ namespace ScheduleIO
                         var id = p.AsElementId();
                         if (id == null || id == ElementId.InvalidElementId) return string.Empty;
                         var el = doc.GetElement(id);
-                        return el?.Name ?? id.IntegerValue.ToString(CultureInfo.InvariantCulture);
+                        return el?.Name ?? id.GetIdValue().ToString(CultureInfo.InvariantCulture);
                     default: return string.Empty;
                 }
             }
@@ -395,7 +395,7 @@ namespace ScheduleIO
                     var line = new Dictionary<string, string>
                     {
                         ["UniqueId"] = e.UniqueId,
-                        ["ElementId"] = e.Id.IntegerValue.ToString(CultureInfo.InvariantCulture)
+                        ["ElementId"] = e.Id.GetIdValue().ToString(CultureInfo.InvariantCulture)
                     };
 
                     foreach (var c in cols)
@@ -682,7 +682,7 @@ namespace ScheduleIO
                     ElementId left = ElementId.InvalidElementId;
                     if (p.StorageType == StorageType.ElementId) left = p.AsElementId();
                     if (left == null) left = ElementId.InvalidElementId;
-                    return left.IntegerValue == right.IntegerValue;
+                    return left.GetIdValue() == right.GetIdValue();
                 }
 
                 return null;
@@ -1206,7 +1206,7 @@ namespace ScheduleIO
                 rr.CreateCell(0).SetCellValue(c.Header);
                 rr.CreateCell(1).SetCellValue(c.OriginalName ?? "");
                 rr.CreateCell(2).SetCellValue(c.ColumnHeading ?? "");
-                rr.CreateCell(3).SetCellValue(c.ParameterId.IntegerValue);
+                rr.CreateCell(3).SetCellValue(c.ParameterId.GetIdValue());
                 rr.CreateCell(4).SetCellValue(c.IsCalculatedOrCombined);
                 rr.CreateCell(5).SetCellValue(c.IsHidden);
                 rr.CreateCell(6).SetCellValue(c.Storage.ToString());
@@ -1398,14 +1398,14 @@ namespace ScheduleIO
                 if (x == null && y == null) return true;
                 if (x == null || y == null) return false;
                 if (!ReferenceEquals(x.Document, y.Document)) return false;
-                return x.Id.IntegerValue == y.Id.IntegerValue;
+                return x.Id.GetIdValue() == y.Id.GetIdValue();
             }
             public int GetHashCode(Element obj)
             {
                 unchecked
                 {
                     int h1 = obj.Document.GetHashCode();
-                    int h2 = obj.Id.IntegerValue.GetHashCode();
+                    int h2 = obj.Id.GetIdValue().GetHashCode();
                     return (h1 * 397) ^ h2;
                 }
             }
@@ -1519,7 +1519,7 @@ namespace ScheduleIO
             // Si on reconnaît des BIP "systèmes", appliquer la règle explicite
             try
             {
-                int pidInt = c?.ParameterId?.IntegerValue ?? 0;
+                int pidInt = c?.ParameterId?.GetIdValue() ?? 0;
                 if (EnumCompat.IsDefinedBip(pidInt))
                 {
                     var bip = EnumCompat.ToBip(pidInt);

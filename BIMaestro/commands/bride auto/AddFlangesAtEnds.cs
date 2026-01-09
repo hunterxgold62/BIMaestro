@@ -62,7 +62,7 @@ namespace Modification
         public bool AllowElement(Element e)
         {
             if (e == null || e.Category == null) return false;
-            int cat = e.Category.Id.IntegerValue;
+            int cat = e.Category.Id.GetIdValue();
             bool okCat = cat == (int)BuiltInCategory.OST_PipeAccessory ||
                          cat == (int)BuiltInCategory.OST_MechanicalEquipment;
             if (!okCat) return false;
@@ -955,7 +955,7 @@ namespace Modification
 
         // ---------- Divers helpers ----------
         private static bool IsCat(Element e, BuiltInCategory bic)
-            => e?.Category != null && e.Category.Id.IntegerValue == (int)bic;
+            => e?.Category != null && e.Category.Id.GetIdValue() == (int)bic;
 
         private static bool HasPipingConnectors(FamilyInstance fi)
         {
@@ -1012,7 +1012,7 @@ namespace Modification
                     if (rc == null) continue;
                     if (rc.Owner?.Id == selfId) continue;
                     if (rc.Domain != Domain.DomainPiping) continue;
-                    int cat = rc.Owner?.Category?.Id.IntegerValue ?? 0;
+                    int cat = rc.Owner?.Category?.Id.GetIdValue() ?? 0;
                     bool isPipeOrFitting =
                         cat == (int)BuiltInCategory.OST_PipeCurves ||
                         cat == (int)BuiltInCategory.OST_PipeFitting;
@@ -1146,8 +1146,8 @@ namespace Modification
                     .OfClass(typeof(FamilySymbol)).Cast<FamilySymbol>()
                     .FirstOrDefault(fs =>
                         fs?.Category != null &&
-                       (fs.Category.Id.IntegerValue == (int)BuiltInCategory.OST_PipeAccessory ||
-                        fs.Category.Id.IntegerValue == (int)BuiltInCategory.OST_PipeFitting) &&
+                       (fs.Category.Id.GetIdValue() == (int)BuiltInCategory.OST_PipeAccessory ||
+                        fs.Category.Id.GetIdValue() == (int)BuiltInCategory.OST_PipeFitting) &&
                         string.Equals(fs.FamilyName, FlangeChoiceCache.FamilyName, StringComparison.OrdinalIgnoreCase) &&
                         string.Equals(fs.Name, FlangeChoiceCache.SymbolName, StringComparison.OrdinalIgnoreCase));
                 if (chosen != null) return chosen;
@@ -1181,7 +1181,7 @@ namespace Modification
             if (filtered.Count == 0) return null;
 
             return filtered
-                .OrderByDescending(fs => fs.Category.Id.IntegerValue == (int)BuiltInCategory.OST_PipeAccessory)
+                .OrderByDescending(fs => fs.Category.Id.GetIdValue() == (int)BuiltInCategory.OST_PipeAccessory)
                 .ThenBy(fs => fs.FamilyName).ThenBy(fs => fs.Name)
                 .First();
         }
@@ -1307,7 +1307,7 @@ namespace Modification
             var baseTypePn = GetHydPnParam(baseSymbol);
             if (baseTypePn == null) return baseSymbol;
 
-            string cacheKey = $"{baseSymbol.Family.Id.IntegerValue}|{pnCanonical}";
+            string cacheKey = $"{baseSymbol.Family.Id.GetIdValue()}|{pnCanonical}";
             if (_pnTypeCache.TryGetValue(cacheKey, out var cachedId))
             {
                 var cached = doc.GetElement(cachedId) as FamilySymbol;

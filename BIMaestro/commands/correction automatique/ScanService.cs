@@ -20,7 +20,7 @@ namespace ScanTextRevit
                     var textsInView = ScanSingleView(doc, view);
 
                     string prefix = GetViewTypeLabel(view);
-                    string key = $"{prefix} : {view.Name} (Id {view.Id.IntegerValue})";
+                    string key = $"{prefix} : {view.Name} (Id {view.Id.GetIdValue()})";
 
                     // (A) Filtrer et dédupliquer avant de stocker
                     var filtered = FilterAndDeduplicate(textsInView);
@@ -43,7 +43,7 @@ namespace ScanTextRevit
                             textsDirectlyOnSheet.Add(new ScannedTextItem
                             {
                                 Text = tn.Text,
-                                ElementId = tn.Id.IntegerValue.ToString()
+                                ElementId = tn.Id.GetIdValue().ToString()
                             });
                         }
                     }
@@ -62,7 +62,7 @@ namespace ScanTextRevit
                             textsDirectlyOnSheet.Add(new ScannedTextItem
                             {
                                 Text = tagText,
-                                ElementId = tag.Id.IntegerValue.ToString()
+                                ElementId = tag.Id.GetIdValue().ToString()
                             });
                         }
                     }
@@ -81,7 +81,7 @@ namespace ScanTextRevit
                             textsDirectlyOnSheet.Add(new ScannedTextItem
                             {
                                 Text = text,
-                                ElementId = fs.Id.IntegerValue.ToString()
+                                ElementId = fs.Id.GetIdValue().ToString()
                             });
                         }
                     }
@@ -99,13 +99,13 @@ namespace ScanTextRevit
                             textsDirectlyOnSheet.Add(new ScannedTextItem
                             {
                                 Text = text,
-                                ElementId = tb.Id.IntegerValue.ToString()
+                                ElementId = tb.Id.GetIdValue().ToString()
                             });
                         }
                     }
 
                     // Ajout final
-                    string sheetKey = $"Feuille : {sheet.SheetNumber} - {sheet.Name} (Id {sheet.Id.IntegerValue})";
+                    string sheetKey = $"Feuille : {sheet.SheetNumber} - {sheet.Name} (Id {sheet.Id.GetIdValue()})";
                     allTextsByViewSheet[sheetKey] = FilterAndDeduplicate(textsDirectlyOnSheet);
 
                     // (5) Vues placées (Viewport)
@@ -121,7 +121,7 @@ namespace ScanTextRevit
                             var textsInPlacedView = ScanSingleView(doc, placedView);
 
                             string prefix = GetViewTypeLabel(placedView);
-                            string key = $"{prefix} : {placedView.Name} (Id {placedView.Id.IntegerValue})";
+                            string key = $"{prefix} : {placedView.Name} (Id {placedView.Id.GetIdValue()})";
                             allTextsByViewSheet[key] = FilterAndDeduplicate(textsInPlacedView);
                         }
                     }
@@ -137,7 +137,7 @@ namespace ScanTextRevit
                         if (vsched != null)
                         {
                             var textsInSchedule = ScanSingleView(doc, vsched);
-                            string key = $"Nomenclature : {vsched.Name} (Id {vsched.Id.IntegerValue})";
+                            string key = $"Nomenclature : {vsched.Name} (Id {vsched.Id.GetIdValue()})";
                             allTextsByViewSheet[key] = FilterAndDeduplicate(textsInSchedule);
                         }
                     }
@@ -160,7 +160,7 @@ namespace ScanTextRevit
                 var scheduleTexts = ScanSchedule(doc, schedule);
                 foreach (var text in scheduleTexts)
                 {
-                    result.Add(new ScannedTextItem { Text = text, ElementId = view.Id.IntegerValue.ToString() });
+                    result.Add(new ScannedTextItem { Text = text, ElementId = view.Id.GetIdValue().ToString() });
                 }
                 return result;
             }
@@ -175,7 +175,7 @@ namespace ScanTextRevit
             {
                 if (!string.IsNullOrEmpty(tn.Text))
                 {
-                    result.Add(new ScannedTextItem { Text = tn.Text, ElementId = tn.Id.IntegerValue.ToString() });
+                    result.Add(new ScannedTextItem { Text = tn.Text, ElementId = tn.Id.GetIdValue().ToString() });
                 }
             }
 
@@ -190,7 +190,7 @@ namespace ScanTextRevit
                 string tagText = tag.TagText;
                 if (!string.IsNullOrEmpty(tagText))
                 {
-                    result.Add(new ScannedTextItem { Text = tagText, ElementId = tag.Id.IntegerValue.ToString() });
+                    result.Add(new ScannedTextItem { Text = tagText, ElementId = tag.Id.GetIdValue().ToString() });
                 }
             }
 
@@ -205,7 +205,7 @@ namespace ScanTextRevit
                 var paramTexts = GetAllStringParameters(fs, doc);
                 foreach (var text in paramTexts)
                 {
-                    result.Add(new ScannedTextItem { Text = text, ElementId = fs.Id.IntegerValue.ToString() });
+                    result.Add(new ScannedTextItem { Text = text, ElementId = fs.Id.GetIdValue().ToString() });
                 }
             }
 

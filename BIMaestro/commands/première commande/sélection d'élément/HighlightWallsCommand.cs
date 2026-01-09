@@ -46,7 +46,7 @@ namespace Visualisation
             // ----- Fonction locale : collecter toutes les occurrences d'une catégorie
             IList<ElementId> CollectAllOfCategory(ElementId catId, bool entireModel)
             {
-                var bic = (BuiltInCategory)catId.IntegerValue;
+                var bic = (BuiltInCategory)catId.GetIdValue();
 
                 FilteredElementCollector collector = entireModel
                     ? new FilteredElementCollector(doc)
@@ -270,13 +270,13 @@ namespace Visualisation
         // Comparateurs utilitaires pour ElementId
         private class ElementIdComparer : IEqualityComparer<ElementId>
         {
-            public bool Equals(ElementId x, ElementId y) => x?.IntegerValue == y?.IntegerValue;
-            public int GetHashCode(ElementId obj) => obj?.IntegerValue.GetHashCode() ?? 0;
+            public bool Equals(ElementId x, ElementId y) => x?.GetIdValue() == y?.GetIdValue();
+            public int GetHashCode(ElementId obj) => obj?.GetIdValue().GetHashCode() ?? 0;
         }
         private class ElementIdEqualityComparer : IEqualityComparer<ElementId>
         {
-            public bool Equals(ElementId x, ElementId y) => x?.IntegerValue == y?.IntegerValue;
-            public int GetHashCode(ElementId obj) => obj?.IntegerValue.GetHashCode() ?? 0;
+            public bool Equals(ElementId x, ElementId y) => x?.GetIdValue() == y?.GetIdValue();
+            public int GetHashCode(ElementId obj) => obj?.GetIdValue().GetHashCode() ?? 0;
         }
     }
 }

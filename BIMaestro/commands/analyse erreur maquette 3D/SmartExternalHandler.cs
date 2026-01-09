@@ -115,15 +115,15 @@ namespace Analyse
 
         // ---------- Helpers IDs ----------
         private static bool IsValidId(ElementId id)
-            => id != null && id != ElementId.InvalidElementId && id.IntegerValue > 0;
+            => id != null && id != ElementId.InvalidElementId && id.GetIdValue() > 0;
 
         private static List<ElementId> CleanIds(IEnumerable<ElementId> ids)
             => (ids ?? Enumerable.Empty<ElementId>()).Where(IsValidId).Distinct(new ElemIdCmp()).ToList();
 
         private class ElemIdCmp : IEqualityComparer<ElementId>
         {
-            public bool Equals(ElementId a, ElementId b) => (a?.IntegerValue ?? int.MinValue) == (b?.IntegerValue ?? int.MinValue);
-            public int GetHashCode(ElementId obj) => obj?.IntegerValue.GetHashCode() ?? 0;
+            public bool Equals(ElementId a, ElementId b) => (a?.GetIdValue() ?? int.MinValue) == (b?.GetIdValue() ?? int.MinValue);
+            public int GetHashCode(ElementId obj) => obj?.GetIdValue().GetHashCode() ?? 0;
         }
 
         // ---------- Vue 3D dédiée ----------

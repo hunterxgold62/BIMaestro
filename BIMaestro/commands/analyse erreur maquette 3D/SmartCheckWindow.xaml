@@ -64,7 +64,7 @@
                           CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single">
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="Type" Binding="{Binding Category}" Width="180"/>
-                        <DataGridTextColumn Header="Id" Binding="{Binding ElementId.IntegerValue}" Width="80"/>
+                        <DataGridTextColumn Header="Id" Binding="{Binding ElementIdValue}" Width="80"/>
                         <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*"/>
                         <DataGridTemplateColumn Header="Actions" Width="220">
                             <DataGridTemplateColumn.CellTemplate>
@@ -86,7 +86,7 @@
                           CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single">
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="Type" Binding="{Binding Category}" Width="180"/>
-                        <DataGridTextColumn Header="Id" Binding="{Binding ElementId.IntegerValue}" Width="80"/>
+                        <DataGridTextColumn Header="Id" Binding="{Binding ElementIdValue}" Width="80"/>
                         <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*"/>
                         <DataGridTemplateColumn Header="Actions" Width="220">
                             <DataGridTemplateColumn.CellTemplate>
@@ -108,7 +108,7 @@
                           CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single">
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="Type" Binding="{Binding Category}" Width="220"/>
-                        <DataGridTextColumn Header="Id" Binding="{Binding ElementId.IntegerValue}" Width="80"/>
+                        <DataGridTextColumn Header="Id" Binding="{Binding ElementIdValue}" Width="80"/>                        
                         <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*"/>
                         <DataGridTemplateColumn Header="Actions" Width="220">
                             <DataGridTemplateColumn.CellTemplate>
@@ -129,7 +129,7 @@
                           CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single">
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="Type" Binding="{Binding Category}" Width="220"/>
-                        <DataGridTextColumn Header="Id" Binding="{Binding ElementId.IntegerValue}" Width="80"/>
+                        <DataGridTextColumn Header="Id" Binding="{Binding ElementIdValue}" Width="80"/>
                         <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*"/>
                         <DataGridTemplateColumn Header="Actions" Width="220">
                             <DataGridTemplateColumn.CellTemplate>
@@ -150,7 +150,7 @@
                           CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single">
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="Type" Binding="{Binding Category}" Width="180"/>
-                        <DataGridTextColumn Header="Id" Binding="{Binding ElementId.IntegerValue}" Width="80"/>
+                        <DataGridTextColumn Header="Id" Binding="{Binding ElementIdValue}" Width="80"/>
                         <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*"/>
                         <DataGridTemplateColumn Header="Actions" Width="220">
                             <DataGridTemplateColumn.CellTemplate>

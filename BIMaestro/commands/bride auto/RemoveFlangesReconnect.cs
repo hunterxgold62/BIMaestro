@@ -526,7 +526,7 @@ namespace Modification
             {
                 if (e == null || e.Category == null) return false;
 
-                int cat = e.Category.Id.IntegerValue;
+                int cat = e.Category.Id.GetIdValue();
                 bool catOk =
                     cat == (int)BuiltInCategory.OST_PipeAccessory ||
                     cat == (int)BuiltInCategory.OST_DuctAccessory ||
@@ -619,7 +619,7 @@ namespace Modification
         private static bool IsFlange(FamilyInstance fi)
         {
             if (fi?.Category == null) return false;
-            int cat = fi.Category.Id.IntegerValue;
+            int cat = fi.Category.Id.GetIdValue();
 
             bool catOk =
                 cat == (int)BuiltInCategory.OST_PipeAccessory ||
@@ -638,7 +638,7 @@ namespace Modification
         private static bool IsInlineSkippable(FamilyInstance fi, Domain domain)
         {
             if (fi?.Category == null) return false;
-            int cat = fi.Category.Id.IntegerValue;
+            int cat = fi.Category.Id.GetIdValue();
 
             bool isFitting = cat == (int)BuiltInCategory.OST_PipeFitting || cat == (int)BuiltInCategory.OST_DuctFitting;
             if (!isFitting) return false;
@@ -732,7 +732,7 @@ namespace Modification
                     if (r?.Owner == null) continue;
                     if (r.Owner.Id == ownerId) continue;
 
-                    int cat = r.Owner.Category?.Id.IntegerValue ?? int.MinValue;
+                    int cat = r.Owner.Category?.Id.GetIdValue() ?? int.MinValue;
                     if (cat == (int)BuiltInCategory.OST_PipingSystem || cat == (int)BuiltInCategory.OST_DuctSystem)
                         continue;
 

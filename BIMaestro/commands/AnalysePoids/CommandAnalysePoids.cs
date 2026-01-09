@@ -268,7 +268,7 @@ private List<string> GetImportNames(Document doc)
                              .OfClass(typeof(FamilyInstance))
                              .WhereElementIsNotElementType()
                              .Cast<FamilyInstance>()
-                             .GroupBy(fi => fi.Symbol.Family.Id.IntegerValue)
+                             .GroupBy(fi => fi.Symbol.Family.Id.GetIdValue())
                              .ToDictionary(g => g.Key, g => g.Count());
 
             var prog = new ProgressWindow();
@@ -284,10 +284,10 @@ private List<string> GetImportNames(Document doc)
                 Dispatcher.CurrentDispatcher.Invoke(DispatcherPriority.Background, new Action(() => { }));
 
                 double mo = 0;
-                int cnt = instCounts.TryGetValue(fam.Id.IntegerValue, out var c) ? c : 0;
+                int cnt = instCounts.TryGetValue(fam.Id.GetIdValue(), out var c) ? c : 0;
                 if (fam.IsEditable)
                 {
-                    string key = fam.Id.IntegerValue.ToString();
+                    string key = fam.Id.GetIdValue().ToString();
                     if (cache.TryGetValue(key, out var entry)
                         && entry.FamilyName == fam.Name)
                     {
@@ -298,7 +298,7 @@ private List<string> GetImportNames(Document doc)
                         mo = GetFamilySizeMo(fam, doc);
                         cache[key] = new FamilyCacheEntry
                         {
-                            FamilyId = fam.Id.IntegerValue,
+                            FamilyId = fam.Id.GetIdValue(),
                             FamilyName = fam.Name,
                             TailleEnMo = mo
                         };

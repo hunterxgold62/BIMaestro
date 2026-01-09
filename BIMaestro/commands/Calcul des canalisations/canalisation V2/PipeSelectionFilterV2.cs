@@ -112,8 +112,8 @@ namespace Analyse
 
                     // Filtrer par système sauf pour les accessoires de canalisation
                     bool isPipeAccessory = elem is FamilyInstance fii
-                           && fii.Category.Id.IntegerValue == (int)BuiltInCategory.OST_PipeAccessory;
-                       if (filterBySystemType && !isPipeAccessory)
+                           && fii.Category.Id.GetIdValue() == (int)BuiltInCategory.OST_PipeAccessory;
+                    if (filterBySystemType && !isPipeAccessory)
                            {
                         string systemTypeName = GetElementSystemTypeName(elem);
                                if (systemTypeName == null || !selectedSystemTypes.Contains(systemTypeName))
@@ -272,7 +272,7 @@ namespace Analyse
                     // --- Traitement des accessoires ---
                     else if (elem is FamilyInstance fi)
                     {
-                        if (fi.Category.Id.IntegerValue == (int)BuiltInCategory.OST_PipeFitting)
+                        if (fi.Category.Id.GetIdValue() == (int)BuiltInCategory.OST_PipeFitting)
                         {
                             List<double> diametres = new List<double>();
                             ConnectorSet connectors = fi.MEPModel?.ConnectorManager?.Connectors;
@@ -335,7 +335,7 @@ namespace Analyse
                                 }
                             }
                         }
-                        else if (fi.Category.Id.IntegerValue == (int)BuiltInCategory.OST_PipeAccessory)
+                        else if (fi.Category.Id.GetIdValue() == (int)BuiltInCategory.OST_PipeAccessory)
                                 {
                                     // 👉 uniquement comptage
                             string accessoryType = fi.Symbol.Family.Name;
@@ -344,7 +344,7 @@ namespace Analyse
                                     else
                                 pipeAccessoryCounts[accessoryType] = 1;
                                 }
-                           else if (includeDucts && fi.Category.Id.IntegerValue == (int)BuiltInCategory.OST_DuctFitting)
+                           else if (includeDucts && fi.Category.Id.GetIdValue() == (int)BuiltInCategory.OST_DuctFitting)
 
                         {
                             List<string> dimensions = new List<string>();

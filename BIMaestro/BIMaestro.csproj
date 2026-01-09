@@ -385,6 +385,7 @@
     <Compile Include="commands\Dossier famille\roue de gta\RadialPathsConfig.cs" />
     <Compile Include="commands\Dossier famille\roue de gta\RadialPlaceFamilyHandler.cs" />
     <Compile Include="commands\Dossier famille\roue de gta\RevitIdleRunner.cs" />
+    <Compile Include="commands\ElementIdExtensions.cs" />
     <Compile Include="commands\export de nomenclature\ExportScheduleAddinObfuscation.cs" />
     <Compile Include="commands\export dwg\ExportSheetsCommand.cs" />
     <Compile Include="commands\export dwg\ExportSheetsWindow.xaml.cs">

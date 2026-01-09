@@ -87,7 +87,7 @@ namespace Analyse
                                 RelatedId = other.Id,
                                 Kind = IssueKind.WallOnWall,
                                 Category = "Murs superposés",
-                                Message = $"Mur #{w.Id.IntegerValue} posé sur mur #{other.Id.IntegerValue} (±{tolMm}mm).",
+                                Message = $"Mur #{w.Id.GetIdValue()} posé sur mur #{other.Id.GetIdValue()} (±{tolMm}mm).",
                                 BBox = wbb
                             };
                             goto NextWall;
@@ -108,7 +108,7 @@ namespace Analyse
                                 RelatedId = f.F.Id,
                                 Kind = IssueKind.WallEmbeddedInFloor,
                                 Category = "Mur noyé dans sol",
-                                Message = $"Mur #{w.Id.IntegerValue} empiète de {FeetToMm(f.TopZ - baseZ):F0} mm dans plancher #{f.F.Id.IntegerValue}.",
+                                Message = $"Mur #{w.Id.GetIdValue()} empiète de {FeetToMm(f.TopZ - baseZ):F0} mm dans plancher #{f.F.Id.GetIdValue()}.",
                                 BBox = wbb
                             };
                             goto NextWall;
@@ -124,7 +124,7 @@ namespace Analyse
                         ElementId = w.Id,
                         Kind = IssueKind.WallFloating,
                         Category = "Murs flottants",
-                        Message = $"Mur #{w.Id.IntegerValue} : base sans support à ±{tolMm}mm.",
+                        Message = $"Mur #{w.Id.GetIdValue()} : base sans support à ±{tolMm}mm.",
                         BBox = wbb
                     };
                 }
@@ -195,7 +195,7 @@ namespace Analyse
 
                     var inter = IntersectBox(padded, link.BBox);
 
-                    var key = $"{pipe.Id.IntegerValue}:{link.LinkId.IntegerValue}";
+                    var key = $"{pipe.Id.GetIdValue()}:{link.LinkId.GetIdValue()}";
                     if (aggregated.TryGetValue(key, out var agg))
                     {
                         aggregated[key] = (UnionBoxes(agg.Box, inter ?? padded), agg.Count + 1, agg.Info, agg.PipeId);
@@ -218,7 +218,7 @@ namespace Analyse
                     RelatedId = info?.LinkId ?? ElementId.InvalidElementId,
                     Kind = IssueKind.LinkPipeClash,
                     Category = "Collisions tuyaux/liens",
-                    Message = $"Tuyau #{entry.PipeId.IntegerValue} en collision avec lien '{info?.Name}' (Id {(info?.LinkId.IntegerValue ?? 0)}){countSuffix}",
+                    Message = $"Tuyau #{entry.PipeId.GetIdValue()} en collision avec lien '{info?.Name}' (Id {(info?.LinkId.GetIdValue() ?? 0)}){countSuffix}",
                     BBox = entry.Box
                 };
             }
@@ -297,7 +297,7 @@ namespace Analyse
                             RelatedId = w.Id,       // Mur
                             Kind = IssueKind.MepThroughWallNoSleeve,
                             Category = "Traversée sans réservation",
-                            Message = $"{NiceType(e)} #{e.Id.IntegerValue} traverse Mur #{w.Id.IntegerValue} sans réservation détectée.",
+                            Message = $"{NiceType(e)} #{e.Id.GetIdValue()} traverse Mur #{w.Id.GetIdValue()} sans réservation détectée.",
                             BBox = ibb               // BB de l'intersection (serrée)
                         };
                     }
@@ -329,7 +329,7 @@ namespace Analyse
                             ElementId = c.Id,
                             Kind = IssueKind.MepUnconnected,
                             Category = "Raccords ouverts",
-                            Message = $"{NiceType(c)} #{c.Id.IntegerValue} : au moins un connecteur est ouvert.",
+                            Message = $"{NiceType(c)} #{c.Id.GetIdValue()} : au moins un connecteur est ouvert.",
                             BBox = c.get_BoundingBox(null)
                         };
                     }
@@ -552,7 +552,7 @@ namespace Analyse
                     bb = TransformBox(bb, current);
                     if (bb != null)
                     {
-                        var key = $"{linkId.IntegerValue}:{linkedElemId.IntegerValue}";
+                        var key = $"{linkId.GetIdValue()}:{linkedElemId.GetIdValue()}";
                         if (meshBoxes != null && meshBoxes.TryGetValue(key, out var existing))
                         {
                             existing.BBox = UnionBoxes(existing.BBox, bb);

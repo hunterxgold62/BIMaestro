@@ -1582,9 +1582,9 @@ namespace Modification
                     || elem is DirectShape,
                 ExtendedReservationWindow.ObjectType.Gaine => elem is Duct,
                 ExtendedReservationWindow.ObjectType.Porte => elem is FamilyInstance fi1
-                    && fi1.Category.Id.IntegerValue == (int)BuiltInCategory.OST_Doors,
+                    && fi1.Category.Id.GetIdValue() == (int)BuiltInCategory.OST_Doors,
                 ExtendedReservationWindow.ObjectType.Fenetre => elem is FamilyInstance fi2
-                    && fi2.Category.Id.IntegerValue == (int)BuiltInCategory.OST_Windows,
+                    && fi2.Category.Id.GetIdValue() == (int)BuiltInCategory.OST_Windows,
                 ExtendedReservationWindow.ObjectType.Autre => true,
                 _ => false
             };

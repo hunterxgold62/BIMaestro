@@ -266,7 +266,7 @@ namespace Visualisation
             // 1) – Cas BuiltInParameter (enum)
             try
             {
-                var bip = (BuiltInParameter)paramId.IntegerValue;
+                var bip = (BuiltInParameter)paramId.GetIdValue();
                 Parameter p = target.get_Parameter(bip);
                 if (p == null)
                 {

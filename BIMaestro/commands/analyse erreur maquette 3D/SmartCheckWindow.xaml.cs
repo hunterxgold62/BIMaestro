@@ -61,7 +61,7 @@ namespace Analyse
         }
 
         private static bool IsValidId(ElementId id)
-            => id != null && id != ElementId.InvalidElementId && id.IntegerValue > 0;
+            => id != null && id != ElementId.InvalidElementId && id.GetIdValue() > 0;
 
         private string CurrentTabName() => (Tabs.SelectedItem as TabItem)?.Header?.ToString() ?? "Toutes";
 
@@ -138,8 +138,8 @@ namespace Analyse
 
         private class IdCmp : IEqualityComparer<ElementId>
         {
-            public bool Equals(ElementId a, ElementId b) => (a?.IntegerValue ?? int.MinValue) == (b?.IntegerValue ?? int.MinValue);
-            public int GetHashCode(ElementId obj) => obj?.IntegerValue.GetHashCode() ?? 0;
+            public bool Equals(ElementId a, ElementId b) => (a?.GetIdValue() ?? int.MinValue) == (b?.GetIdValue() ?? int.MinValue);
+            public int GetHashCode(ElementId obj) => obj?.GetIdValue().GetHashCode() ?? 0;
         }
 
         private void OnPrev(object sender, RoutedEventArgs e)

@@ -63,7 +63,7 @@ namespace IA
                     if (geometryGroupTypeId.Equals(raw))
                         isGeomGroup = true;
                     // Sinon, s'il s'agit d'un ElementId (cas très rare), on compare l'IntegerValue à 2702 (PG_GEOMETRY)
-                    else if (raw is ElementId eid && eid.IntegerValue == 2702)
+                    else if (raw is ElementId eid && eid.GetIdValue() == 2702)
                         isGeomGroup = true;
                 }
                 else
@@ -103,7 +103,7 @@ namespace IA
                     var id = p.AsElementId();
                     if (id == ElementId.InvalidElementId) return "N/A";
                     var e = doc.GetElement(id);
-                    return e?.Name ?? id.IntegerValue.ToString();
+                    return e?.Name ?? id.GetIdValue().ToString();
                 default:
                     return "N/A";
             }

@@ -43,8 +43,8 @@ namespace Analyse
 
         private static string BuildKey(ModelIssue issue)
         {
-            var id = issue?.ElementId?.IntegerValue ?? -1;
-            var related = issue?.RelatedId?.IntegerValue ?? -1;
+            var id = issue?.ElementId?.GetIdValue() ?? -1;
+            var related = issue?.RelatedId?.GetIdValue() ?? -1;
             var msg = issue?.Message ?? string.Empty;
             return $"{issue?.Kind}|{id}|{related}|{msg}";
         }

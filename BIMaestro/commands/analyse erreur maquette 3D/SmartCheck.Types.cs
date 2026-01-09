@@ -25,6 +25,7 @@ namespace Analyse
     public class ModelIssue
     {
         // Par défaut -> jamais null
+        public int ElementIdValue => ElementId.GetIdValue();
         public ElementId ElementId { get; set; } = ElementId.InvalidElementId;  // élément principal (ex: MEP)
         public ElementId RelatedId { get; set; } = ElementId.InvalidElementId;  // élément lié (ex: mur traversé)
         public IssueKind Kind { get; set; }

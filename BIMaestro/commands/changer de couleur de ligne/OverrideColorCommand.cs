@@ -34,7 +34,7 @@ namespace Modification
             if (hasExistingOverrides)
             {
                 var referenceElement = doc.GetElement(referenceElementId);
-                var elementName = referenceElement?.Name ?? referenceElementId.IntegerValue.ToString();
+                var elementName = referenceElement?.Name ?? referenceElementId.GetIdValue().ToString();
 
                 var dialog = new TaskDialog("Copier les graphismes existants")
                 {
