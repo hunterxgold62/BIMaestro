@@ -30,12 +30,8 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Petit “badge” -->
-                <Border Width="44" Height="44" CornerRadius="12" Background="#FF2563EB" VerticalAlignment="Center">
-                    <TextBlock Text="B" Foreground="White" FontWeight="Bold" FontSize="20"
-                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
-
+                <Image x:Name="LogoImage" Width="44" Height="44" VerticalAlignment="Center" Stretch="Uniform"/>
+                
                 <StackPanel Grid.Column="2" VerticalAlignment="Center">
                     <TextBlock Text="Bienvenue dans BIMaestro" FontSize="20" FontWeight="SemiBold"/>
                     <TextBlock Margin="0,4,0,0" Opacity="0.75"

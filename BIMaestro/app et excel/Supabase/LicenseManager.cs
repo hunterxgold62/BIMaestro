@@ -158,9 +158,9 @@ namespace Licensing
 
             if (string.IsNullOrWhiteSpace(installId))
                 installId = GetOrCreateInstallId();
-
-            if (string.IsNullOrWhiteSpace(email))
-                throw new InvalidOperationException("Email manquant.");
+            var normalizedEmail = string.IsNullOrWhiteSpace(email) ? null : email;
+            var normalizedFirstName = string.IsNullOrWhiteSpace(firstName) ? null : firstName;
+            var normalizedLastName = string.IsNullOrWhiteSpace(lastName) ? null : lastName;
 
             using var client = NetSupport.CreateHttpClient(TimeSpan.FromSeconds(15));
 
@@ -171,9 +171,9 @@ namespace Licensing
             var body = new
             {
                 install_id = installId,
-                email = email,
-                first_name = firstName,
-                last_name = lastName,
+                email = normalizedEmail,
+                first_name = normalizedFirstName,
+                last_name = normalizedLastName,
                 machine_id_hash = machineIdHash
             };
 
@@ -191,7 +191,7 @@ namespace Licensing
         /// <summary>
         /// Variante safe: n’explose jamais l’UX si réseau KO.
         /// </summary>
-        public static void TryUpsertUserProfileNoThrow(
+        public static bool TryUpsertUserProfileNoThrow(
             string jwtLicenseToken,
             string installId,
             string email,
@@ -202,10 +202,12 @@ namespace Licensing
             try
             {
                 UpsertUserProfile(jwtLicenseToken, installId, email, firstName, lastName, machineIdHash);
+                return true;
             }
             catch
             {
                 // ignore volontairement
+                return false;
             }
         }
 

@@ -126,7 +126,7 @@ namespace BIMaestro.Welcome
                 {
                     _state.OptInUtc = null;
                 }
-
+                _state.ProfilePending = true;
                 WelcomeStorage.Save(_state);
             }
 
@@ -205,6 +205,7 @@ namespace BIMaestro.Welcome
                         _state.FirstName = win.FirstName;
                         _state.LastName = win.LastName;
                         _state.OptInUtc = DateTime.UtcNow;
+                        _state.ProfilePending = true;
 
                         _state.WelcomeShown = true;
                         WelcomeStorage.Save(_state);
@@ -266,14 +267,13 @@ namespace BIMaestro.Welcome
             }
 
             if (s == null) return;
-            if (!s.EmailOptIn) return;
-            if (string.IsNullOrWhiteSpace(s.Email)) return;
+            if (!s.ProfilePending) return;
             if (string.IsNullOrWhiteSpace(jwt)) return;
 
             // Ici tu stockes un hash stable (comme tu le fais déjà ailleurs)
             var machineHash = Licensing.LicenseManager.ComputeMachineId();
 
-            Licensing.LicenseManager.TryUpsertUserProfileNoThrow(
+            var success = Licensing.LicenseManager.TryUpsertUserProfileNoThrow(
                 jwtLicenseToken: jwt,
                 installId: s.InstallId,
                 email: s.Email,
@@ -281,6 +281,14 @@ namespace BIMaestro.Welcome
                 lastName: s.LastName,
                 machineIdHash: machineHash
             );
+
+            if (!success) return;
+
+            lock (_sync)
+            {
+                s.ProfilePending = false;
+                WelcomeStorage.Save(s);
+            }
         }
         private static string NormalizeValue(string value)
         {

@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Windows;
+using System.Windows.Media.Imaging;
 
 namespace BIMaestro.Welcome
 {
@@ -18,6 +20,7 @@ namespace BIMaestro.Welcome
         public WelcomeWindow()
         {
             InitializeComponent();
+            LogoImage.Source = LoadBitmapFromResource("BIMaestro.png");
         }
 
         private void OpenGuide_Click(object sender, RoutedEventArgs e)
@@ -77,6 +80,25 @@ namespace BIMaestro.Welcome
         }
 
         private static bool IsValidEmail(string email) =>
-            Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$");
+             Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$");
+
+        private static BitmapImage LoadBitmapFromResource(string resourceFileName)
+        {
+            var asm = Assembly.GetExecutingAssembly();
+            string resourcePath = $"BIMaestro.Resources.{resourceFileName}";
+
+            using (var stream = asm.GetManifestResourceStream(resourcePath))
+            {
+                if (stream == null) return null;
+
+                var bmp = new BitmapImage();
+                bmp.BeginInit();
+                bmp.CacheOption = BitmapCacheOption.OnLoad;
+                bmp.StreamSource = stream;
+                bmp.EndInit();
+                bmp.Freeze();
+                return bmp;
+            }
+        }
     }
 }
