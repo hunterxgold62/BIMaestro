@@ -1,4 +1,5 @@
 ﻿using System.Windows;
+using System.Windows.Input;
 
 namespace BIMaestro.Bonus
 {
@@ -8,6 +9,17 @@ namespace BIMaestro.Bonus
         {
             InitializeComponent();
             DataContext = new SnakeLeaderboardViewModel(data);
+
+            PreviewKeyDown += OnPreviewKeyDown;
+        }
+
+        private void OnPreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Escape)
+            {
+                Close();
+                e.Handled = true;
+            }
         }
     }
 }

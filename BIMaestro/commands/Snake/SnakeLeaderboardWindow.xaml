@@ -1,46 +1,230 @@
-﻿<Window x:Class="BIMaestro.Bonus.SnakeLeaderboardWindow"
+﻿<!-- SnakeLeaderboardWindow.xaml -->
+<Window x:Class="BIMaestro.Bonus.SnakeLeaderboardWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Classement Snake"
-        Width="360"
-        Height="420"
+        Width="420"
+        Height="560"
         ResizeMode="NoResize"
-        WindowStartupLocation="CenterOwner">
+        WindowStartupLocation="CenterOwner"
+        Background="#F4F6F9"
+        SnapsToDevicePixels="True"
+        UseLayoutRounding="True">
+
+    <Window.Resources>
+        <!-- Couleurs / typo -->
+        <SolidColorBrush x:Key="CardBg" Color="White"/>
+        <SolidColorBrush x:Key="CardBorder" Color="#D9E0EA"/>
+        <SolidColorBrush x:Key="TextMain" Color="#0F172A"/>
+        <SolidColorBrush x:Key="TextSub" Color="#64748B"/>
+
+        <SolidColorBrush x:Key="ClassicBrush" Color="#3B82F6"/>
+        <SolidColorBrush x:Key="ArcadeBrush"  Color="#10B981"/>
+        <SolidColorBrush x:Key="HardBrush"    Color="#EF4444"/>
+
+        <Style TargetType="{x:Type TextBlock}">
+            <Setter Property="Foreground" Value="{StaticResource TextMain}"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+        </Style>
+
+        <!-- DataGrid simple et neutre (et surtout sans bordure bleue de focus) -->
+        <Style TargetType="{x:Type DataGrid}">
+            <Setter Property="AutoGenerateColumns" Value="False"/>
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="CanUserAddRows" Value="False"/>
+            <Setter Property="CanUserDeleteRows" Value="False"/>
+            <Setter Property="CanUserResizeRows" Value="False"/>
+            <Setter Property="HeadersVisibility" Value="Column"/>
+            <Setter Property="GridLinesVisibility" Value="None"/>
+            <Setter Property="RowHeaderWidth" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="AlternatingRowBackground" Value="#F8FAFC"/>
+            <Setter Property="RowBackground" Value="White"/>
+            <Setter Property="Foreground" Value="{StaticResource TextMain}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        </Style>
+
+        <Style TargetType="{x:Type DataGridColumnHeader}">
+            <Setter Property="Background" Value="#F1F5F9"/>
+            <Setter Property="Foreground" Value="{StaticResource TextSub}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="BorderBrush" Value="#E2E8F0"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+        </Style>
+
+        <Style TargetType="{x:Type DataGridCell}">
+            <Setter Property="Padding" Value="10,7"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+
+        <Style x:Key="ScoreRight" TargetType="{x:Type TextBlock}">
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <!-- Message "vide" -->
+        <Style x:Key="EmptyHint" TargetType="{x:Type TextBlock}">
+            <Setter Property="Foreground" Value="{StaticResource TextSub}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Margin" Value="10,8,10,0"/>
+            <Setter Property="Visibility" Value="Collapsed"/>
+        </Style>
+
+        <Style x:Key="EmptyHintAuto" TargetType="{x:Type TextBlock}" BasedOn="{StaticResource EmptyHint}">
+            <Style.Triggers>
+                <Trigger Property="Tag" Value="False">
+                    <Setter Property="Visibility" Value="Visible"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Carte de section -->
+        <Style x:Key="SectionCard" TargetType="{x:Type Border}">
+            <Setter Property="Background" Value="{StaticResource CardBg}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource CardBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="12"/>
+            <Setter Property="Margin" Value="0,0,0,12"/>
+        </Style>
+    </Window.Resources>
+
     <Grid Margin="12">
-        <TabControl>
-            <TabItem Header="Classic">
-                <ListView ItemsSource="{Binding ClassicEntries}">
-                    <ListView.View>
-                        <GridView>
-                            <GridViewColumn Header="#" DisplayMemberBinding="{Binding Rank}" Width="40"/>
-                            <GridViewColumn Header="Joueur" DisplayMemberBinding="{Binding PlayerName}" Width="190"/>
-                            <GridViewColumn Header="Score" DisplayMemberBinding="{Binding Score}" Width="80"/>
-                        </GridView>
-                    </ListView.View>
-                </ListView>
-            </TabItem>
-            <TabItem Header="Arcade">
-                <ListView ItemsSource="{Binding ArcadeEntries}">
-                    <ListView.View>
-                        <GridView>
-                            <GridViewColumn Header="#" DisplayMemberBinding="{Binding Rank}" Width="40"/>
-                            <GridViewColumn Header="Joueur" DisplayMemberBinding="{Binding PlayerName}" Width="190"/>
-                            <GridViewColumn Header="Score" DisplayMemberBinding="{Binding Score}" Width="80"/>
-                        </GridView>
-                    </ListView.View>
-                </ListView>
-            </TabItem>
-            <TabItem Header="Hardcore">
-                <ListView ItemsSource="{Binding HardcoreEntries}">
-                    <ListView.View>
-                        <GridView>
-                            <GridViewColumn Header="#" DisplayMemberBinding="{Binding Rank}" Width="40"/>
-                            <GridViewColumn Header="Joueur" DisplayMemberBinding="{Binding PlayerName}" Width="190"/>
-                            <GridViewColumn Header="Score" DisplayMemberBinding="{Binding Score}" Width="80"/>
-                        </GridView>
-                    </ListView.View>
-                </ListView>
-            </TabItem>
-        </TabControl>
+        <Border Background="{StaticResource CardBg}"
+                BorderBrush="{StaticResource CardBorder}"
+                BorderThickness="1"
+                CornerRadius="14"
+                Padding="12">
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Header général -->
+                <StackPanel Grid.Row="0" Margin="0,0,0,12">
+                    <TextBlock Text="Classement Snake" FontSize="16" FontWeight="Bold"/>
+                    <TextBlock Text="Scores enregistrés par mode"
+                               Foreground="{StaticResource TextSub}"
+                               FontSize="12"/>
+                </StackPanel>
+
+                <!-- Contenu scrollable -->
+                <ScrollViewer Grid.Row="1"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+
+                    <StackPanel>
+
+                        <!-- ===== CLASSIC ===== -->
+                        <Border Style="{StaticResource SectionCard}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="0,0,0,8">
+                                    <Ellipse Width="10" Height="10" Fill="{StaticResource ClassicBrush}" Margin="0,2,8,0"/>
+                                    <StackPanel>
+                                        <TextBlock Text="Mode : Classic" FontWeight="Bold"/>
+                                        <TextBlock Text="Meilleurs scores en Classic"
+                                                   Foreground="{StaticResource TextSub}" FontSize="11"/>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <DataGrid x:Name="DgClassic" Grid.Row="1" ItemsSource="{Binding ClassicEntries}">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="#" Binding="{Binding Rank}" Width="50"/>
+                                        <DataGridTextColumn Header="Joueur" Binding="{Binding PlayerName}" Width="*"/>
+                                        <DataGridTextColumn Header="Score" Binding="{Binding Score}" Width="80"
+                                                            ElementStyle="{StaticResource ScoreRight}"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+
+                                <TextBlock Grid.Row="2"
+                                           Text="Aucun score pour ce mode."
+                                           Style="{StaticResource EmptyHintAuto}"
+                                           Tag="{Binding ElementName=DgClassic, Path=HasItems}" />
+                            </Grid>
+                        </Border>
+
+                        <!-- ===== ARCADE ===== -->
+                        <Border Style="{StaticResource SectionCard}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="0,0,0,8">
+                                    <Ellipse Width="10" Height="10" Fill="{StaticResource ArcadeBrush}" Margin="0,2,8,0"/>
+                                    <StackPanel>
+                                        <TextBlock Text="Mode : Arcade" FontWeight="Bold"/>
+                                        <TextBlock Text="Meilleurs scores en Arcade"
+                                                   Foreground="{StaticResource TextSub}" FontSize="11"/>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <DataGrid x:Name="DgArcade" Grid.Row="1" ItemsSource="{Binding ArcadeEntries}">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="#" Binding="{Binding Rank}" Width="50"/>
+                                        <DataGridTextColumn Header="Joueur" Binding="{Binding PlayerName}" Width="*"/>
+                                        <DataGridTextColumn Header="Score" Binding="{Binding Score}" Width="80"
+                                                            ElementStyle="{StaticResource ScoreRight}"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+
+                                <TextBlock Grid.Row="2"
+                                           Text="Aucun score pour ce mode."
+                                           Style="{StaticResource EmptyHintAuto}"
+                                           Tag="{Binding ElementName=DgArcade, Path=HasItems}" />
+                            </Grid>
+                        </Border>
+
+                        <!-- ===== HARDCORE ===== -->
+                        <Border Style="{StaticResource SectionCard}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="0,0,0,8">
+                                    <Ellipse Width="10" Height="10" Fill="{StaticResource HardBrush}" Margin="0,2,8,0"/>
+                                    <StackPanel>
+                                        <TextBlock Text="Mode : Hardcore" FontWeight="Bold"/>
+                                        <TextBlock Text="Meilleurs scores en Hardcore"
+                                                   Foreground="{StaticResource TextSub}" FontSize="11"/>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <DataGrid x:Name="DgHardcore" Grid.Row="1" ItemsSource="{Binding HardcoreEntries}">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="#" Binding="{Binding Rank}" Width="50"/>
+                                        <DataGridTextColumn Header="Joueur" Binding="{Binding PlayerName}" Width="*"/>
+                                        <DataGridTextColumn Header="Score" Binding="{Binding Score}" Width="80"
+                                                            ElementStyle="{StaticResource ScoreRight}"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+
+                                <TextBlock Grid.Row="2"
+                                           Text="Aucun score pour ce mode."
+                                           Style="{StaticResource EmptyHintAuto}"
+                                           Tag="{Binding ElementName=DgHardcore, Path=HasItems}" />
+                            </Grid>
+                        </Border>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </Border>
     </Grid>
 </Window>

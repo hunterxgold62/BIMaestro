@@ -677,6 +677,10 @@ namespace BIMaestro.Bonus
             GameImage.Width = _bmpW;
             GameImage.Height = _bmpH;
 
+            // ✅ force le conteneur à demander exactement la bonne taille
+            PlayfieldBorder.Width = _bmpW + 8; // 2 (BorderThickness) *2 + 2 (Padding) *2 = 8
+            PlayfieldBorder.Height = _bmpH + 8;
+
             MapInfoText.Text = $"Map: {_cols}×{_rows}";
 
             double targetW = _baseWindowWidth + (_cols - BaseCols) * CellSize;
@@ -1128,6 +1132,9 @@ namespace BIMaestro.Bonus
 
             for (int gy = 0; gy < h; gy += CellSize)
                 DrawHLine(0, w - 1, gy, gridC);
+
+            DrawVLine(w - 1, 0, h - 1, gridC);
+            DrawHLine(0, w - 1, h - 1, gridC);
 
             if (_mode == GameMode.Hardcore && _walls.Count > 0)
             {
