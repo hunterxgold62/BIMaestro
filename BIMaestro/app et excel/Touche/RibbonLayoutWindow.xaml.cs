@@ -1,8 +1,10 @@
 ﻿using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Windows;
+using System.Windows.Navigation;
 using BIMaestro.Welcome;
 
 namespace BIMaestro.RibbonLayout
@@ -156,6 +158,11 @@ namespace BIMaestro.RibbonLayout
         {
             WelcomeManager.UpdateProfileFromSettings(Email, FirstName, LastName);
             _welcomeState = WelcomeStorage.LoadOrCreate();
+        }
+        private void OnRequestNavigate(object sender, RequestNavigateEventArgs e)
+        {
+            Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true });
+            e.Handled = true;
         }
     }
 

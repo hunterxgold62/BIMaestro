@@ -1,6 +1,7 @@
 ﻿using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using Licensing;
 
 using System;
 using System.Windows.Interop;
@@ -8,9 +9,11 @@ using System.Windows.Interop;
 namespace BIMaestro.Bonus
 {
     [Transaction(TransactionMode.Manual)]
-    public class SnakeCommand : IExternalCommand
+    public class SnakeCommand : BaseTrackedCommand
     {
-        public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        protected override string ButtonId => "SnakeCommand";
+
+        protected override Result OnExecute(ExternalCommandData commandData, ref string message, ElementSet elements)
         {
             try
             {

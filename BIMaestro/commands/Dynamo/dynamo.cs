@@ -7,6 +7,7 @@ using Autodesk.Revit.UI;
 using Autodesk.Revit.DB;
 using Dynamo.Applications;
 using Dynamo.Applications.Properties;
+using Licensing;
 using Newtonsoft.Json;
 
 namespace Modification
@@ -238,41 +239,53 @@ namespace Modification
 
     // 5 commandes de lancement
     [Autodesk.Revit.Attributes.Transaction(Autodesk.Revit.Attributes.TransactionMode.Manual)]
-    public class RunDynamo1Command : IExternalCommand
+    public class RunDynamo1Command : BaseTrackedCommand
     {
-        public Result Execute(ExternalCommandData c, ref string m, ElementSet e)
+        protected override string ButtonId => "RunDynamo1Command";
+
+        protected override Result OnExecute(ExternalCommandData c, ref string m, ElementSet e)
         => DynamoExecutor.RunDynamo(0, c);
     }
     [Autodesk.Revit.Attributes.Transaction(Autodesk.Revit.Attributes.TransactionMode.Manual)]
-    public class RunDynamo2Command : IExternalCommand
+    public class RunDynamo2Command : BaseTrackedCommand
     {
-        public Result Execute(ExternalCommandData c, ref string m, ElementSet e)
+        protected override string ButtonId => "RunDynamo2Command";
+
+        protected override Result OnExecute(ExternalCommandData c, ref string m, ElementSet e)
         => DynamoExecutor.RunDynamo(1, c);
     }
     [Autodesk.Revit.Attributes.Transaction(Autodesk.Revit.Attributes.TransactionMode.Manual)]
-    public class RunDynamo3Command : IExternalCommand
+    public class RunDynamo3Command : BaseTrackedCommand
     {
-        public Result Execute(ExternalCommandData c, ref string m, ElementSet e)
+        protected override string ButtonId => "RunDynamo3Command";
+
+        protected override Result OnExecute(ExternalCommandData c, ref string m, ElementSet e)
         => DynamoExecutor.RunDynamo(2, c);
     }
     [Autodesk.Revit.Attributes.Transaction(Autodesk.Revit.Attributes.TransactionMode.Manual)]
-    public class RunDynamo4Command : IExternalCommand
+    public class RunDynamo4Command : BaseTrackedCommand
     {
-        public Result Execute(ExternalCommandData c, ref string m, ElementSet e)
+        protected override string ButtonId => "RunDynamo4Command";
+
+        protected override Result OnExecute(ExternalCommandData c, ref string m, ElementSet e)
         => DynamoExecutor.RunDynamo(3, c);
     }
     [Autodesk.Revit.Attributes.Transaction(Autodesk.Revit.Attributes.TransactionMode.Manual)]
-    public class RunDynamo5Command : IExternalCommand
+    public class RunDynamo5Command : BaseTrackedCommand
     {
-        public Result Execute(ExternalCommandData c, ref string m, ElementSet e)
+        protected override string ButtonId => "RunDynamo5Command";
+
+        protected override Result OnExecute(ExternalCommandData c, ref string m, ElementSet e)
         => DynamoExecutor.RunDynamo(4, c);
     }
 
     // Commande qui ouvre la fenêtre WPF
     [Autodesk.Revit.Attributes.Transaction(Autodesk.Revit.Attributes.TransactionMode.ReadOnly)]
-    public class ConfigureDynamoButtonCommand : IExternalCommand
+    public class ConfigureDynamoButtonCommand : BaseTrackedCommand
     {
-        public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        protected override string ButtonId => "ConfigureDynamoButtonCommand";
+
+        protected override Result OnExecute(ExternalCommandData commandData, ref string message, ElementSet elements)
         {
             try
             {

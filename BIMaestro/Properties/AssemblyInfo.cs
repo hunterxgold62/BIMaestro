@@ -7,7 +7,7 @@ using System.Runtime.InteropServices;
 // l'ensemble d'attributs suivant. Changez les valeurs de ces attributs pour modifier les informations
 // associées à un assembly.
 [assembly: AssemblyTitle("BIMaestro")]
-[assembly: AssemblyDescription("")]
+[assembly: AssemblyDescription("Un plugin pensé pour simplifier le quotidien des dessinateurs Revit.")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("BIMaestro")]

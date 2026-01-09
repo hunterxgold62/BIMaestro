@@ -4,13 +4,16 @@ using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using BIMaestro.RibbonLayout;
+using Licensing;
 
 namespace BIMaestro.RibbonLayout
 {
     [Transaction(TransactionMode.Manual)]
-    public class RibbonLayoutCommand : IExternalCommand
+    public class RibbonLayoutCommand : BaseTrackedCommand
     {
-        public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        protected override string ButtonId => "RibbonLayoutCommand";
+
+        protected override Result OnExecute(ExternalCommandData commandData, ref string message, ElementSet elements)
         {
             var assemblyPath = Assembly.GetExecutingAssembly().Location;
             var definitions = AppUI.BuildDefaultRibbonDefinitions(assemblyPath);

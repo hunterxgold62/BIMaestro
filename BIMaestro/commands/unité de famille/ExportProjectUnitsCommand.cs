@@ -4,6 +4,7 @@ using System.IO;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using Licensing;
 using Newtonsoft.Json;
 
 namespace Famille
@@ -16,9 +17,11 @@ namespace Famille
     }
 
     [Transaction(TransactionMode.ReadOnly)]
-    public class ExportProjectUnitsCommand : IExternalCommand
+    public class ExportProjectUnitsCommand : BaseTrackedCommand
     {
-        public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        protected override string ButtonId => "ExportProjectUnitsCommand";
+
+        protected override Result OnExecute(ExternalCommandData commandData, ref string message, ElementSet elements)
         {
             // Prépare le dossier et le fichier JSON
             string docDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);

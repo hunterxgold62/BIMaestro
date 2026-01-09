@@ -17,6 +17,7 @@ using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using NPOI.SS.UserModel;
+using Licensing;
 using NPOI.XSSF.UserModel;
 using NPOI.SS.Util;
 using CellType = NPOI.SS.UserModel.CellType;
@@ -280,9 +281,11 @@ namespace ScheduleIO
     // COMMANDE UNIQUE
     // ==========================================================
     [Transaction(TransactionMode.Manual)]
-    public class ScheduleExcelIOCommand : IExternalCommand
+    public class ScheduleExcelIOCommand : BaseTrackedCommand
     {
-        public Result Execute(ExternalCommandData data, ref string message, ElementSet elements)
+        protected override string ButtonId => "ScheduleExcelIOCommand";
+
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
             var td = new TaskDialog("Nomenclature ↔ Excel");
             td.MainInstruction = "Que veux-tu faire ?";

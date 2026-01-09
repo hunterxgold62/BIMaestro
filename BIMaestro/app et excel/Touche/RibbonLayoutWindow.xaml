@@ -1,7 +1,7 @@
 ﻿<Window x:Class="BIMaestro.RibbonLayout.RibbonLayoutWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Options" Height="520" Width="820" WindowStartupLocation="CenterScreen">
+        Title="Options" Height="525" Width="820" WindowStartupLocation="CenterScreen">
     <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
@@ -45,7 +45,7 @@
                 </Grid>
             </TabItem>
 
-            <TabItem Header="Paramètres">
+            <TabItem Header="Contact">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="12">
                         <TextBlock FontWeight="Bold" FontSize="14" Text="Informations (optionnel)" />
@@ -76,6 +76,24 @@
                         </Grid>
 
                         <TextBlock Opacity="0.60" Text="Ces informations restent modifiables à tout moment." />
+
+                        <StackPanel Margin="0,0,0,12">
+                            <TextBlock Text="Contact" FontWeight="Bold" FontSize="13" />
+                            <TextBlock Margin="0,6,0,0">
+                                <Run Text="LinkedIn : " />
+                                <Hyperlink NavigateUri="https://www.linkedin.com/in/paul-lemert-b40921207"
+                                           RequestNavigate="OnRequestNavigate">
+                                    <Run Text="paul-lemert" />
+                                </Hyperlink>
+                            </TextBlock>
+                            <TextBlock Margin="0,6,0,0">
+                                <Run Text="Email : " />
+                                <Hyperlink NavigateUri="mailto:bimaestro.plugin@gmail.com"
+                                           RequestNavigate="OnRequestNavigate">
+                                    <Run Text="bimaestro.plugin@gmail.com" />
+                                </Hyperlink>
+                            </TextBlock>
+                        </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

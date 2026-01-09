@@ -1,14 +1,17 @@
 ﻿using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using Licensing;
 using System;
 
 namespace BIMaestro.Dashboard
 {
     [Transaction(TransactionMode.Manual)]
-    public class ShowTimeDashboard : IExternalCommand
+    public class ShowTimeDashboard : BaseTrackedCommand
     {
-        public Result Execute(ExternalCommandData cdata, ref string message, ElementSet elements)
+        protected override string ButtonId => "ShowTimeDashboard";
+
+        protected override Result OnExecute(ExternalCommandData cdata, ref string message, ElementSet elements)
         {
             try
             {
