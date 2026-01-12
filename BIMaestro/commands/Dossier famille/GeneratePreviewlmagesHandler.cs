@@ -210,7 +210,7 @@ namespace Famille
                     return false;
                 }
 
-                var view = GetExisting3DView(famDoc, out var viewError);
+                var view = GetOrCreatePreview3DView(famDoc, req.LogCallback, out var viewError);
                 if (view == null)
                 {
                     error = viewError ?? "Aucune vue 3D exportable.";
@@ -363,9 +363,43 @@ namespace Famille
             return Path.ChangeExtension(mirrorPath, ".png");
         }
 
-        private static View3D GetExisting3DView(Document famDoc, out string error)
+        private static View3D GetOrCreatePreview3DView(Document famDoc, Action<string> log, out string error)
         {
             error = null;
+
+            View3D created = null;
+
+            try
+            {
+                using (var tx = new Transaction(famDoc, "Créer vue 3D preview"))
+                {
+                    if (tx.Start() == TransactionStatus.Started)
+                    {
+                        var vft = new FilteredElementCollector(famDoc)
+                            .OfClass(typeof(ViewFamilyType))
+                            .Cast<ViewFamilyType>()
+                            .FirstOrDefault(v => v.ViewFamily == ViewFamily.ThreeDimensional);
+
+                        if (vft != null)
+                        {
+                            created = View3D.CreateIsometric(famDoc, vft.Id);
+                            if (created != null)
+                            {
+                                try { created.Name = "__BIMaestroPreview3D"; } catch { }
+                            }
+                        }
+
+                        tx.Commit();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                SafeLog(log, $"ℹ️ Création vue 3D : {ex.Message}");
+            }
+
+            if (created != null)
+                return created;
 
             var views = new FilteredElementCollector(famDoc)
                 .OfClass(typeof(View3D))
@@ -583,6 +617,13 @@ namespace Famille
                     try { view.SetOrientation(new ViewOrientation3D(eye, XYZ.BasisZ, forward)); } catch { }
                     try { view.SaveOrientationAndLock(); } catch { }
 
+                    try
+                    {
+                        var padded = ExpandBoundingBox(bbox, 0.10);
+                        view.SetSectionBox(padded);
+                        view.IsSectionBoxActive = true;
+                    }
+                    catch { }
                     tx.Commit();
                 }
             }
@@ -626,6 +667,25 @@ namespace Famille
             }
 
             return acc;
+        }
+
+        private static BoundingBoxXYZ ExpandBoundingBox(BoundingBoxXYZ bbox, double padFactor)
+        {
+            if (bbox == null) return null;
+
+            var min = bbox.Min;
+            var max = bbox.Max;
+            var extents = max - min;
+
+            double padX = Math.Max(Math.Abs(extents.X) * padFactor, 0.1);
+            double padY = Math.Max(Math.Abs(extents.Y) * padFactor, 0.1);
+            double padZ = Math.Max(Math.Abs(extents.Z) * padFactor, 0.1);
+
+            return new BoundingBoxXYZ
+            {
+                Min = new XYZ(min.X - padX, min.Y - padY, min.Z - padZ),
+                Max = new XYZ(max.X + padX, max.Y + padY, max.Z + padZ)
+            };
         }
 
         private static bool ExportViewToPngRobust(Document famDoc, View3D view, string targetPng, int pixelSize, ImageResolution resolution)
