@@ -357,13 +357,16 @@
     <Compile Include="commands\Dossier famille\FamilyMetadataProvider.cs" />
     <Compile Include="commands\Dossier famille\FamilyLoadOption.cs" />
     <Compile Include="commands\Dossier famille\FamilyUsageManager.cs" />
-    <Compile Include="commands\Dossier famille\GeneratePreviewlmagesHandler.cs" />
+    <Compile Include="commands\Dossier famille\Photo auto\GeneratePreviewlmagesHandler.cs" />
     <Compile Include="commands\Dossier famille\image native de revit\ThumbnailCache.cs" />
     <Compile Include="commands\Dossier famille\ImageResolver.cs" />
     <Compile Include="commands\Dossier famille\LoadCollectionHandler.cs" />
     <Compile Include="commands\Dossier famille\LoadFamilyHandler.cs" />
     <Compile Include="commands\Dossier famille\orbit 3D\FamilyMeshExtractor.cs" />
     <Compile Include="commands\Dossier famille\orbit 3D\FamilyPreviewBridge.cs" />
+    <Compile Include="commands\Dossier famille\Photo auto\ReviewWindow.xaml.cs">
+      <DependentUpon>ReviewWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="commands\Dossier famille\roue de gta\RadialMenuCollectionStateStore.cs" />
     <Compile Include="commands\Dossier famille\orbit 3D\MeshData.cs" />
     <Compile Include="commands\Dossier famille\orbit 3D\Family3DPreviewWindow.xaml.cs">
@@ -586,6 +589,10 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Include="commands\Dossier famille\orbit 3D\Family3DPreviewWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="commands\Dossier famille\Photo auto\ReviewWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
