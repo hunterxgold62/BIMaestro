@@ -364,6 +364,7 @@
     <Compile Include="commands\Dossier famille\LoadFamilyHandler.cs" />
     <Compile Include="commands\Dossier famille\orbit 3D\FamilyMeshExtractor.cs" />
     <Compile Include="commands\Dossier famille\orbit 3D\FamilyPreviewBridge.cs" />
+    <Compile Include="commands\Dossier famille\Photo auto\PreviewReviewSession.cs" />
     <Compile Include="commands\Dossier famille\Photo auto\ReviewWindow.xaml.cs">
       <DependentUpon>ReviewWindow.xaml</DependentUpon>
     </Compile>

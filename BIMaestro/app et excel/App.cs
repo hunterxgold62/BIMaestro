@@ -114,8 +114,8 @@ public class App : IExternalApplication
             AppUI.CreateRibbonUI(application);
 
             // "//" à rajouté pour retiré le message de bienvenue 
-            //BIMaestro.Welcome.WelcomeManager.Initialize(application);
-            //BIMaestro.Welcome.WelcomeManager.TrySyncPendingProfile(LicenseJwt);
+            BIMaestro.Welcome.WelcomeManager.Initialize(application);
+            BIMaestro.Welcome.WelcomeManager.TrySyncPendingProfile(LicenseJwt);
 
 
             return Result.Succeeded;

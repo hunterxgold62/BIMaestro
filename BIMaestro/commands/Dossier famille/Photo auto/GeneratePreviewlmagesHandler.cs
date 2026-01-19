@@ -1,21 +1,24 @@
-﻿using Autodesk.Revit.DB;
-using Autodesk.Revit.UI;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Threading;
+
+using Autodesk.Revit.DB;
+using Autodesk.Revit.UI;
+
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows;
-using System.Windows.Interop;
 
 namespace Famille
 {
-    // ==========================================================
-    // Models
-    // ==========================================================
-
-    public enum PreviewOverwriteMode { AskUser = 0, OverwriteAll = 1, SkipExisting = 2 }
+    public enum PreviewOverwriteMode
+    {
+        AskUser = 0,
+        OverwriteAll = 1,
+        SkipExisting = 2
+    }
 
     public sealed class PreviewGenerationRequest
     {
@@ -25,37 +28,67 @@ namespace Famille
         public Action<PreviewGenerationProgress> ProgressCallback { get; set; }
         public Action<string> LogCallback { get; set; }
 
+        // Overwrite final.png
         public PreviewOverwriteMode OverwriteMode { get; set; } = PreviewOverwriteMode.AskUser;
 
+        // Export Revit "grand"
         public int RevitExportPixelSize { get; set; } = 2000;
         public ImageResolution RevitImageResolution { get; set; } = ImageResolution.DPI_150;
+
+        // Downscale final (traits visuellement plus fins)
         public int FinalSquarePixelSize { get; set; } = 512;
 
+        // Vue
         public bool TryImproveViewIfPossible { get; set; } = true;
+
+        // Nettoyage
         public bool HideAllAnnotationCategories { get; set; } = true;
         public bool HideNoisyCategoriesByNameHeuristic { get; set; } = true;
         public bool HideConnectorsByElement { get; set; } = true;
 
+        // Style
         public bool UseEdges { get; set; } = true;
+
+        // ThinLines (global toggle) : pas toujours respecté par ExportImage
         public bool TryForceThinLinesToggle { get; set; } = false;
 
+        // Post-process : centrer + pad carré (NO SCALE)
         public bool PostProcessToSquareNoScale { get; set; } = true;
-        public bool TransparentBackground { get; set; } = false;
-        public bool MakeBackgroundTransparent { get; set; } = true;
 
+        // Fond blanc puis transparent après
+        public bool TransparentBackground { get; set; } = false;
+
+        // Crop
         public int BackgroundSampleSize { get; set; } = 24;
         public byte BackgroundTolerance { get; set; } = 22;
         public double CropMarginFactor { get; set; } = 0.04;
 
+        // Fond -> transparent
+        public bool MakeBackgroundTransparent { get; set; } = true;
         public byte BackgroundTransparencyTolerance { get; set; } = 5;
         public bool PreserveSemiTransparentPixels { get; set; } = true;
 
-        // Review mode
-        public bool EnableABReview { get; set; } = true;
+        // =========================
+        // NEW : Export A + B + Review
+        // =========================
+
+        // Si true : exporte 2 candidats "__A" et "__B" pour chaque famille, puis ouvre la review WPF.
+        public bool EnableInteractiveChoice { get; set; } = true;
+
+        // Taille d’un lot (après 20 choix => fenêtre propose Continuer / Arrêter).
         public int ReviewBatchSize { get; set; } = 20;
 
-        public bool OrientExisting3DView { get; set; } = true;
-        public double SectionBoxPaddingFactor { get; set; } = 0.35;
+        // Suffix des candidats dans le même dossier que le final.png
+        public string CandidateSuffixA { get; set; } = "__A";
+        public string CandidateSuffixB { get; set; } = "__B";
+
+        // Captions UI
+        public string CandidateCaptionA { get; set; } = "A – Vue existante (ex: {3D})";
+        public string CandidateCaptionB { get; set; } = "B – Vue preview perso (orientation stable)";
+
+        // Orientation : on garde A proche de l’existant, B stable.
+        public bool OrientExistingViewA { get; set; } = false;
+        public bool OrientCustomViewB { get; set; } = true;
     }
 
     public sealed class PreviewEntry
@@ -72,124 +105,6 @@ namespace Famille
         public bool IsCompleted { get; set; }
         public bool IsCanceled { get; set; }
     }
-
-    public enum ReviewChoice { LeftA, RightB }
-
-    public sealed class ReviewItem
-    {
-        public string Title { get; set; }
-        public string FinalPath { get; set; }
-        public string CandidateAPath { get; set; }
-        public string CandidateBPath { get; set; }
-    }
-
-    public sealed class UndoRecord
-    {
-        public ReviewItem Item { get; set; }
-        public string UndoFolder { get; set; }
-        public bool HadFinalBefore { get; set; }
-        public string OldFinalBackup { get; set; }
-        public string OtherMovedBackup { get; set; }
-        public ReviewChoice Choice { get; set; }
-    }
-
-    public static class ReviewFileOps
-    {
-        public static UndoRecord CommitChoice(ReviewItem item, ReviewChoice choice, string undoRoot)
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(item.FinalPath) ?? undoRoot);
-            Directory.CreateDirectory(undoRoot);
-
-            string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
-            string baseName = Path.GetFileNameWithoutExtension(item.FinalPath);
-            string folder = Path.Combine(undoRoot, baseName + "__" + stamp);
-            Directory.CreateDirectory(folder);
-
-            var rec = new UndoRecord
-            {
-                Item = item,
-                UndoFolder = folder,
-                HadFinalBefore = File.Exists(item.FinalPath),
-                Choice = choice
-            };
-
-            if (rec.HadFinalBefore)
-            {
-                rec.OldFinalBackup = Path.Combine(folder, baseName + "__OLD.png");
-                MoveOrReplace(item.FinalPath, rec.OldFinalBackup);
-            }
-
-            string chosen = (choice == ReviewChoice.LeftA) ? item.CandidateAPath : item.CandidateBPath;
-            string other = (choice == ReviewChoice.LeftA) ? item.CandidateBPath : item.CandidateAPath;
-
-            if (File.Exists(chosen))
-                MoveOrReplace(chosen, item.FinalPath);
-
-            if (File.Exists(other))
-            {
-                rec.OtherMovedBackup = Path.Combine(folder, Path.GetFileName(other));
-                MoveOrReplace(other, rec.OtherMovedBackup);
-            }
-
-            return rec;
-        }
-
-        public static void UndoLast(UndoRecord rec)
-        {
-            var item = rec.Item;
-
-            if (File.Exists(item.FinalPath))
-            {
-                string dest = (rec.Choice == ReviewChoice.LeftA) ? item.CandidateAPath : item.CandidateBPath;
-                EnsureDir(Path.GetDirectoryName(dest));
-                MoveOrReplace(item.FinalPath, dest);
-            }
-
-            if (!string.IsNullOrWhiteSpace(rec.OtherMovedBackup) && File.Exists(rec.OtherMovedBackup))
-            {
-                string otherDest = (rec.Choice == ReviewChoice.LeftA) ? item.CandidateBPath : item.CandidateAPath;
-                EnsureDir(Path.GetDirectoryName(otherDest));
-                MoveOrReplace(rec.OtherMovedBackup, otherDest);
-            }
-
-            if (rec.HadFinalBefore && !string.IsNullOrWhiteSpace(rec.OldFinalBackup) && File.Exists(rec.OldFinalBackup))
-            {
-                EnsureDir(Path.GetDirectoryName(item.FinalPath));
-                MoveOrReplace(rec.OldFinalBackup, item.FinalPath);
-            }
-            else
-            {
-                try { if (File.Exists(item.FinalPath)) File.Delete(item.FinalPath); } catch { }
-            }
-
-            try { Directory.Delete(rec.UndoFolder, true); } catch { }
-        }
-
-        private static void EnsureDir(string dir)
-        {
-            try { if (!string.IsNullOrWhiteSpace(dir) && !Directory.Exists(dir)) Directory.CreateDirectory(dir); }
-            catch { }
-        }
-
-        private static void MoveOrReplace(string source, string target)
-        {
-            EnsureDir(Path.GetDirectoryName(target));
-            try
-            {
-                if (File.Exists(target)) File.Delete(target);
-                File.Move(source, target);
-            }
-            catch
-            {
-                try { File.Copy(source, target, true); } catch { }
-                try { File.Delete(source); } catch { }
-            }
-        }
-    }
-
-    // ==========================================================
-    // Handler
-    // ==========================================================
 
     public class GeneratePreviewImagesHandler : IExternalEventHandler
     {
@@ -213,129 +128,109 @@ namespace Famille
             int total = req.Entries.Count;
             int done = 0;
 
-            int batchSize = Math.Max(1, req.ReviewBatchSize <= 0 ? 20 : req.ReviewBatchSize);
+            int batchSize = Math.Max(1, req.ReviewBatchSize);
+            var batchItems = new List<Famille.PreviewReview.ReviewItem>(capacity: batchSize);
 
-            for (int batchStart = 0; batchStart < req.Entries.Count; batchStart += batchSize)
+            for (int i = 0; i < req.Entries.Count; i++)
             {
+                var entry = req.Entries[i];
+
                 if (_stopRequested || req.CancellationToken.IsCancellationRequested)
-                    break;
-
-                var batch = req.Entries.Skip(batchStart).Take(batchSize).ToList();
-
-                var reviewItems = new List<ReviewItem>();
-                bool batchDidWork = false;
-
-                foreach (var entry in batch)
                 {
-                    if (_stopRequested || req.CancellationToken.IsCancellationRequested)
-                        break;
+                    PublishProgress(req, done, total, entry?.FamilyPath, isCanceled: true);
+                    break;
+                }
 
-                    PublishProgress(req, done, total, entry?.FamilyPath);
+                PublishProgress(req, done, total, entry?.FamilyPath);
 
-                    if (!TryExportFamilyCandidates_AB(app, entry, req, out var itemOrNull, out var error))
+                if (req.EnableInteractiveChoice)
+                {
+                    if (TryExportFamilyCandidatesAB(app, entry, req, out var reviewItem, out var error))
+                    {
+                        if (reviewItem != null)
+                            batchItems.Add(reviewItem);
+                    }
+                    else
                     {
                         if (!string.IsNullOrWhiteSpace(error))
                             SafeLog(req.LogCallback, $"⚠️ {Path.GetFileName(entry?.FamilyPath ?? "")} : {error}");
                     }
-                    else
+                }
+                else
+                {
+                    // Mode "classique" : seulement final.png via vue existante.
+                    if (!TryExportFamilySingle(app, entry, req, out var error))
                     {
-                        if (itemOrNull != null)
-                        {
-                            bool aOk = File.Exists(itemOrNull.CandidateAPath);
-                            bool bOk = File.Exists(itemOrNull.CandidateBPath);
-
-                            if (aOk || bOk)
-                            {
-                                reviewItems.Add(itemOrNull);
-                                batchDidWork = true;
-                            }
-                        }
+                        if (!string.IsNullOrWhiteSpace(error))
+                            SafeLog(req.LogCallback, $"⚠️ {Path.GetFileName(entry?.FamilyPath ?? "")} : {error}");
                     }
-
-                    done++;
-                    PublishProgress(req, done, total, entry?.FamilyPath);
                 }
 
-                // Review
-                if (req.EnableABReview && reviewItems.Count > 0 && !_stopRequested && !req.CancellationToken.IsCancellationRequested)
+                done++;
+                PublishProgress(req, done, total, entry?.FamilyPath);
+
+                // Si mode review : dès qu’on atteint batchSize, on ouvre la fenêtre, puis on continue ou on stop.
+                if (req.EnableInteractiveChoice && batchItems.Count >= batchSize)
                 {
-                    EnsureWpfApplication();
+                    bool continueNext = Famille.PreviewReview.PreviewReviewSession.RunBatch(app.MainWindowHandle, batchItems);
 
-                    string undoRoot = Path.Combine(req.TargetRoot, "__undo");
+                    batchItems.Clear();
 
-                    var win = new ReviewWindow(reviewItems, undoRoot, req.LogCallback);
-                    try { new WindowInteropHelper(win).Owner = app.MainWindowHandle; } catch { }
-
-                    bool closedEarly = false;
-                    try
-                    {
-                        win.ShowDialog();
-                        closedEarly = win.ClosedEarly;
-                    }
-                    catch (Exception ex)
-                    {
-                        SafeLog(req.LogCallback, "❌ ShowDialog review failed: " + ex.Message);
-                        // fallback: commit A si dispo sinon B
-                        foreach (var it in reviewItems)
-                        {
-                            try
-                            {
-                                if (File.Exists(it.CandidateAPath))
-                                    ReviewFileOps.CommitChoice(it, ReviewChoice.LeftA, undoRoot);
-                                else if (File.Exists(it.CandidateBPath))
-                                    ReviewFileOps.CommitChoice(it, ReviewChoice.RightB, undoRoot);
-                            }
-                            catch { }
-                        }
-                    }
-
-                    // ✅ Nettoyage demandé : après que le choix est fini, on supprime __undo et __candidates
-                    CleanupReviewFolders(req.TargetRoot);
-
-                    if (closedEarly)
-                        _stopRequested = true;
-                }
-
-                if (_stopRequested || req.CancellationToken.IsCancellationRequested)
-                    break;
-
-                // Continuer / Arrêter : seulement si le batch a réellement fait quelque chose
-                bool hasMore = (batchStart + batch.Count) < req.Entries.Count;
-                if (req.EnableABReview && hasMore && batchDidWork)
-                {
-                    var td = new TaskDialog("BIMaestro – Export des aperçus")
-                    {
-                        MainInstruction = "Batch terminé",
-                        MainContent = "Souhaites-tu continuer sur le batch suivant ?",
-                        CommonButtons = TaskDialogCommonButtons.None,
-                        AllowCancellation = true
-                    };
-                    td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Continuer");
-                    td.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, "Arrêter");
-
-                    var r = td.Show();
-                    if (r == TaskDialogResult.CommandLink2 || r == TaskDialogResult.Cancel)
+                    if (!continueNext)
                     {
                         _stopRequested = true;
+                        PublishProgress(req, done, total, entry?.FamilyPath, isCanceled: true);
                         break;
                     }
                 }
             }
 
-            // cleanup final au cas où
-            CleanupReviewFolders(req.TargetRoot);
+            // Dernier batch restant
+            if (req.EnableInteractiveChoice && !_stopRequested && !req.CancellationToken.IsCancellationRequested && batchItems.Count > 0)
+            {
+                bool continueNext = Famille.PreviewReview.PreviewReviewSession.RunBatch(app.MainWindowHandle, batchItems);
+                batchItems.Clear();
+
+                if (!continueNext)
+                    _stopRequested = true;
+            }
 
             PublishProgress(req, done, total, null, isCompleted: true, isCanceled: _stopRequested || req.CancellationToken.IsCancellationRequested);
         }
 
         public string GetName() => nameof(GeneratePreviewImagesHandler);
 
+        private static void PublishProgress(PreviewGenerationRequest req, int completed, int total, string current, bool isCompleted = false, bool isCanceled = false)
+        {
+            try
+            {
+                req.ProgressCallback?.Invoke(new PreviewGenerationProgress
+                {
+                    Completed = completed,
+                    Total = total,
+                    CurrentFile = current,
+                    IsCompleted = isCompleted,
+                    IsCanceled = isCanceled
+                });
+            }
+            catch { }
+        }
+
+        private static void SafeLog(Action<string> logger, string message)
+        {
+            try { logger?.Invoke(message); } catch { }
+        }
+
         // ==========================================================
-        // Export A/B
+        // MODE 1 : export A+B candidats + review
         // ==========================================================
 
-        private bool TryExportFamilyCandidates_AB(UIApplication uiapp, PreviewEntry entry, PreviewGenerationRequest req,
-            out ReviewItem reviewItem, out string error)
+        private bool TryExportFamilyCandidatesAB(
+            UIApplication uiapp,
+            PreviewEntry entry,
+            PreviewGenerationRequest req,
+            out Famille.PreviewReview.ReviewItem reviewItem,
+            out string error)
         {
             reviewItem = null;
             error = null;
@@ -345,13 +240,11 @@ namespace Famille
                 error = "Entrée invalide.";
                 return false;
             }
-
             if (string.IsNullOrWhiteSpace(req.TargetRoot))
             {
                 error = "Dossier miroir non défini.";
                 return false;
             }
-
             if (!File.Exists(entry.FamilyPath))
             {
                 error = "Fichier introuvable.";
@@ -359,17 +252,184 @@ namespace Famille
             }
 
             string finalPng = GetTargetPath(entry, req.TargetRoot);
-            EnsureDir(Path.GetDirectoryName(finalPng));
+            Directory.CreateDirectory(Path.GetDirectoryName(finalPng) ?? req.TargetRoot);
 
-            // Skip si final existe et choix skip
+            // Overwrite / Skip géré sur le final.png
             if (!ShouldWriteTarget(finalPng, entry, req, uiapp))
                 return true;
 
-            string candA = GetCandidatePath(entry, req.TargetRoot, "A");
-            string candB = GetCandidatePath(entry, req.TargetRoot, "B");
-            EnsureDir(Path.GetDirectoryName(candA));
-            EnsureDir(Path.GetDirectoryName(candB));
+            // check version
+            try
+            {
+                if (IsSavedInNewerRevitVersion(uiapp.Application, entry.FamilyPath))
+                {
+                    error = "Famille enregistrée dans une version Revit plus récente (impossible à ouvrir).";
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                SafeLog(req.LogCallback, $"ℹ️ Info version ignorée : {ex.Message}");
+            }
 
+            string candA = GetCandidatePath(finalPng, req.CandidateSuffixA);
+            string candB = GetCandidatePath(finalPng, req.CandidateSuffixB);
+
+            // On réécrit les candidats si existants (intermédiaires)
+            TryDeleteFile(candA);
+            TryDeleteFile(candB);
+
+            Document famDoc = null;
+
+            try
+            {
+                famDoc = uiapp.Application.OpenDocumentFile(entry.FamilyPath);
+                if (famDoc == null || !famDoc.IsFamilyDocument)
+                {
+                    error = "Fichier non reconnu comme famille.";
+                    return false;
+                }
+
+                View3D viewA = GetExisting3DView(famDoc, out var viewErrA);
+                if (viewA == null)
+                {
+                    error = viewErrA ?? "Aucune vue 3D existante (A).";
+                    return false;
+                }
+
+                View3D viewB = GetOrCreatePreview3DView(famDoc, req.LogCallback, out var viewErrB);
+                if (viewB == null)
+                {
+                    error = viewErrB ?? "Impossible de créer une vue 3D (B).";
+                    return false;
+                }
+
+                if (req.TryImproveViewIfPossible)
+                {
+                    // Prépare A
+                    PrepareViewForExport(famDoc, viewA, req, req.LogCallback);
+                    CleanViewForThumbnailIfPossible(famDoc, viewA, req, req.LogCallback);
+                    if (req.OrientExistingViewA)
+                        ConfigurePreviewOrientationIfPossible(famDoc, viewA, withSectionBox: false, req.LogCallback);
+
+                    // Prépare B
+                    PrepareViewForExport(famDoc, viewB, req, req.LogCallback);
+                    CleanViewForThumbnailIfPossible(famDoc, viewB, req, req.LogCallback);
+                    if (req.OrientCustomViewB)
+                        ConfigurePreviewOrientationIfPossible(famDoc, viewB, withSectionBox: true, req.LogCallback);
+
+                    try { famDoc.Regenerate(); } catch { }
+                }
+
+                // Export A
+                if (!ExportViewToPngRobust(famDoc, viewA, candA, req.RevitExportPixelSize, req.RevitImageResolution))
+                {
+                    error = "Export A impossible (aucun fichier créé).";
+                    return false;
+                }
+
+                PostProcessCandidate(candA, req);
+
+                // Export B
+                if (!ExportViewToPngRobust(famDoc, viewB, candB, req.RevitExportPixelSize, req.RevitImageResolution))
+                {
+                    error = "Export B impossible (aucun fichier créé).";
+                    return false;
+                }
+
+                PostProcessCandidate(candB, req);
+
+                // Build review item
+                reviewItem = new Famille.PreviewReview.ReviewItem
+                {
+                    FamilyDisplayName = Path.GetFileNameWithoutExtension(finalPng) ?? Path.GetFileName(entry.FamilyPath) ?? "Famille",
+                    FinalPath = finalPng,
+                    LeftCandidatePath = candA,
+                    RightCandidatePath = candB,
+                    LeftCaption = req.CandidateCaptionA,
+                    RightCaption = req.CandidateCaptionB
+                };
+
+                return true;
+            }
+            catch (Autodesk.Revit.Exceptions.InvalidOperationException ex)
+            {
+                error = $"API Revit : {ex.Message}";
+                return false;
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return false;
+            }
+            finally
+            {
+                try { famDoc?.Close(false); } catch { }
+            }
+        }
+
+        private void PostProcessCandidate(string pngPath, PreviewGenerationRequest req)
+        {
+            // 1) crop/pad square sans scale
+            if (req.PostProcessToSquareNoScale)
+            {
+                CenterContentAndPadToSquare_NoScale_Pixels(
+                    pngPath,
+                    req.TransparentBackground,
+                    req.BackgroundSampleSize,
+                    req.BackgroundTolerance,
+                    req.CropMarginFactor,
+                    req.LogCallback);
+            }
+
+            // 2) downscale (image opaque) -> mieux que "pâté"
+            if (req.FinalSquarePixelSize > 0)
+            {
+                DownscaleSquarePng_HighQuality(pngPath, req.FinalSquarePixelSize, req.LogCallback);
+            }
+
+            // 3) puis rendre transparent (évite artefacts)
+            if (req.MakeBackgroundTransparent)
+            {
+                ApplyBackgroundTransparency_Pixels(
+                    pngPath,
+                    req.BackgroundTransparencyTolerance,
+                    req.PreserveSemiTransparentPixels,
+                    req.LogCallback);
+            }
+        }
+
+        // ==========================================================
+        // MODE 2 : export classique final.png via vue existante
+        // ==========================================================
+
+        private bool TryExportFamilySingle(UIApplication uiapp, PreviewEntry entry, PreviewGenerationRequest req, out string error)
+        {
+            error = null;
+
+            if (entry == null || string.IsNullOrWhiteSpace(entry.FamilyPath))
+            {
+                error = "Entrée invalide.";
+                return false;
+            }
+            if (string.IsNullOrWhiteSpace(req.TargetRoot))
+            {
+                error = "Dossier miroir non défini.";
+                return false;
+            }
+            if (!File.Exists(entry.FamilyPath))
+            {
+                error = "Fichier introuvable.";
+                return false;
+            }
+
+            string targetPng = GetTargetPath(entry, req.TargetRoot);
+            Directory.CreateDirectory(Path.GetDirectoryName(targetPng) ?? req.TargetRoot);
+
+            if (!ShouldWriteTarget(targetPng, entry, req, uiapp))
+                return true;
+
+            // check version
             try
             {
                 if (IsSavedInNewerRevitVersion(uiapp.Application, entry.FamilyPath))
@@ -394,63 +454,57 @@ namespace Famille
                     return false;
                 }
 
-                View3D viewA = GetExisting3DView(famDoc);
-                View3D viewB = GetOrCreatePreview3DView(famDoc, req.LogCallback);
-
-                bool aOk = false, bOk = false;
-
-                // A
-                if (viewA != null)
+                var view = GetExisting3DView(famDoc, out var viewError);
+                if (view == null)
                 {
-                    if (req.TryImproveViewIfPossible)
-                    {
-                        PrepareViewForExport(famDoc, viewA, req, req.LogCallback);
-                        CleanViewForThumbnailIfPossible(famDoc, viewA, req, req.LogCallback);
-                        if (req.OrientExisting3DView)
-                            ConfigurePreviewOrientationIfPossible(famDoc, viewA, req, req.LogCallback);
-                        try { famDoc.Regenerate(); } catch { }
-                    }
-
-                    if (ExportViewToPngRobust(famDoc, viewA, candA, req.RevitExportPixelSize, req.RevitImageResolution))
-                    {
-                        PostProcessPipeline(candA, req);
-                        aOk = File.Exists(candA);
-                    }
-                }
-
-                // B
-                if (viewB != null)
-                {
-                    if (req.TryImproveViewIfPossible)
-                    {
-                        PrepareViewForExport(famDoc, viewB, req, req.LogCallback);
-                        CleanViewForThumbnailIfPossible(famDoc, viewB, req, req.LogCallback);
-                        ConfigurePreviewOrientationIfPossible(famDoc, viewB, req, req.LogCallback);
-                        try { famDoc.Regenerate(); } catch { }
-                    }
-
-                    if (ExportViewToPngRobust(famDoc, viewB, candB, req.RevitExportPixelSize, req.RevitImageResolution))
-                    {
-                        PostProcessPipeline(candB, req);
-                        bOk = File.Exists(candB);
-                    }
-                }
-
-                if (!aOk && !bOk)
-                {
-                    error = "Export PNG impossible (A et B ont échoué).";
+                    error = viewError ?? "Aucune vue 3D exportable.";
                     return false;
                 }
 
-                reviewItem = new ReviewItem
+                if (req.TryImproveViewIfPossible)
                 {
-                    Title = Path.GetFileNameWithoutExtension(finalPng),
-                    FinalPath = finalPng,
-                    CandidateAPath = candA,
-                    CandidateBPath = candB
-                };
+                    PrepareViewForExport(famDoc, view, req, req.LogCallback);
+                    CleanViewForThumbnailIfPossible(famDoc, view, req, req.LogCallback);
+                    ConfigurePreviewOrientationIfPossible(famDoc, view, withSectionBox: true, req.LogCallback);
+                    try { famDoc.Regenerate(); } catch { }
+                }
+
+                if (!ExportViewToPngRobust(famDoc, view, targetPng, req.RevitExportPixelSize, req.RevitImageResolution))
+                {
+                    error = "Export PNG impossible (aucun fichier créé).";
+                    return false;
+                }
+
+                // post-process
+                if (req.PostProcessToSquareNoScale)
+                {
+                    CenterContentAndPadToSquare_NoScale_Pixels(
+                        targetPng,
+                        req.TransparentBackground,
+                        req.BackgroundSampleSize,
+                        req.BackgroundTolerance,
+                        req.CropMarginFactor,
+                        req.LogCallback);
+                }
+
+                if (req.FinalSquarePixelSize > 0)
+                    DownscaleSquarePng_HighQuality(targetPng, req.FinalSquarePixelSize, req.LogCallback);
+
+                if (req.MakeBackgroundTransparent)
+                {
+                    ApplyBackgroundTransparency_Pixels(
+                        targetPng,
+                        req.BackgroundTransparencyTolerance,
+                        req.PreserveSemiTransparentPixels,
+                        req.LogCallback);
+                }
 
                 return true;
+            }
+            catch (Autodesk.Revit.Exceptions.InvalidOperationException ex)
+            {
+                error = $"API Revit : {ex.Message}";
+                return false;
             }
             catch (Exception ex)
             {
@@ -463,29 +517,8 @@ namespace Famille
             }
         }
 
-        private void PostProcessPipeline(string pngPath, PreviewGenerationRequest req)
-        {
-            if (req.PostProcessToSquareNoScale)
-            {
-                CenterContentAndPadToSquare_NoScale_Pixels(
-                    pngPath,
-                    req.TransparentBackground,
-                    req.BackgroundSampleSize,
-                    req.BackgroundTolerance,
-                    req.CropMarginFactor,
-                    req.LogCallback);
-            }
-
-            // downscale AVANT transparence (évite halo)
-            if (req.FinalSquarePixelSize > 0)
-                DownscaleSquarePng_Lanczos3(pngPath, req.FinalSquarePixelSize, req.LogCallback);
-
-            if (req.MakeBackgroundTransparent)
-                ApplyBackgroundTransparency_Pixels(pngPath, req.BackgroundTransparencyTolerance, req.PreserveSemiTransparentPixels, req.LogCallback);
-        }
-
         // ==========================================================
-        // Overwrite policy
+        // Overwrite logic
         // ==========================================================
 
         private bool ShouldWriteTarget(string targetPng, PreviewEntry entry, PreviewGenerationRequest req, UIApplication uiapp)
@@ -548,8 +581,12 @@ namespace Famille
 
                 var res = td.Show();
 
-                if (res == TaskDialogResult.CommandLink1) return PreviewOverwriteMode.OverwriteAll;
-                if (res == TaskDialogResult.CommandLink2) return PreviewOverwriteMode.SkipExisting;
+                if (res == TaskDialogResult.CommandLink1)
+                    return PreviewOverwriteMode.OverwriteAll;
+
+                if (res == TaskDialogResult.CommandLink2)
+                    return PreviewOverwriteMode.SkipExisting;
+
                 return null;
             }
             catch
@@ -560,41 +597,33 @@ namespace Famille
         }
 
         // ==========================================================
-        // Paths (NO Path.GetRelativePath)
+        // Paths
         // ==========================================================
 
         private static string GetTargetPath(PreviewEntry entry, string targetRoot)
         {
-            string rel = GetSafeRelative(entry);
-            string mirrorPath = Path.Combine(targetRoot, rel);
-            return Path.ChangeExtension(mirrorPath, ".png");
-        }
-
-        private static string GetCandidatePath(PreviewEntry entry, string targetRoot, string variant)
-        {
-            string rel = Path.ChangeExtension(GetSafeRelative(entry), ".png");
-            string candRoot = Path.Combine(targetRoot, "__candidates", variant);
-            return Path.Combine(candRoot, rel);
-        }
-
-        private static string GetSafeRelative(PreviewEntry entry)
-        {
-            string rel = string.IsNullOrWhiteSpace(entry.RelativePath)
+            var relative = string.IsNullOrWhiteSpace(entry.RelativePath)
                 ? (Path.GetFileName(entry.FamilyPath) ?? "preview.rfa")
                 : entry.RelativePath;
 
-            rel = rel.Replace('/', '\\').Trim();
-            while (rel.StartsWith("\\")) rel = rel.Substring(1);
-
-            if (Path.IsPathRooted(rel) || rel.Contains(":"))
-                rel = Path.GetFileName(entry.FamilyPath) ?? "preview.rfa";
-
-            return rel;
+            var mirrorPath = Path.Combine(targetRoot, relative);
+            return Path.ChangeExtension(mirrorPath, ".png");
         }
 
-        private static void EnsureDir(string dir)
+        private static string GetCandidatePath(string finalPngPath, string suffix)
         {
-            try { if (!string.IsNullOrWhiteSpace(dir) && !Directory.Exists(dir)) Directory.CreateDirectory(dir); }
+            var dir = Path.GetDirectoryName(finalPngPath) ?? "";
+            var name = Path.GetFileNameWithoutExtension(finalPngPath) ?? "preview";
+            return Path.Combine(dir, name + suffix + ".png");
+        }
+
+        private static void TryDeleteFile(string path)
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+                    File.Delete(path);
+            }
             catch { }
         }
 
@@ -602,15 +631,21 @@ namespace Famille
         // Views
         // ==========================================================
 
-        private static View3D GetExisting3DView(Document famDoc)
+        private static View3D GetExisting3DView(Document famDoc, out string error)
         {
+            error = null;
+
             var views = new FilteredElementCollector(famDoc)
                 .OfClass(typeof(View3D))
                 .Cast<View3D>()
                 .Where(v => !v.IsTemplate)
                 .ToList();
 
-            if (views.Count == 0) return null;
+            if (views.Count == 0)
+            {
+                error = "Aucune vue 3D existante dans la famille.";
+                return null;
+            }
 
             var default3d = views.FirstOrDefault(v =>
             {
@@ -621,8 +656,11 @@ namespace Famille
             return default3d ?? views[0];
         }
 
-        private static View3D GetOrCreatePreview3DView(Document famDoc, Action<string> log)
+        private static View3D GetOrCreatePreview3DView(Document famDoc, Action<string> log, out string error)
         {
+            error = null;
+
+            // Reuse si existe déjà dans le doc ouvert
             var existing = new FilteredElementCollector(famDoc)
                 .OfClass(typeof(View3D))
                 .Cast<View3D>()
@@ -656,6 +694,7 @@ namespace Famille
                                 try { created.Name = "__BIMaestroPreview3D"; } catch { }
                             }
                         }
+
                         tx.Commit();
                     }
                 }
@@ -665,7 +704,11 @@ namespace Famille
                 SafeLog(log, $"ℹ️ Création vue 3D : {ex.Message}");
             }
 
-            return created;
+            if (created != null)
+                return created;
+
+            // fallback sur une 3D existante
+            return GetExisting3DView(famDoc, out error);
         }
 
         private static void PrepareViewForExport(Document famDoc, View3D view, PreviewGenerationRequest req, Action<string> log)
@@ -674,11 +717,18 @@ namespace Famille
             {
                 using (var tx = new Transaction(famDoc, "Préparer vue export"))
                 {
-                    if (tx.Start() != TransactionStatus.Started) return;
+                    if (tx.Start() != TransactionStatus.Started)
+                        return;
 
-                    try { view.DisplayStyle = req.UseEdges ? DisplayStyle.ShadingWithEdges : DisplayStyle.Shading; } catch { }
+                    try
+                    {
+                        view.DisplayStyle = req.UseEdges ? DisplayStyle.ShadingWithEdges : DisplayStyle.Shading;
+                    }
+                    catch { }
+
                     try { view.DetailLevel = ViewDetailLevel.Fine; } catch { }
 
+                    // Option “stabilise rendu” (silhouettes/ombres)
                     TryForceGraphicDisplayOptionsForThumbnail(view, log);
 
                     tx.Commit();
@@ -694,36 +744,21 @@ namespace Famille
                 var dm = view.GetViewDisplayModel();
                 if (dm == null || !dm.IsValidObject) return;
 
+                // le gros contour “cartoon”
                 try { dm.EnableSilhouettes = false; } catch { }
-                try { dm.SmoothEdges = true; } catch { }
-                try { dm.ShowHiddenLines = ShowHiddenLinesValues.None; } catch { }
 
-                TrySetProperty(dm, "CastShadows", false);
-                TrySetProperty(dm, "AmbientShadows", false);
-                TrySetProperty(dm, "ShowShadows", false);
-                TrySetProperty(dm, "EnableDepthCueing", false);
-                TrySetProperty(dm, "UseDepthCueing", false);
+                // anti-aliasing
+                try { dm.SmoothEdges = true; } catch { }
+
+                // Revit 2023 : ShowHiddenLines est une enum
+                try { dm.ShowHiddenLines = ShowHiddenLinesValues.None; } catch { }
 
                 view.SetViewDisplayModel(dm);
             }
             catch (Exception ex)
             {
-                SafeLog(log, $"ℹ️ Options d'affichage : {ex.Message}");
+                SafeLog(log, $"ℹ️ ViewDisplayModel : {ex.Message}");
             }
-        }
-
-        private static void TrySetProperty(object obj, string propName, object value)
-        {
-            try
-            {
-                var p = obj.GetType().GetProperty(propName, BindingFlags.Instance | BindingFlags.Public);
-                if (p == null || !p.CanWrite) return;
-
-                var t = p.PropertyType;
-                if (t == typeof(bool) && value is bool)
-                    p.SetValue(obj, value, null);
-            }
-            catch { }
         }
 
         private static void CleanViewForThumbnailIfPossible(Document doc, View3D view, PreviewGenerationRequest req, Action<string> log)
@@ -732,7 +767,10 @@ namespace Famille
             {
                 using (var tx = new Transaction(doc, "Nettoyage vue thumbnail"))
                 {
-                    if (tx.Start() != TransactionStatus.Started) return;
+                    if (tx.Start() != TransactionStatus.Started)
+                        return;
+
+                    int hiddenCats = 0;
 
                     if (req.HideAllAnnotationCategories)
                     {
@@ -745,7 +783,10 @@ namespace Famille
                             {
                                 if (!view.CanCategoryBeHidden(cat.Id)) continue;
                                 if (!view.GetCategoryHidden(cat.Id))
+                                {
                                     view.SetCategoryHidden(cat.Id, true);
+                                    hiddenCats++;
+                                }
                             }
                             catch { }
                         }
@@ -779,15 +820,19 @@ namespace Famille
                             {
                                 if (!view.CanCategoryBeHidden(cat.Id)) continue;
                                 if (!view.GetCategoryHidden(cat.Id))
+                                {
                                     view.SetCategoryHidden(cat.Id, true);
+                                    hiddenCats++;
+                                }
                             }
                             catch { }
                         }
                     }
 
+                    int hiddenElems = 0;
                     if (req.HideConnectorsByElement)
                     {
-                        TryHideElementsByCategoryNameTokens(doc, view, new[]
+                        hiddenElems = TryHideElementsByCategoryNameTokens(doc, view, new[]
                         {
                             "connector", "connecteur", "connexion",
                             "élément de connecteur", "element de connecteur"
@@ -795,6 +840,11 @@ namespace Famille
                     }
 
                     tx.Commit();
+
+                    if (hiddenCats > 0)
+                        SafeLog(log, $"✅ Nettoyage : {hiddenCats} catégories masquées.");
+                    if (hiddenElems > 0)
+                        SafeLog(log, $"✅ Connecteurs : {hiddenElems} éléments masqués.");
                 }
             }
             catch (Exception ex)
@@ -817,16 +867,22 @@ namespace Famille
                     try { catName = e.Category?.Name; } catch { }
 
                     if (string.IsNullOrWhiteSpace(catName)) continue;
+
                     if (!tokens.Any(t => catName.IndexOf(t, StringComparison.OrdinalIgnoreCase) >= 0))
                         continue;
 
                     if (e.Id == view.Id) continue;
+
                     ids.Add(e.Id);
                 }
 
                 if (ids.Count == 0) return 0;
 
-                try { view.HideElements(ids); return ids.Count; }
+                try
+                {
+                    view.HideElements(ids);
+                    return ids.Count;
+                }
                 catch
                 {
                     int ok = 0;
@@ -837,52 +893,53 @@ namespace Famille
                     return ok;
                 }
             }
-            catch { return 0; }
+            catch
+            {
+                return 0;
+            }
         }
 
-        private static void ConfigurePreviewOrientationIfPossible(Document famDoc, View3D view, PreviewGenerationRequest req, Action<string> log)
+        private static void ConfigurePreviewOrientationIfPossible(Document famDoc, View3D view, bool withSectionBox, Action<string> log)
         {
             try
             {
                 using (var tx = new Transaction(famDoc, "Orientation preview"))
                 {
-                    if (tx.Start() != TransactionStatus.Started) return;
+                    if (tx.Start() != TransactionStatus.Started)
+                        return;
 
                     var bbox = GetModelBoundingBox(famDoc);
-                    if (bbox == null) { tx.RollBack(); return; }
-
-                    TryUnlock3DView(view);
+                    if (bbox == null)
+                    {
+                        tx.RollBack();
+                        return;
+                    }
 
                     var center = (bbox.Min + bbox.Max) * 0.5;
-                    var ext = (bbox.Max - bbox.Min);
-
-                    double ax = Math.Abs(ext.X), ay = Math.Abs(ext.Y), az = Math.Abs(ext.Z);
-                    double radius = Math.Max(Math.Max(ax, ay), az);
+                    var extents = (bbox.Max - bbox.Min);
+                    double radius = Math.Max(Math.Max(Math.Abs(extents.X), Math.Abs(extents.Y)), Math.Abs(extents.Z));
                     if (radius < 1e-6) radius = 10;
 
-                    XYZ dir;
-                    if (ax >= ay && ax >= az) dir = new XYZ(-0.3, -1.0, 0.9);
-                    else if (ay >= ax && ay >= az) dir = new XYZ(-1.0, -0.3, 0.9);
-                    else dir = new XYZ(-1.0, -1.0, 0.6);
-
-                    dir = dir.Normalize();
-
-                    var eye = center + dir.Multiply(radius * 2.6);
+                    var offsetDir = new XYZ(-1, -1, 1).Normalize();
+                    var eye = center + offsetDir.Multiply(radius * 2.5);
                     var forward = (center - eye);
-                    if (forward.GetLength() < 1e-6) forward = dir.Negate();
+                    if (forward.GetLength() < 1e-6) forward = offsetDir.Multiply(-1);
                     forward = forward.Normalize();
 
                     try { view.SetOrientation(new ViewOrientation3D(eye, XYZ.BasisZ, forward)); } catch { }
 
-                    try
-                    {
-                        var padded = ExpandBoundingBox(bbox, Clamp(req.SectionBoxPaddingFactor, 0.05, 0.80));
-                        view.SetSectionBox(padded);
-                        view.IsSectionBoxActive = true;
-                    }
-                    catch { }
-
                     try { view.SaveOrientationAndLock(); } catch { }
+
+                    if (withSectionBox)
+                    {
+                        try
+                        {
+                            var padded = ExpandBoundingBox(bbox, 0.35);
+                            view.SetSectionBox(padded);
+                            view.IsSectionBoxActive = true;
+                        }
+                        catch { }
+                    }
 
                     tx.Commit();
                 }
@@ -891,23 +948,6 @@ namespace Famille
             {
                 SafeLog(log, $"ℹ️ Orientation : {ex.Message}");
             }
-        }
-
-        private static void TryUnlock3DView(View3D view)
-        {
-            try
-            {
-                var isLockedProp = view.GetType().GetProperty("IsLocked", BindingFlags.Instance | BindingFlags.Public);
-                if (isLockedProp != null && isLockedProp.PropertyType == typeof(bool))
-                {
-                    bool locked = (bool)isLockedProp.GetValue(view, null);
-                    if (!locked) return;
-
-                    var unlockMethod = view.GetType().GetMethod("Unlock", BindingFlags.Instance | BindingFlags.Public);
-                    if (unlockMethod != null) unlockMethod.Invoke(view, null);
-                }
-            }
-            catch { }
         }
 
         private static BoundingBoxXYZ GetModelBoundingBox(Document doc)
@@ -926,7 +966,9 @@ namespace Famille
                 if (bb == null || bb.Min == null || bb.Max == null) continue;
 
                 if (acc == null)
+                {
                     acc = new BoundingBoxXYZ { Min = bb.Min, Max = bb.Max };
+                }
                 else
                 {
                     acc.Min = new XYZ(
@@ -963,10 +1005,15 @@ namespace Famille
             };
         }
 
+        // ==========================================================
+        // Export
+        // ==========================================================
+
         private static bool ExportViewToPngRobust(Document famDoc, View3D view, string targetPng, int pixelSize, ImageResolution resolution)
         {
             var outDir = Path.GetDirectoryName(targetPng) ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(outDir)) return false;
+            if (string.IsNullOrWhiteSpace(outDir))
+                return false;
 
             Directory.CreateDirectory(outDir);
 
@@ -998,10 +1045,11 @@ namespace Famille
             string picked = created.Count > 0
                 ? created.OrderByDescending(File.GetCreationTimeUtc).FirstOrDefault()
                 : after.Where(f => Path.GetFileName(f).StartsWith(baseName, StringComparison.OrdinalIgnoreCase))
-                       .OrderByDescending(File.GetLastWriteTimeUtc)
+                       .OrderByDescending(File.GetCreationTimeUtc)
                        .FirstOrDefault();
 
-            if (picked == null || !File.Exists(picked)) return false;
+            if (picked == null || !File.Exists(picked))
+                return false;
 
             MoveOrReplace(picked, targetPng);
             return File.Exists(targetPng);
@@ -1011,18 +1059,17 @@ namespace Famille
         {
             try
             {
-                EnsureDir(Path.GetDirectoryName(target));
                 if (File.Exists(target)) File.Delete(target);
                 File.Move(source, target);
             }
             catch
             {
-                try { File.Copy(source, target, true); } catch { }
+                try { File.Copy(source, target, overwrite: true); } catch { }
             }
         }
 
         // ==========================================================
-        // Pixel post-process (Crop + Lanczos3 + Transparency)
+        // Pixel-only: centre contenu + pad carré (NO SCALE)
         // ==========================================================
 
         private struct Rgba { public byte R, G, B, A; }
@@ -1101,24 +1148,76 @@ namespace Famille
                         cropStride);
                 }
 
-                var wb = new System.Windows.Media.Imaging.WriteableBitmap(size, size,
+                var wb = new WriteableBitmap(size, size,
                     src.DpiX > 0 ? src.DpiX : 96,
                     src.DpiY > 0 ? src.DpiY : 96,
-                    System.Windows.Media.PixelFormats.Bgra32, null);
+                    PixelFormats.Bgra32, null);
 
-                wb.WritePixels(new System.Windows.Int32Rect(0, 0, size, size), outPixels, outStride, 0);
+                wb.WritePixels(new Int32Rect(0, 0, size, size), outPixels, outStride, 0);
                 SaveBitmapSourceAsPng(wb, pngPath);
 
                 return true;
             }
             catch (Exception ex)
             {
-                SafeLog(log, $"⚠️ PostProcess échec {Path.GetFileName(pngPath)} : {ex.Message}");
+                SafeLog(log, $"⚠️ PostProcess 1:1 échec {Path.GetFileName(pngPath)} : {ex.Message}");
                 return false;
             }
         }
 
-        private static void ApplyBackgroundTransparency_Pixels(string pngPath, byte tolerance, bool preserveSemiTransparent, Action<string> log)
+        // ==========================================================
+        // Downscale "net" (WPF HighQuality)
+        // ==========================================================
+
+        private static void DownscaleSquarePng_HighQuality(string pngPath, int targetSize, Action<string> log)
+        {
+            try
+            {
+                var src = LoadPngAsBgra32(pngPath);
+                if (src == null) return;
+
+                int w = src.PixelWidth;
+                int h = src.PixelHeight;
+
+                if (w != h) return;
+                if (targetSize <= 0) return;
+                if (w <= targetSize) return;
+
+                double dpiX = src.DpiX > 0 ? src.DpiX : 96;
+                double dpiY = src.DpiY > 0 ? src.DpiY : 96;
+
+                var dv = new DrawingVisual();
+                RenderOptions.SetBitmapScalingMode(dv, BitmapScalingMode.HighQuality);
+
+                using (var dc = dv.RenderOpen())
+                {
+                    dc.DrawImage(src, new Rect(0, 0, targetSize, targetSize));
+                }
+
+                var rtb = new RenderTargetBitmap(targetSize, targetSize, dpiX, dpiY, PixelFormats.Pbgra32);
+                rtb.Render(dv);
+
+                // Reconvert en BGRA32 (cohérent avec le reste)
+                var converted = new FormatConvertedBitmap(rtb, PixelFormats.Bgra32, null, 0);
+                SaveBitmapSourceAsPng(converted, pngPath);
+
+                SafeLog(log, $"✅ Downscale HQ : {Path.GetFileName(pngPath)} ({w} -> {targetSize})");
+            }
+            catch (Exception ex)
+            {
+                SafeLog(log, $"ℹ️ Downscale HQ : {Path.GetFileName(pngPath)} : {ex.Message}");
+            }
+        }
+
+        // ==========================================================
+        // Fond -> transparent (couleur dominante)
+        // ==========================================================
+
+        private static void ApplyBackgroundTransparency_Pixels(
+            string pngPath,
+            byte tolerance,
+            bool preserveSemiTransparent,
+            Action<string> log)
         {
             try
             {
@@ -1133,6 +1232,7 @@ namespace Famille
                 src.CopyPixels(px, stride, 0);
 
                 var bg = EstimateBackgroundByDominantColor(px, w, h, stride);
+
                 const byte alphaBgThreshold = 8;
 
                 for (int y = 0; y < h; y++)
@@ -1160,12 +1260,12 @@ namespace Famille
                     }
                 }
 
-                var wb = new System.Windows.Media.Imaging.WriteableBitmap(w, h,
+                var wb = new WriteableBitmap(w, h,
                     src.DpiX > 0 ? src.DpiX : 96,
                     src.DpiY > 0 ? src.DpiY : 96,
-                    System.Windows.Media.PixelFormats.Bgra32, null);
+                    PixelFormats.Bgra32, null);
 
-                wb.WritePixels(new System.Windows.Int32Rect(0, 0, w, h), px, stride, 0);
+                wb.WritePixels(new Int32Rect(0, 0, w, h), px, stride, 0);
                 SaveBitmapSourceAsPng(wb, pngPath);
             }
             catch (Exception ex)
@@ -1189,6 +1289,7 @@ namespace Famille
                     byte g = px[i + 1];
                     byte r = px[i + 2];
                     byte a = px[i + 3];
+
                     if (a < 10) continue;
 
                     int qb = b >> 3;
@@ -1196,6 +1297,7 @@ namespace Famille
                     int qr = r >> 3;
 
                     int key = (qr << 10) | (qg << 5) | qb;
+
                     dict.TryGetValue(key, out int c);
                     dict[key] = c + 1;
                 }
@@ -1213,193 +1315,31 @@ namespace Famille
             return new Rgba { R = R, G = G, B = B, A = 255 };
         }
 
-        // Lanczos3 downscale (net)
-        private sealed class Kernel1D { public int[] Idx; public double[] W; }
+        // ==========================================================
+        // Helpers pixels
+        // ==========================================================
 
-        private static void DownscaleSquarePng_Lanczos3(string pngPath, int targetSize, Action<string> log)
-        {
-            try
-            {
-                var src = LoadPngAsBgra32(pngPath);
-                if (src == null) return;
-
-                int w = src.PixelWidth;
-                int h = src.PixelHeight;
-
-                if (w != h) return;
-                if (targetSize <= 0) return;
-                if (w <= targetSize) return;
-
-                int srcStride = w * 4;
-                byte[] spx = new byte[h * srcStride];
-                src.CopyPixels(spx, srcStride, 0);
-
-                int tw = targetSize;
-                int th = targetSize;
-                int dstStride = tw * 4;
-                byte[] dpx = new byte[th * dstStride];
-
-                const double a = 3.0;
-                double scale = (double)w / tw;
-
-                var kx = BuildLanczosKernels(tw, w, scale, a);
-                var ky = BuildLanczosKernels(th, h, scale, a);
-
-                for (int y = 0; y < th; y++)
-                {
-                    var kyY = ky[y];
-                    int outRow = y * dstStride;
-
-                    for (int x = 0; x < tw; x++)
-                    {
-                        var kxX = kx[x];
-
-                        double sumA = 0.0;
-                        double sumPr = 0.0, sumPg = 0.0, sumPb = 0.0;
-
-                        for (int iy = 0; iy < kyY.Idx.Length; iy++)
-                        {
-                            int sy = kyY.Idx[iy];
-                            double wy = kyY.W[iy];
-                            int srcRow = sy * srcStride;
-
-                            for (int ix = 0; ix < kxX.Idx.Length; ix++)
-                            {
-                                int sx = kxX.Idx[ix];
-                                double wxy = wy * kxX.W[ix];
-                                int si = srcRow + sx * 4;
-
-                                byte b = spx[si + 0];
-                                byte g = spx[si + 1];
-                                byte r = spx[si + 2];
-                                byte A = spx[si + 3];
-
-                                double a01 = A / 255.0;
-
-                                sumA += a01 * wxy;
-                                sumPr += (r * a01) * wxy;
-                                sumPg += (g * a01) * wxy;
-                                sumPb += (b * a01) * wxy;
-                            }
-                        }
-
-                        int di = outRow + x * 4;
-
-                        if (sumA > 1e-9)
-                        {
-                            double invA = 1.0 / sumA;
-
-                            dpx[di + 2] = (byte)ClampByte(sumPr * invA);
-                            dpx[di + 1] = (byte)ClampByte(sumPg * invA);
-                            dpx[di + 0] = (byte)ClampByte(sumPb * invA);
-                            dpx[di + 3] = (byte)ClampByte(sumA * 255.0);
-                        }
-                        else
-                        {
-                            dpx[di + 0] = 0;
-                            dpx[di + 1] = 0;
-                            dpx[di + 2] = 0;
-                            dpx[di + 3] = 0;
-                        }
-                    }
-                }
-
-                var wb = new System.Windows.Media.Imaging.WriteableBitmap(tw, th,
-                    src.DpiX > 0 ? src.DpiX : 96,
-                    src.DpiY > 0 ? src.DpiY : 96,
-                    System.Windows.Media.PixelFormats.Bgra32, null);
-
-                wb.WritePixels(new System.Windows.Int32Rect(0, 0, tw, th), dpx, dstStride, 0);
-                SaveBitmapSourceAsPng(wb, pngPath);
-            }
-            catch (Exception ex)
-            {
-                SafeLog(log, $"ℹ️ Downscale Lanczos3 : {Path.GetFileName(pngPath)} : {ex.Message}");
-            }
-        }
-
-        private static Kernel1D[] BuildLanczosKernels(int dstSize, int srcSize, double scale, double a)
-        {
-            var kernels = new Kernel1D[dstSize];
-            for (int i = 0; i < dstSize; i++)
-            {
-                double center = (i + 0.5) * scale - 0.5;
-
-                int left = (int)Math.Floor(center - a + 1);
-                int right = (int)Math.Floor(center + a);
-
-                int len = right - left + 1;
-                var idx = new int[len];
-                var w = new double[len];
-
-                double sum = 0.0;
-
-                for (int k = 0; k < len; k++)
-                {
-                    int s = left + k;
-                    int sc = s < 0 ? 0 : (s >= srcSize ? srcSize - 1 : s);
-                    idx[k] = sc;
-
-                    double x = center - s;
-                    double wk = Lanczos(x, a);
-                    w[k] = wk;
-                    sum += wk;
-                }
-
-                if (Math.Abs(sum) > 1e-12)
-                    for (int k = 0; k < len; k++) w[k] /= sum;
-
-                kernels[i] = new Kernel1D { Idx = idx, W = w };
-            }
-            return kernels;
-        }
-
-        private static double Lanczos(double x, double a)
-        {
-            double ax = Math.Abs(x);
-            if (ax < 1e-12) return 1.0;
-            if (ax >= a) return 0.0;
-            return Sinc(x) * Sinc(x / a);
-        }
-
-        private static double Sinc(double x)
-        {
-            double pix = Math.PI * x;
-            return Math.Sin(pix) / pix;
-        }
-
-        private static int ClampByte(double v)
-        {
-            int iv = (int)Math.Round(v);
-            if (iv < 0) return 0;
-            if (iv > 255) return 255;
-            return iv;
-        }
-
-        private static System.Windows.Media.Imaging.BitmapSource LoadPngAsBgra32(string path)
+        private static BitmapSource LoadPngAsBgra32(string path)
         {
             if (!File.Exists(path)) return null;
 
-            System.Windows.Media.Imaging.BitmapSource frame;
+            BitmapSource frame;
             using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             {
-                var decoder = new System.Windows.Media.Imaging.PngBitmapDecoder(fs,
-                    System.Windows.Media.Imaging.BitmapCreateOptions.PreservePixelFormat,
-                    System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
-
+                var decoder = new PngBitmapDecoder(fs, BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad);
                 frame = decoder.Frames[0];
             }
 
-            return new System.Windows.Media.Imaging.FormatConvertedBitmap(frame, System.Windows.Media.PixelFormats.Bgra32, null, 0);
+            return new FormatConvertedBitmap(frame, PixelFormats.Bgra32, null, 0);
         }
 
-        private static void SaveBitmapSourceAsPng(System.Windows.Media.Imaging.BitmapSource source, string path)
+        private static void SaveBitmapSourceAsPng(BitmapSource source, string path)
         {
             var tmp = path + ".tmp";
             using (var outFs = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
             {
-                var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
-                encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(source));
+                var encoder = new PngBitmapEncoder();
+                encoder.Frames.Add(BitmapFrame.Create(source));
                 encoder.Save(outFs);
             }
 
@@ -1452,6 +1392,7 @@ namespace Famille
             out int minX, out int minY, out int maxX, out int maxY)
         {
             minX = w; minY = h; maxX = -1; maxY = -1;
+
             const byte alphaBgThreshold = 8;
 
             for (int y = 0; y < h; y++)
@@ -1487,67 +1428,7 @@ namespace Famille
         private static double Clamp(double v, double min, double max) => v < min ? min : (v > max ? max : v);
 
         // ==========================================================
-        // Progress / logging
-        // ==========================================================
-
-        private static void PublishProgress(PreviewGenerationRequest req, int completed, int total, string current, bool isCompleted = false, bool isCanceled = false)
-        {
-            try
-            {
-                req.ProgressCallback?.Invoke(new PreviewGenerationProgress
-                {
-                    Completed = completed,
-                    Total = total,
-                    CurrentFile = current,
-                    IsCompleted = isCompleted,
-                    IsCanceled = isCanceled
-                });
-            }
-            catch { }
-        }
-
-        private static void SafeLog(Action<string> logger, string message)
-        {
-            try { logger?.Invoke(message); } catch { }
-        }
-
-        // ==========================================================
-        // WPF + Cleanup folders
-        // ==========================================================
-
-        private static void EnsureWpfApplication()
-        {
-            try
-            {
-                if (System.Windows.Application.Current == null)
-                {
-                    var wpf = new System.Windows.Application();
-                    wpf.ShutdownMode = ShutdownMode.OnExplicitShutdown;
-                }
-            }
-            catch { }
-        }
-
-        private static void CleanupReviewFolders(string targetRoot)
-        {
-            if (string.IsNullOrWhiteSpace(targetRoot)) return;
-
-            TryDeleteDirectory(Path.Combine(targetRoot, "__undo"));
-            TryDeleteDirectory(Path.Combine(targetRoot, "__candidates"));
-        }
-
-        private static void TryDeleteDirectory(string dir)
-        {
-            try
-            {
-                if (Directory.Exists(dir))
-                    Directory.Delete(dir, true);
-            }
-            catch { }
-        }
-
-        // ==========================================================
-        // Revit Version + ThinLines
+        // Revit version check
         // ==========================================================
 
         private static bool IsSavedInNewerRevitVersion(Autodesk.Revit.ApplicationServices.Application app, string filePath)
