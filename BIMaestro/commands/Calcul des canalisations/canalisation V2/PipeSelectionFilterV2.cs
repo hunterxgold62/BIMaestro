@@ -109,6 +109,14 @@ namespace Analyse
                 {
                     Element elem = doc.GetElement(id);
 
+                    if (!includeDucts)
+                    {
+                        if (elem is Duct)
+                            continue;
+                        if (elem is FamilyInstance ductFitting
+                            && ductFitting.Category?.Id.GetIdValue() == (int)BuiltInCategory.OST_DuctFitting)
+                            continue;
+                    }
 
                     // Filtrer par système sauf pour les accessoires de canalisation
                     bool isPipeAccessory = elem is FamilyInstance fii
@@ -1203,26 +1211,34 @@ namespace Analyse
                 }
 
                 // Création d'une feuille dédiée aux graphiques
-                var wsChart = excel.Workbook.Worksheets.Add("Graphique");
+                ExcelWorksheet wsChart = null;
                 int chartRow = 1;
-                // Premier graphique : répartition de la longueur des canalisations par DN (colonne)
-                wsChart.Cells[chartRow, 1].Value = "DN (mm)";
-                wsChart.Cells[chartRow, 2].Value = "Longueur (m)";
-                wsChart.Cells[chartRow, 1, chartRow, 2].Style.Font.Bold = true;
-                wsChart.Cells[chartRow, 1, chartRow, 2].Style.Fill.PatternType = ExcelFillStyle.Solid;
-                wsChart.Cells[chartRow, 1, chartRow, 2].Style.Fill.BackgroundColor.SetColor(headerFillColor);
-                chartRow++;
-                foreach (var item in pipeData.OrderBy(kvp => kvp.Key))
+                if (pipeData.Count > 0 || elbowCounts.Count > 0)
                 {
-                    wsChart.Cells[chartRow, 1].Value = item.Key;
-                    wsChart.Cells[chartRow, 2].Value = item.Value;
-                    chartRow++;
+                    wsChart = excel.Workbook.Worksheets.Add("Graphique");
                 }
-                var chart1 = wsChart.Drawings.AddChart("chartPipe", eChartType.ColumnClustered);
-                chart1.Title.Text = "Longueur des canalisations par DN";
-                chart1.SetPosition(0, 0, 3, 0);
-                chart1.SetSize(600, 400);
-                chart1.Series.Add(wsChart.Cells[$"B2:B{chartRow - 1}"], wsChart.Cells[$"A2:A{chartRow - 1}"]);
+
+                if (pipeData.Count > 0 && wsChart != null)
+                {
+                    // Premier graphique : répartition de la longueur des canalisations par DN (colonne)
+                    wsChart.Cells[chartRow, 1].Value = "DN (mm)";
+                    wsChart.Cells[chartRow, 2].Value = "Longueur (m)";
+                    wsChart.Cells[chartRow, 1, chartRow, 2].Style.Font.Bold = true;
+                    wsChart.Cells[chartRow, 1, chartRow, 2].Style.Fill.PatternType = ExcelFillStyle.Solid;
+                    wsChart.Cells[chartRow, 1, chartRow, 2].Style.Fill.BackgroundColor.SetColor(headerFillColor);
+                    chartRow++;
+                    foreach (var item in pipeData.OrderBy(kvp => kvp.Key))
+                    {
+                        wsChart.Cells[chartRow, 1].Value = item.Key;
+                        wsChart.Cells[chartRow, 2].Value = item.Value;
+                        chartRow++;
+                    }
+                    var chart1 = wsChart.Drawings.AddChart("chartPipe", eChartType.ColumnClustered);
+                    chart1.Title.Text = "Longueur des canalisations par DN";
+                    chart1.SetPosition(0, 0, 3, 0);
+                    chart1.SetSize(600, 400);
+                    chart1.Series.Add(wsChart.Cells[$"B2:B{chartRow - 1}"], wsChart.Cells[$"A2:A{chartRow - 1}"]);
+                }
 
                 // === Feuille des accessoires de canalisation (uniquement comptage) ===
                 var wsAcc = excel.Workbook.Worksheets.Add("Accessoires Canalisation");
@@ -1258,29 +1274,38 @@ namespace Analyse
 
 
                 // Second graphique (si des coudes existent) : répartition des coudes par DN (pie chart)
-                if (elbowCounts.Count > 0)
+                if (elbowCounts.Count > 0 && wsChart != null)
                 {
-                    int startRow = chartRow + 2;
-                    wsChart.Cells[startRow, 1].Value = "DN (mm)";
-                    wsChart.Cells[startRow, 2].Value = "Nombre de coudes";
-                    wsChart.Cells[startRow, 1, startRow, 2].Style.Font.Bold = true;
-                    wsChart.Cells[startRow, 1, startRow, 2].Style.Fill.PatternType = ExcelFillStyle.Solid;
-                    wsChart.Cells[startRow, 1, startRow, 2].Style.Fill.BackgroundColor.SetColor(headerFillColor);
-                    startRow++;
+                    int headerRow = chartRow + (pipeData.Count > 0 ? 2 : 0);
+                    int dataStartRow = headerRow + 1;
+                    int currentRow = dataStartRow;
+
+                    wsChart.Cells[headerRow, 1].Value = "DN (mm)";
+                    wsChart.Cells[headerRow, 2].Value = "Nombre de coudes";
+                    wsChart.Cells[headerRow, 1, headerRow, 2].Style.Font.Bold = true;
+                    wsChart.Cells[headerRow, 1, headerRow, 2].Style.Fill.PatternType = ExcelFillStyle.Solid;
+                    wsChart.Cells[headerRow, 1, headerRow, 2].Style.Fill.BackgroundColor.SetColor(headerFillColor);
                     foreach (var item in elbowCounts.OrderBy(kvp => kvp.Key))
                     {
-                        wsChart.Cells[startRow, 1].Value = item.Key;
-                        wsChart.Cells[startRow, 2].Value = item.Value;
-                        startRow++;
+                        wsChart.Cells[currentRow, 1].Value = item.Key;
+                        wsChart.Cells[currentRow, 2].Value = item.Value;
+                        currentRow++;
                     }
-                    var chart2 = wsChart.Drawings.AddChart("chartElbow", eChartType.Pie);
-                    chart2.Title.Text = "Répartition des coudes par DN";
-                    chart2.SetPosition(chartRow + 2, 0, 6, 0);
-                    chart2.SetSize(600, 400);
-                    chart2.Series.Add(wsChart.Cells[$"B{chartRow + 3}:B{startRow - 1}"], wsChart.Cells[$"A{chartRow + 3}:A{startRow - 1}"]);
+                    int dataEndRow = currentRow - 1;
+                    if (dataEndRow >= dataStartRow)
+                    {
+                        var chart2 = wsChart.Drawings.AddChart("chartElbow", eChartType.Pie);
+                        chart2.Title.Text = "Répartition des coudes par DN";
+                        chart2.SetPosition(headerRow - 1, 0, 6, 0);
+                        chart2.SetSize(600, 400);
+                        chart2.Series.Add(wsChart.Cells[$"B{dataStartRow}:B{dataEndRow}"], wsChart.Cells[$"A{dataStartRow}:A{dataEndRow}"]);
+                    }
                 }
-                wsChart.Cells[wsChart.Dimension.Address].AutoFitColumns();
-
+                if (wsChart?.Dimension != null)
+                {
+                    wsChart.Cells[wsChart.Dimension.Address].AutoFitColumns();
+                }
+                //
                 // Sauvegarde du fichier
                 FileInfo fi = new FileInfo(filePath);
                 excel.SaveAs(fi);
