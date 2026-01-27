@@ -42,7 +42,7 @@ namespace Famille
                 return Result.Cancelled;
             }
 
-            string jwt = App.LicenseJwt;
+            string jwt = BIMaestroApp.LicenseJwt;
 
             var finalWarnings = new List<string>();
             var finalRenameErrors = new List<string>();

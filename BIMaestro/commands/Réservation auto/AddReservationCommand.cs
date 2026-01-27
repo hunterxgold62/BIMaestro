@@ -629,39 +629,36 @@ namespace Modification
 
                 // 4) Exécution du script Dynamo (si coché)
                 if (dynamoAutoEnabled && !userCancelled)
-                    if (dynamoAutoEnabled)
                 {
                     string journalDynamoPath = @"P:\0-Boîte à outils Revit\1-Dynamo\CML_Arases réservations_par niveau_V24.dyn";
-                    if (!File.Exists(journalDynamoPath))
+                    if (File.Exists(journalDynamoPath))
                     {
-                        TaskDialog.Show("Erreur", "Le fichier Dynamo n'existe pas : " + journalDynamoPath);
-                        return Result.Failed;
-                    }
-                    try
-                    {
-                        DynamoRevit dynamoRevit = new DynamoRevit();
-                        DynamoRevitCommandData dynCmdData = new DynamoRevitCommandData(commandData);
-                        dynCmdData.JournalData = new Dictionary<string, string>
+                        try
                         {
-                            { JournalKeys.ShowUiKey,         false.ToString() },
-                            { JournalKeys.AutomationModeKey, false.ToString() },
-                            { JournalKeys.DynPathKey,        journalDynamoPath },
-                            { JournalKeys.DynPathExecuteKey, true.ToString()  },
-                            { JournalKeys.ForceManualRunKey, true.ToString()  },
-                            { JournalKeys.ModelShutDownKey,  true.ToString()  },
-                            { JournalKeys.ModelNodesInfo,    false.ToString() }
-                        };
-                        var dynRes = dynamoRevit.ExecuteCommand(dynCmdData);
-                        if (dynRes != Result.Succeeded)
-                        {
-                            TaskDialog.Show("Erreur", "Échec de l'exécution Dynamo.");
-                            return dynRes;
+                            DynamoRevit dynamoRevit = new DynamoRevit();
+                            DynamoRevitCommandData dynCmdData = new DynamoRevitCommandData(commandData);
+                            dynCmdData.JournalData = new Dictionary<string, string>
+                            {
+                                { JournalKeys.ShowUiKey,         false.ToString() },
+                                { JournalKeys.AutomationModeKey, false.ToString() },
+                                { JournalKeys.DynPathKey,        journalDynamoPath },
+                                { JournalKeys.DynPathExecuteKey, true.ToString()  },
+                                { JournalKeys.ForceManualRunKey, true.ToString()  },
+                                { JournalKeys.ModelShutDownKey,  true.ToString()  },
+                                { JournalKeys.ModelNodesInfo,    false.ToString() }
+                            };
+                            var dynRes = dynamoRevit.ExecuteCommand(dynCmdData);
+                            if (dynRes != Result.Succeeded)
+                            {
+                                TaskDialog.Show("Erreur", "Échec de l'exécution Dynamo.");
+                                return dynRes;
+                            }
                         }
-                    }
-                    catch (Exception ex)
-                    {
-                        TaskDialog.Show("Erreur", "Exception Dynamo : " + ex.Message);
-                        return Result.Failed;
+                        catch (Exception ex)
+                        {
+                            TaskDialog.Show("Erreur", "Exception Dynamo : " + ex.Message);
+                            return Result.Failed;
+                        }
                     }
                 }
 

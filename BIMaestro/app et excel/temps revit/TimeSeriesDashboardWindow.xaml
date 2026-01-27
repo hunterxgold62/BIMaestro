@@ -259,9 +259,13 @@
                     </Border>
 
                     <Border x:Name="_legendBorder" Grid.Row="1" Grid.Column="1" BorderBrush="{StaticResource NeutralBorder}" BorderThickness="1" CornerRadius="10" Background="#FDFEFE" Padding="10" Margin="12,0,0,0">
-                        <StackPanel>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
                             <TextBlock Text="Légende" FontWeight="SemiBold" Margin="0,0,0,6"/>
-                            <ScrollViewer VerticalScrollBarVisibility="Auto" Height="260">
+                            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                                 <ItemsControl x:Name="_legendList" ItemTemplate="{StaticResource LegendItemTemplate}">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>
@@ -270,7 +274,7 @@
                                     </ItemsControl.ItemsPanel>
                                 </ItemsControl>
                             </ScrollViewer>
-                        </StackPanel>
+                        </Grid>
                     </Border>
                 </Grid>
             </Border>

@@ -21,7 +21,7 @@ namespace ScanTextRevit
             Document doc = uiApp.ActiveUIDocument.Document;
 
             // Récupère le JWT de licence pour les appels IA
-            string jwt = App.LicenseJwt;
+            string jwt = BIMaestroApp.LicenseJwt;
 
             // 1) Récupération de toutes les vues (hors feuilles) et toutes les feuilles
             var allViews = new FilteredElementCollector(doc)

@@ -50,7 +50,7 @@ namespace IA
             MessagesListBox.ItemsSource = conversationHistory;
 
             // Récupère le JWT obtenu au démarrage
-            _jwt = App.LicenseJwt;
+            _jwt = BIMaestroApp.LicenseJwt;
             if (string.IsNullOrEmpty(_jwt))
             {
                 MessageBox.Show("Licence non initialisée. Relancez le plugin.");

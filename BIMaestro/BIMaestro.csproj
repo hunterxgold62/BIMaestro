@@ -280,8 +280,12 @@
     </Compile>
     <Compile Include="app et excel\Touche\AppUI.cs" />
     <Compile Include="app et excel\Supabase\ApiKeys.cs" />
+    <Compile Include="Test\Résa auto v2\ExtendedReservationVoidWindowV2.xaml.cs">
+      <DependentUpon>ExtendedReservationVoidWindowV2.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Test\Résa auto v2\ReservationVoidAutoMultiCommandV2.cs" />
     <None Include="app et excel\Touche\copie touche.cs" />
-    <Compile Include="app et excel\App.cs" />
+    <Compile Include="app et excel\BIMaestroApp.cs" />
     <Compile Include="app et excel\Supabase\BaseTrackedCommand.cs" />
     <Compile Include="app et excel\Supabase\LicenseManager.cs" />
     <Compile Include="app et excel\Supabase\NetSupport.cs" />
@@ -364,10 +368,6 @@
     <Compile Include="commands\Dossier famille\LoadFamilyHandler.cs" />
     <Compile Include="commands\Dossier famille\orbit 3D\FamilyMeshExtractor.cs" />
     <Compile Include="commands\Dossier famille\orbit 3D\FamilyPreviewBridge.cs" />
-    <Compile Include="commands\Dossier famille\Photo auto\PreviewReviewSession.cs" />
-    <Compile Include="commands\Dossier famille\Photo auto\ReviewWindow.xaml.cs">
-      <DependentUpon>ReviewWindow.xaml</DependentUpon>
-    </Compile>
     <Compile Include="commands\Dossier famille\roue de gta\RadialMenuCollectionStateStore.cs" />
     <Compile Include="commands\Dossier famille\orbit 3D\MeshData.cs" />
     <Compile Include="commands\Dossier famille\orbit 3D\Family3DPreviewWindow.xaml.cs">
@@ -429,6 +429,10 @@
     <None Include="Test\2024 to 2023\ExportFamilyToJson.cs" />
     <None Include="Test\2024 to 2023\FamilyExchangeModel.cs" />
     <None Include="Test\2024 to 2023\ImportFamilyFromJson.cs" />
+    <Compile Include="Test\flapy bird\FlappyBirdCommand.cs" />
+    <Compile Include="Test\flapy bird\FlappyBirdWindow.xaml.cs">
+      <DependentUpon>FlappyBirdWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Test\perso pixéli\PixelDancerCommand.cs" />
     <Compile Include="Test\perso pixéli\PixelDancerWindow.xaml.cs">
       <DependentUpon>PixelDancerWindow.xaml</DependentUpon>
@@ -593,10 +597,6 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="commands\Dossier famille\Photo auto\ReviewWindow.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
     <Page Include="commands\Dossier famille\roue de gta\RadialMenuWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -673,11 +673,19 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="Test\flapy bird\FlappyBirdWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="Test\perso pixéli\PixelDancerWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="commands\Snake\SnakeWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Test\Résa auto v2\ExtendedReservationVoidWindowV2.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

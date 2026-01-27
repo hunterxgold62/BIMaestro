@@ -14,7 +14,7 @@ namespace Analyse
     [Transaction(TransactionMode.ReadOnly)]
     public class SmartCheckCommand : BaseTrackedCommand
     {
-        public static readonly string Smart3DName = "BIMastro – SmartCheck 3D";
+        public static readonly string Smart3DName = "BIMaestro – SmartCheck 3D";
         protected override string ButtonId => "SmartCheckCommand";
 
         protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)

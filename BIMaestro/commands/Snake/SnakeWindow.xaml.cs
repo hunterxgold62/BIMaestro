@@ -1622,7 +1622,7 @@ namespace BIMaestro.Bonus
             LeaderboardButton.IsEnabled = false;
             try
             {
-                var jwt = Licensing.LicenseSession.CurrentJwt ?? global::App.LicenseJwt;
+                var jwt = Licensing.LicenseSession.CurrentJwt ?? global::BIMaestroApp.LicenseJwt;
                 if (string.IsNullOrWhiteSpace(jwt))
                     throw new InvalidOperationException("JWT manquant.");
 
@@ -1651,7 +1651,7 @@ namespace BIMaestro.Bonus
             if (!_recordThisRun || _recordScoreThisRun <= 0)
                 return;
 
-            var jwt = Licensing.LicenseSession.CurrentJwt ?? global::App.LicenseJwt;
+            var jwt = Licensing.LicenseSession.CurrentJwt ?? global::BIMaestroApp.LicenseJwt;
             if (string.IsNullOrWhiteSpace(jwt))
                 return;
 
@@ -1659,7 +1659,7 @@ namespace BIMaestro.Bonus
 
             var mode = GetLeaderboardMode();
             var playerName = Environment.UserName;
-            var installId = global::App.InstallId ?? global::App.MachineId ?? Environment.MachineName;
+            var installId = global::BIMaestroApp.InstallId ?? global::BIMaestroApp.MachineId ?? Environment.MachineName;
 
             _ = Task.Run(() => SnakeLeaderboardClient.SubmitRecordAsync(
                 SupabaseFunctionsBaseUrl,

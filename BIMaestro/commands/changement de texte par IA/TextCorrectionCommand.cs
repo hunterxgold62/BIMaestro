@@ -18,7 +18,7 @@ namespace IA
         {
             var commandData = data;
             // 1) Licence → JWT
-            string jwt = App.LicenseJwt;
+            string jwt = BIMaestroApp.LicenseJwt;
 
             UIDocument uidoc = commandData.Application.ActiveUIDocument;
             Document doc = uidoc.Document;

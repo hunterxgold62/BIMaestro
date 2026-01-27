@@ -267,6 +267,13 @@ public static class ExcelLogger
     public static void TouchHeartbeat(Document document, UIApplication uiApp, TimeSpan activeDuration) { }
 
     public static void EndDocumentSessionLogFallback(string documentKey, TimeSpan activeDuration)
+        => EndDocumentSessionLogFallback(documentKey, "(unknown)", "(unknown)", activeDuration);
+
+    private static void EndDocumentSessionLogFallback(
+        string documentKey,
+        string documentName,
+        string revitVersion,
+        TimeSpan activeDuration)
     {
         try
         {
@@ -281,8 +288,8 @@ public static class ExcelLogger
 
                     ws.Cells[lastRow, 1].Value = "Fermé";
                     ws.Cells[lastRow, 2].Value = documentKey;
-                    ws.Cells[lastRow, 3].Value = "(unknown)";
-                    ws.Cells[lastRow, 4].Value = "(unknown)";
+                    ws.Cells[lastRow, 3].Value = documentName;
+                    ws.Cells[lastRow, 4].Value = revitVersion;
                     ws.Cells[lastRow, 5].Value = DateTime.Now.ToString("yyyy-MM-dd");
                     ws.Cells[lastRow, 6].Value = DateTime.Now.ToString("HH:mm:ss");
                     ws.Cells[lastRow, 7].Value = activeDuration;
@@ -336,6 +343,7 @@ public static class ExcelLogger
         public long ActiveSeconds;
         public long LastUpdateTicks;
         public bool IsOpen;
+        public int ProcessId;
     }
 
     private static void UpsertSnapshot(string docKey, TimeSpan activeDuration, string docName, string revitVersion, bool isOpen)
@@ -348,7 +356,8 @@ public static class ExcelLogger
             RevitVersion = revitVersion ?? "(unknown)",
             ActiveSeconds = (long)activeDuration.TotalSeconds,
             LastUpdateTicks = DateTime.UtcNow.Ticks,
-            IsOpen = isOpen
+            IsOpen = isOpen,
+            ProcessId = Process.GetCurrentProcess().Id
         };
         SaveSnapshots(map);
     }
@@ -364,18 +373,31 @@ public static class ExcelLogger
     {
         var map = LoadSnapshots();
         bool changed = false;
+        bool hasOpenSnapshots = false;
 
         foreach (var kv in map)
         {
             var s = kv.Value;
             if (s.IsOpen)
             {
-                EndDocumentSessionLogFallback(s.DocKey, TimeSpan.FromSeconds(Math.Max(0, s.ActiveSeconds)));
-                s.IsOpen = false;
-                changed = true;
+                if (!IsProcessAlive(s.ProcessId))
+                {
+                    EndDocumentSessionLogFallback(
+                        s.DocKey,
+                        string.IsNullOrWhiteSpace(s.DocName) ? "(unknown)" : s.DocName,
+                        string.IsNullOrWhiteSpace(s.RevitVersion) ? "(unknown)" : s.RevitVersion,
+                        TimeSpan.FromSeconds(Math.Max(0, s.ActiveSeconds)));
+                    s.IsOpen = false;
+                    changed = true;
+                }
+                else
+                {
+                    hasOpenSnapshots = true;
+                }
             }
         }
-        if (changed) SaveSnapshots(map); else TryDeleteSnapshotFile();
+        if (changed) SaveSnapshots(map);
+        else if (!hasOpenSnapshots) TryDeleteSnapshotFile();
     }
 
     private static Dictionary<string, Snapshot> LoadSnapshots()
@@ -391,8 +413,10 @@ public static class ExcelLogger
                 if (parts.Length < 6) continue;
 
                 long sec = 0, ti = 0;
+                int pid = 0;
                 long.TryParse(parts[3], out sec);
                 long.TryParse(parts[4], out ti);
+                if (parts.Length >= 7) int.TryParse(parts[6], out pid);
 
                 dict[parts[0]] = new Snapshot
                 {
@@ -401,7 +425,8 @@ public static class ExcelLogger
                     RevitVersion = parts[2],
                     ActiveSeconds = sec,
                     LastUpdateTicks = ti,
-                    IsOpen = parts[5] == "1"
+                    IsOpen = parts[5] == "1",
+                    ProcessId = pid
                 };
             }
         }
@@ -421,11 +446,25 @@ public static class ExcelLogger
             using (var sw = new StreamWriter(SnapshotPath, false))
             {
                 foreach (var s in map.Values)
-                    sw.WriteLine($"{s.DocKey}|{s.DocName}|{s.RevitVersion}|{s.ActiveSeconds}|{s.LastUpdateTicks}|{(s.IsOpen ? "1" : "0")}");
+                    sw.WriteLine($"{s.DocKey}|{s.DocName}|{s.RevitVersion}|{s.ActiveSeconds}|{s.LastUpdateTicks}|{(s.IsOpen ? "1" : "0")}|{s.ProcessId}");
             }
             try { File.SetAttributes(SnapshotPath, FileAttributes.Hidden); } catch { }
         }
         catch { }
+    }
+
+    private static bool IsProcessAlive(int processId)
+    {
+        if (processId <= 0) return false;
+        try
+        {
+            var proc = Process.GetProcessById(processId);
+            return !proc.HasExited;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static void TryDeleteSnapshotFile()

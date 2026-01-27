@@ -25,7 +25,7 @@ namespace Analyse
         public bool AutoSectionBox { get; set; } = true;
 
         public SmartExternalHandler(UIApplication app) { _uiapp = app; }
-        public string GetName() => "BIMastro.SmartExternalHandler";
+        public string GetName() => "BIMaestro.SmartExternalHandler";
 
         public void Execute(UIApplication app)
         {
@@ -52,7 +52,7 @@ namespace Analyse
                             uidoc.ActiveView = v;
 
                             BoundingBoxXYZ focusBox = null;
-                            using (var t = new Transaction(doc, "BIMastro Focus"))
+                            using (var t = new Transaction(doc, "BIMaestro Focus"))
                             {
                                 t.Start();
                                 if (!ShowAllMode) ClearOverrides(uidoc, v);
@@ -70,7 +70,7 @@ namespace Analyse
                             var v = EnsureSmart3D(doc);
                             uidoc.ActiveView = v;
 
-                            using (var t = new Transaction(doc, "BIMastro ShowAll APPLY"))
+                            using (var t = new Transaction(doc, "BIMaestro ShowAll APPLY"))
                             {
                                 t.Start();
                                 TryDisableSectionBox(v);
@@ -105,7 +105,7 @@ namespace Analyse
             }
             catch (Exception ex)
             {
-                TaskDialog.Show("BIMastro – SmartExternalHandler", ex.Message);
+                TaskDialog.Show("BIMaestro – SmartExternalHandler", ex.Message);
             }
             finally
             {

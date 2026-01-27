@@ -49,7 +49,7 @@ namespace Famille
                 return Result.Cancelled;
             }
 
-            string jwt = App.LicenseJwt;
+            string jwt = BIMaestroApp.LicenseJwt;
 
             // Pour afficher TOUT à la fin
             var finalWarnings = new List<string>();
