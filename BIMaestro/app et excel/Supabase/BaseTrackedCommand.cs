@@ -1,5 +1,6 @@
 ﻿using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BIMaestro.UI;
 using System;
 
 namespace Licensing
@@ -47,8 +48,21 @@ namespace Licensing
 
             try
             {
+                AppUI.SetUiApplication(data.Application);
+            }
+            catch
+            {
+                // Non bloquant
+            }
+
+            try
+            {
                 var res = OnExecute(data, ref message, elements);
                 Telemetry.TrackButton(ButtonId, res == Result.Succeeded, BuildContext(data));
+                if (res == Result.Succeeded)
+                {
+                    ButtonRecentManager.RegisterUse(ButtonId, GetType().FullName);
+                }
                 return res;
             }
             catch (Exception ex)

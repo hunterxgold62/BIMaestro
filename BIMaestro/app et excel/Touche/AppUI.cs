@@ -14,6 +14,12 @@ public class AppUI : IExternalApplication
     private static readonly List<RibbonPanel> ribbonPanels = new List<RibbonPanel>();
     public static UIApplication UiApplication { get; private set; }
 
+    private static readonly Dictionary<string, RibbonButtonInfo> ribbonButtonRegistry =
+        new Dictionary<string, RibbonButtonInfo>(StringComparer.OrdinalIgnoreCase);
+    private static readonly List<string> ribbonButtonOrder = new List<string>();
+    private static readonly Dictionary<string, RibbonButtonInfo> ribbonButtonsByCommandClass =
+        new Dictionary<string, RibbonButtonInfo>(StringComparer.OrdinalIgnoreCase);
+
     public Result OnStartup(UIControlledApplication application)
     {
         CreateRibbonUI(application);
@@ -38,7 +44,7 @@ public class AppUI : IExternalApplication
                 new RibbonItemDefinition("Export Nomenclature", "Export Nomenclature", panel => AddPushButton(panel, "Export Nomenclature", "Export \nNomenclature", assemblyPath, "Visualisation.ExportScheduleCommand", "rvt to excel et pdf.png", "Exporte les nomenclatures Revit sélectionnées en fichier Excel ou PDF.")),
                 new RibbonItemDefinition("ExportDwgBatch", "Export DWG", panel => AddPushButton(panel, "ExportDwgBatch", "Export\nDWG", assemblyPath, "Visualisation.ExportSheetsCommand", "export DWG.png", "Exporte automatiquement plusieurs vues ou feuilles en DWG, en nommant chaque fichier selon le projet et la vue comme pour les PDF.")),
                 new RibbonItemDefinition("Sélection d'objet", "Sélection d'objet", panel => AddPushButton(panel, "Sélection d'objet", "Sélection\nd'objet", assemblyPath, "Visualisation.SelectSimilarCommand", "Sélection d'élément.png", "Sélectionne des éléments similaires dans le projet")),
-
+                  new RibbonItemDefinition("RadialMenuButtonsCommand", "Rosace Boutons", panel => AddPushButton(panel, "RadialMenuButtonsCommand", "Rosace\nBoutons", assemblyPath, "BIMaestro.UI.RadialMenuButtonsCommand", "roue ruban.png", "Rosace des 16 derniers boutons BIMaestro utilisés.")),
             }),
 
             new RibbonPanelDefinition("Modification", new List<RibbonItemDefinition>
@@ -134,6 +140,9 @@ public class AppUI : IExternalApplication
         catch (Exception)
         {
         }
+        ribbonButtonRegistry.Clear();
+        ribbonButtonOrder.Clear();
+        ribbonButtonsByCommandClass.Clear();
 
         string assemblyPath = Assembly.GetExecutingAssembly().Location;
         var definitions = BuildDefaultRibbonDefinitions(assemblyPath);
@@ -209,6 +218,10 @@ public class AppUI : IExternalApplication
         (string buttonName, string buttonText, string className, string resourceImageName, string toolTip) b2,
         (string buttonName, string buttonText, string className, string resourceImageName, string toolTip) b3)
     {
+        RegisterButtonDefinition(b1.buttonName, b1.buttonText, b1.className, b1.resourceImageName);
+        RegisterButtonDefinition(b2.buttonName, b2.buttonText, b2.className, b2.resourceImageName);
+        RegisterButtonDefinition(b3.buttonName, b3.buttonText, b3.className, b3.resourceImageName);
+
         var d1 = CreatePushButtonData(b1.buttonName, b1.buttonText, assemblyPath, b1.className, b1.resourceImageName, b1.toolTip);
         var d2 = CreatePushButtonData(b2.buttonName, b2.buttonText, assemblyPath, b2.className, b2.resourceImageName, b2.toolTip);
         var d3 = CreatePushButtonData(b3.buttonName, b3.buttonText, assemblyPath, b3.className, b3.resourceImageName, b3.toolTip);
@@ -219,6 +232,8 @@ public class AppUI : IExternalApplication
 
     private static void AddPushButton(RibbonPanel panel, string buttonName, string buttonText, string assemblyPath, string className, string resourceImageName, string toolTip)
     {
+        RegisterButtonDefinition(buttonName, buttonText, className, resourceImageName);
+
         var buttonData = CreatePushButtonData(buttonName, buttonText, assemblyPath, className, resourceImageName, toolTip);
         panel.AddItem(buttonData);
     }
@@ -292,6 +307,7 @@ public class AppUI : IExternalApplication
         PushButton firstButton = null;
         foreach (var (buttonName, buttonText, className, resourceImageName, toolTip) in buttons)
         {
+            RegisterButtonDefinition(buttonName, buttonText, className, resourceImageName);
             var buttonData = CreatePushButtonData(buttonName, buttonText, assemblyPath, className, resourceImageName, toolTip);
             var addedButton = splitButton.AddPushButton(buttonData);
             if (firstButton == null)
@@ -364,6 +380,21 @@ public class AppUI : IExternalApplication
         return ribbonPanels;
     }
 
+    public static IReadOnlyList<RibbonButtonInfo> GetRibbonButtonInfos()
+    {
+        return ribbonButtonOrder
+            .Select(id => ribbonButtonRegistry.TryGetValue(id, out var info) ? info : null)
+            .Where(info => info != null)
+            .ToList();
+    }
+
+    public static RibbonButtonInfo GetRibbonButtonByCommandClass(string commandClass)
+    {
+        if (string.IsNullOrWhiteSpace(commandClass)) return null;
+        ribbonButtonsByCommandClass.TryGetValue(commandClass, out var info);
+        return info;
+    }
+
     public static void SetUiApplication(UIApplication uiapp)
     {
         UiApplication = uiapp;
@@ -378,4 +409,26 @@ public class AppUI : IExternalApplication
     {
         return UiApplication?.ActiveUIDocument?.Document;
     }
+
+    private static void RegisterButtonDefinition(string buttonId, string displayName, string commandClass, string imageResourceName)
+    {
+        if (string.IsNullOrWhiteSpace(buttonId)) return;
+
+        if (!ribbonButtonRegistry.TryGetValue(buttonId, out var info))
+        {
+            info = new RibbonButtonInfo(buttonId, displayName, commandClass, imageResourceName);
+            ribbonButtonRegistry[buttonId] = info;
+            ribbonButtonOrder.Add(buttonId);
+        }
+
+        info.DisplayName = displayName;
+        info.CommandClass = commandClass;
+        info.ImageResourceName = imageResourceName;
+
+        if (!string.IsNullOrWhiteSpace(commandClass) && !ribbonButtonsByCommandClass.ContainsKey(commandClass))
+        {
+            ribbonButtonsByCommandClass[commandClass] = info;
+        }
+    }
+
 }

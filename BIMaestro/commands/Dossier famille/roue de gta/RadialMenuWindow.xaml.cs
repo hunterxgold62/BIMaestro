@@ -224,7 +224,7 @@ namespace BIMaestro.UI
             if (idx >= 0 && idx < SEGMENTS)
             {
                 var item = _currentPageItems[idx];
-                if (item != null && !string.IsNullOrEmpty(item.FamilyPath))
+                if (item != null && item.HasAction)
                     SafeComplete(true, _pageIndex * PAGE_SIZE + idx, item);
             }
         }
@@ -334,7 +334,7 @@ namespace BIMaestro.UI
                     ResetIdleTimer();
                     e.Handled = true;
                     var item = _currentPageItems[idx];
-                    if (item != null && !string.IsNullOrEmpty(item.FamilyPath))
+                    if (item != null && item.HasAction)
                         SafeComplete(true, _pageIndex * PAGE_SIZE + idx, item);
                 };
 
@@ -364,7 +364,7 @@ namespace BIMaestro.UI
                     ResetIdleTimer();
                     e.Handled = true;
                     var item = _currentPageItems[idx];
-                    if (item != null && !string.IsNullOrEmpty(item.FamilyPath))
+                    if (item != null && item.HasAction)
                         SafeComplete(true, _pageIndex * PAGE_SIZE + idx, item);
                 };
                 border.ContextMenu = BuildContextMenu(idx);
@@ -395,12 +395,14 @@ namespace BIMaestro.UI
 
         private ContextMenu BuildContextMenu(int idx)
         {
+            if (ReloadRequested == null) return null;
+
             var cm = new ContextMenu();
             var mi = new MenuItem { Header = "Recharger la dernière version" };
             mi.Click += (s, e) =>
             {
                 var item = _currentPageItems[idx];
-                if (item == null || string.IsNullOrWhiteSpace(item.FamilyPath)) return;
+                if (item == null || !item.HasFamily) return;
 
                 try { ReloadRequested?.Invoke(item); } catch { }
                 SafeComplete(false, -1, null); // on ferme après action
@@ -454,7 +456,7 @@ namespace BIMaestro.UI
                 var item = _currentPageItems[i];
                 var src = LoadImage(item?.ImagePath);
                 img.Source = src;
-                _iconBorders[i].Opacity = (item == null || string.IsNullOrEmpty(item.FamilyPath)) ? 0.2 : 1.0;
+                _iconBorders[i].Opacity = (item == null || !item.HasAction) ? 0.2 : 1.0;
 
                 var tr = (ScaleTransform)_iconBorders[i].RenderTransform;
                 tr.ScaleX = tr.ScaleY = 1.0;

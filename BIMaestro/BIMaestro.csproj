@@ -280,6 +280,10 @@
     </Compile>
     <Compile Include="app et excel\Touche\AppUI.cs" />
     <Compile Include="app et excel\Supabase\ApiKeys.cs" />
+    <Compile Include="app et excel\Touche\roue gta des touches\ButtonRecentManager.cs" />
+    <Compile Include="app et excel\Touche\roue gta des touches\RadialMenuButtonsCommand.cs" />
+    <Compile Include="app et excel\Touche\roue gta des touches\RibbonButtonImageCache.cs" />
+    <Compile Include="app et excel\Touche\roue gta des touches\RibbonButtonInfo.cs" />
     <Compile Include="Test\Résa auto v2\ExtendedReservationVoidWindowV2.xaml.cs">
       <DependentUpon>ExtendedReservationVoidWindowV2.xaml</DependentUpon>
     </Compile>
@@ -295,10 +299,10 @@
     <Compile Include="app et excel\temps revit\TimeSeriesDashboardWindow.xaml.cs">
       <DependentUpon>TimeSeriesDashboardWindow.xaml</DependentUpon>
     </Compile>
-    <Compile Include="app et excel\Touche\RibbonLayoutCommand.cs" />
-    <Compile Include="app et excel\Touche\RibbonLayoutConfigManager.cs" />
-    <Compile Include="app et excel\Touche\RibbonLayoutModels.cs" />
-    <Compile Include="app et excel\Touche\RibbonLayoutWindow.xaml.cs">
+    <Compile Include="app et excel\Touche\Modification d%27emplacement\RibbonLayoutCommand.cs" />
+    <Compile Include="app et excel\Touche\Modification d%27emplacement\RibbonLayoutConfigManager.cs" />
+    <Compile Include="app et excel\Touche\Modification d%27emplacement\RibbonLayoutModels.cs" />
+    <Compile Include="app et excel\Touche\Modification d%27emplacement\RibbonLayoutWindow.xaml.cs">
       <DependentUpon>RibbonLayoutWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="commands\analyse erreur maquette 3D\SmartCheckState.cs" />
@@ -545,7 +549,7 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="app et excel\Touche\RibbonLayoutWindow.xaml">
+    <Page Include="app et excel\Touche\Modification d%27emplacement\RibbonLayoutWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
