@@ -227,7 +227,25 @@ public class AppUI : IExternalApplication
         var d3 = CreatePushButtonData(b3.buttonName, b3.buttonText, assemblyPath, b3.className, b3.resourceImageName, b3.toolTip);
 
         // Revit stacke jusqu'à 3 items (petits) dans une colonne
-        panel.AddStackedItems(d1, d2, d3);
+        var stacked = panel.AddStackedItems(d1, d2, d3);
+        if (stacked != null)
+        {
+            if (stacked.Count > 0 && stacked[0] is PushButton pb1)
+            {
+                RegisterButtonInstance(b1.buttonName, pb1);
+                RegisterButtonCommandId(b1.buttonName, TryGetCommandId(pb1));
+            }
+            if (stacked.Count > 1 && stacked[1] is PushButton pb2)
+            {
+                RegisterButtonInstance(b2.buttonName, pb2);
+                RegisterButtonCommandId(b2.buttonName, TryGetCommandId(pb2));
+            }
+            if (stacked.Count > 2 && stacked[2] is PushButton pb3)
+            {
+                RegisterButtonInstance(b3.buttonName, pb3);
+                RegisterButtonCommandId(b3.buttonName, TryGetCommandId(pb3));
+            }
+        }
     }
 
     private static void AddPushButton(RibbonPanel panel, string buttonName, string buttonText, string assemblyPath, string className, string resourceImageName, string toolTip)
@@ -235,7 +253,12 @@ public class AppUI : IExternalApplication
         RegisterButtonDefinition(buttonName, buttonText, className, resourceImageName);
 
         var buttonData = CreatePushButtonData(buttonName, buttonText, assemblyPath, className, resourceImageName, toolTip);
-        panel.AddItem(buttonData);
+        var addedButton = panel.AddItem(buttonData) as PushButton;
+        if (addedButton != null)
+        {
+            RegisterButtonInstance(buttonName, addedButton);
+            RegisterButtonCommandId(buttonName, TryGetCommandId(addedButton));
+        }
     }
 
     private static PushButtonData CreatePushButtonData(string buttonName, string buttonText, string assemblyPath, string className, string toolTipImageName, string toolTip)
@@ -310,6 +333,11 @@ public class AppUI : IExternalApplication
             RegisterButtonDefinition(buttonName, buttonText, className, resourceImageName);
             var buttonData = CreatePushButtonData(buttonName, buttonText, assemblyPath, className, resourceImageName, toolTip);
             var addedButton = splitButton.AddPushButton(buttonData);
+            if (addedButton != null)
+            {
+                RegisterButtonInstance(buttonName, addedButton);
+                RegisterButtonCommandId(buttonName, TryGetCommandId(addedButton));
+            }
             if (firstButton == null)
             {
                 firstButton = addedButton;
@@ -394,7 +422,12 @@ public class AppUI : IExternalApplication
         ribbonButtonsByCommandClass.TryGetValue(commandClass, out var info);
         return info;
     }
-
+    public static RibbonButtonInfo GetRibbonButtonById(string buttonId)
+    {
+        if (string.IsNullOrWhiteSpace(buttonId)) return null;
+        ribbonButtonRegistry.TryGetValue(buttonId, out var info);
+        return info;
+    }
     public static void SetUiApplication(UIApplication uiapp)
     {
         UiApplication = uiapp;
@@ -429,6 +462,61 @@ public class AppUI : IExternalApplication
         {
             ribbonButtonsByCommandClass[commandClass] = info;
         }
+    }
+
+    private static void RegisterButtonCommandId(string buttonId, RevitCommandId commandId)
+    {
+        if (string.IsNullOrWhiteSpace(buttonId) || commandId == null) return;
+        if (ribbonButtonRegistry.TryGetValue(buttonId, out var info))
+        {
+            info.CommandId = commandId;
+        }
+    }
+
+    private static void RegisterButtonInstance(string buttonId, PushButton button)
+    {
+        if (string.IsNullOrWhiteSpace(buttonId) || button == null) return;
+        if (ribbonButtonRegistry.TryGetValue(buttonId, out var info))
+        {
+            info.PushButton = button;
+        }
+    }
+
+    public static RevitCommandId TryGetPushButtonCommandId(PushButton button)
+    {
+        return TryGetCommandId(button);
+    }
+
+    private static RevitCommandId TryGetCommandId(PushButton button)
+    {
+        if (button == null) return null;
+        try
+        {
+            var props = button.GetType().GetProperties(
+                System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.Public
+                | System.Reflection.BindingFlags.NonPublic);
+            foreach (var prop in props)
+            {
+                if (prop.PropertyType != typeof(RevitCommandId)) continue;
+                return prop.GetValue(button) as RevitCommandId;
+            }
+
+            var fields = button.GetType().GetFields(
+                System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.Public
+                | System.Reflection.BindingFlags.NonPublic);
+            foreach (var field in fields)
+            {
+                if (field.FieldType != typeof(RevitCommandId)) continue;
+                return field.GetValue(button) as RevitCommandId;
+            }
+        }
+        catch
+        {
+            // ignore
+        }
+        return null;
     }
 
 }

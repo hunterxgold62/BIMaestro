@@ -16,5 +16,7 @@ namespace BIMaestro.RibbonLayout
         public string DisplayName { get; set; }
         public string CommandClass { get; set; }
         public string ImageResourceName { get; set; }
+        public RevitCommandId CommandId { get; set; }
+        public PushButton PushButton { get; set; }
     }
 }
