@@ -130,7 +130,7 @@ namespace Analyse
         private View3D EnsureSmart3D(Document doc)
         {
             var v = new FilteredElementCollector(doc).OfClass(typeof(View3D)).Cast<View3D>()
-                .FirstOrDefault(x => !x.IsTemplate && x.Name.Equals(SmartCheckCommand.Smart3DName, StringComparison.OrdinalIgnoreCase));
+                .FirstOrDefault(x => !x.IsTemplate && x.Name.Equals(SmartClashCommand.Smart3DName, StringComparison.OrdinalIgnoreCase));
 
             if (v == null)
             {
@@ -140,7 +140,7 @@ namespace Analyse
                 {
                     t.Start();
                     v = View3D.CreateIsometric(doc, vft.Id);
-                    v.Name = SmartCheckCommand.Smart3DName;
+                    v.Name = SmartClashCommand.Smart3DName;
                     t.Commit();
                 }
             }

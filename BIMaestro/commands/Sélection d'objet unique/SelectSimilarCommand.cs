@@ -7,6 +7,8 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 using System.Linq;
 // REMPLACÉ : using System.Text.Json;
 using Newtonsoft.Json; // <-- Newtonsoft.Json
@@ -126,7 +128,113 @@ namespace Visualisation
             catch { }
         }
     }
+    // ====================== COULEURS PAR TYPE (PERSISTANTES) ======================
+    internal class SelectSimilarColorMap
+    {
+        private const string FileNameColorMap = "SelectSimilarColorMap.json";
 
+        public Dictionary<string, Dictionary<string, string>> Documents { get; set; }
+            = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
+
+        public static string ColorMapPath => Path.Combine(SelectSimilarPreferences.GetFolder(), FileNameColorMap);
+
+        public static SelectSimilarColorMap Load()
+        {
+            try
+            {
+                if (File.Exists(ColorMapPath))
+                {
+                    var json = File.ReadAllText(ColorMapPath);
+                    var map = JsonConvert.DeserializeObject<SelectSimilarColorMap>(json);
+                    if (map != null && map.Documents != null) return map;
+                }
+            }
+            catch { }
+
+            return new SelectSimilarColorMap();
+        }
+
+        public void Save()
+        {
+            try
+            {
+                var json = JsonConvert.SerializeObject(this, Formatting.Indented);
+                File.WriteAllText(ColorMapPath, json);
+            }
+            catch { }
+        }
+
+        public bool TryGetColor(Document doc, string key, out Color color)
+        {
+            color = default;
+            if (doc == null || string.IsNullOrWhiteSpace(key)) return false;
+
+            var docKey = GetDocumentKey(doc);
+            if (!Documents.TryGetValue(docKey, out var map)) return false;
+            if (!map.TryGetValue(key, out var hex)) return false;
+
+            return TryParseHex(hex, out color);
+        }
+
+        public void SetColor(Document doc, string key, Color color)
+        {
+            if (doc == null || string.IsNullOrWhiteSpace(key)) return;
+            var docKey = GetDocumentKey(doc);
+            if (!Documents.TryGetValue(docKey, out var map))
+            {
+                map = new Dictionary<string, string>(StringComparer.Ordinal);
+                Documents[docKey] = map;
+            }
+
+            map[key] = ToHex(color);
+        }
+
+        public Color CreateColor(string key)
+        {
+            double hue = ComputeHue(key);
+            return ColorFromHSL(hue, 0.5, 0.8);
+        }
+
+        private Color ColorFromHSL(double hue, double v1, double v2)
+        {
+            throw new NotImplementedException();
+        }
+
+        private static string GetDocumentKey(Document doc)
+        {
+            if (!string.IsNullOrWhiteSpace(doc.PathName)) return doc.PathName;
+            return doc.Title ?? "DocumentInconnu";
+        }
+
+        private static double ComputeHue(string key)
+        {
+            if (string.IsNullOrEmpty(key)) return 0.0;
+            using (var sha = SHA256.Create())
+            {
+                var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(key));
+                int value = (bytes[0] << 8) + bytes[1];
+                return value / 65535.0;
+            }
+        }
+
+        private static string ToHex(Color color)
+            => $"#{color.R:X2}{color.G:X2}{color.B:X2}";
+
+        private static bool TryParseHex(string hex, out Color color)
+        {
+            color = default;
+            if (string.IsNullOrWhiteSpace(hex)) return false;
+            try
+            {
+                color = ColorTranslator.FromHtml(hex);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
     // ====================== COMMANDE PRINCIPALE ======================
     [Transaction(TransactionMode.Manual)]
     public class SelectSimilarCommand : BaseTrackedCommand
@@ -266,12 +374,18 @@ namespace Visualisation
                 .Select(id => ComputeKey(doc, wallCatId, floorCatId, doc.GetElement(id)))
                 .Distinct(StringComparer.Ordinal).ToList();
 
-            int n = Math.Max(1, groupKeys.Count);
+            var colorMap = SelectSimilarColorMap.Load();
+            bool colorMapChanged = false;
             var palette = new Dictionary<string, System.Drawing.Color>(StringComparer.Ordinal);
-            for (int i = 0; i < n; i++)
+            foreach (var key in groupKeys)
             {
-                double hue = i / (double)n;
-                palette[groupKeys[i]] = ColorFromHSL(hue, 0.5, 0.8);
+                if (!colorMap.TryGetColor(doc, key, out var color))
+                {
+                    color = colorMap.CreateColor(key);
+                    colorMap.SetColor(doc, key, color);
+                    colorMapChanged = true;
+                }
+                palette[key] = color;
             }
 
             // 7) Appliquer & mémoriser la série
@@ -325,8 +439,11 @@ namespace Visualisation
             };
             LastColoredSet.Save(last);
 
-          
-               
+            if (colorMapChanged)
+            {
+                colorMap.Save();
+            }
+
             return Result.Succeeded;
         }
 

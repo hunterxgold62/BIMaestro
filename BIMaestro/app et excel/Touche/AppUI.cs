@@ -38,13 +38,23 @@ public class AppUI : IExternalApplication
             new RibbonPanelDefinition("Outils de Visualisation", new List<RibbonItemDefinition>
             {
                 new RibbonItemDefinition("HighlightElementsByCategories", "Sélection d'éléments", panel => AddPushButton(panel, "HighlightElementsByCategories", "Sélection\nd'éléments", assemblyPath, "Visualisation.HighlightElementsByCategoriesCommand", "Safeimagekit-resized-img (1).png", "Cette commande permet de :  \r\n- Mettre en évidence et filtrer les éléments d'une ou plusieurs catégories.  \r\n- Regrouper automatiquement les éléments similaires.  \r\n- Simplifier la gestion et la sélection précise dans un projet Revit.  \r\n\r\nUtilité : Facilite les actions répétitives et assure un traitement efficace.  ")),
-                new RibbonItemDefinition("GetPaintedMaterialsButton", "Peinture de matériaux", panel => AddPushButton(panel, "GetPaintedMaterialsButton", "Peinture de\nmatériaux", assemblyPath, "Visualisation.GetPaintedMaterialsCommand", "Peinture et matériaux.png", "Permet d'obtenir une liste des matériaux appliqués à un élément Revit,qu'il s'agisse de matériaux directement associés à l'objet ou de matériaux de peinture appliqués sur ses faces. Une fenêtre d'information affiche les matériaux identifiés pour mieux comprendre la composition de l'élément sélectionné.")),
                 new RibbonItemDefinition("OpenSheetFromViewButton", "Ouvrir la vue du Plan", panel => AddPushButton(panel, "OpenSheetFromViewButton", "Ouvrir la vue\ndu Plan", assemblyPath, "Visualisation.OpenSheetFromView", "safeimagekit-doc.png", "Cette commande permet de basculer entre une vue active (plan, coupe ou 3D) et les feuilles qui la contiennent, ou d'ouvrir une vue directement depuis un viewport sélectionné sur une feuille. \n\nElle simplifie la navigation entre les feuilles et les vues associées dans un projet Revit.")),
-                new RibbonItemDefinition("ReorientViewButton", "Réorienter Vue 3D", panel => AddPushButton(panel, "ReorientViewButton", "Réorienter\nVue 3D", assemblyPath, "Visualisation.ReorientViewCommand", "Element 3D.png", "Permet de réorienter une vue 3D active en fonction de la géométrie d'une face sélectionnée.")),
-                new RibbonItemDefinition("Export Nomenclature", "Export Nomenclature", panel => AddPushButton(panel, "Export Nomenclature", "Export \nNomenclature", assemblyPath, "Visualisation.ExportScheduleCommand", "rvt to excel et pdf.png", "Exporte les nomenclatures Revit sélectionnées en fichier Excel ou PDF.")),
-                new RibbonItemDefinition("ExportDwgBatch", "Export DWG", panel => AddPushButton(panel, "ExportDwgBatch", "Export\nDWG", assemblyPath, "Visualisation.ExportSheetsCommand", "export DWG.png", "Exporte automatiquement plusieurs vues ou feuilles en DWG, en nommant chaque fichier selon le projet et la vue comme pour les PDF.")),
+                new RibbonItemDefinition("Export Nomenclature", "Export Nomenclature", panel => AddPushButton(panel, "Export Nomenclature", "Export de\nNomenclature", assemblyPath, "Visualisation.ExportScheduleCommand", "rvt to excel et pdf.png", "Exporte les nomenclatures Revit sélectionnées en fichier Excel ou PDF.")),
                 new RibbonItemDefinition("Sélection d'objet", "Sélection d'objet", panel => AddPushButton(panel, "Sélection d'objet", "Sélection\nd'objet", assemblyPath, "Visualisation.SelectSimilarCommand", "Sélection d'élément.png", "Sélectionne des éléments similaires dans le projet")),
-                  new RibbonItemDefinition("RadialMenuButtonsCommand", "Rosace Boutons", panel => AddPushButton(panel, "RadialMenuButtonsCommand", "Rosace\nBoutons", assemblyPath, "BIMaestro.UI.RadialMenuButtonsCommand", "roue ruban.png", "Rosace des 16 derniers boutons BIMaestro utilisés.")),
+                new RibbonItemDefinition("RadialMenuButtonsCommand", "Rosace Boutons", panel => AddPushButton(panel, "RadialMenuButtonsCommand", "Rosace\nBoutons", assemblyPath, "BIMaestro.UI.RadialMenuButtonsCommand", "roue ruban.png", "Rosace des 16 derniers boutons BIMaestro utilisés.")),
+                new RibbonItemDefinition("Boutons de Visualisation", "Boutons de Visualisation", panel => AddStackedPushButtons(
+            panel,
+            assemblyPath,
+    
+            ("ReorientViewButton", "Face 3D", "Visualisation.ReorientViewCommand", "Element 3D.png",
+                "Permet de réorienter une vue 3D active en fonction de la géométrie d'une face sélectionnée."),
+            ("ExportDwgBatch", "DWG Exp.", "Visualisation.ExportSheetsCommand", "export DWG.png",
+                "Exporte automatiquement plusieurs vues ou feuilles en DWG, en nommant chaque fichier selon le projet et la vue comme pour les PDF."),
+            ("GetPaintedMaterialsButton", "Peinture", "Visualisation.GetPaintedMaterialsCommand", "Peinture et matériaux.png",
+                "Liste les matériaux (y compris peinture) appliqués à un élément.")
+    
+        )),
+
             }),
 
             new RibbonPanelDefinition("Modification", new List<RibbonItemDefinition>
@@ -85,7 +95,7 @@ public class AppUI : IExternalApplication
                 new RibbonItemDefinition("Qui a fait ça ?", "Qui a fait ça ??", panel => AddPushButton(panel, "Qui a fait ça ?", "Qui a\nfait ça ??", assemblyPath, "Analyse.MainCommand", "Qui à fait ça.png", "Description :\r\n- **Créateur de la vue active** : Identifie qui a créé et modifié la vue actuellement affichée.\r\n- **Créateur des éléments sélectionnés** : Récupère les informations de création et de modification pour un élément sélectionné.\r\n- **Dernière synchronisation** : Affiche l'utilisateur ayant effectué la dernière synchronisation du modèle.\r\n\r\nUtilité :\r\nFacilitez le suivi des responsabilités et identifiez rapidement les auteurs ou éditeurs des éléments et des vues dans un environnement collaboratif partagé.")),
                 new RibbonItemDefinition("AnalysePoidsButton", "Analyse de Poids", panel => AddPushButton(panel, "AnalysePoidsButton", "Analyse\nde Poids", assemblyPath, "Analyse.CommandAnalysePoids", "Calcule de poid1.png", "Fonctionnalités principales :\r\n1. **Analyse des Familles** :\r\n   - Taille de chaque famille (Mo).\r\n   - Nombre d'instances pour chaque famille.\r\n   - Classement par taille décroissante.\r\n\r\n2. **Analyse des Imports CAO** :\r\n   - Taille des imports (Mo).\r\n   - Types d'éléments analysés : Imports CAO, Lien Revit/IFC.\r\n\r\n3. **Export des Résultats** :\r\n   - Export vers un fichier Excel (RevitLogs/TailleFamilleRevit).\r\n   - Organisation claire par nom, type, taille et nombre d'instances.\r\n\r\nUtilité :\r\n- Identifier les éléments volumineux dans votre projet.\r\n- Optimiser la performance du modèle en réduisant les familles et les imports inutiles.")),
                 new RibbonItemDefinition("Temps par projet", "Temps par projet", panel => AddPushButton(panel, "Temps par projet", "Temps par\nprojet", assemblyPath, "BIMaestro.Dashboard.ShowTimeDashboard", "analyse de temps.png", "Affiche le temps passé par projet.")),
-                new RibbonItemDefinition("Check 3D", "Check 3D", panel => AddPushButton(panel, "Check 3D", "Check\n3D", assemblyPath, "Analyse.SmartCheckCommand", "correction 3D.png", "Vérifie les éléments 3D sélectionnés pour détecter les incohérences."))
+                new RibbonItemDefinition("Clash 3D", "Clash 3D", panel => AddPushButton(panel, "Clash 3D", "Clash\n3D", assemblyPath, "Analyse.SmartClashCommand", "correction 3D.png", "Vérifie les éléments 3D sélectionnés pour détecter les incohérences."))
             }),
 
             new RibbonPanelDefinition("Spécifique aux familles", new List<RibbonItemDefinition>
@@ -116,7 +126,7 @@ public class AppUI : IExternalApplication
                     ("Couleur de maquette", "Couleur reset", "Couleur.ResetTabItemRandomColorsCommand", "safeimagekit-bouton reset4.png","Réinitialise les couleurs appliquées"),
                     ("papa Noël", "papa\nNoël", "Couleur.PapanoelCommand", "Père Noël.png","Fait apparaître des couleurs comme des guirlandes\nDouble clic pour revenir à la normale.\n\nAttention désactiver <couleur Oui/Non> avant activation."),
                     ("Snake", "Snake", "BIMaestro.Bonus.SnakeCommand", "snake.png","Petit jeux snake :P"),
-                    //("FlappyBird", "Flappy\nBird", "BIMaestro.Bonus.FlappyBirdCommand", "snake.png","Petit jeu Flappy Bird :P"),
+                    ("FlappyBird", "Flappy\nBird", "BIMaestro.Bonus.FlappyBirdCommand", "snake.png","Petit jeu Flappy Bird :P"),
                 })),
 
                 new RibbonItemDefinition("InfoStack", "Infos empilées", panel => AddStackedPushButtons(

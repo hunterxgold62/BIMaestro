@@ -12,10 +12,10 @@ using System.Linq;
 namespace Analyse
 {
     [Transaction(TransactionMode.ReadOnly)]
-    public class SmartCheckCommand : BaseTrackedCommand
+    public class SmartClashCommand : BaseTrackedCommand
     {
         public static readonly string Smart3DName = "BIMaestro – SmartCheck 3D";
-        protected override string ButtonId => "SmartCheckCommand";
+        protected override string ButtonId => "SmartClashCommand";
 
         protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
