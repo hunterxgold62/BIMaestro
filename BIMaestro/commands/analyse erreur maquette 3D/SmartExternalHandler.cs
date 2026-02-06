@@ -176,28 +176,55 @@ namespace Analyse
             if (ids.Count > 0)
                 uidoc.Selection.SetElementIds(ids);
 
-            // Boîte de focus
-            BoundingBoxXYZ focus = box;
-            if (IsValidId(related))
+            // Boîte de focus : base sur les éléments en conflit, avec priorité à la box d'intersection
+            var pairBoxes = new List<BoundingBoxXYZ>();
+            foreach (var eid in ids)
             {
-                var rel = doc.GetElement(related);
-                var rbb = rel?.get_BoundingBox(null);
-                if (rbb != null && box != null) focus = Union(new[] { box, rbb });
-                else if (rbb != null && box == null) focus = rbb;
-            }
-            if (focus == null && IsValidId(id))
-            {
-                var el = doc.GetElement(id);
-                focus = el?.get_BoundingBox(null);
+                var el = doc.GetElement(eid);
+                var ebb = el?.get_BoundingBox(v) ?? el?.get_BoundingBox(null);
+                if (ebb != null) pairBoxes.Add(ebb);
             }
 
-            // Section box compacte (+200 mm)
-            if (setSection && focus != null)
+            BoundingBoxXYZ focus = null;
+            if (kind == IssueKind.LinkPipeClash)
             {
-                var pad = new XYZ(1, 1, 1) * (200.0 / 304.8);
-                var b = new BoundingBoxXYZ { Min = focus.Min - pad, Max = focus.Max + pad };
-                v.SetSectionBox(b);
-                TryEnableSectionBox(v);
+                // Collision lien/tuyau : ne pas cadrer sur le lien complet, garder le focus sur le tuyau + zone de collision
+                var mainEl = IsValidId(id) ? doc.GetElement(id) : null;
+                var mainBox = mainEl?.get_BoundingBox(v) ?? mainEl?.get_BoundingBox(null);
+                focus = Union(new[] { box, mainBox });
+            }
+            else if (kind == IssueKind.MepThroughWallNoSleeve)
+            {
+                // Traversée MEP : garder les 2 éléments + box calculée
+                focus = Union(new[] { box, Union(pairBoxes) });
+            }
+            else if (kind == IssueKind.MepUnconnected)
+            {
+                // Raccord ouvert : se concentrer sur l'élément MEP principal, avec une taille mini de box
+                var mainEl = IsValidId(id) ? doc.GetElement(id) : null;
+                var mainBox = mainEl?.get_BoundingBox(v) ?? mainEl?.get_BoundingBox(null);
+                focus = EnsureMinimumBoxSize(mainBox ?? box, 300.0 / 304.8);
+            }
+            else
+            {
+                focus = Union(pairBoxes) ?? box;
+            }
+
+            // Section box compacte (+100 mm)
+            if (setSection)
+            {
+                if (focus != null)
+                {
+                    var pad = new XYZ(1, 1, 1) * (100.0 / 304.8);
+                    var b = new BoundingBoxXYZ { Min = focus.Min - pad, Max = focus.Max + pad };
+                    v.SetSectionBox(b);
+                    TryEnableSectionBox(v);
+                }
+                else
+                {
+                    // Évite de rester bloqué sur une section box précédente si aucune box fiable n'est trouvée
+                    TryDisableSectionBox(v);
+                }
             }
 
             // Overrides
@@ -212,13 +239,11 @@ namespace Analyse
             fade.SetSurfaceTransparency(85);
             fade.SetHalftone(true);
 
-            if ((kind == IssueKind.MepThroughWallNoSleeve || kind == IssueKind.LinkPipeClash) && ids.Count > 0)
+            if (ids.Count > 0)
             {
                 foreach (var eid in ids) v.SetElementOverrides(eid, emphasize);
 
-                var allIds = new FilteredElementCollector(doc, v.Id)
-                    .WhereElementIsNotElementType()
-                    .ToElementIds();
+                var allIds = CollectModelElementIds(doc);
 
                 var keep = new HashSet<ElementId>(ids, new ElemIdCmp());
                 foreach (var oid in allIds)
@@ -265,7 +290,7 @@ namespace Analyse
             foreach (var id in ids)
                 v.SetElementOverrides(id, err);
 
-            var allIds = new FilteredElementCollector(doc, v.Id).WhereElementIsNotElementType().ToElementIds();
+            var allIds = CollectModelElementIds(doc);
             var set = new HashSet<ElementId>(ids, new ElemIdCmp());
             var others = allIds.Where(i => !set.Contains(i)).ToList();
 
@@ -281,10 +306,37 @@ namespace Analyse
         private void ClearOverrides(UIDocument uidoc, View3D v)
         {
             var doc = uidoc.Document;
-            var allIds = new FilteredElementCollector(doc, v.Id)
-                .WhereElementIsNotElementType().ToElementIds();
+            var allIds = CollectModelElementIds(doc);
             var neutral = new OverrideGraphicSettings();
             foreach (var id in allIds) v.SetElementOverrides(id, neutral);
+        }
+
+        private static IList<ElementId> CollectModelElementIds(Document doc)
+        {
+            return new FilteredElementCollector(doc)
+                .WhereElementIsNotElementType()
+                .Where(e => e?.Category != null)
+                .Select(e => e.Id)
+                .ToList();
+        }
+
+        private static BoundingBoxXYZ EnsureMinimumBoxSize(BoundingBoxXYZ bb, double minSizeFt)
+        {
+            if (bb == null) return null;
+
+            var cx = (bb.Min.X + bb.Max.X) * 0.5;
+            var cy = (bb.Min.Y + bb.Max.Y) * 0.5;
+            var cz = (bb.Min.Z + bb.Max.Z) * 0.5;
+
+            var hx = Math.Max((bb.Max.X - bb.Min.X) * 0.5, minSizeFt * 0.5);
+            var hy = Math.Max((bb.Max.Y - bb.Min.Y) * 0.5, minSizeFt * 0.5);
+            var hz = Math.Max((bb.Max.Z - bb.Min.Z) * 0.5, minSizeFt * 0.5);
+
+            return new BoundingBoxXYZ
+            {
+                Min = new XYZ(cx - hx, cy - hy, cz - hz),
+                Max = new XYZ(cx + hx, cy + hy, cz + hz)
+            };
         }
 
         private static BoundingBoxXYZ Union(IEnumerable<BoundingBoxXYZ> bbs)
