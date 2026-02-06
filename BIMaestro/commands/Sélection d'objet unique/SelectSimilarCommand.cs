@@ -10,8 +10,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using System.Linq;
-// REMPLACÉ : using System.Text.Json;
-using Newtonsoft.Json; // <-- Newtonsoft.Json
+using Newtonsoft.Json;
 using Color = System.Drawing.Color;
 
 namespace Visualisation

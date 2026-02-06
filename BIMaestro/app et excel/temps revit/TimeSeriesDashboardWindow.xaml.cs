@@ -628,18 +628,44 @@ namespace BIMaestro.Dashboard
                     return;
                 }
 
-                string folder = Directory.Exists(path) ? path : Path.GetDirectoryName(path);
-                if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder))
+                var candidateFolders = ExtractCandidateFolders(path).ToList();
+                var openedFolders = new List<string>();
+
+                foreach (var folder in candidateFolders)
                 {
-                    MessageBox.Show("Dossier introuvable pour : " + path);
-                    return;
+                    if (!openedFolders.Contains(folder, StringComparer.OrdinalIgnoreCase))
+                    {
+                        Process.Start(new ProcessStartInfo { FileName = folder, UseShellExecute = true });
+                        openedFolders.Add(folder);
+                    }
                 }
 
-                Process.Start(new ProcessStartInfo { FileName = folder, UseShellExecute = true });
+                if (openedFolders.Count == 0)
+                {
+                    MessageBox.Show("Dossier introuvable pour : " + path);
+                }
             }
             catch (Exception ex)
             {
                 MessageBox.Show(ex.Message);
+            }
+        }
+
+        private static IEnumerable<string> ExtractCandidateFolders(string documentId)
+        {
+            if (string.IsNullOrWhiteSpace(documentId))
+                yield break;
+
+            var parts = documentId.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (var rawPart in parts)
+            {
+                string part = (rawPart ?? string.Empty).Trim();
+                if (string.IsNullOrWhiteSpace(part))
+                    continue;
+
+                string folder = Directory.Exists(part) ? part : Path.GetDirectoryName(part);
+                if (!string.IsNullOrWhiteSpace(folder) && Directory.Exists(folder))
+                    yield return folder;
             }
         }
 

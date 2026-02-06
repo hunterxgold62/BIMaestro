@@ -41,7 +41,6 @@ public class AppUI : IExternalApplication
                 new RibbonItemDefinition("OpenSheetFromViewButton", "Ouvrir la vue du Plan", panel => AddPushButton(panel, "OpenSheetFromViewButton", "Ouvrir la vue\ndu Plan", assemblyPath, "Visualisation.OpenSheetFromView", "safeimagekit-doc.png", "Cette commande permet de basculer entre une vue active (plan, coupe ou 3D) et les feuilles qui la contiennent, ou d'ouvrir une vue directement depuis un viewport sélectionné sur une feuille. \n\nElle simplifie la navigation entre les feuilles et les vues associées dans un projet Revit.")),
                 new RibbonItemDefinition("Export Nomenclature", "Export Nomenclature", panel => AddPushButton(panel, "Export Nomenclature", "Export de\nNomenclature", assemblyPath, "Visualisation.ExportScheduleCommand", "rvt to excel et pdf.png", "Exporte les nomenclatures Revit sélectionnées en fichier Excel ou PDF.")),
                 new RibbonItemDefinition("Sélection d'objet", "Sélection d'objet", panel => AddPushButton(panel, "Sélection d'objet", "Sélection\nd'objet", assemblyPath, "Visualisation.SelectSimilarCommand", "Sélection d'élément.png", "Sélectionne des éléments similaires dans le projet")),
-                new RibbonItemDefinition("RadialMenuButtonsCommand", "Rosace Boutons", panel => AddPushButton(panel, "RadialMenuButtonsCommand", "Rosace\nBoutons", assemblyPath, "BIMaestro.UI.RadialMenuButtonsCommand", "roue ruban.png", "Rosace des 16 derniers boutons BIMaestro utilisés.")),
                 new RibbonItemDefinition("Boutons de Visualisation", "Boutons de Visualisation", panel => AddStackedPushButtons(
             panel,
             assemblyPath,
@@ -61,7 +60,7 @@ public class AppUI : IExternalApplication
             {
                 new RibbonItemDefinition("OverrideColor", "Couleur d'élément", panel => AddPushButton(panel, "OverrideColor", "Couleur\nd'élément", assemblyPath, "Modification.OverrideColorCommand", "Pallette de couleur anexe .png", "Cette commande permet :  \r\n- De personnaliser les couleurs, motifs et transparence des éléments.  \r\n- D'appliquer des paramètres graphiques à plusieurs vues simultanément.  \r\n- De réinitialiser les modifications si nécessaire.  \r\n\r\nUtilité : Améliorez le rendu et la lisibilité de vos vues.  ")),
                 new RibbonItemDefinition("ElementRenamerButton", "Organisateur d'éléments", panel => AddPushButton(panel, "ElementRenamerButton", "Organisateur\nd'éléments", assemblyPath, "Modification.RenameElementsCommand", "Organisateur d'éléments.png", "Cette commande permet :  \r\n- De renommer des éléments sélectionnés dans Revit avec des préfixes, suffixes, ou des numérotations personnalisées.  \r\n- De trier les éléments par niveau ou par emplacement dans la vue active.  \r\n- De réinitialiser les paramètres texte sélectionnés si nécessaire.  \r\n\r\nUtilité :  \r\nFacilite la gestion des noms d'éléments pour une organisation cohérente dans vos projets.")),
-                  new RibbonItemDefinition("ResérvationAuto2", "Auto Réservation2", panel => AddPushButton(panel, "ResérvationAuto2", "Auto\nRéservation2", assemblyPath, "Modification.V2.ReservationVoidAutoMultiCommandV2", "safeimagekit-Réservation.png", "Crée des réservations automatiques")),
+                 // new RibbonItemDefinition("ResérvationAuto2", "Auto Réservation2", panel => AddPushButton(panel, "ResérvationAuto2", "Auto\nRéservation2", assemblyPath, "Modification.V2.ReservationVoidAutoMultiCommandV2", "safeimagekit-Réservation.png", "Crée des réservations automatiques")),
                 new RibbonItemDefinition("ResérvationAuto", "Auto Réservation", panel => AddPushButton(panel, "ResérvationAuto", "Auto\nRéservation", assemblyPath, "Modification.ReservationAutoMultiCommand", "safeimagekit-Réservation.png", "Crée des réservations automatiques")),
                 new RibbonItemDefinition("Bride auto", "Bride auto", panel => AddSplitButton(panel, "Bride auto", "Bride\nauto", assemblyPath, new List<(string, string, string, string, string)>
                 {
@@ -98,24 +97,27 @@ public class AppUI : IExternalApplication
                 new RibbonItemDefinition("Clash 3D", "Clash 3D", panel => AddPushButton(panel, "Clash 3D", "Clash\n3D", assemblyPath, "Analyse.SmartClashCommand", "correction 3D.png", "Vérifie les éléments 3D sélectionnés pour détecter les incohérences."))
             }),
 
-            new RibbonPanelDefinition("Spécifique aux familles", new List<RibbonItemDefinition>
+              new RibbonPanelDefinition("Spécifique aux familles", new List<RibbonItemDefinition>
             {
                 new RibbonItemDefinition("FamilyBrowser", "Navigateur de Familles", panel => AddSplitButton(panel, "FamilyBrowser", "Navigateur\nde Familles", assemblyPath, new List<(string, string, string, string, string)>
                 {
                     ("FamilyBrowser", "Navigateur\nde Familles", "Famille.FamilyBrowserCommand", "maison famille (1).png","Cette commande permet :  \r\n- De parcourir les dossiers et charger des familles Revit depuis un emplacement centralisé. \r\n- D'afficher des aperçus d'icônes pour identifier rapidement les familles.  \r\n- De gérer des favoris pour accéder plus facilement aux familles les plus utilisées.  \r\n- D'appliquer des filtres de recherche pour une sélection rapide.  \r\n- D'ajuster le thème (mode clair/sombre) et les paramètres visuels.  \r\n\r\nUtilité :  \r\nSimplifie la gestion et le chargement des familles dans vos projets, augmentant votre efficacité.  "),
                     ("Rosace", ".","BIMaestro.UI.RadialMenuCommand", "vide.png","Rosace des familles à ajouter en raccourci clavier voir raccourci souris.")
                 })),
-                new RibbonItemDefinition("PurgeFamilyParameters", "Purge des paramètres", panel => AddPushButton(panel, "PurgeFamilyParameters", "Purge des\nparamètres", assemblyPath, "Famille.PurgeFamilyParametersCommand", "Purge famille32x32.png", "Cette commande permet :  \r\n- De supprimer les paramètres inutilisés dans une famille Revit.  \r\n- De vérifier les cotes, formules et contraintes pour déterminer si un paramètre est utilisé.  \r\n- De sauvegarder automatiquement une copie de la famille avant la purge.  \r\n\r\nUtilité :  \r\nOptimisez vos familles en éliminant les paramètres inutiles, réduisant leur complexité et taille.  \r\n")),
-                new RibbonItemDefinition("Familytraduction", "Traduction de paramètre IA", panel => AddSplitButton(panel, "Familytraduction", "Traduction de\nparamètre IA", assemblyPath, new List<(string, string, string, string, string)>
-                {
-                    ("Familytraduction", "Traduction de\nparamètre IA", "Famille.TraduireParametresFamilleOpenAI", "Pour paramètre de famille1.png","Cette commande permet :  \r\n- De traduire les noms des paramètres utilisateur dans une famille Revit en français.  \r\n- De s'assurer que les paramètres déjà en français ne sont pas modifiés.  \r\n- D'utiliser l'API OpenAI pour garantir une traduction précise.  \r\n- De sauvegarder automatiquement les changements via une transaction.  \r\n\r\nUtilité :  \r\nFacilite l'adaptation des familles Revit à des projets nécessitant des noms de paramètres en français, améliorant la lisibilité et la conformité.  \r\n"),
-                    ("FamilyViewtraduction", "Traduction\nde vues IA","Famille.TraduireVuesFamilleOpenAI", "Pour paramètre de famille1.png","Cette commande permet :  \r\n- De traduire automatiquement les noms des vues d'une famille Revit en français.  \r\n- De conserver les vues déjà en français sans modification.  \r\n- D'assurer l'unicité des noms générés même en cas de doublon potentiel.  \r\n- D'utiliser l'API OpenAI et le cache de traduction pour accélérer les traitements récurrents.  \r\n\r\nUtilité :  \r\nGarantit une nomenclature cohérente et francisée des vues de famille, améliorant la compréhension et la conformité des contenus.  ")
-                })),
-                new RibbonItemDefinition("Export d'unité", "Export d'unité", panel => AddSplitButton(panel, "Export d'unité", "Export\nd'unité", assemblyPath, new List<(string, string, string, string, string)>
-                {
-                    ("Export d'unité", "Export\nd'unité", "Famille.ExportProjectUnitsCommand", "export unité.png","Sauvegarde dans un fichier JSON les unités et leur précision (longueur, surface, volume, angle, etc.) du projet en cours, dans le dossier Mes Documents/RevitLogs/SauvegardePréférence."),
-                    ("Import d'unité", "Import\nd'unité","Famille.ImportProjectUnitsCommand", "import unité.png","Recharge depuis le fichier JSON les unités et leur précision pour appliquer rapidement vos préférences au projet.")
-                }))
+        new RibbonItemDefinition("ConvertSharedToFamily", "Convertir les paramètres partagés", panel => AddPushButton(panel, "ConvertSharedToFamily", "Convertir\nparamètres", assemblyPath, "Famille.ConvertSharedToFamilyParametersCommand", "Purge famille32x32.png", "Convertit tous les paramètres partagés modifiables de la famille en paramètres de famille (même nom, même groupe et même type instance/type).")),                new RibbonItemDefinition("FamilyUtilitiesStack", "Outils familles", panel => AddStackedFamilyUtilities(
+                    panel,
+                    assemblyPath,
+                    ("PurgeFamilyParameters", "Purge", "Famille.PurgeFamilyParametersCommand", "Purge famille32x32.png", "Cette commande permet :  \r\n- De supprimer les paramètres inutilisés dans une famille Revit.  \r\n- De vérifier les cotes, formules et contraintes pour déterminer si un paramètre est utilisé.  \r\n- De sauvegarder automatiquement une copie de la famille avant la purge.  \r\n\r\nUtilité :  \r\nOptimisez vos familles en éliminant les paramètres inutiles, réduisant leur complexité et taille.  \r\n"),
+                    ("Familytraduction", "Trad.IA", new List<(string, string, string, string, string)>
+                    {
+                        ("Familytraduction", "Trad.IA", "Famille.TraduireParametresFamilleOpenAI", "Pour paramètre de famille1.png","Cette commande permet :  \r\n- De traduire les noms des paramètres utilisateur dans une famille Revit en français.  \r\n- De s'assurer que les paramètres déjà en français ne sont pas modifiés.  \r\n- D'utiliser l'API OpenAI pour garantir une traduction précise.  \r\n- De sauvegarder automatiquement les changements via une transaction.  \r\n\r\nUtilité :  \r\nFacilite l'adaptation des familles Revit à des projets nécessitant des noms de paramètres en français, améliorant la lisibilité et la conformité.  \r\n"),
+                        ("FamilyViewtraduction", "Traduction\nde vues IA","Famille.TraduireVuesFamilleOpenAI", "Pour paramètre de famille1.png","Cette commande permet :  \r\n- De traduire automatiquement les noms des vues d'une famille Revit en français.  \r\n- De conserver les vues déjà en français sans modification.  \r\n- D'assurer l'unicité des noms générés même en cas de doublon potentiel.  \r\n- D'utiliser l'API OpenAI et le cache de traduction pour accélérer les traitements récurrents.  \r\n\r\nUtilité :  \r\nGarantit une nomenclature cohérente et francisée des vues de famille, améliorant la compréhension et la conformité des contenus.  ")
+                    }),
+                    ("Export d'unité", "Unités", new List<(string, string, string, string, string)>
+                    {
+                        ("Export d'unité", "Unités", "Famille.ExportProjectUnitsCommand", "export unité.png","Sauvegarde dans un fichier JSON les unités et leur précision (longueur, surface, volume, angle, etc.) du projet en cours, dans le dossier Mes Documents/RevitLogs/SauvegardePréférence."),
+                        ("Import d'unité", "Import\nd'unité","Famille.ImportProjectUnitsCommand", "import unité.png","Recharge depuis le fichier JSON les unités et leur précision pour appliquer rapidement vos préférences au projet.")
+                    })))
             }),
 
             new RibbonPanelDefinition("Couleur et information", new List<RibbonItemDefinition>
@@ -129,13 +131,18 @@ public class AppUI : IExternalApplication
                     ("FlappyBird", "Flappy\nBird", "BIMaestro.Bonus.FlappyBirdCommand", "snake.png","Petit jeu Flappy Bird :P"),
                 })),
 
-                new RibbonItemDefinition("InfoStack", "Infos empilées", panel => AddStackedPushButtons(
+                new RibbonItemDefinition("InfoStack", "Infos empilées", panel => AddStackedInfoButtons(
                     panel,
                     assemblyPath,
                     // (name, text, className, icon, tooltip)
                     ("NOTE_MAJ", "Note", "Page.MiseAJourCommand", "safeimagekit-Information.png", "Page de mise à jour"),
                     ("BIMaestro_Exemple", "Exemple", "Page.GuideCommand", "safeimagekit-Texte maj.png", "Page d'information sur le plugin"),
-("CustomizeRibbon", "Option", "BIMaestro.RibbonLayout.RibbonLayoutCommand", "roue ruban.png", "Configurer le ruban BIMaestro et les paramètres utilisateur.")                ))
+                    ("CustomizeRibbon", "Option", new List<(string, string, string, string, string)>
+                    {
+                        ("CustomizeRibbon", "Option", "BIMaestro.RibbonLayout.RibbonLayoutCommand", "roue ruban.png", "Configurer le ruban BIMaestro et les paramètres utilisateur."),
+                        ("RadialMenuButtonsCommand", "Rosace\nBoutons", "BIMaestro.UI.RadialMenuButtonsCommand", "roue ruban.png", "Rosace des 16 derniers boutons BIMaestro utilisés.")
+                    })
+                ))
             })
         };
     }
@@ -257,6 +264,107 @@ public class AppUI : IExternalApplication
             }
         }
     }
+    private static void AddStackedPushButtons(
+        RibbonPanel panel,
+        string assemblyPath,
+        (string buttonName, string buttonText, string className, string resourceImageName, string toolTip) b1,
+        (string buttonName, string buttonText, string className, string resourceImageName, string toolTip) b2)
+    {
+        RegisterButtonDefinition(b1.buttonName, b1.buttonText, b1.className, b1.resourceImageName);
+        RegisterButtonDefinition(b2.buttonName, b2.buttonText, b2.className, b2.resourceImageName);
+
+        var d1 = CreatePushButtonData(b1.buttonName, b1.buttonText, assemblyPath, b1.className, b1.resourceImageName, b1.toolTip);
+        var d2 = CreatePushButtonData(b2.buttonName, b2.buttonText, assemblyPath, b2.className, b2.resourceImageName, b2.toolTip);
+
+        var stacked = panel.AddStackedItems(d1, d2);
+        if (stacked != null)
+        {
+            if (stacked.Count > 0 && stacked[0] is PushButton pb1)
+            {
+                RegisterButtonInstance(b1.buttonName, pb1);
+                RegisterButtonCommandId(b1.buttonName, TryGetCommandId(pb1));
+            }
+            if (stacked.Count > 1 && stacked[1] is PushButton pb2)
+            {
+                RegisterButtonInstance(b2.buttonName, pb2);
+                RegisterButtonCommandId(b2.buttonName, TryGetCommandId(pb2));
+            }
+        }
+    }
+
+    private static void AddStackedInfoButtons(
+        RibbonPanel panel,
+        string assemblyPath,
+        (string buttonName, string buttonText, string className, string resourceImageName, string toolTip) noteButton,
+        (string buttonName, string buttonText, string className, string resourceImageName, string toolTip) exampleButton,
+        (string splitButtonName, string splitButtonText, List<(string buttonName, string buttonText, string className, string resourceImageName, string toolTip)> buttons) optionSplit)
+    {
+        RegisterButtonDefinition(noteButton.buttonName, noteButton.buttonText, noteButton.className, noteButton.resourceImageName);
+        RegisterButtonDefinition(exampleButton.buttonName, exampleButton.buttonText, exampleButton.className, exampleButton.resourceImageName);
+
+        var noteData = CreatePushButtonData(noteButton.buttonName, noteButton.buttonText, assemblyPath, noteButton.className, noteButton.resourceImageName, noteButton.toolTip);
+        var exampleData = CreatePushButtonData(exampleButton.buttonName, exampleButton.buttonText, assemblyPath, exampleButton.className, exampleButton.resourceImageName, exampleButton.toolTip);
+        var optionData = new SplitButtonData(optionSplit.splitButtonName, optionSplit.splitButtonText);
+
+        var stacked = panel.AddStackedItems(noteData, exampleData, optionData);
+        if (stacked == null)
+        {
+            return;
+        }
+
+        if (stacked.Count > 0 && stacked[0] is PushButton note)
+        {
+            RegisterButtonInstance(noteButton.buttonName, note);
+            RegisterButtonCommandId(noteButton.buttonName, TryGetCommandId(note));
+        }
+
+        if (stacked.Count > 1 && stacked[1] is PushButton example)
+        {
+            RegisterButtonInstance(exampleButton.buttonName, example);
+            RegisterButtonCommandId(exampleButton.buttonName, TryGetCommandId(example));
+        }
+
+        if (stacked.Count > 2 && stacked[2] is SplitButton option)
+        {
+            ConfigureSplitButton(option, assemblyPath, optionSplit.buttons, null, null);
+        }
+    }
+
+    private static void AddStackedFamilyUtilities(
+        RibbonPanel panel,
+        string assemblyPath,
+        (string buttonName, string buttonText, string className, string resourceImageName, string toolTip) purgeButton,
+        (string splitButtonName, string splitButtonText, List<(string buttonName, string buttonText, string className, string resourceImageName, string toolTip)> buttons) traductionSplit,
+        (string splitButtonName, string splitButtonText, List<(string buttonName, string buttonText, string className, string resourceImageName, string toolTip)> buttons) unitsSplit)
+    {
+        RegisterButtonDefinition(purgeButton.buttonName, purgeButton.buttonText, purgeButton.className, purgeButton.resourceImageName);
+
+        var purgeData = CreatePushButtonData(purgeButton.buttonName, purgeButton.buttonText, assemblyPath, purgeButton.className, purgeButton.resourceImageName, purgeButton.toolTip);
+        var traductionData = new SplitButtonData(traductionSplit.splitButtonName, traductionSplit.splitButtonText);
+        var unitsData = new SplitButtonData(unitsSplit.splitButtonName, unitsSplit.splitButtonText);
+
+        var stacked = panel.AddStackedItems(purgeData, traductionData, unitsData);
+        if (stacked == null)
+        {
+            return;
+        }
+
+        if (stacked.Count > 0 && stacked[0] is PushButton purge)
+        {
+            RegisterButtonInstance(purgeButton.buttonName, purge);
+            RegisterButtonCommandId(purgeButton.buttonName, TryGetCommandId(purge));
+        }
+
+        if (stacked.Count > 1 && stacked[1] is SplitButton traduction)
+        {
+            ConfigureSplitButton(traduction, assemblyPath, traductionSplit.buttons, null, null);
+        }
+
+        if (stacked.Count > 2 && stacked[2] is SplitButton units)
+        {
+            ConfigureSplitButton(units, assemblyPath, unitsSplit.buttons, null, null);
+        }
+    }
 
     private static void AddPushButton(RibbonPanel panel, string buttonName, string buttonText, string assemblyPath, string className, string resourceImageName, string toolTip)
     {
@@ -311,7 +419,20 @@ public class AppUI : IExternalApplication
     {
         var splitButtonData = new SplitButtonData(splitButtonName, splitButtonText);
         var splitButton = panel.AddItem(splitButtonData) as SplitButton;
+        ConfigureSplitButton(splitButton, assemblyPath, buttons, splitToolTip, splitToolTipImageResource);
+    }
 
+    private static void ConfigureSplitButton(
+        SplitButton splitButton,
+        string assemblyPath,
+        List<(string buttonName, string buttonText, string className, string resourceImageName, string toolTip)> buttons,
+        string splitToolTip,
+        string splitToolTipImageResource)
+    {
+        if (splitButton == null)
+        {
+            return;
+        }
         if (!string.IsNullOrWhiteSpace(splitToolTip))
         {
             splitButton.ToolTip = splitToolTip;

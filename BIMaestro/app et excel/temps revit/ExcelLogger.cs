@@ -325,8 +325,35 @@ public static class ExcelLogger
     {
         try
         {
-            if (!string.IsNullOrEmpty(doc.PathName))
-                return doc.PathName;
+            if (doc != null)
+            {
+                string localPath = doc.PathName;
+                string centralPath = null;
+
+                if (doc.IsWorkshared)
+                {
+                    try
+                    {
+                        var centralModelPath = doc.GetWorksharingCentralModelPath();
+                        if (centralModelPath != null)
+                            centralPath = ModelPathUtils.ConvertModelPathToUserVisiblePath(centralModelPath);
+                    }
+                    catch { }
+                }
+
+                if (!string.IsNullOrWhiteSpace(localPath) && !string.IsNullOrWhiteSpace(centralPath)
+                    && !string.Equals(localPath, centralPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    return localPath + "|" + centralPath;
+                }
+
+                if (!string.IsNullOrWhiteSpace(localPath))
+                    return localPath;
+
+                if (!string.IsNullOrWhiteSpace(centralPath))
+                    return centralPath;
+            }
+
             return string.IsNullOrWhiteSpace(doc.Title) ? "(sans nom)" : doc.Title;
         }
         catch

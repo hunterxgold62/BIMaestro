@@ -288,6 +288,7 @@
     <Compile Include="commands\flapy bird\FlappyBirdWindow.xaml.cs">
       <DependentUpon>FlappyBirdWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Test\paramétre partagé en famillle\ConvertSharedToFamilyParametersCommand.cs" />
     <Compile Include="Test\Résa auto v2\ExtendedReservationVoidWindowV2.xaml.cs">
       <DependentUpon>ExtendedReservationVoidWindowV2.xaml</DependentUpon>
     </Compile>
