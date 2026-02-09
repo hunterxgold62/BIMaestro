@@ -1,10 +1,12 @@
 ﻿<Window x:Class="Analyse.SmartCheckWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="BIMaestro – Smart Check"
-        Height="680" Width="980"
+        Title="BIMaestro – Clash 3D"
+        Height="700" Width="1150"
         WindowStartupLocation="CenterScreen"
-        ResizeMode="CanResizeWithGrip">
+        ResizeMode="CanResizeWithGrip"
+        Background="#F6F8FB">
+    
     <Window.Resources>
         <SolidColorBrush x:Key="RowSelectedBrush" Color="#E6F1FF"/>
         <SolidColorBrush x:Key="RowOkBrush" Color="#F2F2F2"/>
@@ -33,8 +35,21 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="#D6DEEB"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style TargetType="DataGrid">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="#D6DEEB"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+            <Setter Property="HeadersVisibility" Value="Column"/>
+        </Style>
     </Window.Resources>
-    <Grid Margin="10">
+    <Grid Margin="14">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -42,46 +57,29 @@
         </Grid.RowDefinitions>
 
         <!-- Toolbar -->
-        <DockPanel Grid.Row="0" LastChildFill="True" Margin="0,0,0,8">
-            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" Margin="0,0,12,0">
-                <TextBlock Text="Résultats d’analyse — murs, MEP &amp; liens" FontSize="18" FontWeight="Bold" Margin="0,0,12,0"/>
-                <Button Content="Ouvrir/MAJ vue 3D" Padding="10,6" Margin="0,0,8,0" Click="OnEnsure3D"/>
-                <ToggleButton x:Name="BtnShowAll" Content="Afficher toutes les erreurs" Padding="10,6" Margin="0,0,8,0"
+        <Border Grid.Row="0" Background="White" BorderBrush="#D6DEEB" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,0,0,10">
+            <DockPanel LastChildFill="True">
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" Margin="0,0,12,0" VerticalAlignment="Center">
+                    <TextBlock Text="Clash 3D — Résultats d’analyse" FontSize="19" FontWeight="SemiBold" Margin="0,0,14,0"/>
+                    <Border Background="#EEF3FF" CornerRadius="12" Padding="8,3" Margin="0,0,8,0">
+                        <TextBlock x:Name="TxtIssueCount" Text="0 anomalies" FontWeight="SemiBold" Foreground="#2E5AAC"/>
+                    </Border>
+                    <Button Content="Ouvrir / MAJ vue 3D" Padding="10,6" Margin="0,0,8,0" Click="OnEnsure3D"/>
+                    <ToggleButton x:Name="BtnShowAll" Content="Afficher toutes les erreurs" Padding="10,6" Margin="0,0,8,0"
                               Checked="OnShowAll" Unchecked="OnShowAll"/>
-                <CheckBox x:Name="ChkAutoFocus" Content="Focus auto 3D (sélection)" IsChecked="True" VerticalAlignment="Center" Margin="8,0,0,0"/>
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
-                <Button Content="⟨ Précédent" Padding="10,6" Margin="0,0,6,0" Click="OnPrev"/>
-                <Button Content="Suivant ⟩" Padding="10,6" Click="OnNext"/>
-            </StackPanel>
-        </DockPanel>
+                    <CheckBox x:Name="ChkAutoFocus" Content="Focus auto 3D (sélection)" IsChecked="True" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                    <Button Content="⟨ Précédent" Padding="10,6" Margin="0,0,6,0" Click="OnPrev"/>
+                    <Button Content="Suivant ⟩" Padding="10,6" Click="OnNext"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
 
         <!-- Tabs -->
         <TabControl Grid.Row="1" x:Name="Tabs">
             <TabItem Header="Toutes">
                 <DataGrid x:Name="GridAll" AutoGenerateColumns="False" IsReadOnly="True"
-                          RowStyle="{StaticResource IssueRowStyle}"
-                          CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="Type" Binding="{Binding Category}" Width="180"/>
-                        <DataGridTextColumn Header="Id" Binding="{Binding ElementIdValue}" Width="80"/>
-                        <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*"/>
-                        <DataGridTemplateColumn Header="Actions" Width="220">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                        <Button Content="Focus 3D" Padding="8,4" Margin="0,0,6,0" Click="OnFocus"/>
-                                        <Button Padding="8,4" Click="OnIgnore" Style="{StaticResource OkButtonStyle}"/>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                        </DataGridTemplateColumn>
-                    </DataGrid.Columns>
-                </DataGrid>
-            </TabItem>
-
-            <TabItem Header="Murs">
-                <DataGrid x:Name="GridWalls" AutoGenerateColumns="False" IsReadOnly="True"
                           RowStyle="{StaticResource IssueRowStyle}"
                           CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single">
                     <DataGrid.Columns>
@@ -108,7 +106,7 @@
                           CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single">
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="Type" Binding="{Binding Category}" Width="220"/>
-                        <DataGridTextColumn Header="Id" Binding="{Binding ElementIdValue}" Width="80"/>                        
+                        <DataGridTextColumn Header="Id" Binding="{Binding ElementIdValue}" Width="80"/>
                         <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*"/>
                         <DataGridTemplateColumn Header="Actions" Width="220">
                             <DataGridTemplateColumn.CellTemplate>
@@ -168,7 +166,7 @@
         </TabControl>
 
         <TextBlock Grid.Row="2" Margin="0,8,0,0"
-                   Text="Astuce : Focus 3D met en avant l’élément (et le mur si traversée). 'Afficher toutes les erreurs' enlève la zone de coupe."
+                   Text="Astuce : Focus 3D met en avant l’élément. 'Afficher toutes les erreurs' enlève la zone de coupe."
                    Opacity="0.7"/>
     </Grid>
 </Window>

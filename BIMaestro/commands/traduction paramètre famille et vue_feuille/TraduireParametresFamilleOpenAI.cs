@@ -486,8 +486,8 @@ namespace Famille
 
         private static string GetCachePath()
         {
-            string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            string dir = Path.Combine(appData, "BIMaestro");
+            string MyDocuments = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            string dir = Path.Combine(MyDocuments, "RevitLogs", "SauvegardePréférence");
             return Path.Combine(dir, "translation_cache.json");
         }
     }

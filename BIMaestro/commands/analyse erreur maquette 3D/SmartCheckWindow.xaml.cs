@@ -16,7 +16,6 @@ namespace Analyse
         private readonly SmartExternalHandler _handler;
 
         private readonly List<ModelIssue> _all;
-        private readonly List<ModelIssue> _walls;
         private readonly List<ModelIssue> _mepNoSleeve;
         private readonly List<ModelIssue> _linkClashes;
         private readonly List<ModelIssue> _openConnectors;
@@ -31,15 +30,15 @@ namespace Analyse
             _docKey = docKey;
 
             _all = issues.ToList();
-            _walls = _all.Where(i => i.Kind == IssueKind.WallFloating || i.Kind == IssueKind.WallOnWall || i.Kind == IssueKind.WallEmbeddedInFloor).ToList();
             _mepNoSleeve = _all.Where(i => i.Kind == IssueKind.MepThroughWallNoSleeve).ToList();
             _linkClashes = _all.Where(i => i.Kind == IssueKind.LinkPipeClash).ToList();
             _openConnectors = _all.Where(i => i.Kind == IssueKind.MepUnconnected).ToList();
 
+            TxtIssueCount.Text = $"{_all.Count} anomalies";
+
             Bind();
 
             GridAll.MouseDoubleClick += (s, e) => FocusFromGrid(GridAll);
-            GridWalls.MouseDoubleClick += (s, e) => FocusFromGrid(GridWalls);
             GridMEP.MouseDoubleClick += (s, e) => FocusFromGrid(GridMEP);
             GridLinks.MouseDoubleClick += (s, e) => FocusFromGrid(GridLinks);
             GridOpen.MouseDoubleClick += (s, e) => FocusFromGrid(GridOpen);
@@ -48,10 +47,19 @@ namespace Analyse
         private void Bind()
         {
             BindGrid(GridAll, _all);
-            BindGrid(GridWalls, _walls);
             BindGrid(GridMEP, _mepNoSleeve);
             BindGrid(GridLinks, _linkClashes);
             BindGrid(GridOpen, _openConnectors);
+            UpdateIssueCount();
+        }
+
+        private void UpdateIssueCount()
+        {
+            var ignored = _all.Count(i => i.Ignored);
+            var active = _all.Count - ignored;
+            TxtIssueCount.Text = ignored > 0
+                ? $"{active} actives / {_all.Count} anomalies"
+                : $"{_all.Count} anomalies";
         }
 
         private static void BindGrid(DataGrid grid, IEnumerable<ModelIssue> source)
@@ -69,7 +77,6 @@ namespace Analyse
         {
             switch (CurrentTabName())
             {
-                case "Murs": return _walls.Where(i => !i.Ignored);
                 case "Traversées (sans réservation)": return _mepNoSleeve.Where(i => !i.Ignored);
                 case "Collisions liens / tuyaux": return _linkClashes.Where(i => !i.Ignored);
                 case "Raccords ouverts": return _openConnectors.Where(i => !i.Ignored);
@@ -81,7 +88,6 @@ namespace Analyse
         {
             switch (CurrentTabName())
             {
-                case "Murs": return GridWalls.SelectedItem as ModelIssue;
                 case "Traversées (sans réservation)": return GridMEP.SelectedItem as ModelIssue;
                 case "Collisions liens / tuyaux": return GridLinks.SelectedItem as ModelIssue;
                 case "Raccords ouverts": return GridOpen.SelectedItem as ModelIssue;
@@ -93,7 +99,6 @@ namespace Analyse
         {
             switch (CurrentTabName())
             {
-                case "Murs": return GridWalls;
                 case "Traversées (sans réservation)": return GridMEP;
                 case "Collisions liens / tuyaux": return GridLinks;
                 case "Raccords ouverts": return GridOpen;
@@ -203,7 +208,6 @@ namespace Analyse
             if (issue == null) return;
 
             SelectInGrid(GridAll, issue);
-            SelectInGrid(GridWalls, issue);
             SelectInGrid(GridMEP, issue);
             SelectInGrid(GridLinks, issue);
             SelectInGrid(GridOpen, issue);
