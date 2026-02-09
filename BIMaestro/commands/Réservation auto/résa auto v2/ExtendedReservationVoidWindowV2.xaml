@@ -1,0 +1,333 @@
+﻿<Window x:Class="Modification.ExtendedReservationWindowV2"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="BIMaestro - Créer des réservations V2"
+        Height="480"
+        Width="560"
+        MinWidth="520"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource App.Background}"
+        ResizeMode="CanResize">
+
+    <Window.Resources>
+        <SolidColorBrush x:Key="App.Background"   Color="#F8FAFC"/>
+        <SolidColorBrush x:Key="Card.Background"  Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="Card.Border"      Color="#E5E7EB"/>
+        <SolidColorBrush x:Key="Divider"          Color="#E6EAF0"/>
+        <SolidColorBrush x:Key="Text.Primary"     Color="#0F172A"/>
+        <SolidColorBrush x:Key="Text.Secondary"   Color="#64748B"/>
+        <SolidColorBrush x:Key="Accent"           Color="#3B82F6"/>
+        <SolidColorBrush x:Key="Accent.Subtle"    Color="#EEF2FF"/>
+        <SolidColorBrush x:Key="Accent.Border"    Color="#D6E1FF"/>
+
+        <Style x:Key="SectionTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource Text.Primary}"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="{StaticResource Text.Primary}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin" Value="0,0,12,0"/>
+        </Style>
+
+        <Style x:Key="FieldBox" TargetType="Control">
+            <Setter Property="Margin" Value="0,0,0,12"/>
+        </Style>
+
+        <Style TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{StaticResource Text.Primary}"/>
+            <Setter Property="Margin" Value="0,6,0,6"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="Padding" Value="14"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Background" Value="{StaticResource Card.Background}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Card.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.15" Color="#000000"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="IconButton" TargetType="Button">
+            <Setter Property="Width" Value="24"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Foreground" Value="{StaticResource Text.Primary}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="ToolTip" Value="Options avancées"/>
+            <Setter Property="Opacity" Value="0.65"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" CornerRadius="12"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{StaticResource Accent.Subtle}"/>
+                                <Setter Property="BorderBrush" Value="{StaticResource Accent.Border}"/>
+                                <Setter Property="BorderThickness" Value="1"/>
+                                <Setter Property="Opacity" Value="1"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{StaticResource Accent.Subtle}"/>
+                                <Setter Property="BorderBrush" Value="{StaticResource Accent}"/>
+                                <Setter Property="BorderThickness" Value="1"/>
+                                <Setter Property="Opacity" Value="1"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PrimaryButton" TargetType="Button">
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="MinWidth" Value="120"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="{StaticResource Accent}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Accent}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" CornerRadius="8"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#2563EB"/>
+                                <Setter Property="BorderBrush" Value="#2563EB"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="bd" Property="Background" Value="#BFD4FF"/>
+                                <Setter Property="BorderBrush" Value="#BFD4FF"/>
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="Opacity" Value="0.8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="GhostButton" TargetType="Button">
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="MinWidth" Value="120"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Foreground" Value="{StaticResource Text.Primary}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Card.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" CornerRadius="8"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#F1F5F9"/>
+                                <Setter Property="BorderBrush" Value="#CBD5E1"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PopupCard" TargetType="Border">
+            <Setter Property="Padding" Value="10"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Background" Value="{StaticResource Card.Background}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Card.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect BlurRadius="14" ShadowDepth="2" Opacity="0.22" Color="#000000"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- En-tête -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,12">
+            <TextBlock Text="Créer des réservations V2 (Void Cut)" FontSize="18" FontWeight="Bold" Foreground="{StaticResource Text.Primary}"/>
+            <TextBlock Text="V2 = objet indépendant + coupe automatique du support via void. Profondeur = épaisseur mur/sol (sans +50mm)."
+                       Foreground="{StaticResource Text.Secondary}"
+                       Margin="0,2,0,0"/>
+        </StackPanel>
+
+        <!-- Bandeau Mode -->
+        <Border Grid.Row="1" Style="{StaticResource Card}" Padding="12" Margin="0,0,0,12">
+            <DockPanel LastChildFill="False">
+                <CheckBox x:Name="chkAutomatique"
+                          Content="Mode automatique"
+                          Foreground="{StaticResource Text.Primary}"
+                          ToolTip="Si coché : exécution en mode automatique (comme V1 : murs uniquement). Sinon : mode manuel."
+                          Margin="0,0,12,0"/>
+                <TextBlock Text="(basculer selon votre besoin)"
+                           Foreground="{StaticResource Text.Secondary}"
+                           VerticalAlignment="Center"/>
+            </DockPanel>
+        </Border>
+
+        <!-- Corps -->
+        <Border Grid.Row="2" Style="{StaticResource Card}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="170"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.ColumnSpan="2"
+                           Text="Cibles"
+                           Style="{StaticResource SectionTitle}"/>
+
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Support :" Style="{StaticResource FieldLabel}"/>
+                <ComboBox Grid.Row="1" Grid.Column="1"
+                          x:Name="comboHostType"
+                          Height="28"
+                          Style="{StaticResource FieldBox}"
+                          MaxDropDownHeight="120"
+                          SelectionChanged="OnHostTypeChanged"
+                          ToolTip="Mur = famille verticale, Sol = famille horizontale." />
+
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="Type d’objet :" Style="{StaticResource FieldLabel}"/>
+                <ComboBox Grid.Row="2" Grid.Column="1"
+                          x:Name="comboObjectType"
+                          Height="28"
+                          Style="{StaticResource FieldBox}"
+                          MaxDropDownHeight="300"
+                          SelectionChanged="OnCriteriaChanged"
+                          ToolTip="Sélectionnez le type d’objet concerné." />
+
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="Source canalisations :" Style="{StaticResource FieldLabel}"/>
+                <ComboBox Grid.Row="3" Grid.Column="1"
+                          x:Name="comboPipeSource"
+                          Height="28"
+                          Style="{StaticResource FieldBox}"
+                          MaxDropDownHeight="120"
+                          ToolTip="Choisissez si les canalisations à sélectionner sont dans la maquette ou dans un lien.">
+                    <ComboBoxItem Content="Maquette" />
+                    <ComboBoxItem Content="Lien IFC" />
+                    <ComboBoxItem Content="Lien RVT" />
+                </ComboBox>
+
+                <TextBlock Grid.Row="4" Grid.Column="0" Text="Famille V2 :" Style="{StaticResource FieldLabel}"/>
+                <ComboBox Grid.Row="4" Grid.Column="1"
+                          x:Name="comboFamily"
+                          Height="28"
+                          Style="{StaticResource FieldBox}"
+                          MaxDropDownHeight="300"
+                          SelectionChanged="OnCriteriaChanged"
+                          ToolTip="Choisissez la famille V2 (verticale pour mur / horizontale pour sol).">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding DisplayName}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+
+                <Rectangle Grid.Row="5" Grid.ColumnSpan="2" Height="1" Fill="{StaticResource Divider}"/>
+
+                <CheckBox Grid.Row="6" Grid.ColumnSpan="2"
+                          x:Name="chkMulti"
+                          Content="Multi-sélection canalisations (ou Autre)"
+                          IsChecked="False"
+                          IsEnabled="False"
+                          ToolTip="Disponible pour Canalisations ou Autre (comme V1)."/>
+
+                <Grid Grid.Row="6" Grid.ColumnSpan="2" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+                    <Button x:Name="btnOptions"
+                            Style="{StaticResource IconButton}"
+                            Click="BtnOptions_Click"
+                            PreviewMouseRightButtonUp="BtnOptions_RightClick">
+                        <TextBlock Text="⚙" FontSize="14" />
+                    </Button>
+
+                    <Popup x:Name="popupOptions"
+                           PlacementTarget="{Binding ElementName=btnOptions}"
+                           Placement="Top"
+                           StaysOpen="False"
+                           AllowsTransparency="True"
+                           PopupAnimation="Fade">
+                        <Border Style="{StaticResource PopupCard}" MaxWidth="340">
+                            <StackPanel>
+                                <TextBlock Text="Options avancées"
+                                           Margin="0,0,0,6"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource Text.Primary}"/>
+                                <CheckBox x:Name="chkNorme"
+                                          Content="Appliquer la norme (arrondis)"
+                                          IsChecked="True"
+                                          ToolTip="Pipes/ducts: arrondi 50mm. Autres: arrondi 10cm (comme V1)."/>
+                                <CheckBox x:Name="chkDynamoAuto"
+                                          Content="Exécuter le script Dynamo automatiquement"
+                                          IsChecked="True"
+                                          ToolTip="Lance automatiquement le script Dynamo associé (même chemin que V1)."/>
+                            </StackPanel>
+                        </Border>
+                    </Popup>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- Boutons -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button x:Name="btnCancel"
+                    Content="Annuler"
+                    Style="{StaticResource GhostButton}"
+                    IsCancel="True"
+                    Click="OnCancelClicked"/>
+            <Button x:Name="btnOk"
+                    Content="OK"
+                    Style="{StaticResource PrimaryButton}"
+                    IsDefault="True"
+                    Margin="8,0,0,0"
+                    Click="OnOkClicked"/>
+        </StackPanel>
+    </Grid>
+</Window>

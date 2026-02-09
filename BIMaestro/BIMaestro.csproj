@@ -288,11 +288,11 @@
     <Compile Include="commands\flapy bird\FlappyBirdWindow.xaml.cs">
       <DependentUpon>FlappyBirdWindow.xaml</DependentUpon>
     </Compile>
-    <Compile Include="Test\paramétre partagé en famillle\ConvertSharedToFamilyParametersCommand.cs" />
-    <Compile Include="Test\Résa auto v2\ExtendedReservationVoidWindowV2.xaml.cs">
+    <Compile Include="commands\Réservation auto\résa auto v2\ExtendedReservationVoidWindowV2.xaml.cs">
       <DependentUpon>ExtendedReservationVoidWindowV2.xaml</DependentUpon>
     </Compile>
-    <Compile Include="Test\Résa auto v2\ReservationVoidAutoMultiCommandV2.cs" />
+    <Compile Include="commands\Réservation auto\résa auto v2\ReservationVoidAutoMultiCommandV2.cs" />
+    <Compile Include="Test\paramétre partagé en famillle\ConvertSharedToFamilyParametersCommand.cs" />
     <None Include="app et excel\Touche\copie touche.cs" />
     <Compile Include="app et excel\BIMaestroApp.cs" />
     <Compile Include="app et excel\Supabase\BaseTrackedCommand.cs" />
@@ -678,6 +678,10 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </None>
+    <Page Include="commands\Réservation auto\résa auto v2\ExtendedReservationVoidWindowV2.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
     <Page Include="commands\Snake\SnakeLeaderboardWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -687,10 +691,6 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="commands\Snake\SnakeWindow.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="Test\Résa auto v2\ExtendedReservationVoidWindowV2.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
