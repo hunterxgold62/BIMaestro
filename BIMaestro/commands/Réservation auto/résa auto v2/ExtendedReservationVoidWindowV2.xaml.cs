@@ -10,27 +10,9 @@ namespace Modification
 {
     public partial class ExtendedReservationWindowV2 : Window
     {
-        public enum HostTarget
-        {
-            Mur,
-            Sol
-        }
-
-        public enum ObjectType
-        {
-            Canalisation,
-            Gaine,
-            Porte,
-            Fenetre,
-            Autre
-        }
-
-        public enum PipeSource
-        {
-            Maquette,
-            LienIFC,
-            LienRVT
-        }
+        public enum HostTarget { Mur, Sol }
+        public enum ObjectType { Canalisation, Gaine, Porte, Fenetre, Autre }
+        public enum PipeSource { Maquette, LienIFC, LienRVT }
 
         public ObjectType SelectedObjectType { get; private set; }
         public HostTarget SelectedHostTarget { get; private set; }
@@ -44,11 +26,9 @@ namespace Modification
         {
             get
             {
-                if (comboPipeSource == null)
-                    return PipeSource.Maquette;
+                if (comboPipeSource == null) return PipeSource.Maquette;
 
                 string src = null;
-
                 if (comboPipeSource.SelectedItem is ComboBoxItem item)
                     src = item.Content as string;
                 else if (comboPipeSource.SelectedItem is string s)
@@ -63,15 +43,14 @@ namespace Modification
             }
         }
 
-        private readonly List<FamilySymbol> _allFamilies;
         private readonly List<ReservationSymbolItem> _items;
 
         public ExtendedReservationWindowV2(List<FamilySymbol> familiesV2)
         {
             InitializeComponent();
 
-            _allFamilies = familiesV2 ?? new List<FamilySymbol>();
-            _items = _allFamilies
+            var all = familiesV2 ?? new List<FamilySymbol>();
+            _items = all
                 .Where(fs => fs != null && fs.Family != null)
                 .Select(fs => new ReservationSymbolItem(fs, BuildDisplayName(fs)))
                 .OrderBy(i => i.DisplayName)
@@ -100,13 +79,11 @@ namespace Modification
             };
         }
 
-        // Clic gauche : toggle popup
         private void BtnOptions_Click(object sender, RoutedEventArgs e)
         {
             popupOptions.IsOpen = !popupOptions.IsOpen;
         }
 
-        // Clic droit : toggle popup + consume
         private void BtnOptions_RightClick(object sender, MouseButtonEventArgs e)
         {
             e.Handled = true;
@@ -126,8 +103,13 @@ namespace Modification
                     comboPipeSource.SelectedIndex = 0;
             }
 
-            // V2 : familles rectangulaires uniquement => multi sur cana/autre comme V1
-            chkMulti.IsEnabled = (isCanal || isAutre);
+            // Multi uniquement si :
+            // - Canalisations ou Autre
+            // - Famille rectangulaire
+            var famItem = comboFamily.SelectedItem as ReservationSymbolItem;
+            bool isRect = famItem?.IsRectangular == true;
+
+            chkMulti.IsEnabled = (isCanal || isAutre) && isRect;
             if (!chkMulti.IsEnabled)
                 chkMulti.IsChecked = false;
 
@@ -152,21 +134,11 @@ namespace Modification
 
             switch (comboObjectType.SelectedItem as string)
             {
-                case "Canalisation":
-                    SelectedObjectType = ObjectType.Canalisation;
-                    break;
-                case "Gaine":
-                    SelectedObjectType = ObjectType.Gaine;
-                    break;
-                case "Porte":
-                    SelectedObjectType = ObjectType.Porte;
-                    break;
-                case "Fenêtre":
-                    SelectedObjectType = ObjectType.Fenetre;
-                    break;
-                default:
-                    SelectedObjectType = ObjectType.Autre;
-                    break;
+                case "Canalisation": SelectedObjectType = ObjectType.Canalisation; break;
+                case "Gaine": SelectedObjectType = ObjectType.Gaine; break;
+                case "Porte": SelectedObjectType = ObjectType.Porte; break;
+                case "Fenêtre": SelectedObjectType = ObjectType.Fenetre; break;
+                default: SelectedObjectType = ObjectType.Autre; break;
             }
 
             SelectedReservationSymbol = (comboFamily.SelectedItem as ReservationSymbolItem)?.Symbol;
@@ -183,7 +155,7 @@ namespace Modification
 
         private void UpdateFamilyFilter()
         {
-            if (comboFamily == null || _items == null)
+            if (comboFamily == null)
             {
                 comboFamily.ItemsSource = null;
                 comboFamily.SelectedIndex = -1;
@@ -218,11 +190,21 @@ namespace Modification
             {
                 comboFamily.SelectedIndex = -1;
             }
+
+            // Recalcule l'état du multi après refiltrage
+            var typeSel = comboObjectType.SelectedItem as string;
+            bool isCanal = typeSel == "Canalisation";
+            bool isAutre = typeSel == "Autre";
+            var famItem = comboFamily.SelectedItem as ReservationSymbolItem;
+            bool isRect = famItem?.IsRectangular == true;
+
+            chkMulti.IsEnabled = (isCanal || isAutre) && isRect;
+            if (!chkMulti.IsEnabled)
+                chkMulti.IsChecked = false;
         }
 
         private static string BuildDisplayName(FamilySymbol fs)
         {
-            // Affichage simple (comme V1)
             return fs?.Family?.Name ?? string.Empty;
         }
 
@@ -232,10 +214,16 @@ namespace Modification
             {
                 Symbol = symbol;
                 DisplayName = displayName;
+
+                string fam = symbol?.Family?.Name ?? "";
+                IsCircular = fam.IndexOf("circulaire", StringComparison.OrdinalIgnoreCase) >= 0;
+                IsRectangular = fam.IndexOf("rectangulaire", StringComparison.OrdinalIgnoreCase) >= 0;
             }
 
             public FamilySymbol Symbol { get; }
             public string DisplayName { get; }
+            public bool IsCircular { get; }
+            public bool IsRectangular { get; }
         }
     }
 }

@@ -31,10 +31,7 @@ namespace Modification
 
             try
             {
-                // 1) Filtrage familles V2 (void cutters)
-                // Attendu :
-                // - CML_Réservation rectangulaire verticale (mur)
-                // - CML_Réservation rectangulaire horizontale (sol)
+                // 1) Filtrage familles V2 (void cutters) : rect + circulaire, mur + sol
                 List<FamilySymbol> reservationSymbols = new FilteredElementCollector(doc)
                     .OfClass(typeof(FamilySymbol))
                     .Cast<FamilySymbol>()
@@ -42,8 +39,11 @@ namespace Modification
                     .Where(sym =>
                     {
                         string fam = sym.Family.Name ?? string.Empty;
+
                         return fam.IndexOf("CML_Réservation rectangulaire verticale", StringComparison.OrdinalIgnoreCase) >= 0
-                            || fam.IndexOf("CML_Réservation rectangulaire horizontale", StringComparison.OrdinalIgnoreCase) >= 0;
+                            || fam.IndexOf("CML_Réservation rectangulaire horizontale", StringComparison.OrdinalIgnoreCase) >= 0
+                            || fam.IndexOf("CML_Réservation circulaire verticale", StringComparison.OrdinalIgnoreCase) >= 0
+                            || fam.IndexOf("CML_Réservation circulaire horizontale", StringComparison.OrdinalIgnoreCase) >= 0;
                     })
                     .OrderBy(sym => sym.Family.Name)
                     .ThenBy(sym => sym.Name)
@@ -53,12 +53,14 @@ namespace Modification
                 {
                     TaskDialog.Show("Info",
                         "Aucune famille V2 trouvée.\n\nAttendu :\n" +
-                        "- CML_Réservation rectangulaire verticale (mur)\n" +
-                        "- CML_Réservation rectangulaire horizontale (sol)");
+                        "- CML_Réservation rectangulaire verticale\n" +
+                        "- CML_Réservation rectangulaire horizontale\n" +
+                        "- CML_Réservation circulaire verticale\n" +
+                        "- CML_Réservation circulaire horizontale");
                     return Result.Cancelled;
                 }
 
-                // 2) Fenêtre WPF (identique logique V1)
+                // 2) Fenêtre WPF (logique identique V1)
                 var window = new ExtendedReservationWindowV2(reservationSymbols);
                 if (window.ShowDialog() != true)
                     return Result.Cancelled;
@@ -78,24 +80,23 @@ namespace Modification
                     return Result.Cancelled;
                 }
 
-                // Sécurité cohérence support/famille
                 string famName = symbol.Family?.Name ?? "";
                 bool isVertical = famName.IndexOf("verticale", StringComparison.OrdinalIgnoreCase) >= 0;
                 bool isHorizontal = famName.IndexOf("horizontale", StringComparison.OrdinalIgnoreCase) >= 0;
+                bool isCircular = famName.IndexOf("circulaire", StringComparison.OrdinalIgnoreCase) >= 0;
+                bool isRectangular = famName.IndexOf("rectangulaire", StringComparison.OrdinalIgnoreCase) >= 0;
 
+                // Sécurité cohérence support/famille
                 if (hostTarget == ExtendedReservationWindowV2.HostTarget.Mur && !isVertical)
                 {
                     TaskDialog.Show("Erreur",
-                        "Support = Mur, mais la famille choisie n'est pas 'verticale'.\n" +
-                        "Choisis : CML_Réservation rectangulaire verticale.");
+                        "Support = Mur, mais la famille choisie n'est pas 'verticale'.");
                     return Result.Cancelled;
                 }
-
                 if (hostTarget == ExtendedReservationWindowV2.HostTarget.Sol && !isHorizontal)
                 {
                     TaskDialog.Show("Erreur",
-                        "Support = Sol, mais la famille choisie n'est pas 'horizontale'.\n" +
-                        "Choisis : CML_Réservation rectangulaire horizontale.");
+                        "Support = Sol, mais la famille choisie n'est pas 'horizontale'.");
                     return Result.Cancelled;
                 }
 
@@ -104,7 +105,7 @@ namespace Modification
 
                 string hostLabel = hostTarget == ExtendedReservationWindowV2.HostTarget.Sol ? "sol" : "mur";
 
-                // 3) Mode manuel vs automatique (logique identique V1)
+                // 3) Mode manuel vs automatique
                 if (!automatiqueEnabled)
                 {
                     // ============ MODE MANUEL ============
@@ -117,12 +118,10 @@ namespace Modification
                         _ => "l'objet"
                     };
 
-                    TaskDialog.Show("Mode manuel (V2)",
+                    TaskDialog.Show("Mode manuel",
                         $"Vous allez sélectionner {(multiEnabled ? "plusieurs " : "")}{objetLabel}, puis un {hostLabel}.\n\n" +
-                        "V2 = objet indépendant + void cut sur le support.\n" +
-                        "- Longueur/Largeur/Hauteur : +50mm (+ iso) + arrondi si norme\n" +
-                        "- Profondeur : épaisseur mur/sol (sans +50mm, sans arrondi)\n\n" +
-                        "Répétez autant de fois que nécessaire.");
+                        "Répétez autant de fois que nécessaire.\n" +
+                        "Cliquez sur Non pour terminer.");
 
                     while (true)
                     {
@@ -131,8 +130,8 @@ namespace Modification
                             trans.Start();
                             if (!symbol.IsActive) symbol.Activate();
 
-                            // --- MULTI-SÉLECTION (mêmes règles que V1) ---
-                            if (multiEnabled &&
+                            // MULTI : on garde la règle V1 => uniquement rectangle (cana/autre)
+                            if (multiEnabled && isRectangular &&
                                 (objType == ExtendedReservationWindowV2.ObjectType.Canalisation ||
                                  objType == ExtendedReservationWindowV2.ObjectType.Autre))
                             {
@@ -140,15 +139,9 @@ namespace Modification
                                 try
                                 {
                                     if (objType == ExtendedReservationWindowV2.ObjectType.Canalisation)
-                                    {
                                         elemRefs = GetPipeReferencesBySource(uiDoc, doc, pipeSource);
-                                    }
                                     else
-                                    {
-                                        elemRefs = uiDoc.Selection.PickObjects(
-                                            ObjectType.Element,
-                                            "Sélectionnez plusieurs éléments (CTRL+clic)");
-                                    }
+                                        elemRefs = uiDoc.Selection.PickObjects(ObjectType.Element, "Sélectionnez plusieurs éléments (CTRL+clic)");
                                 }
                                 catch
                                 {
@@ -164,7 +157,6 @@ namespace Modification
                                     break;
                                 }
 
-                                // Résolution des éléments + transform vers la maquette hôte
                                 var resolvedSelections = elemRefs
                                     .Select(r => TryResolveReference(uiDoc, r, out var el, out var tr)
                                         ? (el, tr)
@@ -172,11 +164,7 @@ namespace Modification
                                     .Where(t => t.el != null)
                                     .ToList();
 
-                                var elementsSel = resolvedSelections
-                                    .Select(t => t.el)
-                                    .Where(el => el != null)
-                                    .ToList();
-
+                                var elementsSel = resolvedSelections.Select(t => t.el).Where(x => x != null).ToList();
                                 var transformMap = resolvedSelections
                                     .Where(t => t.el != null && t.tr != null && !t.tr.IsIdentity)
                                     .ToDictionary(t => t.el.Id, t => t.tr);
@@ -188,7 +176,6 @@ namespace Modification
                                     break;
                                 }
 
-                                // Sélection du support (toujours dans la maquette)
                                 Reference hostRef;
                                 try
                                 {
@@ -210,49 +197,43 @@ namespace Modification
                                     hostTarget == ExtendedReservationWindowV2.HostTarget.Sol && hostElem is not Floor)
                                 {
                                     trans.RollBack();
-                                    TaskDialog.Show("Erreur",
-                                        hostTarget == ExtendedReservationWindowV2.HostTarget.Sol
-                                            ? "Veuillez sélectionner un sol valide."
-                                            : "Veuillez sélectionner un mur valide.");
+                                    TaskDialog.Show("Erreur", hostTarget == ExtendedReservationWindowV2.HostTarget.Sol
+                                        ? "Veuillez sélectionner un sol valide."
+                                        : "Veuillez sélectionner un mur valide.");
                                     userCancelled = true;
                                     break;
                                 }
 
                                 Level level = doc.GetElement(hostElem.LevelId) as Level
-                                           ?? new FilteredElementCollector(doc)
-                                                  .OfClass(typeof(Level))
-                                                  .Cast<Level>()
-                                                  .FirstOrDefault();
+                                           ?? new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>().FirstOrDefault();
 
                                 bool ok = false;
 
                                 if (objType == ExtendedReservationWindowV2.ObjectType.Canalisation)
                                 {
-                                    // Pipes si possible
                                     var pipes = elementsSel.OfType<Pipe>().ToList();
 
                                     if (hostTarget == ExtendedReservationWindowV2.HostTarget.Sol)
-                                        ok = CreateVoidReservationFromPipesOnFloor_V2(doc, hostElem as Floor, symbol, elementsSel, pipes, normeEnabled, level, transformMap);
+                                        ok = CreateVoidReservationFromPipesOnFloor_V2(doc, hostElem as Floor, symbol, elementsSel, pipes, normeEnabled, level, isCircular, transformMap);
                                     else
-                                        ok = CreateVoidReservationFromPipesOnWall_V2(doc, hostElem as Wall, symbol, elementsSel, pipes, normeEnabled, level, transformMap);
+                                        ok = CreateVoidReservationFromPipesOnWall_V2(doc, hostElem as Wall, symbol, elementsSel, pipes, normeEnabled, level, isCircular, transformMap);
                                 }
                                 else
                                 {
                                     if (hostTarget == ExtendedReservationWindowV2.HostTarget.Sol)
-                                        ok = CreateVoidReservationFromElementsOnFloor_V2(doc, hostElem as Floor, symbol, elementsSel, normeEnabled, level, GetOversizeForType(objType), transformMap);
+                                        ok = CreateVoidReservationFromElementsOnFloor_V2(doc, hostElem as Floor, symbol, elementsSel, normeEnabled, level, GetOversizeForType(objType), isCircular, transformMap);
                                     else
-                                        ok = CreateVoidReservationFromElementsOnWall_V2(doc, hostElem as Wall, symbol, elementsSel, normeEnabled, level, GetOversizeForType(objType), transformMap);
+                                        ok = CreateVoidReservationFromElementsOnWall_V2(doc, hostElem as Wall, symbol, elementsSel, normeEnabled, level, GetOversizeForType(objType), isCircular, transformMap);
                                 }
 
                                 trans.Commit();
-
                                 if (ok) reservationsCreated = true;
 
-                                userCancelled = true; // on sort après un lot (comportement V1)
+                                userCancelled = true; // comportement V1 : un lot puis sortie
                             }
                             else
                             {
-                                // --- CAS SINGLE (identique logique V1) ---
+                                // SINGLE (cercle ou rectangle)
                                 Reference elemRef;
                                 try
                                 {
@@ -282,14 +263,11 @@ namespace Modification
                                         MainContent = "Réessayer ?",
                                         CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No
                                     };
-                                    if (tdErr.Show() == TaskDialogResult.Yes)
-                                        continue;
-
+                                    if (tdErr.Show() == TaskDialogResult.Yes) continue;
                                     userCancelled = true;
                                     break;
                                 }
 
-                                // Sélection support
                                 Reference hostRef2;
                                 try
                                 {
@@ -316,42 +294,36 @@ namespace Modification
                                         MainContent = "Réessayer ?",
                                         CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No
                                     };
-                                    if (tdErr.Show() == TaskDialogResult.Yes)
-                                        continue;
-
+                                    if (tdErr.Show() == TaskDialogResult.Yes) continue;
                                     userCancelled = true;
                                     break;
                                 }
 
                                 Level level2 = doc.GetElement(hostElem2.LevelId) as Level
-                                           ?? new FilteredElementCollector(doc)
-                                                  .OfClass(typeof(Level))
-                                                  .Cast<Level>()
-                                                  .FirstOrDefault();
+                                           ?? new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>().FirstOrDefault();
 
-                                bool ok = false;
-
-                                // SINGLE => on passe en "liste 1" pour réutiliser les méthodes multi
                                 var one = new List<Element> { selElem };
                                 var transformMapSingle = (transformToHost != null && !transformToHost.IsIdentity)
                                     ? new Dictionary<ElementId, Transform> { { selElem.Id, transformToHost } }
                                     : null;
+
+                                bool ok = false;
 
                                 if (objType == ExtendedReservationWindowV2.ObjectType.Canalisation)
                                 {
                                     var pipes = one.OfType<Pipe>().ToList();
 
                                     if (hostTarget == ExtendedReservationWindowV2.HostTarget.Sol)
-                                        ok = CreateVoidReservationFromPipesOnFloor_V2(doc, hostElem2 as Floor, symbol, one, pipes, normeEnabled, level2, transformMapSingle);
+                                        ok = CreateVoidReservationFromPipesOnFloor_V2(doc, hostElem2 as Floor, symbol, one, pipes, normeEnabled, level2, isCircular, transformMapSingle);
                                     else
-                                        ok = CreateVoidReservationFromPipesOnWall_V2(doc, hostElem2 as Wall, symbol, one, pipes, normeEnabled, level2, transformMapSingle);
+                                        ok = CreateVoidReservationFromPipesOnWall_V2(doc, hostElem2 as Wall, symbol, one, pipes, normeEnabled, level2, isCircular, transformMapSingle);
                                 }
                                 else
                                 {
                                     if (hostTarget == ExtendedReservationWindowV2.HostTarget.Sol)
-                                        ok = CreateVoidReservationFromElementsOnFloor_V2(doc, hostElem2 as Floor, symbol, one, normeEnabled, level2, GetOversizeForType(objType), transformMapSingle);
+                                        ok = CreateVoidReservationFromElementsOnFloor_V2(doc, hostElem2 as Floor, symbol, one, normeEnabled, level2, GetOversizeForType(objType), isCircular, transformMapSingle);
                                     else
-                                        ok = CreateVoidReservationFromElementsOnWall_V2(doc, hostElem2 as Wall, symbol, one, normeEnabled, level2, GetOversizeForType(objType), transformMapSingle);
+                                        ok = CreateVoidReservationFromElementsOnWall_V2(doc, hostElem2 as Wall, symbol, one, normeEnabled, level2, GetOversizeForType(objType), isCircular, transformMapSingle);
                                 }
 
                                 trans.Commit();
@@ -359,7 +331,6 @@ namespace Modification
                             }
                         }
 
-                        // Fin boucle : identique V1
                         var tdFin = new TaskDialog("Terminé")
                         {
                             MainInstruction = "Créer une autre réservation ?",
@@ -380,8 +351,7 @@ namespace Modification
 
                     if (hostTarget == ExtendedReservationWindowV2.HostTarget.Sol)
                     {
-                        TaskDialog.Show("Info",
-                            "Le mode automatique pour les sols n'est pas disponible (comme en V1).\nUtilisez le mode manuel.");
+                        TaskDialog.Show("Info", "Le mode automatique pour les sols n'est pas disponible. Utilisez le mode manuel.");
                         return Result.Cancelled;
                     }
 
@@ -417,62 +387,33 @@ namespace Modification
                         trans.Start();
                         if (!symbol.IsActive) symbol.Activate();
 
-                        if (objType == ExtendedReservationWindowV2.ObjectType.Canalisation ||
-                            objType == ExtendedReservationWindowV2.ObjectType.Gaine)
+                        var walls = new FilteredElementCollector(doc).OfClass(typeof(Wall)).Cast<Wall>().ToList();
+
+                        foreach (Wall wall in walls)
                         {
-                            var walls = new FilteredElementCollector(doc)
-                                .OfClass(typeof(Wall))
-                                .Cast<Wall>()
-                                .ToList();
+                            BoundingBoxXYZ bbWall = wall.get_BoundingBox(null);
+                            if (bbWall == null) continue;
 
-                            foreach (Wall wall in walls)
-                            {
-                                BoundingBoxXYZ bbWall = wall.get_BoundingBox(null);
-                                if (bbWall == null) continue;
+                            Level wallLevel = doc.GetElement(wall.LevelId) as Level
+                                           ?? new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>().FirstOrDefault();
 
-                                Level wallLevel = doc.GetElement(wall.LevelId) as Level
-                                               ?? new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>().FirstOrDefault();
-
-                                foreach (Element elem in targetElements)
-                                {
-                                    BoundingBoxXYZ bbElem = elem.get_BoundingBox(null);
-                                    if (bbElem == null) continue;
-
-                                    BoundingBoxXYZ bbI = IntersectBoundingBoxes(bbWall, bbElem);
-                                    if (bbI == null) continue;
-
-                                    bool ok = CreateVoidReservationFromElementsOnWall_V2(
-                                        doc,
-                                        wall,
-                                        symbol,
-                                        new List<Element> { elem },
-                                        normeEnabled,
-                                        wallLevel,
-                                        GetOversizeForType(objType),
-                                        null);
-
-                                    if (ok) countCreated++;
-                                }
-                            }
-                        }
-                        else
-                        {
                             foreach (Element elem in targetElements)
                             {
-                                if (elem is not FamilyInstance fi) continue;
-                                if (fi.Host is not Wall wallHost) continue;
+                                BoundingBoxXYZ bbElem = elem.get_BoundingBox(null);
+                                if (bbElem == null) continue;
 
-                                Level hostLevel = doc.GetElement(wallHost.LevelId) as Level
-                                               ?? new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>().FirstOrDefault();
+                                BoundingBoxXYZ bbI = IntersectBoundingBoxes(bbWall, bbElem);
+                                if (bbI == null) continue;
 
                                 bool ok = CreateVoidReservationFromElementsOnWall_V2(
                                     doc,
-                                    wallHost,
+                                    wall,
                                     symbol,
                                     new List<Element> { elem },
                                     normeEnabled,
-                                    hostLevel,
+                                    wallLevel,
                                     GetOversizeForType(objType),
+                                    isCircular,
                                     null);
 
                                 if (ok) countCreated++;
@@ -484,7 +425,7 @@ namespace Modification
 
                     if (countCreated > 0) reservationsCreated = true;
 
-                    TaskDialog.Show("Réservations V2 créées",
+                    TaskDialog.Show("Réservations créées",
                         $"Nombre total de réservations placées : {countCreated}");
                 }
 
@@ -531,7 +472,7 @@ namespace Modification
                         "Checklist famille V2 :\n" +
                         "- 'Cut with Voids When Loaded' activé\n" +
                         "- le volume de coupe est bien un Void\n" +
-                        "- paramètres : Longueur/Largeur/Hauteur/Profondeur existent (ou équivalents)\n" +
+                        "- paramètres présents (Diamètre/Profondeur ou Longueur/Largeur/Hauteur/Profondeur)\n" +
                         "- la famille est bien chargée/active.");
                 }
 
@@ -544,7 +485,7 @@ namespace Modification
             }
         }
 
-        #region V2 - Coeur (Void Cut)
+        #region V2 - Coeur (Void Cut) : rectangle + circulaire
 
         private bool CreateVoidReservationFromPipesOnWall_V2(
             Document doc,
@@ -554,6 +495,7 @@ namespace Modification
             List<Pipe> pipes,
             bool normeEnabled,
             Level level,
+            bool isCircular,
             Dictionary<ElementId, Transform> transformMap = null)
         {
             if (wall == null || symbol == null || elementsSel == null || elementsSel.Count == 0)
@@ -562,7 +504,6 @@ namespace Modification
             BoundingBoxXYZ bbWall = wall.get_BoundingBox(null);
             if (bbWall == null) return false;
 
-            // Clip bbox des éléments à l’intérieur du mur (en coordonnées hôte)
             var clippedBbs = elementsSel
                 .Select(e => GetBoundingBoxInHostCoordinates(e, GetTransform(transformMap, e.Id)))
                 .Where(bb => bb != null)
@@ -574,7 +515,6 @@ namespace Modification
 
             BoundingBoxXYZ bbAll = Union(clippedBbs);
 
-            // Isolation max si pipes réels
             double maxIso = 0.0;
             if (pipes != null && pipes.Count > 0)
             {
@@ -584,11 +524,9 @@ namespace Modification
                     .Max();
             }
 
-            // Direction mur (pour Longueur)
             XYZ wallDir = GetWallDirectionXY(wall);
             if (wallDir == null || wallDir.IsZeroLength()) wallDir = XYZ.BasisX;
 
-            // Longueur = projection sur direction mur
             var corners = GetWorldCorners(bbAll);
             double minP = double.MaxValue, maxP = double.MinValue;
             foreach (var c in corners)
@@ -598,24 +536,26 @@ namespace Modification
                 maxP = Math.Max(maxP, p);
             }
 
-            double longueur = (maxP - minP) + 2 * maxIso + OVERSIZE_FT;
-            double hauteur = (bbAll.Max.Z - bbAll.Min.Z) + 2 * maxIso + OVERSIZE_FT;
+            double extentAlongWall = (maxP - minP);
+            double extentZ = (bbAll.Max.Z - bbAll.Min.Z);
 
-            // Profondeur = épaisseur mur (sans oversize, sans arrondi)
-            double profondeur = wall.Width;
+            double oversize = OVERSIZE_FT;
 
-            // Arrondis V1-like : pipes => 50mm, autres => 10cm.
-            // Ici on garde 50mm (plus logique pour des réservations).
+            double lengthOrDiam_W = extentAlongWall + 2 * maxIso + oversize;
+            double heightOrDiam_H = extentZ + 2 * maxIso + oversize;
+
             if (normeEnabled)
             {
-                longueur = RoundToNearest50mm(longueur);
-                hauteur = RoundToNearest50mm(hauteur);
+                // Pipes => 50mm (comme V1)
+                lengthOrDiam_W = RoundToNearest50mm(lengthOrDiam_W);
+                heightOrDiam_H = RoundToNearest50mm(heightOrDiam_H);
             }
+
+            double profondeur = wall.Width; // pas de +50mm
 
             XYZ centroid = (bbAll.Min + bbAll.Max) * 0.5;
             XYZ center = ProjectPointOntoWallPlane(wall, centroid);
 
-            // Création instance non hébergée (objet indépendant)
             if (level == null)
             {
                 level = doc.GetElement(wall.LevelId) as Level
@@ -629,13 +569,21 @@ namespace Modification
                 level,
                 Autodesk.Revit.DB.Structure.StructuralType.NonStructural);
 
-            // Rotation : aligner l'axe X du cutter sur l'axe du mur
             AlignInstanceXToAxisXY(doc, cutter, center, wallDir);
 
-            // Set paramètres (robuste: plusieurs noms possibles)
-            SetParamLength(cutter, longueur);
-            SetParamHeight(cutter, hauteur);
-            SetParamDepth(cutter, profondeur);
+            if (isCircular)
+            {
+                double diam = Math.Max(lengthOrDiam_W, heightOrDiam_H);
+                SetParamDiameter(cutter, diam);
+                SetParamDepth(cutter, profondeur);
+            }
+            else
+            {
+                // rectangle mur : Longueur (le long du mur) + Hauteur
+                SetParamLength(cutter, lengthOrDiam_W);
+                SetParamHeight(cutter, heightOrDiam_H);
+                SetParamDepth(cutter, profondeur);
+            }
 
             doc.Regenerate();
 
@@ -661,6 +609,7 @@ namespace Modification
             List<Pipe> pipes,
             bool normeEnabled,
             Level level,
+            bool isCircular,
             Dictionary<ElementId, Transform> transformMap = null)
         {
             if (floor == null || symbol == null || elementsSel == null || elementsSel.Count == 0)
@@ -669,7 +618,6 @@ namespace Modification
             BoundingBoxXYZ bbFloor = floor.get_BoundingBox(null);
             if (bbFloor == null) return false;
 
-            // On clip aussi au sol (utile si éléments hors sol)
             var clippedBbs = elementsSel
                 .Select(e => GetBoundingBoxInHostCoordinates(e, GetTransform(transformMap, e.Id)))
                 .Where(bb => bb != null)
@@ -690,9 +638,9 @@ namespace Modification
                     .Max();
             }
 
-            // Axe principal en XY (moyenne des directions de pipes si possible)
             XYZ axisX = GetAverageDirectionXY(elementsSel) ?? XYZ.BasisX;
             axisX = axisX.Normalize();
+
             XYZ axisY = XYZ.BasisZ.CrossProduct(axisX);
             axisY = new XYZ(axisY.X, axisY.Y, 0.0);
             if (axisY.IsZeroLength()) axisY = XYZ.BasisY;
@@ -712,19 +660,20 @@ namespace Modification
                 maxY = Math.Max(maxY, py);
             }
 
-            double longueur = (maxX - minX) + 2 * maxIso + OVERSIZE_FT;
-            double largeur = (maxY - minY) + 2 * maxIso + OVERSIZE_FT;
+            double oversize = OVERSIZE_FT;
 
-            // Profondeur = épaisseur sol (sans oversize, sans arrondi)
-            double profondeur = GetFloorThickness(doc, floor);
-            if (profondeur <= 1e-9)
-                profondeur = (bbFloor.Max.Z - bbFloor.Min.Z);
+            double longueur = (maxX - minX) + 2 * maxIso + oversize;
+            double largeur = (maxY - minY) + 2 * maxIso + oversize;
 
             if (normeEnabled)
             {
                 longueur = RoundToNearest50mm(longueur);
                 largeur = RoundToNearest50mm(largeur);
             }
+
+            double profondeur = GetFloorThickness(doc, floor);
+            if (profondeur <= 1e-9)
+                profondeur = (bbFloor.Max.Z - bbFloor.Min.Z);
 
             XYZ centroid = (bbAll.Min + bbAll.Max) * 0.5;
             XYZ center = GetPlacementPointOnFloorMidZ(floor, centroid);
@@ -744,9 +693,19 @@ namespace Modification
 
             AlignInstanceXToAxisXY(doc, cutter, center, axisX);
 
-            SetParamLength(cutter, longueur);
-            SetParamWidth(cutter, largeur);
-            SetParamDepth(cutter, profondeur);
+            if (isCircular)
+            {
+                double diam = Math.Max(longueur, largeur);
+                SetParamDiameter(cutter, diam);
+                SetParamDepth(cutter, profondeur);
+            }
+            else
+            {
+                // rectangle sol : Longueur + Largeur
+                SetParamLength(cutter, longueur);
+                SetParamWidth(cutter, largeur);
+                SetParamDepth(cutter, profondeur);
+            }
 
             doc.Regenerate();
 
@@ -772,6 +731,7 @@ namespace Modification
             bool normeEnabled,
             Level level,
             double oversize,
+            bool isCircular,
             Dictionary<ElementId, Transform> transformMap = null)
         {
             if (wall == null || symbol == null || elementsSel == null || elementsSel.Count == 0)
@@ -803,17 +763,17 @@ namespace Modification
                 maxP = Math.Max(maxP, p);
             }
 
-            double longueur = (maxP - minP) + oversize;
-            double hauteur = (bbAll.Max.Z - bbAll.Min.Z) + oversize;
+            double extentAlongWall = (maxP - minP) + oversize;
+            double extentZ = (bbAll.Max.Z - bbAll.Min.Z) + oversize;
 
-            // Norme V1 : autres => 10cm (comme ton code V1)
             if (normeEnabled)
             {
-                longueur = RoundToNearest10cm(longueur);
-                hauteur = RoundToNearest10cm(hauteur);
+                // V1 : Autres => 10cm
+                extentAlongWall = RoundToNearest10cm(extentAlongWall);
+                extentZ = RoundToNearest10cm(extentZ);
             }
 
-            double profondeur = wall.Width; // sans oversize
+            double profondeur = wall.Width;
 
             XYZ centroid = (bbAll.Min + bbAll.Max) * 0.5;
             XYZ center = ProjectPointOntoWallPlane(wall, centroid);
@@ -833,9 +793,18 @@ namespace Modification
 
             AlignInstanceXToAxisXY(doc, cutter, center, wallDir);
 
-            SetParamLength(cutter, longueur);
-            SetParamHeight(cutter, hauteur);
-            SetParamDepth(cutter, profondeur);
+            if (isCircular)
+            {
+                double diam = Math.Max(extentAlongWall, extentZ);
+                SetParamDiameter(cutter, diam);
+                SetParamDepth(cutter, profondeur);
+            }
+            else
+            {
+                SetParamLength(cutter, extentAlongWall);
+                SetParamHeight(cutter, extentZ);
+                SetParamDepth(cutter, profondeur);
+            }
 
             doc.Regenerate();
 
@@ -861,6 +830,7 @@ namespace Modification
             bool normeEnabled,
             Level level,
             double oversize,
+            bool isCircular,
             Dictionary<ElementId, Transform> transformMap = null)
         {
             if (floor == null || symbol == null || elementsSel == null || elementsSel.Count == 0)
@@ -880,9 +850,9 @@ namespace Modification
 
             BoundingBoxXYZ bbAll = Union(clippedBbs);
 
-            // Axe X principal basé sur direction des éléments si possible
             XYZ axisX = GetAverageDirectionXY(elementsSel) ?? XYZ.BasisX;
             axisX = axisX.Normalize();
+
             XYZ axisY = XYZ.BasisZ.CrossProduct(axisX);
             axisY = new XYZ(axisY.X, axisY.Y, 0.0);
             if (axisY.IsZeroLength()) axisY = XYZ.BasisY;
@@ -933,9 +903,18 @@ namespace Modification
 
             AlignInstanceXToAxisXY(doc, cutter, center, axisX);
 
-            SetParamLength(cutter, longueur);
-            SetParamWidth(cutter, largeur);
-            SetParamDepth(cutter, profondeur);
+            if (isCircular)
+            {
+                double diam = Math.Max(longueur, largeur);
+                SetParamDiameter(cutter, diam);
+                SetParamDepth(cutter, profondeur);
+            }
+            else
+            {
+                SetParamLength(cutter, longueur);
+                SetParamWidth(cutter, largeur);
+                SetParamDepth(cutter, profondeur);
+            }
 
             doc.Regenerate();
 
@@ -959,7 +938,7 @@ namespace Modification
 
         private void SetParamLength(FamilyInstance fi, double v)
         {
-            TrySetDouble(fi, new[] { "Longueur", "COM_Longueur", "Largeur", "COM_Largeur" }, v);
+            TrySetDouble(fi, new[] { "Longueur", "COM_Longueur" }, v);
         }
 
         private void SetParamWidth(FamilyInstance fi, double v)
@@ -975,6 +954,13 @@ namespace Modification
         private void SetParamDepth(FamilyInstance fi, double v)
         {
             TrySetDouble(fi, new[] { "Profondeur", "COM_Profondeur" }, v);
+        }
+
+        private void SetParamDiameter(FamilyInstance fi, double v)
+        {
+            // Tes familles : "Diamètre"
+            // On met aussi des fallbacks classiques
+            TrySetDouble(fi, new[] { "Diamètre", "COM_Diamètre", "COM_Diametre", "Diameter", "COM_Diameter" }, v);
         }
 
         private bool TrySetDouble(Element e, IEnumerable<string> names, double value)
@@ -1388,7 +1374,6 @@ namespace Modification
 
             if (dirs.Count == 0) return null;
 
-            // Standardiser le signe (évite que +d et -d s'annulent)
             XYZ refDir = dirs[0];
             XYZ sum = XYZ.Zero;
 

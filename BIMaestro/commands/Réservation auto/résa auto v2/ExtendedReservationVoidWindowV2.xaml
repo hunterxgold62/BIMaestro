@@ -183,21 +183,19 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- En-tête -->
         <StackPanel Grid.Row="0" Margin="0,0,0,12">
-            <TextBlock Text="Créer des réservations V2 (Void Cut)" FontSize="18" FontWeight="Bold" Foreground="{StaticResource Text.Primary}"/>
-            <TextBlock Text="V2 = objet indépendant + coupe automatique du support via void. Profondeur = épaisseur mur/sol (sans +50mm)."
+            <TextBlock Text="Créer des réservations V2" FontSize="18" FontWeight="Bold" Foreground="{StaticResource Text.Primary}"/>
+            <TextBlock Text="Choisissez le type d’objet et la famille V2 (rectangulaire ou circulaire)."
                        Foreground="{StaticResource Text.Secondary}"
                        Margin="0,2,0,0"/>
         </StackPanel>
 
-        <!-- Bandeau Mode -->
         <Border Grid.Row="1" Style="{StaticResource Card}" Padding="12" Margin="0,0,0,12">
             <DockPanel LastChildFill="False">
                 <CheckBox x:Name="chkAutomatique"
                           Content="Mode automatique"
                           Foreground="{StaticResource Text.Primary}"
-                          ToolTip="Si coché : exécution en mode automatique (comme V1 : murs uniquement). Sinon : mode manuel."
+                          ToolTip="Si coché : exécution en mode automatique (murs uniquement). Sinon : mode manuel."
                           Margin="0,0,12,0"/>
                 <TextBlock Text="(basculer selon votre besoin)"
                            Foreground="{StaticResource Text.Secondary}"
@@ -205,7 +203,6 @@
             </DockPanel>
         </Border>
 
-        <!-- Corps -->
         <Border Grid.Row="2" Style="{StaticResource Card}">
             <Grid>
                 <Grid.RowDefinitions>
@@ -233,7 +230,7 @@
                           Style="{StaticResource FieldBox}"
                           MaxDropDownHeight="120"
                           SelectionChanged="OnHostTypeChanged"
-                          ToolTip="Mur = famille verticale, Sol = famille horizontale." />
+                          ToolTip="Mur = familles verticales / Sol = familles horizontales." />
 
                 <TextBlock Grid.Row="2" Grid.Column="0" Text="Type d’objet :" Style="{StaticResource FieldLabel}"/>
                 <ComboBox Grid.Row="2" Grid.Column="1"
@@ -263,7 +260,7 @@
                           Style="{StaticResource FieldBox}"
                           MaxDropDownHeight="300"
                           SelectionChanged="OnCriteriaChanged"
-                          ToolTip="Choisissez la famille V2 (verticale pour mur / horizontale pour sol).">
+                          ToolTip="Choisissez la famille V2 (rectangulaire ou circulaire).">
                     <ComboBox.ItemTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding DisplayName}" />
@@ -275,10 +272,10 @@
 
                 <CheckBox Grid.Row="6" Grid.ColumnSpan="2"
                           x:Name="chkMulti"
-                          Content="Multi-sélection canalisations (ou Autre)"
+                          Content="Multi-sélection canalisations (rectangle)"
                           IsChecked="False"
                           IsEnabled="False"
-                          ToolTip="Disponible pour Canalisations ou Autre (comme V1)."/>
+                          ToolTip="Uniquement pour les familles rectangulaires (comme V1)."/>
 
                 <Grid Grid.Row="6" Grid.ColumnSpan="2" HorizontalAlignment="Right" VerticalAlignment="Bottom">
                     <Button x:Name="btnOptions"
@@ -302,12 +299,10 @@
                                            Foreground="{StaticResource Text.Primary}"/>
                                 <CheckBox x:Name="chkNorme"
                                           Content="Appliquer la norme (arrondis)"
-                                          IsChecked="True"
-                                          ToolTip="Pipes/ducts: arrondi 50mm. Autres: arrondi 10cm (comme V1)."/>
+                                          IsChecked="True"/>
                                 <CheckBox x:Name="chkDynamoAuto"
                                           Content="Exécuter le script Dynamo automatiquement"
-                                          IsChecked="True"
-                                          ToolTip="Lance automatiquement le script Dynamo associé (même chemin que V1)."/>
+                                          IsChecked="True"/>
                             </StackPanel>
                         </Border>
                     </Popup>
@@ -315,7 +310,6 @@
             </Grid>
         </Border>
 
-        <!-- Boutons -->
         <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
             <Button x:Name="btnCancel"
                     Content="Annuler"
