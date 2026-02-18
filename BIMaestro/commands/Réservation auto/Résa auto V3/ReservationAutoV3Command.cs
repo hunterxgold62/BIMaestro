@@ -48,7 +48,7 @@ namespace Modification
                 cfg = win.Config ?? cfg;
 
                 // Resolve profile according to run
-                var prof = GetProfileForRun(cfg, win.SelectedHost, win.SelectedShape);
+                var prof = win.SelectedExecutionProfile ?? GetProfileForRun(cfg, win.SelectedHost, win.SelectedShape);
                 if (prof == null || string.IsNullOrWhiteSpace(prof.FamilyName))
                 {
                     TaskDialog.Show("BIMaestro",
@@ -477,6 +477,9 @@ namespace Modification
                 center, sym, host, level,
                 Autodesk.Revit.DB.Structure.StructuralType.NonStructural);
 
+            AlignReservationOrientationIfNeeded(doc, fi, sym, host, center,
+                isWall ? GetWallDirectionXY(host as Wall) : GetElementDirectionXY(el, trToHost));
+
             ApplySizing(fi, host, bbInt, cfg, prof, objType, el, trToHost, isRect, normeEnabled);
 
             // ✅ force la coupe si famille "vide"
@@ -522,6 +525,11 @@ namespace Modification
             var fi = doc.Create.NewFamilyInstance(
                 center, sym, host, level,
                 Autodesk.Revit.DB.Structure.StructuralType.NonStructural);
+
+            AlignReservationOrientationIfNeeded(doc, fi, sym, host, center,
+               isWall
+                   ? GetWallDirectionXY(host as Wall)
+                   : GetAverageDirectionXY(elems.Select(x => x.el), elems.ToDictionary(x => x.el.Id, x => x.tr)));
 
             // Multi rect = sizing basé sur unionInt
             ApplySizing_MultiRect(fi, host, unionInt, cfg, prof, objType, normeEnabled);
@@ -881,6 +889,123 @@ namespace Modification
             }
             return XYZ.BasisX;
         }
+
+        private static XYZ GetWallDirectionXY(Wall wall)
+        {
+            if (wall?.Location is LocationCurve lc && lc.Curve is Line line)
+            {
+                XYZ d = line.Direction;
+                d = new XYZ(d.X, d.Y, 0.0);
+                if (!d.IsZeroLength()) return d.Normalize();
+            }
+
+            XYZ n = wall?.Orientation ?? XYZ.BasisY;
+            XYZ dir = n.CrossProduct(XYZ.BasisZ);
+            dir = new XYZ(dir.X, dir.Y, 0.0);
+            if (!dir.IsZeroLength()) return dir.Normalize();
+
+            return XYZ.BasisX;
+        }
+
+        private static XYZ GetElementDirectionXY(Element e, Transform trToHost)
+        {
+            if (e == null) return null;
+
+            XYZ d = null;
+            if (e.Location is LocationCurve lc && lc.Curve is Line ln)
+                d = ln.Direction;
+            else if (e is FamilyInstance fi && fi.HandOrientation != null && !fi.HandOrientation.IsZeroLength())
+                d = fi.HandOrientation;
+
+            if (d == null || d.IsZeroLength()) return null;
+
+            if (trToHost != null && !trToHost.IsIdentity)
+                d = trToHost.OfVector(d);
+
+            d = new XYZ(d.X, d.Y, 0.0);
+            if (d.IsZeroLength()) return null;
+            return d.Normalize();
+        }
+
+        private static XYZ GetAverageDirectionXY(IEnumerable<Element> elements, Dictionary<ElementId, Transform> transformMap)
+        {
+            if (elements == null) return null;
+
+            List<XYZ> dirs = new List<XYZ>();
+            foreach (var e in elements)
+            {
+                Transform tr = Transform.Identity;
+                if (e != null && transformMap != null && transformMap.TryGetValue(e.Id, out var found) && found != null)
+                    tr = found;
+
+                XYZ d = GetElementDirectionXY(e, tr);
+                if (d != null && !d.IsZeroLength())
+                    dirs.Add(d.Normalize());
+            }
+
+            if (dirs.Count == 0) return null;
+
+            XYZ refDir = dirs[0];
+            XYZ sum = XYZ.Zero;
+            foreach (var d in dirs)
+            {
+                XYZ dd = d;
+                if (dd.DotProduct(refDir) < 0) dd = dd.Negate();
+                sum += dd;
+            }
+
+            if (sum.IsZeroLength()) return refDir;
+            return sum.Normalize();
+        }
+
+        private static void AlignReservationOrientationIfNeeded(Document doc, FamilyInstance inst, FamilySymbol symbol, Element host, XYZ origin, XYZ axisX)
+        {
+            if (doc == null || inst == null || symbol == null || host == null || origin == null || axisX == null) return;
+
+            if (IsOpeningFamily(symbol))
+                return;
+
+            AlignInstanceXToAxisXY(doc, inst, origin, axisX);
+        }
+
+        private static bool IsOpeningFamily(FamilySymbol symbol)
+        {
+            string famName = symbol?.Family?.Name ?? string.Empty;
+            string typeName = symbol?.Name ?? string.Empty;
+
+            bool hasOpeningKeyword = famName.IndexOf("ouverture", StringComparison.OrdinalIgnoreCase) >= 0
+                                     || famName.IndexOf("opening", StringComparison.OrdinalIgnoreCase) >= 0
+                                     || typeName.IndexOf("ouverture", StringComparison.OrdinalIgnoreCase) >= 0
+                                     || typeName.IndexOf("opening", StringComparison.OrdinalIgnoreCase) >= 0;
+
+            return hasOpeningKeyword;
+        }
+
+        private static void AlignInstanceXToAxisXY(Document doc, FamilyInstance inst, XYZ origin, XYZ axisX)
+        {
+            if (doc == null || inst == null || axisX == null || axisX.IsZeroLength()) return;
+
+            XYZ desired = new XYZ(axisX.X, axisX.Y, 0.0);
+            if (desired.IsZeroLength()) return;
+            desired = desired.Normalize();
+
+            XYZ current = inst.HandOrientation;
+            current = new XYZ(current.X, current.Y, 0.0);
+            if (current.IsZeroLength()) return;
+            current = current.Normalize();
+
+            double dot = Math.Max(-1.0, Math.Min(1.0, current.DotProduct(desired)));
+            double angle = Math.Acos(dot);
+
+            double crossZ = current.X * desired.Y - current.Y * desired.X;
+            if (crossZ < 0) angle = -angle;
+
+            if (Math.Abs(angle) < 1e-6) return;
+
+            Line axis = Line.CreateUnbound(origin, XYZ.BasisZ);
+            ElementTransformUtils.RotateElement(doc, inst.Id, axis, angle);
+        }
+
 
         private static XYZ ProjectPointOntoWallPlane(Wall wall, XYZ point)
         {

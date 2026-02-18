@@ -23,10 +23,14 @@ namespace Modification
         public bool MultiEnabled { get; private set; }
         public bool NormeEnabled { get; private set; }
         public bool DynamoAutoEnabled { get; private set; }
+        public ProfileConfig SelectedExecutionProfile { get; private set; }
 
         public ReservationAutoV3Config Config { get; private set; }
 
         private readonly Document _doc;
+        private readonly HashSet<string> _allParameterNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly ReservationAutoV3PersoConfig _persoConfig;
+        private readonly Dictionary<string, ShapeOptionItem> _shapeOptionByLabel = new Dictionary<string, ShapeOptionItem>(StringComparer.OrdinalIgnoreCase);
 
         private List<LoadedTypeItem> _loadedTypes = new List<LoadedTypeItem>();
 
@@ -41,15 +45,22 @@ namespace Modification
             }
         }
 
+        private class ShapeOptionItem
+        {
+            public string Label { get; set; }
+            public ShapeTarget Shape { get; set; }
+            public ProfileConfig Profile { get; set; }
+        }
+
         public ReservationAutoV3Window(Document doc, ReservationAutoV3Config cfg)
         {
             InitializeComponent();
 
             _doc = doc;
             Config = cfg ?? new ReservationAutoV3Config();
+            _persoConfig = ReservationAutoV3PersoConfigStore.LoadOrDefault();
 
             comboHost.SelectedIndex = 0;
-            comboShape.SelectedIndex = 0;
             comboObjectType.SelectedIndex = 0;
             comboPipeSource.SelectedIndex = 0;
 
@@ -67,16 +78,17 @@ namespace Modification
             tbRfaPath.Text = Config.LastRfaPath ?? "";
 
             RefreshProfilesSummary();
+            RefreshShapeOptions();
             UpdateMappingPanels();
             OnCriteriaChanged(null, null);
         }
 
         private void RefreshProfilesSummary()
         {
-            txtWallRect.Text = DescribeProfile(Config.WallRect, "Longueur/Hauteur/Profondeur");
-            txtWallCirc.Text = DescribeProfile(Config.WallCirc, "Diamètre/Profondeur");
-            txtFloorRect.Text = DescribeProfile(Config.FloorRect, "Longueur/Largeur/Profondeur");
-            txtFloorCirc.Text = DescribeProfile(Config.FloorCirc, "Diamètre/Profondeur");
+            txtWallRect.Text = DescribeProfilesByVariant(HostTarget.Mur, ShapeTarget.Rectangulaire, "Longueur/Hauteur/Profondeur");
+            txtWallCirc.Text = DescribeProfilesByVariant(HostTarget.Mur, ShapeTarget.Circulaire, "Diamètre/Profondeur");
+            txtFloorRect.Text = DescribeProfilesByVariant(HostTarget.Sol, ShapeTarget.Rectangulaire, "Longueur/Largeur/Profondeur");
+            txtFloorCirc.Text = DescribeProfilesByVariant(HostTarget.Sol, ShapeTarget.Circulaire, "Diamètre/Profondeur");
         }
 
         private string DescribeProfile(ProfileConfig p, string expected)
@@ -88,17 +100,162 @@ namespace Modification
             return $"{p.FamilyName} — {type}";
         }
 
+        private string DescribeProfilesByVariant(HostTarget host, ShapeTarget shape, string expected)
+        {
+            string DescribeAvailable(ProfileConfig p)
+            {
+                if (p == null || string.IsNullOrWhiteSpace(p.FamilyName))
+                    return "(absent)";
+
+                return IsProfileLoadedInProject(p) ? p.FamilyName : $"{p.FamilyName} (non chargée)";
+            }
+
+            var v1 = FindBuiltInProfile(host, shape, isV2: false);
+            var v2 = FindBuiltInProfile(host, shape, isV2: true);
+            var perso = _persoConfig.Get(host, shape);
+
+            if (v1 == null && v2 == null && (perso == null || string.IsNullOrWhiteSpace(perso.FamilyName)))
+                return $"(Non configuré) — attendu : {expected}";
+
+            return $"V1: {DescribeAvailable(v1)} | V2: {DescribeAvailable(v2)} | Perso: {DescribeAvailable(perso)}";
+        }
+
         public void OnCriteriaChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (sender == comboHost)
+                RefreshShapeOptions();
+
             string obj = (comboObjectType.SelectedItem as ComboBoxItem)?.Content as string ?? "Canalisation";
             bool isCanal = obj == "Canalisation";
             comboPipeSource.IsEnabled = isCanal;
 
-            string shape = (comboShape.SelectedItem as ComboBoxItem)?.Content as string ?? "Rectangulaire";
-            bool isRect = shape == "Rectangulaire";
+            string shape = (comboShape.SelectedItem as ComboBoxItem)?.Content as string ?? "Rectangulaire V1";
+            bool isRect = shape.IndexOf("Rectangulaire", StringComparison.OrdinalIgnoreCase) >= 0;
 
             chkMulti.IsEnabled = isCanal && isRect;
             if (!chkMulti.IsEnabled) chkMulti.IsChecked = false;
+        }
+
+        private void RefreshShapeOptions()
+        {
+            string previous = (comboShape.SelectedItem as ComboBoxItem)?.Content as string;
+
+            _shapeOptionByLabel.Clear();
+            comboShape.Items.Clear();
+
+            HostTarget host = ((comboHost.SelectedItem as ComboBoxItem)?.Content as string) == "Sol"
+                ? HostTarget.Sol
+                : HostTarget.Mur;
+
+            TryAddShapeOption(host, ShapeTarget.Rectangulaire, "Rectangulaire V1", FindBuiltInProfile(host, ShapeTarget.Rectangulaire, isV2: false));
+            TryAddShapeOption(host, ShapeTarget.Rectangulaire, "Rectangulaire V2", FindBuiltInProfile(host, ShapeTarget.Rectangulaire, isV2: true));
+            TryAddShapeOption(host, ShapeTarget.Rectangulaire, "Rectangulaire perso", _persoConfig.Get(host, ShapeTarget.Rectangulaire));
+
+            TryAddShapeOption(host, ShapeTarget.Circulaire, "Circulaire V1", FindBuiltInProfile(host, ShapeTarget.Circulaire, isV2: false));
+            TryAddShapeOption(host, ShapeTarget.Circulaire, "Circulaire V2", FindBuiltInProfile(host, ShapeTarget.Circulaire, isV2: true));
+            TryAddShapeOption(host, ShapeTarget.Circulaire, "Circulaire perso", _persoConfig.Get(host, ShapeTarget.Circulaire));
+
+            if (comboShape.Items.Count == 0)
+            {
+                comboShape.Items.Add(new ComboBoxItem { Content = "(Aucune famille disponible)" });
+                comboShape.SelectedIndex = 0;
+                comboShape.IsEnabled = false;
+                return;
+            }
+
+            comboShape.IsEnabled = true;
+
+            int idx = 0;
+            if (!string.IsNullOrWhiteSpace(previous))
+            {
+                for (int i = 0; i < comboShape.Items.Count; i++)
+                {
+                    if ((comboShape.Items[i] as ComboBoxItem)?.Content as string == previous)
+                    {
+                        idx = i;
+                        break;
+                    }
+                }
+            }
+
+            comboShape.SelectedIndex = idx;
+        }
+
+        private void TryAddShapeOption(HostTarget host, ShapeTarget shape, string label, ProfileConfig profile)
+        {
+            if (profile == null || string.IsNullOrWhiteSpace(profile.FamilyName)) return;
+            if (!IsProfileLoadedInProject(profile)) return;
+
+            _shapeOptionByLabel[label] = new ShapeOptionItem
+            {
+                Label = label,
+                Shape = shape,
+                Profile = profile
+            };
+
+            comboShape.Items.Add(new ComboBoxItem { Content = label });
+        }
+
+        private bool IsProfileLoadedInProject(ProfileConfig profile)
+        {
+            if (profile == null || string.IsNullOrWhiteSpace(profile.FamilyName)) return false;
+
+            return new FilteredElementCollector(_doc)
+                .OfClass(typeof(FamilySymbol))
+                .Cast<FamilySymbol>()
+                .Any(s => s?.Family?.Name != null && string.Equals(s.Family.Name, profile.FamilyName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private ProfileConfig FindBuiltInProfile(HostTarget host, ShapeTarget shape, bool isV2)
+        {
+            string[] candidates;
+
+            if (host == HostTarget.Mur && shape == ShapeTarget.Rectangulaire)
+                candidates = isV2
+                    ? new[] { "CML_Réservation rectangulaire verticale", "CML_Réservation rectangulaire murale" }
+                    : new[] { "Réservation rectangulaire murale" };
+            else if (host == HostTarget.Sol && shape == ShapeTarget.Rectangulaire)
+                candidates = isV2
+                    ? new[] { "CML_Réservation rectangulaire horizontale", "CML_Réservation rectangulaire sol" }
+                    : new[] { "Réservation rectangulaire sol" };
+            else if (host == HostTarget.Mur && shape == ShapeTarget.Circulaire)
+                candidates = isV2
+                    ? new[] { "CML_Réservation circulaire verticale", "CML_Réservation circulaire murale" }
+                    : new[] { "Réservation circulaire murale" };
+            else
+                candidates = isV2
+                    ? new[] { "CML_Réservation circulaire horizontale", "CML_Réservation circulaire sol" }
+                    : new[] { "Réservation circulaire sol" };
+
+            foreach (var candidate in candidates)
+            {
+                var symbol = new FilteredElementCollector(_doc)
+                    .OfClass(typeof(FamilySymbol))
+                    .Cast<FamilySymbol>()
+                    .FirstOrDefault(s => s?.Family?.Name != null &&
+                                         s.Family.Name.IndexOf(candidate, StringComparison.OrdinalIgnoreCase) >= 0);
+
+                if (symbol == null) continue;
+
+                return new ProfileConfig
+                {
+                    FamilyName = symbol.Family.Name,
+                    TypeName = symbol.Name,
+                    ParamLength = shape == ShapeTarget.Rectangulaire
+                        ? (host == HostTarget.Mur ? Config.WallRect.ParamLength : Config.FloorRect.ParamLength)
+                        : "",
+                    ParamHeight = host == HostTarget.Mur && shape == ShapeTarget.Rectangulaire ? Config.WallRect.ParamHeight : "",
+                    ParamWidth = host == HostTarget.Sol && shape == ShapeTarget.Rectangulaire ? Config.FloorRect.ParamWidth : "",
+                    ParamDiameter = shape == ShapeTarget.Circulaire
+                        ? (host == HostTarget.Mur ? Config.WallCirc.ParamDiameter : Config.FloorCirc.ParamDiameter)
+                        : "",
+                    ParamDepth = shape == ShapeTarget.Circulaire
+                        ? (host == HostTarget.Mur ? Config.WallCirc.ParamDepth : Config.FloorCirc.ParamDepth)
+                        : (host == HostTarget.Mur ? Config.WallRect.ParamDepth : Config.FloorRect.ParamDepth)
+                };
+            }
+
+            return null;
         }
 
         private void OnBrowseRfa(object sender, RoutedEventArgs e)
@@ -155,6 +312,8 @@ namespace Modification
                     _loadedTypes = GetSymbolsFromFamily(_doc, fam)
                         .Select(s => new LoadedTypeItem(s))
                         .ToList();
+
+                    CollectAllParameterNames(path, _loadedTypes.Select(x => x.Symbol));
 
                     cbLoadedType.ItemsSource = _loadedTypes;
                     cbLoadedType.SelectedIndex = _loadedTypes.Any() ? 0 : -1;
@@ -216,20 +375,26 @@ namespace Modification
         {
             var it = cbLoadedType.SelectedItem as LoadedTypeItem;
             var sym = it?.Symbol;
-            if (sym == null) return;
+            if (sym != null)
+            {
+                CollectParameterNamesFromElement(sym, _allParameterNames);
 
-            var names = sym.Parameters
-                .Cast<Parameter>()
-                .Select(p => p.Definition?.Name)
+                foreach (var familySymbol in GetSymbolsFromFamily(_doc, sym.Family))
+                    CollectParameterNamesFromElement(familySymbol, _allParameterNames);
+            }
+
+            var names = _allParameterNames
                 .Where(n => !string.IsNullOrWhiteSpace(n))
-                .Distinct()
                 .OrderBy(n => n)
                 .ToList();
 
             void fill(ComboBox cb)
             {
                 if (cb == null) return;
+                string previous = cb.Text;
                 cb.ItemsSource = names;
+                if (!string.IsNullOrWhiteSpace(previous) && names.Contains(previous))
+                    cb.Text = previous;
             }
 
             fill(cbMapWallLen);
@@ -243,6 +408,65 @@ namespace Modification
             fill(cbMapFloorDepth);
             fill(cbMapFloorDiam);
             fill(cbMapFloorDepth2);
+        }
+
+        private void CollectAllParameterNames(string rfaPath, IEnumerable<FamilySymbol> symbols)
+        {
+            _allParameterNames.Clear();
+
+            foreach (var symbol in symbols ?? Enumerable.Empty<FamilySymbol>())
+                CollectParameterNamesFromElement(symbol, _allParameterNames);
+
+            foreach (var name in GetParameterNamesFromFamilyDocument(rfaPath))
+                _allParameterNames.Add(name);
+        }
+
+        private static void CollectParameterNamesFromElement(Element element, ISet<string> output)
+        {
+            if (element == null || output == null) return;
+
+            foreach (Parameter p in element.Parameters)
+            {
+                string name = p?.Definition?.Name;
+                if (!string.IsNullOrWhiteSpace(name))
+                    output.Add(name);
+            }
+        }
+
+        private IEnumerable<string> GetParameterNamesFromFamilyDocument(string rfaPath)
+        {
+            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            if (string.IsNullOrWhiteSpace(rfaPath) || !System.IO.File.Exists(rfaPath))
+                return result;
+
+            Document familyDoc = null;
+            try
+            {
+                familyDoc = _doc.Application.OpenDocumentFile(rfaPath);
+                if (!familyDoc.IsFamilyDocument)
+                    return result;
+
+                var manager = familyDoc.FamilyManager;
+                if (manager == null)
+                    return result;
+
+                foreach (FamilyParameter p in manager.Parameters)
+                {
+                    if (!string.IsNullOrWhiteSpace(p?.Definition?.Name))
+                        result.Add(p.Definition.Name);
+                }
+            }
+            catch
+            {
+                // On garde la liste provenant du projet si ouverture RFA impossible.
+            }
+            finally
+            {
+                familyDoc?.Close(false);
+            }
+
+            return result;
         }
 
         private void OnApplyMapping(object sender, RoutedEventArgs e)
@@ -302,7 +526,27 @@ namespace Modification
 
             if (ReservationAutoV3ConfigStore.Save(Config, out var err))
             {
+                var host = (idx == 0 || idx == 1) ? HostTarget.Mur : HostTarget.Sol;
+                var shape = (idx == 0 || idx == 2) ? ShapeTarget.Rectangulaire : ShapeTarget.Circulaire;
+                var targetPersoProfile = _persoConfig.Get(host, shape);
+                if (targetPersoProfile != null)
+                {
+                    targetPersoProfile.FamilyName = p.FamilyName;
+                    targetPersoProfile.TypeName = p.TypeName;
+                    targetPersoProfile.ParamLength = p.ParamLength;
+                    targetPersoProfile.ParamWidth = p.ParamWidth;
+                    targetPersoProfile.ParamHeight = p.ParamHeight;
+                    targetPersoProfile.ParamDiameter = p.ParamDiameter;
+                    targetPersoProfile.ParamDepth = p.ParamDepth;
+                }
+
+                if (!ReservationAutoV3PersoConfigStore.Save(_persoConfig, out var persoErr))
+                {
+                    MessageBox.Show("Profil configuré mais erreur sauvegarde perso : " + persoErr, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+
                 RefreshProfilesSummary();
+                RefreshShapeOptions();
                 MessageBox.Show("Profil configuré + sauvegardé ✅", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             else
@@ -328,13 +572,26 @@ namespace Modification
 
         private void OnOk(object sender, RoutedEventArgs e)
         {
+            if (!comboShape.IsEnabled || !_shapeOptionByLabel.Any())
+            {
+                MessageBox.Show("Aucune famille de réservation disponible pour le support sélectionné.", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
             SelectedHost = ((comboHost.SelectedItem as ComboBoxItem)?.Content as string) == "Sol"
                 ? HostTarget.Sol
                 : HostTarget.Mur;
 
-            SelectedShape = ((comboShape.SelectedItem as ComboBoxItem)?.Content as string) == "Circulaire"
+            SelectedShape = ((comboShape.SelectedItem as ComboBoxItem)?.Content as string)
+                ?.IndexOf("Circulaire", StringComparison.OrdinalIgnoreCase) >= 0
                 ? ShapeTarget.Circulaire
                 : ShapeTarget.Rectangulaire;
+
+            string shapeLabel = (comboShape.SelectedItem as ComboBoxItem)?.Content as string;
+            if (!string.IsNullOrWhiteSpace(shapeLabel) && _shapeOptionByLabel.TryGetValue(shapeLabel, out var shapeOption))
+                SelectedExecutionProfile = shapeOption.Profile;
+            else
+                SelectedExecutionProfile = null;
 
             var obj = (comboObjectType.SelectedItem as ComboBoxItem)?.Content as string ?? "Canalisation";
             SelectedObject = obj switch

@@ -491,8 +491,8 @@
     <Compile Include="commands\Purge de paramètre de famille\ParameterSelectionWindow.xaml.cs">
       <DependentUpon>ParameterSelectionWindow.xaml</DependentUpon>
     </Compile>
-    <Compile Include="commands\Réservation auto\AddReservationCommand.cs" />
-    <Compile Include="commands\Réservation auto\ReservationWindow.xaml.cs">
+    <Compile Include="commands\Réservation auto\résa auto V1\AddReservationCommand.cs" />
+    <Compile Include="commands\Réservation auto\résa auto V1\ReservationWindow.xaml.cs">
       <DependentUpon>ReservationWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="commands\traduction paramètre famille et vue_feuille\TraduireParametresFamilleOpenAI.cs" />
@@ -669,7 +669,7 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="commands\Réservation auto\ReservationWindow.xaml">
+    <Page Include="commands\Réservation auto\résa auto V1\ReservationWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>

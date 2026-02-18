@@ -127,4 +127,75 @@ namespace Modification
             }
         }
     }
+
+    [DataContract]
+    public class ReservationAutoV3PersoConfig
+    {
+        [DataMember] public ProfileConfig WallRectPerso { get; set; } = new ProfileConfig();
+        [DataMember] public ProfileConfig WallCircPerso { get; set; } = new ProfileConfig();
+        [DataMember] public ProfileConfig FloorRectPerso { get; set; } = new ProfileConfig();
+        [DataMember] public ProfileConfig FloorCircPerso { get; set; } = new ProfileConfig();
+
+        public ProfileConfig Get(ReservationAutoV3Window.HostTarget host, ReservationAutoV3Window.ShapeTarget shape)
+        {
+            return (host, shape) switch
+            {
+                (ReservationAutoV3Window.HostTarget.Mur, ReservationAutoV3Window.ShapeTarget.Rectangulaire) => WallRectPerso,
+                (ReservationAutoV3Window.HostTarget.Mur, ReservationAutoV3Window.ShapeTarget.Circulaire) => WallCircPerso,
+                (ReservationAutoV3Window.HostTarget.Sol, ReservationAutoV3Window.ShapeTarget.Rectangulaire) => FloorRectPerso,
+                (ReservationAutoV3Window.HostTarget.Sol, ReservationAutoV3Window.ShapeTarget.Circulaire) => FloorCircPerso,
+                _ => null
+            };
+        }
+    }
+
+    public static class ReservationAutoV3PersoConfigStore
+    {
+        private static string Folder =>
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "SauvegardePréférence");
+
+        public static string ConfigPath =>
+            Path.Combine(Folder, "ResaPerso.json");
+
+        public static ReservationAutoV3PersoConfig LoadOrDefault()
+        {
+            try
+            {
+                if (!File.Exists(ConfigPath))
+                    return new ReservationAutoV3PersoConfig();
+
+                using (var fs = File.OpenRead(ConfigPath))
+                {
+                    var ser = new DataContractJsonSerializer(typeof(ReservationAutoV3PersoConfig));
+                    var cfg = ser.ReadObject(fs) as ReservationAutoV3PersoConfig;
+                    return cfg ?? new ReservationAutoV3PersoConfig();
+                }
+            }
+            catch
+            {
+                return new ReservationAutoV3PersoConfig();
+            }
+        }
+
+        public static bool Save(ReservationAutoV3PersoConfig cfg, out string error)
+        {
+            error = null;
+            try
+            {
+                Directory.CreateDirectory(Folder);
+
+                using (var fs = File.Create(ConfigPath))
+                {
+                    var ser = new DataContractJsonSerializer(typeof(ReservationAutoV3PersoConfig));
+                    ser.WriteObject(fs, cfg ?? new ReservationAutoV3PersoConfig());
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return false;
+            }
+        }
+    }
 }

@@ -121,10 +121,7 @@
                         </ComboBox>
 
                         <TextBlock Grid.Row="2" Grid.Column="0" Text="Forme :" Style="{StaticResource FieldLabel}"/>
-                        <ComboBox Grid.Row="2" Grid.Column="1" x:Name="comboShape" SelectionChanged="OnCriteriaChanged">
-                            <ComboBoxItem Content="Rectangulaire"/>
-                            <ComboBoxItem Content="Circulaire"/>
-                        </ComboBox>
+                        <ComboBox Grid.Row="2" Grid.Column="1" x:Name="comboShape" SelectionChanged="OnCriteriaChanged"/>
 
                         <TextBlock Grid.Row="3" Grid.Column="0" Text="Type d’objet :" Style="{StaticResource FieldLabel}"/>
                         <ComboBox Grid.Row="3" Grid.Column="1" x:Name="comboObjectType" SelectionChanged="OnCriteriaChanged">
