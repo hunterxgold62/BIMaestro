@@ -1,0 +1,1130 @@
+﻿#region Imports
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using Autodesk.Revit.Attributes;
+using Autodesk.Revit.DB;
+using Autodesk.Revit.DB.Mechanical;
+using Autodesk.Revit.DB.Plumbing;
+using Autodesk.Revit.UI;
+using Autodesk.Revit.UI.Selection;
+using Dynamo.Applications;
+using Dynamo.Applications.Properties;
+using Licensing;
+#endregion
+
+namespace Modification
+{
+    [Transaction(TransactionMode.Manual)]
+    public class ReservationAutoV3Command : BaseTrackedCommand
+    {
+        protected override string ButtonId => "ReservationAutoV3Command";
+
+        // Evite de spammer des warnings
+        private static bool _voidCutWarnShown = false;
+
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
+        {
+            UIApplication uiApp = data.Application;
+            UIDocument uiDoc = uiApp.ActiveUIDocument;
+            Document doc = uiDoc.Document;
+
+            try
+            {
+                // Load config
+                var cfg = ReservationAutoV3ConfigStore.LoadOrDefault();
+
+                // Auto-détection : si V1/V2 déjà dans la maquette, on s’en sert
+                EnsureAutoConfigFromProject(doc, cfg);
+                ReservationAutoV3ConfigStore.Save(cfg, out _);
+
+                // UI
+                var win = new ReservationAutoV3Window(doc, cfg);
+                if (win.ShowDialog() != true)
+                    return Result.Cancelled;
+
+                cfg = win.Config ?? cfg;
+
+                // Resolve profile according to run
+                var prof = GetProfileForRun(cfg, win.SelectedHost, win.SelectedShape);
+                if (prof == null || string.IsNullOrWhiteSpace(prof.FamilyName))
+                {
+                    TaskDialog.Show("BIMaestro",
+                        "Aucune famille configurée pour ce cas.\nVa dans Configuration et charge un .RFA puis mappe les paramètres.");
+                    return Result.Cancelled;
+                }
+
+                if (!TryResolveSymbol(doc, prof, out var reservationSymbol))
+                {
+                    TaskDialog.Show("BIMaestro",
+                        "La famille configurée n’est pas chargée dans ce projet.\nCharge-la (onglet Configuration) ou corrige le mapping.");
+                    return Result.Cancelled;
+                }
+
+                bool isWall = win.SelectedHost == ReservationAutoV3Window.HostTarget.Mur;
+                bool isRect = win.SelectedShape == ReservationAutoV3Window.ShapeTarget.Rectangulaire;
+
+                if (win.AutomatiqueEnabled && !isWall)
+                {
+                    TaskDialog.Show("BIMaestro", "Mode automatique : disponible uniquement pour les murs.");
+                    return Result.Cancelled;
+                }
+
+                using (var t = new Transaction(doc, "Réservations Auto V3"))
+                {
+                    t.Start();
+                    if (!reservationSymbol.IsActive) reservationSymbol.Activate();
+
+                    if (!win.AutomatiqueEnabled)
+                        RunManual(uiDoc, doc, win, cfg, prof, reservationSymbol);
+                    else
+                        RunAutomatic(doc, win, cfg, prof, reservationSymbol);
+
+                    t.Commit();
+                }
+
+                // Dynamo
+                if (win.DynamoAutoEnabled && !string.IsNullOrWhiteSpace(cfg.DynamoPath))
+                    TryRunDynamo(data, cfg.DynamoPath);
+
+                return Result.Succeeded;
+            }
+            catch (Exception ex)
+            {
+                message = ex.Message;
+                return Result.Failed;
+            }
+        }
+
+        // =========================
+        // AUTO CONFIG (V1/V2 déjà dans maquette)
+        // =========================
+        private static void EnsureAutoConfigFromProject(Document doc, ReservationAutoV3Config cfg)
+        {
+            if (doc == null || cfg == null) return;
+
+            EnsureProfile(doc, cfg.WallRect, new[]
+            {
+                "CML_Réservation rectangulaire verticale",
+                "CML_Réservation rectangulaire murale",
+                "Réservation rectangulaire murale"
+            }, ProfileKind.WallRect);
+
+            EnsureProfile(doc, cfg.FloorRect, new[]
+            {
+                "CML_Réservation rectangulaire horizontale",
+                "CML_Réservation rectangulaire sol",
+                "Réservation rectangulaire sol"
+            }, ProfileKind.FloorRect);
+
+            EnsureProfile(doc, cfg.WallCirc, new[]
+            {
+                "CML_Réservation circulaire verticale",
+                "CML_Réservation circulaire murale",
+                "Réservation circulaire murale"
+            }, ProfileKind.WallCirc);
+
+            EnsureProfile(doc, cfg.FloorCirc, new[]
+            {
+                "CML_Réservation circulaire horizontale",
+                "CML_Réservation circulaire sol",
+                "Réservation circulaire sol"
+            }, ProfileKind.FloorCirc);
+        }
+
+        private enum ProfileKind { WallRect, WallCirc, FloorRect, FloorCirc }
+
+        private static void EnsureProfile(Document doc, ProfileConfig p, string[] familyCandidates, ProfileKind kind)
+        {
+            if (p == null) return;
+
+            if (!string.IsNullOrWhiteSpace(p.FamilyName))
+            {
+                if (TryResolveSymbol(doc, p, out _))
+                    return;
+            }
+
+            foreach (var famName in familyCandidates)
+            {
+                var sym = FindFirstSymbolByFamilyName(doc, famName);
+                if (sym == null) continue;
+
+                p.FamilyName = sym.Family.Name;
+                p.TypeName = sym.Name;
+
+                AutoMapParameters(sym, p, kind);
+                return;
+            }
+        }
+
+        private static FamilySymbol FindFirstSymbolByFamilyName(Document doc, string familyName)
+        {
+            if (doc == null || string.IsNullOrWhiteSpace(familyName)) return null;
+
+            var symbols = new FilteredElementCollector(doc)
+                .OfClass(typeof(FamilySymbol))
+                .Cast<FamilySymbol>()
+                .Where(s => s?.Family?.Name != null)
+                .Where(s => string.Equals(s.Family.Name, familyName, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            return symbols.FirstOrDefault();
+        }
+
+        private static void AutoMapParameters(FamilySymbol sym, ProfileConfig p, ProfileKind kind)
+        {
+            if (sym == null || p == null) return;
+
+            var names = sym.Parameters
+                .Cast<Parameter>()
+                .Select(x => x.Definition?.Name)
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .ToList();
+
+            string Pick(params string[] keys)
+            {
+                foreach (var k in keys)
+                {
+                    var hit = names.FirstOrDefault(n => n.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0);
+                    if (!string.IsNullOrWhiteSpace(hit))
+                        return hit;
+                }
+                return "";
+            }
+
+            p.ParamDepth = string.IsNullOrWhiteSpace(p.ParamDepth) ? Pick("prof", "depth", "épais", "epais") : p.ParamDepth;
+
+            if (kind == ProfileKind.WallCirc || kind == ProfileKind.FloorCirc)
+            {
+                p.ParamDiameter = string.IsNullOrWhiteSpace(p.ParamDiameter) ? Pick("diam", "ø") : p.ParamDiameter;
+                return;
+            }
+
+            // Rect : certaines familles “ouverture” ont “Largeur/Hauteur” (pas “Longueur”)
+            if (string.IsNullOrWhiteSpace(p.ParamLength))
+            {
+                p.ParamLength = Pick("long", "length");
+                if (string.IsNullOrWhiteSpace(p.ParamLength))
+                    p.ParamLength = Pick("larg", "width"); // fallback ouverture
+            }
+
+            if (kind == ProfileKind.WallRect)
+            {
+                p.ParamHeight = string.IsNullOrWhiteSpace(p.ParamHeight) ? Pick("haut", "height") : p.ParamHeight;
+            }
+            else
+            {
+                p.ParamWidth = string.IsNullOrWhiteSpace(p.ParamWidth) ? Pick("larg", "width") : p.ParamWidth;
+                if (string.IsNullOrWhiteSpace(p.ParamWidth))
+                    p.ParamWidth = Pick("long", "length"); // fallback si inversé
+            }
+        }
+
+        // =========================
+        // PROFILE / SYMBOL
+        // =========================
+        private static ProfileConfig GetProfileForRun(ReservationAutoV3Config cfg,
+            ReservationAutoV3Window.HostTarget host, ReservationAutoV3Window.ShapeTarget shape)
+        {
+            if (cfg == null) return null;
+
+            return (host, shape) switch
+            {
+                (ReservationAutoV3Window.HostTarget.Mur, ReservationAutoV3Window.ShapeTarget.Rectangulaire) => cfg.WallRect,
+                (ReservationAutoV3Window.HostTarget.Mur, ReservationAutoV3Window.ShapeTarget.Circulaire) => cfg.WallCirc,
+                (ReservationAutoV3Window.HostTarget.Sol, ReservationAutoV3Window.ShapeTarget.Rectangulaire) => cfg.FloorRect,
+                (ReservationAutoV3Window.HostTarget.Sol, ReservationAutoV3Window.ShapeTarget.Circulaire) => cfg.FloorCirc,
+                _ => null
+            };
+        }
+
+        private static bool TryResolveSymbol(Document doc, ProfileConfig prof, out FamilySymbol symbol)
+        {
+            symbol = null;
+            if (doc == null || prof == null) return false;
+            if (string.IsNullOrWhiteSpace(prof.FamilyName)) return false;
+
+            var candidates = new FilteredElementCollector(doc)
+                .OfClass(typeof(FamilySymbol))
+                .Cast<FamilySymbol>()
+                .Where(s => s?.Family?.Name != null)
+                .Where(s => string.Equals(s.Family.Name, prof.FamilyName, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            if (!candidates.Any())
+                return false;
+
+            if (!string.IsNullOrWhiteSpace(prof.TypeName))
+            {
+                symbol = candidates.FirstOrDefault(s =>
+                    string.Equals(s.Name, prof.TypeName, StringComparison.OrdinalIgnoreCase));
+            }
+
+            symbol ??= candidates.FirstOrDefault();
+            return symbol != null;
+        }
+
+        // =========================
+        // MANUAL (simple)
+        // =========================
+        private void RunManual(UIDocument uiDoc, Document doc,
+            ReservationAutoV3Window win,
+            ReservationAutoV3Config cfg,
+            ProfileConfig prof,
+            FamilySymbol reservationSymbol)
+        {
+            bool isWall = win.SelectedHost == ReservationAutoV3Window.HostTarget.Mur;
+            bool isRect = win.SelectedShape == ReservationAutoV3Window.ShapeTarget.Rectangulaire;
+
+            TaskDialog.Show("BIMaestro",
+                $"Mode manuel : sélectionne l’objet, puis le {(isWall ? "mur" : "sol")}.\nESC pour arrêter.");
+
+            while (true)
+            {
+                List<(Element el, Transform tr)> picked;
+                try
+                {
+                    picked = PickElements(uiDoc, doc, win, multi: win.MultiEnabled && isRect);
+                }
+                catch
+                {
+                    break;
+                }
+
+                if (picked == null || picked.Count == 0)
+                    break;
+
+                Element host;
+                try
+                {
+                    var rHost = uiDoc.Selection.PickObject(ObjectType.Element,
+                        isWall ? "Sélectionne le mur (ESC pour annuler)" : "Sélectionne le sol (ESC pour annuler)");
+                    host = doc.GetElement(rHost);
+                }
+                catch
+                {
+                    break;
+                }
+
+                if (isWall && host is not Wall)
+                {
+                    TaskDialog.Show("Erreur", "Ce n’est pas un mur.");
+                    continue;
+                }
+                if (!isWall && host is not Floor)
+                {
+                    TaskDialog.Show("Erreur", "Ce n’est pas un sol.");
+                    continue;
+                }
+
+                var level = doc.GetElement(host.LevelId) as Level
+                            ?? new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>().FirstOrDefault();
+
+                if (picked.Count > 1 && isRect)
+                {
+                    CreateRectReservation_Multi(doc, host, level, reservationSymbol, win.SelectedObject, picked, cfg, prof, isWall, win.NormeEnabled);
+                }
+                else
+                {
+                    var (el, tr) = picked.First();
+                    CreateReservation_Single(doc, host, level, reservationSymbol, win.SelectedObject, el, tr, cfg, prof, isWall, isRect, win.NormeEnabled);
+                }
+
+                var td = new TaskDialog("BIMaestro")
+                {
+                    MainInstruction = "Créer une autre réservation ?",
+                    CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No
+                };
+                if (td.Show() != TaskDialogResult.Yes)
+                    break;
+            }
+        }
+
+        // =========================
+        // AUTO (mur only)
+        // =========================
+        private void RunAutomatic(Document doc,
+            ReservationAutoV3Window win,
+            ReservationAutoV3Config cfg,
+            ProfileConfig prof,
+            FamilySymbol reservationSymbol)
+        {
+            var walls = new FilteredElementCollector(doc).OfClass(typeof(Wall)).Cast<Wall>().ToList();
+            if (!walls.Any())
+            {
+                TaskDialog.Show("BIMaestro", "Aucun mur trouvé.");
+                return;
+            }
+
+            var targets = CollectTargets(doc, win.SelectedObject);
+            if (!targets.Any())
+            {
+                TaskDialog.Show("BIMaestro", "Aucun objet trouvé.");
+                return;
+            }
+
+            int created = 0;
+
+            foreach (var wall in walls)
+            {
+                var bbWall = wall.get_BoundingBox(null);
+                if (bbWall == null) continue;
+
+                var level = doc.GetElement(wall.LevelId) as Level
+                            ?? new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>().FirstOrDefault();
+
+                foreach (var el in targets)
+                {
+                    var bbEl = el.get_BoundingBox(null);
+                    if (bbEl == null) continue;
+
+                    // ✅ IMPORTANT : intersection pour dimensionnement
+                    var bbInt = IntersectBoundingBoxes(bbWall, bbEl);
+                    if (bbInt == null) continue;
+
+                    XYZ center = (bbInt.Min + bbInt.Max) * 0.5;
+                    center = ProjectPointOntoWallPlane(wall, center);
+
+                    var fi = doc.Create.NewFamilyInstance(
+                        center, reservationSymbol, wall, level,
+                        Autodesk.Revit.DB.Structure.StructuralType.NonStructural);
+
+                    ApplySizing(fi, wall, bbInt, cfg, prof, win.SelectedObject, el, Transform.Identity,
+                        win.SelectedShape == ReservationAutoV3Window.ShapeTarget.Rectangulaire, win.NormeEnabled);
+
+                    // ✅ force la coupe si famille "vide"
+                    ForceVoidCutSafe(doc, wall, fi);
+
+                    created++;
+                }
+            }
+
+            TaskDialog.Show("BIMaestro", $"Réservations créées : {created}");
+        }
+
+        private static List<Element> CollectTargets(Document doc, ReservationAutoV3Window.ObjectType objType)
+        {
+            return objType switch
+            {
+                ReservationAutoV3Window.ObjectType.Canalisation => new FilteredElementCollector(doc).OfClass(typeof(Pipe)).Cast<Element>().ToList(),
+                ReservationAutoV3Window.ObjectType.Gaine => new FilteredElementCollector(doc).OfClass(typeof(Duct)).Cast<Element>().ToList(),
+                ReservationAutoV3Window.ObjectType.Porte => new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Doors).OfClass(typeof(FamilyInstance)).Cast<Element>().ToList(),
+                ReservationAutoV3Window.ObjectType.Fenetre => new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Windows).OfClass(typeof(FamilyInstance)).Cast<Element>().ToList(),
+                _ => new List<Element>()
+            };
+        }
+
+        // =========================
+        // Picking helpers
+        // =========================
+        private List<(Element el, Transform tr)> PickElements(UIDocument uiDoc, Document doc, ReservationAutoV3Window win, bool multi)
+        {
+            if (!multi)
+            {
+                Reference r;
+                if (win.SelectedObject == ReservationAutoV3Window.ObjectType.Canalisation)
+                    r = PickSinglePipeBySource(uiDoc, doc, win.SelectedPipeSource);
+                else
+                    r = uiDoc.Selection.PickObject(ObjectType.Element, "Sélectionne l’objet (ESC pour annuler)");
+
+                if (!TryResolveReference(uiDoc, r, out var el, out var tr))
+                    return new List<(Element, Transform)>();
+
+                return new List<(Element, Transform)> { (el, tr) };
+            }
+            else
+            {
+                IList<Reference> refs = GetPipeReferencesBySource(uiDoc, doc, win.SelectedPipeSource);
+
+                var list = new List<(Element, Transform)>();
+                foreach (var rr in refs)
+                {
+                    if (TryResolveReference(uiDoc, rr, out var el, out var tr))
+                        list.Add((el, tr));
+                }
+                return list;
+            }
+        }
+
+        // =========================
+        // Create reservations
+        // =========================
+        private void CreateReservation_Single(Document doc,
+            Element host, Level level, FamilySymbol sym,
+            ReservationAutoV3Window.ObjectType objType,
+            Element el, Transform trToHost,
+            ReservationAutoV3Config cfg, ProfileConfig prof,
+            bool isWall, bool isRect, bool normeEnabled)
+        {
+            var bbHost = host.get_BoundingBox(null);
+            var bbEl = GetBoundingBoxInHostCoordinates(el, trToHost);
+            if (bbHost == null || bbEl == null) return;
+
+            // ✅ IMPORTANT : on dimensionne sur l'intersection, pas la bbox complète
+            var bbInt = IntersectBoundingBoxes(bbHost, bbEl);
+            if (bbInt == null) return;
+
+            XYZ center = (bbInt.Min + bbInt.Max) * 0.5;
+
+            if (isWall && host is Wall w)
+                center = ProjectPointOntoWallPlane(w, center);
+            else if (!isWall && host is Floor f)
+                center = GetPlacementPointOnFloor(f, el, center, trToHost);
+
+            var fi = doc.Create.NewFamilyInstance(
+                center, sym, host, level,
+                Autodesk.Revit.DB.Structure.StructuralType.NonStructural);
+
+            ApplySizing(fi, host, bbInt, cfg, prof, objType, el, trToHost, isRect, normeEnabled);
+
+            // ✅ force la coupe si famille "vide"
+            ForceVoidCutSafe(doc, host, fi);
+        }
+
+        private void CreateRectReservation_Multi(Document doc,
+            Element host, Level level, FamilySymbol sym,
+            ReservationAutoV3Window.ObjectType objType,
+            List<(Element el, Transform tr)> elems,
+            ReservationAutoV3Config cfg, ProfileConfig prof,
+            bool isWall, bool normeEnabled)
+        {
+            var bbHost = host.get_BoundingBox(null);
+            if (bbHost == null) return;
+
+            // ✅ Clip de chaque bbox avec le host -> union propre (évite les énormes résa parallèles au mur)
+            var clipped = elems
+                .Select(t => GetBoundingBoxInHostCoordinates(t.el, t.tr))
+                .Where(bb => bb != null)
+                .Select(bb => IntersectBoundingBoxes(bbHost, bb))
+                .Where(bb => bb != null)
+                .ToList();
+
+            if (!clipped.Any()) return;
+
+            double minX = clipped.Min(bb => bb.Min.X);
+            double minY = clipped.Min(bb => bb.Min.Y);
+            double minZ = clipped.Min(bb => bb.Min.Z);
+            double maxX = clipped.Max(bb => bb.Max.X);
+            double maxY = clipped.Max(bb => bb.Max.Y);
+            double maxZ = clipped.Max(bb => bb.Max.Z);
+
+            var unionInt = new BoundingBoxXYZ { Min = new XYZ(minX, minY, minZ), Max = new XYZ(maxX, maxY, maxZ) };
+
+            XYZ center = (unionInt.Min + unionInt.Max) * 0.5;
+
+            if (isWall && host is Wall w)
+                center = ProjectPointOntoWallPlane(w, center);
+            else if (!isWall && host is Floor f)
+                center = GetPlacementPointOnFloor(f, elems.First().el, center, elems.First().tr);
+
+            var fi = doc.Create.NewFamilyInstance(
+                center, sym, host, level,
+                Autodesk.Revit.DB.Structure.StructuralType.NonStructural);
+
+            // Multi rect = sizing basé sur unionInt
+            ApplySizing_MultiRect(fi, host, unionInt, cfg, prof, objType, normeEnabled);
+
+            // ✅ force la coupe si famille "vide"
+            ForceVoidCutSafe(doc, host, fi);
+        }
+
+        // =========================
+        // Sizing (INTERSECTION-BASED)
+        // =========================
+        private void ApplySizing(FamilyInstance fi,
+            Element host,
+            BoundingBoxXYZ bbIntersect,
+            ReservationAutoV3Config cfg, ProfileConfig prof,
+            ReservationAutoV3Window.ObjectType objType,
+            Element intersecting, Transform trToHost,
+            bool isRect, bool normeEnabled)
+        {
+            if (fi == null || host == null || bbIntersect == null) return;
+
+            bool isPipeOrDuct = objType == ReservationAutoV3Window.ObjectType.Canalisation
+                                || objType == ReservationAutoV3Window.ObjectType.Gaine;
+
+            double oversizeFt = MmToFt(isPipeOrDuct ? cfg.OversizeMm_PipeDuct : 0.0);
+            double depthFt = GetHostDepth(host);
+
+            var world = ToWorldBoundingBox(bbIntersect);
+            if (world == null) return;
+
+            if (!isRect)
+            {
+                double diamFt = CalculateDiameterForElement(intersecting, objType, oversizeFt);
+                if (diamFt <= 1e-9)
+                {
+                    double w = (world.Max.X - world.Min.X) + oversizeFt;
+                    double h = (world.Max.Z - world.Min.Z) + oversizeFt;
+                    diamFt = Math.Max(w, h);
+                }
+
+                if (normeEnabled) diamFt = RoundToNearest50mm(diamFt);
+
+                TrySet(fi, prof.ParamDiameter, diamFt, "Diamètre", "COM_Diamètre", "Diameter");
+                TrySet(fi, prof.ParamDepth, depthFt, "Profondeur", "COM_Profondeur", "Depth");
+                return;
+            }
+
+            if (host is Wall wall)
+            {
+                XYZ wallDir = GetWallDirection(wall);
+
+                var corners = new List<XYZ>
+                {
+                    new XYZ(world.Min.X, world.Min.Y, world.Min.Z),
+                    new XYZ(world.Min.X, world.Max.Y, world.Min.Z),
+                    new XYZ(world.Max.X, world.Min.Y, world.Min.Z),
+                    new XYZ(world.Max.X, world.Max.Y, world.Min.Z)
+                };
+                var projs = corners.Select(c => c.DotProduct(wallDir)).ToList();
+
+                double len = (projs.Max() - projs.Min()) + oversizeFt;
+                double hgt = (world.Max.Z - world.Min.Z) + oversizeFt;
+
+                if (normeEnabled)
+                {
+                    len = RoundToNearest50mm(len);
+                    hgt = RoundToNearest50mm(hgt);
+                }
+
+                TrySet(fi, prof.ParamLength, len, "Longueur", "COM_Longueur", "Largeur", "COM_Largeur", "Length", "Width");
+                TrySet(fi, prof.ParamHeight, hgt, "Hauteur", "COM_Hauteur", "Height");
+                TrySet(fi, prof.ParamDepth, depthFt, "Profondeur", "COM_Profondeur", "Depth");
+            }
+            else if (host is Floor)
+            {
+                double len = (world.Max.X - world.Min.X) + oversizeFt;
+                double wid = (world.Max.Y - world.Min.Y) + oversizeFt;
+
+                if (normeEnabled)
+                {
+                    len = RoundToNearest50mm(len);
+                    wid = RoundToNearest50mm(wid);
+                }
+
+                TrySet(fi, prof.ParamLength, len, "Longueur", "COM_Longueur", "Length");
+                TrySet(fi, prof.ParamWidth, wid, "Largeur", "COM_Largeur", "Width");
+                TrySet(fi, prof.ParamDepth, depthFt, "Profondeur", "COM_Profondeur", "Depth");
+            }
+        }
+
+        private void ApplySizing_MultiRect(FamilyInstance fi,
+            Element host,
+            BoundingBoxXYZ unionIntersect,
+            ReservationAutoV3Config cfg, ProfileConfig prof,
+            ReservationAutoV3Window.ObjectType objType,
+            bool normeEnabled)
+        {
+            if (fi == null || host == null || unionIntersect == null) return;
+
+            bool isPipeOrDuct = objType == ReservationAutoV3Window.ObjectType.Canalisation
+                                || objType == ReservationAutoV3Window.ObjectType.Gaine;
+
+            double oversizeFt = MmToFt(isPipeOrDuct ? cfg.OversizeMm_PipeDuct : 0.0);
+            double depthFt = GetHostDepth(host);
+
+            var world = ToWorldBoundingBox(unionIntersect);
+            if (world == null) return;
+
+            if (host is Wall wall)
+            {
+                XYZ wallDir = GetWallDirection(wall);
+
+                var corners = new List<XYZ>
+                {
+                    new XYZ(world.Min.X, world.Min.Y, world.Min.Z),
+                    new XYZ(world.Min.X, world.Max.Y, world.Min.Z),
+                    new XYZ(world.Max.X, world.Min.Y, world.Min.Z),
+                    new XYZ(world.Max.X, world.Max.Y, world.Min.Z)
+                };
+                var projs = corners.Select(c => c.DotProduct(wallDir)).ToList();
+
+                double len = (projs.Max() - projs.Min()) + oversizeFt;
+                double hgt = (world.Max.Z - world.Min.Z) + oversizeFt;
+
+                if (normeEnabled)
+                {
+                    len = RoundToNearest50mm(len);
+                    hgt = RoundToNearest50mm(hgt);
+                }
+
+                TrySet(fi, prof.ParamLength, len, "Longueur", "COM_Longueur", "Largeur", "COM_Largeur", "Length", "Width");
+                TrySet(fi, prof.ParamHeight, hgt, "Hauteur", "COM_Hauteur", "Height");
+                TrySet(fi, prof.ParamDepth, depthFt, "Profondeur", "COM_Profondeur", "Depth");
+            }
+            else if (host is Floor)
+            {
+                double len = (world.Max.X - world.Min.X) + oversizeFt;
+                double wid = (world.Max.Y - world.Min.Y) + oversizeFt;
+
+                if (normeEnabled)
+                {
+                    len = RoundToNearest50mm(len);
+                    wid = RoundToNearest50mm(wid);
+                }
+
+                TrySet(fi, prof.ParamLength, len, "Longueur", "COM_Longueur", "Length");
+                TrySet(fi, prof.ParamWidth, wid, "Largeur", "COM_Largeur", "Width");
+                TrySet(fi, prof.ParamDepth, depthFt, "Profondeur", "COM_Profondeur", "Depth");
+            }
+        }
+
+        private static bool TrySet(FamilyInstance fi, string preferredName, double val, params string[] fallbacks)
+        {
+            bool Try(string name)
+            {
+                if (string.IsNullOrWhiteSpace(name)) return false;
+                var p = fi.LookupParameter(name);
+                if (p != null && !p.IsReadOnly)
+                {
+                    p.Set(val);
+                    return true;
+                }
+                return false;
+            }
+
+            if (Try(preferredName)) return true;
+            foreach (var fb in fallbacks ?? Array.Empty<string>())
+                if (Try(fb)) return true;
+
+            return false;
+        }
+
+        // =========================
+        // VOID CUT FORCE (robuste)
+        // =========================
+        private void ForceVoidCutSafe(Document doc, Element host, FamilyInstance fi)
+        {
+            if (doc == null || host == null || fi == null) return;
+
+            // On tente sans regen
+            if (TryForceVoidCut(doc, host, fi))
+                return;
+
+            // Si échec, regen + retry (souvent nécessaire pour géométrie void)
+            try
+            {
+                doc.Regenerate();
+            }
+            catch { }
+
+            if (TryForceVoidCut(doc, host, fi))
+                return;
+
+            // Si ça ne coupe toujours pas : c’est probablement la famille (option “Cut with Voids When Loaded”, etc.)
+            if (!_voidCutWarnShown)
+            {
+                _voidCutWarnShown = true;
+                TaskDialog.Show("BIMaestro",
+                    "Info découpe (familles 'vide') :\n" +
+                    "Certaines familles ne coupent pas si l’option famille n’est pas activée.\n\n" +
+                    "Vérifie dans l’éditeur de famille :\n" +
+                    "- 'Cut with Voids When Loaded'\n" +
+                    "- le vide est bien en 'Cut Geometry'\n" +
+                    "- la catégorie/support autorise la coupe.\n\n" +
+                    "Le plugin a tenté de forcer la coupe automatiquement.");
+            }
+        }
+
+        private static bool TryForceVoidCut(Document doc, Element host, FamilyInstance fi)
+        {
+            try
+            {
+                // Reflection safe : évite les soucis de signature/versions
+                var asm = typeof(Element).Assembly;
+                var t = asm.GetType("Autodesk.Revit.DB.InstanceVoidCutUtils");
+                if (t == null) return false;
+
+                var methods = t.GetMethods(BindingFlags.Public | BindingFlags.Static)
+                    .Where(m => m.Name == "AddInstanceVoidCut")
+                    .ToList();
+
+                foreach (var m in methods)
+                {
+                    var ps = m.GetParameters();
+                    if (ps.Length != 3) continue;
+
+                    bool ok0 = ps[0].ParameterType == typeof(Document);
+                    bool ok1 = typeof(Element).IsAssignableFrom(ps[1].ParameterType);
+                    bool ok2 = typeof(Element).IsAssignableFrom(ps[2].ParameterType);
+
+                    if (!ok0 || !ok1 || !ok2) continue;
+
+                    m.Invoke(null, new object[] { doc, host, fi });
+                    return true;
+                }
+            }
+            catch
+            {
+                // ignore
+            }
+            return false;
+        }
+
+        // =========================
+        // Host depth
+        // =========================
+        private static double GetHostDepth(Element host)
+        {
+            if (host is Wall w) return w.Width;
+
+            if (host is Floor f)
+            {
+                var p = f.get_Parameter(BuiltInParameter.FLOOR_ATTR_THICKNESS_PARAM);
+                if (p != null && p.StorageType == StorageType.Double)
+                    return p.AsDouble();
+
+                var bb = f.get_BoundingBox(null);
+                if (bb != null)
+                    return Math.Abs(bb.Max.Z - bb.Min.Z);
+            }
+
+            return 0.0;
+        }
+
+        // =========================
+        // Geometry helpers
+        // =========================
+        private static double MmToFt(double mm) => mm / 304.8;
+
+        private static BoundingBoxXYZ IntersectBoundingBoxes(BoundingBoxXYZ bb1, BoundingBoxXYZ bb2)
+        {
+            var w1 = ToWorldBoundingBox(bb1);
+            var w2 = ToWorldBoundingBox(bb2);
+            if (w1 == null || w2 == null) return null;
+
+            double minX = Math.Max(w1.Min.X, w2.Min.X);
+            double maxX = Math.Min(w1.Max.X, w2.Max.X);
+            if (minX > maxX) return null;
+
+            double minY = Math.Max(w1.Min.Y, w2.Min.Y);
+            double maxY = Math.Min(w1.Max.Y, w2.Max.Y);
+            if (minY > maxY) return null;
+
+            double minZ = Math.Max(w1.Min.Z, w2.Min.Z);
+            double maxZ = Math.Min(w1.Max.Z, w2.Max.Z);
+            if (minZ > maxZ) return null;
+
+            return new BoundingBoxXYZ { Min = new XYZ(minX, minY, minZ), Max = new XYZ(maxX, maxY, maxZ) };
+        }
+
+        private static BoundingBoxXYZ ToWorldBoundingBox(BoundingBoxXYZ bb)
+        {
+            if (bb == null) return null;
+
+            Transform t = bb.Transform ?? Transform.Identity;
+            var corners = new List<XYZ>
+            {
+                new XYZ(bb.Min.X, bb.Min.Y, bb.Min.Z),
+                new XYZ(bb.Min.X, bb.Min.Y, bb.Max.Z),
+                new XYZ(bb.Min.X, bb.Max.Y, bb.Min.Z),
+                new XYZ(bb.Min.X, bb.Max.Y, bb.Max.Z),
+                new XYZ(bb.Max.X, bb.Min.Y, bb.Min.Z),
+                new XYZ(bb.Max.X, bb.Min.Y, bb.Max.Z),
+                new XYZ(bb.Max.X, bb.Max.Y, bb.Min.Z),
+                new XYZ(bb.Max.X, bb.Max.Y, bb.Max.Z)
+            }.Select(p => t.OfPoint(p)).ToList();
+
+            double minX = corners.Min(p => p.X);
+            double minY = corners.Min(p => p.Y);
+            double minZ = corners.Min(p => p.Z);
+            double maxX = corners.Max(p => p.X);
+            double maxY = corners.Max(p => p.Y);
+            double maxZ = corners.Max(p => p.Z);
+
+            return new BoundingBoxXYZ { Min = new XYZ(minX, minY, minZ), Max = new XYZ(maxX, maxY, maxZ) };
+        }
+
+        private static BoundingBoxXYZ GetBoundingBoxInHostCoordinates(Element elem, Transform transformToHost)
+        {
+            if (elem == null) return null;
+
+            var bb = elem.get_BoundingBox(null);
+            if (bb == null) return null;
+
+            if (transformToHost == null || transformToHost.IsIdentity)
+                return bb;
+
+            var corners = new List<XYZ>
+            {
+                new XYZ(bb.Min.X, bb.Min.Y, bb.Min.Z),
+                new XYZ(bb.Min.X, bb.Min.Y, bb.Max.Z),
+                new XYZ(bb.Min.X, bb.Max.Y, bb.Min.Z),
+                new XYZ(bb.Min.X, bb.Max.Y, bb.Max.Z),
+                new XYZ(bb.Max.X, bb.Min.Y, bb.Min.Z),
+                new XYZ(bb.Max.X, bb.Min.Y, bb.Max.Z),
+                new XYZ(bb.Max.X, bb.Max.Y, bb.Min.Z),
+                new XYZ(bb.Max.X, bb.Max.Y, bb.Max.Z)
+            }.Select(p => transformToHost.OfPoint(p)).ToList();
+
+            double minX = corners.Min(p => p.X);
+            double minY = corners.Min(p => p.Y);
+            double minZ = corners.Min(p => p.Z);
+            double maxX = corners.Max(p => p.X);
+            double maxY = corners.Max(p => p.Y);
+            double maxZ = corners.Max(p => p.Z);
+
+            return new BoundingBoxXYZ { Min = new XYZ(minX, minY, minZ), Max = new XYZ(maxX, maxY, maxZ) };
+        }
+
+        private static XYZ GetWallDirection(Wall wall)
+        {
+            if (wall?.Location is LocationCurve lc && lc.Curve is Line line)
+            {
+                var d = line.Direction;
+                if (d != null && d.GetLength() > 1e-9)
+                    return d.Normalize();
+            }
+            return XYZ.BasisX;
+        }
+
+        private static XYZ ProjectPointOntoWallPlane(Wall wall, XYZ point)
+        {
+            if (wall == null || point == null) return point;
+
+            XYZ normal = wall.Orientation;
+            if (normal == null || normal.GetLength() < 1e-9) return point;
+            normal = normal.Normalize();
+
+            XYZ origin = null;
+            if (wall.Location is LocationCurve lc && lc.Curve != null)
+                origin = lc.Curve.Evaluate(0.5, true);
+
+            origin ??= point;
+            double offset = normal.DotProduct(point - origin);
+
+            return point - normal * offset;
+        }
+
+        private static XYZ GetPlacementPointOnFloor(Floor floor, Element intersectingElement, XYZ fallbackCenter, Transform transformToHost)
+        {
+            if (floor == null) return fallbackCenter;
+
+            var bb = floor.get_BoundingBox(null);
+            if (bb == null) return fallbackCenter;
+
+            double z = (bb.Min.Z + bb.Max.Z) * 0.5;
+            XYZ src = fallbackCenter;
+
+            if (intersectingElement != null)
+            {
+                var bbEl = GetBoundingBoxInHostCoordinates(intersectingElement, transformToHost);
+                if (bbEl != null) src = (bbEl.Min + bbEl.Max) * 0.5;
+            }
+
+            return new XYZ(src.X, src.Y, z);
+        }
+
+        // =========================
+        // Diameter & rounding
+        // =========================
+        private static double CalculateDiameterForElement(Element elem, ReservationAutoV3Window.ObjectType objType, double oversizeFt)
+        {
+            if (objType == ReservationAutoV3Window.ObjectType.Canalisation && elem is Pipe p)
+            {
+                double d = p.LookupParameter("Diamètre")?.AsDouble() ?? 0.0;
+                double iso = p.LookupParameter("Epaisseur d'isolation")?.AsDouble() ?? 0.0;
+                return d + 2 * iso + oversizeFt;
+            }
+
+            if (objType == ReservationAutoV3Window.ObjectType.Gaine && elem is Duct dct)
+            {
+                double d = dct.LookupParameter("Diamètre")?.AsDouble() ?? 0.0;
+                double iso = dct.LookupParameter("Epaisseur d'isolation")?.AsDouble() ?? 0.0;
+                return d + 2 * iso + oversizeFt;
+            }
+
+            return 0.0;
+        }
+
+        private static double RoundToNearest50mm(double valueInFeet)
+        {
+            double mm = valueInFeet * 304.8;
+            double mmRounded = Math.Ceiling(mm / 50.0) * 50.0;
+            return mmRounded / 304.8;
+        }
+
+        // =========================
+        // Dynamo
+        // =========================
+        private static void TryRunDynamo(ExternalCommandData commandData, string dynPath)
+        {
+            try
+            {
+                if (!File.Exists(dynPath)) return;
+
+                DynamoRevit dynamoRevit = new DynamoRevit();
+                DynamoRevitCommandData dynCmdData = new DynamoRevitCommandData(commandData);
+                dynCmdData.JournalData = new Dictionary<string, string>
+                {
+                    { JournalKeys.ShowUiKey,         false.ToString() },
+                    { JournalKeys.AutomationModeKey, false.ToString() },
+                    { JournalKeys.DynPathKey,        dynPath },
+                    { JournalKeys.DynPathExecuteKey, true.ToString()  },
+                    { JournalKeys.ForceManualRunKey, true.ToString()  },
+                    { JournalKeys.ModelShutDownKey,  true.ToString()  },
+                    { JournalKeys.ModelNodesInfo,    false.ToString() }
+                };
+
+                dynamoRevit.ExecuteCommand(dynCmdData);
+            }
+            catch
+            {
+                // volontairement silencieux
+            }
+        }
+
+        // =========================
+        // Link/host pipe selection
+        // =========================
+        private class HostPipeSelectionFilter : ISelectionFilter
+        {
+            public bool AllowElement(Element elem) => elem is Pipe;
+            public bool AllowReference(Reference reference, XYZ position) => false;
+        }
+
+        private class LinkPipeSelectionFilter : ISelectionFilter
+        {
+            private readonly Document _doc;
+            private readonly ReservationAutoV3Window.PipeSource _pipeSource;
+
+            public LinkPipeSelectionFilter(Document doc, ReservationAutoV3Window.PipeSource pipeSource)
+            {
+                _doc = doc;
+                _pipeSource = pipeSource;
+            }
+
+            private static bool IsIfcLink(RevitLinkInstance linkInstance)
+            {
+                try
+                {
+                    var extRef = linkInstance.GetExternalFileReference();
+                    if (extRef != null)
+                    {
+                        string kind = extRef.ExternalFileReferenceType.ToString();
+                        if (string.Equals(kind, "IFC", StringComparison.OrdinalIgnoreCase))
+                            return true;
+                    }
+                }
+                catch { }
+
+                var linkDoc = linkInstance.GetLinkDocument();
+                string pathOrName = (linkDoc?.PathName ?? linkInstance.Name ?? string.Empty).ToLowerInvariant();
+                return pathOrName.EndsWith(".ifc") || pathOrName.Contains(".ifc");
+            }
+
+            private static bool IsRvtLink(RevitLinkInstance linkInstance)
+            {
+                try
+                {
+                    var extRef = linkInstance.GetExternalFileReference();
+                    if (extRef != null && extRef.ExternalFileReferenceType == ExternalFileReferenceType.RevitLink)
+                        return true;
+                }
+                catch { }
+
+                var linkDoc = linkInstance.GetLinkDocument();
+                string pathOrName = (linkDoc?.PathName ?? linkInstance.Name ?? string.Empty).ToLowerInvariant();
+                bool hasIfc = pathOrName.Contains(".ifc");
+                bool hasRvt = pathOrName.EndsWith(".rvt");
+                return hasRvt && !hasIfc;
+            }
+
+            private bool MatchesExpectedLinkType(RevitLinkInstance linkInstance)
+            {
+                return _pipeSource switch
+                {
+                    ReservationAutoV3Window.PipeSource.LienIFC => IsIfcLink(linkInstance),
+                    ReservationAutoV3Window.PipeSource.LienRVT => IsRvtLink(linkInstance),
+                    _ => false
+                };
+            }
+
+            public bool AllowElement(Element elem)
+            {
+                var linkInstance = elem as RevitLinkInstance;
+                if (linkInstance == null) return false;
+                return linkInstance.GetLinkDocument() != null && MatchesExpectedLinkType(linkInstance);
+            }
+
+            public bool AllowReference(Reference reference, XYZ position)
+            {
+                if (reference == null) return false;
+
+                Element linkElem = _doc.GetElement(reference.ElementId);
+                var linkInstance = linkElem as RevitLinkInstance;
+                if (linkInstance == null) return false;
+
+                Document linkDoc = linkInstance.GetLinkDocument();
+                if (linkDoc == null) return false;
+
+                Element linkedElem = linkDoc.GetElement(reference.LinkedElementId);
+                return MatchesExpectedLinkType(linkInstance) && linkedElem != null;
+            }
+        }
+
+        private static Reference PickSinglePipeBySource(UIDocument uiDoc, Document doc, ReservationAutoV3Window.PipeSource pipeSource)
+        {
+            return pipeSource switch
+            {
+                ReservationAutoV3Window.PipeSource.Maquette => uiDoc.Selection.PickObject(
+                    ObjectType.Element, new HostPipeSelectionFilter(),
+                    "Sélectionne la canalisation (maquette)"),
+
+                ReservationAutoV3Window.PipeSource.LienIFC or ReservationAutoV3Window.PipeSource.LienRVT => uiDoc.Selection.PickObject(
+                    ObjectType.LinkedElement, new LinkPipeSelectionFilter(doc, pipeSource),
+                    "Sélectionne la canalisation (lien)"),
+
+                _ => uiDoc.Selection.PickObject(ObjectType.Element, new HostPipeSelectionFilter(), "Sélectionne la canalisation")
+            };
+        }
+
+        private static IList<Reference> GetPipeReferencesBySource(UIDocument uiDoc, Document doc, ReservationAutoV3Window.PipeSource pipeSource)
+        {
+            return pipeSource switch
+            {
+                ReservationAutoV3Window.PipeSource.Maquette => uiDoc.Selection.PickObjects(
+                    ObjectType.Element, new HostPipeSelectionFilter(),
+                    "Sélectionne les canalisations (CTRL + clic, ESC pour terminer)"),
+
+                ReservationAutoV3Window.PipeSource.LienIFC or ReservationAutoV3Window.PipeSource.LienRVT => uiDoc.Selection.PickObjects(
+                    ObjectType.LinkedElement, new LinkPipeSelectionFilter(doc, pipeSource),
+                    "Sélectionne les canalisations (lien) (CTRL + clic, ESC pour terminer)"),
+
+                _ => null
+            };
+        }
+
+        private static bool TryResolveReference(UIDocument uiDoc, Reference reference, out Element element, out Transform transformToHost)
+        {
+            element = null;
+            transformToHost = Transform.Identity;
+
+            if (reference == null)
+                return false;
+
+            if (reference.LinkedElementId != ElementId.InvalidElementId)
+            {
+                var linkInstance = uiDoc.Document.GetElement(reference.ElementId) as RevitLinkInstance;
+                if (linkInstance == null)
+                    return false;
+
+                Document linkDoc = linkInstance.GetLinkDocument();
+                if (linkDoc == null)
+                    return false;
+
+                element = linkDoc.GetElement(reference.LinkedElementId);
+                transformToHost = linkInstance.GetTotalTransform();
+                return element != null;
+            }
+
+            element = uiDoc.Document.GetElement(reference);
+            transformToHost = Transform.Identity;
+            return element != null;
+        }
+    }
+}

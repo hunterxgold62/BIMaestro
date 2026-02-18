@@ -1,0 +1,296 @@
+﻿<Window x:Class="Modification.ReservationAutoV3Window"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="BIMaestro - Réservations Auto (V3)"
+        Height="590"
+        Width="760"
+        MinWidth="720"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource App.Background}"
+        ResizeMode="CanResize">
+
+    <Window.Resources>
+        <SolidColorBrush x:Key="App.Background"   Color="#F8FAFC"/>
+        <SolidColorBrush x:Key="Card.Background"  Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="Card.Border"      Color="#E5E7EB"/>
+        <SolidColorBrush x:Key="Divider"          Color="#E6EAF0"/>
+        <SolidColorBrush x:Key="Text.Primary"     Color="#0F172A"/>
+        <SolidColorBrush x:Key="Text.Secondary"   Color="#64748B"/>
+        <SolidColorBrush x:Key="Accent"           Color="#3B82F6"/>
+
+        <Style x:Key="SectionTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource Text.Primary}"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="{StaticResource Text.Primary}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin" Value="0,0,12,0"/>
+        </Style>
+
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="Padding" Value="14"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Background" Value="{StaticResource Card.Background}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Card.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+
+        <Style x:Key="PrimaryButton" TargetType="Button">
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="MinWidth" Value="140"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="{StaticResource Accent}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Accent}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+
+        <Style x:Key="GhostButton" TargetType="Button">
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="MinWidth" Value="140"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Foreground" Value="{StaticResource Text.Primary}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Card.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+
+        <Style TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{StaticResource Text.Primary}"/>
+            <Setter Property="Margin" Value="0,6,0,6"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style TargetType="TextBox">
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+        </Style>
+
+        <Style TargetType="ComboBox">
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,12">
+            <TextBlock Text="Réservations Auto (V3)" FontSize="18" FontWeight="Bold" Foreground="{StaticResource Text.Primary}"/>
+            <TextBlock Text="V1+V2 dans un seul bouton + ajout simple de familles perso (chargement .RFA + mapping paramètres)."
+                       Foreground="{StaticResource Text.Secondary}"/>
+        </StackPanel>
+
+        <TabControl Grid.Row="1">
+            <!-- EXECUTION -->
+            <TabItem Header="Exécution">
+                <Border Style="{StaticResource Card}" Margin="0,10,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="200"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Text="Cibles" Style="{StaticResource SectionTitle}"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Support :" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Row="1" Grid.Column="1" x:Name="comboHost" SelectionChanged="OnCriteriaChanged">
+                            <ComboBoxItem Content="Mur"/>
+                            <ComboBoxItem Content="Sol"/>
+                        </ComboBox>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Forme :" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Row="2" Grid.Column="1" x:Name="comboShape" SelectionChanged="OnCriteriaChanged">
+                            <ComboBoxItem Content="Rectangulaire"/>
+                            <ComboBoxItem Content="Circulaire"/>
+                        </ComboBox>
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Type d’objet :" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Row="3" Grid.Column="1" x:Name="comboObjectType" SelectionChanged="OnCriteriaChanged">
+                            <ComboBoxItem Content="Canalisation"/>
+                            <ComboBoxItem Content="Gaine"/>
+                            <ComboBoxItem Content="Porte"/>
+                            <ComboBoxItem Content="Fenêtre"/>
+                            <ComboBoxItem Content="Autre"/>
+                        </ComboBox>
+
+                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Source canalisations :" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Row="4" Grid.Column="1" x:Name="comboPipeSource">
+                            <ComboBoxItem Content="Maquette"/>
+                            <ComboBoxItem Content="Lien IFC"/>
+                            <ComboBoxItem Content="Lien RVT"/>
+                        </ComboBox>
+
+                        <Rectangle Grid.Row="5" Grid.ColumnSpan="2" Height="1" Fill="{StaticResource Divider}" Margin="0,4,0,8"/>
+
+                        <CheckBox Grid.Row="6" Grid.ColumnSpan="2" x:Name="chkAutomatique"
+                                  Content="Mode automatique (scan - mur uniquement)"/>
+
+                        <CheckBox Grid.Row="7" Grid.ColumnSpan="2" x:Name="chkMulti"
+                                  Content="Multi-sélection (canalisations - rectangle)"
+                                  IsEnabled="False"/>
+
+                        <Rectangle Grid.Row="8" Grid.ColumnSpan="2" Height="1" Fill="{StaticResource Divider}" Margin="0,4,0,8"/>
+
+                        <StackPanel Grid.Row="9" Grid.ColumnSpan="2">
+                            <TextBlock Text="Options" Style="{StaticResource SectionTitle}" Margin="0,0,0,4"/>
+                            <CheckBox x:Name="chkNorme" Content="Appliquer la norme (arrondi 50mm)" />
+                            <CheckBox x:Name="chkDynamo" Content="Exécuter Dynamo automatiquement" />
+                        </StackPanel>
+
+                    </Grid>
+                </Border>
+            </TabItem>
+
+            <!-- CONFIG -->
+            <TabItem Header="Configuration (familles)">
+                <Border Style="{StaticResource Card}" Margin="0,10,0,0">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+
+                            <TextBlock Text="Configuration actuelle (auto-détectée si familles présentes)" Style="{StaticResource SectionTitle}" />
+
+                            <Border Style="{StaticResource Card}" Margin="0,0,0,10">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="170"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Text="Profils" FontWeight="SemiBold" Margin="0,0,0,8"/>
+
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Mur - Rectangle :" Style="{StaticResource FieldLabel}"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="1" x:Name="txtWallRect" Foreground="{StaticResource Text.Secondary}"/>
+
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Mur - Cercle :" Style="{StaticResource FieldLabel}"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="1" x:Name="txtWallCirc" Foreground="{StaticResource Text.Secondary}"/>
+
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Sol - Rectangle :" Style="{StaticResource FieldLabel}"/>
+                                    <TextBlock Grid.Row="3" Grid.Column="1" x:Name="txtFloorRect" Foreground="{StaticResource Text.Secondary}"/>
+
+                                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Sol - Cercle :" Style="{StaticResource FieldLabel}"/>
+                                    <TextBlock Grid.Row="4" Grid.Column="1" x:Name="txtFloorCirc" Foreground="{StaticResource Text.Secondary}"/>
+                                </Grid>
+                            </Border>
+
+                            <TextBlock Text="Ajouter / configurer une famille (simple)" Style="{StaticResource SectionTitle}" />
+
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+
+                                    <TextBlock Text="1) Charger un fichier .RFA de réservation" FontWeight="SemiBold"/>
+                                    <DockPanel Margin="0,6,0,10" LastChildFill="True">
+                                        <Button x:Name="btnBrowseRfa" Content="Parcourir…" Width="110" Margin="0,0,8,0" Click="OnBrowseRfa"/>
+                                        <TextBox x:Name="tbRfaPath" IsReadOnly="True"/>
+                                    </DockPanel>
+
+                                    <Button x:Name="btnLoadRfa" Content="Charger dans le projet" Style="{StaticResource PrimaryButton}" Click="OnLoadRfa" />
+
+                                    <Rectangle Height="1" Fill="{StaticResource Divider}" Margin="0,12,0,12"/>
+
+                                    <TextBlock Text="2) À quoi correspond cette famille ?" FontWeight="SemiBold"/>
+                                    <ComboBox x:Name="cbTargetProfile" SelectionChanged="OnTargetProfileChanged">
+                                        <ComboBoxItem Content="Mur - Rectangulaire"/>
+                                        <ComboBoxItem Content="Mur - Circulaire"/>
+                                        <ComboBoxItem Content="Sol - Rectangulaire"/>
+                                        <ComboBoxItem Content="Sol - Circulaire"/>
+                                    </ComboBox>
+
+                                    <TextBlock Text="Type (si la famille a plusieurs types) :" Style="{StaticResource FieldLabel}"/>
+                                    <ComboBox x:Name="cbLoadedType" DisplayMemberPath="Display" SelectionChanged="OnLoadedTypeChanged"/>
+
+                                    <Rectangle Height="1" Fill="{StaticResource Divider}" Margin="0,12,0,12"/>
+
+                                    <TextBlock Text="3) Mapping des paramètres" FontWeight="SemiBold"/>
+
+                                    <StackPanel x:Name="panelMapRectWall" Visibility="Collapsed">
+                                        <TextBlock Text="Longueur (axe mur) :" Style="{StaticResource FieldLabel}"/>
+                                        <ComboBox x:Name="cbMapWallLen" IsEditable="True"/>
+                                        <TextBlock Text="Hauteur :" Style="{StaticResource FieldLabel}"/>
+                                        <ComboBox x:Name="cbMapWallHeight" IsEditable="True"/>
+                                        <TextBlock Text="Profondeur :" Style="{StaticResource FieldLabel}"/>
+                                        <ComboBox x:Name="cbMapWallDepth" IsEditable="True"/>
+                                    </StackPanel>
+
+                                    <StackPanel x:Name="panelMapCircWall" Visibility="Collapsed">
+                                        <TextBlock Text="Diamètre :" Style="{StaticResource FieldLabel}"/>
+                                        <ComboBox x:Name="cbMapWallDiam" IsEditable="True"/>
+                                        <TextBlock Text="Profondeur :" Style="{StaticResource FieldLabel}"/>
+                                        <ComboBox x:Name="cbMapWallDepth2" IsEditable="True"/>
+                                    </StackPanel>
+
+                                    <StackPanel x:Name="panelMapRectFloor" Visibility="Collapsed">
+                                        <TextBlock Text="Longueur :" Style="{StaticResource FieldLabel}"/>
+                                        <ComboBox x:Name="cbMapFloorLen" IsEditable="True"/>
+                                        <TextBlock Text="Largeur :" Style="{StaticResource FieldLabel}"/>
+                                        <ComboBox x:Name="cbMapFloorWidth" IsEditable="True"/>
+                                        <TextBlock Text="Profondeur :" Style="{StaticResource FieldLabel}"/>
+                                        <ComboBox x:Name="cbMapFloorDepth" IsEditable="True"/>
+                                    </StackPanel>
+
+                                    <StackPanel x:Name="panelMapCircFloor" Visibility="Collapsed">
+                                        <TextBlock Text="Diamètre :" Style="{StaticResource FieldLabel}"/>
+                                        <ComboBox x:Name="cbMapFloorDiam" IsEditable="True"/>
+                                        <TextBlock Text="Profondeur :" Style="{StaticResource FieldLabel}"/>
+                                        <ComboBox x:Name="cbMapFloorDepth2" IsEditable="True"/>
+                                    </StackPanel>
+
+                                    <Button x:Name="btnApplyMapping" Content="Appliquer au profil + Sauvegarder" Style="{StaticResource PrimaryButton}"
+                                            Margin="0,10,0,0" Click="OnApplyMapping"/>
+
+                                    <Rectangle Height="1" Fill="{StaticResource Divider}" Margin="0,12,0,12"/>
+
+                                    <TextBlock Text="Oversize Pipe/Duct (mm) :" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="tbOversize" Text="50"/>
+
+                                    <TextBlock Text="Chemin Dynamo :" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="tbDynamoPath"/>
+
+                                    <CheckBox x:Name="chkDefaultNorme" Content="Norme activée par défaut (arrondi)" />
+                                    <CheckBox x:Name="chkDefaultDynamo" Content="Dynamo auto activé par défaut" />
+
+                                    <Button Content="Sauvegarder config (sans changer les familles)" Style="{StaticResource GhostButton}"
+                                            HorizontalAlignment="Right" Click="OnSaveOnly"/>
+
+                                </StackPanel>
+                            </Border>
+
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+            </TabItem>
+        </TabControl>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="Annuler" Style="{StaticResource GhostButton}" IsCancel="True" Click="OnCancel"/>
+            <Button Content="OK" Style="{StaticResource PrimaryButton}" Margin="8,0,0,0" IsDefault="True" Click="OnOk"/>
+        </StackPanel>
+    </Grid>
+</Window>

@@ -293,17 +293,17 @@
       <DependentUpon>ExtendedReservationVoidWindowV2.xaml</DependentUpon>
     </Compile>
     <Compile Include="commands\Réservation auto\résa auto v2\ReservationVoidAutoMultiCommandV2.cs" />
+    <Compile Include="commands\Réservation auto\résa auto v3\ReservationAutoV3Command.cs" />
+    <Compile Include="commands\Réservation auto\résa auto v3\ReservationAutoV3Config.cs" />
+    <Compile Include="commands\Réservation auto\résa auto v3\ReservationV3Window.xaml.cs">
+      <DependentUpon>ReservationV3Window.xaml</DependentUpon>
+    </Compile>
     <Compile Include="commands\Suivi maquette collaboratif\CollaborativeModelTracker.cs" />
     <Compile Include="commands\Suivi maquette collaboratif\CollaborativeModelTrackerStore.cs" />
     <Compile Include="commands\Suivi maquette collaboratif\CollaborativeModelTrackerWindow.xaml.cs">
       <DependentUpon>CollaborativeModelTrackerWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="Test\paramétre partagé en famillle\ConvertSharedToFamilyParametersCommand.cs" />
-    <Compile Include="Test\Résa auto V3\ReservationAutoV3Command.cs" />
-    <Compile Include="Test\Résa auto V3\ReservationAutoV3Config.cs" />
-    <Compile Include="Test\Résa auto V3\ReservationV3Window.xaml.cs">
-      <DependentUpon>ReservationV3Window.xaml</DependentUpon>
-    </Compile>
     <None Include="app et excel\Touche\copie touche.cs" />
     <Compile Include="app et excel\BIMaestroApp.cs" />
     <Compile Include="app et excel\Supabase\BaseTrackedCommand.cs" />
@@ -693,6 +693,10 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <Page Include="commands\Réservation auto\résa auto v3\ReservationV3Window.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
     <Page Include="commands\Snake\SnakeLeaderboardWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -706,10 +710,6 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="commands\Snake\SnakeWindow.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="Test\Résa auto V3\ReservationV3Window.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
