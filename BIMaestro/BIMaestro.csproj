@@ -197,6 +197,7 @@
       <HintPath>..\packages\System.Runtime.InteropServices.RuntimeInformation.4.3.0\lib\net45\System.Runtime.InteropServices.RuntimeInformation.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="System.Runtime.Serialization" />
     <Reference Include="System.Security" />
     <Reference Include="System.Security.Cryptography.Algorithms, Version=4.2.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Security.Cryptography.Algorithms.4.3.1\lib\net463\System.Security.Cryptography.Algorithms.dll</HintPath>
@@ -292,7 +293,17 @@
       <DependentUpon>ExtendedReservationVoidWindowV2.xaml</DependentUpon>
     </Compile>
     <Compile Include="commands\Réservation auto\résa auto v2\ReservationVoidAutoMultiCommandV2.cs" />
+    <Compile Include="commands\Suivi maquette collaboratif\CollaborativeModelTracker.cs" />
+    <Compile Include="commands\Suivi maquette collaboratif\CollaborativeModelTrackerStore.cs" />
+    <Compile Include="commands\Suivi maquette collaboratif\CollaborativeModelTrackerWindow.xaml.cs">
+      <DependentUpon>CollaborativeModelTrackerWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Test\paramétre partagé en famillle\ConvertSharedToFamilyParametersCommand.cs" />
+    <Compile Include="Test\Résa auto V3\ReservationAutoV3Command.cs" />
+    <Compile Include="Test\Résa auto V3\ReservationAutoV3Config.cs" />
+    <Compile Include="Test\Résa auto V3\ReservationV3Window.xaml.cs">
+      <DependentUpon>ReservationV3Window.xaml</DependentUpon>
+    </Compile>
     <None Include="app et excel\Touche\copie touche.cs" />
     <Compile Include="app et excel\BIMaestroApp.cs" />
     <Compile Include="app et excel\Supabase\BaseTrackedCommand.cs" />
@@ -686,11 +697,19 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="commands\Suivi maquette collaboratif\CollaborativeModelTrackerWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="Test\perso pixéli\PixelDancerWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="commands\Snake\SnakeWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Test\Résa auto V3\ReservationV3Window.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

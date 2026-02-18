@@ -222,6 +222,7 @@ public class BIMaestroApp : IExternalApplication
         {
             _uiApp ??= new UIApplication(e.Document.Application);
             ExcelLogger.OnDocumentOpened(e.Document, _uiApp);
+            Analyse.CollaborativeModelTrackerStore.TryAutoLog(e.Document, _uiApp);
         }
         catch (Exception ex)
         {
@@ -235,6 +236,7 @@ public class BIMaestroApp : IExternalApplication
         {
             _uiApp ??= new UIApplication(e.Document.Application);
             ExcelLogger.OnDocumentClosing(e.Document, _uiApp);
+            Analyse.CollaborativeModelTrackerStore.TryAutoLog(e.Document, _uiApp);
         }
         catch (Exception ex)
         {

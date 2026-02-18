@@ -1,0 +1,292 @@
+﻿using Autodesk.Revit.DB;
+using Autodesk.Revit.UI;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Threading;
+using Color = System.Windows.Media.Color;
+
+namespace Analyse
+{
+    public partial class CollaborativeModelTrackerWindow : Window
+    {
+        private const string AllUsersLabel = "Tout le monde";
+        private const string AllVersionsLabel = "Toutes versions";
+        private const string AllFilesLabel = "Tous fichiers";
+        private readonly Document _doc;
+        private readonly UIApplication _uiapp;
+        private List<CollaborativeModelRecord> _allRecords = new List<CollaborativeModelRecord>();
+
+        private sealed class ProjectCard
+        {
+            public string ProjectName { get; set; }
+            public string ModelName { get; set; }
+            public string ModelPath { get; set; }
+            public string UserName { get; set; }
+            public string CreatorName { get; set; }
+            public string RevitVersion { get; set; }
+            public Brush PastelBrush { get; set; }
+        }
+
+        public CollaborativeModelTrackerWindow(Document doc, UIApplication uiapp)
+        {
+            InitializeComponent();
+            _doc = doc;
+            _uiapp = uiapp;
+            LoadRecords();
+            ApplyFilters();
+        }
+
+        private void LoadRecords()
+        {
+            _allRecords = CollaborativeModelTrackerStore.Load();
+
+            var users = CollaborativeModelTrackerStore.GetKnownUsers();
+            if (!users.Contains(AllUsersLabel, StringComparer.OrdinalIgnoreCase))
+                users.Insert(0, AllUsersLabel);
+
+            var previous = UserComboBox.Text;
+            UserComboBox.ItemsSource = users;
+            UserComboBox.Text = !string.IsNullOrWhiteSpace(previous)
+                ? previous
+                : AllUsersLabel;
+
+            var versions = _allRecords
+                .Select(r => r.RevitVersion)
+                .Where(v => !string.IsNullOrWhiteSpace(v))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(v => v)
+                .ToList();
+            versions.Insert(0, AllVersionsLabel);
+            var previousVersion = RevitVersionComboBox.Text;
+            RevitVersionComboBox.ItemsSource = versions;
+            RevitVersionComboBox.Text = !string.IsNullOrWhiteSpace(previousVersion) ? previousVersion : AllVersionsLabel;
+
+            var fileTypes = _allRecords
+                .Select(r => GetFileExtensionLabel(r.ModelPath, r.ModelName))
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(x => x)
+                .ToList();
+            fileTypes.Insert(0, AllFilesLabel);
+            var previousType = FileTypeComboBox.Text;
+            FileTypeComboBox.ItemsSource = fileTypes;
+            FileTypeComboBox.Text = !string.IsNullOrWhiteSpace(previousType) ? previousType : AllFilesLabel;
+
+            InfoText.Text =
+                $"{_allRecords.Select(r => r.ModelName).Distinct(StringComparer.OrdinalIgnoreCase).Count()} maquettes | JSON: {CollaborativeModelTrackerStore.JsonPath}" +
+                (string.IsNullOrWhiteSpace(CollaborativeModelTrackerStore.LastDirectoryResolutionMessage)
+                    ? string.Empty
+                    : $"\n{CollaborativeModelTrackerStore.LastDirectoryResolutionMessage}");
+        }
+
+        private void ApplyFilters()
+        {
+            var selectedUser = (UserComboBox.Text ?? string.Empty).Trim();
+            var search = (SearchModelTextBox.Text ?? string.Empty).Trim();
+            var selectedVersion = (RevitVersionComboBox.SelectedItem as string ?? RevitVersionComboBox.Text ?? string.Empty).Trim();
+            var selectedFileType = (FileTypeComboBox.SelectedItem as string ?? FileTypeComboBox.Text ?? string.Empty).Trim();
+
+            IEnumerable<CollaborativeModelRecord> query = _allRecords;
+
+            if (!string.IsNullOrWhiteSpace(selectedUser) &&
+                !selectedUser.Equals(AllUsersLabel, StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(r => string.Equals(r.UserName ?? string.Empty, selectedUser, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrWhiteSpace(selectedVersion) &&
+                !selectedVersion.Equals(AllVersionsLabel, StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(r => string.Equals(r.RevitVersion ?? string.Empty, selectedVersion, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrWhiteSpace(selectedFileType) &&
+                !selectedFileType.Equals(AllFilesLabel, StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(r => string.Equals(GetFileExtensionLabel(r.ModelPath, r.ModelName), selectedFileType, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                query = query.Where(r => !string.IsNullOrWhiteSpace(r.ModelName) &&
+                                         r.ModelName.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0);
+            }
+
+            var models = query
+                .GroupBy(r => string.IsNullOrWhiteSpace(r.ModelName) ? "Maquette inconnue" : r.ModelName, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.OrderByDescending(x => x.TimestampDate).First())
+                .OrderBy(m => m.ModelName)
+                .ToList();
+
+            var cards = new List<ProjectCard>();
+            for (int i = 0; i < models.Count; i++)
+            {
+                var m = models[i];
+                cards.Add(new ProjectCard
+                {
+                    ModelName = m.ModelName,
+                    ProjectName = m.ProjectName,
+                    ModelPath = m.ModelPath,
+                    UserName = m.UserName,
+                    CreatorName = m.CreatorName,
+                    RevitVersion = m.RevitVersion,
+                    PastelBrush = BuildPastelBrush(i)
+                });
+            }
+
+            ProjectsListBox.ItemsSource = cards;
+            AutoAdjustWindowWidth(cards);
+        }
+
+        private void AutoAdjustWindowWidth(List<ProjectCard> cards)
+        {
+            try
+            {
+                int maxPathLen = cards.Count == 0
+                    ? 0
+                    : cards.Max(c => string.IsNullOrWhiteSpace(c.ModelPath) ? 0 : c.ModelPath.Length);
+
+                double suggested = 1050 + Math.Min(700, Math.Max(0, maxPathLen - 80) * 4.0);
+                double screenMax = Math.Max(1050, SystemParameters.WorkArea.Width - 30);
+                Width = Math.Min(screenMax, suggested);
+            }
+            catch
+            {
+            }
+        }
+
+        private static Brush BuildPastelBrush(int index)
+        {
+            Color[] palette =
+            {
+                Color.FromRgb(244, 236, 255),
+                Color.FromRgb(235, 247, 255),
+                Color.FromRgb(232, 252, 241),
+                Color.FromRgb(255, 244, 230),
+                Color.FromRgb(255, 236, 242),
+                Color.FromRgb(245, 245, 230),
+                Color.FromRgb(232, 242, 255),
+                Color.FromRgb(238, 255, 248)
+            };
+
+            return new SolidColorBrush(palette[index % palette.Length]);
+        }
+
+        private void Refresh_Click(object sender, RoutedEventArgs e)
+        {
+            LoadRecords();
+            ApplyFilters();
+        }
+
+        private void UserComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            ApplyFilters();
+        }
+
+        private void UserComboBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            ApplyFilters();
+        }
+
+        private void SearchModelTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            ApplyFilters();
+        }
+
+        private static string GetFileExtensionLabel(string modelPath, string modelName)
+        {
+            string ext = null;
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(modelPath))
+                    ext = Path.GetExtension(modelPath);
+                if (string.IsNullOrWhiteSpace(ext) && !string.IsNullOrWhiteSpace(modelName))
+                    ext = Path.GetExtension(modelName);
+            }
+            catch
+            {
+            }
+
+            if (string.IsNullOrWhiteSpace(ext))
+                return "(sans extension)";
+
+            return ext.Trim().TrimStart('.').ToUpperInvariant();
+        }
+
+        private void RevitVersionComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            Dispatcher.BeginInvoke(new Action(ApplyFilters), DispatcherPriority.Background);
+        }
+
+        private void FileTypeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            Dispatcher.BeginInvoke(new Action(ApplyFilters), DispatcherPriority.Background);
+        }
+
+        private void OpenFolder_Click(object sender, RoutedEventArgs e)
+        {
+            OpenCurrentSelectedModelFolder();
+        }
+
+        private void ProjectsListBox_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            OpenCurrentSelectedModelFolder();
+        }
+
+        private void OpenCurrentSelectedModelFolder()
+        {
+            try
+            {
+                if (!(ProjectsListBox.SelectedItem is ProjectCard project))
+                {
+                    OpenFolderPath(CollaborativeModelTrackerStore.ActiveDirectory);
+                    return;
+                }
+
+                var target = ResolveFolderFromModelPath(project.ModelPath);
+                OpenFolderPath(target);
+            }
+            catch
+            {
+                MessageBox.Show("Impossible d'ouvrir le dossier du projet sélectionné.", "Info", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        private static string ResolveFolderFromModelPath(string modelPath)
+        {
+            if (!string.IsNullOrWhiteSpace(modelPath) && !modelPath.Equals("Chemin non disponible", StringComparison.OrdinalIgnoreCase))
+            {
+                if (Directory.Exists(modelPath))
+                    return modelPath;
+
+                try
+                {
+                    var dir = Path.GetDirectoryName(modelPath);
+                    if (!string.IsNullOrWhiteSpace(dir) && Directory.Exists(dir))
+                        return dir;
+                }
+                catch
+                {
+                }
+            }
+
+            return CollaborativeModelTrackerStore.ActiveDirectory;
+        }
+
+        private static void OpenFolderPath(string folder)
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = folder,
+                UseShellExecute = true
+            });
+        }
+    }
+}
