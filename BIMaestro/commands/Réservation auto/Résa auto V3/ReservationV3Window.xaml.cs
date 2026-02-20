@@ -54,6 +54,7 @@ namespace Modification
 
         public ReservationAutoV3Window(Document doc, ReservationAutoV3Config cfg)
         {
+            ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
 
             _doc = doc;

@@ -1,0 +1,181 @@
+﻿BIMaestro — Charte Graphique UI (WPF)
+1️⃣ Philosophie visuelle
+
+BIMaestro adopte une interface :
+
+Claire
+
+Professionnelle
+
+Technique
+
+Moderne
+
+Sobre
+
+Le design privilégie la lisibilité, la hiérarchie visuelle et la cohérence sur l’ensemble des fenêtres.
+
+La couleur de marque est utilisée avec retenue.
+Elle sert à guider l’action, pas à décorer.
+
+2️⃣ Palette officielle
+Couleurs principales
+
+Fond global application
+#F6F8FB
+
+Surface / Cards
+#FFFFFF
+
+Surface subtile
+#F9FAFB
+
+Bordures
+#E6EAF0
+
+Dividers
+#EEF2F7
+
+Texte
+
+Texte principal
+#0F172A
+
+Texte secondaire
+#64748B
+
+Texte discret
+#94A3B8
+
+Couleur de marque (Brand)
+
+Vert BIMaestro
+#0F5132
+
+Hover
+#0B3D26
+
+Pressed
+#08301D
+
+Focus
+#7CC8A3
+
+Couleurs informatives
+
+Highlight doux
+#FFFBEB
+
+Bordure highlight
+#FDE68A
+
+3️⃣ Règles d’utilisation de la couleur
+❗ Règle fondamentale
+
+La couleur de marque est réservée :
+
+aux boutons primaires
+
+au header principal
+
+aux éléments actifs ou sélectionnés
+
+aux états focus
+
+Elle ne doit PAS être utilisée :
+
+en fond de grandes zones de contenu
+
+sur des cards principales
+
+comme couleur dominante de l’interface
+
+4️⃣ Structure type d’une fenêtre
+
+Header de marque (Brand)
+
+Zone de contenu en cards blanches
+
+Inputs cohérents (TextBox / ComboBox)
+
+Boutons secondaires (Surface)
+
+Bouton principal (Brand)
+
+Chaque fenêtre doit respecter cette hiérarchie.
+
+5️⃣ Boutons
+
+PrimaryButton
+→ Action principale
+→ Une seule action dominante par écran
+
+SecondaryButton
+→ Actions secondaires
+→ Annuler / Retour / Sauvegarde simple
+
+Jamais deux Primary côte à côte.
+
+6️⃣ Inputs
+
+Border radius : 10–12
+
+Hauteur : 32 px
+
+Focus = bordure verte
+
+Disabled = opacité réduite
+
+7️⃣ Tabs
+
+Style “pill” arrondi
+
+Selected = fond blanc + bordure focus
+
+Non sélectionné = neutre
+
+8️⃣ Espacements
+
+Margin standard vertical : 8–12 px
+
+Séparation section : 16 px
+
+Padding card : 16 px
+
+9️⃣ Cohérence globale
+
+Toute nouvelle fenêtre doit :
+
+utiliser le Theme commun
+
+ne pas redéfinir les couleurs localement
+
+respecter la hiérarchie visuelle
+
+conserver la sobriété
+
+🔟 Évolution future
+
+Possibilité prévue :
+
+Mode sombre
+
+Accent alternatif (bleu / cyan)
+
+Personnalisation utilisateur
+
+Toute évolution doit conserver :
+
+la même structure
+
+la même hiérarchie
+
+la même logique d’accent
+
+Principe directeur
+
+BIMaestro doit ressembler à une suite logicielle cohérente,
+pas à un assemblage de fenêtres.
+
+La sobriété crée la crédibilité.
+La cohérence crée la marque.

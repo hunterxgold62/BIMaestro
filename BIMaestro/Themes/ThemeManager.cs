@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Windows;
 
@@ -6,6 +7,8 @@ namespace Modification
 {
     internal static class ThemeManager
     {
+        private const string ThemeDictionaryPath = "/BIMaestro;component/Themes/BIMaestroTheme.xaml";
+        private static readonly object SyncRoot = new object();
         private static bool _loaded;
 
         /// <summary>
@@ -14,38 +17,45 @@ namespace Modification
         /// </summary>
         public static void EnsureThemeLoaded()
         {
-            if (_loaded) return;
-
-            // Revit héberge l'app WPF (Application.Current existe normalement)
-            if (Application.Current == null)
-                return;
-
-            // Si déjà mergé, on ne fait rien
-            bool alreadyMerged = Application.Current.Resources.MergedDictionaries
-                .Any(d => d.Source != null && d.Source.OriginalString.Contains("BIMaestroTheme.xaml"));
-
-            if (alreadyMerged)
+            if (_loaded)
             {
-                _loaded = true;
                 return;
             }
 
-            try
+            lock (SyncRoot)
             {
-                // Pack URI vers ton ResourceDictionary
-                // Remplace YOUR_ASSEMBLY_NAME par le nom exact de l'assembly où se trouve Themes/BIMaestroTheme.xaml
-                var uri = new Uri("pack://application:,,,Themes/BIMaestroTheme.xaml", UriKind.Absolute);
+                if (_loaded)
+                {
+                    return;
+                }
 
-                var dict = new ResourceDictionary { Source = uri };
-                Application.Current.Resources.MergedDictionaries.Add(dict);
+                if (Application.Current == null)
+                {
+                    return;
+                }
 
-                _loaded = true;
-            }
-            catch
-            {
-                // En dernier recours, on marque comme chargé pour éviter de spammer
-                // mais idéalement tu loggues l'erreur dans ton système de logs.
-                _loaded = true;
+                bool alreadyMerged = Application.Current.Resources.MergedDictionaries
+                    .Any(d => d.Source != null
+                              && d.Source.OriginalString.IndexOf("BIMaestroTheme.xaml", StringComparison.OrdinalIgnoreCase) >= 0);
+
+                if (alreadyMerged)
+                {
+                    _loaded = true;
+                    return;
+                }
+
+                try
+                {
+                    var uri = new Uri(ThemeDictionaryPath, UriKind.Relative);
+                    var dictionary = new ResourceDictionary { Source = uri };
+                    Application.Current.Resources.MergedDictionaries.Add(dictionary);
+
+                    _loaded = true;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[ThemeManager] Impossible de charger le thème '{ThemeDictionaryPath}': {ex}");
+                }
             }
         }
     }
