@@ -28,6 +28,18 @@ namespace Analyse
 
         private static string _activeDirectory;
         private static string _lastDirectoryResolutionMessage;
+        private static string _configuredSharedDirectory;
+
+        private static readonly string FallbackDirectory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+            "RevitLogs",
+            "SuiviMaquettesCollaboratif");
+
+        private static readonly string CustomPathConfigFile = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+            "RevitLogs",
+            "SuiviMaquettesCollaboratif",
+            "shared_path_override.txt");
 
         public static string ActiveDirectory
         {
@@ -51,6 +63,41 @@ namespace Analyse
                 {
                     return _lastDirectoryResolutionMessage;
                 }
+            }
+        }
+
+
+        public static bool IsUsingFallbackLocal
+        {
+            get
+            {
+                lock (SyncObj)
+                {
+                    var active = ResolveWritableDirectoryNoThrow();
+                    return string.Equals(active, FallbackDirectory, StringComparison.OrdinalIgnoreCase);
+                }
+            }
+        }
+
+        public static bool TrySetSharedDirectory(string directory, out string error)
+        {
+            lock (SyncObj)
+            {
+                if (string.IsNullOrWhiteSpace(directory))
+                {
+                    error = "Chemin vide.";
+                    return false;
+                }
+
+                directory = directory.Trim();
+                if (!TryCreateAndWrite(directory, out error))
+                    return false;
+
+                _configuredSharedDirectory = directory;
+                PersistConfiguredDirectory(directory);
+                _activeDirectory = directory;
+                _lastDirectoryResolutionMessage = $"Dossier commun personnalisé utilisé: {directory}";
+                return true;
             }
         }
 
@@ -284,10 +331,15 @@ namespace Analyse
             if (!string.IsNullOrWhiteSpace(_activeDirectory))
                 return _activeDirectory;
 
-            string fallback = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                "RevitLogs",
-                "SuiviMaquettesCollaboratif");
+            if (string.IsNullOrWhiteSpace(_configuredSharedDirectory))
+                _configuredSharedDirectory = LoadConfiguredDirectory();
+
+            if (!string.IsNullOrWhiteSpace(_configuredSharedDirectory) && TryCreateAndWrite(_configuredSharedDirectory, out var customErr))
+            {
+                _activeDirectory = _configuredSharedDirectory;
+                _lastDirectoryResolutionMessage = $"Dossier commun personnalisé utilisé: {_configuredSharedDirectory}";
+                return _activeDirectory;
+            }
 
             if (TryCreateAndWrite(PreferredSharedDirectory, out var prefError))
             {
@@ -296,11 +348,11 @@ namespace Analyse
                 return _activeDirectory;
             }
 
-            if (TryCreateAndWrite(fallback, out var fallbackError))
+            if (TryCreateAndWrite(FallbackDirectory, out var fallbackError))
             {
-                _activeDirectory = fallback;
+                _activeDirectory = FallbackDirectory;
                 _lastDirectoryResolutionMessage =
-                    $"Lecteur partagé indisponible ({PreferredSharedDirectory}). Fallback local utilisé: {fallback}. Erreur initiale: {prefError}";
+                    $"Lecteur partagé indisponible ({PreferredSharedDirectory}). Fallback local utilisé: {FallbackDirectory}. Erreur initiale: {prefError}";
                 return _activeDirectory;
             }
 
@@ -308,6 +360,36 @@ namespace Analyse
             _lastDirectoryResolutionMessage =
                 $"Impossible d'initialiser les dossiers de sortie. Erreur partagé: {prefError} | Erreur fallback: {fallbackError}";
             return _activeDirectory;
+        }
+
+        private static string LoadConfiguredDirectory()
+        {
+            try
+            {
+                if (!File.Exists(CustomPathConfigFile))
+                    return null;
+
+                var path = File.ReadAllText(CustomPathConfigFile)?.Trim();
+                return string.IsNullOrWhiteSpace(path) ? null : path;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static void PersistConfiguredDirectory(string directory)
+        {
+            try
+            {
+                var configDir = Path.GetDirectoryName(CustomPathConfigFile);
+                if (!string.IsNullOrWhiteSpace(configDir))
+                    Directory.CreateDirectory(configDir);
+                File.WriteAllText(CustomPathConfigFile, directory ?? string.Empty);
+            }
+            catch
+            {
+            }
         }
 
         private static bool TryCreateAndWrite(string directory, out string error)

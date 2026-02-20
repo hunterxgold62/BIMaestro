@@ -11,6 +11,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Color = System.Windows.Media.Color;
+using Forms = System.Windows.Forms;
 
 namespace Analyse
 {
@@ -22,6 +23,7 @@ namespace Analyse
         private readonly Document _doc;
         private readonly UIApplication _uiapp;
         private List<CollaborativeModelRecord> _allRecords = new List<CollaborativeModelRecord>();
+        private bool _hasPromptedForCommonPath;
 
         private sealed class ProjectCard
         {
@@ -84,6 +86,51 @@ namespace Analyse
                 (string.IsNullOrWhiteSpace(CollaborativeModelTrackerStore.LastDirectoryResolutionMessage)
                     ? string.Empty
                     : $"\n{CollaborativeModelTrackerStore.LastDirectoryResolutionMessage}");
+
+            PromptForCommonPathIfNeeded();
+        }
+
+        private void PromptForCommonPathIfNeeded()
+        {
+            if (_hasPromptedForCommonPath)
+                return;
+
+            _hasPromptedForCommonPath = true;
+
+            if (!CollaborativeModelTrackerStore.IsUsingFallbackLocal)
+                return;
+
+            var result = MessageBox.Show(
+                "Le chemin partagé par défaut est inaccessible.Voulez - vous choisir maintenant un dossier commun(serveur) ?",
+
+                "Choisir un chemin commun",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result != MessageBoxResult.Yes)
+                return;
+
+            using (var dialog = new Forms.FolderBrowserDialog())
+            {
+                dialog.Description = "Sélectionnez le dossier commun pour stocker le JSON/Excel de suivi";
+                dialog.SelectedPath = CollaborativeModelTrackerStore.ActiveDirectory;
+
+                if (dialog.ShowDialog() != Forms.DialogResult.OK || string.IsNullOrWhiteSpace(dialog.SelectedPath))
+                    return;
+
+                if (!CollaborativeModelTrackerStore.TrySetSharedDirectory(dialog.SelectedPath, out var error))
+                {
+                    MessageBox.Show($"Le chemin sélectionné n'est pas utilisable : { error}",
+
+                     "Chemin invalide", MessageBoxButton.OK, MessageBoxImage.Warning);
+                   
+                    
+                    return;
+                }
+
+                LoadRecords();
+                ApplyFilters();
+            }
         }
 
         private void ApplyFilters()
