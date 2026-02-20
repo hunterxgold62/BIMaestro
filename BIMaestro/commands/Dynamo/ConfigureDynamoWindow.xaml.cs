@@ -58,6 +58,7 @@ namespace Modification
 
         public ConfigureDynamoWindow()
         {
+            ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
 
             PathsItemsControl.ItemsSource = _paths;

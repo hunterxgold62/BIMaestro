@@ -2,153 +2,153 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="BIMaestro - Configurer un bouton Dynamo"
-        MinWidth="420"
+        MinWidth="520"
         SizeToContent="WidthAndHeight"
         ResizeMode="NoResize"
-        WindowStartupLocation="CenterOwner">
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource App.Background}"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True">
 
-    <Grid Margin="18">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/BIMaestro;component/Themes/BIMaestroTheme.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Grid Margin="16">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0" Margin="0,0,0,12">
-            <TextBlock Text="Personnaliser un bouton Dynamo"
-                       FontWeight="Bold"
-                       FontSize="16" />
-            <TextBlock Text="Choisissez l'emplacement, renommez l'étiquette et sélectionnez le script .dyn à lancer."
-                       Foreground="Gray"
-                       Margin="0,2,0,0" />
-        </StackPanel>
-
-        <Grid Grid.Row="1" Margin="0,0,0,10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-            <TextBlock Text="Bouton à configurer :"
-                       VerticalAlignment="Center" />
-            <ComboBox x:Name="ButtonComboBox"
-                      Grid.Column="1"
-                      Width="80"
-                      SelectedIndex="0">
-                <ComboBoxItem>1</ComboBoxItem>
-                <ComboBoxItem>2</ComboBoxItem>
-                <ComboBoxItem>3</ComboBoxItem>
-                <ComboBoxItem>4</ComboBoxItem>
-                <ComboBoxItem>5</ComboBoxItem>
-            </ComboBox>
-        </Grid>
-
-        <Grid Grid.Row="2" Margin="0,0,0,10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-            <StackPanel Orientation="Vertical">
-                <TextBlock Text="Texte affiché sur le ruban :"
-                           Margin="0,0,15,4" />
-                <TextBlock Text="Utilisez Entrée pour forcer un retour à la ligne."
-                           FontSize="11"
-                           Foreground="Gray" />
+        <Border Grid.Row="0"
+                CornerRadius="16"
+                Background="{StaticResource Brand}"
+                Padding="16"
+                Margin="0,0,0,12">
+            <StackPanel>
+                <TextBlock Text="Personnaliser un bouton Dynamo" Style="{StaticResource H1}"/>
+                <TextBlock Text="Choisissez l'emplacement, renommez l'étiquette et sélectionnez le ou les scripts .dyn à lancer."
+                           Margin="0,6,0,0"
+                           Foreground="#E7F6EE"
+                           TextWrapping="Wrap"/>
             </StackPanel>
-            <TextBox x:Name="LabelTextBox"
-                     Grid.Column="1"
-                     Height="52"
-                     AcceptsReturn="True"
-                     TextWrapping="Wrap"
-                     TextChanged="LabelTextBox_TextChanged"
-                     VerticalContentAlignment="Top" />
-        </Grid>
+        </Border>
 
-        <Grid Grid.Row="3" Margin="0,0,0,12">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-            <StackPanel VerticalAlignment="Top">
-                <TextBlock Text="Scripts Dynamo à lancer :"
-                           Margin="0,0,0,2" />
-                <TextBlock Text="Ils seront exécutés dans l'ordre de la liste."
-                           FontSize="11"
-                           Foreground="Gray" />
-            </StackPanel>
+        <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,0,0,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Bouton à configurer :" VerticalAlignment="Center" Style="{StaticResource Label}"/>
+                <ComboBox x:Name="ButtonComboBox" Grid.Column="1" Width="100" SelectedIndex="0" HorizontalAlignment="Left">
+                    <ComboBoxItem>1</ComboBoxItem>
+                    <ComboBoxItem>2</ComboBoxItem>
+                    <ComboBoxItem>3</ComboBoxItem>
+                    <ComboBoxItem>4</ComboBoxItem>
+                    <ComboBoxItem>5</ComboBoxItem>
+                </ComboBox>
+            </Grid>
+        </Border>
 
-            <StackPanel Grid.Column="1">
-                <ItemsControl x:Name="PathsItemsControl"
-                              AlternationCount="100">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel Margin="0,0,0,8">
-                                <TextBlock Text="{Binding Label}"
-                                           FontWeight="SemiBold"
-                                           Margin="0,0,0,2" />
-                                <DockPanel>
-                                    <TextBox Text="{Binding Path, UpdateSourceTrigger=PropertyChanged}"
-                                             IsReadOnly="True"
-                                             Margin="0,0,6,0"
-                                             MinWidth="260"
-                                             ToolTip="Chemin complet du fichier .dyn sélectionné" />
-                                    <StackPanel Orientation="Horizontal">
-                                        <Button Content="Parcourir..."
-                                                Tag="{Binding}"
-                                                Click="BrowsePathButton_Click"
-                                                Margin="0,0,6,0" />
-                                        <Button Content="Supprimer"
-                                                Tag="{Binding}"
-                                                Click="RemovePathButton_Click" />
-                                    </StackPanel>
-                                </DockPanel>
-                            </StackPanel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+        <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,0,0,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Vertical">
+                    <TextBlock Text="Texte affiché sur le ruban :" Style="{StaticResource Label}" Margin="0,0,15,4"/>
+                    <TextBlock Text="Utilisez Entrée pour forcer un retour à la ligne." Style="{StaticResource Hint}"/>
+                </StackPanel>
+                <TextBox x:Name="LabelTextBox"
+                         Grid.Column="1"
+                         MinHeight="52"
+                         AcceptsReturn="True"
+                         TextWrapping="Wrap"
+                         TextChanged="LabelTextBox_TextChanged"
+                         VerticalContentAlignment="Top"/>
+            </Grid>
+        </Border>
 
-                <Button Content="Ajouter un script"
-                        HorizontalAlignment="Left"
-                        Width="150"
-                        Click="AddPathButton_Click" />
-            </StackPanel>
-        </Grid>
+        <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,0,0,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel VerticalAlignment="Top">
+                    <TextBlock Text="Scripts Dynamo à lancer :" Style="{StaticResource Label}" Margin="0,0,0,2"/>
+                    <TextBlock Text="Ils seront exécutés dans l'ordre de la liste." Style="{StaticResource Hint}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1">
+                    <ItemsControl x:Name="PathsItemsControl" AlternationCount="100">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Margin="0,0,0,8">
+                                    <TextBlock Text="{Binding Label}" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                                    <DockPanel>
+                                        <TextBox Text="{Binding Path, UpdateSourceTrigger=PropertyChanged}"
+                                                 IsReadOnly="True"
+                                                 Margin="0,0,6,0"
+                                                 MinWidth="300"
+                                                 ToolTip="Chemin complet du fichier .dyn sélectionné"/>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Button Content="Parcourir..."
+                                                    Tag="{Binding}"
+                                                    Click="BrowsePathButton_Click"
+                                                    Margin="0,0,6,0"
+                                                    Style="{StaticResource SecondaryButton}"
+                                                    Width="120"/>
+                                            <Button Content="Supprimer"
+                                                    Tag="{Binding}"
+                                                    Click="RemovePathButton_Click"
+                                                    Style="{StaticResource SecondaryButton}"
+                                                    Width="110"/>
+                                        </StackPanel>
+                                    </DockPanel>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <Button Content="Ajouter un script"
+                            HorizontalAlignment="Left"
+                            Width="160"
+                            Style="{StaticResource SecondaryButton}"
+                            Click="AddPathButton_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
 
         <Border Grid.Row="4"
+                Style="{StaticResource Card}"
                 Margin="0,0,0,12"
-                Padding="10"
-                BorderThickness="1"
-                CornerRadius="4"
-                BorderBrush="#FFBEBEBE">
+                Padding="12">
             <StackPanel>
-                <TextBlock Text="Aperçu du texte sur le ruban"
-                           FontWeight="SemiBold"
-                           Margin="0,0,0,6" />
-                <Border Background="#FFF5F5F5"
+                <TextBlock Text="Aperçu du texte sur le ruban" Style="{StaticResource H2}" Margin="0,0,0,6"/>
+                <Border Background="{StaticResource Surface.Subtle}"
                         Padding="8"
-                        CornerRadius="4"
-                        BorderBrush="#FFD4D4D4"
+                        CornerRadius="8"
+                        BorderBrush="{StaticResource Border}"
                         BorderThickness="1">
-                    <TextBlock x:Name="PreviewTextBlock"
-                               TextAlignment="Center"
-                               FontWeight="Bold" />
+                    <TextBlock x:Name="PreviewTextBlock" TextAlignment="Center" FontWeight="Bold" Foreground="{StaticResource Text.Primary}"/>
                 </Border>
             </StackPanel>
         </Border>
 
-        <StackPanel Grid.Row="5"
-                    Orientation="Horizontal"
-                    HorizontalAlignment="Right">
-            <Button Content="OK"
-                    Width="90"
-                    Margin="0,0,8,0"
-                    IsDefault="True"
-                    Click="OkButton_Click" />
-            <Button Content="Annuler"
-                    Width="90"
-                    IsCancel="True" />
+        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Annuler" Width="100" Margin="0,0,8,0" Style="{StaticResource SecondaryButton}" IsCancel="True"/>
+            <Button Content="OK" Width="100" IsDefault="True" Style="{StaticResource PrimaryButton}" Click="OkButton_Click"/>
         </StackPanel>
     </Grid>
 </Window>

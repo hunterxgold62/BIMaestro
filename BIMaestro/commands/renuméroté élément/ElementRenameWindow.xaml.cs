@@ -150,6 +150,7 @@ namespace Modification
 
         public ElementRenamerWindow(List<string> parameters)
         {
+            ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
             this.DataContext = this;
 

@@ -24,6 +24,7 @@ namespace IA
 
         public CorrectionWindow(string originalText, string baselineCorrectedText, string jwt)
         {
+            ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
 
             // Thème

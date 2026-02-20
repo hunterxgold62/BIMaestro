@@ -5,47 +5,56 @@
         Title="BIMaestro - Sélectionner la couleur"
         Height="700" Width="720"
         WindowStartupLocation="CenterScreen"
-        Background="#FFFAFBFC">
+        Background="{DynamicResource App.Background}"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True">
     <Window.Resources>
-        <Style TargetType="GroupBox">
-            <Setter Property="Margin" Value="10"/>
-            <Setter Property="Padding" Value="12"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="BorderBrush" Value="#FFCED4DA"/>
-            <Setter Property="BorderThickness" Value="1"/>
-        </Style>
-        <Style TargetType="Button">
-            <Setter Property="Margin" Value="6"/>
-            <Setter Property="Padding" Value="8,4"/>
-            <Setter Property="MinWidth" Value="110"/>
-        </Style>
-        <Style TargetType="CheckBox">
-            <Setter Property="Margin" Value="4"/>
-        </Style>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/BIMaestro;component/Themes/BIMaestroTheme.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
 
-        <DataTemplate x:Key="FillPatternTemplate">
-            <StackPanel Orientation="Horizontal" Margin="2" VerticalAlignment="Center">
-                <Border Width="64" Height="36" BorderBrush="#FFB9C1CA" BorderThickness="1" CornerRadius="4"
-                           Background="White" SnapsToDevicePixels="True">
-                    <Rectangle Fill="{Binding PreviewBrush}" RadiusX="3" RadiusY="3" Stroke="#FFE0E4EA" StrokeThickness="0.8"/>
-                </Border>
-                <TextBlock Text="{Binding Name}" Margin="10,0,0,0" VerticalAlignment="Center"/>
-            </StackPanel>
-        </DataTemplate>
+            <Style TargetType="GroupBox">
+                <Setter Property="Margin" Value="10"/>
+                <Setter Property="Padding" Value="12"/>
+                <Setter Property="FontSize" Value="14"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource Border}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+            </Style>
+            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                <Setter Property="Margin" Value="6"/>
+                <Setter Property="Padding" Value="8,4"/>
+                <Setter Property="MinWidth" Value="110"/>
+                <Setter Property="Height" Value="34"/>
+            </Style>
+            <Style TargetType="CheckBox">
+                <Setter Property="Margin" Value="4"/>
+            </Style>
 
-        <DataTemplate x:Key="LinePatternTemplate">
-            <StackPanel Orientation="Horizontal" Margin="2" VerticalAlignment="Center">
-                <Border Width="96" Height="32" BorderBrush="#FFB9C1CA" BorderThickness="1" CornerRadius="4" Background="White">
-                    <Canvas Margin="6,0" Width="84" Height="32">
-                        <Line X1="4" X2="80" Y1="16" Y2="16" StrokeThickness="3"
+            <DataTemplate x:Key="FillPatternTemplate">
+                <StackPanel Orientation="Horizontal" Margin="2" VerticalAlignment="Center">
+                    <Border Width="64" Height="36" BorderBrush="#FFB9C1CA" BorderThickness="1" CornerRadius="4"
+                           Background="{DynamicResource Surface}" SnapsToDevicePixels="True">
+                        <Rectangle Fill="{Binding PreviewBrush}" RadiusX="3" RadiusY="3" Stroke="{DynamicResource Divider}" StrokeThickness="0.8"/>
+                    </Border>
+                    <TextBlock Text="{Binding Name}" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                </StackPanel>
+            </DataTemplate>
+
+            <DataTemplate x:Key="LinePatternTemplate">
+                <StackPanel Orientation="Horizontal" Margin="2" VerticalAlignment="Center">
+                    <Border Width="96" Height="32" BorderBrush="#FFB9C1CA" BorderThickness="1" CornerRadius="4" Background="{DynamicResource Surface}">
+                        <Canvas Margin="6,0" Width="84" Height="32">
+                            <Line X1="4" X2="80" Y1="16" Y2="16" StrokeThickness="3"
                               Stroke="#FF2A2E37"
                               StrokeDashCap="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
                               StrokeDashArray="{Binding DashArray}"/>
-                    </Canvas>
-                </Border>
-                <TextBlock Text="{Binding Name}" Margin="10,0,0,0" VerticalAlignment="Center"/>
-            </StackPanel>
-        </DataTemplate>
+                        </Canvas>
+                    </Border>
+                    <TextBlock Text="{Binding Name}" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                </StackPanel>
+            </DataTemplate>
+        </ResourceDictionary>
     </Window.Resources>
 
     <Grid Margin="12">
@@ -54,7 +63,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0" Background="White" CornerRadius="8" BorderBrush="#FFD8DEE6" BorderThickness="1">
+        <Border Grid.Row="0" Background="{DynamicResource Surface}" CornerRadius="12" BorderBrush="{DynamicResource Border}" BorderThickness="1">
             <TabControl Margin="12">
 
                 <!-- Options générales -->
@@ -73,7 +82,7 @@
                                             Minimum="0" Maximum="100" Value="0"
                                             Width="260" TickFrequency="10"
                                             IsSnapToTickEnabled="True"/>
-                                    <Border Margin="12,0,0,0" Padding="10,4" Background="#FFEFF2F6" CornerRadius="4">
+                                    <Border Margin="12,0,0,0" Padding="10,4" Background="{DynamicResource Surface.Subtle}" CornerRadius="4">
                                         <TextBlock Text="{Binding ElementName=TransparencySlider, Path=Value, StringFormat={} {0}%}"/>
                                     </Border>
                                 </StackPanel>
@@ -98,7 +107,7 @@
                                 <ColumnDefinition Width="3*"/>
                             </Grid.ColumnDefinitions>
 
-                            <Border Background="White" CornerRadius="8" BorderBrush="#FFD8DEE6" BorderThickness="1" Padding="12">
+                            <Border Background="{DynamicResource Surface}" CornerRadius="8" BorderBrush="{DynamicResource Border}" BorderThickness="1" Padding="12">
                                 <StackPanel>
                                     <TextBlock Text="Sélection de la couleur" FontWeight="Bold"/>
                                     <xctk:ColorPicker x:Name="ColorPickerControl"
@@ -109,22 +118,22 @@
                                 </StackPanel>
                             </Border>
 
-                            <Border Grid.Column="1" Margin="14,0,0,0" Padding="14" Background="White" CornerRadius="8" BorderBrush="#FFD8DEE6" BorderThickness="1">
+                            <Border Grid.Column="1" Margin="14,0,0,0" Padding="14" Background="{DynamicResource Surface}" CornerRadius="8" BorderBrush="{DynamicResource Border}" BorderThickness="1">
                                 <StackPanel>
                                     <TextBlock Text="Aperçu" FontWeight="Bold" HorizontalAlignment="Center"/>
                                     <UniformGrid Rows="2" Margin="0,12,0,0">
                                         <StackPanel>
                                             <TextBlock Text="Surface" FontWeight="SemiBold" HorizontalAlignment="Center"/>
                                             <Border Margin="0,6,0,0" Width="200" Height="76" CornerRadius="8"
-                                                    BorderBrush="#FFC3C8D1" BorderThickness="1" Background="White">
-                                                <Rectangle x:Name="SurfacePreviewRectangle" RadiusX="6" RadiusY="6" Stroke="#FFE0E4EA" StrokeThickness="1"/>
+                                                    BorderBrush="{DynamicResource Border}" BorderThickness="1" Background="{DynamicResource Surface}">
+                                                <Rectangle x:Name="SurfacePreviewRectangle" RadiusX="6" RadiusY="6" Stroke="{DynamicResource Divider}" StrokeThickness="1"/>
                                             </Border>
                                         </StackPanel>
                                         <StackPanel>
                                             <TextBlock Text="Coupe" FontWeight="SemiBold" HorizontalAlignment="Center"/>
                                             <Border Margin="0,6,0,0" Width="200" Height="76" CornerRadius="8"
-                                                    BorderBrush="#FFC3C8D1" BorderThickness="1" Background="White">
-                                                <Rectangle x:Name="CutPreviewRectangle" RadiusX="6" RadiusY="6" Stroke="#FFE0E4EA" StrokeThickness="1"/>
+                                                    BorderBrush="{DynamicResource Border}" BorderThickness="1" Background="{DynamicResource Surface}">
+                                                <Rectangle x:Name="CutPreviewRectangle" RadiusX="6" RadiusY="6" Stroke="{DynamicResource Divider}" StrokeThickness="1"/>
                                             </Border>
                                         </StackPanel>
                                     </UniformGrid>
@@ -177,8 +186,7 @@
                                                   ShowDropDownButton="True"
                                                   StandardColorsHeader="Palette"/>
                             </StackPanel>
-                            <Border Margin="24,0,0,0" Padding="12" Background="#FFEFF2F6" CornerRadius="6" Width="220" Height="120"
-                                    IsEnabled="{Binding ElementName=ModifyLineColorCheckBox, Path=IsChecked}">
+                            <Border Margin="24,0,0,0" Padding="12" Background="{DynamicResource Surface.Subtle}" CornerRadius="6" Width="220" Height="120"                                    IsEnabled="{Binding ElementName=ModifyLineColorCheckBox, Path=IsChecked}">
                                 <StackPanel>
                                     <TextBlock Text="Aperçu" FontWeight="Bold" HorizontalAlignment="Center"/>
                                     <Canvas Margin="0,16,0,0" Width="180" Height="60" HorizontalAlignment="Center">
@@ -228,8 +236,7 @@
                                     Content="Tout désélectionner"
                                     Click="DeselectAllViewsButton_Click"/>
                         </StackPanel>
-                        <Border BorderBrush="#FFD8DEE6" BorderThickness="1" CornerRadius="6">
-                            <TreeView x:Name="ViewsTreeView" Margin="5"
+                        <Border BorderBrush="{DynamicResource Border}" BorderThickness="1" CornerRadius="6">                            <TreeView x:Name="ViewsTreeView" Margin="5"
                                       ScrollViewer.VerticalScrollBarVisibility="Auto"
                                       ScrollViewer.HorizontalScrollBarVisibility="Auto"
                                       ScrollViewer.CanContentScroll="True"/>

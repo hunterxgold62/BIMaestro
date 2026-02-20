@@ -10,6 +10,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Modification;
 using Color = System.Windows.Media.Color;
 using Forms = System.Windows.Forms;
 
@@ -38,6 +39,7 @@ namespace Analyse
 
         public CollaborativeModelTrackerWindow(Document doc, UIApplication uiapp)
         {
+            ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
             _doc = doc;
             _uiapp = uiapp;

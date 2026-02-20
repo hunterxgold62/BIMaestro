@@ -3,8 +3,8 @@ using System.Diagnostics;
 using System.Linq;
 using System.Windows;
 
-namespace Modification
-{
+
+
     internal static class ThemeManager
     {
         private const string ThemeDictionaryPath = "/BIMaestro;component/Themes/BIMaestroTheme.xaml";
@@ -59,4 +59,3 @@ namespace Modification
             }
         }
     }
-}

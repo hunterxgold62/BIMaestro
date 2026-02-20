@@ -49,6 +49,7 @@ namespace Modification
 
         public ColorPickerWindow(UIApplication uiapp, bool allowOverrideEditing = true)
         {
+            ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
             _uiapp = uiapp;
             _uidoc = uiapp?.ActiveUIDocument;
