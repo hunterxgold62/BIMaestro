@@ -22,6 +22,7 @@ namespace Analyse
                             double totalMo,
                             ExternalCommandData cmdData)
         {
+            ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
             _ = totalMo;
 

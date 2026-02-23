@@ -8,6 +8,7 @@ namespace IA
 
         public ProfileSelectionWindow()
         {
+            ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
         }
 

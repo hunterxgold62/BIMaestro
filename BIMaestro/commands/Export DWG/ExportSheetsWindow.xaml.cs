@@ -20,6 +20,7 @@ namespace Visualisation
 
         public ExportWindow(ExternalCommandData cmdData)
         {
+            ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
             _doc = cmdData.Application.ActiveUIDocument.Document;
 

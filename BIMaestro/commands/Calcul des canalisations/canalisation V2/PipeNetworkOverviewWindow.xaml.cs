@@ -13,6 +13,7 @@ namespace Analyse
 
         public PipeNetworkInteractionWindow(IEnumerable<PipeNetworkDisplayItem> networks, Action<HashSet<ElementId>> selectInRevit)
         {
+            ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
             _selectInRevit = selectInRevit;
             Networks = new ObservableCollection<PipeNetworkDisplayItem>(networks);

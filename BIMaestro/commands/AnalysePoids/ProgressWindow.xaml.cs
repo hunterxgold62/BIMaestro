@@ -8,6 +8,7 @@ namespace Analyse
 
         public ProgressWindow()
         {
+            ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
         }
 

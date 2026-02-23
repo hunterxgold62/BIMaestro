@@ -3,201 +3,116 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:Visualisation"
         Title="BIMaestro - Sélection des Familles"
-        Height="520" Width="510"
+        Height="560"
+        Width="700"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
-        Background="#FAFBFC"
+        Background="{DynamicResource App.Background}"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
         TextOptions.TextFormattingMode="Ideal">
 
-    <!-- =========================  RESSOURCES / STYLES  ========================= -->
     <Window.Resources>
-        <!-- Palette -->
-        <SolidColorBrush x:Key="AccentBrush" Color="#0EA5E9"/>
-        <SolidColorBrush x:Key="AccentBrushHover" Color="#0C8AD1"/>
-        <SolidColorBrush x:Key="BorderBrush" Color="#D1D5DB"/>
-        <SolidColorBrush x:Key="PanelBrush" Color="#FFFFFFFF"/>
-        <SolidColorBrush x:Key="TextBrush" Color="#1F2937"/>
-        <SolidColorBrush x:Key="SubTextBrush" Color="#4B5563"/>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/BIMaestro;component/Themes/BIMaestroTheme.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
 
-        <!-- Titre -->
-        <Style x:Key="TitleTextStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="18"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Foreground" Value="#0B78C2"/>
-            <Setter Property="HorizontalAlignment" Value="Center"/>
-            <Setter Property="Margin" Value="0,6,0,14"/>
-        </Style>
-
-        <!-- Bouton plat, coins arrondis -->
-        <Style x:Key="BaseButton" TargetType="Button">
-            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-            <Setter Property="Background" Value="#F3F4F6"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="14,8"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="MinWidth" Value="140"/>
-            <Setter Property="HorizontalAlignment" Value="Center"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="bd"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="8"
-                                SnapsToDevicePixels="True">
-                            <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Center"
-                                              Margin="{TemplateBinding Padding}"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="BorderBrush" Value="#B6BCC6"/>
-                                <Setter TargetName="bd" Property="Background" Value="#ECEEF1"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#E5E7EB"/>
-                                <Setter TargetName="bd" Property="BorderBrush" Value="#A7B0BC"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="bd" Property="Opacity" Value="0.55"/>
-                                <Setter Property="Cursor" Value="Arrow"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Bouton principal (Terminer) -->
-        <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource BaseButton}">
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-            <Setter Property="MinWidth" Value="130"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="bd"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="8">
-                            <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Center"
-                                              Margin="{TemplateBinding Padding}"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="{StaticResource AccentBrushHover}"/>
-                                <Setter TargetName="bd" Property="BorderBrush" Value="{StaticResource AccentBrushHover}"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#0A74C0"/>
-                                <Setter TargetName="bd" Property="BorderBrush" Value="#0A74C0"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="bd" Property="Opacity" Value="0.55"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Bouton “fantôme” (Annuler) -->
-        <Style x:Key="GhostButton" TargetType="Button" BasedOn="{StaticResource BaseButton}">
-            <Setter Property="Background" Value="#FFFFFF"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
-            <Setter Property="Foreground" Value="{StaticResource SubTextBrush}"/>
-        </Style>
-
-        <!-- CheckBox plus discrète -->
-        <Style TargetType="CheckBox" x:Key="CleanCheckBox">
-            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-            <Setter Property="FontSize" Value="12.5"/>
-            <Setter Property="Margin" Value="2,0,0,0"/>
-        </Style>
+            <Style x:Key="TreeCheckBox" TargetType="CheckBox">
+                <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+                <Setter Property="FontSize" Value="12.5"/>
+                <Setter Property="Margin" Value="2,2,0,2"/>
+            </Style>
+        </ResourceDictionary>
     </Window.Resources>
 
-    <!-- =========================  LAYOUT  ========================= -->
-    <Grid Margin="14">
+    <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <!-- Header -->
+            <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
-            <!-- Options + boutons -->
-            <RowDefinition/>
-            <!-- Arbre -->
-            <RowDefinition Height="Auto"/>
-            <!-- Footer -->
         </Grid.RowDefinitions>
 
-        <!-- Titre -->
-        <TextBlock Grid.Row="0"
-                   Text="Sélection des Familles et Sous-Familles"
-                   Style="{StaticResource TitleTextStyle}"/>
-
-        <!-- Barre d’options + actions rapides -->
-        <DockPanel Grid.Row="1" LastChildFill="False" Margin="0,0,0,10">
-            <CheckBox x:Name="EntireModelCheckBox"
-                      DockPanel.Dock="Left"
-                      Style="{StaticResource CleanCheckBox}"
-                      VerticalAlignment="Center"
-                      Content="Étendre à toute la maquette"
-ToolTip="Quand coché : collecte/sélection dans tout le projet, pas uniquement la vue active."
-                      Checked="EntireModelScopeChanged"
-                      Unchecked="EntireModelScopeChanged"/>            
-            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right" >
-                <Button x:Name="SelectAllViewsButton"
-                        Style="{StaticResource BaseButton}"
-                        Content="Tout sélectionner"
-                        Margin="0,0,8,0"
-                        Click="SelectAllViewsButton_Click" Width="66"/>
-                <Button x:Name="DeselectAllViewsButton"
-                        Style="{StaticResource BaseButton}"
-                        Content="Tout désélectionner"
-                        Click="DeselectAllViewsButton_Click" Width="1"/>
-            </StackPanel>
-        </DockPanel>
-
-        <!-- Arbre familles / sous-familles -->
-        <Border Grid.Row="2"
-                Background="{StaticResource PanelBrush}"
-                BorderBrush="{StaticResource BorderBrush}"
-                BorderThickness="1"
-                CornerRadius="10"
-                Padding="8">
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <TreeView x:Name="FamiliesTreeView">
-                    <TreeView.Resources>
-                        <HierarchicalDataTemplate DataType="{x:Type local:FamilyItem}"
-                                                  ItemsSource="{Binding VisibleSubFamilies}">
-                            <StackPanel Orientation="Horizontal">
-                                <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                          Style="{StaticResource CleanCheckBox}"
-                                          Content="{Binding Name}"/>
-                            </StackPanel>
-                        </HierarchicalDataTemplate>
-                    </TreeView.Resources>
-                </TreeView>
-            </ScrollViewer>
+        <Border Grid.Row="0"
+                Background="{DynamicResource Brand}"
+                Padding="16,12"
+                CornerRadius="0,0,12,12">
+            <TextBlock Text="Sélection des Familles et Sous-Familles"
+                       Style="{DynamicResource H1}"/>
         </Border>
 
-        <!-- Footer -->
-        <DockPanel Grid.Row="3" Margin="0,12,0,0" LastChildFill="False">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" DockPanel.Dock="Right">
-                <Button Content="Terminer"
-                        Style="{StaticResource PrimaryButton}"
-                        IsDefault="True"
-                        Margin="0,0,8,0"
-                        Click="FinishButton_Click"/>
-                <Button Content="Annuler"
-                        Style="{StaticResource GhostButton}"
-                        IsCancel="True"
-                        Click="CancelButton_Click"/>
-            </StackPanel>
-        </DockPanel>
+        <Border Grid.Row="1" Style="{DynamicResource Card}" Margin="16" Padding="16">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,12">
+                    <CheckBox x:Name="EntireModelCheckBox"
+                              DockPanel.Dock="Left"
+                              Style="{StaticResource TreeCheckBox}"
+                              VerticalAlignment="Center"
+                              Content="Étendre à toute la maquette"
+                              ToolTip="Quand coché : collecte/sélection dans tout le projet, pas uniquement la vue active."
+                              Checked="EntireModelScopeChanged"
+                              Unchecked="EntireModelScopeChanged"/>
+
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button x:Name="SelectAllViewsButton"
+                                Style="{DynamicResource SecondaryButton}"
+                                Content="Tout sélectionner"
+                                Margin="0,0,8,0"
+                                MinWidth="160"
+                                Click="SelectAllViewsButton_Click"/>
+                        <Button x:Name="DeselectAllViewsButton"
+                                Style="{DynamicResource SecondaryButton}"
+                                Content="Tout désélectionner"
+                                MinWidth="180"
+                                Click="DeselectAllViewsButton_Click"/>
+                    </StackPanel>
+                </DockPanel>
+
+                <Border Grid.Row="1"
+                        Background="{DynamicResource Surface}"
+                        BorderBrush="{DynamicResource Border}"
+                        BorderThickness="1"
+                        CornerRadius="12"
+                        Padding="10">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <TreeView x:Name="FamiliesTreeView"
+                                  Background="Transparent"
+                                  BorderThickness="0">
+                            <TreeView.Resources>
+                                <HierarchicalDataTemplate DataType="{x:Type local:FamilyItem}"
+                                                          ItemsSource="{Binding VisibleSubFamilies}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                  Style="{StaticResource TreeCheckBox}"
+                                                  Content="{Binding Name}"/>
+                                    </StackPanel>
+                                </HierarchicalDataTemplate>
+                            </TreeView.Resources>
+                        </TreeView>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="2" Style="{DynamicResource Card}" Margin="16,0,16,16" Padding="12">
+            <DockPanel LastChildFill="False">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" DockPanel.Dock="Right">
+                    <Button Content="Terminer"
+                            Style="{DynamicResource PrimaryButton}"
+                            IsDefault="True"
+                            Margin="0,0,8,0"
+                            Click="FinishButton_Click"/>
+                    <Button Content="Annuler"
+                            Style="{DynamicResource SecondaryButton}"
+                            IsCancel="True"
+                            Click="CancelButton_Click"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
     </Grid>
 </Window>

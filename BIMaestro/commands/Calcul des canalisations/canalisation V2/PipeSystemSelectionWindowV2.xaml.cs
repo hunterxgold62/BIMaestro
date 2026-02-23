@@ -17,6 +17,7 @@ namespace Analyse
 
         public PipeSystemTypeSelectionWindowV2(List<string> systemTypes)
         {
+            ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
 
             // Lier la liste des Types de système au ItemsControl

@@ -19,6 +19,7 @@ namespace Modification
 
         public PickDefaultFlangeWindow(IList<FamilySymbol> symbols)
         {
+            ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
 
             _all = symbols.Select(fs => new FlangeItem(fs)).ToList();

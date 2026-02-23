@@ -39,6 +39,7 @@ namespace ScanTextRevit
 
         public SelectViewsWindow(List<View> allViews, List<ViewSheet> allSheets, Document doc)
         {
+            ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
 
             _allViews = allViews;
@@ -310,14 +311,14 @@ namespace ScanTextRevit
         {
             if (_preferences.DarkMode)
             {
-                MainBorder.Background = new SolidColorBrush(Color.FromRgb(45, 45, 48));
+                //MainBorder.Background = new SolidColorBrush(Color.FromRgb(45, 45, 48));
                 this.Foreground = new SolidColorBrush(Colors.White);
                 ViewsTreeView.Background = new SolidColorBrush(Color.FromRgb(45, 45, 48));
                 ViewsTreeView.Foreground = new SolidColorBrush(Colors.White);
             }
             else
             {
-                MainBorder.Background = new SolidColorBrush(Color.FromRgb(250, 250, 250));
+                //MainBorder.Background = new SolidColorBrush(Color.FromRgb(250, 250, 250));
                 this.Foreground = new SolidColorBrush(Colors.Black);
                 ViewsTreeView.Background = new SolidColorBrush(Color.FromRgb(250, 250, 250));
                 ViewsTreeView.Foreground = new SolidColorBrush(Colors.Black);

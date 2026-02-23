@@ -36,6 +36,7 @@ namespace IA
 
         public GPTBotWindow(string systemMessage, UIDocument uidoc)
         {
+            ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
 
             this.uidoc = uidoc; // Stocker le UIDocument

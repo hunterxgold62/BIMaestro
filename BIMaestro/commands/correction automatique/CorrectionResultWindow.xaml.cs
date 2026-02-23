@@ -45,6 +45,7 @@ namespace ScanTextRevit
 
         public CorrectionResultWindow()
         {
+            ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
             LoadPreferences();
             ApplyTheme();
