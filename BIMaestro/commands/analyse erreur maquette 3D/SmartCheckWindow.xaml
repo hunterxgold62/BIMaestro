@@ -125,7 +125,7 @@
         </Border>
 
         <TabControl Grid.Row="2" x:Name="Tabs">
-            <TabItem Header="Toutes">
+            <TabItem Header="Toutes" Margin="0,0,-2,0">
                 <DataGrid x:Name="GridAll" Style="{StaticResource IssueGridStyle}" AutoGenerateColumns="False" IsReadOnly="True"
                           RowStyle="{StaticResource IssueRowStyle}"
                           CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single">
@@ -147,7 +147,7 @@
                 </DataGrid>
             </TabItem>
 
-            <TabItem Header="Traversées (sans réservation)">
+            <TabItem Header="Traversées (sans réservation)" Margin="6,0,-8,0">
                 <DataGrid x:Name="GridMEP" Style="{StaticResource IssueGridStyle}" AutoGenerateColumns="False" IsReadOnly="True"
                           RowStyle="{StaticResource IssueRowStyle}"
                           CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single">
@@ -169,7 +169,7 @@
                 </DataGrid>
             </TabItem>
 
-            <TabItem Header="Collisions liens / tuyaux">
+            <TabItem Header="Collisions liens / tuyaux" Margin="12,0,-13,0">
                 <DataGrid x:Name="GridLinks" Style="{StaticResource IssueGridStyle}" AutoGenerateColumns="False" IsReadOnly="True"
                           RowStyle="{StaticResource IssueRowStyle}"
                           CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single">
@@ -191,7 +191,7 @@
                 </DataGrid>
             </TabItem>
 
-            <TabItem Header="Raccords ouverts">
+            <TabItem Header="Raccords ouverts" Margin="19,0,-21,1">
                 <DataGrid x:Name="GridOpen" Style="{StaticResource IssueGridStyle}" AutoGenerateColumns="False" IsReadOnly="True"
                           RowStyle="{StaticResource IssueRowStyle}"
                           CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single">

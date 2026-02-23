@@ -10,6 +10,7 @@ namespace Famille
 
         public ParameterSelectionWindow(ObservableCollection<ParameterSelection> parameters)
         {
+            ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
             Parameters = parameters;
             DataContext = this;

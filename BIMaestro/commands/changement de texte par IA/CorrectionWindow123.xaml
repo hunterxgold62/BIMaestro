@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="BIMaestro - Correction / Reformulation de Texte"
         Width="640"
-        Height="560"
+        Height="600"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource App.Background}"
         UseLayoutRounding="True"

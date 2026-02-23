@@ -12,6 +12,7 @@ namespace Modification
 
         public CleanupWindow()
         {
+            ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
         }
 

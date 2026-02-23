@@ -19,6 +19,7 @@ namespace BIMaestro.RibbonLayout
 
         public RibbonLayoutWindow(IEnumerable<RibbonPanelDefinition> definitions, RibbonLayoutConfig layout)
         {
+            ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
             Panels = new ObservableCollection<PanelViewModel>(layout.Panels
                 .Select(panel => CreatePanelViewModel(panel, definitions.First(d => d.Name == panel.Name))));

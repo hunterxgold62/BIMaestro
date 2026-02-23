@@ -1,88 +1,100 @@
-﻿<!-- UI/CleanupWindow.xaml -->
-<Window x:Class="Modification.CleanupWindow"
+﻿<Window x:Class="Modification.CleanupWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="BIMaestro - Nettoyage du projet"
-        Height="410" Width="510"
+        Height="534" Width="540"
+        Background="{DynamicResource App.Background}"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
         ShowInTaskbar="False"
         Topmost="True">
     <Window.Resources>
-        <!-- Bannière d’avertissement (fond jaune doux + bordure) -->
-        <Style x:Key="WarningBanner" TargetType="Border">
-            <Setter Property="Background" Value="#FFFDF4E5"/>
-            <Setter Property="BorderBrush" Value="#FFE5A45A"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="6"/>
-            <Setter Property="Padding" Value="10"/>
-            <Setter Property="Margin" Value="0,8,0,8"/>
-        </Style>
-        <!-- Titre de section -->
-        <Style x:Key="SectionHeader" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Margin" Value="0,0,0,6"/>
-        </Style>
-        <!-- Info bulles homogènes -->
-        <Style TargetType="CheckBox">
-            <Setter Property="Margin" Value="0,6,0,0"/>
-        </Style>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/BIMaestro;component/Themes/BIMaestroTheme.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
     </Window.Resources>
 
-    <Grid Margin="14,14,14,8">
+    <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- En-tête -->
-        <StackPanel Grid.Row="0" Margin="0,0,0,8">
-            <TextBlock FontWeight="Bold" FontSize="16"
-                       Text="Sélectionnez les opérations à réaliser"/>
-            <TextBlock Foreground="#666" FontSize="12"
-                       Text="Astuce : une question proposera de créer « NomDuFichier - Purger.rvt » avant exécution."/>
-        </StackPanel>
+        <Border Grid.Row="0"
+                Background="{DynamicResource Brand}"
+                CornerRadius="14"
+                Padding="16"
+                Margin="0,0,0,12">
+            <StackPanel>
+                <TextBlock Style="{StaticResource H1}" Text="Nettoyage du projet"/>
+                <TextBlock Style="{StaticResource Hint}"
+                           Foreground="White"
+                           Margin="0,6,0,0"
+                           Text="Sélectionnez les opérations à réaliser. Une question proposera de créer « NomDuFichier - Purger.rvt » avant exécution."/>
+            </StackPanel>
+        </Border>
 
-        <!-- Contenu -->
-        <StackPanel Grid.Row="1">
-            <TextBlock Style="{StaticResource SectionHeader}"
-                       Text="Opérations de nettoyage"/>
-            <Border BorderBrush="#DDD" BorderThickness="1" CornerRadius="6" Padding="10">
-                <StackPanel>
-                    <CheckBox x:Name="ViewsCheckbox"
-                              Content="Supprimer les vues non placées sur feuille"
-                              ToolTip="Supprime les vues (plans, coupes, 3D, détails, rendus) non placées et différentes de la vue active."/>
-                    <CheckBox x:Name="FamiliesCheckbox"
-                              Content="Purger les familles inutilisées (méthode douce)"
-                              ToolTip="Liste et purge via la commande native Revit « Purger les éléments inutilisés »."/>
-                    <CheckBox x:Name="SchedulesCheckbox"
-                              Content="Supprimer les nomenclatures inutilisées"
-                              ToolTip="Supprime les nomenclatures jamais placées qui contiennent « Interne » dans leur nom."/>
-                    <Separator Margin="0,10,0,8"/>
-                    <!-- Bloc d’avertissement pour la méthode forte -->
-                    <Border Style="{StaticResource WarningBanner}">
-                        <StackPanel>
-                            <TextBlock FontWeight="Bold" Foreground="#B54708"
-                                       Text="⚠ Méthode forte — à exécuter en dernier"/>
-                            <TextBlock Margin="0,4,0,0" TextWrapping="Wrap"
-                                       Text="Essaie de supprimer de force les familles chargées non utilisées (hors familles système usuelles). Peut provoquer des avertissements ou des échecs selon les dépendances."/>
-                            <CheckBox x:Name="HardFamiliesCheckbox"
-                                      Content="Purger les familles inutilisées (méthode forte)"
-                                      ToolTip="Supprime agressivement les familles non instanciées. À utiliser uniquement après les autres opérations."/>
-                        </StackPanel>
-                    </Border>
-                    <TextBlock Foreground="#666" FontStyle="Italic" FontSize="11"
-                               Text="Recommandé : lancez la méthode forte seulement après les étapes ci-dessus."/>
-                </StackPanel>
-            </Border>
-        </StackPanel>
+        <Border Grid.Row="1" Style="{StaticResource Card}">
+            <StackPanel>
+                <TextBlock Style="{StaticResource H2}" Text="Opérations de nettoyage"/>
 
-        <!-- Boutons -->
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
-            <Button x:Name="CancelButton" Content="Annuler" Width="95" Margin="0,0,8,0" IsCancel="True" Click="CancelButton_Click"/>
-            <Button x:Name="OkButton" Content="Lancer" Width="120" IsDefault="True" Click="OkButton_Click"/>
+                <CheckBox x:Name="ViewsCheckbox"
+                          Content="Supprimer les vues non placées sur feuille"
+                          ToolTip="Supprime les vues (plans, coupes, 3D, détails, rendus) non placées et différentes de la vue active."/>
+                <CheckBox x:Name="FamiliesCheckbox"
+                          Content="Purger les familles inutilisées (méthode douce)"
+                          ToolTip="Liste et purge via la commande native Revit « Purger les éléments inutilisés »."/>
+                <CheckBox x:Name="SchedulesCheckbox"
+                          Content="Supprimer les nomenclatures inutilisées"
+                          ToolTip="Supprime les nomenclatures jamais placées qui contiennent « Interne » dans leur nom."/>
+
+                <Separator Margin="0,10,0,10"/>
+
+                <Border Background="{DynamicResource Warm.Highlight}"
+                        BorderBrush="{DynamicResource Warm.Border}"
+                        BorderThickness="1"
+                        CornerRadius="10"
+                        Padding="12"
+                        Margin="0,0,0,8">
+                    <StackPanel>
+                        <TextBlock FontWeight="Bold"
+                                   Foreground="{DynamicResource Text.Primary}"
+                                   Text="⚠ Méthode forte — à exécuter en dernier"/>
+                        <TextBlock Style="{StaticResource Hint}"
+                                   Margin="0,4,0,8"
+                                   Text="Essaie de supprimer de force les familles chargées non utilisées (hors familles système usuelles). Peut provoquer des avertissements ou des échecs selon les dépendances."/>
+                        <CheckBox x:Name="HardFamiliesCheckbox"
+                                  Content="Purger les familles inutilisées (méthode forte)"
+                                  ToolTip="Supprime agressivement les familles non instanciées. À utiliser uniquement après les autres opérations."/>
+                    </StackPanel>
+                </Border>
+
+                <TextBlock Style="{StaticResource Hint}"
+                           FontStyle="Italic"
+                           Text="Recommandé : lancez la méthode forte seulement après les étapes ci-dessus."/>
+            </StackPanel>
+        </Border>
+
+        <StackPanel Grid.Row="2"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="0,12,0,0">
+            <Button x:Name="CancelButton"
+                    Style="{StaticResource SecondaryButton}"
+                    Content="Annuler"
+                    MinWidth="110"
+                    Margin="0,0,8,0"
+                    IsCancel="True"
+                    Click="CancelButton_Click"/>
+            <Button x:Name="OkButton"
+                    Style="{StaticResource PrimaryButton}"
+                    Content="Lancer"
+                    MinWidth="130"
+                    IsDefault="True"
+                    Click="OkButton_Click"/>
         </StackPanel>
     </Grid>
 </Window>
