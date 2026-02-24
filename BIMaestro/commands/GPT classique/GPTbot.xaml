@@ -7,7 +7,9 @@
         Width="620"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
-        Background="{DynamicResource App.Background}">
+        Background="{DynamicResource App.Background}"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True">
 
     <Window.Resources>
         <ResourceDictionary>
@@ -15,6 +17,7 @@
                 <ResourceDictionary Source="/BIMaestro;component/Themes/BIMaestroTheme.xaml"/>
             </ResourceDictionary.MergedDictionaries>
 
+            <!-- ====== Bulle USER ====== -->
             <DataTemplate x:Key="UserMessageTemplate">
                 <StackPanel HorizontalAlignment="Right" Margin="0,8,0,0">
                     <Border Style="{DynamicResource Card}"
@@ -23,49 +26,50 @@
                             MaxWidth="420"
                             Margin="50,0,0,0"
                             Padding="12">
-                        <TextBox Text="{Binding Content}"
-                                 TextWrapping="Wrap"
-                                 Foreground="White"
-                                 Background="Transparent"
-                                 BorderThickness="0"
-                                 IsReadOnly="True"
-                                 IsReadOnlyCaretVisible="True"
-                                 Cursor="IBeam"/>
+                        <!-- ✅ TextBlock : mesure propre, pas de clipping TextBox -->
+                        <TextBlock Text="{Binding Content}"
+                                   TextWrapping="Wrap"
+                                   Foreground="White"
+                                   TextOptions.TextFormattingMode="Display"
+                                   LineStackingStrategy="MaxHeight"/>
                     </Border>
                 </StackPanel>
             </DataTemplate>
 
+            <!-- ====== Bulle BOT ====== -->
             <DataTemplate x:Key="BotMessageTemplate">
                 <StackPanel HorizontalAlignment="Left" Margin="0,8,0,0">
                     <Border Style="{DynamicResource Card}"
                             MaxWidth="420"
                             Margin="0,0,50,0"
                             Padding="12">
-                        <TextBox Text="{Binding Content}"
-                                 TextWrapping="Wrap"
-                                 Foreground="{DynamicResource Text.Primary}"
-                                 Background="Transparent"
-                                 BorderThickness="0"
-                                 IsReadOnly="True"
-                                 IsReadOnlyCaretVisible="True"
-                                 Cursor="IBeam"/>
+                        <TextBlock Text="{Binding Content}"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource Text.Primary}"
+                                   TextOptions.TextFormattingMode="Display"
+                                   LineStackingStrategy="MaxHeight"/>
                     </Border>
                 </StackPanel>
             </DataTemplate>
         </ResourceDictionary>
     </Window.Resources>
 
-    <Grid>
+    <Grid Margin="0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0" Background="{DynamicResource Brand}" Padding="16,12" CornerRadius="0,0,12,12">
+        <!-- ===== Header ===== -->
+        <Border Grid.Row="0"
+                Background="{DynamicResource Brand}"
+                Padding="16,12"
+                CornerRadius="0,0,12,12">
             <TextBlock Text="Assistant BIMaestro" Style="{DynamicResource H1}"/>
         </Border>
 
+        <!-- ===== Zone messages ===== -->
         <Border Grid.Row="1" Style="{DynamicResource Card}" Margin="16" Padding="12">
             <Grid>
                 <Grid.RowDefinitions>
@@ -73,38 +77,46 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <ScrollViewer Grid.Row="0"
-                              VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled"
-                              PreviewMouseWheel="ScrollViewer_PreviewMouseWheel">
-                    <ListBox x:Name="MessagesListBox"
-                             ItemsSource="{Binding}"
-                             Background="Transparent"
-                             BorderThickness="0"
-                             Foreground="{DynamicResource Text.Primary}">
-                        <ListBox.Resources>
-                            <DataTemplate DataType="{x:Type local:MessageModel}">
-                                <ContentControl Content="{Binding}">
-                                    <ContentControl.Style>
-                                        <Style TargetType="ContentControl">
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding Role}" Value="system">
-                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding Role}" Value="user">
-                                                    <Setter Property="ContentTemplate" Value="{StaticResource UserMessageTemplate}"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding Role}" Value="assistant">
-                                                    <Setter Property="ContentTemplate" Value="{StaticResource BotMessageTemplate}"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </ContentControl.Style>
-                                </ContentControl>
-                            </DataTemplate>
-                        </ListBox.Resources>
-                    </ListBox>
-                </ScrollViewer>
+                <!-- ✅ PAS de ScrollViewer autour : ListBox gère son scroll -->
+                <ListBox x:Name="MessagesListBox"
+                         Grid.Row="0"
+                         ItemsSource="{Binding}"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         Foreground="{DynamicResource Text.Primary}"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         Padding="2">
+
+                    <!-- ✅ Chat = mieux sans virtualisation (sinon clipping/mesure) -->
+                    <ListBox.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel/>
+                        </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+
+                    <ListBox.Resources>
+                        <DataTemplate DataType="{x:Type local:MessageModel}">
+                            <ContentControl Content="{Binding}">
+                                <ContentControl.Style>
+                                    <Style TargetType="ContentControl">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Role}" Value="system">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Role}" Value="user">
+                                                <Setter Property="ContentTemplate" Value="{StaticResource UserMessageTemplate}"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Role}" Value="assistant">
+                                                <Setter Property="ContentTemplate" Value="{StaticResource BotMessageTemplate}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ContentControl.Style>
+                            </ContentControl>
+                        </DataTemplate>
+                    </ListBox.Resources>
+                </ListBox>
 
                 <ProgressBar x:Name="LoadingIndicator"
                              Grid.Row="1"
@@ -117,31 +129,45 @@
             </Grid>
         </Border>
 
+        <!-- ===== Zone saisie ===== -->
         <Border Grid.Row="2" Style="{DynamicResource Card}" Margin="16,0,16,16" Padding="12">
-            <DockPanel LastChildFill="True">
+            <!-- ✅ Grid plutôt que DockPanel : sizing plus fiable -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
                 <TextBox x:Name="InputBox"
-                         DockPanel.Dock="Left"
-                         Height="36"
-                         VerticalAlignment="Center"
+                         Grid.Column="0"
+                         MinHeight="40"
+                         VerticalContentAlignment="Center"
                          Margin="0,0,10,0"
-                         Padding="10,2"
-                         MinWidth="300"/>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button x:Name="ElementButton"
-                            Content="Élément"
-                            Width="120"
-                            Margin="0,0,8,0"
-                            Style="{DynamicResource SecondaryButton}"
-                            Click="ElementButton_Click"
-                            IsEnabled="True"/>
-                    <Button x:Name="AskButton"
-                            Content="Envoyer"
-                            Width="120"
-                            Style="{DynamicResource PrimaryButton}"
-                            Click="AskButton_Click"
-                            IsEnabled="True"/>
-                </StackPanel>
-            </DockPanel>
+                         Padding="10,4"
+                         TextWrapping="Wrap"
+                         AcceptsReturn="True"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+
+                <Button x:Name="ElementButton"
+                        Grid.Column="1"
+                        Content="Élément"
+                        MinWidth="120"
+                        Height="40"
+                        Margin="0,0,8,0"
+                        Style="{DynamicResource SecondaryButton}"
+                        Click="ElementButton_Click"
+                        IsEnabled="True"/>
+
+                <Button x:Name="AskButton"
+                        Grid.Column="2"
+                        Content="Envoyer"
+                        MinWidth="120"
+                        Height="40"
+                        Style="{DynamicResource PrimaryButton}"
+                        Click="AskButton_Click"
+                        IsEnabled="True"/>
+            </Grid>
         </Border>
     </Grid>
 </Window>

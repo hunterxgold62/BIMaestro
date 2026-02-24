@@ -51,12 +51,6 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <CheckBox x:Name="darkThemeCheckBox"
-                          Grid.Row="0"
-                          Content="Mode sombre"
-                          Margin="0,0,0,10"
-                          VerticalAlignment="Center"
-                          Click="darkThemeCheckBox_Click"/>
 
                 <TextBlock Grid.Row="1" Text="Texte original :" Style="{StaticResource H2}" Margin="0,0,0,4"/>
 

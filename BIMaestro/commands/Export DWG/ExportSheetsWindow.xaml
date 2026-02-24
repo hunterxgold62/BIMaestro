@@ -1,9 +1,14 @@
 ﻿<Window x:Class="Visualisation.ExportWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="BIMaestro - Export DWG par feuille" Height="180" Width="480"
+        Title="BIMaestro - Export DWG par feuille"
+        Width="680"
+        SizeToContent="Height"
+        MinHeight="220"
         WindowStartupLocation="CenterScreen"
-        Background="{DynamicResource App.Background}">
+        Background="{DynamicResource App.Background}"
+        ResizeMode="NoResize">
+
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
@@ -11,45 +16,81 @@
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Window.Resources>
-    <Grid Margin="12">
+
+    <Grid Margin="18">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- 1) Choix du jeu de feuilles -->
-        <TextBlock Text="Jeu de feuilles :" Grid.Row="0" VerticalAlignment="Center" Style="{DynamicResource Label}"/>
+        <!-- Col 0: labels | Col 1: champs | Col 2: bouton "Parcourir" -->
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Ligne 0 : Jeu de feuilles -->
+        <TextBlock Grid.Row="0" Grid.Column="0"
+                   Text="Jeu de feuilles :"
+                   VerticalAlignment="Center"
+                   Margin="0,0,14,0"
+                   Style="{DynamicResource Label}"/>
+
         <ComboBox x:Name="SheetSetComboBox"
+                  Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2"
                   IsEditable="True"
                   IsTextSearchEnabled="True"
-                  Grid.Row="0"
-                  Margin="120,0,0,0"
-                  Width="300"/>
+                  MinWidth="360"
+                  Height="34"
+                  VerticalAlignment="Center"/>
 
-        <!-- 2) Choix du dossier d’export -->
-        <TextBlock Text="Dossier d’export :" Grid.Row="1" VerticalAlignment="Center" Margin="0,10,0,0" Style="{DynamicResource Label}"/>
-        <StackPanel Orientation="Horizontal" Grid.Row="1" Margin="120,10,0,0">
-            <!-- On peut toujours coller / taper le chemin -->
-            <TextBox x:Name="FolderTextBox" Width="240"/>
-            <Button Content="Parcourir…" Margin="5,0,0,0"
-                    Click="BrowseButton_Click" Style="{DynamicResource SecondaryButton}"/>
-        </StackPanel>
+        <!-- Ligne 1 : Dossier d'export -->
+        <TextBlock Grid.Row="1" Grid.Column="0"
+                   Text="Dossier d’export :"
+                   VerticalAlignment="Center"
+                   Margin="0,14,14,0"
+                   Style="{DynamicResource Label}"/>
 
-        <!-- 3) Boutons -->
-        <StackPanel Orientation="Horizontal"
-                    Grid.Row="2"
-                    HorizontalAlignment="Right"
-                    Margin="0,20,0,0">
+        <TextBox x:Name="FolderTextBox"
+                 Grid.Row="1" Grid.Column="1"
+                 Margin="0,14,10,0"
+                 Height="34"
+                 VerticalAlignment="Center"/>
+
+        <Button Grid.Row="1" Grid.Column="2"
+                Content="Parcourir"
+                Margin="0,14,0,0"
+                MinWidth="120"
+                Height="34"
+                Click="BrowseButton_Click"
+                Style="{DynamicResource SecondaryButton}"/>
+
+        <!-- Ligne 2 : Boutons bas -->
+        <Grid Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,20,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
             <Button x:Name="CancelButton"
+                    Grid.Column="1"
                     Content="Annuler"
-                    Width="75"
-                    Margin="0,0,10,0"
-                    Click="CancelButton_Click" Style="{DynamicResource SecondaryButton}"/>
+                    MinWidth="140"
+                    Height="38"
+                    Margin="0,0,12,0"
+                    Click="CancelButton_Click"
+                    Style="{DynamicResource SecondaryButton}"/>
+
             <Button x:Name="ExportButton"
+                    Grid.Column="2"
                     Content="Exporter"
-                    Width="100"
-                    Click="ExportButton_Click" Style="{DynamicResource PrimaryButton}"/>
-        </StackPanel>
+                    MinWidth="180"
+                    Height="38"
+                    Click="ExportButton_Click"
+                    Style="{DynamicResource PrimaryButton}"/>
+        </Grid>
     </Grid>
 </Window>

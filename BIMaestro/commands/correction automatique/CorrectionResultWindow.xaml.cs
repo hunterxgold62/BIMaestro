@@ -25,7 +25,7 @@ namespace ScanTextRevit
         // Filtre courant : "", "Erreur" ou "Mineur"
         private string _currentCategoryFilter = "";
 
-        // Préférences (mode sombre et autres options)
+        // Préférences utilisateur
         private Preferences _preferences;
 
         // Chemin de sauvegarde des préférences
@@ -48,7 +48,6 @@ namespace ScanTextRevit
             ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
             LoadPreferences();
-            ApplyTheme();
         }
 
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -248,14 +247,12 @@ namespace ScanTextRevit
 
         private void AddCard(CorrectionItem item, int repetitionCount = 0, Dictionary<string, CorrectionItem> repetitions = null)
         {
-            bool isDark = _preferences.DarkMode;
 
             Border card = new Border
             {
-                // En mode sombre, fond légèrement moins contrasté
-                Background = isDark ? new SolidColorBrush(Color.FromRgb(62, 62, 66)) : Brushes.White,
+                Background = Brushes.White,
                 CornerRadius = new CornerRadius(8),
-                BorderBrush = new SolidColorBrush(isDark ? Color.FromRgb(90, 90, 90) : Color.FromRgb(220, 220, 220)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(220, 220, 220)),
                 BorderThickness = new Thickness(1),
                 Margin = new Thickness(30, 4, 10, 4),
                 Padding = new Thickness(10)
@@ -272,7 +269,7 @@ namespace ScanTextRevit
                 Text = "Texte original : " + item.OriginalText,
                 FontSize = 13,
                 TextWrapping = TextWrapping.Wrap,
-                Foreground = isDark ? new SolidColorBrush(Colors.White) : new SolidColorBrush(Colors.Black)
+                Foreground = new SolidColorBrush(Colors.Black)
             };
             Grid.SetRow(originalText, 0);
             grid.Children.Add(originalText);
@@ -315,9 +312,9 @@ namespace ScanTextRevit
                 Padding = new Thickness(5, 2, 5, 2),
                 Cursor = Cursors.Hand,
                 Background = Brushes.Transparent,
-                Foreground = isDark ? new SolidColorBrush(Colors.White) : new SolidColorBrush(Colors.Black),
+                Foreground = new SolidColorBrush(Colors.Black),
                 BorderThickness = new Thickness(1),
-                BorderBrush = isDark ? new SolidColorBrush(Color.FromRgb(120, 120, 120)) : new SolidColorBrush(Colors.Black)
+                BorderBrush = new SolidColorBrush(Colors.Black)
             };
             copyButton.Click += (s, e) => Clipboard.SetText(item.CorrectedText);
             correctedPanel.Children.Add(copyButton);
@@ -331,7 +328,7 @@ namespace ScanTextRevit
                 Cursor = Cursors.Hand,
                 Background = Brushes.Transparent,
                 BorderThickness = new Thickness(1),
-                BorderBrush = isDark ? new SolidColorBrush(Color.FromRgb(120, 120, 120)) : new SolidColorBrush(Colors.Black)
+                BorderBrush = new SolidColorBrush(Colors.Black)
             };
             if (repetitions != null && repetitions.Count > 1)
             {
@@ -358,16 +355,11 @@ namespace ScanTextRevit
             else
             {
                 showButton.IsEnabled = false;
-                if (isDark)
-                {
-                    showButton.Foreground = new SolidColorBrush(Colors.LightGray);
-                    showButton.BorderBrush = new SolidColorBrush(Colors.LightGray);
-                }
             }
             // Pour assurer une bonne lisibilité, définissons la couleur si le bouton est actif
             if (showButton.IsEnabled)
             {
-                showButton.Foreground = isDark ? new SolidColorBrush(Colors.White) : new SolidColorBrush(Colors.Black);
+                showButton.Foreground = new SolidColorBrush(Colors.Black);
             }
             correctedPanel.Children.Add(showButton);
 
@@ -381,7 +373,7 @@ namespace ScanTextRevit
                 FontSize = 12,
                 FontStyle = FontStyles.Italic,
                 TextWrapping = TextWrapping.Wrap,
-                Foreground = isDark ? new SolidColorBrush(Colors.LightGray) : new SolidColorBrush(Colors.Gray)
+                Foreground = new SolidColorBrush(Colors.Gray)
             };
             Grid.SetRow(explanationText, 2);
             grid.Children.Add(explanationText);
@@ -392,7 +384,7 @@ namespace ScanTextRevit
 
 
         private void ShowElement(string elementIdStr)
-        {
+        { 
             try
             {
                 if (UiDoc != null && int.TryParse(elementIdStr?.Trim(), out int idValue))
@@ -490,7 +482,6 @@ namespace ScanTextRevit
             {
                 _preferences = new Preferences();
             }
-            DarkModeCheckBox.IsChecked = _preferences.DarkMode;
             HideDuplicatesCheckBox.IsChecked = _preferences.HideDuplicates;
 
         }
@@ -501,29 +492,7 @@ namespace ScanTextRevit
             File.WriteAllText(PrefFilePath, json);
         }
 
-        private void ApplyTheme()
-        {
-            if (_preferences.DarkMode)
-            {
-                // Palette harmonieuse pour le mode sombre
-                MainBorder.Background = new SolidColorBrush(Color.FromRgb(45, 45, 48));
-                this.Foreground = new SolidColorBrush(Colors.White);
-                FilterPanel.Background = MainBorder.Background;
-                ProgressBarPanel.Background = MainBorder.Background;
-                CorrectionsPanel.Background = MainBorder.Background;
-                // Pour le bouton "Afficher toutes", choisissez une couleur contrastante
-                ShowAllFilterButton.Foreground = new SolidColorBrush(Colors.Cyan);
-            }
-            else
-            {
-                MainBorder.Background = new SolidColorBrush(Color.FromRgb(250, 250, 250));
-                this.Foreground = new SolidColorBrush(Colors.Black);
-                FilterPanel.Background = MainBorder.Background;
-                ProgressBarPanel.Background = MainBorder.Background;
-                CorrectionsPanel.Background = MainBorder.Background;
-                ShowAllFilterButton.Foreground = new SolidColorBrush(Colors.Blue);
-            }
-        }
+       
 
 
         // Événements des filtres
@@ -551,21 +520,7 @@ namespace ScanTextRevit
             RefreshDisplay();
         }
       
-        private void DarkModeCheckBox_Checked(object sender, RoutedEventArgs e)
-        {
-            _preferences.DarkMode = true;
-            ApplyTheme();
-            SavePreferences();
-            RefreshDisplay();
-        }
-
-        private void DarkModeCheckBox_Unchecked(object sender, RoutedEventArgs e)
-        {
-            _preferences.DarkMode = false;
-            ApplyTheme();
-            SavePreferences();
-            RefreshDisplay();
-        }
+       
 
         private void HideDuplicatesCheckBox_Checked(object sender, RoutedEventArgs e)
         {
@@ -585,7 +540,6 @@ namespace ScanTextRevit
     // Classe de préférences unique
     public class Preferences
     {
-        public bool DarkMode { get; set; } = false;
         public bool HideDuplicates { get; set; } = false;
     }
 }

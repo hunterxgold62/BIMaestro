@@ -103,12 +103,7 @@
                                     Click="ShowAllFilterButton_Click"
                                     Margin="0,0,8,0"/>
 
-                            <CheckBox x:Name="DarkModeCheckBox"
-                                      Content="Mode sombre"
-                                      Foreground="{DynamicResource Text.Primary}"
-                                      Margin="12,0,0,0"
-                                      Checked="DarkModeCheckBox_Checked"
-                                      Unchecked="DarkModeCheckBox_Unchecked"/>
+                            
                         </WrapPanel>
                     </Border>
 

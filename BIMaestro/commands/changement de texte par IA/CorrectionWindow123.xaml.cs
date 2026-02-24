@@ -27,10 +27,7 @@ namespace IA
             ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
 
-            // Thème
-            var prefs = Preferences.LoadPreferences();
-            ApplyTheme(prefs.IsDarkTheme);
-            darkThemeCheckBox.IsChecked = prefs.IsDarkTheme;
+            
 
             // Contexte
             _originalText = originalText;
@@ -45,7 +42,6 @@ namespace IA
             // Événements UI
             styleComboBox.SelectionChanged += styleComboBox_SelectionChanged;
             proposalsListBox.MouseDoubleClick += proposalsListBox_MouseDoubleClick;
-            darkThemeCheckBox.Click += darkThemeCheckBox_Click;
         }
 
         private void okButton_Click(object sender, RoutedEventArgs e)
@@ -128,14 +124,7 @@ namespace IA
                 : Visibility.Collapsed;
         }
 
-        private void darkThemeCheckBox_Click(object sender, RoutedEventArgs e)
-        {
-            bool isDark = darkThemeCheckBox.IsChecked == true;
-            ApplyTheme(isDark);
-            var prefs = Preferences.LoadPreferences();
-            prefs.IsDarkTheme = isDark;
-            Preferences.SavePreferences(prefs);
-        }
+        
 
         // === Utilitaires de rendu ===
 
@@ -173,25 +162,7 @@ namespace IA
             return "";
         }
 
-        private void ApplyTheme(bool dark)
-        {
-            if (dark)
-            {
-                Background = Brushes.DimGray;
-                originalTextBox.Background = Brushes.Gray;
-                originalTextBox.Foreground = Brushes.White;
-                proposalsListBox.Background = Brushes.Gray;
-                proposalsListBox.Foreground = Brushes.White;
-            }
-            else
-            {
-                Background = Brushes.WhiteSmoke;
-                originalTextBox.Background = Brushes.White;
-                originalTextBox.Foreground = Brushes.Black;
-                proposalsListBox.Background = Brushes.White;
-                proposalsListBox.Foreground = Brushes.Black;
-            }
-        }
+        
 
         private string GeneratePrompt(string inputText, string style, string customInstruction)
         {

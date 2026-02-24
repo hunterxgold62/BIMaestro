@@ -22,6 +22,7 @@ namespace Analyse
         private readonly List<ModelIssue> _openConnectors;
         private readonly string _docKey;
         private int _cursor = -1;
+        private bool _suppressAutoFocus;
 
         public SmartCheckWindow(IEnumerable<ModelIssue> issues, ExternalEvent extEvent, SmartExternalHandler handler, string docKey)
         {
@@ -44,6 +45,22 @@ namespace Analyse
             GridMEP.MouseDoubleClick += (s, e) => FocusFromGrid(GridMEP);
             GridLinks.MouseDoubleClick += (s, e) => FocusFromGrid(GridLinks);
             GridOpen.MouseDoubleClick += (s, e) => FocusFromGrid(GridOpen);
+
+            GridAll.SelectionChanged += OnGridSelectionChanged;
+            GridMEP.SelectionChanged += OnGridSelectionChanged;
+            GridLinks.SelectionChanged += OnGridSelectionChanged;
+            GridOpen.SelectionChanged += OnGridSelectionChanged;
+        }
+
+        private void OnGridSelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_suppressAutoFocus) return;
+            if (ChkAutoFocus?.IsChecked != true) return;
+
+            var issue = (sender as DataGrid)?.SelectedItem as ModelIssue;
+            if (issue == null || issue.Ignored) return;
+
+            DoFocus(issue, keepShowAll: BtnShowAll.IsChecked == true);
         }
 
         private void Bind()
@@ -175,8 +192,7 @@ namespace Analyse
             _handler.CurrentKind = issue.Kind;
             _handler.IssueBox = issue.BBox;
             _handler.ShowAllMode = keepShowAll;
-            _handler.AutoSectionBox = true;
-            SafeRaise();
+            _handler.AutoSectionBox = (ChkAutoFocus?.IsChecked == true); SafeRaise();
 
             UpdateCursor(issue);
         }
@@ -209,14 +225,22 @@ namespace Analyse
         {
             if (issue == null) return;
 
-            SelectInGrid(GridAll, issue);
-            SelectInGrid(GridMEP, issue);
-            SelectInGrid(GridLinks, issue);
-            SelectInGrid(GridOpen, issue);
+            _suppressAutoFocus = true;
+            try
+            {
+                SelectInGrid(GridAll, issue);
+                SelectInGrid(GridMEP, issue);
+                SelectInGrid(GridLinks, issue);
+                SelectInGrid(GridOpen, issue);
 
-            var currentGrid = GridForCurrentTab();
-            if (currentGrid != GridAll)
-                SelectInGrid(currentGrid, issue);
+                var currentGrid = GridForCurrentTab();
+                if (currentGrid != GridAll)
+                    SelectInGrid(currentGrid, issue);
+            }
+            finally
+            {
+                _suppressAutoFocus = false;
+            }
         }
 
         private static void SelectInGrid(DataGrid grid, ModelIssue issue)

@@ -22,20 +22,7 @@ namespace ScanTextRevit
         private Dictionary<ElementId, List<Viewport>> _vpsBySheet;
         private Dictionary<ElementId, List<ScheduleSheetInstance>> _schedulesBySheet;
 
-        // Pour la gestion du thème
-        private Preferences _preferences;
-        private static string PrefFilePath
-        {
-            get
-            {
-                var baseDir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                    "RevitLogs",
-                    "SauvegardePréférence");
-                Directory.CreateDirectory(baseDir);
-                return Path.Combine(baseDir, "thème IA auto.json");
-            }
-        }
+        
 
         public SelectViewsWindow(List<View> allViews, List<ViewSheet> allSheets, Document doc)
         {
@@ -47,9 +34,7 @@ namespace ScanTextRevit
             _doc = doc;
 
             PreloadData();      // 1) on charge une seule fois tous les viewports et nomenclatures
-            LoadPreferences();  // 2) on lit le thème
-            ApplyTheme();       // 3) on applique le thème
-            PopulateTreeView();// 4) on construit l'arbre
+            
         }
 
         /// <summary>
@@ -277,53 +262,7 @@ namespace ScanTextRevit
             Close();
         }
 
-        // -----------------------------------
-        //   Gestion des Préférences & Thème
-        // -----------------------------------
-
-        private void LoadPreferences()
-        {
-            try
-            {
-                if (File.Exists(PrefFilePath))
-                {
-                    var json = File.ReadAllText(PrefFilePath);
-                    _preferences = JsonConvert.DeserializeObject<Preferences>(json);
-                    return;
-                }
-            }
-            catch { /* ignore */ }
-
-            _preferences = new Preferences();
-        }
-
-        private void SavePreferences()
-        {
-            try
-            {
-                var json = JsonConvert.SerializeObject(_preferences, Formatting.Indented);
-                File.WriteAllText(PrefFilePath, json);
-            }
-            catch { /* ignore */ }
-        }
-
-        private void ApplyTheme()
-        {
-            if (_preferences.DarkMode)
-            {
-                //MainBorder.Background = new SolidColorBrush(Color.FromRgb(45, 45, 48));
-                this.Foreground = new SolidColorBrush(Colors.White);
-                ViewsTreeView.Background = new SolidColorBrush(Color.FromRgb(45, 45, 48));
-                ViewsTreeView.Foreground = new SolidColorBrush(Colors.White);
-            }
-            else
-            {
-                //MainBorder.Background = new SolidColorBrush(Color.FromRgb(250, 250, 250));
-                this.Foreground = new SolidColorBrush(Colors.Black);
-                ViewsTreeView.Background = new SolidColorBrush(Color.FromRgb(250, 250, 250));
-                ViewsTreeView.Foreground = new SolidColorBrush(Colors.Black);
-            }
-        }
+       
     }
 
 }

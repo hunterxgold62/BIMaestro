@@ -6,9 +6,6 @@ namespace IA { }
 
 public class Preferences
 {
-    public bool IsDarkTheme { get; set; }
-
-    // Génère un chemin automatique vers \Documents\RevitLogs\SauvegardePreference\preferences.json
     private static string GetPrefFilePath()
     {
         string baseDir = Path.Combine(
@@ -16,7 +13,7 @@ public class Preferences
             "RevitLogs",
             "SauvegardePréférence"
         );
-        Directory.CreateDirectory(baseDir); // crée le dossier si besoin
+        Directory.CreateDirectory(baseDir);
         return Path.Combine(baseDir, "thème IA.json");
     }
 
@@ -37,9 +34,9 @@ public class Preferences
         }
         catch
         {
-            // Ignorer l'erreur et renvoyer la config par défaut
         }
-        return new Preferences { IsDarkTheme = false };
+
+        return new Preferences();
     }
 
     public static void SavePreferences(Preferences prefs)
@@ -52,7 +49,6 @@ public class Preferences
         }
         catch
         {
-            // Gérer erreur écriture si besoin
         }
     }
 }
