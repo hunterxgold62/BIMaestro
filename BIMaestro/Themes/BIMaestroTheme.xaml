@@ -33,9 +33,6 @@
                       Opacity="0.10"/>
 
     <!-- ========= BASE TYPO ========= -->
-    <Style TargetType="TextBlock">
-        <Setter Property="FontFamily" Value="Segoe UI"/>
-    </Style>
 
     <Style x:Key="H1" TargetType="TextBlock">
         <Setter Property="FontSize" Value="20"/>

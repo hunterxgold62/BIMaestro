@@ -60,9 +60,9 @@ public class AppUI : IExternalApplication
             {
                 new RibbonItemDefinition("OverrideColor", "Couleur d'élément", panel => AddPushButton(panel, "OverrideColor", "Couleur\nd'élément", assemblyPath, "Modification.OverrideColorCommand", "Pallette de couleur anexe .png", "Cette commande permet :  \r\n- De personnaliser les couleurs, motifs et transparence des éléments.  \r\n- D'appliquer des paramètres graphiques à plusieurs vues simultanément.  \r\n- De réinitialiser les modifications si nécessaire.  \r\n\r\nUtilité : Améliorez le rendu et la lisibilité de vos vues.  ")),
                 new RibbonItemDefinition("ElementRenamerButton", "Organisateur d'éléments", panel => AddPushButton(panel, "ElementRenamerButton", "Organisateur\nd'éléments", assemblyPath, "Modification.RenameElementsCommand", "Organisateur d'éléments.png", "Cette commande permet :  \r\n- De renommer des éléments sélectionnés dans Revit avec des préfixes, suffixes, ou des numérotations personnalisées.  \r\n- De trier les éléments par niveau ou par emplacement dans la vue active.  \r\n- De réinitialiser les paramètres texte sélectionnés si nécessaire.  \r\n\r\nUtilité :  \r\nFacilite la gestion des noms d'éléments pour une organisation cohérente dans vos projets.")),
-                new RibbonItemDefinition("ResérvationAuto2", "Auto Réservation2", panel => AddPushButton(panel, "ResérvationAuto2", "Auto\nRéservation2", assemblyPath, "Modification.ReservationAutoMultiVoidCommandV2", "safeimagekit-Réservation.png", "Crée des réservations automatiques")),
-                new RibbonItemDefinition("ResérvationAuto3", "Auto Réservation3", panel => AddPushButton(panel, "ResérvationAuto3", "Auto\nRéservation3", assemblyPath, "Modification.ReservationAutoV3Command", "safeimagekit-Réservation.png", "Crée des réservations automatiques")),
-                new RibbonItemDefinition("ResérvationAuto", "Auto Réservation", panel => AddPushButton(panel, "ResérvationAuto", "Auto\nRéservation", assemblyPath, "Modification.ReservationAutoMultiCommand", "safeimagekit-Réservation.png", "Crée des réservations automatiques")),
+               // new RibbonItemDefinition("ResérvationAuto2", "Auto Réservation2", panel => AddPushButton(panel, "ResérvationAuto2", "Auto\nRéservation2", assemblyPath, "Modification.ReservationAutoMultiVoidCommandV2", "safeimagekit-Réservation.png", "Crée des réservations automatiques")),
+                new RibbonItemDefinition("ResérvationAuto3", "Auto Réservation3", panel => AddPushButton(panel, "ResérvationAuto3", "Auto\nRéservation3", assemblyPath, "Modification.ReservationAutoV3Command", "résa cercle.png", "Crée des réservations automatiques")),
+                //new RibbonItemDefinition("ResérvationAuto", "Auto Réservation", panel => AddPushButton(panel, "ResérvationAuto", "Auto\nRéservation", assemblyPath, "Modification.ReservationAutoMultiCommand", "safeimagekit-Réservation.png", "Crée des réservations automatiques")),
                 new RibbonItemDefinition("Bride auto", "Bride auto", panel => AddSplitButton(panel, "Bride auto", "Bride\nauto", assemblyPath, new List<(string, string, string, string, string)>
                 {
                     ("Bride auto", "Bride\nauto", "Modification.AddFlangesAtEnds", "bride auto.png","Ajoute automatiquement des brides aux extrémités sélectionnées"),
@@ -99,13 +99,13 @@ public class AppUI : IExternalApplication
                 new RibbonItemDefinition("Clash 3D", "Clash 3D", panel => AddPushButton(panel, "Clash 3D", "Clash\n3D", assemblyPath, "Analyse.SmartClashCommand", "correction 3D.png", "Vérifie les éléments 3D sélectionnés pour détecter les incohérences."))
             }),
 
-              new RibbonPanelDefinition("Spécifique aux familles", new List<RibbonItemDefinition>
+                new RibbonPanelDefinition("Spécifique aux familles", new List<RibbonItemDefinition>
             {
-                new RibbonItemDefinition("FamilyBrowser", "Navigateur de Familles", panel => AddSplitButton(panel, "FamilyBrowser", "Navigateur\nde Familles", assemblyPath, new List<(string, string, string, string, string)>
+                new RibbonItemDefinition("FamilyBrowser", "Navigateur de Familles", panel => AddSplitButton(panel, "FamilyBrowser", "Famille", assemblyPath, new List<(string, string, string, string, string)>
                 {
                     ("FamilyBrowser", "Navigateur\nde Familles", "Famille.FamilyBrowserCommand", "maison famille (1).png","Cette commande permet :  \r\n- De parcourir les dossiers et charger des familles Revit depuis un emplacement centralisé. \r\n- D'afficher des aperçus d'icônes pour identifier rapidement les familles.  \r\n- De gérer des favoris pour accéder plus facilement aux familles les plus utilisées.  \r\n- D'appliquer des filtres de recherche pour une sélection rapide.  \r\n- D'ajuster le thème (mode clair/sombre) et les paramètres visuels.  \r\n\r\nUtilité :  \r\nSimplifie la gestion et le chargement des familles dans vos projets, augmentant votre efficacité.  "),
                     ("Rosace", ".","BIMaestro.UI.RadialMenuCommand", "vide.png","Rosace des familles à ajouter en raccourci clavier voir raccourci souris.")
-                })),
+                }, "Navigateur de Familles", "maison famille (1).png", keepDefaultCurrentButton: true, fixedDisplayText: "Famille")),
         new RibbonItemDefinition("ConvertSharedToFamily", "Convertir les paramètres partagés", panel => AddPushButton(panel, "ConvertSharedToFamily", "Convertir\nparamètres", assemblyPath, "Famille.ConvertSharedToFamilyParametersCommand", "Purge famille32x32.png", "Convertit tous les paramètres partagés modifiables de la famille en paramètres de famille (même nom, même groupe et même type instance/type).")),                new RibbonItemDefinition("FamilyUtilitiesStack", "Outils familles", panel => AddStackedFamilyUtilities(
                     panel,
                     assemblyPath,
@@ -411,17 +411,19 @@ public class AppUI : IExternalApplication
     }
 
     private static void AddSplitButton(
-      RibbonPanel panel,
-      string splitButtonName,
-      string splitButtonText,
-      string assemblyPath,
-      List<(string buttonName, string buttonText, string className, string resourceImageName, string toolTip)> buttons,
-      string splitToolTip = null,
-      string splitToolTipImageResource = null)
+       RibbonPanel panel,
+       string splitButtonName,
+       string splitButtonText,
+       string assemblyPath,
+       List<(string buttonName, string buttonText, string className, string resourceImageName, string toolTip)> buttons,
+       string splitToolTip = null,
+       string splitToolTipImageResource = null,
+       bool keepDefaultCurrentButton = true,
+       string fixedDisplayText = null)
     {
         var splitButtonData = new SplitButtonData(splitButtonName, splitButtonText);
         var splitButton = panel.AddItem(splitButtonData) as SplitButton;
-        ConfigureSplitButton(splitButton, assemblyPath, buttons, splitToolTip, splitToolTipImageResource);
+        ConfigureSplitButton(splitButton, assemblyPath, buttons, splitToolTip, splitToolTipImageResource, keepDefaultCurrentButton, fixedDisplayText);
     }
 
     private static void ConfigureSplitButton(
@@ -429,7 +431,9 @@ public class AppUI : IExternalApplication
         string assemblyPath,
         List<(string buttonName, string buttonText, string className, string resourceImageName, string toolTip)> buttons,
         string splitToolTip,
-        string splitToolTipImageResource)
+        string splitToolTipImageResource,
+        bool keepDefaultCurrentButton = true,
+        string fixedDisplayText = null)
     {
         if (splitButton == null)
         {
@@ -477,9 +481,60 @@ public class AppUI : IExternalApplication
             }
         }
 
-        if (firstButton != null)
+        if (keepDefaultCurrentButton && firstButton != null)
         {
             KeepSplitButtonDefault(splitButton, firstButton);
+        }
+
+        KeepSplitButtonText(splitButton, fixedDisplayText);
+    }
+
+    private static void KeepSplitButtonText(SplitButton splitButton, string fixedDisplayText)
+    {
+        if (splitButton == null || string.IsNullOrWhiteSpace(fixedDisplayText))
+            return;
+
+        TrySetRibbonItemText(splitButton, fixedDisplayText);
+
+        try
+        {
+            var eventInfo = splitButton.GetType().GetEvent("CurrentButtonChanged");
+            if (eventInfo != null)
+            {
+                EventHandler handler = (_, __) => TrySetRibbonItemText(splitButton, fixedDisplayText);
+                var del = Delegate.CreateDelegate(eventInfo.EventHandlerType, handler.Target, handler.Method);
+                eventInfo.AddEventHandler(splitButton, del);
+            }
+        }
+        catch
+        {
+            // Ignore si l'API ne supporte pas ces hooks.
+        }
+    }
+
+    private static void TrySetRibbonItemText(object ribbonItem, string text)
+    {
+        if (ribbonItem == null || string.IsNullOrWhiteSpace(text))
+            return;
+
+        try
+        {
+            var itemTextProperty = ribbonItem.GetType().GetProperty("ItemText");
+            if (itemTextProperty != null && itemTextProperty.CanWrite)
+            {
+                itemTextProperty.SetValue(ribbonItem, text, null);
+                return;
+            }
+
+            var textProperty = ribbonItem.GetType().GetProperty("Text");
+            if (textProperty != null && textProperty.CanWrite)
+            {
+                textProperty.SetValue(ribbonItem, text, null);
+            }
+        }
+        catch
+        {
+            // Ignore si la propriété n'est pas modifiable selon la version Revit.
         }
     }
 

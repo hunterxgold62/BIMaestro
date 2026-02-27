@@ -5,163 +5,189 @@
         xmlns:ui="clr-namespace:BIMaestro.UI"
         xmlns:xctk="http://schemas.xceed.com/wpf/xaml/toolkit"
         Title="BIMaestro - Navigateur de Familles"
-        Height="600" Width="1150"
+        Height="585" Width="1150"
         MinWidth="600" MinHeight="400"
         FontFamily="Segoe UI" FontSize="12"
-        Foreground="{DynamicResource PrimaryText}"
+        Background="{DynamicResource App.Background}"
+        Foreground="{DynamicResource Text.Primary}"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
         Loaded="Window_Loaded">
 
     <Window.Resources>
-        <!-- Thème -->
-        <SolidColorBrush x:Key="PrimaryText" Color="Black"/>
-        <SolidColorBrush x:Key="TabInactiveForeground" Color="Black"/>
-        <SolidColorBrush x:Key="TabActiveForeground" Color="Black"/>
-        <SolidColorBrush x:Key="SearchBoxBackground" Color="#FFFFFFFF"/>
-        <SolidColorBrush x:Key="SearchBoxForeground" Color="#FF000000"/>
-        <SolidColorBrush x:Key="SearchBoxBorder" Color="#FFCCCCCC"/>
-        <LinearGradientBrush x:Key="BackgroundGradient" StartPoint="0,0" EndPoint="0,1">
-            <GradientStop Offset="0" Color="#FFEB0F0F"/>
-            <GradientStop Offset="1" Color="#FFFFFFFF"/>
-        </LinearGradientBrush>
-        <SolidColorBrush x:Key="PanelBackground"    Color="#F0F0F0"/>
-        <SolidColorBrush x:Key="TreeViewBackground" Color="#F0F0F0"/>
-        <SolidColorBrush x:Key="ItemsBackground"    Color="Transparent"/>
-        <SolidColorBrush x:Key="TabBackground"      Color="Transparent"/>
-        <SolidColorBrush x:Key="ImageBackground"    Color="Transparent"/>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/BIMaestro;component/Themes/BIMaestroTheme.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
 
-        <ItemsPanelTemplate x:Key="FamilyListWrapPanel">
-            <WrapPanel IsItemsHost="True"/>
-        </ItemsPanelTemplate>
+            <!-- Thème -->
+            <SolidColorBrush x:Key="PrimaryText" Color="#0F172A"/>
+            <SolidColorBrush x:Key="TabInactiveForeground" Color="#64748B"/>
+            <SolidColorBrush x:Key="TabActiveForeground" Color="#0F172A"/>
+            <SolidColorBrush x:Key="SearchBoxBackground" Color="#FFFFFF"/>
+            <SolidColorBrush x:Key="SearchBoxForeground" Color="#0F172A"/>
+            <SolidColorBrush x:Key="SearchBoxBorder" Color="#E6EAF0"/>
+            <LinearGradientBrush x:Key="BackgroundGradient" StartPoint="0,0" EndPoint="0,1">
+                <GradientStop Offset="0" Color="#F6F8FB"/>
+                <GradientStop Offset="1" Color="#FFFFFF"/>
+            </LinearGradientBrush>
+            <SolidColorBrush x:Key="PanelBackground"    Color="#F9FAFB"/>
+            <SolidColorBrush x:Key="TreeViewBackground" Color="#F9FAFB"/>
+            <SolidColorBrush x:Key="ItemsBackground"    Color="Transparent"/>
+            <SolidColorBrush x:Key="TabBackground"      Color="Transparent"/>
+            <SolidColorBrush x:Key="ImageBackground"    Color="Transparent"/>
 
-        <ItemsPanelTemplate x:Key="FamilyListStackPanel">
-            <StackPanel IsItemsHost="True" Orientation="Vertical"/>
-        </ItemsPanelTemplate>
+            <ItemsPanelTemplate x:Key="FamilyListWrapPanel">
+                <WrapPanel IsItemsHost="True"/>
+            </ItemsPanelTemplate>
 
-        <!-- Styles -->
-        <Style TargetType="TreeViewItem">
-            <Setter Property="Foreground" Value="{DynamicResource PrimaryText}"/>
-        </Style>
+            <ItemsPanelTemplate x:Key="FamilyListStackPanel">
+                <StackPanel IsItemsHost="True" Orientation="Vertical"/>
+            </ItemsPanelTemplate>
 
-        <Style x:Key="ImageStyle" TargetType="Image">
-            <Setter Property="Effect">
-                <Setter.Value>
-                    <DropShadowEffect ShadowDepth="2" BlurRadius="4" Opacity="0.3"/>
-                </Setter.Value>
-            </Setter>
-        </Style>
-        <Style x:Key="PillButtonStyle" TargetType="Button">
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Background" Value="#FFE9EEF6"/>
-            <Setter Property="BorderBrush" Value="#FFC9D7F5"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="10,4"/>
-            <Setter Property="Margin" Value="0,0,8,8"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="#FF1F3B57"/>
-            <Setter Property="Focusable" Value="False"/>
-            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
+            <!-- Styles -->
+            <Style TargetType="TreeViewItem">
+                <Setter Property="Foreground" Value="{DynamicResource PrimaryText}"/>
+            </Style>
+
+            <Style x:Key="ImageStyle" TargetType="Image">
+                <Setter Property="Effect">
+                    <Setter.Value>
+                        <DropShadowEffect ShadowDepth="2" BlurRadius="4" Opacity="0.3"/>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+            <Style x:Key="PillButtonStyle" TargetType="Button">
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="Background" Value="{DynamicResource Surface.Subtle}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource Border}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Padding" Value="10,4"/>
+                <Setter Property="Margin" Value="0,0,8,8"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+                <Setter Property="Focusable" Value="False"/>
+                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="12"
                                 Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center"
+                                <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center"/>
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
 
-        <Style x:Key="DocumentationBadgeStyle" TargetType="Button">
-            <Setter Property="Content" Value="DOC"/>
-            <Setter Property="FontSize" Value="10"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="8,4"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Background" Value="#F0FFFFFF"/>
-            <Setter Property="Foreground" Value="#FF0F6EB8"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="BorderBrush" Value="#FF0F6EB8"/>
-            <Setter Property="Visibility" Value="Collapsed"/>
-            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
-            <Setter Property="ToolTip" Value="Ouvrir la documentation"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
+
+            <Style x:Key="FavoritesToolbarCard" TargetType="Border" BasedOn="{StaticResource Card}">
+                <Setter Property="Padding" Value="12"/>
+                <Setter Property="CornerRadius" Value="10"/>
+            </Style>
+
+            <Style x:Key="FavoritesActionButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                <Setter Property="Height" Value="34"/>
+                <Setter Property="MinWidth" Value="74"/>
+                <Setter Property="Padding" Value="12,0"/>
+            </Style>
+
+            <Style x:Key="FavoritesPrimaryActionButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+                <Setter Property="Height" Value="34"/>
+                <Setter Property="MinWidth" Value="150"/>
+                <Setter Property="Padding" Value="12,0"/>
+            </Style>
+
+            <Style x:Key="DocumentationBadgeStyle" TargetType="Button">
+                <Setter Property="Content" Value="DOC"/>
+                <Setter Property="FontSize" Value="10"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Padding" Value="8,4"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="Background" Value="{DynamicResource Surface}"/>
+                <Setter Property="Foreground" Value="{DynamicResource Brand}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource Brand}"/>
+                <Setter Property="Visibility" Value="Collapsed"/>
+                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                <Setter Property="ToolTip" Value="Ouvrir la documentation"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="12"
                                 Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center"
+                                <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center"/>
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding DocumentationAvailable}" Value="True">
-                    <Setter Property="Visibility" Value="Visible"/>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding DocumentationAvailable}" Value="True">
+                        <Setter Property="Visibility" Value="Visible"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
 
-        <!-- Vignette famille (onglet Dossiers) -->
-        <DataTemplate x:Key="FamilyItemTemplate" DataType="{x:Type local:FamilyItem}">
-            <Border Margin="5" Width="200"
+            <!-- Vignette famille (onglet Dossiers) -->
+            <DataTemplate x:Key="FamilyItemTemplate" DataType="{x:Type local:FamilyItem}">
+                <Border Margin="5" Width="200"
                     Background="{DynamicResource PanelBackground}"
                     CornerRadius="5"
                     BorderBrush="#33000000"
                     BorderThickness="1"
                     MouseLeftButtonDown="FamilyItem_DoubleClick">
-                <Border.ContextMenu>
-                    <ContextMenu>
-                        <MenuItem Header="Documentation"
+                    <Border.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Documentation"
                                   Click="DocumentationMenuItem_Click"
                                   DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                        <Separator/>
-                        <MenuItem Header="Rentrer dans la famille"
+                            <Separator/>
+                            <MenuItem Header="Rentrer dans la famille"
                                   Click="OpenFamilyFile_Click"
                                   DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                        <MenuItem Header="Charger la dernière version"
+                            <MenuItem Header="Charger la dernière version"
                                   Click="ReloadFamily_Click"
                                   DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
 
-                        <Separator/>
+                            <Separator/>
 
-                        <!-- Ajout express dans la collection active -->
-                        <MenuItem Header="Ajouter à la collection active"
+                            <!-- Ajout express dans la collection active -->
+                            <MenuItem Header="Ajouter à la collection active"
                                   Click="AddToActiveCollection_Click"
                                   DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                    </ContextMenu>
-                </Border.ContextMenu>
+                        </ContextMenu>
+                    </Border.ContextMenu>
 
-                <Grid Margin="5">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
+                    <Grid Margin="5">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
 
-                    <Grid Grid.Row="0">
-                        <Border Background="{DynamicResource ImageBackground}" Padding="3">
-                            <Image Source="{Binding Icon}"
+                        <Grid Grid.Row="0">
+                            <Border Background="{DynamicResource ImageBackground}" Padding="3">
+                                <Image Source="{Binding Icon}"
                                    Width="180" Height="180"
                                    Stretch="UniformToFill"
                                    HorizontalAlignment="Center"
                                    VerticalAlignment="Center"
                                    Style="{StaticResource ImageStyle}"/>
-                        </Border>
-                        <Button Style="{StaticResource DocumentationBadgeStyle}"
+                            </Border>
+                            <Button Style="{StaticResource DocumentationBadgeStyle}"
                                 HorizontalAlignment="Left"
                                 VerticalAlignment="Top"
                                 Margin="6"
                                 Click="DocumentationBadge_Click"/>
-                    </Grid>
-                    <Button Content="3D"
+                        </Grid>
+                        <Button Content="3D"
                             Width="28" Height="20" FontSize="10" Padding="0"
                             HorizontalAlignment="Right" VerticalAlignment="Top" Margin="4"
                             Click="OnPreview3DClick"
@@ -170,14 +196,14 @@
                             BorderThickness="0"
                             BorderBrush="Transparent"
                             FocusVisualStyle="{x:Null}"/>
-                    <Grid Grid.Row="1">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
+                        <Grid Grid.Row="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
 
-                        <!-- ★ : Favoris -->
-                        <Button Grid.Column="0" Content="★"
+                            <!-- ★ : Favoris -->
+                            <Button Grid.Column="0" Content="★"
                                 Click="FavoriteButton_Click"
                                 ToolTip="Ajouter/retirer des Favoris"
                                 Background="Transparent"
@@ -186,19 +212,19 @@
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Top"
                                 Margin="0,0,5,0">
-                            <Button.Style>
-                                <Style TargetType="Button">
-                                    <Setter Property="Foreground" Value="SkyBlue"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsFavorite}" Value="True">
-                                            <Setter Property="Foreground" Value="Orange"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <Setter Property="Foreground" Value="SkyBlue"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsFavorite}" Value="True">
+                                                <Setter Property="Foreground" Value="Orange"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
 
-                        <TextBlock Grid.Column="1"
+                            <TextBlock Grid.Column="1"
                                    Text="{Binding Name}"
                                    Foreground="{DynamicResource PrimaryText}"
                                    FontWeight="Bold"
@@ -207,75 +233,75 @@
                                    HorizontalAlignment="Center"
                                    Margin="0,0,5,0"
                                    ToolTip="Nom complet de la famille"/>
+                        </Grid>
                     </Grid>
-                </Grid>
-            </Border>
-        </DataTemplate>
+                </Border>
+            </DataTemplate>
 
-        <DataTemplate x:Key="FamilyItemDetailedTemplate" DataType="{x:Type local:FamilyItem}">
-            <Border Margin="5"
+            <DataTemplate x:Key="FamilyItemDetailedTemplate" DataType="{x:Type local:FamilyItem}">
+                <Border Margin="5"
                     Background="{DynamicResource PanelBackground}"
                     CornerRadius="5"
                     BorderBrush="#33000000"
                     BorderThickness="1"
                     MouseLeftButtonDown="FamilyItem_DoubleClick"
                     HorizontalAlignment="Stretch">
-                <Border.ContextMenu>
-                    <ContextMenu>
-                        <MenuItem Header="Documentation"
+                    <Border.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Documentation"
                                   Click="DocumentationMenuItem_Click"
                                   DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                        <Separator/>
-                        <MenuItem Header="Rentrer dans la famille"
+                            <Separator/>
+                            <MenuItem Header="Rentrer dans la famille"
                                   Click="OpenFamilyFile_Click"
                                   DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                        <MenuItem Header="Charger la dernière version"
+                            <MenuItem Header="Charger la dernière version"
                                   Click="ReloadFamily_Click"
                                   DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
 
-                        <Separator/>
+                            <Separator/>
 
-                        <MenuItem Header="Ajouter à la collection active"
+                            <MenuItem Header="Ajouter à la collection active"
                                   Click="AddToActiveCollection_Click"
                                   DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                    </ContextMenu>
-                </Border.ContextMenu>
+                        </ContextMenu>
+                    </Border.ContextMenu>
 
-                <Grid Margin="10">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="180"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
+                    <Grid Margin="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="180"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
 
-                    <Grid Grid.Column="0" HorizontalAlignment="Left">
-                        <Border Background="{DynamicResource ImageBackground}"
+                        <Grid Grid.Column="0" HorizontalAlignment="Left">
+                            <Border Background="{DynamicResource ImageBackground}"
                                 Padding="3">
-                            <Image Source="{Binding Icon}"
+                                <Image Source="{Binding Icon}"
                                    Width="200" Height="200"
                                    Stretch="Uniform"
                                    HorizontalAlignment="Center"
                                    VerticalAlignment="Center"
                                    Style="{StaticResource ImageStyle}"/>
-                        </Border>
-                        <Button Style="{StaticResource DocumentationBadgeStyle}"
+                            </Border>
+                            <Button Style="{StaticResource DocumentationBadgeStyle}"
                                 HorizontalAlignment="Left"
                                 VerticalAlignment="Top"
                                 Margin="6"
                                 Click="DocumentationBadge_Click"/>
-                    </Grid>
+                        </Grid>
 
-                    <Grid Grid.Column="1" Margin="20,0,10,0">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
+                        <Grid Grid.Column="1" Margin="20,0,10,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
 
-                        </Grid.RowDefinitions>
+                            </Grid.RowDefinitions>
 
-                        <DockPanel Grid.Row="0" LastChildFill="True">
-                            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
-                                <Button Content="3D"
+                            <DockPanel Grid.Row="0" LastChildFill="True">
+                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                                    <Button Content="3D"
                                         Width="32" Height="22" FontSize="10" Padding="0"
                                         Margin="0,0,8,0"
                                         Click="OnPreview3DClick"
@@ -284,7 +310,7 @@
                                         BorderThickness="0"
                                         BorderBrush="Transparent"
                                         FocusVisualStyle="{x:Null}"/>
-                                <Button Content="★"
+                                    <Button Content="★"
                                         Click="FavoriteButton_Click"
                                         ToolTip="Ajouter/retirer des Favoris"
                                         Background="Transparent"
@@ -293,237 +319,237 @@
                                         Width="32"
                                         HorizontalAlignment="Right"
                                         Margin="0,0,0,0">
-                                    <Button.Style>
-                                        <Style TargetType="Button">
-                                            <Setter Property="Foreground" Value="SkyBlue"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsFavorite}" Value="True">
-                                                    <Setter Property="Foreground" Value="Orange"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                </Button>
-                            </StackPanel>
-                            <TextBlock Text="{Binding Name}"
+                                        <Button.Style>
+                                            <Style TargetType="Button">
+                                                <Setter Property="Foreground" Value="SkyBlue"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsFavorite}" Value="True">
+                                                        <Setter Property="Foreground" Value="Orange"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+                                </StackPanel>
+                                <TextBlock Text="{Binding Name}"
                                        Foreground="{DynamicResource PrimaryText}"
                                        FontWeight="Bold"
                                        FontSize="18"
                                        TextWrapping="Wrap"
                                        Margin="0,0,10,0"
                                        VerticalAlignment="Center"/>
-                        </DockPanel>
-                        <WrapPanel Grid.Row="1" Margin="0,14,0,0">
-                            <Button Click="CategoryPill_Click">
-                                <Button.Style>
-                                    <Style TargetType="Button" BasedOn="{StaticResource PillButtonStyle}">
-                                        <Setter Property="Background" Value="#FFE9EEF6"/>
-                                        <Setter Property="BorderBrush" Value="#FFC9D7F5"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding Category}" Value="">
-                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding Category}" Value="{x:Null}">
-                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Button.Style>
-                                <TextBlock Text="{Binding Category}" Foreground="#FF1F3B57"/>
-                            </Button>
+                            </DockPanel>
+                            <WrapPanel Grid.Row="1" Margin="0,14,0,0">
+                                <Button Click="CategoryPill_Click">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource PillButtonStyle}">
+                                            <Setter Property="Background" Value="{DynamicResource Surface.Subtle}"/>
+                                            <Setter Property="BorderBrush" Value="{DynamicResource Border}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Category}" Value="">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Category}" Value="{x:Null}">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                    <TextBlock Text="{Binding Category}" Foreground="#FF1F3B57"/>
+                                </Button>
 
-                            <Button Click="VersionPill_Click">
-                                <Button.Style>
-                                    <Style TargetType="Button" BasedOn="{StaticResource PillButtonStyle}">
-                                        <Setter Property="Background" Value="#FFF2F5FC"/>
-                                        <Setter Property="BorderBrush" Value="#FFDCE6FA"/>
-                                        <Setter Property="Foreground" Value="#FF2A3F6A"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding RevitSavedVersion}" Value="">
-                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding RevitSavedVersion}" Value="{x:Null}">
-                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Button.Style>
-                                <TextBlock Foreground="#FF2A3F6A" FontWeight="SemiBold">
+                                <Button Click="VersionPill_Click">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource PillButtonStyle}">
+                                            <Setter Property="Background" Value="#FFF2F5FC"/>
+                                            <Setter Property="BorderBrush" Value="#FFDCE6FA"/>
+                                            <Setter Property="Foreground" Value="#FF2A3F6A"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding RevitSavedVersion}" Value="">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding RevitSavedVersion}" Value="{x:Null}">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                    <TextBlock Foreground="#FF2A3F6A" FontWeight="SemiBold">
                                     <Run Text="Revit "/>
                                     <Run Text="{Binding RevitSavedVersion}"/>
-                                </TextBlock>
-                            </Button>
+                                    </TextBlock>
+                                </Button>
 
-                            <Button Click="SizePill_Click">
-                                <Button.Style>
-                                    <Style TargetType="Button" BasedOn="{StaticResource PillButtonStyle}">
-                                        <Setter Property="Background" Value="#FFFDF2E8"/>
-                                        <Setter Property="BorderBrush" Value="#FFF6D9B8"/>
-                                        <Setter Property="Foreground" Value="#FF594525"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding FileSizeText}" Value="">
-                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding FileSizeText}" Value="{x:Null}">
-                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=IsSizeSortActive}" Value="True">
-                                                <Setter Property="Background" Value="#FFF9E2C7"/>
-                                                <Setter Property="BorderBrush" Value="#FFE0A35C"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Button.Style>
-                                <TextBlock Text="{Binding FileSizeText}" Foreground="#FF594525" FontWeight="SemiBold"/>
-                            </Button>
-                        </WrapPanel>
+                                <Button Click="SizePill_Click">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource PillButtonStyle}">
+                                            <Setter Property="Background" Value="#FFFDF2E8"/>
+                                            <Setter Property="BorderBrush" Value="#FFF6D9B8"/>
+                                            <Setter Property="Foreground" Value="#FF594525"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding FileSizeText}" Value="">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding FileSizeText}" Value="{x:Null}">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=IsSizeSortActive}" Value="True">
+                                                    <Setter Property="Background" Value="#FFF9E2C7"/>
+                                                    <Setter Property="BorderBrush" Value="#FFE0A35C"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                    <TextBlock Text="{Binding FileSizeText}" Foreground="#FF594525" FontWeight="SemiBold"/>
+                                </Button>
+                            </WrapPanel>
 
-                        <Border Grid.Row="2"
+                            <Border Grid.Row="2"
                                 Margin="0,16,0,0"
                                 Background="#FFFFFFFF"
                                 BorderBrush="#22000000"
                                 BorderThickness="1"
                                 CornerRadius="10"
                                 Padding="18">
-                            <StackPanel>
-                                <TextBlock Text="Détails"
+                                <StackPanel>
+                                    <TextBlock Text="Détails"
                                            Foreground="#FF1F3B57"
                                            FontWeight="SemiBold"
                                            FontSize="14"/>
-                                <Border Height="1"
+                                    <Border Height="1"
                                         Margin="0,10,0,14"
                                         Background="#22000000"/>
 
-                                <Grid Margin="0,0,0,12">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="18"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0"
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="18"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0"
                                                Foreground="#FF6C7A92"
                                                FontWeight="SemiBold"
                                                Text="Catégorie"/>
-                                    <TextBlock Grid.Column="2"
+                                        <TextBlock Grid.Column="2"
                                                Foreground="#FF1F3B57"
                                                Text="{Binding Category, TargetNullValue=—}"/>
-                                </Grid>
+                                    </Grid>
 
-                                <Grid Margin="0,0,0,12">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="18"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0"
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="18"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0"
                                                Foreground="#FF6C7A92"
                                                FontWeight="SemiBold"
                                                Text="Version Revit"/>
-                                    <TextBlock Grid.Column="2"
+                                        <TextBlock Grid.Column="2"
                                                Foreground="#FF1F3B57"
                                                Text="{Binding RevitSavedVersion, TargetNullValue=—}"/>
-                                </Grid>
+                                    </Grid>
 
-                                <Grid Margin="0,0,0,12">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="18"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0"
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="18"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0"
                                                Foreground="#FF6C7A92"
                                                FontWeight="SemiBold"
                                                Text="Dernière mise à jour"/>
-                                    <TextBlock Grid.Column="2"
+                                        <TextBlock Grid.Column="2"
                                                Foreground="#FF1F3B57"
                                                Text="{Binding LastUpdatedText, TargetNullValue=—}"/>
-                                </Grid>
+                                    </Grid>
 
-                                <Grid Margin="0,0,0,12">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="18"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0"
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="18"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0"
                                                Foreground="#FF6C7A92"
                                                FontWeight="SemiBold"
                                                Text="Taille du fichier"/>
-                                    <TextBlock Grid.Column="2"
+                                        <TextBlock Grid.Column="2"
                                                Foreground="#FF1F3B57"
                                                Text="{Binding FileSizeText, TargetNullValue=—}"/>
-                                </Grid>
+                                    </Grid>
 
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="18"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0"
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="18"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0"
                                                Foreground="#FF6C7A92"
                                                FontWeight="SemiBold"
                                                Text="Numéro OmniClass"/>
-                                    <TextBlock Grid.Column="2"
+                                        <TextBlock Grid.Column="2"
                                                Foreground="#FF1F3B57"
                                               Text="{Binding OmniClassDisplay, TargetNullValue=—}"/>
-                                </Grid>
-                            </StackPanel>
-                        </Border>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
 
 
+                        </Grid>
                     </Grid>
-                </Grid>
-            </Border>
-        </DataTemplate>
+                </Border>
+            </DataTemplate>
 
-        <!-- Vignette famille (onglet Favoris/Collections) : bouton 🗑 -->
-        <DataTemplate x:Key="CollectionItemTemplate" DataType="{x:Type local:FamilyItem}">
-            <Border Margin="5" Width="200"
+            <!-- Vignette famille (onglet Favoris/Collections) : bouton 🗑 -->
+            <DataTemplate x:Key="CollectionItemTemplate" DataType="{x:Type local:FamilyItem}">
+                <Border Margin="5" Width="200"
                     Background="{DynamicResource PanelBackground}"
                     CornerRadius="5"
                     MouseLeftButtonDown="FamilyItem_DoubleClick">
-                <Border.ContextMenu>
-                    <ContextMenu>
-                        <MenuItem Header="Rentrer dans la famille"
+                    <Border.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Rentrer dans la famille"
                                   Click="OpenFamilyFile_Click"
                                   DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                        <MenuItem Header="Charger la dernière version"
+                            <MenuItem Header="Charger la dernière version"
                                   Click="ReloadFamily_Click"
                                   DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                    </ContextMenu>
-                </Border.ContextMenu>
+                        </ContextMenu>
+                    </Border.ContextMenu>
 
-                <Grid Margin="5">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
+                    <Grid Margin="5">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
 
-                    <Grid Grid.Row="0">
-                        <Border Background="{DynamicResource ImageBackground}" Padding="3">
-                            <Image Source="{Binding Icon}"
+                        <Grid Grid.Row="0">
+                            <Border Background="{DynamicResource ImageBackground}" Padding="3">
+                                <Image Source="{Binding Icon}"
                                    Width="180" Height="180"
                                    Stretch="UniformToFill"
                                    HorizontalAlignment="Center"
                                    VerticalAlignment="Center"
                                    Style="{StaticResource ImageStyle}"/>
-                        </Border>
-                        <Button Style="{StaticResource DocumentationBadgeStyle}"
+                            </Border>
+                            <Button Style="{StaticResource DocumentationBadgeStyle}"
                                 HorizontalAlignment="Left"
                                 VerticalAlignment="Top"
                                 Margin="6"
                                 Click="DocumentationBadge_Click"/>
-                    </Grid>
+                        </Grid>
 
-                    <Grid Grid.Row="1">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
+                        <Grid Grid.Row="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
 
-                        <!-- 🗑 : supprimer de la collection courante (taille réduite) -->
-                        <Button Grid.Column="0"
+                            <!-- 🗑 : supprimer de la collection courante (taille réduite) -->
+                            <Button Grid.Column="0"
         Click="RemoveFromCollection_Click"
         ToolTip="Retirer de la collection courante"
         Background="Transparent"
@@ -536,12 +562,12 @@
         HorizontalContentAlignment="Center"
         VerticalContentAlignment="Center"
         Focusable="True">
-                            <!-- Icône poubelle animée (hover) -->
-                            <ui:AnimatedDeleteIcon IconSize="18"
+                                <!-- Icône poubelle animée (hover) -->
+                                <ui:AnimatedDeleteIcon IconSize="18"
                          Foreground="{DynamicResource PrimaryText}"/>
-                        </Button>
+                            </Button>
 
-                        <TextBlock Grid.Column="1"
+                            <TextBlock Grid.Column="1"
            Text="{Binding Name}"
            Foreground="{DynamicResource PrimaryText}"
            FontWeight="Bold"
@@ -550,8 +576,8 @@
            HorizontalAlignment="Center"
            Margin="0,0,5,0"/>
 
-                    </Grid>
-                    <Button Content="3D"
+                        </Grid>
+                        <Button Content="3D"
         Width="28" Height="20" FontSize="10" Padding="0"
         HorizontalAlignment="Right" VerticalAlignment="Top" Margin="4"
         Click="OnPreview3DClick"
@@ -561,9 +587,10 @@
         BorderBrush="Transparent"
         FocusVisualStyle="{x:Null}"/>
 
-                </Grid>
-            </Border>
-        </DataTemplate>
+                    </Grid>
+                </Border>
+            </DataTemplate>
+        </ResourceDictionary>
     </Window.Resources>
 
     <Grid Background="{DynamicResource BackgroundGradient}">
@@ -729,39 +756,41 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,6">
-                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
-                            <TextBlock Text="Collection :" VerticalAlignment="Center"
-                                       Margin="0,0,8,0" Foreground="{DynamicResource PrimaryText}"/>
-                            <ComboBox x:Name="CollectionCombo"
-                                      Width="240"
-                                      DisplayMemberPath="Name"
-                                      SelectionChanged="CollectionCombo_SelectionChanged"/>
-                            <Button Content="Nouv."   Width="60" Margin="6,0,0,0" Click="CollectionNew_Click"/>
-                            <Button Content="Ren."    Width="60" Margin="6,0,0,0" Click="CollectionRename_Click"/>
-                            <Button Content="Suppr."  Width="70" Margin="6,0,0,0" Click="CollectionDelete_Click"/>
-                        </StackPanel>
+                    <Border Grid.Row="0" Background="{DynamicResource ItemsBackground}">
+                        <DockPanel LastChildFill="False">
+                            <WrapPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                                <TextBlock Text="Collection :" VerticalAlignment="Center"
+                                           Margin="0,0,8,0" Foreground="{DynamicResource PrimaryText}"/>
+                                <ComboBox x:Name="CollectionCombo"
+                                          Width="300"
+                                          DisplayMemberPath="Name"
+                                          SelectionChanged="CollectionCombo_SelectionChanged"/>
+                                <Button Content="Nouv." Margin="6,0,0,0" Style="{StaticResource FavoritesActionButton}" Click="CollectionNew_Click" Background="#FFEBEBEB"/>
+                                <Button Content="Ren." Margin="6,0,0,0" Style="{StaticResource FavoritesActionButton}" Click="CollectionRename_Click" Background="#FFEBEBEB"/>
+                                <Button Content="Suppr." Margin="6,0,0,0" Style="{StaticResource FavoritesActionButton}" Click="CollectionDelete_Click" Background="#FFEBEBEB"/>
+                            </WrapPanel>
 
-                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
-                            <Button x:Name="CollectionActionsButton"
-                                    Content="Partager"
-                                    Width="120"
-                                    Margin="0,0,10,0"
-                                    Click="CollectionActionsButton_Click">
-                                <Button.ContextMenu>
-                                    <ContextMenu>
-                                        <MenuItem Header="Partager la collection…"
-                                                  Click="CollectionShareMenuItem_Click"/>
-                                        <MenuItem Header="Télécharger la collection…"
-                                                  Click="CollectionDownloadMenuItem_Click"/>
-                                    </ContextMenu>
-                                </Button.ContextMenu>
-                            </Button>
-                            <Button Content="Charger la collection"
-                                    Width="160"
-                                    Click="CollectionLoad_Click"/>
-                        </StackPanel>
-                    </DockPanel>
+                            <WrapPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                                <Button x:Name="CollectionActionsButton"
+                                        Content="Partager"
+                                        Margin="0,0,10,0"
+                                        Style="{StaticResource FavoritesActionButton}"
+                                        Click="CollectionActionsButton_Click" Background="#FFEBEBEB" IsDefault="True">
+                                    <Button.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="Partager la collection…"
+                                                      Click="CollectionShareMenuItem_Click"/>
+                                            <MenuItem Header="Télécharger la collection…"
+                                                      Click="CollectionDownloadMenuItem_Click"/>
+                                        </ContextMenu>
+                                    </Button.ContextMenu>
+                                </Button>
+                                <Button Content="Charger la collection"
+                                        Style="{StaticResource FavoritesPrimaryActionButton}"
+                                        Click="CollectionLoad_Click"/>
+                            </WrapPanel>
+                        </DockPanel>
+                    </Border>
 
                     <ScrollViewer Grid.Row="1" Background="{DynamicResource ItemsBackground}">
                         <ItemsControl x:Name="CollectionListView"
@@ -781,7 +810,7 @@
                 </Grid>
             </TabItem>
 
-             <!-- Onglet Paramètres -->
+            <!-- Onglet Paramètres -->
             <TabItem x:Name="SettingsTabItem"
                      Header="Paramètres"
                      Background="{DynamicResource TabBackground}">

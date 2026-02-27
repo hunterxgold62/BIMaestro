@@ -130,6 +130,7 @@ namespace Famille
 
         public FamilyBrowserWindow()
         {
+            ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
             DataContext = this;
 

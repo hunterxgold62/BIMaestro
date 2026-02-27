@@ -19,6 +19,7 @@ namespace BIMaestro.Welcome
 
         public WelcomeWindow()
         {
+            ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
             LogoImage.Source = LoadBitmapFromResource("BIMaestro.png");
         }

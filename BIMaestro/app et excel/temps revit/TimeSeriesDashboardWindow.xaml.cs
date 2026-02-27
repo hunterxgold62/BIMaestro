@@ -64,6 +64,7 @@ namespace BIMaestro.Dashboard
 
         public TimeSeriesDashboardWindow(string currentDocumentPath = null)
         {
+            ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
 
             _currentDocumentPath = currentDocumentPath;

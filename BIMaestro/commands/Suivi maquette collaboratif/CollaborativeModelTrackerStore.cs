@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
+using Newtonsoft.Json;
 
 namespace Analyse
 {
@@ -234,8 +234,8 @@ namespace Analyse
                 .OrderByDescending(r => r.TimestampDate)
                 .ToList();
 
-            var options = new JsonSerializerOptions { WriteIndented = true };
-            File.WriteAllText(JsonPath, JsonSerializer.Serialize(ordered, options));
+            var json = JsonConvert.SerializeObject(ordered, Formatting.Indented);
+            File.WriteAllText(JsonPath, json);
             ExportExcel(ordered);
         }
 
@@ -247,7 +247,7 @@ namespace Analyse
             try
             {
                 var json = File.ReadAllText(JsonPath);
-                var data = JsonSerializer.Deserialize<List<CollaborativeModelRecord>>(json);
+                var data = JsonConvert.DeserializeObject<List<CollaborativeModelRecord>>(json);
                 return data ?? new List<CollaborativeModelRecord>();
             }
             catch

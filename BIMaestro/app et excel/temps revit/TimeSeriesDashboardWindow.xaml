@@ -3,116 +3,110 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:oxy="clr-namespace:OxyPlot.Wpf;assembly=OxyPlot.Wpf"
         Title="BIMaestro — Temps par type de document"
-        Width="1280" Height="840" MinWidth="1100" MinHeight="680"
+        Width="1280" Height="880" MinWidth="1100" MinHeight="680"
         WindowStartupLocation="CenterScreen"
-        Background="#F8F9FB">
+        Background="{DynamicResource App.Background}"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True">
 
     <!-- =============== RESSOURCES (styles + couleurs) =============== -->
     <Window.Resources>
-        <!-- Couleurs -->
-        <SolidColorBrush x:Key="NeutralBg" Color="#F2F5F8"/>
-        <SolidColorBrush x:Key="NeutralBorder" Color="#DCE0E7"/>
-        <SolidColorBrush x:Key="Primary" Color="#1677FF"/>
-        <SolidColorBrush x:Key="PrimaryText" Color="#22262E"/>
-        <SolidColorBrush x:Key="MutedText" Color="#78808C"/>
-        <DropShadowEffect x:Key="CardShadow" BlurRadius="8" ShadowDepth="1" Opacity="0.08"/>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/BIMaestro;component/Themes/BIMaestroTheme.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
 
-        <!-- Cartes -->
-        <Style x:Key="CardBorder" TargetType="Border">
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="CornerRadius" Value="12"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="SnapsToDevicePixels" Value="True"/>
-            <Setter Property="Effect" Value="{StaticResource CardShadow}"/>
-        </Style>
+            <!-- Cartes -->
+            <Style x:Key="CardBorder" TargetType="Border" BasedOn="{StaticResource Card}">
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="CornerRadius" Value="12"/>
+            </Style>
 
-        <!-- Boutons -->
-        <Style x:Key="PrimaryButton" TargetType="Button">
-            <Setter Property="Height" Value="30"/>
-            <Setter Property="Margin" Value="6,0,0,0"/>
-            <Setter Property="Padding" Value="12,0"/>
-            <Setter Property="Background" Value="{StaticResource Primary}"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderBrush" Value="{StaticResource Primary}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Cursor" Value="Hand"/>
-        </Style>
+            <!-- Typographie locale alignée thème -->
+            <Style x:Key="SectionTitle" TargetType="TextBlock" BasedOn="{StaticResource H2}">
+                <Setter Property="Margin" Value="0,0,0,6"/>
+            </Style>
 
-        <Style x:Key="GhostButton" TargetType="Button">
-            <Setter Property="Height" Value="30"/>
-            <Setter Property="Margin" Value="6,0,0,0"/>
-            <Setter Property="Padding" Value="12,0"/>
-            <Setter Property="Background" Value="#F8F9FB"/>
-            <Setter Property="Foreground" Value="{StaticResource PrimaryText}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource NeutralBorder}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Cursor" Value="Hand"/>
-        </Style>
+            <!-- Boutons -->
+            <Style x:Key="DashboardPrimaryButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+                <Setter Property="Height" Value="34"/>
+                <Setter Property="MinWidth" Value="130"/>
+                <Setter Property="Margin" Value="6,0,0,0"/>
+                <Setter Property="Padding" Value="12,0"/>
+            </Style>
 
-        <Style x:Key="TinyButton" TargetType="Button">
-            <Setter Property="Width" Value="28"/>
-            <Setter Property="Height" Value="26"/>
-            <Setter Property="Margin" Value="4,0,0,0"/>
-            <Setter Property="Background" Value="{StaticResource NeutralBg}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource NeutralBorder}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Cursor" Value="Hand"/>
-        </Style>
+            <Style x:Key="DashboardGhostButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                <Setter Property="Height" Value="34"/>
+                <Setter Property="MinWidth" Value="120"/>
+                <Setter Property="Margin" Value="6,0,0,0"/>
+                <Setter Property="Padding" Value="12,0"/>
+            </Style>
 
-        <Style x:Key="ChipButton" TargetType="Button">
-            <Setter Property="Height" Value="26"/>
-            <Setter Property="Margin" Value="0,0,6,0"/>
-            <Setter Property="Padding" Value="10,0"/>
-            <Setter Property="Background" Value="{StaticResource NeutralBg}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource NeutralBorder}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Cursor" Value="Hand"/>
-        </Style>
+            <Style x:Key="TinyButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                <Setter Property="Width" Value="30"/>
+                <Setter Property="Height" Value="30"/>
+                <Setter Property="Margin" Value="6,0,0,0"/>
+                <Setter Property="Background" Value="{DynamicResource Surface.Subtle}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource Border}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="MinWidth" Value="30"/>
+            </Style>
 
-        <Style x:Key="SegmentToggle" TargetType="{x:Type ToggleButton}">
-            <Setter Property="Height" Value="32"/>
-            <Setter Property="MinWidth" Value="130"/>
-            <Setter Property="Margin" Value="0,0,8,0"/>
-            <Setter Property="Padding" Value="10,0"/>
-            <Setter Property="Background" Value="{StaticResource NeutralBg}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource NeutralBorder}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="{StaticResource PrimaryText}"/>
-            <Style.Triggers>
-                <Trigger Property="IsChecked" Value="True">
-                    <Setter Property="Background" Value="#E2ECF7"/>
-                    <Setter Property="BorderBrush" Value="#7FB1F6"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
+            <Style x:Key="ChipButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                <Setter Property="Height" Value="30"/>
+                <Setter Property="Margin" Value="0,0,6,6"/>
+                <Setter Property="Padding" Value="10,0"/>
+                <Setter Property="Background" Value="{DynamicResource Surface.Subtle}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource Border}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="MinWidth" Value="64"/>
+            </Style>
 
-        <!-- Item légende -->
-        <DataTemplate x:Key="LegendItemTemplate">
-            <StackPanel Orientation="Horizontal" Margin="0,4,0,4">
-                <Border Width="10" Height="10" CornerRadius="5" Margin="0,0,8,0"
-                        Background="{Binding Brush}"/>
-                <CheckBox Content="{Binding Label}" IsChecked="{Binding IsChecked, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-            </StackPanel>
-        </DataTemplate>
+            <Style x:Key="SegmentToggle" TargetType="{x:Type ToggleButton}">
+                <Setter Property="Height" Value="34"/>
+                <Setter Property="MinWidth" Value="130"/>
+                <Setter Property="Margin" Value="0,0,8,8"/>
+                <Setter Property="Padding" Value="10,0"/>
+                <Setter Property="Background" Value="{DynamicResource Surface.Subtle}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource Border}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+                <Style.Triggers>
+                    <Trigger Property="IsChecked" Value="True">
+                        <Setter Property="Background" Value="{DynamicResource Hover.Fill}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource Focus}"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
 
-        <!-- Style items de la liste projets -->
-        <Style x:Key="ProjectItemStyle" TargetType="ListViewItem">
-            <Setter Property="Padding" Value="6,4"/>
-            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="ToolTip" Value="{Binding DocumentId}"/>
-            <Style.Triggers>
-                <Trigger Property="ItemsControl.AlternationIndex" Value="1">
-                    <Setter Property="Background" Value="#F8F9FB"/>
-                </Trigger>
-                <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="#E2ECF7"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
+            <!-- Item légende -->
+            <DataTemplate x:Key="LegendItemTemplate">
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,4">
+                    <Border Width="10" Height="10" CornerRadius="5" Margin="0,0,8,0"
+                            Background="{Binding Brush}"/>
+                    <CheckBox Content="{Binding Label}" IsChecked="{Binding IsChecked, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+            </DataTemplate>
+
+            <!-- Style items de la liste projets -->
+            <Style x:Key="ProjectItemStyle" TargetType="ListViewItem">
+                <Setter Property="Padding" Value="6,4"/>
+                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="ToolTip" Value="{Binding DocumentId}"/>
+                <Style.Triggers>
+                    <Trigger Property="ItemsControl.AlternationIndex" Value="1">
+                        <Setter Property="Background" Value="{DynamicResource Surface.Subtle}"/>
+                    </Trigger>
+                    <Trigger Property="IsSelected" Value="True">
+                        <Setter Property="Background" Value="{DynamicResource Hover.Fill}"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+        </ResourceDictionary>
     </Window.Resources>
 
     <!-- ============================= LAYOUT ============================= -->
@@ -134,7 +128,7 @@
             <Grid Margin="0,0,12,0">
                 <Border Style="{StaticResource CardBorder}">
                     <StackPanel Margin="16">
-                        <TextBlock Text="Heures sur la période" Foreground="{StaticResource MutedText}"/>
+                        <TextBlock Text="Heures sur la période" Foreground="{DynamicResource Text.Secondary}"/>
                         <TextBlock x:Name="_kpiHours" Text="0.0 h" FontSize="22" FontWeight="SemiBold" Margin="0,6,0,0"/>
                     </StackPanel>
                 </Border>
@@ -143,7 +137,7 @@
             <Grid Grid.Column="1" Margin="0,0,12,0">
                 <Border Style="{StaticResource CardBorder}">
                     <StackPanel Margin="16">
-                        <TextBlock Text="Projets sélectionnés" Foreground="{StaticResource MutedText}"/>
+                        <TextBlock Text="Projets sélectionnés" Foreground="{DynamicResource Text.Secondary}"/>
                         <TextBlock x:Name="_kpiProjects" Text="0" FontSize="22" FontWeight="SemiBold" Margin="0,6,0,0"/>
                     </StackPanel>
                 </Border>
@@ -152,7 +146,7 @@
             <Grid Grid.Column="2">
                 <Border Style="{StaticResource CardBorder}">
                     <StackPanel Margin="16">
-                        <TextBlock Text="Moyenne / jour" Foreground="{StaticResource MutedText}"/>
+                        <TextBlock Text="Moyenne / jour" Foreground="{DynamicResource Text.Secondary}"/>
                         <TextBlock x:Name="_kpiAvg" Text="0.0 h" FontSize="22" FontWeight="SemiBold" Margin="0,6,0,0"/>
                     </StackPanel>
                 </Border>
@@ -168,23 +162,23 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="Temps par type de document" FontWeight="SemiBold" FontSize="16" VerticalAlignment="Center" Margin="0,0,8,0"/>
                         <ToggleButton x:Name="_tgRvt" Style="{StaticResource SegmentToggle}" Content="Maquettes (.rvt)" Checked="DocTypeToggle_Click"/>
                         <ToggleButton x:Name="_tgRfa" Style="{StaticResource SegmentToggle}" Content="Familles (.rfa)" Checked="DocTypeToggle_Click"/>
 
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,8">
                             <TextBlock Text="Légende" VerticalAlignment="Center"/>
                             <CheckBox x:Name="_cbLegend" Content="Afficher" Margin="6,0,0,0" IsChecked="True" Checked="Legend_Checked" Unchecked="Legend_Checked"/>
                         </StackPanel>
-                    </StackPanel>
+                    </WrapPanel>
 
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button Style="{StaticResource GhostButton}" Content="Exporter PNG" Click="ExportPng_Click"/>
-                        <Button Style="{StaticResource GhostButton}" Content="Exporter CSV" Click="ExportCsv_Click"/>
-                        <Button Style="{StaticResource PrimaryButton}" Content="Ouvrir Excel" Click="OpenExcel_Click"/>
-                        <Button Style="{StaticResource GhostButton}" Content="Réinitialiser" Click="Reset_Click"/>
-                    </StackPanel>
+                    <WrapPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
+                        <Button Style="{StaticResource DashboardGhostButton}" Content="Exporter PNG" Click="ExportPng_Click"/>
+                        <Button Style="{StaticResource DashboardGhostButton}" Content="Exporter CSV" Click="ExportCsv_Click"/>
+                        <Button Style="{StaticResource DashboardPrimaryButton}" Content="Ouvrir Excel" Click="OpenExcel_Click"/>
+                        <Button Style="{StaticResource DashboardGhostButton}" Content="Réinitialiser" Click="Reset_Click"/>
+                    </WrapPanel>
                 </Grid>
 
                 <Grid Margin="0,10,0,0">
@@ -196,12 +190,12 @@
 
                     <!-- Dates -->
                     <StackPanel Grid.Column="0" Orientation="Vertical">
-                        <TextBlock Text="Période" FontWeight="SemiBold"/>
+                        <TextBlock Text="Période" Style="{StaticResource SectionTitle}"/>
                         <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                            <DatePicker x:Name="_dpFrom" Width="150" SelectedDateChanged="OnDateChanged"/>
+                            <DatePicker x:Name="_dpFrom" Width="150" Margin="0,0,8,0" SelectedDateChanged="OnDateChanged"/>
                             <DatePicker x:Name="_dpTo" Width="150" SelectedDateChanged="OnDateChanged"/>
                         </StackPanel>
-                        <WrapPanel Margin="0,6,0,0" ItemWidth="70" ItemHeight="32">
+                        <WrapPanel Margin="0,8,0,0">
                             <Button Style="{StaticResource ChipButton}" Content="7 j" Click="Chip7_Click"/>
                             <Button Style="{StaticResource ChipButton}" Content="30 j" Click="Chip30_Click"/>
                             <Button Style="{StaticResource ChipButton}" Content="YTD" Click="ChipYtd_Click"/>
@@ -212,17 +206,17 @@
 
                     <!-- Mode + tri + Top N -->
                     <StackPanel Grid.Column="1" Orientation="Vertical" Margin="12,0">
-                        <TextBlock Text="Affichage" FontWeight="SemiBold"/>
-                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                        <TextBlock Text="Affichage" Style="{StaticResource SectionTitle}"/>
+                        <WrapPanel Orientation="Horizontal" Margin="0,6,0,0">
                             <ToggleButton x:Name="_tgOverview" Style="{StaticResource SegmentToggle}" Content="Aperçu" Checked="Mode_Checked"/>
                             <ToggleButton x:Name="_tgCompare"  Style="{StaticResource SegmentToggle}" Content="Comparer" Checked="Mode_Checked"/>
-                        </StackPanel>
+                        </WrapPanel>
 
-                        
+
                     </StackPanel>
 
                     <StackPanel Grid.Column="2" Orientation="Vertical">
-                        <TextBlock Text="Top N" FontWeight="SemiBold"/>
+                        <TextBlock Text="Top N" Style="{StaticResource SectionTitle}"/>
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,6,0,0">
                             <Button x:Name="_btnTopNMinus" Style="{StaticResource TinyButton}" Content="–" Click="BtnTopNMinus_Click"/>
                             <TextBox x:Name="_tbTopN" Width="48" Height="28" Text="20" HorizontalContentAlignment="Center"
@@ -252,19 +246,19 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-                    <TextBlock Text="Temps par type de document" FontWeight="SemiBold" FontSize="15" Grid.ColumnSpan="2" Margin="0,0,0,10"/>
+                    <TextBlock Text="Temps par type de document" Style="{StaticResource H2}" Grid.ColumnSpan="2" Margin="0,0,0,10"/>
 
-                    <Border x:Name="_chartBorder" Grid.Row="1" Grid.Column="0" BorderBrush="{StaticResource NeutralBorder}" BorderThickness="1" Background="White" CornerRadius="10">
-                        <oxy:PlotView x:Name="_plotView" Background="White" />
+                    <Border x:Name="_chartBorder" Grid.Row="1" Grid.Column="0" BorderBrush="{DynamicResource Border}" BorderThickness="1" Background="{DynamicResource Surface}" CornerRadius="10">
+                        <oxy:PlotView x:Name="_plotView" Background="{DynamicResource Surface}" />
                     </Border>
 
-                    <Border x:Name="_legendBorder" Grid.Row="1" Grid.Column="1" BorderBrush="{StaticResource NeutralBorder}" BorderThickness="1" CornerRadius="10" Background="#FDFEFE" Padding="10" Margin="12,0,0,0">
+                    <Border x:Name="_legendBorder" Grid.Row="1" Grid.Column="1" BorderBrush="{DynamicResource Border}" BorderThickness="1" CornerRadius="10" Background="{DynamicResource Surface.Subtle}" Padding="10" Margin="12,0,0,0">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
-                            <TextBlock Text="Légende" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                            <TextBlock Text="Légende" Style="{StaticResource H2}" Margin="0,0,0,6"/>
                             <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                                 <ItemsControl x:Name="_legendList" ItemTemplate="{StaticResource LegendItemTemplate}">
                                     <ItemsControl.ItemsPanel>
@@ -288,8 +282,8 @@
 
                 <Border Grid.Row="0" Style="{StaticResource CardBorder}" Margin="12,12,12,6">
                     <StackPanel Margin="14">
-                        <TextBlock Text="Recherche rapide" FontWeight="SemiBold" FontSize="14"/>
-                        <TextBlock Text="Tapez pour trouver un projet/famille et ouvrir son dossier sans impacter les graphiques." Foreground="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                        <TextBlock Text="Recherche rapide" Style="{StaticResource H2}"/>
+                        <TextBlock Text="Tapez pour trouver un projet/famille et ouvrir son dossier sans impacter les graphiques." Foreground="{DynamicResource Text.Secondary}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                         <Grid Margin="0,8,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -301,9 +295,9 @@
                             <Button x:Name="_btnClearSearch" Grid.Column="1" Style="{StaticResource TinyButton}" Content="✕" Click="ClearSearch_Click"/>
                         </Grid>
 
-                        <TextBlock x:Name="_lblCount" Margin="0,4,0,0" Foreground="{StaticResource MutedText}"/>
+                        <TextBlock x:Name="_lblCount" Margin="0,4,0,0" Foreground="{DynamicResource Text.Secondary}"/>
 
-                        <Border BorderBrush="{StaticResource NeutralBorder}" BorderThickness="1" CornerRadius="8" Background="#FDFEFE" Padding="10" Margin="0,8,0,8">
+                        <Border BorderBrush="{DynamicResource Border}" BorderThickness="1" CornerRadius="8" Background="{DynamicResource Surface.Subtle}" Padding="10" Margin="0,8,0,8">
                             <ScrollViewer VerticalScrollBarVisibility="Auto" Height="160">
                                 <ItemsControl x:Name="_icSuggestions">
                                     <ItemsControl.ItemsPanel>
@@ -323,14 +317,14 @@
                             </ScrollViewer>
                         </Border>
 
-                        <Button Style="{StaticResource PrimaryButton}" Content="Ouvrir l'emplacement" HorizontalAlignment="Right" Click="OpenLocation_Click"/>
+                        <Button Style="{StaticResource DashboardPrimaryButton}" Content="Ouvrir l'emplacement" HorizontalAlignment="Right" Click="OpenLocation_Click"/>
                     </StackPanel>
                 </Border>
 
                 <Border Grid.Row="1" Style="{StaticResource CardBorder}" Margin="12,6,12,12">
                     <StackPanel Margin="14">
-                        <TextBlock Text="Astuces" FontWeight="SemiBold" FontSize="14"/>
-                        <TextBlock Foreground="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,6,0,0">
+                        <TextBlock Text="Astuces" Style="{StaticResource H2}"/>
+                        <TextBlock Foreground="{DynamicResource Text.Secondary}" TextWrapping="Wrap" Margin="0,6,0,0">
 • Utilisez la barre de recherche pour filtrer les maquettes/familles.
 • Cliquez sur un résultat pour ouvrir rapidement son dossier.
 • Ajustez le Top N pour épurer les graphiques.
