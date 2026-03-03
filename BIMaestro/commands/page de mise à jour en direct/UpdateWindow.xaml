@@ -99,9 +99,9 @@
                     <TextBlock Text="Ouvrir dans le navigateur"/>
                 </Button>
 
-                <Button Grid.Column="2" Click="Refresh_Click" Margin="0,0,6,0"
-                        Style="{StaticResource HeaderBtn}" ToolTip="Actualiser">
-                    <TextBlock Text="Actualiser"/>
+                <Button Grid.Column="2" Click="UpdateNow_Click" Margin="0,0,6,0"
+                        Style="{StaticResource HeaderBtn}" ToolTip="Mettre à jour">
+                    <TextBlock Text="Mettre à jour"/>
                 </Button>
 
                 <Button Grid.Column="3" Click="Close_Click" Margin="0,0,10,0"

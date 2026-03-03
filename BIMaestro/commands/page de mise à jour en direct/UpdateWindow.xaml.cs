@@ -17,6 +17,7 @@ namespace Page
     public partial class UpdateWindow : Window
     {
         private const string SiteUrl = "https://sites.google.com/view/bimaestro";
+        private const string DownloadUrl = "https://www.bimaestro.fr/t%C3%A9l%C3%A9chargement";
 
         // Hosts autorisés (tout le reste s'ouvre dans le navigateur)
         private static readonly HashSet<string> AllowedHosts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -388,7 +389,6 @@ namespace Page
                     MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
-
         // ======== UI ========
         private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
@@ -401,9 +401,12 @@ namespace Page
             else OpenExternal(SiteUrl);
         }
 
-        private void OpenInBrowser_Click(object sender, RoutedEventArgs e) => OpenExternal(SiteUrl);
 
-        private void CopyLink_Click(object sender, RoutedEventArgs e) => Clipboard.SetText(SiteUrl);
+        private void UpdateNow_Click(object sender, RoutedEventArgs e) => OpenExternal(DownloadUrl);
+
+        private void OpenInBrowser_Click(object sender, RoutedEventArgs e) => OpenExternal(DownloadUrl);
+
+        private void CopyLink_Click(object sender, RoutedEventArgs e) => Clipboard.SetText(DownloadUrl);
 
         private void Close_Click(object sender, RoutedEventArgs e) => Close();
 

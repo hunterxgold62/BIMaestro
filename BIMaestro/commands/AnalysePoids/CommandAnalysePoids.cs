@@ -230,7 +230,7 @@ private List<string> GetImportNames(Document doc)
 
             Parallel.ForEach(roots, (root, state) =>
             {
-                foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+                foreach (var file in SafeEnumerateFiles(root))
                 {
                     var name = Path.GetFileName(file);
                     if (remaining.ContainsKey(name) && remaining[name] == null)
@@ -250,6 +250,71 @@ private List<string> GetImportNames(Document doc)
             return remaining
                 .Where(kv => kv.Value != null)
                 .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase);
+        }
+
+        private IEnumerable<string> SafeEnumerateFiles(string root)
+        {
+            if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
+                yield break;
+
+            var stack = new Stack<string>();
+            stack.Push(root);
+
+            while (stack.Count > 0)
+            {
+                var current = stack.Pop();
+                IEnumerable<string> files;
+
+                try
+                {
+                    files = Directory.EnumerateFiles(current);
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    continue;
+                }
+                catch (IOException)
+                {
+                    continue;
+                }
+
+                foreach (var file in files)
+                    yield return file;
+
+                IEnumerable<string> subDirs;
+                try
+                {
+                    subDirs = Directory.EnumerateDirectories(current);
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    continue;
+                }
+                catch (IOException)
+                {
+                    continue;
+                }
+
+                foreach (var dir in subDirs)
+                {
+                    try
+                    {
+                        var attrs = File.GetAttributes(dir);
+                        if ((attrs & FileAttributes.ReparsePoint) != 0)
+                            continue;
+
+                        stack.Push(dir);
+                    }
+                    catch (UnauthorizedAccessException)
+                    {
+                        // Dossier protégé : on ignore et on continue l'indexation.
+                    }
+                    catch (IOException)
+                    {
+                        // Dossier invalide/indisponible : on ignore et on continue.
+                    }
+                }
+            }
         }
 
 

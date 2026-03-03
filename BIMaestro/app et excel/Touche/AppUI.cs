@@ -56,11 +56,16 @@ public class AppUI : IExternalApplication
 
             }),
 
-            new RibbonPanelDefinition("Modification", new List<RibbonItemDefinition>
+             new RibbonPanelDefinition("Modification", new List<RibbonItemDefinition>
             {
-                new RibbonItemDefinition("OverrideColor", "Couleur d'élément", panel => AddPushButton(panel, "OverrideColor", "Couleur\nd'élément", assemblyPath, "Modification.OverrideColorCommand", "Pallette de couleur anexe .png", "Cette commande permet :  \r\n- De personnaliser les couleurs, motifs et transparence des éléments.  \r\n- D'appliquer des paramètres graphiques à plusieurs vues simultanément.  \r\n- De réinitialiser les modifications si nécessaire.  \r\n\r\nUtilité : Améliorez le rendu et la lisibilité de vos vues.  ")),
-                new RibbonItemDefinition("ElementRenamerButton", "Organisateur d'éléments", panel => AddPushButton(panel, "ElementRenamerButton", "Organisateur\nd'éléments", assemblyPath, "Modification.RenameElementsCommand", "Organisateur d'éléments.png", "Cette commande permet :  \r\n- De renommer des éléments sélectionnés dans Revit avec des préfixes, suffixes, ou des numérotations personnalisées.  \r\n- De trier les éléments par niveau ou par emplacement dans la vue active.  \r\n- De réinitialiser les paramètres texte sélectionnés si nécessaire.  \r\n\r\nUtilité :  \r\nFacilite la gestion des noms d'éléments pour une organisation cohérente dans vos projets.")),
-               // new RibbonItemDefinition("ResérvationAuto2", "Auto Réservation2", panel => AddPushButton(panel, "ResérvationAuto2", "Auto\nRéservation2", assemblyPath, "Modification.ReservationAutoMultiVoidCommandV2", "safeimagekit-Réservation.png", "Crée des réservations automatiques")),
+                new RibbonItemDefinition("ModificationQuickTools", "Outils rapides", panel => AddStackedPushButtons(
+                    panel,
+                    assemblyPath,
+                    ("OverrideColor", "Couleur", "Modification.OverrideColorCommand", "Pallette de couleur anexe .png", "Cette commande permet :  \r\n- De personnaliser les couleurs, motifs et transparence des éléments.  \r\n- D'appliquer des paramètres graphiques à plusieurs vues simultanément.  \r\n- De réinitialiser les modifications si nécessaire.  \r\n\r\nUtilité : Améliorez le rendu et la lisibilité de vos vues.  "),
+                    ("ElementRenamerButton", "Organisateur", "Modification.RenameElementsCommand", "Organisateur d'éléments.png", "Cette commande permet :  \r\n- De renommer des éléments sélectionnés dans Revit avec des préfixes, suffixes, ou des numérotations personnalisées.  \r\n- De trier les éléments par niveau ou par emplacement dans la vue active.  \r\n- De réinitialiser les paramètres texte sélectionnés si nécessaire.  \r\n\r\nUtilité :  \r\nFacilite la gestion des noms d'éléments pour une organisation cohérente dans vos projets."),
+                    ("Purge du plan", "Purge", "Modification.CombinedCleanupCommand", "purge.png", "Supprime les vues non placées, les familles et les nomenclatures inutilisées afin d'alléger le projet.\r\nUne fenêtre permet de choisir précisément les éléments à purger avant exécution.\r\n")
+                )),
+                // new RibbonItemDefinition("ResérvationAuto2", "Auto Réservation2", panel => AddPushButton(panel, "ResérvationAuto2", "Auto\nRéservation2", assemblyPath, "Modification.ReservationAutoMultiVoidCommandV2", "safeimagekit-Réservation.png", "Crée des réservations automatiques")),
                 new RibbonItemDefinition("ResérvationAuto3", "Auto Réservation3", panel => AddPushButton(panel, "ResérvationAuto3", "Auto\nRéservation3", assemblyPath, "Modification.ReservationAutoV3Command", "résa cercle.png", "Crée des réservations automatiques")),
                 //new RibbonItemDefinition("ResérvationAuto", "Auto Réservation", panel => AddPushButton(panel, "ResérvationAuto", "Auto\nRéservation", assemblyPath, "Modification.ReservationAutoMultiCommand", "safeimagekit-Réservation.png", "Crée des réservations automatiques")),
                 new RibbonItemDefinition("Bride auto", "Bride auto", panel => AddSplitButton(panel, "Bride auto", "Bride\nauto", assemblyPath, new List<(string, string, string, string, string)>
@@ -79,7 +84,6 @@ public class AppUI : IExternalApplication
                     ("dynamo réglage", "Auto dynamo\nréglage", "Modification.ConfigureDynamoButtonCommand", "réglage.png","Configure les paramètres Dynamo"),
                 })),
                 new RibbonItemDefinition("GestionExcelCmd", "Gestion Excel", panel => AddPushButton(panel, "GestionExcelCmd", "Gestion\nExcel", assemblyPath, "ScheduleIO.ScheduleExcelIOCommand", "export import Excel.png", "Exporter ou importer une nomenclature au format Excel")),
-                new RibbonItemDefinition("Purge du plan", "Purge du plan", panel => AddPushButton(panel, "Purge du plan", "Purge du\nplan", assemblyPath, "Modification.CombinedCleanupCommand", "purge.png", "Supprime les vues non placées, les familles et les nomenclatures inutilisées afin d'alléger le projet.\r\nUne fenêtre permet de choisir précisément les éléments à purger avant exécution.\r\n")),
             }),
 
             new RibbonPanelDefinition("Outils IA", new List<RibbonItemDefinition>

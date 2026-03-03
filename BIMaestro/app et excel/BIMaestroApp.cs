@@ -116,7 +116,7 @@ public class BIMaestroApp : IExternalApplication
             // "//" à rajouté pour retiré le message de bienvenue 
             BIMaestro.Welcome.WelcomeManager.Initialize(application);
             BIMaestro.Welcome.WelcomeManager.TrySyncPendingProfile(LicenseJwt);
-
+            Page.UpdateNotificationManager.Initialize(application);
 
             return Result.Succeeded;
         }
