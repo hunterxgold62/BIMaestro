@@ -118,27 +118,26 @@ public class BIMaestroApp : IExternalApplication
             BIMaestro.Welcome.WelcomeManager.TrySyncPendingProfile(LicenseJwt);
             Page.UpdateNotificationManager.Initialize(application);
 
-            return Result.Succeeded;
-        }
-        catch (InvalidOperationException) // licence invalide / expirée et pas de cache
+       
+         return Result.Succeeded;
+    }
+        catch (InvalidOperationException)
         {
-            string addinsFolder = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "Autodesk", "Revit", "Addins", "2024");
+            const string contactEmail = "bimaestro.plugin@gmail.com";
+    const string linkedInUrl = "https://www.linkedin.com/in/paul-lemert-b40921207";
 
-            var td = new TaskDialog("BIMaestro – licence requise")
-            {
-                MainInstruction = "Licence invalide ou expirée",
-                MainContent =
-                    "Ta licence BIMaestro n'est pas active pour cette machine.\n\n" +
-                    "Si tu veux tester, écris-moi : bimaestro.plugin@gmail.com\n" +
-                    "Pour désinstaller, supprime BIMaestro.addin du dossier Addins."
-            };
-            td.CommonButtons = TaskDialogCommonButtons.Close;
-            td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Ouvrir le dossier Addins");
+    var td = new TaskDialog("BIMaestro – Erreur")
+    {
+        MainInstruction = "Une erreur est survenue au démarrage",
+        MainContent =
+            "Impossible de lancer BIMaestro pour le moment.\n\n" +
+            $"Si le problème continue, contacte-moi : {contactEmail}"
+    };
+    td.CommonButtons = TaskDialogCommonButtons.Close;
+            td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Me contacter");
             var result = td.Show();
             if (result == TaskDialogResult.CommandLink1)
-                System.Diagnostics.Process.Start("explorer.exe", addinsFolder);
+                System.Diagnostics.Process.Start(linkedInUrl);
 
             return Result.Failed;
         }

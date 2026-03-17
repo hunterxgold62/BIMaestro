@@ -23,15 +23,26 @@
                     <Border Style="{DynamicResource Card}"
                             Background="{DynamicResource Brand}"
                             BorderBrush="{DynamicResource Brand}"
-                            MaxWidth="420"
+                            MaxWidth="390"
                             Margin="50,0,0,0"
-                            Padding="12">
-                        <!-- ✅ TextBlock : mesure propre, pas de clipping TextBox -->
-                        <TextBlock Text="{Binding Content}"
-                                   TextWrapping="Wrap"
-                                   Foreground="White"
-                                   TextOptions.TextFormattingMode="Display"
-                                   LineStackingStrategy="MaxHeight"/>
+                            Padding="10,8">
+                        <TextBox Text="{Binding Content}"
+                                 IsReadOnly="True"
+                                 IsReadOnlyCaretVisible="False"
+                                 BorderThickness="0"
+                                 Background="Transparent"
+                                 Padding="0"
+                                 Margin="0"
+                                 MinHeight="0"
+                                 VerticalAlignment="Top"
+                                 VerticalContentAlignment="Top"
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="True"
+                                 ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 Foreground="White"
+                                 CaretBrush="White"
+                                 FocusVisualStyle="{x:Null}"/>
                     </Border>
                 </StackPanel>
             </DataTemplate>
@@ -40,17 +51,44 @@
             <DataTemplate x:Key="BotMessageTemplate">
                 <StackPanel HorizontalAlignment="Left" Margin="0,8,0,0">
                     <Border Style="{DynamicResource Card}"
-                            MaxWidth="420"
+                            MaxWidth="390"
                             Margin="0,0,50,0"
-                            Padding="12">
-                        <TextBlock Text="{Binding Content}"
-                                   TextWrapping="Wrap"
-                                   Foreground="{DynamicResource Text.Primary}"
-                                   TextOptions.TextFormattingMode="Display"
-                                   LineStackingStrategy="MaxHeight"/>
+                            Padding="10,8">
+                        <TextBox Text="{Binding Content}"
+                                 IsReadOnly="True"
+                                 IsReadOnlyCaretVisible="False"
+                                 BorderThickness="0"
+                                 Background="Transparent"
+                                 Padding="0"
+                                 Margin="0"
+                                 MinHeight="0"
+                                 VerticalAlignment="Top"
+                                 VerticalContentAlignment="Top"
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="True"
+                                 ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 Foreground="{DynamicResource Text.Primary}"
+                                 FocusVisualStyle="{x:Null}"/>
                     </Border>
                 </StackPanel>
             </DataTemplate>
+
+            <Style TargetType="ListBoxItem">
+                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="Margin" Value="0"/>
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Focusable" Value="False"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ListBoxItem">
+                            <ContentPresenter/>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
         </ResourceDictionary>
     </Window.Resources>
 
@@ -130,7 +168,7 @@
         </Border>
 
         <!-- ===== Zone saisie ===== -->
-        <Border Grid.Row="2" Style="{DynamicResource Card}" Margin="16,0,16,16" Padding="12">
+        <Border Grid.Row="2" Style="{DynamicResource Card}" Margin="16,0,16,16" Padding="13">
             <!-- ✅ Grid plutôt que DockPanel : sizing plus fiable -->
             <Grid>
                 <Grid.ColumnDefinitions>

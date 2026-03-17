@@ -471,7 +471,7 @@ namespace Modification
             if (isWall && host is Wall w)
                 center = ProjectPointOntoWallPlane(w, center);
             else if (!isWall && host is Floor f)
-                center = GetPlacementPointOnFloor(f, el, center, trToHost);
+                center = GetPlacementPointOnFloor(f, center);
 
             var fi = doc.Create.NewFamilyInstance(
                 center, sym, host, level,
@@ -520,7 +520,7 @@ namespace Modification
             if (isWall && host is Wall w)
                 center = ProjectPointOntoWallPlane(w, center);
             else if (!isWall && host is Floor f)
-                center = GetPlacementPointOnFloor(f, elems.First().el, center, elems.First().tr);
+                center = GetPlacementPointOnFloor(f, center);
 
             var fi = doc.Create.NewFamilyInstance(
                 center, sym, host, level,
@@ -529,7 +529,7 @@ namespace Modification
             AlignReservationOrientationIfNeeded(doc, fi, sym, host, center,
                isWall
                    ? GetWallDirectionXY(host as Wall)
-                   : GetAverageDirectionXY(elems.Select(x => x.el), elems.ToDictionary(x => x.el.Id, x => x.tr)));
+                   : GetPreferredFloorAxisXY(unionInt, elems));
 
             // Multi rect = sizing basé sur unionInt
             ApplySizing_MultiRect(fi, host, unionInt, cfg, prof, objType, normeEnabled);
@@ -565,9 +565,7 @@ namespace Modification
                 double diamFt = CalculateDiameterForElement(intersecting, objType, oversizeFt);
                 if (diamFt <= 1e-9)
                 {
-                    double w = (world.Max.X - world.Min.X) + oversizeFt;
-                    double h = (world.Max.Z - world.Min.Z) + oversizeFt;
-                    diamFt = Math.Max(w, h);
+                    diamFt = CalculateFallbackDiameter(host, world, depthFt, oversizeFt);
                 }
 
                 if (normeEnabled) diamFt = RoundToNearest50mm(diamFt);
@@ -958,6 +956,22 @@ namespace Modification
             return sum.Normalize();
         }
 
+        private static XYZ GetPreferredFloorAxisXY(BoundingBoxXYZ unionIntersect, List<(Element el, Transform tr)> elems)
+        {
+            if (unionIntersect != null)
+            {
+                double dx = Math.Abs(unionIntersect.Max.X - unionIntersect.Min.X);
+                double dy = Math.Abs(unionIntersect.Max.Y - unionIntersect.Min.Y);
+
+                if (Math.Abs(dx - dy) > 1e-6)
+                    return dx >= dy ? XYZ.BasisX : XYZ.BasisY;
+            }
+
+            if (elems != null && elems.Count > 0)
+                return GetAverageDirectionXY(elems.Select(x => x.el), elems.ToDictionary(x => x.el.Id, x => x.tr));
+
+            return XYZ.BasisX;
+        }
         private static void AlignReservationOrientationIfNeeded(Document doc, FamilyInstance inst, FamilySymbol symbol, Element host, XYZ origin, XYZ axisX)
         {
             if (doc == null || inst == null || symbol == null || host == null || origin == null || axisX == null) return;
@@ -1025,7 +1039,7 @@ namespace Modification
             return point - normal * offset;
         }
 
-        private static XYZ GetPlacementPointOnFloor(Floor floor, Element intersectingElement, XYZ fallbackCenter, Transform transformToHost)
+        private static XYZ GetPlacementPointOnFloor(Floor floor, XYZ fallbackCenter)
         {
             if (floor == null) return fallbackCenter;
 
@@ -1033,15 +1047,7 @@ namespace Modification
             if (bb == null) return fallbackCenter;
 
             double z = (bb.Min.Z + bb.Max.Z) * 0.5;
-            XYZ src = fallbackCenter;
-
-            if (intersectingElement != null)
-            {
-                var bbEl = GetBoundingBoxInHostCoordinates(intersectingElement, transformToHost);
-                if (bbEl != null) src = (bbEl.Min + bbEl.Max) * 0.5;
-            }
-
-            return new XYZ(src.X, src.Y, z);
+            return new XYZ(fallbackCenter.X, fallbackCenter.Y, z);
         }
 
         // =========================
@@ -1060,10 +1066,62 @@ namespace Modification
             {
                 double d = dct.LookupParameter("Diamètre")?.AsDouble() ?? 0.0;
                 double iso = dct.LookupParameter("Epaisseur d'isolation")?.AsDouble() ?? 0.0;
-                return d + 2 * iso + oversizeFt;
+                if (d > 1e-9)
+                    return d + 2 * iso + oversizeFt;
+
+                double w = dct.LookupParameter("Largeur")?.AsDouble()
+                           ?? dct.LookupParameter("Width")?.AsDouble()
+                           ?? 0.0;
+                double h = dct.LookupParameter("Hauteur")?.AsDouble()
+                           ?? dct.LookupParameter("Height")?.AsDouble()
+                           ?? 0.0;
+
+                if (w > 1e-9 || h > 1e-9)
+                    return Math.Max(w, h) + 2 * iso + oversizeFt;
+            }
+
+            if (objType == ReservationAutoV3Window.ObjectType.Autre && elem is FamilyInstance fi)
+            {
+                double d = fi.LookupParameter("Diamètre")?.AsDouble()
+                           ?? fi.LookupParameter("Diameter")?.AsDouble()
+                           ?? 0.0;
+                if (d > 1e-9)
+                    return d + oversizeFt;
+
+                double w = fi.LookupParameter("Largeur")?.AsDouble()
+                           ?? fi.LookupParameter("Width")?.AsDouble()
+                           ?? 0.0;
+                double h = fi.LookupParameter("Hauteur")?.AsDouble()
+                           ?? fi.LookupParameter("Height")?.AsDouble()
+                           ?? 0.0;
+
+                if (w > 1e-9 || h > 1e-9)
+                    return Math.Max(w, h) + oversizeFt;
             }
 
             return 0.0;
+        }
+
+        private static double CalculateFallbackDiameter(Element host, BoundingBoxXYZ world, double depthFt, double oversizeFt)
+        {
+            if (world == null) return oversizeFt;
+
+            var dims = new[]
+            {
+                Math.Abs(world.Max.X - world.Min.X),
+                Math.Abs(world.Max.Y - world.Min.Y),
+                Math.Abs(world.Max.Z - world.Min.Z)
+            };
+
+            double diam = dims.Max();
+            if (host is Floor || host is Wall)
+            {
+                var byDistanceToDepth = dims.OrderBy(d => Math.Abs(d - depthFt)).ToList();
+                if (byDistanceToDepth.Count >= 3)
+                    diam = Math.Max(byDistanceToDepth[1], byDistanceToDepth[2]);
+            }
+
+            return diam + oversizeFt;
         }
 
         private static double RoundToNearest50mm(double valueInFeet)

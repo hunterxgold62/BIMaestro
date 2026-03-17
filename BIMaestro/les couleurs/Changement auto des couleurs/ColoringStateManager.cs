@@ -110,6 +110,9 @@ namespace Couleur
     // -----------------------------------------------------------------------
     public static class ColoringStateManager
     {
+        private const bool DefaultColoringActive = true;
+        private const bool DefaultFullMode = false;
+
         private static readonly string persistenceFilePath =
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
                          "RevitLogs", "SauvegardePréférence", "resetColor.txt");
@@ -132,23 +135,23 @@ namespace Couleur
                     }
                     else
                     {
-                        IsColoringActive = true;
-                        IsFullMode = true;
+                        IsColoringActive = DefaultColoringActive;
+                        IsFullMode = DefaultFullMode;
                         SaveState();
                     }
                 }
                 else
                 {
-                    IsColoringActive = true;
-                    IsFullMode = true;
+                    IsColoringActive = DefaultColoringActive;
+                    IsFullMode = DefaultFullMode;
                     SaveState();
                 }
             }
             catch
             {
                 TaskDialog.Show("Erreur de Chargement", "Impossible de charger l'état, valeurs par défaut appliquées.");
-                IsColoringActive = true;
-                IsFullMode = true;
+                IsColoringActive = DefaultColoringActive;
+                IsFullMode = DefaultFullMode;
             }
         }
 

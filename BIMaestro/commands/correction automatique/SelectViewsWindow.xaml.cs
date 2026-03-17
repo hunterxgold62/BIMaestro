@@ -22,7 +22,8 @@ namespace ScanTextRevit
         private Dictionary<ElementId, List<Viewport>> _vpsBySheet;
         private Dictionary<ElementId, List<ScheduleSheetInstance>> _schedulesBySheet;
 
-        
+        private CheckBox _viewsGroupCheckBox;
+        private CheckBox _sheetsGroupCheckBox;
 
         public SelectViewsWindow(List<View> allViews, List<ViewSheet> allSheets, Document doc)
         {
@@ -34,7 +35,8 @@ namespace ScanTextRevit
             _doc = doc;
 
             PreloadData();      // 1) on charge une seule fois tous les viewports et nomenclatures
-            
+            PopulateTreeView(); // 2) on affiche les groupes de vues/feuilles dans l'arbre
+
         }
 
         /// <summary>
@@ -88,6 +90,7 @@ namespace ScanTextRevit
                     IsChecked = false,
                     Foreground = this.Foreground
                 };
+                _viewsGroupCheckBox = chkGroupVues;
                 var groupVues = new TreeViewItem
                 {
                     Header = chkGroupVues,
@@ -111,7 +114,8 @@ namespace ScanTextRevit
                             {
                                 Content = $"{GetViewTypeLabel(view)} : {view.Name}",
                                 Tag = view.Id,
-                                Foreground = this.Foreground
+                                Foreground = this.Foreground,
+                                IsChecked = _viewsGroupCheckBox?.IsChecked == true
                             };
                             groupVues.Items.Add(new TreeViewItem { Header = cb });
                         }
@@ -130,6 +134,7 @@ namespace ScanTextRevit
                     IsChecked = false,
                     Foreground = this.Foreground
                 };
+                _sheetsGroupCheckBox = chkGroupSheets;
                 var groupSheets = new TreeViewItem
                 {
                     Header = chkGroupSheets,
@@ -152,7 +157,8 @@ namespace ScanTextRevit
                             {
                                 Content = $"Feuille : {sheet.SheetNumber} - {sheet.Name}",
                                 Tag = sheet.Id,
-                                Foreground = this.Foreground
+                                Foreground = this.Foreground,
+                                IsChecked = _sheetsGroupCheckBox?.IsChecked == true
                             };
                             var sheetItem = new TreeViewItem
                             {
@@ -172,7 +178,8 @@ namespace ScanTextRevit
                                     {
                                         Content = $"{GetViewTypeLabel(placedView)} : {placedView.Name}",
                                         Tag = placedView.Id,
-                                        Foreground = this.Foreground
+                                        Foreground = this.Foreground,
+                                        IsChecked = _sheetsGroupCheckBox?.IsChecked == true
                                     };
                                     sheetItem.Items.Add(new TreeViewItem { Header = cbChild });
                                 }
@@ -188,7 +195,8 @@ namespace ScanTextRevit
                                     {
                                         Content = $"Nomenclature : {vsched.Name}",
                                         Tag = vsched.Id,
-                                        Foreground = this.Foreground
+                                        Foreground = this.Foreground,
+                                        IsChecked = _sheetsGroupCheckBox?.IsChecked == true
                                     };
                                     sheetItem.Items.Add(new TreeViewItem { Header = cbChild });
                                 }
@@ -231,16 +239,48 @@ namespace ScanTextRevit
         /// </summary>
         public List<ElementId> GetSelectedElementIds()
         {
-            var selected = new List<ElementId>();
+            var selected = new HashSet<ElementId>();
             foreach (var top in ViewsTreeView.Items)
             {
                 if (top is TreeViewItem tvi)
                     CollectCheckedElementIds(tvi, selected);
             }
-            return selected;
+            // Si l'utilisateur coche un groupe sans le déplier (lazy-load),
+            // on ajoute explicitement les éléments correspondants.
+            if (_viewsGroupCheckBox?.IsChecked == true)
+            {
+                var placedViewIds = new HashSet<ElementId>();
+                foreach (var sheet in _allSheets)
+                {
+                    if (_vpsBySheet.TryGetValue(sheet.Id, out var vps))
+                        foreach (var vp in vps)
+                            placedViewIds.Add(vp.ViewId);
+                }
+
+                foreach (var view in _allViews.Where(v => !placedViewIds.Contains(v.Id)))
+                    selected.Add(view.Id);
+            }
+
+            if (_sheetsGroupCheckBox?.IsChecked == true)
+            {
+                foreach (var sheet in _allSheets)
+                {
+                    selected.Add(sheet.Id);
+
+                    if (_vpsBySheet.TryGetValue(sheet.Id, out var vps))
+                        foreach (var vp in vps)
+                            selected.Add(vp.ViewId);
+
+                    if (_schedulesBySheet.TryGetValue(sheet.Id, out var ssiList))
+                        foreach (var ssi in ssiList)
+                            selected.Add(ssi.ScheduleId);
+                }
+            }
+
+            return selected.ToList();
         }
 
-        private void CollectCheckedElementIds(TreeViewItem item, List<ElementId> list)
+        private void CollectCheckedElementIds(TreeViewItem item, HashSet<ElementId> list)
         {
             if (item.Header is CheckBox cb && cb.IsChecked == true && cb.Tag is ElementId id)
                 list.Add(id);

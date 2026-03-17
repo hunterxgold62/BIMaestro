@@ -16,6 +16,7 @@ namespace BIMaestro.Bonus
         private const double GapSize = 150;
         private const double Gravity = 0.45;
         private const double FlapStrength = -7.5;
+        private const double MaxFallSpeed = 10;
         private const double PipeSpeed = 3.2;
         private const double BirdX = 90;
         private const double PipeCapHeight = 18;
@@ -53,12 +54,24 @@ namespace BIMaestro.Bonus
             ResetGame("Appuie sur Espace pour commencer");
         }
 
+        private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            Focus();
+            TriggerFlap();
+        }
+
         private void Window_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key != Key.Space)
             {
                 return;
             }
+
+            TriggerFlap();
+        }
+
+        private void TriggerFlap()
+        {
 
             if (!_running)
             {
@@ -76,7 +89,7 @@ namespace BIMaestro.Bonus
         {
             if (_gameOver)
             {
-                ResetGame("Appuie sur Espace pour rejouer");
+                ResetGame("Appuie sur Espace ou clique pour rejouer");
             }
 
             _running = true;
@@ -134,6 +147,11 @@ namespace BIMaestro.Bonus
         private void UpdateBird()
         {
             _birdVelocity += Gravity;
+            if (_birdVelocity > MaxFallSpeed)
+            {
+                _birdVelocity = MaxFallSpeed;
+            }
+
             _birdY += _birdVelocity;
 
             PositionBird(BirdX);
@@ -194,6 +212,11 @@ namespace BIMaestro.Bonus
 
             double minGapCenter = 120;
             double maxGapCenter = canvasHeight - 120;
+            if (maxGapCenter <= minGapCenter)
+            {
+                minGapCenter = canvasHeight * 0.35;
+                maxGapCenter = canvasHeight * 0.65;
+            }
             double gapCenter = minGapCenter + _random.NextDouble() * (maxGapCenter - minGapCenter);
 
             double topHeight = gapCenter - GapSize / 2;
@@ -311,7 +334,7 @@ namespace BIMaestro.Bonus
             _timer.Stop();
 
             OverlayTitle.Text = "Perdu !";
-            OverlayMessage.Text = "Appuie sur Espace pour rejouer";
+            OverlayMessage.Text = "Appuie sur Espace ou clique pour rejouer";
             Overlay.Visibility = Visibility.Visible;
         }
 
