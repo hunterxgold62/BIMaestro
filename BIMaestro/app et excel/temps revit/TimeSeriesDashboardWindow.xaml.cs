@@ -45,6 +45,7 @@ namespace BIMaestro.Dashboard
         private DispatcherTimer _searchDebounce;
 
         private readonly string _currentDocumentPath;
+        private readonly List<VersionLegendItem> _revitLegendItems = new();
 
         // ===== Data =====
         private List<LogRow> _rows = new();
@@ -156,7 +157,11 @@ namespace BIMaestro.Dashboard
             if (!_uiReady) return;
             if (sender is Button btn)
             {
-                _tbSearch.Text = btn.Content?.ToString() ?? string.Empty;
+                if (btn.DataContext is ProjectItem item)
+                    _tbSearch.Text = item.BaseName ?? string.Empty;
+                else
+                    _tbSearch.Text = btn.Content?.ToString() ?? string.Empty;
+
                 string path = btn.Tag?.ToString();
                 TryOpenLocation(path);
             }
@@ -251,10 +256,15 @@ namespace BIMaestro.Dashboard
                         BaseName = GetBaseName(name, id),
                         Folder = GetLastFolder(id),
                         Tail = SafeDocIdTail(id),
+                        RevitVersion = NormalizeRevitVersion(last?.RevitVersion),
+                        RevitVersionLabel = BuildRevitVersionLabel(last?.RevitVersion),
+                        RevitVersionBrush = GetVersionBrush(last?.RevitVersion),
                         Hours = 0,
                         LastSeen = last?.When ?? DateTime.MinValue
                     };
                 }).ToList();
+
+            BuildRevitLegendItems();
         }
 
         // ===== REFRESH =====
@@ -377,7 +387,7 @@ namespace BIMaestro.Dashboard
                 double others = Math.Max(0, totals.Skip(topN).Sum(x => x.Hours));
                 if (others > 0.0001) top.Add(new { DocId = "others", Hours = others, Name = "Autres" });
 
-                var shown = top.Where(t => !_hiddenBars.Contains(t.Name)).ToList();
+                var shown = top.Where(t => !_hiddenBars.Contains(t.DocId ?? t.Name)).ToList();
 
                 var catAxis = new CategoryAxis { Position = AxisPosition.Bottom, Angle = -50 };
                 foreach (var t in shown) catAxis.Labels.Add(Short(t.Name));
@@ -401,14 +411,17 @@ namespace BIMaestro.Dashboard
                     var items = new List<LegendItemVM>();
                     foreach (var t in top)
                     {
-                        bool currentlyShown = !_hiddenBars.Contains(t.Name);
-                        items.Add(new LegendItemVM(t.Name, () =>
+                        string hiddenKey = t.DocId ?? t.Name;
+                        bool currentlyShown = !_hiddenBars.Contains(hiddenKey);
+                        var legendItem = new LegendItemVM(t.Name, currentlyShown, () =>
                         {
-                            if (_hiddenBars.Contains(t.Name)) _hiddenBars.Remove(t.Name);
-                            else _hiddenBars.Add(t.Name);
+                            if (_hiddenBars.Contains(hiddenKey)) _hiddenBars.Remove(hiddenKey);
+                            else _hiddenBars.Add(hiddenKey);
                             DrawChart();
                         })
-                        { Brush = br, IsChecked = currentlyShown });
+                        { Brush = br };
+
+                        items.Add(legendItem);
                     }
                     _legendList.ItemsSource = items;
                 }
@@ -475,7 +488,7 @@ namespace BIMaestro.Dashboard
                     {
                         var oc = GetOxyColor(idx);
                         var br = new SWM.SolidColorBrush(SWM.Color.FromArgb(oc.A, oc.R, oc.G, oc.B)); br.Freeze();
-                        legendItems.Add(new LegendItemVM(legend, () => { ls.IsVisible = !ls.IsVisible; _plotView.InvalidatePlot(true); }) { Brush = br });
+                        legendItems.Add(new LegendItemVM(legend, ls.IsVisible, () => { ls.IsVisible = !ls.IsVisible; _plotView.InvalidatePlot(true); }) { Brush = br });
                     }
                     idx++;
                 }
@@ -761,6 +774,80 @@ namespace BIMaestro.Dashboard
             return string.IsNullOrWhiteSpace(s) ? "(sans nom)" : s;
         }
 
+        private void BuildRevitLegendItems()
+        {
+            _revitLegendItems.Clear();
+
+            var items = (_projects ?? Enumerable.Empty<ProjectItem>())
+                .Select(p => NormalizeRevitVersion(p.RevitVersion))
+                .Where(v => !string.IsNullOrWhiteSpace(v))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(v => v, StringComparer.OrdinalIgnoreCase)
+                .Select(v => new VersionLegendItem
+                {
+                    Label = BuildRevitLegendLabel(v),
+                    Brush = GetVersionBrush(v)
+                })
+                .ToList();
+
+            if (items.Count == 0)
+            {
+                items.Add(new VersionLegendItem
+                {
+                    Label = "Inconnue",
+                    Brush = GetVersionBrush(null)
+                });
+            }
+
+            _revitLegendItems.AddRange(items);
+
+            if (_icRevitLegend != null)
+                _icRevitLegend.ItemsSource = _revitLegendItems.ToList();
+        }
+
+        private static string NormalizeRevitVersion(string rawVersion)
+        {
+            if (string.IsNullOrWhiteSpace(rawVersion))
+                return string.Empty;
+
+            string text = rawVersion.Trim();
+            var digits = new string(text.Where(char.IsDigit).ToArray());
+            if (digits.Length >= 4)
+                return digits.Substring(0, 4);
+
+            return text;
+        }
+
+        private static string BuildRevitVersionLabel(string rawVersion)
+        {
+            string normalized = NormalizeRevitVersion(rawVersion);
+            return string.IsNullOrWhiteSpace(normalized) ? "Version inconnue" : $"Revit {normalized}";
+        }
+
+        private static string BuildRevitLegendLabel(string rawVersion)
+        {
+            string normalized = NormalizeRevitVersion(rawVersion);
+            if (string.IsNullOrWhiteSpace(normalized))
+                return "Inconnue";
+
+            return normalized.Length >= 2 ? $"V{normalized.Substring(normalized.Length - 2)}" : $"V{normalized}";
+        }
+
+        private static Brush GetVersionBrush(string rawVersion)
+        {
+            string version = NormalizeRevitVersion(rawVersion);
+            string hex = version switch
+            {
+                "2023" => "#4F46E5",
+                "2024" => "#0891B2",
+                "2025" => "#16A34A",
+                "2026" => "#EA580C",
+                _ => "#6B7280"
+            };
+
+            return (Brush)new BrushConverter().ConvertFrom(hex);
+        }
+
         private static string GetLastFolder(string id)
         {
             try
@@ -907,19 +994,44 @@ namespace BIMaestro.Dashboard
             public string BaseName { get; set; }
             public string Folder { get; set; }
             public string Tail { get; set; }
+            public string RevitVersion { get; set; }
+            public string RevitVersionLabel { get; set; }
+            public Brush RevitVersionBrush { get; set; }
             public double Hours { get; set; }
             public DateTime LastSeen { get; set; }
         }
 
         [Obfuscation(Exclude = true, ApplyToMembers = true, StripAfterObfuscation = false)]
+        private class VersionLegendItem
+        {
+            public string Label { get; set; }
+            public Brush Brush { get; set; }
+        }
+
+        [Obfuscation(Exclude = true, ApplyToMembers = true, StripAfterObfuscation = false)]
         private class LegendItemVM : System.ComponentModel.INotifyPropertyChanged
         {
-            private bool _isChecked = true;
+            private bool _isChecked;
             public string Label { get; set; }
             public Action Toggle { get; set; }
             public Brush Brush { get; set; } = Brushes.Black;
-            public bool IsChecked { get { return _isChecked; } set { if (_isChecked == value) return; _isChecked = value; PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsChecked))); Toggle?.Invoke(); } }
-            public LegendItemVM(string label, Action toggle) { Label = label; Toggle = toggle; }
+            public bool IsChecked
+            {
+                get { return _isChecked; }
+                set
+                {
+                    if (_isChecked == value) return;
+                    _isChecked = value;
+                    PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsChecked)));
+                    Toggle?.Invoke();
+                }
+            }
+            public LegendItemVM(string label, bool isChecked, Action toggle)
+            {
+                Label = label;
+                Toggle = toggle;
+                _isChecked = isChecked;
+            }
             public event System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
         }
 

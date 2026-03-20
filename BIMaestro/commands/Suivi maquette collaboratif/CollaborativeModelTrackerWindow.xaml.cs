@@ -228,11 +228,6 @@ namespace Analyse
             return new SolidColorBrush(palette[index % palette.Length]);
         }
 
-        private void Refresh_Click(object sender, RoutedEventArgs e)
-        {
-            LoadRecords();
-            ApplyFilters();
-        }
 
         private void UserComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {

@@ -89,11 +89,6 @@
                          VerticalContentAlignment="Center"
                          TextChanged="SearchModelTextBox_TextChanged"/>
 
-                <Button Grid.Column="8"
-                        Content="Rafraîchir"
-                        Width="110"
-                        Style="{StaticResource SecondaryButton}"
-                        Click="Refresh_Click"/>
             </Grid>
         </Border>
 

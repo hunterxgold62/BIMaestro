@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:oxy="clr-namespace:OxyPlot.Wpf;assembly=OxyPlot.Wpf"
         Title="BIMaestro — Temps par type de document"
-        Width="1280" Height="880" MinWidth="1100" MinHeight="680"
+        Width="1280" Height="900" MinWidth="1100" MinHeight="680"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource App.Background}"
         UseLayoutRounding="True"
@@ -89,6 +89,23 @@
                     <CheckBox Content="{Binding Label}" IsChecked="{Binding IsChecked, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
                 </StackPanel>
             </DataTemplate>
+
+            <DataTemplate x:Key="RevitVersionLegendTemplate">
+                <Border Margin="0,0,8,8"
+                        Padding="8,5"
+                        CornerRadius="14"
+                        BorderThickness="1"
+                        BorderBrush="{DynamicResource Border}"
+                        Background="{DynamicResource Surface}">
+                    <StackPanel Orientation="Horizontal">
+                        <Border Width="10" Height="10" CornerRadius="5" Margin="0,0,8,0"
+                                Background="{Binding Brush}"
+                                VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding Label}" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                    </StackPanel>
+                </Border>
+            </DataTemplate>
+
 
             <!-- Style items de la liste projets -->
             <Style x:Key="ProjectItemStyle" TargetType="ListViewItem">
@@ -296,7 +313,6 @@
                         </Grid>
 
                         <TextBlock x:Name="_lblCount" Margin="0,4,0,0" Foreground="{DynamicResource Text.Secondary}"/>
-
                         <Border BorderBrush="{DynamicResource Border}" BorderThickness="1" CornerRadius="8" Background="{DynamicResource Surface.Subtle}" Padding="10" Margin="0,8,0,8">
                             <ScrollViewer VerticalScrollBarVisibility="Auto" Height="160">
                                 <ItemsControl x:Name="_icSuggestions">
@@ -307,10 +323,18 @@
                                     </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Button Style="{StaticResource ChipButton}" Height="32" Padding="12,6" Margin="0,4,6,4"
+                                            <Button Style="{StaticResource ChipButton}" Height="32" Padding="10,6" Margin="0,4,6,4"
                                                     VerticalContentAlignment="Center"
-                                                    Content="{Binding BaseName}"
-                                                    Tag="{Binding DocumentId}" Click="Suggestion_Click"/>
+                                                    Tag="{Binding DocumentId}" Click="Suggestion_Click">
+                                                <Button.Content>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Border Width="10" Height="10" CornerRadius="5" Margin="0,0,8,0"
+                                                                Background="{Binding RevitVersionBrush}"
+                                                                ToolTip="{Binding RevitVersionLabel}"/>
+                                                        <TextBlock Text="{Binding BaseName}" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Button.Content>
+                                            </Button>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
@@ -323,12 +347,14 @@
 
                 <Border Grid.Row="1" Style="{StaticResource CardBorder}" Margin="12,6,12,12">
                     <StackPanel Margin="14">
-                        <TextBlock Text="Astuces" Style="{StaticResource H2}"/>
-                        <TextBlock Foreground="{DynamicResource Text.Secondary}" TextWrapping="Wrap" Margin="0,6,0,0">
-• Utilisez la barre de recherche pour filtrer les maquettes/familles.
-• Cliquez sur un résultat pour ouvrir rapidement son dossier.
-• Ajustez le Top N pour épurer les graphiques.
-                        </TextBlock>
+                        <TextBlock Text="Légende Revit :" Style="{StaticResource H2}" Margin="0,0,0,10"/>
+                        <ItemsControl x:Name="_icRevitLegend" ItemTemplate="{StaticResource RevitVersionLegendTemplate}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
                     </StackPanel>
                 </Border>
             </Grid>

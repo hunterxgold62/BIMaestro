@@ -873,9 +873,7 @@
   <ItemGroup>
     <EmbeddedResource Include="Resources\BIMaestro.png" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="NewFolder1\" />
-  </ItemGroup>
+  <ItemGroup />
   <ItemGroup>
     <EmbeddedResource Include="Resources\résa cercle.png" />
     <Content Include="Themes\BIMaestro_Charte_Graphique.txt" />

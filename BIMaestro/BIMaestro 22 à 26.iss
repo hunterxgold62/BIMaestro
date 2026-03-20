@@ -8,7 +8,7 @@
 [Setup]
 AppId={{E3B0C442-98FC-1C14-9AF7-7D7CE11B9A09}}
 AppName=BIMaestro
-AppVersion=1.0.5.9
+AppVersion=1.0.6.0
 PrivilegesRequired=lowest
 DisableProgramGroupPage=yes
 DisableDirPage=yes
@@ -36,7 +36,7 @@ begin
     '    <Name>BIMaestro</Name>' + #13#10 +
     '    <Assembly>' + BinFolder + '\BIMaestro.dll</Assembly>' + #13#10 +
     '    <AddInId>{E3B0C442-98FC-1C14-9AF7-7D7CE11B9A09}</AddInId>' + #13#10 +
-    '    <FullClassName>App</FullClassName>' + #13#10 +
+    '    <FullClassName>BIMaestroApp</FullClassName>' + #13#10 +
     '    <VendorId>PAUL LEMERT</VendorId>' + #13#10 +
     '    <VendorDescription>Paul LEMERT</VendorDescription>' + #13#10 +
     '  </AddIn>' + #13#10 +

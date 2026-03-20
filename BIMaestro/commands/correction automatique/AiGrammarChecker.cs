@@ -111,40 +111,38 @@ namespace ScanTextRevit
                             }
                         }
 
-                        // 5) Forcer la catégorie "Mineur" si seule la ponctuation diffère
+                        // 5) Réduction des faux positifs (espaces/ponctuation/étiquettes BIM).
+                        var filteredCorrections = new List<CorrectionItem>();
                         foreach (var corr in corrections)
                         {
                             if (!string.IsNullOrEmpty(corr.OriginalText) && !string.IsNullOrEmpty(corr.CorrectedText))
                             {
-                                // On normalise en FormKD pour séparer accents, puis on retire tous les signes de ponctuation Unicode
-                                string Normalize(string s) =>
-                                    new string(
-                                        s.Normalize(NormalizationForm.FormKD)
-                                         .Where(ch => CharUnicodeInfo.GetUnicodeCategory(ch)
-                                                         != UnicodeCategory.NonSpacingMark
-                                                         && !char.IsPunctuation(ch))
-                                         .ToArray()
-                                    ).Trim();
+                                var original = corr.OriginalText.Trim();
+                                var corrected = corr.CorrectedText.Trim();
 
-                                // Puis :
-                                var nOrig = Normalize(corr.OriginalText).ToLowerInvariant();
-                                var nCorr = Normalize(corr.CorrectedText).ToLowerInvariant();
-                                if (nOrig == nCorr)
+                                if (IsWhitespaceOnlyDifference(original, corrected) && IsLikelyLabelOrTag(original))
+                                {
+                                    // Cas bruyant: étiquettes/codes où l'IA ne fait qu'ajuster des espaces.
+                                    continue;
+                                }
+
+                                if (IsFormattingOnlyDifference(original, corrected))
+                                {
                                     corr.Category = "Mineur";
-                            
+                                }
                             }
+
+                            filteredCorrections.Add(corr);
                         }
 
-                        // 6) On envoie TOUTES les corrections au UI,
-                        //    c'est la fenêtre qui se chargera de filtrer 
-                        //    (afin de pouvoir afficher "Aucune erreur détectée" si besoin).
+                        // 6) On envoie toutes les corrections utiles au UI.
                         lock (finalResults)
                         {
-                            finalResults[key].AddRange(corrections);
+                            finalResults[key].AddRange(filteredCorrections);
                         }
 
                         // On notifie la fenêtre (WPF) de ce chunk
-                        ChunkProcessed?.Invoke(key, corrections);
+                        ChunkProcessed?.Invoke(key, filteredCorrections);
 
                         // 7) Mise à jour de la progression
                         int current = System.Threading.Interlocked.Increment(ref processedChunks);
@@ -168,6 +166,9 @@ namespace ScanTextRevit
             return
               "Tu es un correcteur expert en français. Pour chaque objet du tableau JSON ci‑dessous, "
             + "fournis LineNumber, OriginalText, CorrectedText, Explanation, Category. "
+            + "Ne signale PAS les micro-variantes de mise en forme (espaces en trop/en moins, doubles espaces, espace insécable, ponctuation cosmétique) sauf si le sens change réellement. "
+            + "Pour les textes très courts ou de type étiquette/code (ex: 'Niv. 01', 'A-101', 'Lot CVC'), évite les corrections stylistiques et corrige uniquement les fautes évidentes qui nuisent à la lisibilité. "
+            + "Si une correction est uniquement cosmétique, renvoie Category=Mineur. Si c'est une vraie faute de langue (grammaire/conjugaison/accord/sens), renvoie Category=Erreur. "
             + "Si aucun texte ne requiert de correction, réponds STRICTEMENT avec [] (tableau JSON vide).\n"
             + linesJson;
         }
@@ -347,6 +348,49 @@ namespace ScanTextRevit
         {
             if (string.IsNullOrEmpty(input)) return input;
             return new string(input.Where(ch => !char.IsPunctuation(ch)).ToArray());
+        }
+
+        private bool IsFormattingOnlyDifference(string original, string corrected)
+        {
+            string NormalizeForCompare(string value)
+            {
+                if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+
+                var normalized = value.Normalize(NormalizationForm.FormKD)
+                    .Where(ch => CharUnicodeInfo.GetUnicodeCategory(ch) != UnicodeCategory.NonSpacingMark)
+                    .ToArray();
+
+                string noPunctuation = new string(normalized.Where(ch => !char.IsPunctuation(ch)).ToArray());
+                string collapsedWhitespace = Regex.Replace(noPunctuation, @"\s+", " ").Trim();
+                return collapsedWhitespace.ToLowerInvariant();
+            }
+
+            return NormalizeForCompare(original) == NormalizeForCompare(corrected);
+        }
+
+        private bool IsWhitespaceOnlyDifference(string original, string corrected)
+        {
+            if (string.IsNullOrWhiteSpace(original) || string.IsNullOrWhiteSpace(corrected))
+                return false;
+
+            string o = Regex.Replace(original, @"\s+", "").Trim();
+            string c = Regex.Replace(corrected, @"\s+", "").Trim();
+            return string.Equals(o, c, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(original, corrected, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private bool IsLikelyLabelOrTag(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return false;
+            string trimmed = text.Trim();
+
+            if (trimmed.Length <= 18) return true;
+
+            bool hasDigit = trimmed.Any(char.IsDigit);
+            bool hasSeparator = trimmed.Any(ch => ch == '-' || ch == '_' || ch == '/' || ch == '.');
+            bool fewWords = trimmed.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).Length <= 3;
+
+            return fewWords && (hasDigit || hasSeparator);
         }
     }
 }

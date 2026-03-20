@@ -424,8 +424,9 @@ namespace Modification
             if (!multi)
             {
                 Reference r;
-                if (win.SelectedObject == ReservationAutoV3Window.ObjectType.Canalisation)
-                    r = PickSinglePipeBySource(uiDoc, doc, win.SelectedPipeSource);
+                if (win.SelectedObject == ReservationAutoV3Window.ObjectType.Canalisation
+                    || win.SelectedObject == ReservationAutoV3Window.ObjectType.Gaine)
+                    r = PickSingleMepCurveBySource(uiDoc, doc, win.SelectedPipeSource, win.SelectedObject);
                 else
                     r = uiDoc.Selection.PickObject(ObjectType.Element, "Sélectionne l’objet (ESC pour annuler)");
 
@@ -436,7 +437,7 @@ namespace Modification
             }
             else
             {
-                IList<Reference> refs = GetPipeReferencesBySource(uiDoc, doc, win.SelectedPipeSource);
+                IList<Reference> refs = GetMepCurveReferencesBySource(uiDoc, doc, win.SelectedPipeSource, win.SelectedObject);
 
                 var list = new List<(Element, Transform)>();
                 foreach (var rr in refs)
@@ -1164,9 +1165,25 @@ namespace Modification
         // =========================
         // Link/host pipe selection
         // =========================
-        private class HostPipeSelectionFilter : ISelectionFilter
+        private class HostMepCurveSelectionFilter : ISelectionFilter
         {
-            public bool AllowElement(Element elem) => elem is Pipe;
+            private readonly ReservationAutoV3Window.ObjectType _objectType;
+
+            public HostMepCurveSelectionFilter(ReservationAutoV3Window.ObjectType objectType)
+            {
+                _objectType = objectType;
+            }
+
+            public bool AllowElement(Element elem)
+            {
+                return _objectType switch
+                {
+                    ReservationAutoV3Window.ObjectType.Canalisation => elem is Pipe,
+                    ReservationAutoV3Window.ObjectType.Gaine => elem is Duct,
+                    _ => false
+                };
+            }
+
             public bool AllowReference(Reference reference, XYZ position) => false;
         }
 
@@ -1174,11 +1191,13 @@ namespace Modification
         {
             private readonly Document _doc;
             private readonly ReservationAutoV3Window.PipeSource _pipeSource;
+            private readonly ReservationAutoV3Window.ObjectType _objectType;
 
-            public LinkPipeSelectionFilter(Document doc, ReservationAutoV3Window.PipeSource pipeSource)
+            public LinkPipeSelectionFilter(Document doc, ReservationAutoV3Window.PipeSource pipeSource, ReservationAutoV3Window.ObjectType objectType)
             {
                 _doc = doc;
                 _pipeSource = pipeSource;
+                _objectType = objectType;
             }
 
             private static bool IsIfcLink(RevitLinkInstance linkInstance)
@@ -1246,37 +1265,58 @@ namespace Modification
                 if (linkDoc == null) return false;
 
                 Element linkedElem = linkDoc.GetElement(reference.LinkedElementId);
-                return MatchesExpectedLinkType(linkInstance) && linkedElem != null;
+                if (!MatchesExpectedLinkType(linkInstance) || linkedElem == null)
+                    return false;
+
+                return _objectType switch
+                {
+                    ReservationAutoV3Window.ObjectType.Canalisation => linkedElem is Pipe,
+                    ReservationAutoV3Window.ObjectType.Gaine => linkedElem is Duct,
+                    _ => false
+                };
             }
         }
 
-        private static Reference PickSinglePipeBySource(UIDocument uiDoc, Document doc, ReservationAutoV3Window.PipeSource pipeSource)
+        private static Reference PickSingleMepCurveBySource(UIDocument uiDoc, Document doc,
+            ReservationAutoV3Window.PipeSource pipeSource,
+            ReservationAutoV3Window.ObjectType objectType)
         {
+            var hostFilter = new HostMepCurveSelectionFilter(objectType);
+            var linkFilter = new LinkPipeSelectionFilter(doc, pipeSource, objectType);
+
+            string objectName = objectType == ReservationAutoV3Window.ObjectType.Gaine ? "gaine" : "canalisation";
+
             return pipeSource switch
             {
                 ReservationAutoV3Window.PipeSource.Maquette => uiDoc.Selection.PickObject(
-                    ObjectType.Element, new HostPipeSelectionFilter(),
-                    "Sélectionne la canalisation (maquette)"),
+                    ObjectType.Element, hostFilter,
+                    $"Sélectionne la {objectName} (maquette)"),
 
                 ReservationAutoV3Window.PipeSource.LienIFC or ReservationAutoV3Window.PipeSource.LienRVT => uiDoc.Selection.PickObject(
-                    ObjectType.LinkedElement, new LinkPipeSelectionFilter(doc, pipeSource),
-                    "Sélectionne la canalisation (lien)"),
+                    ObjectType.LinkedElement, linkFilter,
+                    $"Sélectionne la {objectName} (lien)"),
 
-                _ => uiDoc.Selection.PickObject(ObjectType.Element, new HostPipeSelectionFilter(), "Sélectionne la canalisation")
+                _ => uiDoc.Selection.PickObject(ObjectType.Element, hostFilter, $"Sélectionne la {objectName}")
             };
         }
 
-        private static IList<Reference> GetPipeReferencesBySource(UIDocument uiDoc, Document doc, ReservationAutoV3Window.PipeSource pipeSource)
+        private static IList<Reference> GetMepCurveReferencesBySource(UIDocument uiDoc, Document doc,
+            ReservationAutoV3Window.PipeSource pipeSource,
+            ReservationAutoV3Window.ObjectType objectType)
         {
+            var hostFilter = new HostMepCurveSelectionFilter(objectType);
+            var linkFilter = new LinkPipeSelectionFilter(doc, pipeSource, objectType);
+            string objectLabelPlural = objectType == ReservationAutoV3Window.ObjectType.Gaine ? "gaines" : "canalisations";
+
             return pipeSource switch
             {
                 ReservationAutoV3Window.PipeSource.Maquette => uiDoc.Selection.PickObjects(
-                    ObjectType.Element, new HostPipeSelectionFilter(),
-                    "Sélectionne les canalisations (CTRL + clic, ESC pour terminer)"),
+                    ObjectType.Element, hostFilter,
+                    $"Sélectionne les {objectLabelPlural} (CTRL + clic, ESC pour terminer)"),
 
                 ReservationAutoV3Window.PipeSource.LienIFC or ReservationAutoV3Window.PipeSource.LienRVT => uiDoc.Selection.PickObjects(
-                    ObjectType.LinkedElement, new LinkPipeSelectionFilter(doc, pipeSource),
-                    "Sélectionne les canalisations (lien) (CTRL + clic, ESC pour terminer)"),
+                    ObjectType.LinkedElement, linkFilter,
+                    $"Sélectionne les {objectLabelPlural} (lien) (CTRL + clic, ESC pour terminer)"),
 
                 _ => null
             };
