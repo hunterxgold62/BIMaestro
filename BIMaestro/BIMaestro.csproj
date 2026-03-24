@@ -299,6 +299,9 @@
       <DependentUpon>SnakeWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="commands\page de mise à jour en direct\UpdateNotificationManager.cs" />
+    <Compile Include="commands\page de mise à jour en direct\UpdatePromptWindow.xaml.cs">
+      <DependentUpon>UpdatePromptWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="commands\Réservation auto\résa auto v2\ExtendedReservationVoidWindowV2.xaml.cs">
       <DependentUpon>ExtendedReservationVoidWindowV2.xaml</DependentUpon>
     </Compile>
@@ -651,6 +654,10 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <Page Include="commands\page de mise à jour en direct\UpdatePromptWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="commands\page de mise à jour en direct\UpdateWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -877,6 +884,7 @@
   <ItemGroup>
     <EmbeddedResource Include="Resources\résa cercle.png" />
     <EmbeddedResource Include="Resources\Flappy bird-1.png" />
+    <EmbeddedResource Include="Resources\Mickey.gif" />
     <Content Include="Themes\BIMaestro_Charte_Graphique.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

@@ -6,6 +6,8 @@ using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Diagnostics;
+using System.Windows;
+using System.Windows.Interop;
 
 namespace Page
 {
@@ -60,8 +62,8 @@ namespace Page
 
             if (!_hasUpdate || !_shouldPrompt || _promptShown) return;
 
-            _promptShown = true;
-            ShowNonBlockingPrompt();
+            if (ShowNonBlockingPrompt())
+                _promptShown = true;
         }
 
         private static async Task CheckLatestVersionNoThrowAsync()
@@ -157,32 +159,34 @@ namespace Page
             }
         }
 
-        private static void ShowNonBlockingPrompt()
+        private static bool ShowNonBlockingPrompt()
         {
             try
             {
-                var td = new TaskDialog("BIMaestro - Mise à jour disponible")
+                var prompt = new UpdatePromptWindow(_latestVersion?.ToString() ?? "?", _currentVersion?.ToString() ?? "?");
+
+                // Revit n'est pas toujours une app WPF "classique" avec MainWindow valide.
+                // On attache la fenêtre au handle natif principal pour garantir l'affichage au premier plan.
+                IntPtr revitMainHwnd = Process.GetCurrentProcess().MainWindowHandle;
+                if (revitMainHwnd != IntPtr.Zero)
+                    new WindowInteropHelper(prompt).Owner = revitMainHwnd;
+                else
                 {
-                    MainInstruction = $"Nouvelle version BIMaestro : v{_latestVersion}",
-                    MainContent = $"Version installée : v{_currentVersion}\n\nVoulez-vous ouvrir la page de mise à jour ?",
-                    VerificationText = "Ne plus afficher aujourd'hui",
-                    CommonButtons = TaskDialogCommonButtons.Close
-                };
+                    Window owner = Application.Current?.MainWindow;
+                    if (owner != null && owner.IsLoaded)
+                        prompt.Owner = owner;
+                }
 
-                td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Mettre à jour");
-                td.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, "Plus tard");
-
-                var result = td.Show();
-                bool muteToday = td.WasVerificationChecked();
+                prompt.ShowDialog();
 
                 _state.LastPromptUtc = DateTime.UtcNow;
 
-                if (muteToday)
+                if (prompt.MuteToday)
                 {
                     _state.SuppressReason = ReasonMuteToday;
                     _state.SuppressUntilUtc = DateTime.UtcNow.Date.AddDays(1);
                 }
-                else if (result == TaskDialogResult.CommandLink2)
+                else if (prompt.Result == UpdatePromptResult.Later)
                 {
                     _state.SuppressReason = ReasonLater;
                     _state.SuppressUntilUtc = DateTime.UtcNow.AddDays(1);
@@ -196,15 +200,16 @@ namespace Page
 
                 SaveState(_state);
 
-                if (result == TaskDialogResult.CommandLink1)
+                if (prompt.Result == UpdatePromptResult.UpdateNow)
                     OpenDownloadPage();
+
+                return true;
             }
             catch
             {
-                // no-op
+                return false;
             }
         }
-
         private static void OpenDownloadPage()
         {
             try
