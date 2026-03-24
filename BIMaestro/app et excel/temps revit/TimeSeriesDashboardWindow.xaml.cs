@@ -241,14 +241,22 @@ namespace BIMaestro.Dashboard
 
         private void BuildProjectList()
         {
-            var closed = _rows.Where(r => string.Equals(r.Event, "Fermé", StringComparison.OrdinalIgnoreCase));
-            _projects = closed
+            _projects = (_rows ?? Enumerable.Empty<LogRow>())
+                .Where(r => !string.IsNullOrWhiteSpace(r.DocumentId))
                 .GroupBy(r => r.DocumentId)
                 .Select(g =>
                 {
-                    var last = g.OrderByDescending(r => r.When).FirstOrDefault();
+                    var ordered = g.OrderByDescending(r => r.When)
+                        .ThenByDescending(r => GetEventPriority(r.Event))
+                        .ToList();
+
+                    var latestEntry = ordered.FirstOrDefault();
+                    var latestOpenEntry = ordered.FirstOrDefault(r =>
+                        string.Equals(r.Event, "Ouvert", StringComparison.OrdinalIgnoreCase));
+                    var versionSource = latestOpenEntry ?? latestEntry;
+
                     string id = g.Key;
-                    string name = string.IsNullOrWhiteSpace(last?.DocumentName) ? "(sans nom)" : last.DocumentName;
+                    string name = string.IsNullOrWhiteSpace(latestEntry?.DocumentName) ? "(sans nom)" : latestEntry.DocumentName;
                     return new ProjectItem
                     {
                         DocumentId = id,
@@ -256,11 +264,11 @@ namespace BIMaestro.Dashboard
                         BaseName = GetBaseName(name, id),
                         Folder = GetLastFolder(id),
                         Tail = SafeDocIdTail(id),
-                        RevitVersion = NormalizeRevitVersion(last?.RevitVersion),
-                        RevitVersionLabel = BuildRevitVersionLabel(last?.RevitVersion),
-                        RevitVersionBrush = GetVersionBrush(last?.RevitVersion),
+                        RevitVersion = NormalizeRevitVersion(versionSource?.RevitVersion),
+                        RevitVersionLabel = BuildRevitVersionLabel(versionSource?.RevitVersion),
+                        RevitVersionBrush = GetVersionBrush(versionSource?.RevitVersion),
                         Hours = 0,
-                        LastSeen = last?.When ?? DateTime.MinValue
+                        LastSeen = latestEntry?.When ?? DateTime.MinValue
                     };
                 }).ToList();
 
@@ -772,6 +780,19 @@ namespace BIMaestro.Dashboard
             else
             { try { s = Path.GetFileNameWithoutExtension(s); } catch { } }
             return string.IsNullOrWhiteSpace(s) ? "(sans nom)" : s;
+        }
+
+
+
+        private static int GetEventPriority(string eventName)
+        {
+            if (string.Equals(eventName, "Ouvert", StringComparison.OrdinalIgnoreCase))
+                return 2;
+
+            if (string.Equals(eventName, "Fermé", StringComparison.OrdinalIgnoreCase))
+                return 1;
+
+            return 0;
         }
 
         private void BuildRevitLegendItems()

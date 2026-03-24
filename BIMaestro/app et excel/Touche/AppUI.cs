@@ -140,7 +140,7 @@ public class AppUI : IExternalApplication
                     ("Couleur de maquette", "Couleur reset", "Couleur.ResetTabItemRandomColorsCommand", "safeimagekit-bouton reset4.png","Réinitialise les couleurs appliquées"),
                     ("papa Noël", "papa\nNoël", "Couleur.PapanoelCommand", "Père Noël.png","Fait apparaître des couleurs comme des guirlandes\nDouble clic pour revenir à la normale.\n\nAttention désactiver <couleur Oui/Non> avant activation."),
                     ("Snake", "Snake", "BIMaestro.Bonus.SnakeCommand", "snake.png","Petit jeux snake :P"),
-                    ("FlappyBird", "Flappy\nBird", "BIMaestro.Bonus.FlappyBirdCommand", "snake.png","Petit jeu Flappy Bird :P"),
+                    ("FlappyBird", "Flappy\nBird", "BIMaestro.Bonus.FlappyBirdCommand", "Flappy bird-1.png","Petit jeu Flappy Bird :P"),
                 })),
 
                 new RibbonItemDefinition("InfoStack", "Infos empilées", panel => AddStackedInfoButtons(

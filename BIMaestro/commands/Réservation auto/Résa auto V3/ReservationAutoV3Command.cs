@@ -279,7 +279,7 @@ namespace Modification
             bool isRect = win.SelectedShape == ReservationAutoV3Window.ShapeTarget.Rectangulaire;
 
             TaskDialog.Show("BIMaestro",
-                $"Mode manuel : sélectionne l’objet, puis le {(isWall ? "mur" : "sol")}.\nESC pour arrêter.");
+                $"Mode manuel : sélectionne l’objet, puis le {(isWall ? "mur" : "sol")}.\nECHAP pour arrêter.");
 
             while (true)
             {

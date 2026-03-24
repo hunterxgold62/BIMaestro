@@ -55,11 +55,15 @@ namespace Analyse
             if (!users.Contains(AllUsersLabel, StringComparer.OrdinalIgnoreCase))
                 users.Insert(0, AllUsersLabel);
 
-            var previous = UserComboBox.Text;
+            var previous = (UserComboBox.SelectedItem as string ?? UserComboBox.Text ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(previous))
+                previous = AllUsersLabel;
+
             UserComboBox.ItemsSource = users;
-            UserComboBox.Text = !string.IsNullOrWhiteSpace(previous)
-                ? previous
-                : AllUsersLabel;
+            var selectedUserItem = users.FirstOrDefault(item => string.Equals(item, previous, StringComparison.OrdinalIgnoreCase))
+                                   ?? AllUsersLabel;
+            UserComboBox.SelectedItem = selectedUserItem;
+            UserComboBox.Text = selectedUserItem;
 
             var versions = _allRecords
                 .Select(r => r.RevitVersion)
@@ -68,9 +72,15 @@ namespace Analyse
                 .OrderBy(v => v)
                 .ToList();
             versions.Insert(0, AllVersionsLabel);
-            var previousVersion = RevitVersionComboBox.Text;
+            var previousVersion = (RevitVersionComboBox.SelectedItem as string ?? RevitVersionComboBox.Text ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(previousVersion))
+                previousVersion = AllVersionsLabel;
+
             RevitVersionComboBox.ItemsSource = versions;
-            RevitVersionComboBox.Text = !string.IsNullOrWhiteSpace(previousVersion) ? previousVersion : AllVersionsLabel;
+            var selectedVersionItem = versions.FirstOrDefault(item => string.Equals(item, previousVersion, StringComparison.OrdinalIgnoreCase))
+                                      ?? AllVersionsLabel;
+            RevitVersionComboBox.SelectedItem = selectedVersionItem;
+            RevitVersionComboBox.Text = selectedVersionItem;
 
             var fileTypes = _allRecords
                 .Select(r => GetFileExtensionLabel(r.ModelPath, r.ModelName))
@@ -79,9 +89,15 @@ namespace Analyse
                 .OrderBy(x => x)
                 .ToList();
             fileTypes.Insert(0, AllFilesLabel);
-            var previousType = FileTypeComboBox.Text;
+            var previousType = (FileTypeComboBox.SelectedItem as string ?? FileTypeComboBox.Text ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(previousType))
+                previousType = AllFilesLabel;
+
             FileTypeComboBox.ItemsSource = fileTypes;
-            FileTypeComboBox.Text = !string.IsNullOrWhiteSpace(previousType) ? previousType : AllFilesLabel;
+            var selectedFileTypeItem = fileTypes.FirstOrDefault(item => string.Equals(item, previousType, StringComparison.OrdinalIgnoreCase))
+                                       ?? AllFilesLabel;
+            FileTypeComboBox.SelectedItem = selectedFileTypeItem;
+            FileTypeComboBox.Text = selectedFileTypeItem;
 
             InfoText.Text =
                 $"{_allRecords.Select(r => r.ModelName).Distinct(StringComparer.OrdinalIgnoreCase).Count()} maquettes | JSON: {CollaborativeModelTrackerStore.JsonPath}" +
@@ -135,12 +151,22 @@ namespace Analyse
             }
         }
 
+
         private void ApplyFilters()
         {
-            var selectedUser = (UserComboBox.Text ?? string.Empty).Trim();
+            var selectedUser = (UserComboBox.SelectedItem as string ?? UserComboBox.Text ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(selectedUser))
+                selectedUser = AllUsersLabel;
+
             var search = (SearchModelTextBox.Text ?? string.Empty).Trim();
+
             var selectedVersion = (RevitVersionComboBox.SelectedItem as string ?? RevitVersionComboBox.Text ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(selectedVersion))
+                selectedVersion = AllVersionsLabel;
+
             var selectedFileType = (FileTypeComboBox.SelectedItem as string ?? FileTypeComboBox.Text ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(selectedFileType))
+                selectedFileType = AllFilesLabel;
 
             IEnumerable<CollaborativeModelRecord> query = _allRecords;
 
@@ -231,7 +257,7 @@ namespace Analyse
 
         private void UserComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            ApplyFilters();
+            Dispatcher.BeginInvoke(new Action(ApplyFilters), DispatcherPriority.Background);
         }
 
         private void UserComboBox_LostFocus(object sender, RoutedEventArgs e)

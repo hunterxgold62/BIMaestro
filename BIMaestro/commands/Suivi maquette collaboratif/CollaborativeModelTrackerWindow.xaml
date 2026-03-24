@@ -63,7 +63,8 @@
                 <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="Utilisateur :" Style="{StaticResource FilterLabel}"/>
                 <ComboBox x:Name="UserComboBox"
                           Grid.Column="1"
-                          IsEditable="True"
+                          IsEditable="True"                          
+                          IsTextSearchEnabled="True"
                           Margin="0,0,12,0"
                           SelectionChanged="UserComboBox_SelectionChanged"
                           LostFocus="UserComboBox_LostFocus"/>
@@ -98,11 +99,17 @@
                      BorderThickness="0"
                      MouseDoubleClick="ProjectsListBox_MouseDoubleClick"
                      HorizontalContentAlignment="Stretch"
-                     ScrollViewer.CanContentScroll="False"
+                     ScrollViewer.CanContentScroll="True"
                      ScrollViewer.IsDeferredScrollingEnabled="True"
                      VirtualizingPanel.IsVirtualizing="True"
                      VirtualizingPanel.VirtualizationMode="Recycling"
                      SnapsToDevicePixels="True">
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <VirtualizingStackPanel IsVirtualizing="True"
+                                                VirtualizationMode="Recycling"/>
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
                 <ListBox.ItemContainerStyle>
                     <Style TargetType="ListBoxItem">
                         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>

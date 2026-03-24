@@ -285,9 +285,18 @@
     <Compile Include="app et excel\Touche\roue gta des touches\RadialMenuButtonsCommand.cs" />
     <Compile Include="app et excel\Touche\roue gta des touches\RibbonButtonImageCache.cs" />
     <Compile Include="app et excel\Touche\roue gta des touches\RibbonButtonInfo.cs" />
-    <Compile Include="commands\flapy bird\FlappyBirdCommand.cs" />
-    <Compile Include="commands\flapy bird\FlappyBirdWindow.xaml.cs">
+    <Compile Include="commands\Jeux\flapy bird\FlappyBirdCommand.cs" />
+    <Compile Include="commands\Jeux\flapy bird\FlappyBirdWindow.xaml.cs">
       <DependentUpon>FlappyBirdWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\Jeux\snake\snake.cs" />
+    <Compile Include="commands\Jeux\snake\SnakeLeaderboardClient.cs" />
+    <Compile Include="commands\Jeux\snake\SnakeLeaderboardModels.cs" />
+    <Compile Include="commands\Jeux\snake\SnakeLeaderboardWindow.xaml.cs">
+      <DependentUpon>SnakeLeaderboardWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\Jeux\snake\SnakeWindow.xaml.cs">
+      <DependentUpon>SnakeWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="commands\page de mise à jour en direct\UpdateNotificationManager.cs" />
     <Compile Include="commands\Réservation auto\résa auto v2\ExtendedReservationVoidWindowV2.xaml.cs">
@@ -431,11 +440,6 @@
     <Compile Include="commands\purge\DeleteUnusedSchedulesCommand.cs" />
     <Compile Include="commands\purge\sup de famille forte.cs" />
     <Compile Include="commands\réseau auto entre canalisation\ConnectPipesCommand.cs" />
-    <Compile Include="commands\Snake\SnakeLeaderboardClient.cs" />
-    <Compile Include="commands\Snake\SnakeLeaderboardModels.cs" />
-    <Compile Include="commands\Snake\SnakeLeaderboardWindow.xaml.cs">
-      <DependentUpon>SnakeLeaderboardWindow.xaml</DependentUpon>
-    </Compile>
     <Compile Include="commands\Sélection d%27objet unique\SelectSimilarCommand.cs" />
     <Compile Include="commands\traduction paramètre famille et vue_feuille\TraduireVuesFamilleOpenAl.cs" />
     <Compile Include="commands\unité de famille\ExportProjectUnitsCommand.cs" />
@@ -454,10 +458,6 @@
     <Compile Include="Test\perso pixéli\PixelDancerCommand.cs" />
     <Compile Include="Test\perso pixéli\PixelDancerWindow.xaml.cs">
       <DependentUpon>PixelDancerWindow.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="commands\Snake\snake.cs" />
-    <Compile Include="commands\Snake\SnakeWindow.xaml.cs">
-      <DependentUpon>SnakeWindow.xaml</DependentUpon>
     </Compile>
     <None Include="Test\automatisation de tuyaux\SelectionHelper.cs" />
     <None Include="Test\automatisation de tuyaux\test avec coude qui marche moyen\ConnectPipes.cs" />
@@ -627,11 +627,19 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
-    <Page Include="commands\flapy bird\FlappyBirdWindow.xaml">
+    <Page Include="commands\GPT classique\ProfileSelectionWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
-    <Page Include="commands\GPT classique\ProfileSelectionWindow.xaml">
+    <Page Include="commands\Jeux\flapy bird\FlappyBirdWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\Jeux\snake\SnakeLeaderboardWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\Jeux\snake\SnakeWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
@@ -699,19 +707,11 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
-    <Page Include="commands\Snake\SnakeLeaderboardWindow.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
     <Page Include="commands\Suivi maquette collaboratif\CollaborativeModelTrackerWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="Test\perso pixéli\PixelDancerWindow.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="commands\Snake\SnakeWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -876,6 +876,7 @@
   <ItemGroup />
   <ItemGroup>
     <EmbeddedResource Include="Resources\résa cercle.png" />
+    <EmbeddedResource Include="Resources\Flappy bird-1.png" />
     <Content Include="Themes\BIMaestro_Charte_Graphique.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

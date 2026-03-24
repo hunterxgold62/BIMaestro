@@ -404,7 +404,7 @@ namespace Page
 
         private void UpdateNow_Click(object sender, RoutedEventArgs e) => OpenExternal(DownloadUrl);
 
-        private void OpenInBrowser_Click(object sender, RoutedEventArgs e) => OpenExternal(DownloadUrl);
+        private void OpenInBrowser_Click(object sender, RoutedEventArgs e) => OpenExternal(SiteUrl);
 
         private void CopyLink_Click(object sender, RoutedEventArgs e) => Clipboard.SetText(DownloadUrl);
 
