@@ -154,7 +154,25 @@
                                                Style="{StaticResource Hint}"
                                                Margin="0,0,0,10"/>
                                     <CheckBox x:Name="chkNorme" Content="Appliquer la norme (arrondi 50 mm)" Margin="0,0,0,6"/>
-                                    <CheckBox x:Name="chkDynamo" Content="Exécuter Dynamo automatiquement"/>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <CheckBox x:Name="chkDynamo" Content="Exécuter Dynamo automatiquement" VerticalAlignment="Center"/>
+                                        <Border Margin="8,0,0,0"
+                                                Width="18"
+                                                Height="18"
+                                                CornerRadius="9"
+                                                BorderThickness="1"
+                                                BorderBrush="{StaticResource Border}"
+                                                Background="{StaticResource Surface.Subtle}"
+                                                ToolTipService.InitialShowDelay="120">
+                                            <TextBlock Text="i"
+                                                       FontWeight="Bold"
+                                                       FontSize="11"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="{StaticResource Text.Secondary}"
+                                                       ToolTip="Option facultative : lance un script Dynamo après la création/mise à jour des réservations pour renseigner ou corriger automatiquement des paramètres. Vous pouvez utiliser votre propre script adapté à vos familles et à votre méthode projet. Exemple : mise à jour Hauteur relative / NGF pour corriger rapidement les décalages et éviter les oublis."/>
+                                        </Border>
+                                    </StackPanel>
                                 </StackPanel>
 
                             </Grid>

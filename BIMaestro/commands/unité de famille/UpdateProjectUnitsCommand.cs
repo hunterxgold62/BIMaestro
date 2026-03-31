@@ -6,6 +6,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace Famille
 {
@@ -50,22 +51,28 @@ namespace Famille
                 tx.Start();
                 Units projectUnits = doc.GetUnits();
 
-                foreach (var u in list)
+                int appliedCount = 0;
+                foreach (var u in list.Where(x => x != null))
                 {
+                    if (string.IsNullOrWhiteSpace(u.SpecType) || string.IsNullOrWhiteSpace(u.UnitType)) { continue; }
+
                     var specId = new ForgeTypeId(u.SpecType);
                     var unitId = new ForgeTypeId(u.UnitType);
                     if (UnitUtils.IsValidUnit(specId, unitId))
                     {
                         var fo = new FormatOptions(unitId) { Accuracy = u.Accuracy };
                         projectUnits.SetFormatOptions(specId, fo);
+                        appliedCount++;
                     }
                 }
 
                 doc.SetUnits(projectUnits);
                 tx.Commit();
+
+                var disciplineCount = UnitUtils.GetAllDisciplines().Count();
+                TaskDialog.Show("Importer unités", $"✅ {appliedCount} unité(s) importée(s) (toutes disciplines, {disciplineCount} discipline(s)) depuis :\n{filePath}");
             }
 
-            TaskDialog.Show("Importer unités", $"✅ Unités importées depuis :\n{filePath}");
             return Result.Succeeded;
         }
     }

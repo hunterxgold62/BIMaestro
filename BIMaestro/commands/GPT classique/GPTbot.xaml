@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:IA"
         Title="BIMaestro - GPT Bot"
-        Height="560"
+        Height="600"
         Width="620"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
@@ -26,23 +26,17 @@
                             MaxWidth="390"
                             Margin="50,0,0,0"
                             Padding="10,8">
-                        <TextBox Text="{Binding Content}"
-                                 IsReadOnly="True"
-                                 IsReadOnlyCaretVisible="False"
-                                 BorderThickness="0"
-                                 Background="Transparent"
-                                 Padding="0"
-                                 Margin="0"
-                                 MinHeight="0"
-                                 VerticalAlignment="Top"
-                                 VerticalContentAlignment="Top"
-                                 TextWrapping="Wrap"
-                                 AcceptsReturn="True"
-                                 ScrollViewer.VerticalScrollBarVisibility="Disabled"
-                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                 Foreground="White"
-                                 CaretBrush="White"
-                                 FocusVisualStyle="{x:Null}"/>
+                        <TextBlock Text="{Binding Content}"
+                                   TextWrapping="Wrap"
+                                   Foreground="White">
+                            <TextBlock.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Copier tout"
+                                              CommandParameter="{Binding Content}"
+                                              Click="CopyMenuItem_Click"/>
+                                </ContextMenu>
+                            </TextBlock.ContextMenu>
+                        </TextBlock>
                     </Border>
                 </StackPanel>
             </DataTemplate>
@@ -54,25 +48,21 @@
                             MaxWidth="390"
                             Margin="0,0,50,0"
                             Padding="10,8">
-                        <TextBox Text="{Binding Content}"
-                                 IsReadOnly="True"
-                                 IsReadOnlyCaretVisible="False"
-                                 BorderThickness="0"
-                                 Background="Transparent"
-                                 Padding="0"
-                                 Margin="0"
-                                 MinHeight="0"
-                                 VerticalAlignment="Top"
-                                 VerticalContentAlignment="Top"
-                                 TextWrapping="Wrap"
-                                 AcceptsReturn="True"
-                                 ScrollViewer.VerticalScrollBarVisibility="Disabled"
-                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                 Foreground="{DynamicResource Text.Primary}"
-                                 FocusVisualStyle="{x:Null}"/>
+                        <TextBlock Text="{Binding Content}"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource Text.Primary}">
+                            <TextBlock.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Copier tout"
+                                              CommandParameter="{Binding Content}"
+                                              Click="CopyMenuItem_Click"/>
+                                </ContextMenu>
+                            </TextBlock.ContextMenu>
+                        </TextBlock>
                     </Border>
                 </StackPanel>
             </DataTemplate>
+
 
             <Style TargetType="ListBoxItem">
                 <Setter Property="HorizontalContentAlignment" Value="Stretch"/>

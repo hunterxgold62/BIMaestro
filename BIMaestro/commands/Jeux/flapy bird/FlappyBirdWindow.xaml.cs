@@ -11,6 +11,7 @@ using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using System.Threading.Tasks;
+using System.Diagnostics;
 
 using IOPath = System.IO.Path;
 
@@ -25,9 +26,13 @@ namespace BIMaestro.Bonus
         private const double FlapStrength = -7.5;
         private const double MaxFallSpeed = 10;
         private const double PipeSpeed = 3.2;
+        private const double TargetFps = 60.0;
+        private const double BaseFrameSeconds = 1.0 / TargetFps;
+        private const double MaxDeltaSeconds = 0.05;
         private const double BirdX = 90;
         private const double PipeCapHeight = 18;
         private const int PipeSpawnTicks = 70;
+        private const double PipeSpawnIntervalSeconds = PipeSpawnTicks * BaseFrameSeconds;
         private const string SupabaseFunctionsBaseUrl = "https://xqovxfgghbqxwsadzhzl.functions.supabase.co";
 
         private readonly DispatcherTimer _timer;
@@ -38,9 +43,10 @@ namespace BIMaestro.Bonus
         private readonly Brush _pipeFill = CreatePipeFill();
         private readonly Brush _pipeStroke = CreatePipeStroke();
         private Rectangle _bird;
+        private RotateTransform _birdRotation;
         private double _birdY;
         private double _birdVelocity;
-        private int _ticksSincePipe;
+        private double _pipeSpawnAccumulator;
         private bool _running;
         private bool _gameOver;
         private int _score;
@@ -50,6 +56,7 @@ namespace BIMaestro.Bonus
         private int _recordScoreThisRun;
         private bool _isSyncingBestScore;
         private readonly string _stateFile;
+        private readonly Stopwatch _frameStopwatch = new Stopwatch();
 
         public FlappyBirdWindow()
         {
@@ -59,7 +66,7 @@ namespace BIMaestro.Bonus
 
             _timer = new DispatcherTimer
             {
-                Interval = TimeSpan.FromMilliseconds(16)
+                Interval = TimeSpan.FromMilliseconds(1000.0 / TargetFps)
             };
             _timer.Tick += OnTick;
         }
@@ -69,6 +76,13 @@ namespace BIMaestro.Bonus
             Focus();
             ResetGame("Appuie sur Espace pour commencer");
             TriggerBestScoreSync();
+        }
+
+        private void Window_Closed(object sender, EventArgs e)
+        {
+            _timer.Stop();
+            _frameStopwatch.Reset();
+            _timer.Tick -= OnTick;
         }
 
         private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -111,8 +125,9 @@ namespace BIMaestro.Bonus
 
             _running = true;
             Overlay.Visibility = Visibility.Collapsed;
-            _timer.Start();
             _birdVelocity = FlapStrength;
+            _frameStopwatch.Restart();
+            _timer.Start();
         }
 
         private void ResetGame(string overlayMessage)
@@ -121,6 +136,7 @@ namespace BIMaestro.Bonus
             _pipes.Clear();
             GameCanvas.Children.Clear();
 
+            _birdRotation = new RotateTransform(0, BirdSize / 2, BirdSize / 2);
             _bird = new Rectangle
             {
                 Width = BirdSize,
@@ -129,19 +145,21 @@ namespace BIMaestro.Bonus
                 RadiusY = 6,
                 Fill = _birdFill,
                 Stroke = _birdStroke,
-                StrokeThickness = 1.2
+                StrokeThickness = 1.2,
+                RenderTransform = _birdRotation
             };
 
             GameCanvas.Children.Add(_bird);
 
             _birdY = (GameCanvas.ActualHeight > 0 ? GameCanvas.ActualHeight : 560) / 2 - BirdSize / 2;
             _birdVelocity = 0;
-            _ticksSincePipe = 0;
+            _pipeSpawnAccumulator = 0;
             _score = 0;
             _recordThisRun = false;
             _recordScoreThisRun = 0;
             _running = false;
             _gameOver = false;
+            _frameStopwatch.Reset();
 
             UpdateScore();
             UpdateBestScoreUi();
@@ -160,20 +178,25 @@ namespace BIMaestro.Bonus
                 return;
             }
 
-            UpdateBird();
-            UpdatePipes();
+            double dt = _frameStopwatch.IsRunning ? _frameStopwatch.Elapsed.TotalSeconds : BaseFrameSeconds;
+            _frameStopwatch.Restart();
+            dt = Math.Min(MaxDeltaSeconds, Math.Max(BaseFrameSeconds * 0.35, dt));
+            double frameScale = dt / BaseFrameSeconds;
+
+            UpdateBird(frameScale);
+            UpdatePipes(frameScale, dt);
             CheckCollision();
         }
 
-        private void UpdateBird()
+        private void UpdateBird(double frameScale)
         {
-            _birdVelocity += Gravity;
+            _birdVelocity += Gravity * frameScale;
             if (_birdVelocity > MaxFallSpeed)
             {
                 _birdVelocity = MaxFallSpeed;
             }
 
-            _birdY += _birdVelocity;
+            _birdY += _birdVelocity * frameScale;
 
             PositionBird(BirdX);
         }
@@ -184,22 +207,25 @@ namespace BIMaestro.Bonus
             Canvas.SetTop(_bird, _birdY);
 
             double tilt = Math.Max(-30, Math.Min(40, _birdVelocity * 5.5));
-            _bird.RenderTransform = new RotateTransform(tilt, BirdSize / 2, BirdSize / 2);
+            if (_birdRotation != null)
+            {
+                _birdRotation.Angle = tilt;
+            }
         }
 
-        private void UpdatePipes()
+        private void UpdatePipes(double frameScale, double dt)
         {
-            _ticksSincePipe++;
-            if (_ticksSincePipe >= PipeSpawnTicks)
+            _pipeSpawnAccumulator += dt;
+            while (_pipeSpawnAccumulator >= PipeSpawnIntervalSeconds)
             {
-                _ticksSincePipe = 0;
+                _pipeSpawnAccumulator -= PipeSpawnIntervalSeconds;
                 SpawnPipe();
             }
 
             for (int i = _pipes.Count - 1; i >= 0; i--)
             {
                 var pipe = _pipes[i];
-                pipe.X -= PipeSpeed;
+                pipe.X -= PipeSpeed * frameScale;
                 Canvas.SetLeft(pipe.Top, pipe.X);
                 Canvas.SetLeft(pipe.Bottom, pipe.X);
                 Canvas.SetLeft(pipe.TopCap, pipe.X - 4);
@@ -363,6 +389,7 @@ namespace BIMaestro.Bonus
             _gameOver = true;
             _running = false;
             _timer.Stop();
+            _frameStopwatch.Reset();
 
             OverlayTitle.Text = "Perdu !";
             OverlayMessage.Text = $"Score : {_score} — Appuie sur Espace ou clique pour rejouer";

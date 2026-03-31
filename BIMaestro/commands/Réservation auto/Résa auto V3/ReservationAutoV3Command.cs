@@ -167,10 +167,25 @@ namespace Modification
                 .OfClass(typeof(FamilySymbol))
                 .Cast<FamilySymbol>()
                 .Where(s => s?.Family?.Name != null)
-                .Where(s => string.Equals(s.Family.Name, familyName, StringComparison.OrdinalIgnoreCase))
+                .Where(s => FamilyNameContains(s.Family.Name, familyName))
                 .ToList();
 
             return symbols.FirstOrDefault();
+        }
+
+        private static bool FamilyNameContains(string currentFamilyName, string expectedName)
+        {
+            string current = RemoveCmlPrefix(currentFamilyName);
+            string expected = RemoveCmlPrefix(expectedName);
+            return current.IndexOf(expected, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static string RemoveCmlPrefix(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+            return value.StartsWith("CML_", StringComparison.OrdinalIgnoreCase)
+                ? value.Substring(4)
+                : value;
         }
 
         private static void AutoMapParameters(FamilySymbol sym, ProfileConfig p, ProfileKind kind)

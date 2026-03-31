@@ -885,6 +885,8 @@
     <EmbeddedResource Include="Resources\résa cercle.png" />
     <EmbeddedResource Include="Resources\Flappy bird-1.png" />
     <EmbeddedResource Include="Resources\Mickey.gif" />
+    <EmbeddedResource Include="Resources\Collaboration.png" />
+    <EmbeddedResource Include="Resources\Convertir paramètres1.png" />
     <Content Include="Themes\BIMaestro_Charte_Graphique.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

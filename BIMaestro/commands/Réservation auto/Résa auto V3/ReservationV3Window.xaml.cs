@@ -234,8 +234,7 @@ namespace Modification
                     .OfClass(typeof(FamilySymbol))
                     .Cast<FamilySymbol>()
                     .FirstOrDefault(s => s?.Family?.Name != null &&
-                                         s.Family.Name.IndexOf(candidate, StringComparison.OrdinalIgnoreCase) >= 0);
-
+                                         FamilyNameContains(s.Family.Name, candidate));
                 if (symbol == null) continue;
 
                 return new ProfileConfig
@@ -259,6 +258,20 @@ namespace Modification
             return null;
         }
 
+        private static bool FamilyNameContains(string currentFamilyName, string expectedName)
+        {
+            string current = RemoveCmlPrefix(currentFamilyName);
+            string expected = RemoveCmlPrefix(expectedName);
+            return current.IndexOf(expected, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static string RemoveCmlPrefix(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+            return value.StartsWith("CML_", StringComparison.OrdinalIgnoreCase)
+                ? value.Substring(4)
+                : value;
+        }
         private void OnBrowseRfa(object sender, RoutedEventArgs e)
         {
             var dlg = new OpenFileDialog

@@ -6,6 +6,7 @@ using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Licensing;
 using Newtonsoft.Json;
+using System.Linq;
 
 namespace Famille
 {
@@ -29,31 +30,18 @@ namespace Famille
             Directory.CreateDirectory(prefDir);
             string filePath = Path.Combine(prefDir, "RevitUnits.json");
 
-            // Liste mise à jour : on exporte maintenant aussi la DISTANCE
-            var specTypes = new[]
-            {
-                SpecTypeId.Angle,
-                SpecTypeId.Distance,    // ← Ajouté
-                SpecTypeId.Length,
-                SpecTypeId.Area,
-                SpecTypeId.CostPerArea,
-                SpecTypeId.MassDensity,
-                SpecTypeId.RotationAngle,
-                SpecTypeId.Slope,
-                SpecTypeId.Speed,
-                SpecTypeId.Time,
-                SpecTypeId.Volume,
-                SpecTypeId.Currency
-            };
-
             Document doc = commandData.Application.ActiveUIDocument.Document;
             Units units = doc.GetUnits();
             var list = new List<UnitInfo>();
+            var allSpecs = UnitUtils.GetAllMeasurableSpecs();
 
-            foreach (var specId in specTypes)
+            foreach (var specId in allSpecs)
             {
                 FormatOptions fo = units.GetFormatOptions(specId);
+                if (fo == null) { continue; }
                 ForgeTypeId unitId = fo.GetUnitTypeId();
+                if (unitId == null || string.IsNullOrWhiteSpace(unitId.TypeId)) { continue; }
+
                 list.Add(new UnitInfo
                 {
                     SpecType = specId.TypeId,
@@ -64,7 +52,8 @@ namespace Famille
 
             File.WriteAllText(filePath, JsonConvert.SerializeObject(list, Formatting.Indented));
 
-            TaskDialog.Show("Export unités", $"✅ Unités exportées vers :\n{filePath}");
+            var disciplineCount = UnitUtils.GetAllDisciplines().Count();
+            TaskDialog.Show("Export unités", $"✅ {list.Count} unité(s) exportée(s) (toutes disciplines, {disciplineCount} discipline(s)) vers :\n{filePath}");
             return Result.Succeeded;
         }
     }

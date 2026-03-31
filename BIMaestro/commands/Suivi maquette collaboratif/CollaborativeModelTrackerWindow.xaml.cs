@@ -333,21 +333,52 @@ namespace Analyse
         {
             if (!string.IsNullOrWhiteSpace(modelPath) && !modelPath.Equals("Chemin non disponible", StringComparison.OrdinalIgnoreCase))
             {
-                if (Directory.Exists(modelPath))
-                    return modelPath;
+                var candidates = modelPath
+                    .Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(p => (p ?? string.Empty).Trim())
+                    .Where(p => !string.IsNullOrWhiteSpace(p))
+                    .ToList();
 
-                try
+                if (candidates.Count == 0)
+                    candidates.Add(modelPath);
+
+                // Format attendu : local|partagé (comme le suivi temps par projet).
+                // Si maquette partagée, on privilégie le chemin partagé.
+                if (candidates.Count > 1)
                 {
-                    var dir = Path.GetDirectoryName(modelPath);
-                    if (!string.IsNullOrWhiteSpace(dir) && Directory.Exists(dir))
-                        return dir;
+                    string sharedCandidate = candidates[candidates.Count - 1];
+                    string sharedFolder = Directory.Exists(sharedCandidate) ? sharedCandidate : TryGetExistingDirectory(sharedCandidate);
+                    if (!string.IsNullOrWhiteSpace(sharedFolder))
+                        return sharedFolder;
                 }
-                catch
+
+                foreach (var candidate in candidates)
                 {
+                    if (Directory.Exists(candidate))
+                        return candidate;
+
+                    var dir = TryGetExistingDirectory(candidate);
+                    if (!string.IsNullOrWhiteSpace(dir))
+                        return dir;
                 }
             }
 
             return CollaborativeModelTrackerStore.ActiveDirectory;
+        }
+
+        private static string TryGetExistingDirectory(string path)
+        {
+            try
+            {
+                var dir = Path.GetDirectoryName(path);
+                if (!string.IsNullOrWhiteSpace(dir) && Directory.Exists(dir))
+                    return dir;
+            }
+            catch
+            {
+            }
+
+            return null;
         }
 
         private static void OpenFolderPath(string folder)

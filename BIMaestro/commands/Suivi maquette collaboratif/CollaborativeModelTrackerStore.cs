@@ -303,8 +303,39 @@ namespace Analyse
             if (doc == null)
                 return "Inconnu";
 
-            if (!string.IsNullOrWhiteSpace(doc.PathName))
-                return doc.PathName;
+            try
+            {
+                string localPath = doc.PathName;
+                string centralPath = null;
+
+                if (doc.IsWorkshared)
+                {
+                    try
+                    {
+                        var centralModelPath = doc.GetWorksharingCentralModelPath();
+                        if (centralModelPath != null)
+                            centralPath = ModelPathUtils.ConvertModelPathToUserVisiblePath(centralModelPath);
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(localPath) && !string.IsNullOrWhiteSpace(centralPath) &&
+                    !string.Equals(localPath, centralPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    return localPath + "|" + centralPath;
+                }
+
+                if (!string.IsNullOrWhiteSpace(centralPath))
+                    return centralPath;
+
+                if (!string.IsNullOrWhiteSpace(localPath))
+                    return localPath;
+            }
+            catch
+            {
+            }
 
             try
             {
@@ -320,6 +351,7 @@ namespace Analyse
 
             return "Chemin non disponible";
         }
+
 
         private static void EnsureActiveDirectory()
         {
