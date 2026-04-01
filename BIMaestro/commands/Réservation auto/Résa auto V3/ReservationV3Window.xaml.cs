@@ -1,10 +1,18 @@
-﻿using System;
+﻿using Autodesk.Revit.DB;
+using Microsoft.Win32;
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
-using Autodesk.Revit.DB;
-using Microsoft.Win32;
+using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Media.Imaging;
+using Color = System.Windows.Media.Color;
 
 namespace Modification
 {
@@ -31,6 +39,26 @@ namespace Modification
         private readonly HashSet<string> _allParameterNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly ReservationAutoV3PersoConfig _persoConfig;
         private readonly Dictionary<string, ShapeOptionItem> _shapeOptionByLabel = new Dictionary<string, ShapeOptionItem>(StringComparer.OrdinalIgnoreCase);
+        private HostTarget _selectedHost = HostTarget.Mur;
+        private ShapeTarget _selectedShapeBase = ShapeTarget.Rectangulaire;
+        private GifPlaybackData _murGifData;
+        private GifPlaybackData _solGifData;
+        private BitmapFrame _murFirstFrame;
+        private BitmapFrame _solFirstFrame;
+        private GifPlaybackData _shapeRectGifData;
+        private GifPlaybackData _shapeCircGifData;
+        private BitmapFrame _shapeRectFirstFrame;
+        private BitmapFrame _shapeCircFirstFrame;
+        private GifPlaybackData _objPipeGifData;
+        private GifPlaybackData _objDuctGifData;
+        private GifPlaybackData _objDoorGifData;
+        private GifPlaybackData _objWindowGifData;
+        private GifPlaybackData _objOtherGifData;
+        private BitmapFrame _objPipeFirstFrame;
+        private BitmapFrame _objDuctFirstFrame;
+        private BitmapFrame _objDoorFirstFrame;
+        private BitmapFrame _objWindowFirstFrame;
+        private BitmapFrame _objOtherFirstFrame;
 
         private List<LoadedTypeItem> _loadedTypes = new List<LoadedTypeItem>();
 
@@ -52,6 +80,12 @@ namespace Modification
             public ProfileConfig Profile { get; set; }
         }
 
+        private class GifPlaybackData
+        {
+            public List<BitmapSource> Frames { get; } = new List<BitmapSource>();
+            public List<TimeSpan> Delays { get; } = new List<TimeSpan>();
+        }
+
         public ReservationAutoV3Window(Document doc, ReservationAutoV3Config cfg)
         {
             ThemeManager.EnsureThemeLoaded();
@@ -61,7 +95,6 @@ namespace Modification
             Config = cfg ?? new ReservationAutoV3Config();
             _persoConfig = ReservationAutoV3PersoConfigStore.LoadOrDefault();
 
-            comboHost.SelectedIndex = 0;
             comboObjectType.SelectedIndex = 0;
             comboPipeSource.SelectedIndex = 0;
 
@@ -78,8 +111,13 @@ namespace Modification
 
             tbRfaPath.Text = Config.LastRfaPath ?? "";
 
+            InitializeHostGifSelectors();
+            InitializeShapeGifSelectors();
+            InitializeObjectGifSelectors();
             RefreshProfilesSummary();
             RefreshShapeOptions();
+            UpdateShapeSelectorUi();
+            UpdateObjectSelectorUi();
             UpdateMappingPanels();
             OnCriteriaChanged(null, null);
         }
@@ -123,8 +161,7 @@ namespace Modification
 
         public void OnCriteriaChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (sender == comboHost)
-                RefreshShapeOptions();
+            UpdateObjectSelectorUi();
 
             string obj = (comboObjectType.SelectedItem as ComboBoxItem)?.Content as string ?? "Canalisation";
             bool isCanal = obj == "Canalisation";
@@ -144,17 +181,11 @@ namespace Modification
             _shapeOptionByLabel.Clear();
             comboShape.Items.Clear();
 
-            HostTarget host = ((comboHost.SelectedItem as ComboBoxItem)?.Content as string) == "Sol"
-                ? HostTarget.Sol
-                : HostTarget.Mur;
+            HostTarget host = _selectedHost;
 
-            TryAddShapeOption(host, ShapeTarget.Rectangulaire, "Rectangulaire V1", FindBuiltInProfile(host, ShapeTarget.Rectangulaire, isV2: false));
-            TryAddShapeOption(host, ShapeTarget.Rectangulaire, "Rectangulaire V2", FindBuiltInProfile(host, ShapeTarget.Rectangulaire, isV2: true));
-            TryAddShapeOption(host, ShapeTarget.Rectangulaire, "Rectangulaire perso", _persoConfig.Get(host, ShapeTarget.Rectangulaire));
-
-            TryAddShapeOption(host, ShapeTarget.Circulaire, "Circulaire V1", FindBuiltInProfile(host, ShapeTarget.Circulaire, isV2: false));
-            TryAddShapeOption(host, ShapeTarget.Circulaire, "Circulaire V2", FindBuiltInProfile(host, ShapeTarget.Circulaire, isV2: true));
-            TryAddShapeOption(host, ShapeTarget.Circulaire, "Circulaire perso", _persoConfig.Get(host, ShapeTarget.Circulaire));
+            TryAddShapeOption(host, _selectedShapeBase, $"{GetShapePrefix(_selectedShapeBase)} V1", FindBuiltInProfile(host, _selectedShapeBase, isV2: false));
+            TryAddShapeOption(host, _selectedShapeBase, $"{GetShapePrefix(_selectedShapeBase)} V2", FindBuiltInProfile(host, _selectedShapeBase, isV2: true));
+            TryAddShapeOption(host, _selectedShapeBase, $"{GetShapePrefix(_selectedShapeBase)} perso", _persoConfig.Get(host, _selectedShapeBase));
 
             if (comboShape.Items.Count == 0)
             {
@@ -181,6 +212,8 @@ namespace Modification
 
             comboShape.SelectedIndex = idx;
         }
+
+        private static string GetShapePrefix(ShapeTarget shape) => shape == ShapeTarget.Circulaire ? "Circulaire" : "Rectangulaire";
 
         private void TryAddShapeOption(HostTarget host, ShapeTarget shape, string label, ProfileConfig profile)
         {
@@ -272,6 +305,325 @@ namespace Modification
                 ? value.Substring(4)
                 : value;
         }
+        private void InitializeHostGifSelectors()
+        {
+            var murResource = FindBestGifResource("mur", null);
+            var solResource = FindBestGifResource("sol", murResource);
+
+            TryLoadGif(imgHostMur, txtHostMurFallback, murResource, out _murGifData, out _murFirstFrame);
+            TryLoadGif(imgHostSol, txtHostSolFallback, solResource, out _solGifData, out _solFirstFrame);
+            UpdateHostSelectorUi();
+        }
+
+        private void InitializeShapeGifSelectors()
+        {
+            TryLoadGif(imgShapeRect, txtShapeRectFallback, FindBestGifResource("rect", null), out _shapeRectGifData, out _shapeRectFirstFrame);
+            TryLoadGif(imgShapeCirc, txtShapeCircFallback, FindBestGifResource("circ", null), out _shapeCircGifData, out _shapeCircFirstFrame);
+        }
+
+        private void InitializeObjectGifSelectors()
+        {
+            TryLoadGif(imgObjPipe, txtObjPipeFallback, FindBestGifResource("cana", null), out _objPipeGifData, out _objPipeFirstFrame);
+            TryLoadGif(imgObjDuct, txtObjDuctFallback, FindBestGifResource("gaine", null), out _objDuctGifData, out _objDuctFirstFrame);
+            TryLoadGif(imgObjDoor, txtObjDoorFallback, FindBestGifResource("porte", null), out _objDoorGifData, out _objDoorFirstFrame);
+            TryLoadGif(imgObjWindow, txtObjWindowFallback, FindBestGifResource("fenetre", null), out _objWindowGifData, out _objWindowFirstFrame);
+            TryLoadGif(imgObjOther, txtObjOtherFallback, FindBestGifResource("autre", null), out _objOtherGifData, out _objOtherFirstFrame);
+        }
+
+        private string FindBestGifResource(string keyword, string excludedResource)
+        {
+            var asm = Assembly.GetExecutingAssembly();
+            var names = asm.GetManifestResourceNames();
+
+            return names.FirstOrDefault(n =>
+                n.IndexOf(".Resources.", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                n.EndsWith(".gif", StringComparison.OrdinalIgnoreCase) &&
+                n.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0 &&
+                !string.Equals(n, excludedResource, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static bool TryLoadGif(Image image, TextBlock fallbackText, string resourceName, out GifPlaybackData gifData, out BitmapFrame firstFrame)
+        {
+            gifData = null;
+            firstFrame = null;
+
+            if (image == null || string.IsNullOrWhiteSpace(resourceName))
+                return false;
+
+            try
+            {
+                var asm = Assembly.GetExecutingAssembly();
+                using (Stream stream = asm.GetManifestResourceStream(resourceName))
+                {
+                    if (stream == null) return false;
+                    gifData = BuildGifPlaybackData(stream);
+                    if (gifData?.Frames == null || gifData.Frames.Count == 0)
+                        return false;
+
+                    firstFrame = BitmapFrame.Create(gifData.Frames[0]);
+                    image.Source = firstFrame;
+                    if (fallbackText != null)
+                        fallbackText.Visibility = System.Windows.Visibility.Collapsed;
+                    return true;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static GifPlaybackData BuildGifPlaybackData(Stream stream)
+        {
+            var data = new GifPlaybackData();
+            using (var gif = System.Drawing.Image.FromStream(stream, true, true))
+            {
+                var frameDimension = new System.Drawing.Imaging.FrameDimension(gif.FrameDimensionsList[0]);
+                int frameCount = gif.GetFrameCount(frameDimension);
+                var delays = ExtractFrameDelays(gif, frameCount);
+
+                for (int i = 0; i < frameCount; i++)
+                {
+                    gif.SelectActiveFrame(frameDimension, i);
+                    using (var bmp = new System.Drawing.Bitmap(gif.Width, gif.Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb))
+                    using (var g = System.Drawing.Graphics.FromImage(bmp))
+                    {
+                        g.Clear(System.Drawing.Color.Transparent);
+                        g.DrawImage(gif, 0, 0, gif.Width, gif.Height);
+
+                        var source = ToBitmapSource(bmp);
+                        data.Frames.Add(source);
+                        data.Delays.Add(delays[i]);
+                    }
+                }
+            }
+
+            return data;
+        }
+
+        private static List<TimeSpan> ExtractFrameDelays(System.Drawing.Image gif, int frameCount)
+        {
+            const int FrameDelayPropertyId = 0x5100;
+            var result = Enumerable.Repeat(TimeSpan.FromMilliseconds(100), frameCount).ToList();
+
+            try
+            {
+                var item = gif.GetPropertyItem(FrameDelayPropertyId);
+                if (item?.Value == null || item.Value.Length < 4) return result;
+
+                for (int i = 0; i < frameCount; i++)
+                {
+                    int offset = i * 4;
+                    if (offset + 3 >= item.Value.Length) break;
+                    int delayCs = BitConverter.ToInt32(item.Value, offset); // centiseconds
+                    if (delayCs <= 0) delayCs = 10;
+                    result[i] = TimeSpan.FromMilliseconds(delayCs * 10);
+                }
+            }
+            catch
+            {
+            }
+
+            return result;
+        }
+
+        [DllImport("gdi32.dll")]
+        private static extern bool DeleteObject(IntPtr hObject);
+
+        private static BitmapSource ToBitmapSource(System.Drawing.Bitmap bitmap)
+        {
+            IntPtr hBitmap = bitmap.GetHbitmap();
+            try
+            {
+                var source = Imaging.CreateBitmapSourceFromHBitmap(
+                    hBitmap,
+                    IntPtr.Zero,
+                    Int32Rect.Empty,
+                    BitmapSizeOptions.FromEmptyOptions());
+
+                source.Freeze();
+                return source;
+            }
+            finally
+            {
+                DeleteObject(hBitmap);
+            }
+        }
+
+        private static void PlayGifOnce(Image image, GifPlaybackData gifData, BitmapFrame firstFrame)
+        {
+            if (image == null || gifData?.Frames == null || gifData.Frames.Count == 0) return;
+
+            image.BeginAnimation(Image.SourceProperty, null);
+            if (firstFrame != null) image.Source = firstFrame;
+
+            var animation = new ObjectAnimationUsingKeyFrames();
+            TimeSpan total = TimeSpan.Zero;
+            for (int i = 0; i < gifData.Frames.Count; i++)
+            {
+                var frame = gifData.Frames[i];
+                var delay = i < gifData.Delays.Count ? gifData.Delays[i] : TimeSpan.FromMilliseconds(100);
+                animation.KeyFrames.Add(new DiscreteObjectKeyFrame(frame, KeyTime.FromTimeSpan(total)));
+                total += delay;
+            }
+            if (total <= TimeSpan.Zero) total = TimeSpan.FromSeconds(1);
+            animation.Duration = total;
+            animation.RepeatBehavior = new RepeatBehavior(1);
+            animation.FillBehavior = FillBehavior.Stop;
+            animation.Completed += (s, e) =>
+            {
+                image.BeginAnimation(Image.SourceProperty, null);
+                if (firstFrame != null)
+                    image.Source = firstFrame;
+            };
+            image.BeginAnimation(Image.SourceProperty, animation);
+        }
+
+        private void SelectHost(HostTarget host)
+        {
+            _selectedHost = host;
+            UpdateHostSelectorUi();
+            RefreshShapeOptions();
+            OnCriteriaChanged(null, null);
+        }
+
+        private void SelectShapeBase(ShapeTarget shape)
+        {
+            _selectedShapeBase = shape;
+            UpdateShapeSelectorUi();
+            RefreshShapeOptions();
+            OnCriteriaChanged(null, null);
+        }
+
+        private void SelectObjectType(ObjectType objectType)
+        {
+            comboObjectType.SelectedIndex = objectType switch
+            {
+                ObjectType.Canalisation => 0,
+                ObjectType.Gaine => 1,
+                ObjectType.Porte => 2,
+                ObjectType.Fenetre => 3,
+                _ => 4
+            };
+
+            UpdateObjectSelectorUi();
+            OnCriteriaChanged(null, null);
+        }
+
+        private void UpdateHostSelectorUi()
+        {
+            bool murSelected = _selectedHost == HostTarget.Mur;
+            hostMurCard.BorderBrush = murSelected ? new SolidColorBrush(Color.FromRgb(53, 182, 121)) : (Brush)FindResource("Border");
+            hostSolCard.BorderBrush = !murSelected ? new SolidColorBrush(Color.FromRgb(53, 182, 121)) : (Brush)FindResource("Border");
+        }
+
+        private void UpdateShapeSelectorUi()
+        {
+            bool rectSelected = _selectedShapeBase == ShapeTarget.Rectangulaire;
+            shapeRectCard.BorderBrush = rectSelected ? new SolidColorBrush(Color.FromRgb(53, 182, 121)) : (Brush)FindResource("Border");
+            shapeCircCard.BorderBrush = !rectSelected ? new SolidColorBrush(Color.FromRgb(53, 182, 121)) : (Brush)FindResource("Border");
+        }
+
+        private void UpdateObjectSelectorUi()
+        {
+            var selected = (comboObjectType.SelectedItem as ComboBoxItem)?.Content as string ?? "Canalisation";
+
+            objPipeCard.BorderBrush = selected == "Canalisation" ? new SolidColorBrush(Color.FromRgb(53, 182, 121)) : (Brush)FindResource("Border");
+            objDuctCard.BorderBrush = selected == "Gaine" ? new SolidColorBrush(Color.FromRgb(53, 182, 121)) : (Brush)FindResource("Border");
+            objDoorCard.BorderBrush = selected == "Porte" ? new SolidColorBrush(Color.FromRgb(53, 182, 121)) : (Brush)FindResource("Border");
+            objWindowCard.BorderBrush = selected == "Fenêtre" ? new SolidColorBrush(Color.FromRgb(53, 182, 121)) : (Brush)FindResource("Border");
+            objOtherCard.BorderBrush = selected == "Autre" ? new SolidColorBrush(Color.FromRgb(53, 182, 121)) : (Brush)FindResource("Border");
+        }
+
+        private void OnMurHostClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            SelectHost(HostTarget.Mur);
+            PlayGifOnce(imgHostMur, _murGifData, _murFirstFrame);
+        }
+
+        private void OnSolHostClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            SelectHost(HostTarget.Sol);
+            PlayGifOnce(imgHostSol, _solGifData, _solFirstFrame);
+        }
+        private void OnMurGifHover(object sender, System.Windows.Input.MouseEventArgs e)
+        {
+            StartPulse(hostMurCard);
+            PlayGifOnce(imgHostMur, _murGifData, _murFirstFrame);
+        }
+
+        private void OnSolGifHover(object sender, System.Windows.Input.MouseEventArgs e)
+        {
+            StartPulse(hostSolCard);
+            PlayGifOnce(imgHostSol, _solGifData, _solFirstFrame);
+        }
+
+        private void OnShapeRectClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            SelectShapeBase(ShapeTarget.Rectangulaire);
+            PlayGifOnce(imgShapeRect, _shapeRectGifData, _shapeRectFirstFrame);
+        }
+
+        private void OnShapeCircClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            SelectShapeBase(ShapeTarget.Circulaire);
+            PlayGifOnce(imgShapeCirc, _shapeCircGifData, _shapeCircFirstFrame);
+        }
+
+        private void OnShapeRectHover(object sender, System.Windows.Input.MouseEventArgs e)
+        {
+            StartPulse(shapeRectCard);
+            PlayGifOnce(imgShapeRect, _shapeRectGifData, _shapeRectFirstFrame);
+        }
+
+        private void OnShapeCircHover(object sender, System.Windows.Input.MouseEventArgs e)
+        {
+            StartPulse(shapeCircCard);
+            PlayGifOnce(imgShapeCirc, _shapeCircGifData, _shapeCircFirstFrame);
+        }
+
+        private void OnShapeVariantChanged(object sender, SelectionChangedEventArgs e)
+        {
+            string label = (comboShape.SelectedItem as ComboBoxItem)?.Content as string ?? comboShape.Text ?? "";
+            if (label.IndexOf("Circulaire", StringComparison.OrdinalIgnoreCase) >= 0 && _selectedShapeBase != ShapeTarget.Circulaire)
+            {
+                _selectedShapeBase = ShapeTarget.Circulaire;
+                UpdateShapeSelectorUi();
+            }
+            else if (label.IndexOf("Rectangulaire", StringComparison.OrdinalIgnoreCase) >= 0 && _selectedShapeBase != ShapeTarget.Rectangulaire)
+            {
+                _selectedShapeBase = ShapeTarget.Rectangulaire;
+                UpdateShapeSelectorUi();
+            }
+
+            OnCriteriaChanged(null, null);
+        }
+
+        private void OnObjPipeClick(object sender, System.Windows.Input.MouseButtonEventArgs e) { SelectObjectType(ObjectType.Canalisation); PlayGifOnce(imgObjPipe, _objPipeGifData, _objPipeFirstFrame); }
+        private void OnObjDuctClick(object sender, System.Windows.Input.MouseButtonEventArgs e) { SelectObjectType(ObjectType.Gaine); PlayGifOnce(imgObjDuct, _objDuctGifData, _objDuctFirstFrame); }
+        private void OnObjDoorClick(object sender, System.Windows.Input.MouseButtonEventArgs e) { SelectObjectType(ObjectType.Porte); PlayGifOnce(imgObjDoor, _objDoorGifData, _objDoorFirstFrame); }
+        private void OnObjWindowClick(object sender, System.Windows.Input.MouseButtonEventArgs e) { SelectObjectType(ObjectType.Fenetre); PlayGifOnce(imgObjWindow, _objWindowGifData, _objWindowFirstFrame); }
+        private void OnObjOtherClick(object sender, System.Windows.Input.MouseButtonEventArgs e) { SelectObjectType(ObjectType.Autre); PlayGifOnce(imgObjOther, _objOtherGifData, _objOtherFirstFrame); }
+        private void OnObjPipeHover(object sender, System.Windows.Input.MouseEventArgs e) { StartPulse(objPipeCard); PlayGifOnce(imgObjPipe, _objPipeGifData, _objPipeFirstFrame); }
+        private void OnObjDuctHover(object sender, System.Windows.Input.MouseEventArgs e) { StartPulse(objDuctCard); PlayGifOnce(imgObjDuct, _objDuctGifData, _objDuctFirstFrame); }
+        private void OnObjDoorHover(object sender, System.Windows.Input.MouseEventArgs e) { StartPulse(objDoorCard); PlayGifOnce(imgObjDoor, _objDoorGifData, _objDoorFirstFrame); }
+        private void OnObjWindowHover(object sender, System.Windows.Input.MouseEventArgs e) { StartPulse(objWindowCard); PlayGifOnce(imgObjWindow, _objWindowGifData, _objWindowFirstFrame); }
+        private void OnObjOtherHover(object sender, System.Windows.Input.MouseEventArgs e) { StartPulse(objOtherCard); PlayGifOnce(imgObjOther, _objOtherGifData, _objOtherFirstFrame); }
+
+        private static void StartPulse(Border border)
+        {
+            if (border == null) return;
+            var pulse = new DoubleAnimation
+            {
+                From = 1.0,
+                To = 0.88,
+                Duration = TimeSpan.FromMilliseconds(140),
+                AutoReverse = true,
+                FillBehavior = FillBehavior.Stop
+            };
+            border.BeginAnimation(UIElement.OpacityProperty, pulse);
+        }
+
         private void OnBrowseRfa(object sender, RoutedEventArgs e)
         {
             var dlg = new OpenFileDialog
@@ -584,6 +936,7 @@ namespace Modification
                 MessageBox.Show("Erreur sauvegarde : " + err, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Error);
         }
 
+
         private void OnOk(object sender, RoutedEventArgs e)
         {
             if (!comboShape.IsEnabled || !_shapeOptionByLabel.Any())
@@ -592,14 +945,9 @@ namespace Modification
                 return;
             }
 
-            SelectedHost = ((comboHost.SelectedItem as ComboBoxItem)?.Content as string) == "Sol"
-                ? HostTarget.Sol
-                : HostTarget.Mur;
+            SelectedHost = _selectedHost;
 
-            SelectedShape = ((comboShape.SelectedItem as ComboBoxItem)?.Content as string)
-                ?.IndexOf("Circulaire", StringComparison.OrdinalIgnoreCase) >= 0
-                ? ShapeTarget.Circulaire
-                : ShapeTarget.Rectangulaire;
+            SelectedShape = _selectedShapeBase;
 
             string shapeLabel = (comboShape.SelectedItem as ComboBoxItem)?.Content as string;
             if (!string.IsNullOrWhiteSpace(shapeLabel) && _shapeOptionByLabel.TryGetValue(shapeLabel, out var shapeOption))

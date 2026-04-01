@@ -887,6 +887,14 @@
     <EmbeddedResource Include="Resources\Mickey.gif" />
     <EmbeddedResource Include="Resources\Collaboration.png" />
     <EmbeddedResource Include="Resources\Convertir paramètres1.png" />
+    <EmbeddedResource Include="Resources\Gif\sol_18998666.gif" />
+    <Content Include="Resources\Gif\Canalisation.gif" />
+    <EmbeddedResource Include="Resources\Gif\mur_11260681.gif" />
+    <Content Include="Resources\Gif\Circulaire.gif" />
+    <Content Include="Resources\Gif\Sol.gif" />
+    <Content Include="Resources\Gif\porte.gif" />
+    <Content Include="Resources\Gif\Rectangulaire.gif" />
+    <Content Include="Resources\Gif\Fenêtre.gif" />
     <Content Include="Themes\BIMaestro_Charte_Graphique.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

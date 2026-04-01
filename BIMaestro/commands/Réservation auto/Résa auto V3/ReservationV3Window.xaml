@@ -89,26 +89,147 @@
                                            Margin="0,0,0,10"/>
 
                                 <TextBlock Grid.Row="1" Grid.Column="0" Text="Support" Style="{StaticResource Label}" VerticalAlignment="Center"/>
-                                <ComboBox Grid.Row="1" Grid.Column="1"
-                                          x:Name="comboHost"
-                                          Height="34"
-                                          SelectionChanged="OnCriteriaChanged">
-                                    <ComboBoxItem Content="Mur"/>
-                                    <ComboBoxItem Content="Sol"/>
-                                </ComboBox>
+                                <WrapPanel Grid.Row="1"
+                                           Grid.Column="1"
+                                           Orientation="Horizontal"
+                                           HorizontalAlignment="Left">
+                                    <Border x:Name="hostMurCard"
+                                            Margin="0,0,6,0"
+                                            Width="110"
+                                            BorderThickness="2"
+                                            CornerRadius="10"
+                                            BorderBrush="{StaticResource Border}"
+                                            Background="{StaticResource Surface.Subtle}"
+                                            Cursor="Hand"
+                                            MouseEnter="OnMurGifHover"
+                                            MouseLeftButtonUp="OnMurHostClick"
+                                            ToolTip="Sélectionner Mur">
+                                        <Grid Height="52">
+                                            <Image x:Name="imgHostMur"
+                                                   Stretch="Uniform"
+                                                   Margin="6"
+                                                   RenderOptions.BitmapScalingMode="HighQuality"/>
+                                            <TextBlock x:Name="txtHostMurFallback"
+                                                       Text="Mur"
+                                                       FontWeight="SemiBold"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Border>
 
-                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Forme" Style="{StaticResource Label}" VerticalAlignment="Center" Margin="0,8,0,0"/>
-                                <ComboBox Grid.Row="2" Grid.Column="1"
-                                          x:Name="comboShape"
-                                          Height="34"
-                                          Margin="0,8,0,0"
-                                          SelectionChanged="OnCriteriaChanged"/>
+                                    <Border x:Name="hostSolCard"
+                                            Margin="6,0,0,0"
+                                            Width="110"
+                                            BorderThickness="2"
+                                            CornerRadius="10"
+                                            BorderBrush="{StaticResource Border}"
+                                            Background="{StaticResource Surface.Subtle}"
+                                            Cursor="Hand"
+                                            MouseEnter="OnSolGifHover"
+                                            MouseLeftButtonUp="OnSolHostClick"
+                                            ToolTip="Sélectionner Sol">
+                                        <Grid Height="52">
+                                            <Image x:Name="imgHostSol"
+                                                   Stretch="Uniform"
+                                                   Margin="6"
+                                                   RenderOptions.BitmapScalingMode="HighQuality"/>
+                                            <TextBlock x:Name="txtHostSolFallback"
+                                                       Text="Sol"
+                                                       FontWeight="SemiBold"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Border>
+                                </WrapPanel>
 
-                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Type d’objet" Style="{StaticResource Label}" VerticalAlignment="Center" Margin="0,8,0,0"/>
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Forme" Style="{StaticResource Label}" VerticalAlignment="Top" Margin="0,10,0,0"/>
+                                <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,8,0,0">
+                                    <WrapPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                                        <Border x:Name="shapeRectCard"
+                                                Width="110"
+                                                Margin="0,0,6,0"
+                                                BorderThickness="2"
+                                                CornerRadius="10"
+                                                BorderBrush="{StaticResource Border}"
+                                                Background="{StaticResource Surface.Subtle}"
+                                                Cursor="Hand"
+                                                MouseEnter="OnShapeRectHover"
+                                                MouseLeftButtonUp="OnShapeRectClick"
+                                                ToolTip="Rectangulaire">
+                                            <Grid Height="52">
+                                                <Image x:Name="imgShapeRect" Stretch="Uniform" Margin="6" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                                <TextBlock x:Name="txtShapeRectFallback" Text="Rect." FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Grid>
+                                        </Border>
+                                        <Border x:Name="shapeCircCard"
+                                                Width="110"
+                                                Margin="6,0,0,0"
+                                                BorderThickness="2"
+                                                CornerRadius="10"
+                                                BorderBrush="{StaticResource Border}"
+                                                Background="{StaticResource Surface.Subtle}"
+                                                Cursor="Hand"
+                                                MouseEnter="OnShapeCircHover"
+                                                MouseLeftButtonUp="OnShapeCircClick"
+                                                ToolTip="Circulaire">
+                                            <Grid Height="52">
+                                                <Image x:Name="imgShapeCirc" Stretch="Uniform" Margin="6" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                                <TextBlock x:Name="txtShapeCircFallback" Text="Circ." FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Grid>
+                                        </Border>
+                                    </WrapPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0" VerticalAlignment="Center">
+                                        <TextBlock Text="Variante :" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <ComboBox x:Name="comboShape"
+                                                  Width="220"
+                                                  Height="32"
+                                                  IsEditable="True"
+                                                  SelectionChanged="OnShapeVariantChanged"/>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Type d’objet" Style="{StaticResource Label}" VerticalAlignment="Top" Margin="0,10,0,0"/>
+                                <StackPanel Grid.Row="3" Grid.Column="1" Margin="0,8,0,0">
+                                    <WrapPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                                        <Border x:Name="objPipeCard" Width="88" Margin="0,0,6,0" BorderThickness="2" CornerRadius="10" BorderBrush="{StaticResource Border}" Background="{StaticResource Surface.Subtle}" Cursor="Hand" MouseEnter="OnObjPipeHover" MouseLeftButtonUp="OnObjPipeClick" ToolTip="Canalisation">
+                                            <Grid Height="50">
+                                                <Image x:Name="imgObjPipe" Stretch="Uniform" Margin="6" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                                <TextBlock x:Name="txtObjPipeFallback" Text="Cana" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Grid>
+                                        </Border>
+                                        <Border x:Name="objDuctCard" Width="88" Margin="0,0,6,0" BorderThickness="2" CornerRadius="10" BorderBrush="{StaticResource Border}" Background="{StaticResource Surface.Subtle}" Cursor="Hand" MouseEnter="OnObjDuctHover" MouseLeftButtonUp="OnObjDuctClick" ToolTip="Gaine">
+                                            <Grid Height="50">
+                                                <Image x:Name="imgObjDuct" Stretch="Uniform" Margin="6" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                                <TextBlock x:Name="txtObjDuctFallback" Text="Gaine" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Grid>
+                                        </Border>
+                                        <Border x:Name="objDoorCard" Width="88" Margin="0,0,6,0" BorderThickness="2" CornerRadius="10" BorderBrush="{StaticResource Border}" Background="{StaticResource Surface.Subtle}" Cursor="Hand" MouseEnter="OnObjDoorHover" MouseLeftButtonUp="OnObjDoorClick" ToolTip="Porte">
+                                            <Grid Height="50">
+                                                <Image x:Name="imgObjDoor" Stretch="Uniform" Margin="6" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                                <TextBlock x:Name="txtObjDoorFallback" Text="Porte" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Grid>
+                                        </Border>
+                                        <Border x:Name="objWindowCard" Width="88" Margin="0,0,6,0" BorderThickness="2" CornerRadius="10" BorderBrush="{StaticResource Border}" Background="{StaticResource Surface.Subtle}" Cursor="Hand" MouseEnter="OnObjWindowHover" MouseLeftButtonUp="OnObjWindowClick" ToolTip="Fenêtre">
+                                            <Grid Height="50">
+                                                <Image x:Name="imgObjWindow" Stretch="Uniform" Margin="6" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                                <TextBlock x:Name="txtObjWindowFallback" Text="Fenêtre" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Grid>
+                                        </Border>
+                                        <Border x:Name="objOtherCard" Width="88" Margin="0,0,0,0" BorderThickness="2" CornerRadius="10" BorderBrush="{StaticResource Border}" Background="{StaticResource Surface.Subtle}" Cursor="Hand" MouseEnter="OnObjOtherHover" MouseLeftButtonUp="OnObjOtherClick" ToolTip="Autre">
+                                            <Grid Height="50">
+                                                <Image x:Name="imgObjOther" Stretch="Uniform" Margin="6" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                                <TextBlock x:Name="txtObjOtherFallback" Text="Autre" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Grid>
+                                        </Border>
+                                    </WrapPanel>
+                                </StackPanel>
+
                                 <ComboBox Grid.Row="3" Grid.Column="1"
                                           x:Name="comboObjectType"
-                                          Height="34"
-                                          Margin="0,8,0,0"
+                                          Height="1"
+                                          Width="1"
+                                          Opacity="0"
+                                          IsHitTestVisible="False"
                                           SelectionChanged="OnCriteriaChanged">
                                     <ComboBoxItem Content="Canalisation"/>
                                     <ComboBoxItem Content="Gaine"/>
