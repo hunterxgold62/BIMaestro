@@ -39,16 +39,24 @@ namespace Modification
         private readonly HashSet<string> _allParameterNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly ReservationAutoV3PersoConfig _persoConfig;
         private readonly Dictionary<string, ShapeOptionItem> _shapeOptionByLabel = new Dictionary<string, ShapeOptionItem>(StringComparer.OrdinalIgnoreCase);
+
         private HostTarget _selectedHost = HostTarget.Mur;
         private ShapeTarget _selectedShapeBase = ShapeTarget.Rectangulaire;
+
+        private bool _rectShapeAvailable;
+        private bool _circShapeAvailable;
+        private bool _isRefreshingShapeOptions;
+
         private GifPlaybackData _murGifData;
         private GifPlaybackData _solGifData;
         private BitmapFrame _murFirstFrame;
         private BitmapFrame _solFirstFrame;
+
         private GifPlaybackData _shapeRectGifData;
         private GifPlaybackData _shapeCircGifData;
         private BitmapFrame _shapeRectFirstFrame;
         private BitmapFrame _shapeCircFirstFrame;
+
         private GifPlaybackData _objPipeGifData;
         private GifPlaybackData _objDuctGifData;
         private GifPlaybackData _objDoorGifData;
@@ -66,6 +74,7 @@ namespace Modification
         {
             public FamilySymbol Symbol { get; }
             public string Display { get; }
+
             public LoadedTypeItem(FamilySymbol s)
             {
                 Symbol = s;
@@ -97,10 +106,8 @@ namespace Modification
 
             comboObjectType.SelectedIndex = 0;
             comboPipeSource.SelectedIndex = 0;
-
             cbTargetProfile.SelectedIndex = 0;
 
-            // Defaults UI
             chkDefaultNorme.IsChecked = Config.DefaultNormeEnabled;
             chkDefaultDynamo.IsChecked = Config.DefaultDynamoAutoEnabled;
             tbOversize.Text = Config.OversizeMm_PipeDuct.ToString("0");
@@ -114,8 +121,10 @@ namespace Modification
             InitializeHostGifSelectors();
             InitializeShapeGifSelectors();
             InitializeObjectGifSelectors();
+
             RefreshProfilesSummary();
             RefreshShapeOptions();
+            UpdateHostSelectorUi();
             UpdateShapeSelectorUi();
             UpdateObjectSelectorUi();
             UpdateMappingPanels();
@@ -167,10 +176,10 @@ namespace Modification
             bool isCanal = obj == "Canalisation";
             comboPipeSource.IsEnabled = isCanal;
 
-            string shape = (comboShape.SelectedItem as ComboBoxItem)?.Content as string ?? "Rectangulaire V1";
+            string shape = (comboShape.SelectedItem as ComboBoxItem)?.Content as string ?? "";
             bool isRect = shape.IndexOf("Rectangulaire", StringComparison.OrdinalIgnoreCase) >= 0;
 
-            chkMulti.IsEnabled = isCanal && isRect;
+            chkMulti.IsEnabled = isCanal && isRect && comboShape.IsEnabled;
             if (!chkMulti.IsEnabled) chkMulti.IsChecked = false;
         }
 
@@ -178,57 +187,133 @@ namespace Modification
         {
             string previous = (comboShape.SelectedItem as ComboBoxItem)?.Content as string;
 
-            _shapeOptionByLabel.Clear();
-            comboShape.Items.Clear();
+            RefreshShapeAvailability();
 
-            HostTarget host = _selectedHost;
-
-            TryAddShapeOption(host, _selectedShapeBase, $"{GetShapePrefix(_selectedShapeBase)} V1", FindBuiltInProfile(host, _selectedShapeBase, isV2: false));
-            TryAddShapeOption(host, _selectedShapeBase, $"{GetShapePrefix(_selectedShapeBase)} V2", FindBuiltInProfile(host, _selectedShapeBase, isV2: true));
-            TryAddShapeOption(host, _selectedShapeBase, $"{GetShapePrefix(_selectedShapeBase)} perso", _persoConfig.Get(host, _selectedShapeBase));
-
-            if (comboShape.Items.Count == 0)
+            _isRefreshingShapeOptions = true;
+            try
             {
-                comboShape.Items.Add(new ComboBoxItem { Content = "(Aucune famille disponible)" });
-                comboShape.SelectedIndex = 0;
-                comboShape.IsEnabled = false;
-                return;
-            }
-
-            comboShape.IsEnabled = true;
-
-            int idx = 0;
-            if (!string.IsNullOrWhiteSpace(previous))
-            {
-                for (int i = 0; i < comboShape.Items.Count; i++)
+                if (!_rectShapeAvailable && !_circShapeAvailable)
                 {
-                    if ((comboShape.Items[i] as ComboBoxItem)?.Content as string == previous)
+                    _selectedShapeBase = ShapeTarget.Rectangulaire;
+                    _shapeOptionByLabel.Clear();
+                    comboShape.Items.Clear();
+                    comboShape.Items.Add(new ComboBoxItem { Content = "(Aucune famille disponible)" });
+                    comboShape.SelectedIndex = 0;
+                    comboShape.IsEnabled = false;
+                    comboShape.Text = string.Empty;
+                    UpdateShapeSelectorUi();
+                    OnCriteriaChanged(null, null);
+                    return;
+                }
+
+                if (_selectedShapeBase == ShapeTarget.Rectangulaire && !_rectShapeAvailable)
+                    _selectedShapeBase = ShapeTarget.Circulaire;
+                else if (_selectedShapeBase == ShapeTarget.Circulaire && !_circShapeAvailable)
+                    _selectedShapeBase = ShapeTarget.Rectangulaire;
+
+                _shapeOptionByLabel.Clear();
+                comboShape.Items.Clear();
+
+                foreach (var option in GetAvailableShapeOptions(_selectedHost, _selectedShapeBase))
+                {
+                    _shapeOptionByLabel[option.Label] = option;
+                    comboShape.Items.Add(new ComboBoxItem { Content = option.Label });
+                }
+
+                if (comboShape.Items.Count == 0)
+                {
+                    comboShape.Items.Add(new ComboBoxItem { Content = "(Aucune famille disponible)" });
+                    comboShape.SelectedIndex = 0;
+                    comboShape.IsEnabled = false;
+                    comboShape.Text = string.Empty;
+                }
+                else
+                {
+                    comboShape.IsEnabled = true;
+
+                    int idx = 0;
+                    if (!string.IsNullOrWhiteSpace(previous))
                     {
-                        idx = i;
-                        break;
+                        for (int i = 0; i < comboShape.Items.Count; i++)
+                        {
+                            if ((comboShape.Items[i] as ComboBoxItem)?.Content as string == previous)
+                            {
+                                idx = i;
+                                break;
+                            }
+                        }
+                    }
+
+                    comboShape.SelectedIndex = idx;
+
+                    if (comboShape.SelectedItem is ComboBoxItem selectedItem &&
+                        selectedItem.Content is string selectedLabel)
+                    {
+                        comboShape.Text = selectedLabel;
+                    }
+                    else
+                    {
+                        comboShape.Text = string.Empty;
                     }
                 }
             }
+            finally
+            {
+                _isRefreshingShapeOptions = false;
+            }
 
-            comboShape.SelectedIndex = idx;
+            UpdateShapeSelectorUi();
+            OnCriteriaChanged(null, null);
         }
 
-        private static string GetShapePrefix(ShapeTarget shape) => shape == ShapeTarget.Circulaire ? "Circulaire" : "Rectangulaire";
-
-        private void TryAddShapeOption(HostTarget host, ShapeTarget shape, string label, ProfileConfig profile)
+        private void RefreshShapeAvailability()
         {
-            if (profile == null || string.IsNullOrWhiteSpace(profile.FamilyName)) return;
-            if (!IsProfileLoadedInProject(profile)) return;
+            _rectShapeAvailable = HasAnyLoadedProfile(_selectedHost, ShapeTarget.Rectangulaire);
+            _circShapeAvailable = HasAnyLoadedProfile(_selectedHost, ShapeTarget.Circulaire);
+        }
 
-            _shapeOptionByLabel[label] = new ShapeOptionItem
+        private bool HasAnyLoadedProfile(HostTarget host, ShapeTarget shape)
+        {
+            return GetAvailableShapeOptions(host, shape).Any();
+        }
+
+        private IEnumerable<ShapeOptionItem> GetAvailableShapeOptions(HostTarget host, ShapeTarget shape)
+        {
+            foreach (var option in CreateShapeOptionItems(host, shape))
             {
-                Label = label,
+                if (option?.Profile == null) continue;
+                if (string.IsNullOrWhiteSpace(option.Profile.FamilyName)) continue;
+                if (!IsProfileLoadedInProject(option.Profile)) continue;
+                yield return option;
+            }
+        }
+
+        private IEnumerable<ShapeOptionItem> CreateShapeOptionItems(HostTarget host, ShapeTarget shape)
+        {
+            yield return new ShapeOptionItem
+            {
+                Label = $"{GetShapePrefix(shape)} V1",
                 Shape = shape,
-                Profile = profile
+                Profile = FindBuiltInProfile(host, shape, isV2: false)
             };
 
-            comboShape.Items.Add(new ComboBoxItem { Content = label });
+            yield return new ShapeOptionItem
+            {
+                Label = $"{GetShapePrefix(shape)} V2",
+                Shape = shape,
+                Profile = FindBuiltInProfile(host, shape, isV2: true)
+            };
+
+            yield return new ShapeOptionItem
+            {
+                Label = $"{GetShapePrefix(shape)} perso",
+                Shape = shape,
+                Profile = _persoConfig.Get(host, shape)
+            };
         }
+
+        private static string GetShapePrefix(ShapeTarget shape)
+            => shape == ShapeTarget.Circulaire ? "Circulaire" : "Rectangulaire";
 
         private bool IsProfileLoadedInProject(ProfileConfig profile)
         {
@@ -237,7 +322,8 @@ namespace Modification
             return new FilteredElementCollector(_doc)
                 .OfClass(typeof(FamilySymbol))
                 .Cast<FamilySymbol>()
-                .Any(s => s?.Family?.Name != null && string.Equals(s.Family.Name, profile.FamilyName, StringComparison.OrdinalIgnoreCase));
+                .Any(s => s?.Family?.Name != null &&
+                          string.Equals(s.Family.Name, profile.FamilyName, StringComparison.OrdinalIgnoreCase));
         }
 
         private ProfileConfig FindBuiltInProfile(HostTarget host, ShapeTarget shape, bool isV2)
@@ -305,6 +391,7 @@ namespace Modification
                 ? value.Substring(4)
                 : value;
         }
+
         private void InitializeHostGifSelectors()
         {
             var murResource = FindBestGifResource("mur", null);
@@ -415,7 +502,7 @@ namespace Modification
                 {
                     int offset = i * 4;
                     if (offset + 3 >= item.Value.Length) break;
-                    int delayCs = BitConverter.ToInt32(item.Value, offset); // centiseconds
+                    int delayCs = BitConverter.ToInt32(item.Value, offset);
                     if (delayCs <= 0) delayCs = 10;
                     result[i] = TimeSpan.FromMilliseconds(delayCs * 10);
                 }
@@ -466,7 +553,9 @@ namespace Modification
                 animation.KeyFrames.Add(new DiscreteObjectKeyFrame(frame, KeyTime.FromTimeSpan(total)));
                 total += delay;
             }
+
             if (total <= TimeSpan.Zero) total = TimeSpan.FromSeconds(1);
+
             animation.Duration = total;
             animation.RepeatBehavior = new RepeatBehavior(1);
             animation.FillBehavior = FillBehavior.Stop;
@@ -476,6 +565,7 @@ namespace Modification
                 if (firstFrame != null)
                     image.Source = firstFrame;
             };
+
             image.BeginAnimation(Image.SourceProperty, animation);
         }
 
@@ -489,6 +579,9 @@ namespace Modification
 
         private void SelectShapeBase(ShapeTarget shape)
         {
+            if (shape == ShapeTarget.Rectangulaire && !_rectShapeAvailable) return;
+            if (shape == ShapeTarget.Circulaire && !_circShapeAvailable) return;
+
             _selectedShapeBase = shape;
             UpdateShapeSelectorUi();
             RefreshShapeOptions();
@@ -519,9 +612,25 @@ namespace Modification
 
         private void UpdateShapeSelectorUi()
         {
-            bool rectSelected = _selectedShapeBase == ShapeTarget.Rectangulaire;
-            shapeRectCard.BorderBrush = rectSelected ? new SolidColorBrush(Color.FromRgb(53, 182, 121)) : (Brush)FindResource("Border");
-            shapeCircCard.BorderBrush = !rectSelected ? new SolidColorBrush(Color.FromRgb(53, 182, 121)) : (Brush)FindResource("Border");
+            ApplyShapeCardState(shapeRectCard, _selectedShapeBase == ShapeTarget.Rectangulaire, _rectShapeAvailable);
+            ApplyShapeCardState(shapeCircCard, _selectedShapeBase == ShapeTarget.Circulaire, _circShapeAvailable);
+        }
+
+        private void ApplyShapeCardState(Border card, bool isSelected, bool isEnabled)
+        {
+            if (card == null) return;
+
+            Brush selectedBrush = new SolidColorBrush(Color.FromRgb(53, 182, 121));
+            Brush normalBorder = (Brush)FindResource("Border");
+            Brush disabledBorder = (Brush)FindResource("Divider");
+            Brush enabledBackground = (Brush)FindResource("Surface");
+            Brush disabledBackground = (Brush)FindResource("Surface.Subtle");
+
+            card.BorderBrush = !isEnabled ? disabledBorder : (isSelected ? selectedBrush : normalBorder);
+            card.Background = isEnabled ? enabledBackground : disabledBackground;
+            card.Opacity = isEnabled ? 1.0 : 0.45;
+            card.IsHitTestVisible = isEnabled;
+            card.Cursor = isEnabled ? System.Windows.Input.Cursors.Hand : System.Windows.Input.Cursors.Arrow;
         }
 
         private void UpdateObjectSelectorUi()
@@ -546,6 +655,7 @@ namespace Modification
             SelectHost(HostTarget.Sol);
             PlayGifOnce(imgHostSol, _solGifData, _solFirstFrame);
         }
+
         private void OnMurGifHover(object sender, System.Windows.Input.MouseEventArgs e)
         {
             StartPulse(hostMurCard);
@@ -560,31 +670,41 @@ namespace Modification
 
         private void OnShapeRectClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
+            if (!_rectShapeAvailable) return;
             SelectShapeBase(ShapeTarget.Rectangulaire);
             PlayGifOnce(imgShapeRect, _shapeRectGifData, _shapeRectFirstFrame);
         }
 
         private void OnShapeCircClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
+            if (!_circShapeAvailable) return;
             SelectShapeBase(ShapeTarget.Circulaire);
             PlayGifOnce(imgShapeCirc, _shapeCircGifData, _shapeCircFirstFrame);
         }
 
         private void OnShapeRectHover(object sender, System.Windows.Input.MouseEventArgs e)
         {
+            if (!_rectShapeAvailable) return;
             StartPulse(shapeRectCard);
             PlayGifOnce(imgShapeRect, _shapeRectGifData, _shapeRectFirstFrame);
         }
 
         private void OnShapeCircHover(object sender, System.Windows.Input.MouseEventArgs e)
         {
+            if (!_circShapeAvailable) return;
             StartPulse(shapeCircCard);
             PlayGifOnce(imgShapeCirc, _shapeCircGifData, _shapeCircFirstFrame);
         }
 
         private void OnShapeVariantChanged(object sender, SelectionChangedEventArgs e)
         {
-            string label = (comboShape.SelectedItem as ComboBoxItem)?.Content as string ?? comboShape.Text ?? "";
+            if (_isRefreshingShapeOptions)
+                return;
+
+            string label = (comboShape.SelectedItem as ComboBoxItem)?.Content as string;
+            if (string.IsNullOrWhiteSpace(label))
+                return;
+
             if (label.IndexOf("Circulaire", StringComparison.OrdinalIgnoreCase) >= 0 && _selectedShapeBase != ShapeTarget.Circulaire)
             {
                 _selectedShapeBase = ShapeTarget.Circulaire;
@@ -599,20 +719,70 @@ namespace Modification
             OnCriteriaChanged(null, null);
         }
 
-        private void OnObjPipeClick(object sender, System.Windows.Input.MouseButtonEventArgs e) { SelectObjectType(ObjectType.Canalisation); PlayGifOnce(imgObjPipe, _objPipeGifData, _objPipeFirstFrame); }
-        private void OnObjDuctClick(object sender, System.Windows.Input.MouseButtonEventArgs e) { SelectObjectType(ObjectType.Gaine); PlayGifOnce(imgObjDuct, _objDuctGifData, _objDuctFirstFrame); }
-        private void OnObjDoorClick(object sender, System.Windows.Input.MouseButtonEventArgs e) { SelectObjectType(ObjectType.Porte); PlayGifOnce(imgObjDoor, _objDoorGifData, _objDoorFirstFrame); }
-        private void OnObjWindowClick(object sender, System.Windows.Input.MouseButtonEventArgs e) { SelectObjectType(ObjectType.Fenetre); PlayGifOnce(imgObjWindow, _objWindowGifData, _objWindowFirstFrame); }
-        private void OnObjOtherClick(object sender, System.Windows.Input.MouseButtonEventArgs e) { SelectObjectType(ObjectType.Autre); PlayGifOnce(imgObjOther, _objOtherGifData, _objOtherFirstFrame); }
-        private void OnObjPipeHover(object sender, System.Windows.Input.MouseEventArgs e) { StartPulse(objPipeCard); PlayGifOnce(imgObjPipe, _objPipeGifData, _objPipeFirstFrame); }
-        private void OnObjDuctHover(object sender, System.Windows.Input.MouseEventArgs e) { StartPulse(objDuctCard); PlayGifOnce(imgObjDuct, _objDuctGifData, _objDuctFirstFrame); }
-        private void OnObjDoorHover(object sender, System.Windows.Input.MouseEventArgs e) { StartPulse(objDoorCard); PlayGifOnce(imgObjDoor, _objDoorGifData, _objDoorFirstFrame); }
-        private void OnObjWindowHover(object sender, System.Windows.Input.MouseEventArgs e) { StartPulse(objWindowCard); PlayGifOnce(imgObjWindow, _objWindowGifData, _objWindowFirstFrame); }
-        private void OnObjOtherHover(object sender, System.Windows.Input.MouseEventArgs e) { StartPulse(objOtherCard); PlayGifOnce(imgObjOther, _objOtherGifData, _objOtherFirstFrame); }
+        private void OnObjPipeClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            SelectObjectType(ObjectType.Canalisation);
+            PlayGifOnce(imgObjPipe, _objPipeGifData, _objPipeFirstFrame);
+        }
+
+        private void OnObjDuctClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            SelectObjectType(ObjectType.Gaine);
+            PlayGifOnce(imgObjDuct, _objDuctGifData, _objDuctFirstFrame);
+        }
+
+        private void OnObjDoorClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            SelectObjectType(ObjectType.Porte);
+            PlayGifOnce(imgObjDoor, _objDoorGifData, _objDoorFirstFrame);
+        }
+
+        private void OnObjWindowClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            SelectObjectType(ObjectType.Fenetre);
+            PlayGifOnce(imgObjWindow, _objWindowGifData, _objWindowFirstFrame);
+        }
+
+        private void OnObjOtherClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            SelectObjectType(ObjectType.Autre);
+            PlayGifOnce(imgObjOther, _objOtherGifData, _objOtherFirstFrame);
+        }
+
+        private void OnObjPipeHover(object sender, System.Windows.Input.MouseEventArgs e)
+        {
+            StartPulse(objPipeCard);
+            PlayGifOnce(imgObjPipe, _objPipeGifData, _objPipeFirstFrame);
+        }
+
+        private void OnObjDuctHover(object sender, System.Windows.Input.MouseEventArgs e)
+        {
+            StartPulse(objDuctCard);
+            PlayGifOnce(imgObjDuct, _objDuctGifData, _objDuctFirstFrame);
+        }
+
+        private void OnObjDoorHover(object sender, System.Windows.Input.MouseEventArgs e)
+        {
+            StartPulse(objDoorCard);
+            PlayGifOnce(imgObjDoor, _objDoorGifData, _objDoorFirstFrame);
+        }
+
+        private void OnObjWindowHover(object sender, System.Windows.Input.MouseEventArgs e)
+        {
+            StartPulse(objWindowCard);
+            PlayGifOnce(imgObjWindow, _objWindowGifData, _objWindowFirstFrame);
+        }
+
+        private void OnObjOtherHover(object sender, System.Windows.Input.MouseEventArgs e)
+        {
+            StartPulse(objOtherCard);
+            PlayGifOnce(imgObjOther, _objOtherGifData, _objOtherFirstFrame);
+        }
 
         private static void StartPulse(Border border)
         {
             if (border == null) return;
+
             var pulse = new DoubleAnimation
             {
                 From = 1.0,
@@ -638,7 +808,9 @@ namespace Modification
                 {
                     dlg.InitialDirectory = System.IO.Path.GetDirectoryName(tbRfaPath.Text);
                 }
-                catch { }
+                catch
+                {
+                }
             }
 
             if (dlg.ShowDialog() == true)
@@ -659,7 +831,6 @@ namespace Modification
 
             try
             {
-                // Charge la famille dans le projet sans popup
                 using (var t = new Transaction(_doc, "Charger famille réservation (V3)"))
                 {
                     t.Start();
@@ -674,7 +845,6 @@ namespace Modification
 
                     t.Commit();
 
-                    // Récupère tous les types de cette famille
                     _loadedTypes = GetSymbolsFromFamily(_doc, fam)
                         .Select(s => new LoadedTypeItem(s))
                         .ToList();
@@ -683,6 +853,9 @@ namespace Modification
 
                     cbLoadedType.ItemsSource = _loadedTypes;
                     cbLoadedType.SelectedIndex = _loadedTypes.Any() ? 0 : -1;
+
+                    RefreshProfilesSummary();
+                    RefreshShapeOptions();
 
                     MessageBox.Show("Famille chargée ✅\nChoisis ensuite le profil (mur/sol + forme) et mappe les paramètres.",
                         "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -724,14 +897,21 @@ namespace Modification
             panelMapRectFloor.Visibility = System.Windows.Visibility.Collapsed;
             panelMapCircFloor.Visibility = System.Windows.Visibility.Collapsed;
 
-
             int idx = cbTargetProfile.SelectedIndex;
             switch (idx)
             {
-                case 0: panelMapRectWall.Visibility = System.Windows.Visibility.Visible; break;  // Mur Rect
-                case 1: panelMapCircWall.Visibility = System.Windows.Visibility.Visible; break;  // Mur Circ
-                case 2: panelMapRectFloor.Visibility = System.Windows.Visibility.Visible; break; // Sol Rect
-                case 3: panelMapCircFloor.Visibility = System.Windows.Visibility.Visible; break; // Sol Circ
+                case 0:
+                    panelMapRectWall.Visibility = System.Windows.Visibility.Visible;
+                    break;
+                case 1:
+                    panelMapCircWall.Visibility = System.Windows.Visibility.Visible;
+                    break;
+                case 2:
+                    panelMapRectFloor.Visibility = System.Windows.Visibility.Visible;
+                    break;
+                case 3:
+                    panelMapCircFloor.Visibility = System.Windows.Visibility.Visible;
+                    break;
             }
 
             FillParamCombosFromSelectedSymbol();
@@ -825,7 +1005,6 @@ namespace Modification
             }
             catch
             {
-                // On garde la liste provenant du projet si ouverture RFA impossible.
             }
             finally
             {
@@ -846,7 +1025,6 @@ namespace Modification
                 return;
             }
 
-            // Mise à jour des options globales
             if (!double.TryParse(tbOversize.Text?.Trim(), out var ov)) ov = 50.0;
             Config.OversizeMm_PipeDuct = Math.Max(0.0, ov);
             Config.DynamoPath = tbDynamoPath.Text ?? "";
@@ -866,7 +1044,6 @@ namespace Modification
             p.FamilyName = sym.Family.Name;
             p.TypeName = sym.Name;
 
-            // Mapping selon profil
             if (idx == 0)
             {
                 p.ParamLength = cbMapWallLen?.Text ?? "";
@@ -936,7 +1113,6 @@ namespace Modification
                 MessageBox.Show("Erreur sauvegarde : " + err, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Error);
         }
 
-
         private void OnOk(object sender, RoutedEventArgs e)
         {
             if (!comboShape.IsEnabled || !_shapeOptionByLabel.Any())
@@ -946,7 +1122,6 @@ namespace Modification
             }
 
             SelectedHost = _selectedHost;
-
             SelectedShape = _selectedShapeBase;
 
             string shapeLabel = (comboShape.SelectedItem as ComboBoxItem)?.Content as string;
@@ -975,11 +1150,9 @@ namespace Modification
 
             AutomatiqueEnabled = chkAutomatique.IsChecked == true;
             MultiEnabled = chkMulti.IsChecked == true;
-
             NormeEnabled = chkNorme.IsChecked == true;
             DynamoAutoEnabled = chkDynamo.IsChecked == true;
 
-            // persist defaults if user changed them in exec
             Config.DefaultNormeEnabled = NormeEnabled;
             Config.DefaultDynamoAutoEnabled = DynamoAutoEnabled;
             ReservationAutoV3ConfigStore.Save(Config, out _);
@@ -998,14 +1171,12 @@ namespace Modification
         {
             public bool OnFamilyFound(bool familyInUse, out bool overwriteParameterValues)
             {
-                // Important : pas de popup. On ne force pas l’écrasement des paramètres.
                 overwriteParameterValues = false;
                 return true;
             }
 
             public bool OnSharedFamilyFound(Family sharedFamily, bool familyInUse, out FamilySource source, out bool overwriteParameterValues)
             {
-                // Idem : pas de popup, pas d'écrasement.
                 source = FamilySource.Project;
                 overwriteParameterValues = false;
                 return true;
