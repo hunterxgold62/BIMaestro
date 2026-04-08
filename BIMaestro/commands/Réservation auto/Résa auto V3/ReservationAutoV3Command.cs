@@ -361,19 +361,49 @@ namespace Modification
         // AUTO (mur only)
         // =========================
         private void RunAutomatic(Document doc,
-            ReservationAutoV3Window win,
-            ReservationAutoV3Config cfg,
-            ProfileConfig prof,
-            FamilySymbol reservationSymbol)
+    ReservationAutoV3Window win,
+    ReservationAutoV3Config cfg,
+    ProfileConfig prof,
+    FamilySymbol reservationSymbol)
         {
-            var walls = new FilteredElementCollector(doc).OfClass(typeof(Wall)).Cast<Wall>().ToList();
+            var walls = new FilteredElementCollector(doc)
+                .OfClass(typeof(Wall))
+                .Cast<Wall>()
+                .ToList();
+
             if (!walls.Any())
             {
                 TaskDialog.Show("BIMaestro", "Aucun mur trouvé.");
                 return;
             }
 
-            var targets = CollectTargets(doc, win.SelectedObject);
+            List<Element> targets = win.SelectedObject switch
+            {
+                ReservationAutoV3Window.ObjectType.Canalisation => new FilteredElementCollector(doc)
+                    .OfClass(typeof(Pipe))
+                    .Cast<Element>()
+                    .ToList(),
+
+                ReservationAutoV3Window.ObjectType.Gaine => new FilteredElementCollector(doc)
+                    .OfClass(typeof(Duct))
+                    .Cast<Element>()
+                    .ToList(),
+
+                ReservationAutoV3Window.ObjectType.Porte => new FilteredElementCollector(doc)
+                    .OfCategory(BuiltInCategory.OST_Doors)
+                    .OfClass(typeof(FamilyInstance))
+                    .Cast<Element>()
+                    .ToList(),
+
+                ReservationAutoV3Window.ObjectType.Fenetre => new FilteredElementCollector(doc)
+                    .OfCategory(BuiltInCategory.OST_Windows)
+                    .OfClass(typeof(FamilyInstance))
+                    .Cast<Element>()
+                    .ToList(),
+
+                _ => new List<Element>()
+            };
+
             if (!targets.Any())
             {
                 TaskDialog.Show("BIMaestro", "Aucun objet trouvé.");
@@ -388,14 +418,17 @@ namespace Modification
                 if (bbWall == null) continue;
 
                 var level = doc.GetElement(wall.LevelId) as Level
-                            ?? new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>().FirstOrDefault();
+                            ?? new FilteredElementCollector(doc)
+                                .OfClass(typeof(Level))
+                                .Cast<Level>()
+                                .FirstOrDefault();
 
                 foreach (var el in targets)
                 {
                     var bbEl = el.get_BoundingBox(null);
                     if (bbEl == null) continue;
 
-                    // ✅ IMPORTANT : intersection pour dimensionnement
+                    // Intersection pour dimensionnement
                     var bbInt = IntersectBoundingBoxes(bbWall, bbEl);
                     if (bbInt == null) continue;
 
@@ -403,32 +436,42 @@ namespace Modification
                     center = ProjectPointOntoWallPlane(wall, center);
 
                     var fi = doc.Create.NewFamilyInstance(
-                        center, reservationSymbol, wall, level,
+                        center,
+                        reservationSymbol,
+                        wall,
+                        level,
                         Autodesk.Revit.DB.Structure.StructuralType.NonStructural);
 
-                    ApplySizing(fi, wall, bbInt, cfg, prof, win.SelectedObject, el, Transform.Identity,
-                        win.SelectedShape == ReservationAutoV3Window.ShapeTarget.Rectangulaire, win.NormeEnabled);
+                    ApplySizing(
+                        fi,
+                        wall,
+                        bbInt,
+                        cfg,
+                        prof,
+                        win.SelectedObject,
+                        el,
+                        Transform.Identity,
+                        win.SelectedShape == ReservationAutoV3Window.ShapeTarget.Rectangulaire,
+                        win.NormeEnabled);
 
-                    // ✅ force la coupe si famille "vide"
+                    ApplyVerticalPlacementCorrection(
+                        doc,
+                        fi,
+                        wall,
+                        prof,
+                        bbInt,
+                        cfg,
+                        win.SelectedObject,
+                        el,
+                        win.SelectedShape == ReservationAutoV3Window.ShapeTarget.Rectangulaire,
+                        win.NormeEnabled);
+
                     ForceVoidCutSafe(doc, wall, fi);
-
                     created++;
                 }
             }
 
             TaskDialog.Show("BIMaestro", $"Réservations créées : {created}");
-        }
-
-        private static List<Element> CollectTargets(Document doc, ReservationAutoV3Window.ObjectType objType)
-        {
-            return objType switch
-            {
-                ReservationAutoV3Window.ObjectType.Canalisation => new FilteredElementCollector(doc).OfClass(typeof(Pipe)).Cast<Element>().ToList(),
-                ReservationAutoV3Window.ObjectType.Gaine => new FilteredElementCollector(doc).OfClass(typeof(Duct)).Cast<Element>().ToList(),
-                ReservationAutoV3Window.ObjectType.Porte => new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Doors).OfClass(typeof(FamilyInstance)).Cast<Element>().ToList(),
-                ReservationAutoV3Window.ObjectType.Fenetre => new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Windows).OfClass(typeof(FamilyInstance)).Cast<Element>().ToList(),
-                _ => new List<Element>()
-            };
         }
 
         // =========================
@@ -498,6 +541,8 @@ namespace Modification
 
             ApplySizing(fi, host, bbInt, cfg, prof, objType, el, trToHost, isRect, normeEnabled);
 
+            ApplyVerticalPlacementCorrection(doc, fi, host, prof, bbInt, cfg, objType, el, isRect, normeEnabled);
+
             // ✅ force la coupe si famille "vide"
             ForceVoidCutSafe(doc, host, fi);
         }
@@ -549,6 +594,8 @@ namespace Modification
 
             // Multi rect = sizing basé sur unionInt
             ApplySizing_MultiRect(fi, host, unionInt, cfg, prof, objType, normeEnabled);
+
+            ApplyVerticalPlacementCorrection(doc, fi, host, prof, unionInt, cfg, objType, null, true, normeEnabled);
 
             // ✅ force la coupe si famille "vide"
             ForceVoidCutSafe(doc, host, fi);
@@ -714,6 +761,94 @@ namespace Modification
                 if (Try(fb)) return true;
 
             return false;
+        }
+
+        // =========================
+        // CORRECTION DE POSITION VERTICALE
+        // =========================
+        private void ApplyVerticalPlacementCorrection(
+            Document doc,
+            FamilyInstance fi,
+            Element host,
+            ProfileConfig prof,
+            BoundingBoxXYZ bbIntersect,
+            ReservationAutoV3Config cfg,
+            ReservationAutoV3Window.ObjectType objType,
+            Element intersecting,
+            bool isRect,
+            bool normeEnabled)
+        {
+            if (doc == null || fi == null || host == null || prof == null || bbIntersect == null)
+                return;
+
+            double verticalSizeFt = ComputeReferenceVerticalSize(host, bbIntersect, cfg, objType, intersecting, isRect, normeEnabled);
+            double shiftFt = MmToFt(prof.VerticalPlacementOffsetMm);
+
+            switch (prof.VerticalPlacementReference)
+            {
+                case VerticalPlacementReference.Bottom:
+                    shiftFt += verticalSizeFt * 0.5;
+                    break;
+
+                case VerticalPlacementReference.Top:
+                    shiftFt -= verticalSizeFt * 0.5;
+                    break;
+
+                case VerticalPlacementReference.Center:
+                default:
+                    break;
+            }
+
+            if (Math.Abs(shiftFt) < 1e-9)
+                return;
+
+            ElementTransformUtils.MoveElement(doc, fi.Id, XYZ.BasisZ * shiftFt);
+        }
+
+        private double ComputeReferenceVerticalSize(
+            Element host,
+            BoundingBoxXYZ bbIntersect,
+            ReservationAutoV3Config cfg,
+            ReservationAutoV3Window.ObjectType objType,
+            Element intersecting,
+            bool isRect,
+            bool normeEnabled)
+        {
+            if (host == null || bbIntersect == null)
+                return 0.0;
+
+            double depthFt = GetHostDepth(host);
+
+            // Pour les sols/dalles : le vrai problème vertical est quasiment toujours lié à l’épaisseur traversée
+            if (host is Floor)
+                return depthFt;
+
+            // Pour les murs : on corrige sur la hauteur de réservation
+            bool isPipeOrDuct = objType == ReservationAutoV3Window.ObjectType.Canalisation
+                                || objType == ReservationAutoV3Window.ObjectType.Gaine;
+
+            double oversizeFt = MmToFt(isPipeOrDuct ? cfg.OversizeMm_PipeDuct : 0.0);
+            var world = ToWorldBoundingBox(bbIntersect);
+            if (world == null)
+                return 0.0;
+
+            if (!isRect)
+            {
+                double diamFt = CalculateDiameterForElement(intersecting, objType, oversizeFt);
+                if (diamFt <= 1e-9)
+                    diamFt = CalculateFallbackDiameter(host, world, depthFt, oversizeFt);
+
+                if (normeEnabled)
+                    diamFt = RoundToNearest50mm(diamFt);
+
+                return diamFt;
+            }
+
+            double hgt = (world.Max.Z - world.Min.Z) + oversizeFt;
+            if (normeEnabled)
+                hgt = RoundToNearest50mm(hgt);
+
+            return hgt;
         }
 
         // =========================
@@ -988,6 +1123,7 @@ namespace Modification
 
             return XYZ.BasisX;
         }
+
         private static void AlignReservationOrientationIfNeeded(Document doc, FamilyInstance inst, FamilySymbol symbol, Element host, XYZ origin, XYZ axisX)
         {
             if (doc == null || inst == null || symbol == null || host == null || origin == null || axisX == null) return;
@@ -1035,7 +1171,6 @@ namespace Modification
             Line axis = Line.CreateUnbound(origin, XYZ.BasisZ);
             ElementTransformUtils.RotateElement(doc, inst.Id, axis, angle);
         }
-
 
         private static XYZ ProjectPointOntoWallPlane(Wall wall, XYZ point)
         {

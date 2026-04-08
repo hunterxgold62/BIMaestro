@@ -6,6 +6,14 @@ using System.Runtime.Serialization.Json;
 namespace Modification
 {
     [DataContract]
+    public enum VerticalPlacementReference
+    {
+        [EnumMember] Center = 0,
+        [EnumMember] Bottom = 1,
+        [EnumMember] Top = 2
+    }
+
+    [DataContract]
     public class ReservationAutoV3Config
     {
         [DataMember] public ProfileConfig WallRect { get; set; } = ProfileConfig.DefaultWallRect();
@@ -41,6 +49,18 @@ namespace Modification
         [DataMember] public string ParamDiameter { get; set; } = "";
         [DataMember] public string ParamDepth { get; set; } = "";
 
+        // =========================
+        // Correction de placement vertical
+        // =========================
+        // Center  : le point d’insertion de la famille est déjà au centre
+        // Bottom  : le point d’insertion est en bas -> le plugin remonte de la moitié de la hauteur / profondeur
+        // Top     : le point d’insertion est en haut -> le plugin redescend de la moitié de la hauteur / profondeur
+        [DataMember] public VerticalPlacementReference VerticalPlacementReference { get; set; } = VerticalPlacementReference.Center;
+
+        // Correction manuelle supplémentaire en mm
+        // utile pour les familles avec logique interne de type arase inférieure / décalage incorporé
+        [DataMember] public double VerticalPlacementOffsetMm { get; set; } = 0.0;
+
         public bool IsConfigured => !string.IsNullOrWhiteSpace(FamilyName);
 
         public static ProfileConfig DefaultWallRect() => new ProfileConfig
@@ -49,7 +69,9 @@ namespace Modification
             TypeName = "",
             ParamLength = "Longueur",
             ParamHeight = "Hauteur",
-            ParamDepth = "Profondeur"
+            ParamDepth = "Profondeur",
+            VerticalPlacementReference = VerticalPlacementReference.Center,
+            VerticalPlacementOffsetMm = 0.0
         };
 
         public static ProfileConfig DefaultFloorRect() => new ProfileConfig
@@ -58,7 +80,9 @@ namespace Modification
             TypeName = "",
             ParamLength = "Longueur",
             ParamWidth = "Largeur",
-            ParamDepth = "Profondeur"
+            ParamDepth = "Profondeur",
+            VerticalPlacementReference = VerticalPlacementReference.Center,
+            VerticalPlacementOffsetMm = 0.0
         };
 
         public static ProfileConfig DefaultWallCirc() => new ProfileConfig
@@ -66,7 +90,9 @@ namespace Modification
             FamilyName = "CML_Réservation circulaire verticale",
             TypeName = "",
             ParamDiameter = "Diamètre",
-            ParamDepth = "Profondeur"
+            ParamDepth = "Profondeur",
+            VerticalPlacementReference = VerticalPlacementReference.Center,
+            VerticalPlacementOffsetMm = 0.0
         };
 
         public static ProfileConfig DefaultFloorCirc() => new ProfileConfig
@@ -74,7 +100,9 @@ namespace Modification
             FamilyName = "CML_Réservation circulaire horizontale",
             TypeName = "",
             ParamDiameter = "Diamètre",
-            ParamDepth = "Profondeur"
+            ParamDepth = "Profondeur",
+            VerticalPlacementReference = VerticalPlacementReference.Center,
+            VerticalPlacementOffsetMm = 0.0
         };
     }
 

@@ -880,7 +880,9 @@
   <ItemGroup>
     <EmbeddedResource Include="Resources\BIMaestro.png" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Folder Include="commands\paramétre partagé en famillle\" />
+  </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Resources\résa cercle.png" />
     <EmbeddedResource Include="Resources\Flappy bird-1.png" />

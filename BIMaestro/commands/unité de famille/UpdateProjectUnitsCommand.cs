@@ -36,6 +36,7 @@ namespace Famille
                 list = JsonConvert.DeserializeObject<List<UnitInfo>>(
                     File.ReadAllText(filePath)
                 );
+                if (list == null) { list = new List<UnitInfo>(); }
             }
             catch (Exception ex)
             {
@@ -50,11 +51,20 @@ namespace Famille
             {
                 tx.Start();
                 Units projectUnits = doc.GetUnits();
+                var modifiableSpecs = new HashSet<string>(
+                    Units.GetModifiableSpecs().Select(s => s.TypeId)
+                );
 
                 int appliedCount = 0;
+                int skippedUnmodifiableCount = 0;
                 foreach (var u in list.Where(x => x != null))
                 {
                     if (string.IsNullOrWhiteSpace(u.SpecType) || string.IsNullOrWhiteSpace(u.UnitType)) { continue; }
+                    if (!modifiableSpecs.Contains(u.SpecType))
+                    {
+                        skippedUnmodifiableCount++;
+                        continue;
+                    }
 
                     var specId = new ForgeTypeId(u.SpecType);
                     var unitId = new ForgeTypeId(u.UnitType);
@@ -70,7 +80,7 @@ namespace Famille
                 tx.Commit();
 
                 var disciplineCount = UnitUtils.GetAllDisciplines().Count();
-                TaskDialog.Show("Importer unités", $"✅ {appliedCount} unité(s) importée(s) (toutes disciplines, {disciplineCount} discipline(s)) depuis :\n{filePath}");
+                TaskDialog.Show("Importer unités", $"✅ {appliedCount} unité(s) importée(s) (toutes disciplines, {disciplineCount} discipline(s)) depuis :\n{filePath}\n\n⚠️ {skippedUnmodifiableCount} unité(s) ignorée(s) car non modifiables dans ce projet.");
             }
 
             return Result.Succeeded;
