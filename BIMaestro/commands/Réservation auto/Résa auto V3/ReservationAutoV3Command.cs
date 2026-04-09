@@ -761,33 +761,63 @@ namespace Modification
         // CORRECTION DE POSITION VERTICALE
         // =========================
         private void ApplyVerticalPlacementCorrection(
-            Document doc,
-            FamilyInstance fi,
-            FamilySymbol symbol,
-            Element host,
-            ProfileConfig prof,
-            BoundingBoxXYZ bbIntersect,
-            ReservationAutoV3Config cfg,
-            ReservationAutoV3Window.ObjectType objType,
-            Element intersecting,
-            bool isRect,
-            bool normeEnabled)
+    Document doc,
+    FamilyInstance fi,
+    FamilySymbol symbol,
+    Element host,
+    ProfileConfig prof,
+    BoundingBoxXYZ bbIntersect,
+    ReservationAutoV3Config cfg,
+    ReservationAutoV3Window.ObjectType objType,
+    Element intersecting,
+    bool isRect,
+    bool normeEnabled)
         {
             if (doc == null || fi == null || symbol == null || host == null || prof == null || bbIntersect == null)
                 return;
 
+            // ✅ IMPORTANT :
+            // on n'applique la logique de placement vertical QUE sur les profils perso
+            bool isPersoProfile = string.IsNullOrWhiteSpace(prof.TypeName)
+                ? false
+                : prof.FamilyName != null && (
+                    prof.FamilyName.IndexOf("perso", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    prof.TypeName.IndexOf("perso", StringComparison.OrdinalIgnoreCase) >= 0);
+
+            // En pratique le plus fiable n'est pas le nom "perso" mais le fait que le profil
+            // vienne d'une config utilisateur. Comme ici on ne reçoit pas directement cette info,
+            // on protège au moins les V1/V2 connues.
+            bool isBuiltInKnown =
+                FamilyNameContains(prof.FamilyName, "CML_Réservation rectangulaire verticale") ||
+                FamilyNameContains(prof.FamilyName, "CML_Réservation rectangulaire horizontale") ||
+                FamilyNameContains(prof.FamilyName, "CML_Réservation circulaire verticale") ||
+                FamilyNameContains(prof.FamilyName, "CML_Réservation circulaire horizontale") ||
+                FamilyNameContains(prof.FamilyName, "Réservation rectangulaire murale") ||
+                FamilyNameContains(prof.FamilyName, "Réservation rectangulaire sol") ||
+                FamilyNameContains(prof.FamilyName, "Réservation circulaire murale") ||
+                FamilyNameContains(prof.FamilyName, "Réservation circulaire sol");
+
+            if (isBuiltInKnown)
+                return;
+
             VerticalPlacementMode mode = ResolveVerticalPlacementMode(symbol, prof);
 
+            // si on est sur Auto sans décalage manuel et qu'on ne veut pas impacter les cas standards,
+            // on peut sortir si l'auto conclut "Center"
             double verticalSizeFt = ComputeReferenceVerticalSize(host, bbIntersect, cfg, objType, intersecting, isRect, normeEnabled);
             double shiftFt = MmToFt(prof.VerticalPlacementOffsetMm);
 
             switch (mode)
             {
-                case VerticalPlacementMode.Bottom:
+                // ✅ INVERSION CORRIGÉE PAR RAPPORT À MA VERSION PRÉCÉDENTE
+                // Si la référence de famille est en bas, il faut monter la famille
+                // et ton test montre que c'est actuellement "Haut" qui donne le bon résultat.
+                case VerticalPlacementMode.Top:
                     shiftFt += verticalSizeFt * 0.5;
                     break;
 
-                case VerticalPlacementMode.Top:
+                // Si la référence est en haut, il faut descendre la famille
+                case VerticalPlacementMode.Bottom:
                     shiftFt -= verticalSizeFt * 0.5;
                     break;
 
