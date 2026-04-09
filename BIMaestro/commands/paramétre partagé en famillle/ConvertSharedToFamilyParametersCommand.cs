@@ -14,6 +14,7 @@ namespace Famille
     public class ConvertSharedToFamilyParametersCommand : BaseTrackedCommand
     {
         protected override string ButtonId => "ConvertSharedToFamilyParameters";
+        private const int ConversionBatchSize = 5;
 
         protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
@@ -45,31 +46,47 @@ namespace Famille
             int converted = 0;
             var failed = new List<string>();
 
-            using (var tx = new Transaction(doc, "Convertir paramètres partagés en paramètres de famille"))
+            bool tempTypeCreated = false;
+            bool tempTypeInitialized = false;
+
+            foreach (var batch in Batch(sharedParameters, ConversionBatchSize))
             {
-                tx.Start();
-
-                bool tempTypeCreated;
-                EnsureCurrentTypeExists(familyManager, out tempTypeCreated);
-
-                foreach (var parameter in sharedParameters)
+                using (var tx = new Transaction(doc, "Convertir paramètres partagés en paramètres de famille"))
                 {
-                    string error;
-                    if (TryReplaceSharedParameter(doc, familyManager, parameter, out error))
+                    tx.Start();
+
+                    if (!tempTypeInitialized)
                     {
-                        converted++;
+                        EnsureCurrentTypeExists(familyManager, out tempTypeCreated);
+                        tempTypeInitialized = true;
                     }
-                    else
+
+                    foreach (var parameter in batch)
                     {
-                        string name = ParameterDisplayName(parameter);
-                        failed.Add(string.IsNullOrWhiteSpace(error) ? name : $"{name} — {error}");
+                        string error;
+                        if (TryReplaceSharedParameter(doc, familyManager, parameter, out error))
+                        {
+                            converted++;
+                        }
+                        else
+                        {
+                            string name = ParameterDisplayName(parameter);
+                            failed.Add(string.IsNullOrWhiteSpace(error) ? name : $"{name} — {error}");
+                        }
                     }
+
+                    tx.Commit();
                 }
+            }
 
-                if (tempTypeCreated)
+            if (tempTypeCreated)
+            {
+                using (var cleanupTx = new Transaction(doc, "Nettoyage type temporaire BIMaestro"))
+                {
+                    cleanupTx.Start();
                     TryCleanupTemporaryType(familyManager);
-
-                tx.Commit();
+                    cleanupTx.Commit();
+                }
             }
 
             string report = $"Paramètres partagés détectés : {sharedParameters.Count}\n" +
@@ -81,6 +98,15 @@ namespace Famille
 
             TaskDialog.Show("Conversion terminée", report);
             return Result.Succeeded;
+        }
+
+        private static IEnumerable<List<FamilyParameter>> Batch(List<FamilyParameter> parameters, int size)
+        {
+            if (parameters == null || parameters.Count == 0 || size <= 0)
+                yield break;
+
+            for (int i = 0; i < parameters.Count; i += size)
+                yield return parameters.Skip(i).Take(size).ToList();
         }
 
         private static string ParameterDisplayName(FamilyParameter parameter)

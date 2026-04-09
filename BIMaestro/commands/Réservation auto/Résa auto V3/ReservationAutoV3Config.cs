@@ -6,11 +6,12 @@ using System.Runtime.Serialization.Json;
 namespace Modification
 {
     [DataContract]
-    public enum VerticalPlacementReference
+    public enum VerticalPlacementMode
     {
-        [EnumMember] Center = 0,
-        [EnumMember] Bottom = 1,
-        [EnumMember] Top = 2
+        [EnumMember] Auto = 0,
+        [EnumMember] Center = 1,
+        [EnumMember] Bottom = 2,
+        [EnumMember] Top = 3
     }
 
     [DataContract]
@@ -49,16 +50,8 @@ namespace Modification
         [DataMember] public string ParamDiameter { get; set; } = "";
         [DataMember] public string ParamDepth { get; set; } = "";
 
-        // =========================
-        // Correction de placement vertical
-        // =========================
-        // Center  : le point d’insertion de la famille est déjà au centre
-        // Bottom  : le point d’insertion est en bas -> le plugin remonte de la moitié de la hauteur / profondeur
-        // Top     : le point d’insertion est en haut -> le plugin redescend de la moitié de la hauteur / profondeur
-        [DataMember] public VerticalPlacementReference VerticalPlacementReference { get; set; } = VerticalPlacementReference.Center;
-
-        // Correction manuelle supplémentaire en mm
-        // utile pour les familles avec logique interne de type arase inférieure / décalage incorporé
+        // Option B : auto + correction utilisateur
+        [DataMember] public VerticalPlacementMode VerticalPlacementMode { get; set; } = VerticalPlacementMode.Auto;
         [DataMember] public double VerticalPlacementOffsetMm { get; set; } = 0.0;
 
         public bool IsConfigured => !string.IsNullOrWhiteSpace(FamilyName);
@@ -70,7 +63,7 @@ namespace Modification
             ParamLength = "Longueur",
             ParamHeight = "Hauteur",
             ParamDepth = "Profondeur",
-            VerticalPlacementReference = VerticalPlacementReference.Center,
+            VerticalPlacementMode = VerticalPlacementMode.Auto,
             VerticalPlacementOffsetMm = 0.0
         };
 
@@ -81,7 +74,7 @@ namespace Modification
             ParamLength = "Longueur",
             ParamWidth = "Largeur",
             ParamDepth = "Profondeur",
-            VerticalPlacementReference = VerticalPlacementReference.Center,
+            VerticalPlacementMode = VerticalPlacementMode.Auto,
             VerticalPlacementOffsetMm = 0.0
         };
 
@@ -91,7 +84,7 @@ namespace Modification
             TypeName = "",
             ParamDiameter = "Diamètre",
             ParamDepth = "Profondeur",
-            VerticalPlacementReference = VerticalPlacementReference.Center,
+            VerticalPlacementMode = VerticalPlacementMode.Auto,
             VerticalPlacementOffsetMm = 0.0
         };
 
@@ -101,7 +94,7 @@ namespace Modification
             TypeName = "",
             ParamDiameter = "Diamètre",
             ParamDepth = "Profondeur",
-            VerticalPlacementReference = VerticalPlacementReference.Center,
+            VerticalPlacementMode = VerticalPlacementMode.Auto,
             VerticalPlacementOffsetMm = 0.0
         };
     }

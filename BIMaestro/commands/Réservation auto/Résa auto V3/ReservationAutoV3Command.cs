@@ -217,12 +217,11 @@ namespace Modification
                 return;
             }
 
-            // Rect : certaines familles “ouverture” ont “Largeur/Hauteur” (pas “Longueur”)
             if (string.IsNullOrWhiteSpace(p.ParamLength))
             {
                 p.ParamLength = Pick("long", "length");
                 if (string.IsNullOrWhiteSpace(p.ParamLength))
-                    p.ParamLength = Pick("larg", "width"); // fallback ouverture
+                    p.ParamLength = Pick("larg", "width");
             }
 
             if (kind == ProfileKind.WallRect)
@@ -233,7 +232,7 @@ namespace Modification
             {
                 p.ParamWidth = string.IsNullOrWhiteSpace(p.ParamWidth) ? Pick("larg", "width") : p.ParamWidth;
                 if (string.IsNullOrWhiteSpace(p.ParamWidth))
-                    p.ParamWidth = Pick("long", "length"); // fallback si inversé
+                    p.ParamWidth = Pick("long", "length");
             }
         }
 
@@ -282,7 +281,7 @@ namespace Modification
         }
 
         // =========================
-        // MANUAL (simple)
+        // MANUAL
         // =========================
         private void RunManual(UIDocument uiDoc, Document doc,
             ReservationAutoV3Window win,
@@ -361,10 +360,10 @@ namespace Modification
         // AUTO (mur only)
         // =========================
         private void RunAutomatic(Document doc,
-    ReservationAutoV3Window win,
-    ReservationAutoV3Config cfg,
-    ProfileConfig prof,
-    FamilySymbol reservationSymbol)
+            ReservationAutoV3Window win,
+            ReservationAutoV3Config cfg,
+            ProfileConfig prof,
+            FamilySymbol reservationSymbol)
         {
             var walls = new FilteredElementCollector(doc)
                 .OfClass(typeof(Wall))
@@ -428,7 +427,6 @@ namespace Modification
                     var bbEl = el.get_BoundingBox(null);
                     if (bbEl == null) continue;
 
-                    // Intersection pour dimensionnement
                     var bbInt = IntersectBoundingBoxes(bbWall, bbEl);
                     if (bbInt == null) continue;
 
@@ -457,6 +455,7 @@ namespace Modification
                     ApplyVerticalPlacementCorrection(
                         doc,
                         fi,
+                        reservationSymbol,
                         wall,
                         prof,
                         bbInt,
@@ -521,7 +520,6 @@ namespace Modification
             var bbEl = GetBoundingBoxInHostCoordinates(el, trToHost);
             if (bbHost == null || bbEl == null) return;
 
-            // ✅ IMPORTANT : on dimensionne sur l'intersection, pas la bbox complète
             var bbInt = IntersectBoundingBoxes(bbHost, bbEl);
             if (bbInt == null) return;
 
@@ -541,9 +539,8 @@ namespace Modification
 
             ApplySizing(fi, host, bbInt, cfg, prof, objType, el, trToHost, isRect, normeEnabled);
 
-            ApplyVerticalPlacementCorrection(doc, fi, host, prof, bbInt, cfg, objType, el, isRect, normeEnabled);
+            ApplyVerticalPlacementCorrection(doc, fi, sym, host, prof, bbInt, cfg, objType, el, isRect, normeEnabled);
 
-            // ✅ force la coupe si famille "vide"
             ForceVoidCutSafe(doc, host, fi);
         }
 
@@ -557,7 +554,6 @@ namespace Modification
             var bbHost = host.get_BoundingBox(null);
             if (bbHost == null) return;
 
-            // ✅ Clip de chaque bbox avec le host -> union propre (évite les énormes résa parallèles au mur)
             var clipped = elems
                 .Select(t => GetBoundingBoxInHostCoordinates(t.el, t.tr))
                 .Where(bb => bb != null)
@@ -592,17 +588,15 @@ namespace Modification
                    ? GetWallDirectionXY(host as Wall)
                    : GetPreferredFloorAxisXY(unionInt, elems));
 
-            // Multi rect = sizing basé sur unionInt
             ApplySizing_MultiRect(fi, host, unionInt, cfg, prof, objType, normeEnabled);
 
-            ApplyVerticalPlacementCorrection(doc, fi, host, prof, unionInt, cfg, objType, null, true, normeEnabled);
+            ApplyVerticalPlacementCorrection(doc, fi, sym, host, prof, unionInt, cfg, objType, null, true, normeEnabled);
 
-            // ✅ force la coupe si famille "vide"
             ForceVoidCutSafe(doc, host, fi);
         }
 
         // =========================
-        // Sizing (INTERSECTION-BASED)
+        // Sizing
         // =========================
         private void ApplySizing(FamilyInstance fi,
             Element host,
@@ -769,6 +763,7 @@ namespace Modification
         private void ApplyVerticalPlacementCorrection(
             Document doc,
             FamilyInstance fi,
+            FamilySymbol symbol,
             Element host,
             ProfileConfig prof,
             BoundingBoxXYZ bbIntersect,
@@ -778,23 +773,26 @@ namespace Modification
             bool isRect,
             bool normeEnabled)
         {
-            if (doc == null || fi == null || host == null || prof == null || bbIntersect == null)
+            if (doc == null || fi == null || symbol == null || host == null || prof == null || bbIntersect == null)
                 return;
+
+            VerticalPlacementMode mode = ResolveVerticalPlacementMode(symbol, prof);
 
             double verticalSizeFt = ComputeReferenceVerticalSize(host, bbIntersect, cfg, objType, intersecting, isRect, normeEnabled);
             double shiftFt = MmToFt(prof.VerticalPlacementOffsetMm);
 
-            switch (prof.VerticalPlacementReference)
+            switch (mode)
             {
-                case VerticalPlacementReference.Bottom:
+                case VerticalPlacementMode.Bottom:
                     shiftFt += verticalSizeFt * 0.5;
                     break;
 
-                case VerticalPlacementReference.Top:
+                case VerticalPlacementMode.Top:
                     shiftFt -= verticalSizeFt * 0.5;
                     break;
 
-                case VerticalPlacementReference.Center:
+                case VerticalPlacementMode.Center:
+                case VerticalPlacementMode.Auto:
                 default:
                     break;
             }
@@ -803,6 +801,117 @@ namespace Modification
                 return;
 
             ElementTransformUtils.MoveElement(doc, fi.Id, XYZ.BasisZ * shiftFt);
+        }
+
+        private VerticalPlacementMode ResolveVerticalPlacementMode(FamilySymbol symbol, ProfileConfig prof)
+        {
+            if (prof == null)
+                return VerticalPlacementMode.Center;
+
+            if (prof.VerticalPlacementMode != VerticalPlacementMode.Auto)
+                return prof.VerticalPlacementMode;
+
+            return DetectVerticalPlacementModeFromSymbol(symbol);
+        }
+
+        private VerticalPlacementMode DetectVerticalPlacementModeFromSymbol(FamilySymbol symbol)
+{
+    try
+    {
+        if (symbol == null)
+            return VerticalPlacementMode.Center;
+
+        var opts = new Options
+        {
+            ComputeReferences = false,
+            IncludeNonVisibleObjects = true,
+            DetailLevel = ViewDetailLevel.Fine
+        };
+
+        GeometryElement geo = symbol.get_Geometry(opts);
+        if (geo == null)
+            return VerticalPlacementMode.Center;
+
+        bool found = false;
+        double minZ = double.MaxValue;
+        double maxZ = double.MinValue;
+
+        void Accumulate(GeometryElement g)
+        {
+            if (g == null) return;
+
+            foreach (GeometryObject obj in g)
+            {
+                if (obj is GeometryInstance gi)
+                {
+                    Accumulate(gi.GetInstanceGeometry());
+                    continue;
+                }
+
+                BoundingBoxXYZ bb = GetGeometryBoundingBox(obj);
+                if (bb == null) continue;
+
+                Transform t = bb.Transform ?? Transform.Identity;
+
+                var corners = new[]
+                {
+                    new XYZ(bb.Min.X, bb.Min.Y, bb.Min.Z),
+                    new XYZ(bb.Min.X, bb.Min.Y, bb.Max.Z),
+                    new XYZ(bb.Min.X, bb.Max.Y, bb.Min.Z),
+                    new XYZ(bb.Min.X, bb.Max.Y, bb.Max.Z),
+                    new XYZ(bb.Max.X, bb.Min.Y, bb.Min.Z),
+                    new XYZ(bb.Max.X, bb.Min.Y, bb.Max.Z),
+                    new XYZ(bb.Max.X, bb.Max.Y, bb.Min.Z),
+                    new XYZ(bb.Max.X, bb.Max.Y, bb.Max.Z)
+                }.Select(p => t.OfPoint(p));
+
+                foreach (var p in corners)
+                {
+                    found = true;
+                    if (p.Z < minZ) minZ = p.Z;
+                    if (p.Z > maxZ) maxZ = p.Z;
+                }
+            }
+        }
+
+        Accumulate(geo);
+
+        if (!found)
+            return VerticalPlacementMode.Center;
+
+        double centerZ = (minZ + maxZ) * 0.5;
+        double height = maxZ - minZ;
+        if (height < 1e-9)
+            return VerticalPlacementMode.Center;
+
+        double tolerance = height * 0.15;
+
+        if (Math.Abs(centerZ) <= tolerance)
+            return VerticalPlacementMode.Center;
+
+        if (minZ >= -tolerance && maxZ > tolerance)
+            return VerticalPlacementMode.Bottom;
+
+        if (maxZ <= tolerance && minZ < -tolerance)
+            return VerticalPlacementMode.Top;
+
+        if (Math.Abs(minZ) < Math.Abs(maxZ))
+            return VerticalPlacementMode.Bottom;
+
+        if (Math.Abs(maxZ) < Math.Abs(minZ))
+            return VerticalPlacementMode.Top;
+
+        return VerticalPlacementMode.Center;
+    }
+    catch
+    {
+        return VerticalPlacementMode.Center;
+    }
+}
+
+        private BoundingBoxXYZ GetGeometryBoundingBox(GeometryObject obj)
+        {
+            throw new NotImplementedException();
         }
 
         private double ComputeReferenceVerticalSize(
@@ -819,11 +928,9 @@ namespace Modification
 
             double depthFt = GetHostDepth(host);
 
-            // Pour les sols/dalles : le vrai problème vertical est quasiment toujours lié à l’épaisseur traversée
             if (host is Floor)
                 return depthFt;
 
-            // Pour les murs : on corrige sur la hauteur de réservation
             bool isPipeOrDuct = objType == ReservationAutoV3Window.ObjectType.Canalisation
                                 || objType == ReservationAutoV3Window.ObjectType.Gaine;
 
@@ -852,17 +959,15 @@ namespace Modification
         }
 
         // =========================
-        // VOID CUT FORCE (robuste)
+        // VOID CUT FORCE
         // =========================
         private void ForceVoidCutSafe(Document doc, Element host, FamilyInstance fi)
         {
             if (doc == null || host == null || fi == null) return;
 
-            // On tente sans regen
             if (TryForceVoidCut(doc, host, fi))
                 return;
 
-            // Si échec, regen + retry (souvent nécessaire pour géométrie void)
             try
             {
                 doc.Regenerate();
@@ -872,7 +977,6 @@ namespace Modification
             if (TryForceVoidCut(doc, host, fi))
                 return;
 
-            // Si ça ne coupe toujours pas : c’est probablement la famille (option “Cut with Voids When Loaded”, etc.)
             if (!_voidCutWarnShown)
             {
                 _voidCutWarnShown = true;
@@ -891,7 +995,6 @@ namespace Modification
         {
             try
             {
-                // Reflection safe : évite les soucis de signature/versions
                 var asm = typeof(Element).Assembly;
                 var t = asm.GetType("Autodesk.Revit.DB.InstanceVoidCutUtils");
                 if (t == null) return false;
@@ -917,7 +1020,6 @@ namespace Modification
             }
             catch
             {
-                // ignore
             }
             return false;
         }
@@ -1308,7 +1410,6 @@ namespace Modification
             }
             catch
             {
-                // volontairement silencieux
             }
         }
 

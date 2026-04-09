@@ -302,6 +302,7 @@
     <Compile Include="commands\page de mise à jour en direct\UpdatePromptWindow.xaml.cs">
       <DependentUpon>UpdatePromptWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="commands\paramétre partagé en famillle\ConvertSharedToFamilyParametersCommand.cs" />
     <Compile Include="commands\Réservation auto\résa auto v2\ExtendedReservationVoidWindowV2.xaml.cs">
       <DependentUpon>ExtendedReservationVoidWindowV2.xaml</DependentUpon>
     </Compile>
@@ -316,7 +317,6 @@
     <Compile Include="commands\Suivi maquette collaboratif\CollaborativeModelTrackerWindow.xaml.cs">
       <DependentUpon>CollaborativeModelTrackerWindow.xaml</DependentUpon>
     </Compile>
-    <Compile Include="Test\paramétre partagé en famillle\ConvertSharedToFamilyParametersCommand.cs" />
     <Compile Include="Themes\ThemeManager.cs" />
     <None Include="app et excel\Touche\copie touche.cs" />
     <Compile Include="app et excel\BIMaestroApp.cs" />
@@ -880,9 +880,7 @@
   <ItemGroup>
     <EmbeddedResource Include="Resources\BIMaestro.png" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="commands\paramétre partagé en famillle\" />
-  </ItemGroup>
+  <ItemGroup />
   <ItemGroup>
     <EmbeddedResource Include="Resources\résa cercle.png" />
     <EmbeddedResource Include="Resources\Flappy bird-1.png" />

@@ -46,6 +46,7 @@ namespace Modification
         private bool _rectShapeAvailable;
         private bool _circShapeAvailable;
         private bool _isRefreshingShapeOptions;
+        private bool _isRefreshingPlacementUi;
 
         private GifPlaybackData _murGifData;
         private GifPlaybackData _solGifData;
@@ -128,6 +129,7 @@ namespace Modification
             UpdateShapeSelectorUi();
             UpdateObjectSelectorUi();
             UpdateMappingPanels();
+            RefreshVerticalPlacementUiFromCurrentProfile();
             OnCriteriaChanged(null, null);
         }
 
@@ -155,7 +157,9 @@ namespace Modification
                 if (p == null || string.IsNullOrWhiteSpace(p.FamilyName))
                     return "(absent)";
 
-                return IsProfileLoadedInProject(p) ? p.FamilyName : $"{p.FamilyName} (non chargée)";
+                string loaded = IsProfileLoadedInProject(p) ? "" : " (non chargée)";
+                string placement = DescribeVerticalPlacement(p);
+                return $"{p.FamilyName}{loaded} [{placement}]";
             }
 
             var v1 = FindBuiltInProfile(host, shape, isV2: false);
@@ -166,6 +170,25 @@ namespace Modification
                 return $"(Non configuré) — attendu : {expected}";
 
             return $"V1: {DescribeAvailable(v1)} | V2: {DescribeAvailable(v2)} | Perso: {DescribeAvailable(perso)}";
+        }
+
+        private static string DescribeVerticalPlacement(ProfileConfig profile)
+        {
+            if (profile == null) return "Auto";
+
+            string mode = profile.VerticalPlacementMode switch
+            {
+                VerticalPlacementMode.Center => "Centre",
+                VerticalPlacementMode.Bottom => "Bas",
+                VerticalPlacementMode.Top => "Haut",
+                _ => "Auto"
+            };
+
+            if (Math.Abs(profile.VerticalPlacementOffsetMm) < 0.001)
+                return mode;
+
+            string sign = profile.VerticalPlacementOffsetMm > 0 ? "+" : "";
+            return $"{mode} {sign}{profile.VerticalPlacementOffsetMm:0.#} mm";
         }
 
         public void OnCriteriaChanged(object sender, SelectionChangedEventArgs e)
@@ -370,11 +393,37 @@ namespace Modification
                         : "",
                     ParamDepth = shape == ShapeTarget.Circulaire
                         ? (host == HostTarget.Mur ? Config.WallCirc.ParamDepth : Config.FloorCirc.ParamDepth)
-                        : (host == HostTarget.Mur ? Config.WallRect.ParamDepth : Config.FloorRect.ParamDepth)
+                        : (host == HostTarget.Mur ? Config.WallRect.ParamDepth : Config.FloorRect.ParamDepth),
+                    VerticalPlacementMode = GetExistingPlacementMode(host, shape),
+                    VerticalPlacementOffsetMm = GetExistingPlacementOffset(host, shape)
                 };
             }
 
             return null;
+        }
+
+        private VerticalPlacementMode GetExistingPlacementMode(HostTarget host, ShapeTarget shape)
+        {
+            var existing = GetCurrentProfileFromConfig(host, shape);
+            return existing?.VerticalPlacementMode ?? VerticalPlacementMode.Auto;
+        }
+
+        private double GetExistingPlacementOffset(HostTarget host, ShapeTarget shape)
+        {
+            var existing = GetCurrentProfileFromConfig(host, shape);
+            return existing?.VerticalPlacementOffsetMm ?? 0.0;
+        }
+
+        private ProfileConfig GetCurrentProfileFromConfig(HostTarget host, ShapeTarget shape)
+        {
+            return (host, shape) switch
+            {
+                (HostTarget.Mur, ShapeTarget.Rectangulaire) => Config.WallRect,
+                (HostTarget.Mur, ShapeTarget.Circulaire) => Config.WallCirc,
+                (HostTarget.Sol, ShapeTarget.Rectangulaire) => Config.FloorRect,
+                (HostTarget.Sol, ShapeTarget.Circulaire) => Config.FloorCirc,
+                _ => null
+            };
         }
 
         private static bool FamilyNameContains(string currentFamilyName, string expectedName)
@@ -856,6 +905,7 @@ namespace Modification
 
                     RefreshProfilesSummary();
                     RefreshShapeOptions();
+                    RefreshVerticalPlacementUiFromCurrentProfile();
 
                     MessageBox.Show("Famille chargée ✅\nChoisis ensuite le profil (mur/sol + forme) et mappe les paramètres.",
                         "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -883,11 +933,18 @@ namespace Modification
         private void OnTargetProfileChanged(object sender, SelectionChangedEventArgs e)
         {
             UpdateMappingPanels();
+            RefreshVerticalPlacementUiFromCurrentProfile();
         }
 
         private void OnLoadedTypeChanged(object sender, SelectionChangedEventArgs e)
         {
             FillParamCombosFromSelectedSymbol();
+        }
+
+        private void OnVerticalPlacementChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isRefreshingPlacementUi)
+                return;
         }
 
         private void UpdateMappingPanels()
@@ -1014,6 +1071,59 @@ namespace Modification
             return result;
         }
 
+        private void RefreshVerticalPlacementUiFromCurrentProfile()
+        {
+            var profile = GetSelectedTargetProfileConfig();
+            _isRefreshingPlacementUi = true;
+            try
+            {
+                cbVerticalReference.SelectedIndex = profile?.VerticalPlacementMode switch
+                {
+                    VerticalPlacementMode.Center => 1,
+                    VerticalPlacementMode.Bottom => 2,
+                    VerticalPlacementMode.Top => 3,
+                    _ => 0
+                };
+
+                tbVerticalOffset.Text = (profile?.VerticalPlacementOffsetMm ?? 0.0).ToString("0.##");
+            }
+            finally
+            {
+                _isRefreshingPlacementUi = false;
+            }
+        }
+
+        private ProfileConfig GetSelectedTargetProfileConfig()
+        {
+            int idx = cbTargetProfile.SelectedIndex;
+            return idx switch
+            {
+                0 => Config.WallRect,
+                1 => Config.WallCirc,
+                2 => Config.FloorRect,
+                3 => Config.FloorCirc,
+                _ => Config.WallRect
+            };
+        }
+
+        private void ApplyVerticalPlacementUiToProfile(ProfileConfig profile)
+        {
+            if (profile == null) return;
+
+            profile.VerticalPlacementMode = cbVerticalReference.SelectedIndex switch
+            {
+                1 => VerticalPlacementMode.Center,
+                2 => VerticalPlacementMode.Bottom,
+                3 => VerticalPlacementMode.Top,
+                _ => VerticalPlacementMode.Auto
+            };
+
+            if (!double.TryParse(tbVerticalOffset.Text?.Trim(), out var offset))
+                offset = 0.0;
+
+            profile.VerticalPlacementOffsetMm = offset;
+        }
+
         private void OnApplyMapping(object sender, RoutedEventArgs e)
         {
             var it = cbLoadedType.SelectedItem as LoadedTypeItem;
@@ -1067,6 +1177,8 @@ namespace Modification
                 p.ParamDepth = cbMapFloorDepth2?.Text ?? "";
             }
 
+            ApplyVerticalPlacementUiToProfile(p);
+
             if (ReservationAutoV3ConfigStore.Save(Config, out var err))
             {
                 var host = (idx == 0 || idx == 1) ? HostTarget.Mur : HostTarget.Sol;
@@ -1081,6 +1193,8 @@ namespace Modification
                     targetPersoProfile.ParamHeight = p.ParamHeight;
                     targetPersoProfile.ParamDiameter = p.ParamDiameter;
                     targetPersoProfile.ParamDepth = p.ParamDepth;
+                    targetPersoProfile.VerticalPlacementMode = p.VerticalPlacementMode;
+                    targetPersoProfile.VerticalPlacementOffsetMm = p.VerticalPlacementOffsetMm;
                 }
 
                 if (!ReservationAutoV3PersoConfigStore.Save(_persoConfig, out var persoErr))
@@ -1090,6 +1204,7 @@ namespace Modification
 
                 RefreshProfilesSummary();
                 RefreshShapeOptions();
+                RefreshVerticalPlacementUiFromCurrentProfile();
                 MessageBox.Show("Profil configuré + sauvegardé ✅", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             else
@@ -1106,6 +1221,9 @@ namespace Modification
             Config.DynamoPath = tbDynamoPath.Text ?? "";
             Config.DefaultNormeEnabled = chkDefaultNorme.IsChecked == true;
             Config.DefaultDynamoAutoEnabled = chkDefaultDynamo.IsChecked == true;
+
+            var selectedProfile = GetSelectedTargetProfileConfig();
+            ApplyVerticalPlacementUiToProfile(selectedProfile);
 
             if (ReservationAutoV3ConfigStore.Save(Config, out var err))
                 MessageBox.Show("Configuration sauvegardée ✅", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);

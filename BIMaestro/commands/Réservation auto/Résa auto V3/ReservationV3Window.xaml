@@ -821,6 +821,29 @@
                                         <ComboBox x:Name="cbMapFloorDepth2" Height="34" IsEditable="True"/>
                                     </StackPanel>
 
+                                    <Rectangle Height="1" Fill="{StaticResource Divider}" Margin="0,16,0,14"/>
+
+                                    <TextBlock Text="4) Placement vertical"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource Text.Primary}"/>
+                                    <TextBlock Text="Le mode Auto tente une détection. Corrigez si nécessaire selon la construction réelle de la famille."
+                                               Style="{StaticResource Hint}" Margin="0,4,0,10"/>
+
+                                    <TextBlock Text="Référence verticale" Style="{StaticResource Label}"/>
+                                    <ComboBox x:Name="cbVerticalReference"
+                                              Height="34"
+                                              SelectionChanged="OnVerticalPlacementChanged">
+                                        <ComboBoxItem Content="Auto"/>
+                                        <ComboBoxItem Content="Centre"/>
+                                        <ComboBoxItem Content="Bas"/>
+                                        <ComboBoxItem Content="Haut"/>
+                                    </ComboBox>
+
+                                    <TextBlock Text="Offset vertical (mm)" Style="{StaticResource Label}" Margin="0,10,0,0"/>
+                                    <TextBox x:Name="tbVerticalOffset"
+                                             Height="34"
+                                             Text="0"/>
+
                                     <Button x:Name="btnApplyMapping"
                                             Content="Appliquer au profil + sauvegarder"
                                             Style="{StaticResource PrimaryButton}"
