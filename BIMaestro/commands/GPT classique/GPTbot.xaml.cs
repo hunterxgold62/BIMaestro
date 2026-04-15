@@ -97,7 +97,7 @@ namespace IA
             conversationHistory.Add(userMessage);
             InputBox.Clear();
 
-            MessagesListBox.ScrollIntoView(userMessage);
+            ScrollToLatestMessage(userMessage);
 
             // Désactive l'envoi de messages et affiche l'indicateur de chargement
             isAwaitingResponse = true;
@@ -110,7 +110,7 @@ namespace IA
             var botMessage = new MessageModel { Role = "assistant", Content = response };
             conversationHistory.Add(botMessage);
 
-            MessagesListBox.ScrollIntoView(botMessage);
+            ScrollToLatestMessage(botMessage);
 
             // Réactive l'envoi de messages et cache l'indicateur de chargement
             isAwaitingResponse = false;
@@ -179,7 +179,7 @@ namespace IA
                     Content = "Les informations des éléments sélectionnés ont été enregistrées. Elles seront incluses dans votre prochaine question."
                 };
                 conversationHistory.Add(infoMessage);
-                MessagesListBox.ScrollIntoView(infoMessage);
+                ScrollToLatestMessage(infoMessage);
             }
             catch (Exception ex)
             {
@@ -237,6 +237,17 @@ namespace IA
         protected void OnPropertyChanged(string name)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        }
+
+        private void ScrollToLatestMessage(MessageModel messageToShow)
+        {
+            if (messageToShow == null) return;
+
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                MessagesListBox.UpdateLayout();
+                MessagesListBox.ScrollIntoView(messageToShow);
+            }), System.Windows.Threading.DispatcherPriority.ContextIdle);
         }
     }
 

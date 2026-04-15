@@ -6,7 +6,9 @@
         Height="600"
         Width="620"
         WindowStartupLocation="CenterScreen"
-        ResizeMode="NoResize"
+        MinHeight="520"
+        MinWidth="560"
+        ResizeMode="CanResize"
         Background="{DynamicResource App.Background}"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True">
@@ -27,7 +29,7 @@
                             Margin="50,0,0,0"
                             Padding="10,8">
                         <TextBlock Text="{Binding Content}"
-                                   TextWrapping="Wrap"
+                                   TextWrapping="WrapWithOverflow"
                                    Foreground="White">
                             <TextBlock.ContextMenu>
                                 <ContextMenu>
@@ -47,10 +49,11 @@
                     <Border Style="{DynamicResource Card}"
                             MaxWidth="390"
                             Margin="0,0,50,0"
-                            Padding="10,8">
+                            Padding="10,8"
+                            Background="#FFF4F6FA">
                         <TextBlock Text="{Binding Content}"
-                                   TextWrapping="Wrap"
-                                   Foreground="{DynamicResource Text.Primary}">
+                                   TextWrapping="WrapWithOverflow"
+                                   Foreground="#FF1E293B">
                             <TextBlock.ContextMenu>
                                 <ContextMenu>
                                     <MenuItem Header="Copier tout"

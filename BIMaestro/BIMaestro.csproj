@@ -303,10 +303,6 @@
       <DependentUpon>UpdatePromptWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="commands\paramétre partagé en famillle\ConvertSharedToFamilyParametersCommand.cs" />
-    <Compile Include="commands\Réservation auto\résa auto v2\ExtendedReservationVoidWindowV2.xaml.cs">
-      <DependentUpon>ExtendedReservationVoidWindowV2.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="commands\Réservation auto\résa auto v2\ReservationVoidAutoMultiCommandV2.cs" />
     <Compile Include="commands\Réservation auto\résa auto v3\ReservationAutoV3Command.cs" />
     <Compile Include="commands\Réservation auto\résa auto v3\ReservationAutoV3Config.cs" />
     <Compile Include="commands\Réservation auto\résa auto v3\ReservationV3Window.xaml.cs">
@@ -496,10 +492,6 @@
     <Compile Include="commands\Purge de paramètre de famille\ParameterSelectionWindow.xaml.cs">
       <DependentUpon>ParameterSelectionWindow.xaml</DependentUpon>
     </Compile>
-    <Compile Include="commands\Réservation auto\résa auto V1\AddReservationCommand.cs" />
-    <Compile Include="commands\Réservation auto\résa auto V1\ReservationWindow.xaml.cs">
-      <DependentUpon>ReservationWindow.xaml</DependentUpon>
-    </Compile>
     <Compile Include="commands\traduction paramètre famille et vue_feuille\TraduireParametresFamilleOpenAI.cs" />
     <Compile Include="commands\GPT classique\messagemodel.cs" />
     <Compile Include="commands\GPT classique\ProfileSelectionWindow.xaml.cs">
@@ -686,10 +678,6 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="commands\Réservation auto\résa auto V1\ReservationWindow.xaml">
-      <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
-    </Page>
     <None Include="Test\Clé d%27accés\Clés d%27accés.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -706,10 +694,6 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </None>
-    <Page Include="commands\Réservation auto\résa auto v2\ExtendedReservationVoidWindowV2.xaml">
-      <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
-    </Page>
     <Page Include="commands\Réservation auto\résa auto v3\ReservationV3Window.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>

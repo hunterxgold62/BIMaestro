@@ -901,11 +901,12 @@ namespace Modification
                     CollectAllParameterNames(path, _loadedTypes.Select(x => x.Symbol));
 
                     cbLoadedType.ItemsSource = _loadedTypes;
-                    cbLoadedType.SelectedIndex = _loadedTypes.Any() ? 0 : -1;
+                    cbLoadedType.SelectedIndex = ResolvePreferredLoadedTypeIndex(_loadedTypes, GetSelectedTargetProfileConfig());
 
                     RefreshProfilesSummary();
                     RefreshShapeOptions();
                     RefreshVerticalPlacementUiFromCurrentProfile();
+                    FillParamCombosFromSelectedSymbol();
 
                     MessageBox.Show("Famille chargée ✅\nChoisis ensuite le profil (mur/sol + forme) et mappe les paramètres.",
                         "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -970,7 +971,7 @@ namespace Modification
                     panelMapCircFloor.Visibility = System.Windows.Visibility.Visible;
                     break;
             }
-
+            ApplyMappingFromSelectedProfileToUi();
             FillParamCombosFromSelectedSymbol();
         }
 
@@ -1013,6 +1014,56 @@ namespace Modification
             fill(cbMapFloorDepth2);
         }
 
+        private int ResolvePreferredLoadedTypeIndex(List<LoadedTypeItem> loadedTypes, ProfileConfig profile)
+        {
+            if (loadedTypes == null || loadedTypes.Count == 0)
+                return -1;
+
+            if (profile == null || string.IsNullOrWhiteSpace(profile.FamilyName))
+                return 0;
+
+            int sameFamilyAndType = loadedTypes.FindIndex(x =>
+                x?.Symbol?.Family?.Name.Equals(profile.FamilyName, StringComparison.OrdinalIgnoreCase) == true &&
+                (string.IsNullOrWhiteSpace(profile.TypeName) ||
+                 x.Symbol.Name.Equals(profile.TypeName, StringComparison.OrdinalIgnoreCase)));
+            if (sameFamilyAndType >= 0)
+                return sameFamilyAndType;
+
+            int sameFamily = loadedTypes.FindIndex(x =>
+                x?.Symbol?.Family?.Name.Equals(profile.FamilyName, StringComparison.OrdinalIgnoreCase) == true);
+            return sameFamily >= 0 ? sameFamily : 0;
+        }
+
+        private void ApplyMappingFromSelectedProfileToUi()
+        {
+            var profile = GetSelectedTargetProfileConfig();
+            if (profile == null)
+                return;
+
+            int idx = cbTargetProfile.SelectedIndex;
+            if (idx == 0)
+            {
+                cbMapWallLen.Text = profile.ParamLength ?? "";
+                cbMapWallHeight.Text = profile.ParamHeight ?? "";
+                cbMapWallDepth.Text = profile.ParamDepth ?? "";
+            }
+            else if (idx == 1)
+            {
+                cbMapWallDiam.Text = profile.ParamDiameter ?? "";
+                cbMapWallDepth2.Text = profile.ParamDepth ?? "";
+            }
+            else if (idx == 2)
+            {
+                cbMapFloorLen.Text = profile.ParamLength ?? "";
+                cbMapFloorWidth.Text = profile.ParamWidth ?? "";
+                cbMapFloorDepth.Text = profile.ParamDepth ?? "";
+            }
+            else if (idx == 3)
+            {
+                cbMapFloorDiam.Text = profile.ParamDiameter ?? "";
+                cbMapFloorDepth2.Text = profile.ParamDepth ?? "";
+            }
+        }
         private void CollectAllParameterNames(string rfaPath, IEnumerable<FamilySymbol> symbols)
         {
             _allParameterNames.Clear();
