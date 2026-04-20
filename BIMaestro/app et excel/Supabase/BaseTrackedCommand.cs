@@ -30,6 +30,27 @@ namespace Licensing
 
         protected abstract Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements);
 
+        private string ResolveButtonDisplayName()
+        {
+            var fullName = GetType().FullName;
+            var info = AppUI.GetRibbonButtonByCommandClass(fullName);
+            if (!string.IsNullOrWhiteSpace(info?.DisplayName))
+            {
+                return NormalizeLabel(info.DisplayName);
+            }
+
+            return NormalizeLabel(ButtonId);
+        }
+
+        private static string NormalizeLabel(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+            return string.Join(" ", value
+                .Replace("\r", " ")
+                .Replace("\n", " ")
+                .Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries));
+        }
+
         public Result Execute(ExternalCommandData data, ref string message, ElementSet elements)
         {
             // ✅ Hook global : au tout premier bouton BIMaestro, start timer (2 min), puis popup.
@@ -57,17 +78,19 @@ namespace Licensing
 
             try
             {
+                var trackedButtonLabel = ResolveButtonDisplayName();
                 var res = OnExecute(data, ref message, elements);
-                Telemetry.TrackButton(ButtonId, res == Result.Succeeded, BuildContext(data));
+                Telemetry.TrackButton(trackedButtonLabel, res == Result.Succeeded, BuildContext(data));
                 if (res == Result.Succeeded)
                 {
-                    ButtonRecentManager.RegisterUse(ButtonId, GetType().FullName);
+                    ButtonRecentManager.RegisterUse(trackedButtonLabel, GetType().FullName);
                 }
                 return res;
             }
             catch (Exception ex)
             {
-                Telemetry.TrackButton(ButtonId, false, new { error = ex.GetType().Name, ex.Message });
+                var trackedButtonLabel = ResolveButtonDisplayName();
+                Telemetry.TrackButton(trackedButtonLabel, false, new { error = ex.GetType().Name, ex.Message });
                 throw;
             }
         }

@@ -14,7 +14,7 @@ namespace Page
     internal static class UpdateNotificationManager
     {
         private const string SiteUrl = "https://sites.google.com/view/bimaestro";
-        private const string DownloadUrl = "https://www.bimaestro.fr/t%C3%A9l%C3%A9chargement";
+        private const string DownloadUrl = "https://www.bimaestro.fr/telechargement";
         private const string ReasonMuteToday = "mute_today";
         private const string ReasonLater = "later";
 
