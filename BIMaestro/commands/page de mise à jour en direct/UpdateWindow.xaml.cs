@@ -17,7 +17,7 @@ namespace Page
     public partial class UpdateWindow : Window
     {
         private const string SiteUrl = "https://sites.google.com/view/bimaestro";
-        private const string DownloadUrl = "https://www.bimaestro.fr/t%C3%A9l%C3%A9chargement";
+        private const string DownloadUrl = "https://www.bimaestro.fr/telechargement";
 
         // Hosts autorisés (tout le reste s'ouvre dans le navigateur)
         private static readonly HashSet<string> AllowedHosts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
