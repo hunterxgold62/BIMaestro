@@ -141,20 +141,9 @@
                 <Border Margin="5" Width="200"
                     Background="{DynamicResource PanelBackground}"
                     CornerRadius="5"
+                    BorderBrush="#33000000"
                     BorderThickness="1"
-                    MouseLeftButtonDown="FamilyItem_DoubleClick"
-                    PreviewMouseRightButtonDown="FamilyItem_RightClickSelect">
-                    <Border.Style>
-                        <Style TargetType="Border">
-                            <Setter Property="BorderBrush" Value="#33000000"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                    <Setter Property="BorderBrush" Value="#FF2D8CFF"/>
-                                    <Setter Property="BorderThickness" Value="2"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Border.Style>
+                    MouseLeftButtonDown="FamilyItem_DoubleClick">
                     <Border.ContextMenu>
                         <ContextMenu>
                             <MenuItem Header="Documentation"
@@ -173,12 +162,6 @@
                             <!-- Ajout express dans la collection active -->
                             <MenuItem Header="Ajouter à la collection active"
                                   Click="AddToActiveCollection_Click"
-                                  DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                            <MenuItem Header="Ajouter la sélection à la collection active"
-                                  Click="AddSelectionToActiveCollection_Click"
-                                  DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                            <MenuItem Header="Charger la sélection"
-                                  Click="LoadSelection_Click"
                                   DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                         </ContextMenu>
                     </Border.ContextMenu>
@@ -259,21 +242,10 @@
                 <Border Margin="5"
                     Background="{DynamicResource PanelBackground}"
                     CornerRadius="5"
+                    BorderBrush="#33000000"
                     BorderThickness="1"
                     MouseLeftButtonDown="FamilyItem_DoubleClick"
-                    PreviewMouseRightButtonDown="FamilyItem_RightClickSelect"
                     HorizontalAlignment="Stretch">
-                    <Border.Style>
-                        <Style TargetType="Border">
-                            <Setter Property="BorderBrush" Value="#33000000"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                    <Setter Property="BorderBrush" Value="#FF2D8CFF"/>
-                                    <Setter Property="BorderThickness" Value="2"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Border.Style>
                     <Border.ContextMenu>
                         <ContextMenu>
                             <MenuItem Header="Documentation"
@@ -291,12 +263,6 @@
 
                             <MenuItem Header="Ajouter à la collection active"
                                   Click="AddToActiveCollection_Click"
-                                  DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                            <MenuItem Header="Ajouter la sélection à la collection active"
-                                  Click="AddSelectionToActiveCollection_Click"
-                                  DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                            <MenuItem Header="Charger la sélection"
-                                  Click="LoadSelection_Click"
                                   DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                         </ContextMenu>
                     </Border.ContextMenu>
@@ -771,12 +737,6 @@
                                           Foreground="{DynamicResource PrimaryText}"
                                           Checked="DetailedViewCheckBox_Changed"
                                           Unchecked="DetailedViewCheckBox_Changed" Width="92"/>
-                                <CheckBox x:Name="MultiSelectCheckBox"
-                                          Content="Sélection multiple"
-                                          Foreground="{DynamicResource PrimaryText}"
-                                          Margin="0,0,8,0"
-                                          Checked="MultiSelectCheckBox_Changed"
-                                          Unchecked="MultiSelectCheckBox_Changed"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
                                 <TextBlock Foreground="{DynamicResource PrimaryText}" Margin="5,0,0,0" Text="Familles affichées : "/>
@@ -855,11 +815,7 @@
             <TabItem x:Name="SettingsTabItem"
                      Header="Paramètres"
                      Background="{DynamicResource TabBackground}">
-                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled"
-                              Padding="0"
-                              Focusable="False">
-                    <Grid x:Name="SettingsPanelRoot" Margin="12,10,8,10" Background="Transparent">
+                <Grid x:Name="SettingsPanelRoot" Margin="12,10,8,10" Background="Transparent">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -1136,8 +1092,7 @@
                             </StackPanel>
                         </Grid>
                     </Border>
-                    </Grid>
-                </ScrollViewer>
+                </Grid>
             </TabItem>
 
         </TabControl>
