@@ -60,6 +60,8 @@ namespace Famille
         private bool _sizeSortDescending;
         private bool _dateSortDescending;
         private bool _isResorting;
+        private bool _isMultiSelectionEnabled;
+        private FamilyItem _lastSelectedFamily;
 
         // ===== Données UI =====
         private List<FamilyItem> allFamilies = new();
@@ -754,6 +756,9 @@ namespace Famille
 
         private void BeginPaging(List<FamilyItem> fullResult)
         {
+            ClearSelectedFamilies();
+            _lastSelectedFamily = null;
+
             _currentResult = fullResult ?? new List<FamilyItem>();
             _nextIndex = 0;
             displayedFamilies = new List<FamilyItem>();
@@ -1316,12 +1321,106 @@ namespace Famille
 
         private void FamilyItem_DoubleClick(object sender, MouseButtonEventArgs e)
         {
-            if (e.ClickCount != 2) return;
-            if (sender is Border b && b.DataContext is FamilyItem fam)
+            if (sender is not Border b || b.DataContext is not FamilyItem fam)
+                return;
+
+            if (_isMultiSelectionEnabled)
             {
-                FamilyBrowserCommand.LoadFamilyHandlerInstance.FamilyPath = fam.Path;
-                FamilyBrowserCommand.LoadFamilyEventInstance.Raise();
+                if (e.ClickCount == 1)
+                {
+                    SelectFamilyFromClick(fam, Keyboard.Modifiers);
+                    e.Handled = true;
+                }
+                return;
             }
+
+            if (e.ClickCount != 2) return;
+            FamilyBrowserCommand.LoadFamilyHandlerInstance.FamilyPath = fam.Path;
+            FamilyBrowserCommand.LoadFamilyEventInstance.Raise();
+        }
+
+        private void FamilyItem_RightClickSelect(object sender, MouseButtonEventArgs e)
+        {
+            if (!_isMultiSelectionEnabled) return;
+            if (sender is not Border b || b.DataContext is not FamilyItem fam) return;
+
+            var selectedFamilies = GetSelectedFamilies();
+            if (!selectedFamilies.Contains(fam))
+            {
+                SelectFamilyFromClick(fam, ModifierKeys.None);
+            }
+        }
+
+        private void MultiSelectCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            _isMultiSelectionEnabled = MultiSelectCheckBox?.IsChecked == true;
+            if (!_isMultiSelectionEnabled)
+            {
+                ClearSelectedFamilies();
+                _lastSelectedFamily = null;
+            }
+        }
+
+        private void SelectFamilyFromClick(FamilyItem clickedFamily, ModifierKeys modifiers)
+        {
+            if (clickedFamily == null) return;
+
+            bool shift = (modifiers & ModifierKeys.Shift) == ModifierKeys.Shift;
+            bool ctrl = (modifiers & ModifierKeys.Control) == ModifierKeys.Control;
+
+            if (shift && _lastSelectedFamily != null)
+            {
+                int start = displayedFamilies.IndexOf(_lastSelectedFamily);
+                int end = displayedFamilies.IndexOf(clickedFamily);
+                if (start >= 0 && end >= 0)
+                {
+                    if (!ctrl)
+                        ClearSelectedFamilies();
+
+                    int min = Math.Min(start, end);
+                    int max = Math.Max(start, end);
+                    for (int i = min; i <= max; i++)
+                        displayedFamilies[i].IsSelected = true;
+                }
+                else
+                {
+                    if (!ctrl)
+                        ClearSelectedFamilies();
+                    clickedFamily.IsSelected = true;
+                }
+            }
+            else if (ctrl)
+            {
+                clickedFamily.IsSelected = !clickedFamily.IsSelected;
+            }
+            else
+            {
+                ClearSelectedFamilies();
+                clickedFamily.IsSelected = true;
+            }
+
+            _lastSelectedFamily = clickedFamily;
+        }
+
+        private List<FamilyItem> GetSelectedFamilies()
+            => displayedFamilies.Where(f => f.IsSelected).ToList();
+
+        private List<FamilyItem> GetEffectiveSelection(FamilyItem contextFamily = null)
+        {
+            var selected = GetSelectedFamilies();
+            if (selected.Count > 0)
+                return selected;
+
+            if (contextFamily != null)
+                return new List<FamilyItem> { contextFamily };
+
+            return new List<FamilyItem>();
+        }
+
+        private void ClearSelectedFamilies()
+        {
+            foreach (var family in displayedFamilies.Where(f => f.IsSelected))
+                family.IsSelected = false;
         }
 
         private void OpenFamilyFile_Click(object sender, RoutedEventArgs e)
@@ -2620,22 +2719,63 @@ namespace Famille
         private void AddToActiveCollection_Click(object sender, RoutedEventArgs e)
         {
             if ((sender as MenuItem)?.DataContext is not FamilyItem fam) return;
+            AddFamiliesToActiveCollection(GetEffectiveSelection(fam));
+        }
+
+        private void AddSelectionToActiveCollection_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as MenuItem)?.DataContext is not FamilyItem fam) return;
+            AddFamiliesToActiveCollection(GetEffectiveSelection(fam));
+        }
+
+        private void AddFamiliesToActiveCollection(IEnumerable<FamilyItem> families)
+        {
+            var familyList = families?.Where(f => f != null).ToList() ?? new List<FamilyItem>();
+            if (familyList.Count == 0) return;
 
             if (_selectedCollection == null)
                 EnsureFavoritesCollection();
 
-            if (!_selectedCollection.Paths.Any(p => p.Equals(fam.Path, StringComparison.OrdinalIgnoreCase)))
+            bool updated = false;
+            foreach (var fam in familyList)
             {
+                if (_selectedCollection.Paths.Any(p => p.Equals(fam.Path, StringComparison.OrdinalIgnoreCase)))
+                    continue;
+
                 _selectedCollection.Paths.Add(fam.Path);
-                SaveCollections();
-                RefreshCollectionContent();
+                updated = true;
 
                 if (_selectedCollection.Id == FavoritesCollectionId)
-                {
                     fam.IsFavorite = true;
+            }
+
+            if (updated)
+            {
+                SaveCollections();
+                RefreshCollectionContent();
+                if (_selectedCollection.Id == FavoritesCollectionId)
+                {
                     ExportFavoritesCollectionToTxt();
                 }
             }
+        }
+
+        private void LoadSelection_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as MenuItem)?.DataContext is not FamilyItem fam) return;
+            var selectedFamilies = GetEffectiveSelection(fam);
+            if (selectedFamilies.Count == 0) return;
+
+            var paths = selectedFamilies
+                .Select(f => f.Path)
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (paths.Count == 0) return;
+
+            FamilyBrowserCommand.LoadCollectionHandlerInstance.FamilyPaths = paths;
+            FamilyBrowserCommand.LoadCollectionEventInstance.Raise();
         }
 
         // 🗑 : retirer un élément de la collection sélectionnée
@@ -2849,6 +2989,13 @@ namespace Famille
         {
             get => _isFavorite;
             set { if (_isFavorite != value) { _isFavorite = value; OnPropertyChanged(nameof(IsFavorite)); } }
+        }
+
+        private bool _isSelected;
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set { if (_isSelected != value) { _isSelected = value; OnPropertyChanged(nameof(IsSelected)); } }
         }
 
         private string _revitSavedVersion;
