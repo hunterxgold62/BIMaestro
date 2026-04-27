@@ -141,9 +141,22 @@
                 <Border Margin="5" Width="200"
                     Background="{DynamicResource PanelBackground}"
                     CornerRadius="5"
-                    BorderBrush="#33000000"
                     BorderThickness="1"
-                    MouseLeftButtonDown="FamilyItem_DoubleClick">
+                    MouseLeftButtonDown="FamilyItem_DoubleClick"
+                    PreviewMouseRightButtonDown="FamilyItem_RightClickSelect"
+                    ContextMenuOpening="FamilyItem_ContextMenuOpening">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="BorderBrush" Value="#33000000"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                    <Setter Property="BorderBrush" Value="{DynamicResource Brand}"/>
+                                    <Setter Property="BorderThickness" Value="3"/>
+                                    <Setter Property="Background" Value="#1F0F5132"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
                     <Border.ContextMenu>
                         <ContextMenu>
                             <MenuItem Header="Documentation"
@@ -242,10 +255,23 @@
                 <Border Margin="5"
                     Background="{DynamicResource PanelBackground}"
                     CornerRadius="5"
-                    BorderBrush="#33000000"
                     BorderThickness="1"
                     MouseLeftButtonDown="FamilyItem_DoubleClick"
+                    PreviewMouseRightButtonDown="FamilyItem_RightClickSelect"
+                    ContextMenuOpening="FamilyItem_ContextMenuOpening"
                     HorizontalAlignment="Stretch">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="BorderBrush" Value="#33000000"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                    <Setter Property="BorderBrush" Value="{DynamicResource Brand}"/>
+                                    <Setter Property="BorderThickness" Value="3"/>
+                                    <Setter Property="Background" Value="#1F0F5132"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
                     <Border.ContextMenu>
                         <ContextMenu>
                             <MenuItem Header="Documentation"
@@ -731,9 +757,15 @@
                                     </Button.Style>
                                 </Button>
 
+                                <CheckBox x:Name="MultiSelectCheckBox"
+                                          Content="Sélection multiple"
+                                          Foreground="{DynamicResource PrimaryText}"
+                                          Margin="0,0,20,0"
+                                          Checked="MultiSelectCheckBox_Changed"
+                                          Unchecked="MultiSelectCheckBox_Changed"/>
                                 <CheckBox x:Name="DetailedViewCheckBox"
                                           Content="Vue détaillée"
-                                          Margin="0,0,20,0"
+                                          Margin="0,0,8,0"
                                           Foreground="{DynamicResource PrimaryText}"
                                           Checked="DetailedViewCheckBox_Changed"
                                           Unchecked="DetailedViewCheckBox_Changed" Width="92"/>
@@ -815,7 +847,11 @@
             <TabItem x:Name="SettingsTabItem"
                      Header="Paramètres"
                      Background="{DynamicResource TabBackground}">
-                <Grid x:Name="SettingsPanelRoot" Margin="12,10,8,10" Background="Transparent">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              Padding="0"
+                              Focusable="False">
+                    <Grid x:Name="SettingsPanelRoot" Margin="12,10,8,10" Background="Transparent">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -1092,7 +1128,8 @@
                             </StackPanel>
                         </Grid>
                     </Border>
-                </Grid>
+                    </Grid>
+                </ScrollViewer>
             </TabItem>
 
         </TabControl>
