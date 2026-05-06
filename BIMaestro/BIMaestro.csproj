@@ -364,6 +364,7 @@
     </Compile>
     <Compile Include="commands\changement de texte par IA\Preferences.cs" />
     <Compile Include="commands\changement de texte par IA\TextCorrectionCommand.cs" />
+    <Compile Include="commands\image réaliste IA\RealisticViewImageCommand.cs" />
     <Compile Include="commands\changer de couleur de ligne\ColorPicker.xaml.cs">
       <DependentUpon>ColorPicker.xaml</DependentUpon>
     </Compile>
