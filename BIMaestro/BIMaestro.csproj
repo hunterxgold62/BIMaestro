@@ -359,7 +359,6 @@
     <Compile Include="commands\Calcul des canalisations\canalisation V2\PipeSystemSelectionWindowV2.xaml.cs">
       <DependentUpon>PipeSystemSelectionWindowV2.xaml</DependentUpon>
     </Compile>
-    <Compile Include="commands\capture openia\InverseBooleanConverter.cs" />
     <Compile Include="commands\changement de texte par IA\CorrectionWindow123.xaml.cs">
       <DependentUpon>CorrectionWindow123.xaml</DependentUpon>
     </Compile>
@@ -506,11 +505,6 @@
     <Compile Include="commands\qui est le coupable\MainCommand.cs" />
     <Compile Include="commands\renuméroté élément\RenameElementsCommand.cs" />
     <Compile Include="commands\Vision 3D\vue sur face 3D.cs" />
-    <Compile Include="commands\capture openia\ScreenCapture.cs" />
-    <Compile Include="commands\capture openia\ScreenCaptureCommand.cs" />
-    <Compile Include="commands\capture openia\SelectionWindow.xaml.cs">
-      <DependentUpon>SelectionWindow.xaml</DependentUpon>
-    </Compile>
     <Compile Include="app et excel\temps revit\ExcelLogger.cs" />
     <Compile Include="commands\GPT classique\GPTbot.xaml.cs">
       <DependentUpon>GPTbot.xaml</DependentUpon>
@@ -671,10 +665,6 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="commands\GPT classique\GPTbot.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="commands\capture openia\SelectionWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
