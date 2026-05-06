@@ -360,6 +360,11 @@
       <DependentUpon>PipeSystemSelectionWindowV2.xaml</DependentUpon>
     </Compile>
     <Compile Include="commands\capture openia\InverseBooleanConverter.cs" />
+    <Compile Include="commands\capture openia\ImageResizeHelper.cs" />
+    <Compile Include="commands\capture openia\RevitRealisticViewCommand.cs" />
+    <Compile Include="commands\capture openia\RevitRealisticViewWindow.xaml.cs">
+      <DependentUpon>RevitRealisticViewWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="commands\changement de texte par IA\CorrectionWindow123.xaml.cs">
       <DependentUpon>CorrectionWindow123.xaml</DependentUpon>
     </Compile>
@@ -677,6 +682,10 @@
     <Page Include="commands\capture openia\SelectionWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="commands\capture openia\RevitRealisticViewWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
     </Page>
     <None Include="Test\Clé d%27accés\Clés d%27accés.xaml">
       <Generator>MSBuild:Compile</Generator>
