@@ -702,68 +702,68 @@
     </Page>
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\Purge famille32x32.png" />
+    <EmbeddedResource Include="Resources\OLD\Purge famille32x32.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\Calcule de poid1.png" />
-    <EmbeddedResource Include="Resources\Image IA.png" />
-    <EmbeddedResource Include="Resources\Pallette de couleur anexe .png" />
-    <EmbeddedResource Include="Resources\Peinture et matériaux.png" />
-    <EmbeddedResource Include="Resources\Pour paramètre de famille1.png" />
-    <EmbeddedResource Include="Resources\Qui à fait ça.png" />
-    <EmbeddedResource Include="Resources\safeimagekit-doc.png" />
-    <EmbeddedResource Include="Resources\Safeimagekit-resized-img %281%29.png" />
-    <EmbeddedResource Include="Resources\Safeimagekit-resized-img %284%29.png" />
-    <EmbeddedResource Include="Resources\Safeimagekit-resized-img %285%29.png" />
+    <EmbeddedResource Include="Resources\OLD\Calcule de poid1.png" />
+    <EmbeddedResource Include="Resources\OLD\Image IA.png" />
+    <EmbeddedResource Include="Resources\OLD\Pallette de couleur anexe .png" />
+    <EmbeddedResource Include="Resources\OLD\Peinture et matériaux.png" />
+    <EmbeddedResource Include="Resources\OLD\Pour paramètre de famille1.png" />
+    <EmbeddedResource Include="Resources\OLD\Qui à fait ça.png" />
+    <EmbeddedResource Include="Resources\OLD\safeimagekit-doc.png" />
+    <EmbeddedResource Include="Resources\OLD\Safeimagekit-resized-img %281%29.png" />
+    <EmbeddedResource Include="Resources\OLD\Safeimagekit-resized-img %284%29.png" />
+    <EmbeddedResource Include="Resources\OLD\Safeimagekit-resized-img %285%29.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\Canalisation.png" />
+    <EmbeddedResource Include="Resources\OLD\Canalisation.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\Canalisation V2 %282%29.png" />
+    <EmbeddedResource Include="Resources\OLD\Canalisation V2 %282%29.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\maison famille %281%29.png" />
+    <EmbeddedResource Include="Resources\OLD\maison famille %281%29.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\Père Noël.png" />
+    <EmbeddedResource Include="Resources\OLD\Père Noël.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\bouton lumière.png" />
+    <EmbeddedResource Include="Resources\OLD\bouton lumière.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\Element 3D.png" />
-    <EmbeddedResource Include="Resources\safeimagekit-correction de texte IA.png" />
+    <EmbeddedResource Include="Resources\OLD\Element 3D.png" />
+    <EmbeddedResource Include="Resources\OLD\safeimagekit-correction de texte IA.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\mini-AutocanalisationV2.png" />
+    <EmbeddedResource Include="Resources\OLD\mini-AutocanalisationV2.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\safeimagekit-Information.png" />
+    <EmbeddedResource Include="Resources\OLD\safeimagekit-Information.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\safeimagekit-Texte maj.png" />
+    <EmbeddedResource Include="Resources\OLD\safeimagekit-Texte maj.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\safeimagekit-bouton reset4.png" />
+    <EmbeddedResource Include="Resources\OLD\safeimagekit-bouton reset4.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\Dynamo.png" />
+    <EmbeddedResource Include="Resources\OLD\Dynamo.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\safeimagekit-Réservation.png" />
+    <EmbeddedResource Include="Resources\OLD\safeimagekit-Réservation.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\safeimagekit-qfdfsf.png" />
+    <EmbeddedResource Include="Resources\OLD\safeimagekit-qfdfsf.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\menu contextuel.png" />
+    <EmbeddedResource Include="Resources\OLD\menu contextuel.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\wtf bouton.png" />
+    <EmbeddedResource Include="Resources\OLD\wtf bouton.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\attention bouton.png" />
+    <EmbeddedResource Include="Resources\OLD\attention bouton.png" />
   </ItemGroup>
   <ItemGroup>
     <COMReference Include="Microsoft.Office.Core">
@@ -795,73 +795,73 @@
     </COMReference>
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\rvt to excel et pdf.png" />
+    <EmbeddedResource Include="Resources\OLD\rvt to excel et pdf.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\réglage.png" />
+    <EmbeddedResource Include="Resources\OLD\réglage.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\dynamo 3.png" />
+    <EmbeddedResource Include="Resources\OLD\dynamo 3.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\dynamo 4.png" />
-    <EmbeddedResource Include="Resources\dynamo 5.png" />
+    <EmbeddedResource Include="Resources\OLD\dynamo 4.png" />
+    <EmbeddedResource Include="Resources\OLD\dynamo 5.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\dynamo 1.png" />
-    <EmbeddedResource Include="Resources\dynamo 2.png" />
+    <EmbeddedResource Include="Resources\OLD\dynamo 1.png" />
+    <EmbeddedResource Include="Resources\OLD\dynamo 2.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\export DWG.png" />
+    <EmbeddedResource Include="Resources\OLD\export DWG.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\Organisateur d%27éléments.png" />
+    <EmbeddedResource Include="Resources\OLD\Organisateur d%27éléments.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\export import Excel.png" />
+    <EmbeddedResource Include="Resources\OLD\export import Excel.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\purge.png" />
+    <EmbeddedResource Include="Resources\OLD\purge.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\import unité.png" />
+    <EmbeddedResource Include="Resources\OLD\import unité.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\export unité.png" />
+    <EmbeddedResource Include="Resources\OLD\export unité.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\Sélection d%27élément.png" />
+    <EmbeddedResource Include="Resources\OLD\Sélection d%27élément.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\bride auto.png" />
+    <EmbeddedResource Include="Resources\OLD\bride auto.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\analyse de temps.png" />
-    <EmbeddedResource Include="Resources\cana auto.png" />
-    <EmbeddedResource Include="Resources\correction 3D.png" />
+    <EmbeddedResource Include="Resources\OLD\analyse de temps.png" />
+    <EmbeddedResource Include="Resources\OLD\cana auto.png" />
+    <EmbeddedResource Include="Resources\OLD\correction 3D.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\vide.png" />
+    <EmbeddedResource Include="Resources\OLD\vide.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\bride suppresion.png" />
+    <EmbeddedResource Include="Resources\OLD\bride suppresion.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\roue ruban.png" />
+    <EmbeddedResource Include="Resources\OLD\roue ruban.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\snake.png" />
+    <EmbeddedResource Include="Resources\OLD\snake.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\BIMaestro.png" />
+    <EmbeddedResource Include="Resources\OLD\BIMaestro.png" />
   </ItemGroup>
   <ItemGroup />
   <ItemGroup>
-    <EmbeddedResource Include="Resources\résa cercle.png" />
-    <EmbeddedResource Include="Resources\Flappy bird-1.png" />
-    <EmbeddedResource Include="Resources\Mickey.gif" />
-    <EmbeddedResource Include="Resources\Collaboration.png" />
-    <EmbeddedResource Include="Resources\Convertir paramètres1.png" />
+    <EmbeddedResource Include="Resources\OLD\résa cercle.png" />
+    <EmbeddedResource Include="Resources\OLD\Flappy bird-1.png" />
+    <EmbeddedResource Include="Resources\OLD\Mickey.gif" />
+    <EmbeddedResource Include="Resources\OLD\Collaboration.png" />
+    <EmbeddedResource Include="Resources\OLD\Convertir paramètres1.png" />
     <EmbeddedResource Include="Resources\Gif\Canalisation.gif" />
     <EmbeddedResource Include="Resources\Gif\mur_11260681.gif" />
     <EmbeddedResource Include="Resources\Gif\Circulaire.gif" />
@@ -871,6 +871,50 @@
     <EmbeddedResource Include="Resources\Gif\Fenetre.gif" />
     <EmbeddedResource Include="Resources\Gif\Autre.gif" />
     <EmbeddedResource Include="Resources\Gif\Gaine.gif" />
+    <EmbeddedResource Include="Resources\OLD\rendu plan IA.png" />
+    <EmbeddedResource Include="Resources\Analyse de poid.png" />
+    <EmbeddedResource Include="Resources\Audit texte IA.png" />
+    <EmbeddedResource Include="Resources\Bride auto %282%29.png" />
+    <EmbeddedResource Include="Resources\Calcul de canalisation.png" />
+    <EmbeddedResource Include="Resources\Chatbot + élémet.png" />
+    <EmbeddedResource Include="Resources\Clash 3D.png" />
+    <EmbeddedResource Include="Resources\Convertir paramètres %282%29.png" />
+    <EmbeddedResource Include="Resources\Correction de texte IA %282%29.png" />
+    <EmbeddedResource Include="Resources\Couleur oui non.png" />
+    <EmbeddedResource Include="Resources\DWG Exp..png" />
+    <EmbeddedResource Include="Resources\Exemple.png" />
+    <EmbeddedResource Include="Resources\Export de Nomenclature.png" />
+    <EmbeddedResource Include="Resources\Face 3D.png" />
+    <EmbeddedResource Include="Resources\Gestion Excel.png" />
+    <EmbeddedResource Include="Resources\Import unités.png" />
+    <EmbeddedResource Include="Resources\Option.png" />
+    <EmbeddedResource Include="Resources\Organisateur.png" />
+    <EmbeddedResource Include="Resources\Ouvrir la vue.png" />
+    <EmbeddedResource Include="Resources\Peinture.png" />
+    <EmbeddedResource Include="Resources\Purge.png" />
+    <EmbeddedResource Include="Resources\qui à fait ça %282%29.png" />
+    <EmbeddedResource Include="Resources\rendu plan IA.png" />
+    <EmbeddedResource Include="Resources\Suppression de brides.png" />
+    <EmbeddedResource Include="Resources\Sélection d%27objet.png" />
+    <EmbeddedResource Include="Resources\Sélection d%27éléments.png" />
+    <EmbeddedResource Include="Resources\Tard IA.png" />
+    <EmbeddedResource Include="Resources\Temps par projet.png" />
+    <EmbeddedResource Include="Resources\Unités.png" />
+    <EmbeddedResource Include="Resources\Couleur.png" />
+    <EmbeddedResource Include="Resources\Dynamo 1 %282%29.png" />
+    <EmbeddedResource Include="Resources\Dynamo 2 %282%29.png" />
+    <EmbeddedResource Include="Resources\Dynamo 3 %282%29.png" />
+    <EmbeddedResource Include="Resources\Dynamo 4 %282%29.png" />
+    <EmbeddedResource Include="Resources\Dynamo 5 %282%29.png" />
+    <EmbeddedResource Include="Resources\suivie maquette.png" />
+    <EmbeddedResource Include="Resources\flappy bird.png" />
+    <EmbeddedResource Include="Resources\papa noel.png" />
+    <EmbeddedResource Include="Resources\reset.png" />
+    <EmbeddedResource Include="Resources\snake.png" />
+    <EmbeddedResource Include="Resources\Information %282%29.png" />
+    <EmbeddedResource Include="Resources\Purge famille2.png" />
+    <EmbeddedResource Include="Resources\Famille.png" />
+    <EmbeddedResource Include="Resources\Auto réservation.png" />
     <Content Include="Themes\BIMaestro_Charte_Graphique.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

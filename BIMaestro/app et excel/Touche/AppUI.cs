@@ -37,19 +37,19 @@ public class AppUI : IExternalApplication
         {
             new RibbonPanelDefinition("Outils de Visualisation", new List<RibbonItemDefinition>
             {
-                new RibbonItemDefinition("HighlightElementsByCategories", "Sélection d'éléments", panel => AddPushButton(panel, "HighlightElementsByCategories", "Sélection\nd'éléments", assemblyPath, "Visualisation.HighlightElementsByCategoriesCommand", "Safeimagekit-resized-img (1).png", "Met en évidence et filtre les éléments de catégories choisies.\r\nRegroupe automatiquement les éléments similaires pour accélérer la sélection et les actions répétitives.")),                
-                new RibbonItemDefinition("OpenSheetFromViewButton", "Ouvrir la vue du Plan", panel => AddPushButton(panel, "OpenSheetFromViewButton", " Ouvrir \nla vue", assemblyPath, "Visualisation.OpenSheetFromView", "safeimagekit-doc.png", "Passe rapidement de la vue active à la feuille associée (et inversement).\r\nPermet aussi d'ouvrir une vue directement depuis un viewport sélectionné sur une feuille.")),
-                 new RibbonItemDefinition("Export Nomenclature", "Export Nomenclature", panel => AddPushButton(panel, "Export Nomenclature", "Export de\nNomenclature", assemblyPath, "Visualisation.ExportScheduleCommand", "rvt to excel et pdf.png", "Exporte les nomenclatures Revit sélectionnées en fichier Excel ou PDF.")),
-                new RibbonItemDefinition("Sélection d'objet", "Sélection d'objet", panel => AddPushButton(panel, "Sélection d'objet", "Sélection\nd'objet", assemblyPath, "Visualisation.SelectSimilarCommand", "Sélection d'élément.png", "Sélectionne des éléments similaires dans le projet")),
+                new RibbonItemDefinition("HighlightElementsByCategories", "Sélection d'éléments", panel => AddPushButton(panel, "HighlightElementsByCategories", "Sélection\nd'éléments", assemblyPath, "Visualisation.HighlightElementsByCategoriesCommand", "Sélection d'éléments.png", "Met en évidence et filtre les éléments de catégories choisies.\r\nRegroupe automatiquement les éléments similaires pour accélérer la sélection et les actions répétitives.")),                
+                new RibbonItemDefinition("OpenSheetFromViewButton", "Ouvrir la vue du Plan", panel => AddPushButton(panel, "OpenSheetFromViewButton", " Ouvrir \nla vue", assemblyPath, "Visualisation.OpenSheetFromView", "Ouvrir la vue.png", "Passe rapidement de la vue active à la feuille associée (et inversement).\r\nPermet aussi d'ouvrir une vue directement depuis un viewport sélectionné sur une feuille.")),
+                 new RibbonItemDefinition("Export Nomenclature", "Export Nomenclature", panel => AddPushButton(panel, "Export Nomenclature", "Export de\nNomenclature", assemblyPath, "Visualisation.ExportScheduleCommand", "Export de Nomenclature.png", "Exporte les nomenclatures Revit sélectionnées en fichier Excel ou PDF.")),
+                new RibbonItemDefinition("Sélection d'objet", "Sélection d'objet", panel => AddPushButton(panel, "Sélection d'objet", "Sélection\nd'objet", assemblyPath, "Visualisation.SelectSimilarCommand", "Sélection d'objet.png", "Sélectionne des éléments similaires dans le projet")),
                 new RibbonItemDefinition("Boutons de Visualisation", "Boutons de Visualisation", panel => AddStackedPushButtons(
             panel,
             assemblyPath,
     
-            ("ReorientViewButton", "Face 3D", "Visualisation.ReorientViewCommand", "Element 3D.png",
+            ("ReorientViewButton", "Face 3D", "Visualisation.ReorientViewCommand", "Face 3D.png",
                 "Permet de réorienter une vue 3D active en fonction de la géométrie d'une face sélectionnée."),
-            ("ExportDwgBatch", "DWG Exp.", "Visualisation.ExportSheetsCommand", "export DWG.png",
+            ("ExportDwgBatch", "DWG Exp.", "Visualisation.ExportSheetsCommand", "DWG Exp..png",
                 "Exporte automatiquement plusieurs vues ou feuilles en DWG, en nommant chaque fichier selon le projet et la vue comme pour les PDF."),
-            ("GetPaintedMaterialsButton", "Peinture", "Visualisation.GetPaintedMaterialsCommand", "Peinture et matériaux.png",
+            ("GetPaintedMaterialsButton", "Peinture", "Visualisation.GetPaintedMaterialsCommand", "Peinture.png",
                 "Liste les matériaux (y compris peinture) appliqués à un élément.")
     
         )),
@@ -60,75 +60,74 @@ public class AppUI : IExternalApplication
             {
                 
                 // new RibbonItemDefinition("ResérvationAuto2", "Auto Réservation2", panel => AddPushButton(panel, "ResérvationAuto2", "Auto\nRéservation2", assemblyPath, "Modification.ReservationAutoMultiVoidCommandV2", "safeimagekit-Réservation.png", "Crée des réservations automatiques")),
-                new RibbonItemDefinition("ResérvationAuto", "Auto Réservation", panel => AddPushButton(panel, "ResérvationAuto", " Auto \nRéservation", assemblyPath, "Modification.ReservationAutoV3Command", "résa cercle.png", "Crée des réservations automatiques")),
+                new RibbonItemDefinition("ResérvationAuto", "Auto Réservation", panel => AddPushButton(panel, "ResérvationAuto", " Auto \nRéservation", assemblyPath, "Modification.ReservationAutoV3Command", "Auto réservation.png", "Crée des réservations automatiques")),
                 //new RibbonItemDefinition("ResérvationAuto", "Auto Réservation", panel => AddPushButton(panel, "ResérvationAuto", "Auto\nRéservation", assemblyPath, "Modification.ReservationAutoMultiCommand", "safeimagekit-Réservation.png", "Crée des réservations automatiques")),
                 new RibbonItemDefinition("Bride auto", "Bride auto", panel => AddSplitButton(panel, "Bride auto", "Bride\nauto", assemblyPath, new List<(string, string, string, string, string)>
                 {
-                    ("Bride auto", "Bride\nauto", "Modification.AddFlangesAtEnds", "bride auto.png","Ajoute automatiquement des brides aux extrémités sélectionnées"),
+                    ("Bride auto", "Bride\nauto", "Modification.AddFlangesAtEnds", "Bride auto (2).png","Ajoute automatiquement des brides aux extrémités sélectionnées"),
                     ("Choix bride", "Choix\nbride", "Modification.PickDefaultFlange", "safeimagekit-bouton reset4.png","Permet de choisir la bride par défaut"),
-                    ("Suppression de brides", "Suppression\nde brides", "Modification.RemoveFlangesReconnect", "bride suppresion.png","Permet de supprimer les brides")
+                    ("Suppression de brides", "Suppression\nde brides", "Modification.RemoveFlangesReconnect", "Suppression de brides.png","Permet de supprimer les brides")
                 })),
                 new RibbonItemDefinition("Dynamo auto", "Dynamo Auto", panel => AddSplitButton(panel, "Dynamo auto", "Dynamo\nAuto", assemblyPath, new List<(string, string, string, string, string)>
                 {
-                    ("dynamo 1", DynamoSettings.GetLabel(0), "Modification.RunDynamo1Command", "dynamo 1.png","Lance le script Dynamo n°1."),
-                    ("dynamo 2", DynamoSettings.GetLabel(1), "Modification.RunDynamo2Command", "dynamo 2.png","Lance le script Dynamo n°2."),
-                    ("dynamo 3", DynamoSettings.GetLabel(2), "Modification.RunDynamo3Command", "dynamo 3.png","Lance le script Dynamo n°3."),
-                    ("dynamo 4", DynamoSettings.GetLabel(3), "Modification.RunDynamo4Command", "dynamo 4.png","Lance le script Dynamo n°4."),
-                    ("dynamo 5", DynamoSettings.GetLabel(4), "Modification.RunDynamo5Command", "dynamo 5.png","Lance le script Dynamo n°5."),
+                    ("dynamo 1", DynamoSettings.GetLabel(0), "Modification.RunDynamo1Command", "Dynamo 1 (2).png","Lance le script Dynamo n°1."),
+                    ("dynamo 2", DynamoSettings.GetLabel(1), "Modification.RunDynamo2Command", "dynamo 2 (2).png","Lance le script Dynamo n°2."),
+                    ("dynamo 3", DynamoSettings.GetLabel(2), "Modification.RunDynamo3Command", "dynamo 3 (2).png","Lance le script Dynamo n°3."),
+                    ("dynamo 4", DynamoSettings.GetLabel(3), "Modification.RunDynamo4Command", "dynamo 4 (2).png","Lance le script Dynamo n°4."),
+                    ("dynamo 5", DynamoSettings.GetLabel(4), "Modification.RunDynamo5Command", "dynamo 5 (2).png","Lance le script Dynamo n°5."),
                     ("dynamo réglage", "Auto dynamo\nréglage", "Modification.ConfigureDynamoButtonCommand", "réglage.png","Configure les paramètres Dynamo"),
                 })),
-                new RibbonItemDefinition("GestionExcelCmd", "Gestion Excel", panel => AddPushButton(panel, "GestionExcelCmd", "Gestion\nExcel", assemblyPath, "ScheduleIO.ScheduleExcelIOCommand", "export import Excel.png", "Exporter ou importer une nomenclature au format Excel")),
+                new RibbonItemDefinition("GestionExcelCmd", "Gestion Excel", panel => AddPushButton(panel, "GestionExcelCmd", "Gestion\nExcel", assemblyPath, "ScheduleIO.ScheduleExcelIOCommand", "Gestion Excel.png", "Exporter ou importer une nomenclature au format Excel")),
                 new RibbonItemDefinition("ModificationQuickTools", "Outils rapides", panel => AddStackedPushButtons(
                         panel,
                         assemblyPath,
-                        ("OverrideColor", "Couleur", "Modification.OverrideColorCommand", "Pallette de couleur anexe .png", "Applique des remplacements graphiques aux éléments (couleur, motif, transparence).\r\nPeut agir sur plusieurs vues et propose une réinitialisation des modifications."),
-                        ("ElementRenamerButton", "Organisateur", "Modification.RenameElementsCommand", "Organisateur d'éléments.png", "Renomme les éléments sélectionnés avec préfixes, suffixes et numérotation.\r\nTrie les éléments par niveau/emplacement et peut réinitialiser le paramètre texte ciblé."),
-                        ("Purge du plan", "Purge", "Modification.CombinedCleanupCommand", "purge.png", "Supprime les vues non placées, les familles et les nomenclatures inutilisées afin d'alléger le projet.\r\nUne fenêtre permet de choisir précisément les éléments à purger avant exécution.\r\n")
+                        ("OverrideColor", "Couleur", "Modification.OverrideColorCommand", "Couleur.png", "Applique des remplacements graphiques aux éléments (couleur, motif, transparence).\r\nPeut agir sur plusieurs vues et propose une réinitialisation des modifications."),
+                        ("ElementRenamerButton", "Organisateur", "Modification.RenameElementsCommand", "Organisateur.png", "Renomme les éléments sélectionnés avec préfixes, suffixes et numérotation.\r\nTrie les éléments par niveau/emplacement et peut réinitialiser le paramètre texte ciblé."),
+                        ("Purge du plan", "Purge", "Modification.CombinedCleanupCommand", "Purge.png", "Supprime les vues non placées, les familles et les nomenclatures inutilisées afin d'alléger le projet.\r\nUne fenêtre permet de choisir précisément les éléments à purger avant exécution.\r\n")
                     )),
              }),
 
             new RibbonPanelDefinition("Outils IA", new List<RibbonItemDefinition>
             {
-                new RibbonItemDefinition("GPTBotWindowButton", "Chatbot + élément", panel => AddPushButton(panel, "GPTBotWindowButton", "Chatbot\n+ élément", assemblyPath, "IA.GPTBotWindowCommand", "Image IA.png", "Ouvre un assistant IA conversationnel connecté à votre contexte Revit.\r\nAnalyse les éléments sélectionnés et répond selon le profil choisi (Basique, Revit, BIM Manager).")),
-                new RibbonItemDefinition("TextCorrectionButton", "Correction de texte IA", panel => AddPushButton(panel, "TextCorrectionButton", "Correction \nde texte IA", assemblyPath, "IA.TextCorrectionCommand", "safeimagekit-correction de texte IA.png", "Corrige et reformule les textes Revit sélectionnés avec l'IA.\r\nPropose plusieurs styles et laisse valider, modifier ou ignorer chaque suggestion.")),
-                new RibbonItemDefinition("ScanText", "Audit texte IA", panel => AddPushButton(panel, "ScanText", "Audit texte\nIA", assemblyPath, "ScanTextRevit.SelectViewsCommand", "safeimagekit-qfdfsf.png", "Analyse les textes des vues/feuilles sélectionnées pour détecter les fautes d'orthographe, de grammaire et de ponctuation. \r\n\r\nPourquoi ce bouton est utile :\r\n- évite les oublis avant envoi client,\r\n- classe les anomalies par gravité (Mineur / Erreur),\r\n- propose des corrections détaillées ligne par ligne.\r\n\r\nConseil : sélectionne seulement les vues/feuilles à contrôler pour accélérer l'analyse.")),
-                new RibbonItemDefinition("RealisticViewImage", "Plan réaliste IA", panel => AddPushButton(panel, "RealisticViewImage", "Plan\nréaliste IA", assemblyPath, "IA.RealisticViewImageCommand", "Image IA.png", "Transforme une vue Plan/Coupe/3D en rendu réaliste avec gpt-image-2 (qualité low), en conservant strictement le cadrage et la géométrie. La vue est compressée pour rester dans une limite de 1024x1024 max avant envoi."))            }),
-
+                new RibbonItemDefinition("GPTBotWindowButton", "Chatbot + élément", panel => AddPushButton(panel, "GPTBotWindowButton", "Chatbot\n+ élément", assemblyPath, "IA.GPTBotWindowCommand", "Chatbot + élémet.png", "Ouvre un assistant IA conversationnel connecté à votre contexte Revit.\r\nAnalyse les éléments sélectionnés et répond selon le profil choisi (Basique, Revit, BIM Manager).")),
+                new RibbonItemDefinition("TextCorrectionButton", "Correction de texte IA", panel => AddPushButton(panel, "TextCorrectionButton", "Correction \nde texte IA", assemblyPath, "IA.TextCorrectionCommand", "Correction de texte IA (2).png", "Corrige et reformule les textes Revit sélectionnés avec l'IA.\r\nPropose plusieurs styles et laisse valider, modifier ou ignorer chaque suggestion.")),
+                new RibbonItemDefinition("ScanText", "Audit texte IA", panel => AddPushButton(panel, "ScanText", "Audit texte\nIA", assemblyPath, "ScanTextRevit.SelectViewsCommand", "Audit texte IA.png", "Analyse les textes des vues/feuilles sélectionnées pour détecter les fautes d'orthographe, de grammaire et de ponctuation. \r\n\r\nPourquoi ce bouton est utile :\r\n- évite les oublis avant envoi client,\r\n- classe les anomalies par gravité (Mineur / Erreur),\r\n- propose des corrections détaillées ligne par ligne.\r\n\r\nConseil : sélectionne seulement les vues/feuilles à contrôler pour accélérer l'analyse.")),
+                new RibbonItemDefinition("RealisticViewImage", "Rendu plan IA", panel => AddPushButton(panel, "RealisticViewImage", "Rendu\nplan IA", assemblyPath, "IA.RealisticViewImageCommand", "rendu plan IA.png", "Génère un rendu réaliste à partir d'une vue Plan/Coupe/3D via gpt-image-2.\r\n\r\nCe que fait le bouton :\r\n- conserve le cadrage et la géométrie de la vue source,\r\n- optimise l'image avant envoi ,\r\n- crée une variante visuelle rapide pour présentation client.\r\n\r\nConseil : lancez-le sur une vue propre (annotations masquées) pour obtenir un résultat plus lisible."))            }),
            new RibbonPanelDefinition("Analyse", new List<RibbonItemDefinition>
             {
-                new RibbonItemDefinition("PipeLengthByDiameterV2", "Calcul des canalisations", panel => AddPushButton(panel, "PipeLengthByDiameterV2", "Calcul des\ncanalisations", assemblyPath, "Analyse.PipeLengthByDiameterCommandV2", "Canalisation.png", "Description :\r\n- Calcule les longueurs des canalisations et gaines par diamètre (DN ou dimensions).\r\n- Compte les accessoires de type coudes et tés par diamètre.\r\n- Estime les volumes d'eau par diamètre intérieur.\r\n- Intègre un filtre par type de système pour une analyse précise.\r\n- Permet d'inclure ou non les gaines dans les calculs.\r\n- Exporte les résultats sous forme de tableau Excel détaillé.\r\n\r\nUtilité :\r\nOptimisez votre gestion des systèmes MEP en obtenant rapidement une analyse précise des longueurs, volumes et accessoires, avec possibilité d'exportation.")),
-                new RibbonItemDefinition("Qui a fait ça ?", "Qui a fait ça ??", panel => AddPushButton(panel, "Qui a fait ça ?", "Qui a\nfait ça ??", assemblyPath, "Analyse.MainCommand", "Qui à fait ça.png", "Description :\r\n- **Créateur de la vue active** : Identifie qui a créé et modifié la vue actuellement affichée.\r\n- **Créateur des éléments sélectionnés** : Récupère les informations de création et de modification pour un élément sélectionné.\r\n- **Dernière synchronisation** : Affiche l'utilisateur ayant effectué la dernière synchronisation du modèle.\r\n\r\nUtilité :\r\nFacilitez le suivi des responsabilités et identifiez rapidement les auteurs ou éditeurs des éléments et des vues dans un environnement collaboratif partagé.")),
-                new RibbonItemDefinition("AnalysePoidsButton", "Analyse de Poids", panel => AddPushButton(panel, "AnalysePoidsButton", "Analyse\nde Poids", assemblyPath, "Analyse.CommandAnalysePoids", "Calcule de poid1.png", "Fonctionnalités principales :\r\n1. **Analyse des Familles** :\r\n   - Taille de chaque famille (Mo).\r\n   - Nombre d'instances pour chaque famille.\r\n   - Classement par taille décroissante.\r\n\r\n2. **Analyse des Imports CAO** :\r\n   - Taille des imports (Mo).\r\n   - Types d'éléments analysés : Imports CAO, Lien Revit/IFC.\r\n\r\n3. **Export des Résultats** :\r\n   - Export vers un fichier Excel (RevitLogs/TailleFamilleRevit).\r\n   - Organisation claire par nom, type, taille et nombre d'instances.\r\n\r\nUtilité :\r\n- Identifier les éléments volumineux dans votre projet.\r\n- Optimiser la performance du modèle en réduisant les familles et les imports inutiles.")),
+                new RibbonItemDefinition("PipeLengthByDiameterV2", "Calcul des canalisations", panel => AddPushButton(panel, "PipeLengthByDiameterV2", "Calcul des\ncanalisations", assemblyPath, "Analyse.PipeLengthByDiameterCommandV2", "Calcul de canalisation.png", "Description :\r\n- Calcule les longueurs des canalisations et gaines par diamètre (DN ou dimensions).\r\n- Compte les accessoires de type coudes et tés par diamètre.\r\n- Estime les volumes d'eau par diamètre intérieur.\r\n- Intègre un filtre par type de système pour une analyse précise.\r\n- Permet d'inclure ou non les gaines dans les calculs.\r\n- Exporte les résultats sous forme de tableau Excel détaillé.\r\n\r\nUtilité :\r\nOptimisez votre gestion des systèmes MEP en obtenant rapidement une analyse précise des longueurs, volumes et accessoires, avec possibilité d'exportation.")),
+                new RibbonItemDefinition("Qui a fait ça ?", "Qui a fait ça ??", panel => AddPushButton(panel, "Qui a fait ça ?", "Qui a\nfait ça ??", assemblyPath, "Analyse.MainCommand", "qui à fait ça (2).png", "Description :\r\n- **Créateur de la vue active** : Identifie qui a créé et modifié la vue actuellement affichée.\r\n- **Créateur des éléments sélectionnés** : Récupère les informations de création et de modification pour un élément sélectionné.\r\n- **Dernière synchronisation** : Affiche l'utilisateur ayant effectué la dernière synchronisation du modèle.\r\n\r\nUtilité :\r\nFacilitez le suivi des responsabilités et identifiez rapidement les auteurs ou éditeurs des éléments et des vues dans un environnement collaboratif partagé.")),
+                new RibbonItemDefinition("AnalysePoidsButton", "Analyse de Poids", panel => AddPushButton(panel, "AnalysePoidsButton", "Analyse\nde Poids", assemblyPath, "Analyse.CommandAnalysePoids", "Analyse de poid.png", "Fonctionnalités principales :\r\n1. **Analyse des Familles** :\r\n   - Taille de chaque famille (Mo).\r\n   - Nombre d'instances pour chaque famille.\r\n   - Classement par taille décroissante.\r\n\r\n2. **Analyse des Imports CAO** :\r\n   - Taille des imports (Mo).\r\n   - Types d'éléments analysés : Imports CAO, Lien Revit/IFC.\r\n\r\n3. **Export des Résultats** :\r\n   - Export vers un fichier Excel (RevitLogs/TailleFamilleRevit).\r\n   - Organisation claire par nom, type, taille et nombre d'instances.\r\n\r\nUtilité :\r\n- Identifier les éléments volumineux dans votre projet.\r\n- Optimiser la performance du modèle en réduisant les familles et les imports inutiles.")),
 
                 new RibbonItemDefinition("Temps par projet", "Temps par projet", panel => AddSplitButton(panel, "Temps par projet", "Temps par\nprojet", assemblyPath, new List<(string, string, string, string, string)>
                 {
-                    ("Temps par projet", "Temps par\nprojet", "BIMaestro.Dashboard.ShowTimeDashboard", "analyse de temps.png", "Affiche le temps passé par projet."),
-                    ("Suivi maquette collaboratif", "Suivi\nmaquette", "Analyse.CollaborativeModelTrackerCommand", "Collaboration.png", "Crée/consulte un registre JSON + Excel pour toutes les maquettes (suivi auto ouverture/fermeture). Si la maquette n'existe pas, le créateur devient le premier ouvreur.")
+                    ("Temps par projet", "Temps par\nprojet", "BIMaestro.Dashboard.ShowTimeDashboard", "Temps par projet.png", "Affiche le temps passé par projet."),
+                    ("Suivi maquette collaboratif", "Suivi\nmaquette", "Analyse.CollaborativeModelTrackerCommand", "suivie maquette.png", "Crée/consulte un registre JSON + Excel pour toutes les maquettes (suivi auto ouverture/fermeture). Si la maquette n'existe pas, le créateur devient le premier ouvreur.")
                 })),
                
-                new RibbonItemDefinition("Clash 3D", "Clash 3D", panel => AddPushButton(panel, "Clash 3D", "Clash\n3D", assemblyPath, "Analyse.SmartClashCommand", "correction 3D.png", "Vérifie les éléments 3D sélectionnés pour détecter les incohérences."))
+                new RibbonItemDefinition("Clash 3D", "Clash 3D", panel => AddPushButton(panel, "Clash 3D", "Clash\n3D", assemblyPath, "Analyse.SmartClashCommand", "Clash 3D.png", "Vérifie les éléments 3D sélectionnés pour détecter les incohérences."))
             }),
             
                 new RibbonPanelDefinition("Spécifique aux familles", new List<RibbonItemDefinition>
             {
                 new RibbonItemDefinition("FamilyBrowser", "Navigateur de Familles", panel => AddSplitButton(panel, "FamilyBrowser", "Famille", assemblyPath, new List<(string, string, string, string, string)>
                 {
-                    ("FamilyBrowser", "Navigateur\nde Familles", "Famille.FamilyBrowserCommand", "maison famille (1).png","Parcourt vos dossiers de familles Revit et charge les contenus en quelques clics.\r\nInclut aperçu visuel, favoris, recherche et options d'affichage pour accélérer le travail."), 
+                    ("FamilyBrowser", "Navigateur\nde Familles", "Famille.FamilyBrowserCommand", "Famille.png","Parcourt vos dossiers de familles Revit et charge les contenus en quelques clics.\r\nInclut aperçu visuel, favoris, recherche et options d'affichage pour accélérer le travail."), 
                     ("Rosace", ".","BIMaestro.UI.RadialMenuCommand", "vide.png","Rosace des familles à ajouter en raccourci clavier voir raccourci souris.")
                 }, "Navigateur de Familles", "maison famille (1).png", keepDefaultCurrentButton: true, fixedDisplayText: "Famille")),
-        new RibbonItemDefinition("ConvertSharedToFamily", "Convertir les paramètres partagés", panel => AddPushButton(panel, "ConvertSharedToFamily", "Convertir\nparamètres", assemblyPath, "Famille.ConvertSharedToFamilyParametersCommand", "Convertir paramètres1.png", "Convertit tous les paramètres partagés modifiables de la famille en paramètres de famille (même nom, même groupe et même type instance/type).")),                new RibbonItemDefinition("FamilyUtilitiesStack", "Outils familles", panel => AddStackedFamilyUtilities(
+        new RibbonItemDefinition("ConvertSharedToFamily", "Convertir les paramètres partagés", panel => AddPushButton(panel, "ConvertSharedToFamily", "Convertir\nparamètres", assemblyPath, "Famille.ConvertSharedToFamilyParametersCommand", "Convertir paramètres (2).png", "Convertit tous les paramètres partagés modifiables de la famille en paramètres de famille (même nom, même groupe et même type instance/type).")),                new RibbonItemDefinition("FamilyUtilitiesStack", "Outils familles", panel => AddStackedFamilyUtilities(
                     panel,
                     assemblyPath,
-                    ("PurgeFamilyParameters", "Purge", "Famille.PurgeFamilyParametersCommand", "Purge famille32x32.png", "Supprime les paramètres inutilisés d'une famille Revit après vérification des dépendances.\r\nCrée automatiquement une sauvegarde avant nettoyage."),
+                    ("PurgeFamilyParameters", "Purge", "Famille.PurgeFamilyParametersCommand", "Purge famille2.png", "Supprime les paramètres inutilisés d'une famille Revit après vérification des dépendances.\r\nCrée automatiquement une sauvegarde avant nettoyage."),
                     ("Familytraduction", "Trad.IA", new List<(string, string, string, string, string)>
                     {
-                        ("Familytraduction", "Trad.IA", "Famille.TraduireParametresFamilleOpenAI", "Pour paramètre de famille1.png","Traduit en français les noms de paramètres utilisateur d'une famille.\r\nIgnore les paramètres déjà francisés et enregistre les changements de façon sécurisée."),
-                        ("FamilyViewtraduction", "Traduction\nde vues IA","Famille.TraduireVuesFamilleOpenAI", "Pour paramètre de famille1.png","Cette commande permet :  \r\n- De traduire automatiquement les noms des vues d'une famille Revit en français.  \r\n- De conserver les vues déjà en français sans modification.  \r\n- D'assurer l'unicité des noms générés même en cas de doublon potentiel.  \r\n- D'utiliser l'API OpenAI et le cache de traduction pour accélérer les traitements récurrents.  \r\n\r\nUtilité :  \r\nGarantit une nomenclature cohérente et francisée des vues de famille, améliorant la compréhension et la conformité des contenus.  ")
+                        ("Familytraduction", "Trad.IA", "Famille.TraduireParametresFamilleOpenAI", "Tard IA.png","Traduit en français les noms de paramètres utilisateur d'une famille.\r\nIgnore les paramètres déjà francisés et enregistre les changements de façon sécurisée."),
+                        ("FamilyViewtraduction", "Traduction\nde vues IA","Famille.TraduireVuesFamilleOpenAI", "Tard IA.png","Cette commande permet :  \r\n- De traduire automatiquement les noms des vues d'une famille Revit en français.  \r\n- De conserver les vues déjà en français sans modification.  \r\n- D'assurer l'unicité des noms générés même en cas de doublon potentiel.  \r\n- D'utiliser l'API OpenAI et le cache de traduction pour accélérer les traitements récurrents.  \r\n\r\nUtilité :  \r\nGarantit une nomenclature cohérente et francisée des vues de famille, améliorant la compréhension et la conformité des contenus.  ")
                     }),
                     ("Export d'unité", "Unités", new List<(string, string, string, string, string)>
                     {
-                        ("Export d'unité", "Unités", "Famille.ExportProjectUnitsCommand", "export unité.png","Sauvegarde dans un fichier JSON les unités et leur précision (longueur, surface, volume, angle, etc.) du projet en cours, dans le dossier Mes Documents/RevitLogs/SauvegardePréférence."),
-                        ("Import d'unité", "Import\nd'unité","Famille.ImportProjectUnitsCommand", "import unité.png","Recharge depuis le fichier JSON les unités et leur précision pour appliquer rapidement vos préférences au projet.")
+                        ("Export d'unité", "Unités", "Famille.ExportProjectUnitsCommand", "Unités.png","Sauvegarde dans un fichier JSON les unités et leur précision (longueur, surface, volume, angle, etc.) du projet en cours, dans le dossier Mes Documents/RevitLogs/SauvegardePréférence."),
+                        ("Import d'unité", "Import\nd'unité","Famille.ImportProjectUnitsCommand", "Import unités.png","Recharge depuis le fichier JSON les unités et leur précision pour appliquer rapidement vos préférences au projet.")
                     })))
             }),
 
@@ -136,23 +135,23 @@ public class AppUI : IExternalApplication
             {
                 new RibbonItemDefinition("Changement de couleur", "Changement de couleur", panel => AddSplitButton(panel, "Changement de couleur", "couleur\nOui/Non", assemblyPath, new List<(string, string, string, string, string)>
                 {
-                    ("Couleur de projet", "Couleur\nOui/Non", "Couleur.ToggleCombinedColoringCommand", "bouton lumière.png","Active ou désactive les couleurs du projet (simple ou double clic)"),
-                    ("Couleur de maquette", "Couleur reset", "Couleur.ResetTabItemRandomColorsCommand", "safeimagekit-bouton reset4.png","Réinitialise les couleurs appliquées"),
-                    ("papa Noël", "papa\nNoël", "Couleur.PapanoelCommand", "Père Noël.png","Fait apparaître des couleurs comme des guirlandes\nDouble clic pour revenir à la normale.\n\nAttention désactiver <couleur Oui/Non> avant activation."),
+                    ("Couleur de projet", "Couleur\nOui/Non", "Couleur.ToggleCombinedColoringCommand", "Couleur oui non.png","Active ou désactive les couleurs du projet (simple ou double clic)"),
+                    ("Couleur de maquette", "Couleur reset", "Couleur.ResetTabItemRandomColorsCommand", "reset.png","Réinitialise les couleurs appliquées"),
+                    ("papa Noël", "papa\nNoël", "Couleur.PapanoelCommand", "papa noel.png","Fait apparaître des couleurs comme des guirlandes\nDouble clic pour revenir à la normale.\n\nAttention désactiver <couleur Oui/Non> avant activation."),
                     ("Snake", "Snake", "BIMaestro.Bonus.SnakeCommand", "snake.png","Petit jeux snake :P"),
-                    ("FlappyBird", "Flappy\nBird", "BIMaestro.Bonus.FlappyBirdCommand", "Flappy bird-1.png","Petit jeu Flappy Bird :P"),
+                    ("FlappyBird", "Flappy\nBird", "BIMaestro.Bonus.FlappyBirdCommand", "flappy bird.png","Petit jeu Flappy Bird :P"),
                 })),
 
                 new RibbonItemDefinition("InfoStack", "Infos empilées", panel => AddStackedInfoButtons(
                     panel,
                     assemblyPath,
                     // (name, text, className, icon, tooltip)
-                    ("NOTE_MAJ", "Note", "Page.MiseAJourCommand", "safeimagekit-Information.png", "Page de mise à jour"),
-                    ("BIMaestro_Exemple", "Exemple", "Page.GuideCommand", "safeimagekit-Texte maj.png", "Page d'information sur le plugin"),
+                    ("NOTE_MAJ", "Note", "Page.MiseAJourCommand", "Information (2).png", "Page de mise à jour"),
+                    ("BIMaestro_Exemple", "Exemple", "Page.GuideCommand", "Exemple.png", "Page d'information sur le plugin"),
                     ("CustomizeRibbon", "Option", new List<(string, string, string, string, string)>
                     {
-                        ("CustomizeRibbon", "Option", "BIMaestro.RibbonLayout.RibbonLayoutCommand", "roue ruban.png", "Configurer le ruban BIMaestro et les paramètres utilisateur."),
-                        ("RadialMenuButtonsCommand", "Rosace\nBoutons", "BIMaestro.UI.RadialMenuButtonsCommand", "roue ruban.png", "Rosace des 16 derniers boutons BIMaestro utilisés.")
+                        ("CustomizeRibbon", "Option", "BIMaestro.RibbonLayout.RibbonLayoutCommand", "Option.png", "Configurer le ruban BIMaestro et les paramètres utilisateur."),
+                        ("RadialMenuButtonsCommand", "Rosace\nBoutons", "BIMaestro.UI.RadialMenuButtonsCommand", "Option.png", "Rosace des 16 derniers boutons BIMaestro utilisés.")
                     })
                 ))
             })
