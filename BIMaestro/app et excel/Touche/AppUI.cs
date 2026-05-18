@@ -19,7 +19,6 @@ public class AppUI : IExternalApplication
     private static readonly List<string> ribbonButtonOrder = new List<string>();
     private static readonly Dictionary<string, RibbonButtonInfo> ribbonButtonsByCommandClass =
         new Dictionary<string, RibbonButtonInfo>(StringComparer.OrdinalIgnoreCase);
-
     public Result OnStartup(UIControlledApplication application)
     {
         CreateRibbonUI(application);
@@ -65,16 +64,16 @@ public class AppUI : IExternalApplication
                 new RibbonItemDefinition("Bride auto", "Bride auto", panel => AddSplitButton(panel, "Bride auto", "Bride\nauto", assemblyPath, new List<(string, string, string, string, string)>
                 {
                     ("Bride auto", "Bride\nauto", "Modification.AddFlangesAtEnds", "Bride auto (2).png","Ajoute automatiquement des brides aux extrémités sélectionnées"),
-                    ("Choix bride", "Choix\nbride", "Modification.PickDefaultFlange", "safeimagekit-bouton reset4.png","Permet de choisir la bride par défaut"),
+                    ("Choix bride", "Choix\nbride", "Modification.PickDefaultFlange", "reset.png","Permet de choisir la bride par défaut"),
                     ("Suppression de brides", "Suppression\nde brides", "Modification.RemoveFlangesReconnect", "Suppression de brides.png","Permet de supprimer les brides")
                 })),
                 new RibbonItemDefinition("Dynamo auto", "Dynamo Auto", panel => AddSplitButton(panel, "Dynamo auto", "Dynamo\nAuto", assemblyPath, new List<(string, string, string, string, string)>
                 {
                     ("dynamo 1", DynamoSettings.GetLabel(0), "Modification.RunDynamo1Command", "Dynamo 1 (2).png","Lance le script Dynamo n°1."),
-                    ("dynamo 2", DynamoSettings.GetLabel(1), "Modification.RunDynamo2Command", "dynamo 2 (2).png","Lance le script Dynamo n°2."),
-                    ("dynamo 3", DynamoSettings.GetLabel(2), "Modification.RunDynamo3Command", "dynamo 3 (2).png","Lance le script Dynamo n°3."),
-                    ("dynamo 4", DynamoSettings.GetLabel(3), "Modification.RunDynamo4Command", "dynamo 4 (2).png","Lance le script Dynamo n°4."),
-                    ("dynamo 5", DynamoSettings.GetLabel(4), "Modification.RunDynamo5Command", "dynamo 5 (2).png","Lance le script Dynamo n°5."),
+                    ("dynamo 2", DynamoSettings.GetLabel(1), "Modification.RunDynamo2Command", "Dynamo 2 (2).png","Lance le script Dynamo n°2."),
+                    ("dynamo 3", DynamoSettings.GetLabel(2), "Modification.RunDynamo3Command", "Dynamo 3 (2).png","Lance le script Dynamo n°3."),
+                    ("dynamo 4", DynamoSettings.GetLabel(3), "Modification.RunDynamo4Command", "Dynamo 4 (2).png","Lance le script Dynamo n°4."),
+                    ("dynamo 5", DynamoSettings.GetLabel(4), "Modification.RunDynamo5Command", "Dynamo 5 (2).png","Lance le script Dynamo n°5."),
                     ("dynamo réglage", "Auto dynamo\nréglage", "Modification.ConfigureDynamoButtonCommand", "réglage.png","Configure les paramètres Dynamo"),
                 })),
                 new RibbonItemDefinition("GestionExcelCmd", "Gestion Excel", panel => AddPushButton(panel, "GestionExcelCmd", "Gestion\nExcel", assemblyPath, "ScheduleIO.ScheduleExcelIOCommand", "Gestion Excel.png", "Exporter ou importer une nomenclature au format Excel")),
@@ -188,6 +187,7 @@ public class AppUI : IExternalApplication
                 item.Builder(panel);
             }
         }
+
     }
 
     private static IEnumerable<RibbonPanelConfig> OrderPanels(IEnumerable<RibbonPanelDefinition> definitions, RibbonLayoutConfig layout)
