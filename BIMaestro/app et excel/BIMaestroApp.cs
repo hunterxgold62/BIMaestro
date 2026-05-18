@@ -23,6 +23,7 @@ public class BIMaestroApp : IExternalApplication
 
     private UIApplication _uiApp;
     private bool _hasResetWhenOff = false;
+    private bool _hasShownTimeTrackingError = false;
 
     private static readonly string LogDirectory =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs");
@@ -209,9 +210,26 @@ public class BIMaestroApp : IExternalApplication
             _uiApp ??= new UIApplication(args.Document.Application);
             ExcelLogger.OnViewActivated(args.Document, _uiApp);
         }
+        catch (Autodesk.Revit.Exceptions.InvalidObjectException ex)
+        {
+            AppendLog($"OnViewActivated (suivi du temps) : {ex.Message}\n{ex.StackTrace}");
+
+            if (_hasShownTimeTrackingError) return;
+            _hasShownTimeTrackingError = true;
+
+            var td = new TaskDialog("BIMaestro - Suivi du temps")
+            {
+                MainInstruction = "Un problème est survenu avec l'enregistrement du temps.",
+                MainContent =
+                    "BIMaestro n'arrive plus à suivre correctement le temps sur ce projet.\n\n" +
+                    "Pour rétablir le suivi, enregistre ton travail puis relance Revit."
+            };
+            td.CommonButtons = TaskDialogCommonButtons.Close;
+            td.Show();
+        }
         catch (Exception ex)
         {
-            TaskDialog.Show("Erreur ViewActivated", ex.ToString());
+            AppendLog($"OnViewActivated : {ex.Message}\n{ex.StackTrace}");
         }
     }
 

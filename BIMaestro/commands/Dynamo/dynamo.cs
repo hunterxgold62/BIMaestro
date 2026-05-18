@@ -308,8 +308,9 @@ namespace Modification
 
                 string labelPreview = DynamoSettings.GetLabel(wnd.SelectedButtonIndex).Replace("\n", " / ");
                 string pathPreview = string.Join("\n", wnd.SelectedPaths);
-                TaskDialog.Show("Fait",
-                    $"Le bouton \"{labelPreview}\" utilisera :\n{pathPreview}");
+                TaskDialog.Show("Configuration enregistrée",
+                    $"Le bouton \"{labelPreview}\" utilisera :\n{pathPreview}\n\n" +
+                    "Note : le nouveau nom du bouton sera visible après la prochaine réouverture de Revit.");
                 return Result.Succeeded;
             }
             catch (Exception ex)
