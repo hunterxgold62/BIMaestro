@@ -34,9 +34,24 @@
                 Background="{StaticResource Brand}"
                 Padding="18"
                 Margin="0,0,0,14">
-            <StackPanel>
-                <TextBlock Text="Réservations automatiques" Style="{StaticResource H1}"/>
-            </StackPanel>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Text="Réservations automatiques" Style="{StaticResource H1}"/>
+
+                <Button Grid.Column="1"
+                        Content="?"
+                        Width="28"
+                        Height="28"
+                        FontWeight="Bold"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
+                        ToolTip="Ouvrir l'aide en ligne"
+                        Click="HelpButton_Click"/>
+            </Grid>
         </Border>
 
         <!-- ========= CONTENT ========= -->

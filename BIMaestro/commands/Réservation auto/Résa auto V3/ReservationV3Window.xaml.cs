@@ -3,6 +3,7 @@ using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -18,6 +19,7 @@ namespace Modification
 {
     public partial class ReservationAutoV3Window : Window
     {
+        private const string HelpUrl = "https://www.bimaestro.fr";
         public enum HostTarget { Mur, Sol }
         public enum ShapeTarget { Rectangulaire, Circulaire }
         public enum ObjectType { Canalisation, Gaine, Porte, Fenetre, Autre }
@@ -1336,6 +1338,17 @@ namespace Modification
             Close();
         }
 
+        private void HelpButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(HelpUrl) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Impossible d'ouvrir l'aide en ligne : {ex.Message}", "Aide", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
         private class NoPromptFamilyLoadOptions : IFamilyLoadOptions
         {
             public bool OnFamilyFound(bool familyInUse, out bool overwriteParameterValues)
