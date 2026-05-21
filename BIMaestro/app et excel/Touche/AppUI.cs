@@ -130,15 +130,14 @@ public class AppUI : IExternalApplication
                     })))
             }),
 
-            new RibbonPanelDefinition("Couleur et information", new List<RibbonItemDefinition>
+           new RibbonPanelDefinition("Couleur et information", new List<RibbonItemDefinition>
             {
                 new RibbonItemDefinition("Changement de couleur", "Changement de couleur", panel => AddSplitButton(panel, "Changement de couleur", "couleur\nOui/Non", assemblyPath, new List<(string, string, string, string, string)>
                 {
                     ("Couleur de projet", "Couleur\nOui/Non", "Couleur.ToggleCombinedColoringCommand", "Couleur oui non.png","Active ou désactive les couleurs du projet (simple ou double clic)"),
                     ("Couleur de maquette", "Couleur reset", "Couleur.ResetTabItemRandomColorsCommand", "reset.png","Réinitialise les couleurs appliquées"),
                     ("papa Noël", "papa\nNoël", "Couleur.PapanoelCommand", "papa noel.png","Fait apparaître des couleurs comme des guirlandes\nDouble clic pour revenir à la normale.\n\nAttention désactiver <couleur Oui/Non> avant activation."),
-                    ("Snake", "Snake", "BIMaestro.Bonus.SnakeCommand", "snake.png","Petit jeux snake :P"),
-                    ("FlappyBird", "Flappy\nBird", "BIMaestro.Bonus.FlappyBirdCommand", "flappy bird.png","Petit jeu Flappy Bird :P"),
+                    ("BIMaestro_Exemple", "Exemple", "Page.GuideCommand", "Exemple.png", "Page d'information sur le plugin"),
                 })),
 
                 new RibbonItemDefinition("InfoStack", "Infos empilées", panel => AddStackedInfoButtons(
@@ -146,7 +145,11 @@ public class AppUI : IExternalApplication
                     assemblyPath,
                     // (name, text, className, icon, tooltip)
                     ("NOTE_MAJ", "Note", "Page.MiseAJourCommand", "Information (2).png", "Page de mise à jour"),
-                    ("BIMaestro_Exemple", "Exemple", "Page.GuideCommand", "Exemple.png", "Page d'information sur le plugin"),
+                    ("JeuxSplit", "Snake", new List<(string, string, string, string, string)>
+                    {
+                        ("Snake", "Snake", "BIMaestro.Bonus.SnakeCommand", "snake.png", "Petit jeu Snake :P"),
+                        ("FlappyBird", "Flappy\nBird", "BIMaestro.Bonus.FlappyBirdCommand", "flappy bird.png", "Petit jeu Flappy Bird :P")
+                    }),
                     ("CustomizeRibbon", "Option", new List<(string, string, string, string, string)>
                     {
                         ("CustomizeRibbon", "Option", "BIMaestro.RibbonLayout.RibbonLayoutCommand", "Option.png", "Configurer le ruban BIMaestro et les paramètres utilisateur."),
@@ -304,20 +307,19 @@ public class AppUI : IExternalApplication
     }
 
     private static void AddStackedInfoButtons(
-        RibbonPanel panel,
-        string assemblyPath,
-        (string buttonName, string buttonText, string className, string resourceImageName, string toolTip) noteButton,
-        (string buttonName, string buttonText, string className, string resourceImageName, string toolTip) exampleButton,
-        (string splitButtonName, string splitButtonText, List<(string buttonName, string buttonText, string className, string resourceImageName, string toolTip)> buttons) optionSplit)
+         RibbonPanel panel,
+         string assemblyPath,
+         (string buttonName, string buttonText, string className, string resourceImageName, string toolTip) noteButton,
+         (string splitButtonName, string splitButtonText, List<(string buttonName, string buttonText, string className, string resourceImageName, string toolTip)> buttons) gamesSplit,
+         (string splitButtonName, string splitButtonText, List<(string buttonName, string buttonText, string className, string resourceImageName, string toolTip)> buttons) optionSplit)
     {
         RegisterButtonDefinition(noteButton.buttonName, noteButton.buttonText, noteButton.className, noteButton.resourceImageName);
-        RegisterButtonDefinition(exampleButton.buttonName, exampleButton.buttonText, exampleButton.className, exampleButton.resourceImageName);
 
         var noteData = CreatePushButtonData(noteButton.buttonName, noteButton.buttonText, assemblyPath, noteButton.className, noteButton.resourceImageName, noteButton.toolTip);
-        var exampleData = CreatePushButtonData(exampleButton.buttonName, exampleButton.buttonText, assemblyPath, exampleButton.className, exampleButton.resourceImageName, exampleButton.toolTip);
+        var gamesData = new SplitButtonData(gamesSplit.splitButtonName, gamesSplit.splitButtonText);
         var optionData = new SplitButtonData(optionSplit.splitButtonName, optionSplit.splitButtonText);
 
-        var stacked = panel.AddStackedItems(noteData, exampleData, optionData);
+        var stacked = panel.AddStackedItems(noteData, gamesData, optionData);
         if (stacked == null)
         {
             return;
@@ -329,10 +331,9 @@ public class AppUI : IExternalApplication
             RegisterButtonCommandId(noteButton.buttonName, TryGetCommandId(note));
         }
 
-        if (stacked.Count > 1 && stacked[1] is PushButton example)
+        if (stacked.Count > 1 && stacked[1] is SplitButton games)
         {
-            RegisterButtonInstance(exampleButton.buttonName, example);
-            RegisterButtonCommandId(exampleButton.buttonName, TryGetCommandId(example));
+            ConfigureSplitButton(games, assemblyPath, gamesSplit.buttons, "Snake", "snake.png");
         }
 
         if (stacked.Count > 2 && stacked[2] is SplitButton option)
@@ -340,6 +341,7 @@ public class AppUI : IExternalApplication
             ConfigureSplitButton(option, assemblyPath, optionSplit.buttons, null, null);
         }
     }
+
 
     private static void AddStackedFamilyUtilities(
         RibbonPanel panel,

@@ -14,6 +14,20 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="/BIMaestro;component/Themes/BIMaestroTheme.xaml"/>
             </ResourceDictionary.MergedDictionaries>
+            <Style x:Key="HelpButtonStyle" TargetType="Button">
+                <Setter Property="Width" Value="34"/>
+                <Setter Property="Height" Value="34"/>
+                <Setter Property="MinWidth" Value="34"/>
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="Margin" Value="0"/>
+                <Setter Property="Background" Value="#F1F3F5"/>
+                <Setter Property="Foreground" Value="#111827"/>
+                <Setter Property="BorderBrush" Value="#D1D5DB"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="FontWeight" Value="Bold"/>
+                <Setter Property="FontSize" Value="15"/>
+                <Setter Property="Cursor" Value="Hand"/>
+            </Style>
         </ResourceDictionary>
     </Window.Resources>
 
@@ -70,13 +84,25 @@
         <!-- Ligne 2 : Boutons bas -->
         <Grid Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,20,0,0">
             <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
+            <Button x:Name="HelpButton"
+                    Grid.Column="0"
+                    Content="?"
+                    Width="34"
+                    Height="34"
+                    Margin="0,0,12,0"
+                    VerticalAlignment="Bottom"
+                    HorizontalAlignment="Left"
+                    ToolTip="Ouvrir l’aide en ligne"
+                    Click="HelpButton_Click"
+                    Style="{StaticResource HelpButtonStyle}"/>
             <Button x:Name="CancelButton"
-                    Grid.Column="1"
+                    Grid.Column="2"
                     Content="Annuler"
                     MinWidth="140"
                     Height="38"
@@ -85,7 +111,7 @@
                     Style="{DynamicResource SecondaryButton}"/>
 
             <Button x:Name="ExportButton"
-                    Grid.Column="2"
+                    Grid.Column="3"
                     Content="Exporter"
                     MinWidth="180"
                     Height="38"

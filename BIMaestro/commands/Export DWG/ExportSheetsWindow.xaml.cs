@@ -17,6 +17,7 @@ namespace Visualisation
     {
         private readonly Document _doc;
         private readonly List<ViewSheetSet> _sheetSets;
+        private const string HelpUrl = "https://bimaestro.net/";
 
         public ExportWindow(ExternalCommandData cmdData)
         {
@@ -50,6 +51,18 @@ namespace Visualisation
 
         private void CancelButton_Click(object sender, RoutedEventArgs e) => Close();
 
+        private void HelpButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(HelpUrl) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
         private void ExportButton_Click(object sender, RoutedEventArgs e)
         {
             string setName = SheetSetComboBox.Text?.Trim();

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Windows;
 
@@ -8,6 +9,7 @@ namespace Modification
 {
     public partial class ElementRenamerWindow : Window, INotifyPropertyChanged
     {
+        private const string HelpUrl = "https://bimaestro.net/";
         public event PropertyChangedEventHandler PropertyChanged;
 
         // Méthode pour notifier les changements de propriété
@@ -204,6 +206,17 @@ namespace Modification
             else if (SelectedNumberFormat == "A,B,C...")
             {
                 StartNumber = "A";
+            }
+        }
+        private void HelpButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(HelpUrl) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
     }

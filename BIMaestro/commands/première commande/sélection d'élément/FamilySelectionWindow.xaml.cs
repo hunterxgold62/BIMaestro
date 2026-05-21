@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Windows;
 
@@ -9,6 +10,7 @@ namespace Visualisation
 {
     public partial class FamilySelectionWindow : Window
     {
+        private const string HelpUrl = "https://bimaestro.net/";
         /// <summary>
         /// Noms de familles parent cochées. Ex. ["Simple (T)", "BarreAP", ...]
         /// </summary>
@@ -152,6 +154,18 @@ namespace Visualisation
                 : _viewFamilies;
 
             BuildTree(families);
+        }
+
+        private void HelpButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(HelpUrl) { UseShellExecute = true });
+            }
+            catch
+            {
+                MessageBox.Show("Impossible d’ouvrir la page d’aide.", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         private void BuildTree(IEnumerable<string> families)
