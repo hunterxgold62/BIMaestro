@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Windows;
@@ -12,6 +13,7 @@ namespace Modification
 {
     public partial class ConfigureDynamoWindow : Window
     {
+        private const string HelpUrl = "https://bimaestro.net/";
         private class PathEntry : INotifyPropertyChanged
         {
             private string path;
@@ -197,6 +199,17 @@ namespace Modification
             for (int i = 0; i < _paths.Count; i++)
             {
                 _paths[i].Label = $"Chemin {i + 1}";
+            }
+        }
+        private void HelpButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(HelpUrl) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
     }

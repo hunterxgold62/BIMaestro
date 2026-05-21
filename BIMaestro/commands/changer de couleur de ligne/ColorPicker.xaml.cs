@@ -125,10 +125,7 @@ namespace Modification
             _allGraphicViews = new FilteredElementCollector(_document)
                 .OfClass(typeof(View))
                 .Cast<View>()
-                .Where(v => v != null)
-                .Where(v => !v.IsTemplate)
-                .Where(v => v.AreGraphicsOverridesAllowed())
-                .Where(v => !IsBrowserView(v))
+                .Where(IsUsableGraphicView)
                 .OrderBy(v => GetViewTypeLabel(v.ViewType))
                 .ThenBy(v => v.Name)
                 .ToList();
@@ -146,10 +143,11 @@ namespace Modification
         {
             ViewsTreeView.Items.Clear();
 
-            TreeViewItem activeGroup = CreateGroup("Vue active");
             View activeView = _uidoc.ActiveView;
 
-            if (activeView != null && activeView.AreGraphicsOverridesAllowed())
+            TreeViewItem activeGroup = CreateGroup("Vue active");
+
+            if (IsUsableGraphicView(activeView))
             {
                 activeGroup.Items.Add(CreateViewItem(activeView, true));
             }
@@ -161,6 +159,7 @@ namespace Modification
             ViewsTreeView.Items.Add(activeGroup);
 
             TreeViewItem sheetsGroup = CreateGroup("Feuilles - appliquer aux vues placées");
+
             foreach (ViewSheet sheet in _allSheets)
             {
                 List<View> placedViews = GetPlacedGraphicViews(sheet);
@@ -169,10 +168,10 @@ namespace Modification
                     continue;
 
                 string sheetLabel = $"{sheet.SheetNumber} - {sheet.Name}";
+
                 CheckBox sheetCheckBox = new CheckBox
                 {
                     Content = sheetLabel,
-                    Tag = sheet.Id,
                     IsChecked = false
                 };
 
@@ -196,7 +195,18 @@ namespace Modification
             ViewsTreeView.Items.Add(sheetsGroup);
 
             TreeViewItem viewsGroup = CreateGroup("Toutes les vues du projet");
-            foreach (IGrouping<ViewType, View> group in _allGraphicViews.GroupBy(v => v.ViewType).OrderBy(g => GetViewTypeLabel(g.Key)))
+
+            IEnumerable<View> viewsWithoutActiveView = _allGraphicViews;
+
+            if (activeView != null)
+            {
+                viewsWithoutActiveView = viewsWithoutActiveView
+                    .Where(v => v.Id != activeView.Id);
+            }
+
+            foreach (IGrouping<ViewType, View> group in viewsWithoutActiveView
+                         .GroupBy(v => v.ViewType)
+                         .OrderBy(g => GetViewTypeLabel(g.Key)))
             {
                 CheckBox typeCheckBox = new CheckBox
                 {
@@ -245,7 +255,7 @@ namespace Modification
             CheckBox checkBox = new CheckBox
             {
                 Content = $"{GetViewTypeLabel(view.ViewType)} - {view.Name}",
-                Tag = view.Id,
+                Tag = view.UniqueId,
                 IsChecked = false
             };
 
@@ -296,21 +306,19 @@ namespace Modification
                 return result;
             }
 
+            HashSet<string> uniqueIds = new HashSet<string>();
+
             foreach (ElementId viewId in placedViewIds)
             {
                 View view = _document.GetElement(viewId) as View;
 
-                if (view == null)
+                if (!IsUsableGraphicView(view))
                     continue;
 
-                if (view.IsTemplate)
-                    continue;
-
-                if (!view.AreGraphicsOverridesAllowed())
-                    continue;
-
-                if (result.All(v => v.Id != view.Id))
+                if (uniqueIds.Add(view.UniqueId))
+                {
                     result.Add(view);
+                }
             }
 
             return result
@@ -431,28 +439,30 @@ namespace Modification
         {
             View activeView = _uidoc?.ActiveView;
 
-            if (activeView == null)
+            if (!IsUsableGraphicView(activeView))
                 return;
 
-            SetCheckBoxByViewId(ViewsTreeView.Items, activeView.Id, true);
+            SetCheckBoxByViewUniqueId(ViewsTreeView.Items, activeView.UniqueId, true);
         }
 
         private List<View> CollectSelectedViews()
         {
-            HashSet<int> collectedIds = new HashSet<int>();
+            HashSet<string> collectedUniqueIds = new HashSet<string>();
             List<View> result = new List<View>();
 
-            CollectSelectedViewsRecursive(ViewsTreeView.Items, collectedIds, result);
+            CollectSelectedViewsRecursive(ViewsTreeView.Items, collectedUniqueIds, result);
 
             return result
-                .Where(v => v != null && v.IsValidObject)
-                .Where(v => v.AreGraphicsOverridesAllowed())
-                .GroupBy(v => v.Id)
+                .Where(IsUsableGraphicView)
+                .GroupBy(v => v.UniqueId)
                 .Select(g => g.First())
                 .ToList();
         }
 
-        private void CollectSelectedViewsRecursive(ItemCollection items, HashSet<int> collectedIds, List<View> result)
+        private void CollectSelectedViewsRecursive(
+            ItemCollection items,
+            HashSet<string> collectedUniqueIds,
+            List<View> result)
         {
             foreach (object item in items)
             {
@@ -460,17 +470,18 @@ namespace Modification
                 {
                     if (treeViewItem.Header is CheckBox checkBox &&
                         checkBox.IsChecked == true &&
-                        checkBox.Tag is ElementId viewId)
+                        checkBox.Tag is string viewUniqueId &&
+                        !string.IsNullOrWhiteSpace(viewUniqueId))
                     {
-                        View view = _document.GetElement(viewId) as View;
+                        View view = _document.GetElement(viewUniqueId) as View;
 
-                        if (view != null && collectedIds.Add(view.Id.IntegerValue))
+                        if (IsUsableGraphicView(view) && collectedUniqueIds.Add(view.UniqueId))
                         {
                             result.Add(view);
                         }
                     }
 
-                    CollectSelectedViewsRecursive(treeViewItem.Items, collectedIds, result);
+                    CollectSelectedViewsRecursive(treeViewItem.Items, collectedUniqueIds, result);
                 }
             }
         }
@@ -510,22 +521,22 @@ namespace Modification
             }
         }
 
-        private bool SetCheckBoxByViewId(ItemCollection items, ElementId viewId, bool isChecked)
+        private bool SetCheckBoxByViewUniqueId(ItemCollection items, string viewUniqueId, bool isChecked)
         {
             foreach (object item in items)
             {
                 if (item is TreeViewItem treeViewItem)
                 {
                     if (treeViewItem.Header is CheckBox checkBox &&
-                        checkBox.Tag is ElementId checkBoxViewId &&
-                        checkBoxViewId == viewId)
+                        checkBox.Tag is string checkBoxViewUniqueId &&
+                        checkBoxViewUniqueId == viewUniqueId)
                     {
                         checkBox.IsChecked = isChecked;
-                        ExpandParents(treeViewItem);
+                        treeViewItem.IsExpanded = true;
                         return true;
                     }
 
-                    if (SetCheckBoxByViewId(treeViewItem.Items, viewId, isChecked))
+                    if (SetCheckBoxByViewUniqueId(treeViewItem.Items, viewUniqueId, isChecked))
                     {
                         treeViewItem.IsExpanded = true;
                         return true;
@@ -536,12 +547,34 @@ namespace Modification
             return false;
         }
 
-        private void ExpandParents(TreeViewItem item)
+        private static bool IsUsableGraphicView(View view)
         {
-            if (item == null)
-                return;
+            if (view == null)
+                return false;
 
-            item.IsExpanded = true;
+            if (!view.IsValidObject)
+                return false;
+
+            if (view.IsTemplate)
+                return false;
+
+            if (IsBrowserView(view))
+                return false;
+
+            try
+            {
+                if (!view.AreGraphicsOverridesAllowed())
+                    return false;
+            }
+            catch
+            {
+                return false;
+            }
+
+            if (view is ViewSheet)
+                return false;
+
+            return true;
         }
 
         private static bool IsBrowserView(View view)
