@@ -74,13 +74,13 @@ public class AppUI : IExternalApplication
                     ("dynamo 3", DynamoSettings.GetLabel(2), "Modification.RunDynamo3Command", "Dynamo 3 (2).png","Lance le script Dynamo n°3."),
                     ("dynamo 4", DynamoSettings.GetLabel(3), "Modification.RunDynamo4Command", "Dynamo 4 (2).png","Lance le script Dynamo n°4."),
                     ("dynamo 5", DynamoSettings.GetLabel(4), "Modification.RunDynamo5Command", "Dynamo 5 (2).png","Lance le script Dynamo n°5."),
-                    ("dynamo réglage", "Auto dynamo\nréglage", "Modification.ConfigureDynamoButtonCommand", "reset.png","Configure les paramètres Dynamo"),
+                    ("dynamo réglage", "Auto dynamo\nréglage", "Modification.ConfigureDynamoButtonCommand", "paramétre.png","Configure les paramètres Dynamo"),
                 })),
                 new RibbonItemDefinition("GestionExcelCmd", "Gestion Excel", panel => AddPushButton(panel, "GestionExcelCmd", "Gestion\nExcel", assemblyPath, "ScheduleIO.ScheduleExcelIOCommand", "Gestion Excel.png", "Exporter ou importer une nomenclature au format Excel")),
                 new RibbonItemDefinition("ModificationQuickTools", "Outils rapides", panel => AddStackedPushButtons(
                         panel,
                         assemblyPath,
-                        ("OverrideColor", "Couleur", "Modification.OverrideColorCommand", "Couleur.png", "Applique des remplacements graphiques aux éléments (couleur, motif, transparence).\r\nPeut agir sur plusieurs vues et propose une réinitialisation des modifications."),
+                        ("Surcharges vues", "Surcharges", "Modification.OverrideColorCommand", "Couleur.png", "Applique ou réinitialise rapidement la demi-teinte, la transparence ou le masquage des éléments sélectionnés dans les vues choisies. Si une feuille est sélectionnée, BIMaestro applique l’action aux vues placées sur cette feuille."),
                         ("ElementRenamerButton", "Organisateur", "Modification.RenameElementsCommand", "Organisateur.png", "Renomme les éléments sélectionnés avec préfixes, suffixes et numérotation.\r\nTrie les éléments par niveau/emplacement et peut réinitialiser le paramètre texte ciblé."),
                         ("Purge du plan", "Purge", "Modification.CombinedCleanupCommand", "Purge.png", "Supprime les vues non placées, les familles et les nomenclatures inutilisées afin d'alléger le projet.\r\nUne fenêtre permet de choisir précisément les éléments à purger avant exécution.\r\n")
                     )),
@@ -117,7 +117,7 @@ public class AppUI : IExternalApplication
         new RibbonItemDefinition("ConvertSharedToFamily", "Convertir les paramètres partagés", panel => AddPushButton(panel, "ConvertSharedToFamily", "Convertir\nparamètres", assemblyPath, "Famille.ConvertSharedToFamilyParametersCommand", "Convertir paramètres (2).png", "Convertit tous les paramètres partagés modifiables de la famille en paramètres de famille (même nom, même groupe et même type instance/type).")),                new RibbonItemDefinition("FamilyUtilitiesStack", "Outils familles", panel => AddStackedFamilyUtilities(
                     panel,
                     assemblyPath,
-                    ("PurgeFamilyParameters", "Purge", "Famille.PurgeFamilyParametersCommand", "Purge famille2.png", "Supprime les paramètres inutilisés d'une famille Revit après vérification des dépendances.\r\nCrée automatiquement une sauvegarde avant nettoyage."),
+                    ("PurgeFamilyParameters", "Purge", "Famille.PurgeFamilyParametersCommand", "Purge famille.png", "Supprime les paramètres inutilisés d'une famille Revit après vérification des dépendances.\r\nCrée automatiquement une sauvegarde avant nettoyage."),
                     ("Familytraduction", "Trad.IA", new List<(string, string, string, string, string)>
                     {
                         ("Familytraduction", "Trad.IA", "Famille.TraduireParametresFamilleOpenAI", "Tard IA.png","Traduit en français les noms de paramètres utilisateur d'une famille.\r\nIgnore les paramètres déjà francisés et enregistre les changements de façon sécurisée."),

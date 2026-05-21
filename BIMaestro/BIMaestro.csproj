@@ -369,7 +369,7 @@
       <DependentUpon>ColorPicker.xaml</DependentUpon>
     </Compile>
     <Compile Include="commands\changer de couleur de ligne\OverrideColorCommand.cs" />
-    <Compile Include="commands\changer de couleur de ligne\ResetOverridesCommand.cs" />
+    <None Include="commands\changer de couleur de ligne\ResetOverridesCommand.cs" />
     <Compile Include="commands\correction automatique\AiGrammarCache.cs" />
     <Compile Include="commands\correction automatique\AiGrammarChecker.cs" />
     <Compile Include="commands\correction automatique\CorrectionItem.cs" />
@@ -915,6 +915,8 @@
     <EmbeddedResource Include="Resources\Purge famille2.png" />
     <EmbeddedResource Include="Resources\Famille.png" />
     <EmbeddedResource Include="Resources\Auto réservation.png" />
+    <EmbeddedResource Include="Resources\paramétre.png" />
+    <EmbeddedResource Include="Resources\Purge famille.png" />
     <Content Include="Themes\BIMaestro_Charte_Graphique.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

@@ -135,6 +135,8 @@ namespace IA
 
                 JObject response = SendImageRequestWithFallback(jwt, b64Input, outputSize, prompt);
 
+                TrackImageTokenUsage(response, outputSize, effectiveMode, picker.SelectedView);
+
                 string resultB64 = ExtractImageBase64(response);
 
                 if (string.IsNullOrWhiteSpace(resultB64))
@@ -607,6 +609,46 @@ namespace IA
                 ?? json?["result"]?["b64_json"]?.ToString();
         }
 
+        private static void TrackImageTokenUsage(
+         JObject response,
+         string outputSize,
+         RenderMode mode,
+         View view)
+        {
+            try
+            {
+                var usage = response?["usage"];
+                int inputTokens = usage?["input_tokens"]?.Value<int?>()
+                    ?? usage?["prompt_tokens"]?.Value<int?>()
+                    ?? 0;
+                int outputTokens = usage?["output_tokens"]?.Value<int?>()
+                    ?? usage?["completion_tokens"]?.Value<int?>()
+                    ?? 0;
+                int totalTokens = usage?["total_tokens"]?.Value<int?>()
+                    ?? (inputTokens + outputTokens);
+
+                Licensing.Telemetry.TrackButton(
+                    "IA.RenduPlan.Tokens",
+                    true,
+                    new
+                    {
+                        feature = "RealisticViewImage",
+                        model = "gpt-image-2",
+                        view_type = view?.ViewType.ToString() ?? "",
+                        output_size = outputSize,
+                        mode = GetModeLabel(mode),
+                        input_tokens = inputTokens,
+                        output_tokens = outputTokens,
+                        total_tokens = totalTokens,
+                        has_usage = usage != null
+                    }
+                );
+            }
+            catch
+            {
+                // Ne jamais bloquer le rendu image si le tracking échoue.
+            }
+        }
         private static HistoryContext CreateHistoryContext(Document doc, View view)
         {
             string projectName = doc != null && !string.IsNullOrWhiteSpace(doc.Title)

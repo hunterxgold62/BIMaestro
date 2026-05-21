@@ -1,950 +1,604 @@
-﻿using System;
+﻿using Autodesk.Revit.DB;
+using Autodesk.Revit.UI;
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
-using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
-using Autodesk.Revit.DB;
-using Autodesk.Revit.UI;
-using Xceed.Wpf.Toolkit;
-using Brush = System.Windows.Media.Brush;
 using Brushes = System.Windows.Media.Brushes;
-using Color = System.Windows.Media.Color;
-using MessageBox = System.Windows.MessageBox;
-using Size = System.Windows.Size;
 
 namespace Modification
 {
-    public partial class ColorPickerWindow : Window
+    public partial class GraphicOverrideWindow : Window
     {
         public List<View> SelectedViews { get; private set; } = new List<View>();
+
         public bool HideInView { get; private set; }
-        public Color? SelectedColor { get; private set; }
-        public ElementId SelectedSurfacePatternId { get; private set; }
-        public ElementId SelectedCutPatternId { get; private set; }
+
         public int SelectedTransparency { get; private set; }
+
         public bool ApplyHalftone { get; private set; }
-        public bool ModifyLineColor { get; private set; }
-        public Color? SelectedLineColor { get; private set; }
-        public ElementId SelectedProjectionLinePatternId { get; private set; }
-        public int SelectedProjectionLineWeight { get; private set; }
-        public bool IsResetRequested { get; private set; } = false;
-        public static double PatternPreviewCellsAcross { get; private set; }
+
+        public bool IsResetRequested { get; private set; }
+
+        public bool UnhideElements { get; private set; }
 
         private readonly UIApplication _uiapp;
         private readonly UIDocument _uidoc;
         private readonly Document _document;
-        private List<View> _allViews;
 
-        private readonly bool _allowOverrideEditing;
+        private readonly bool _optionsEnabled;
+        private readonly bool _copyExistingOverridesMode;
 
-        private readonly List<FillPatternOption> _surfacePatternOptions = new List<FillPatternOption>();
-        private readonly List<FillPatternOption> _cutPatternOptions = new List<FillPatternOption>();
-        private readonly List<LinePatternOption> _linePatternOptions = new List<LinePatternOption>();
+        private List<View> _allGraphicViews = new List<View>();
+        private List<ViewSheet> _allSheets = new List<ViewSheet>();
 
-        private const double PatternPreviewTileSize = 32.0;      // taille de la tuile en DIP
-        private const double PatternPreviewDesiredMinSpacingDip = 5.0;  // zone "réelle" couverte : 6 ft x 6 ft
+        private const string HelpUrl = "https://bimaestro.fr";
 
-
-        public ColorPickerWindow(UIApplication uiapp, bool allowOverrideEditing = true)
+        public GraphicOverrideWindow(
+            UIApplication uiapp,
+            bool optionsEnabled = true,
+            bool copyExistingOverridesMode = false)
         {
             ThemeManager.EnsureThemeLoaded();
+
             InitializeComponent();
+
             _uiapp = uiapp;
-            _uidoc = uiapp?.ActiveUIDocument;
+            _uidoc = _uiapp?.ActiveUIDocument;
             _document = _uidoc?.Document;
-            _allowOverrideEditing = allowOverrideEditing;
 
-            if (!_allowOverrideEditing)
-            {
-                Title = "Copier les graphismes existants";
-            }
+            _optionsEnabled = optionsEnabled;
+            _copyExistingOverridesMode = copyExistingOverridesMode;
 
-            // Valeurs par défaut
-            SelectedColor = Colors.Red;
-            SelectedLineColor = Colors.Blue;
-            SelectedSurfacePatternId = ElementId.InvalidElementId;
-            SelectedCutPatternId = ElementId.InvalidElementId;
-            SelectedProjectionLinePatternId = ElementId.InvalidElementId;
-            SelectedProjectionLineWeight = 1;
-            SelectedTransparency = 0;
-            ApplyHalftone = false;
-            HideInView = false;
-            ModifyLineColor = false;
-
-            // Événements
-            ColorPickerControl.SelectedColorChanged += (s, e) =>
-            {
-                SelectedColor = e.NewValue;
-                UpdateFillPreview();
-            };
-            LineColorPicker.SelectedColorChanged += (s, e) =>
-            {
-                SelectedLineColor = e.NewValue;
-                UpdateLinePreview(e.NewValue);
-            };
-            Loaded += ColorPickerWindow_Loaded;
-
-            UpdateFillPreview();
-            UpdateLinePreview(SelectedLineColor);
+            Loaded += GraphicOverrideWindow_Loaded;
         }
 
-        private void ColorPickerWindow_Loaded(object sender, RoutedEventArgs e)
+        private void GraphicOverrideWindow_Loaded(object sender, RoutedEventArgs e)
         {
             if (_uidoc == null || _document == null)
             {
-                MessageBox.Show("Impossible de récupérer le document actif.", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(
+                    "Impossible de récupérer le document actif.",
+                    "BIMaestro",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+
+                DialogResult = false;
                 Close();
                 return;
             }
 
-            var activeViewId = _uidoc.ActiveView.Id;
-            if (!_allowOverrideEditing)
+            ApplyModeToInterface();
+
+            LoadViewsAndSheets();
+            BuildTree();
+            SelectActiveView();
+            UpdateTransparencyText();
+        }
+
+        private void ApplyModeToInterface()
+        {
+            if (_optionsEnabled)
+                return;
+
+            HalftoneCheckBox.IsEnabled = false;
+            HideInViewCheckBox.IsEnabled = false;
+            TransparencySlider.IsEnabled = false;
+
+            if (_copyExistingOverridesMode)
             {
-                GeneralOptionsTab.IsEnabled = false;
-                ColorsTab.IsEnabled = false;
-                LinesTab.IsEnabled = false;
-                ViewsTab.IsSelected = true;
+                Title = "BIMaestro - Copier les surcharges existantes";
+                ApplyButton.Content = "Copier";
+
+                MessageBox.Show(
+                    "Mode copie activé.\n\nLes options générales sont désactivées, car BIMaestro va copier la surcharge graphique existante détectée dans la vue active.",
+                    "BIMaestro",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
             }
+        }
 
-            // Remplir les combobox de motifs
-            var fillPatterns = new FilteredElementCollector(_document)
-                               .OfClass(typeof(FillPatternElement))
-                               .Cast<FillPatternElement>()
-                               .OrderBy(p => p.Name)
-                               .ToList();
-
-            _surfacePatternOptions.Clear();
-            _cutPatternOptions.Clear();
-
-            var neutralForeground = Color.FromRgb(64, 70, 82);
-            var neutralBackground = Colors.White;
-
-            var defaultPreview = CreateFillPatternPreview(null, null, neutralForeground, neutralBackground);
-            _surfacePatternOptions.Add(new FillPatternOption("(Aucun)", ElementId.InvalidElementId, null, null, defaultPreview));
-            _cutPatternOptions.Add(new FillPatternOption("(Aucun)", ElementId.InvalidElementId, null, null, defaultPreview));
-
-            foreach (var patt in fillPatterns)
+        private void HelpButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
             {
-                var pattern = patt.GetFillPattern();
-                var previewBrush = CreateFillPatternPreview(pattern, patt, neutralForeground, neutralBackground);
-                var option = new FillPatternOption(patt.Name, patt.Id, pattern, patt, previewBrush);
-                _surfacePatternOptions.Add(option);
-                _cutPatternOptions.Add(new FillPatternOption(patt.Name, patt.Id, pattern, patt, previewBrush));
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = HelpUrl,
+                    UseShellExecute = true
+                });
             }
-
-            SurfacePatternComboBox.ItemsSource = _surfacePatternOptions;
-            SurfacePatternComboBox.SelectedIndex = 0;
-            CutPatternComboBox.ItemsSource = _cutPatternOptions;
-            CutPatternComboBox.SelectedIndex = 0;
-
-            SurfacePatternComboBox.SelectionChanged += (_, __) => UpdateFillPreview();
-            CutPatternComboBox.SelectionChanged += (_, __) => UpdateFillPreview();
-
-            SurfaceForegroundCheckBox.Checked += FillPatternOptionChanged;
-            SurfaceForegroundCheckBox.Unchecked += FillPatternOptionChanged;
-            SurfaceBackgroundCheckBox.Checked += FillPatternOptionChanged;
-            SurfaceBackgroundCheckBox.Unchecked += FillPatternOptionChanged;
-            CutForegroundCheckBox.Checked += FillPatternOptionChanged;
-            CutForegroundCheckBox.Unchecked += FillPatternOptionChanged;
-            CutBackgroundCheckBox.Checked += FillPatternOptionChanged;
-            CutBackgroundCheckBox.Unchecked += FillPatternOptionChanged;
-
-            var linePatterns = new FilteredElementCollector(_document)
-                               .OfClass(typeof(LinePatternElement))
-                               .Cast<LinePatternElement>()
-                               .OrderBy(lp => lp.Name)
-                               .ToList();
-
-            _linePatternOptions.Clear();
-            _linePatternOptions.Add(new LinePatternOption("(Par défaut)", ElementId.InvalidElementId, null, null));
-
-            foreach (var lp in linePatterns)
+            catch
             {
-                var pattern = lp.GetLinePattern();
-                var dashArray = CreateDashArray(pattern);
-                _linePatternOptions.Add(new LinePatternOption(lp.Name, lp.Id, pattern, dashArray));
+                MessageBox.Show(
+                    "Impossible d’ouvrir la page d’aide.",
+                    "BIMaestro",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
             }
+        }
 
-            ProjectionLinePatternComboBox.ItemsSource = _linePatternOptions;
-            ProjectionLinePatternComboBox.SelectedIndex = 0;
-            ProjectionLinePatternComboBox.SelectionChanged += (_, __) => RefreshLinePatternPreview();
+        private void LoadViewsAndSheets()
+        {
+            _allGraphicViews = new FilteredElementCollector(_document)
+                .OfClass(typeof(View))
+                .Cast<View>()
+                .Where(v => v != null)
+                .Where(v => !v.IsTemplate)
+                .Where(v => v.AreGraphicsOverridesAllowed())
+                .Where(v => !IsBrowserView(v))
+                .OrderBy(v => GetViewTypeLabel(v.ViewType))
+                .ThenBy(v => v.Name)
+                .ToList();
 
-            // Charger et grouper les vues (hors templates et SystemBrowser)
-            _allViews = new FilteredElementCollector(_document)
-                        .OfClass(typeof(View))
-                        .Cast<View>()
-                        .Where(v => !v.IsTemplate && !v.ViewType.ToString().Contains("Browser"))
-                        .OrderBy(v => v.Name)
-                        .ToList();
+            _allSheets = new FilteredElementCollector(_document)
+                .OfClass(typeof(ViewSheet))
+                .Cast<ViewSheet>()
+                .Where(s => s != null && !s.IsTemplate)
+                .OrderBy(s => s.SheetNumber)
+                .ThenBy(s => s.Name)
+                .ToList();
+        }
 
+        private void BuildTree()
+        {
             ViewsTreeView.Items.Clear();
-            foreach (var group in _allViews.GroupBy(v => v.ViewType).OrderBy(g => g.Key.ToString()))
+
+            TreeViewItem activeGroup = CreateGroup("Vue active");
+            View activeView = _uidoc.ActiveView;
+
+            if (activeView != null && activeView.AreGraphicsOverridesAllowed())
             {
-                var headerCb = new CheckBox { Content = TraduireViewType(group.Key), IsChecked = false };
-                var groupItem = new TreeViewItem { Header = headerCb, IsExpanded = true };
-                headerCb.Checked += (s, args) => SetChildCheckBoxes(groupItem, true);
-                headerCb.Unchecked += (s, args) => SetChildCheckBoxes(groupItem, false);
-
-                foreach (var v in group)
-                {
-                    var cb = new CheckBox { Content = v.Name, Tag = v.Id, IsChecked = false };
-                    if (v.Id == activeViewId) cb.Background = Brushes.LightBlue;
-                    groupItem.Items.Add(new TreeViewItem { Header = cb });
-                }
-
-                ViewsTreeView.Items.Add(groupItem);
-            }
-
-            UpdateFillPreview();
-            RefreshLinePatternPreview();
-        }
-
-        private static string TraduireViewType(ViewType vt)
-        {
-            switch (vt)
-            {
-                case ViewType.FloorPlan: return "Plan d'étage";
-                case ViewType.CeilingPlan: return "Plan de plafond";
-                case ViewType.ThreeD: return "3D";
-                case ViewType.Elevation: return "Élévation";
-                case ViewType.Section: return "Coupe";
-                case ViewType.Detail: return "Détail";
-                case ViewType.DrawingSheet: return "Feuille";
-                case ViewType.Legend: return "Légende";
-                case ViewType.DraftingView: return "Croquis";
-                case ViewType.EngineeringPlan: return "Plan d'ingénierie";
-                case ViewType.Schedule: return "Planning";
-                default: return vt.ToString();
-            }
-        }
-
-        private void SelectAllViewsButton_Click(object sender, RoutedEventArgs e)
-            => SetAllCheckBoxesInTreeView(ViewsTreeView, true);
-
-        private void DeselectAllViewsButton_Click(object sender, RoutedEventArgs e)
-            => SetAllCheckBoxesInTreeView(ViewsTreeView, false);
-
-        private void SetChildCheckBoxes(TreeViewItem parent, bool isChecked)
-        {
-            foreach (TreeViewItem child in parent.Items)
-            {
-                if (child.Header is CheckBox cb) cb.IsChecked = isChecked;
-                SetChildCheckBoxes(child, isChecked);
-            }
-        }
-
-        private void SetAllCheckBoxesInTreeView(ItemsControl parent, bool isChecked)
-        {
-            foreach (TreeViewItem child in parent.Items)
-            {
-                if (child.Header is CheckBox cb) cb.IsChecked = isChecked;
-                SetAllCheckBoxesInTreeView(child, isChecked);
-            }
-        }
-
-        private void Apply_Click(object sender, RoutedEventArgs e)
-        {
-            SelectedSurfacePatternId = ElementId.InvalidElementId;
-            if (SurfacePatternComboBox.SelectedItem is FillPatternOption surfaceOption)
-                SelectedSurfacePatternId = surfaceOption.Id;
-
-            SelectedCutPatternId = ElementId.InvalidElementId;
-            if (CutPatternComboBox.SelectedItem is FillPatternOption cutOption)
-                SelectedCutPatternId = cutOption.Id;
-
-            SelectedTransparency = (int)TransparencySlider.Value;
-            ApplyHalftone = HalftoneCheckBox.IsChecked ?? false;
-            ModifyLineColor = ModifyLineColorCheckBox.IsChecked ?? false;
-
-            SelectedProjectionLinePatternId = ElementId.InvalidElementId;
-            if (ProjectionLinePatternComboBox.SelectedItem is LinePatternOption lineOption)
-                SelectedProjectionLinePatternId = lineOption.Id;
-
-            SelectedProjectionLineWeight = (int)System.Math.Round(ProjectionLineWeightSlider.Value);
-
-            HideInView = HideInViewCheckBox.IsChecked ?? false;
-
-            SelectedViews.Clear();
-            TraverseTreeAndCollect(ViewsTreeView.Items);
-            if (SelectedViews.Count == 0)
-            {
-                MessageBox.Show("Veuillez sélectionner au moins une vue.", "Erreur",
-                                MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
-            }
-
-            DialogResult = true;
-            Close();
-        }
-
-        private void Reset_Click(object sender, RoutedEventArgs e)
-        {
-            if (_uidoc == null || _document == null)
-            {
-                MessageBox.Show("Impossible de récupérer le document actif.", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
-            }
-
-            var selectedElementIds = _uidoc.Selection.GetElementIds();
-
-            if (selectedElementIds.Count == 0)
-            {
-                MessageBox.Show("Sélectionnez d’abord au moins un élément à réinitialiser.", "Erreur",
-                                MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
-            }
-
-            SelectedViews.Clear();
-            TraverseTreeAndCollect(ViewsTreeView.Items);
-            if (SelectedViews.Count == 0)
-            {
-                MessageBox.Show("Veuillez sélectionner au moins une vue pour la réinitialisation.", "Erreur",
-                                MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
-            }
-
-            // Demande de réaffichage des masqués
-            var answer = MessageBox.Show(
-                "Voulez-vous réafficher les éléments cachés dans ces vues ?",
-                "Réafficher éléments cachés",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            using (var tx = new Transaction(_document, "Reset Overrides and Unhide"))
-            {
-                tx.Start();
-                foreach (var view in SelectedViews)
-                {
-                    foreach (var id in selectedElementIds)
-                    {
-                        try { view.SetElementOverrides(id, new OverrideGraphicSettings()); } catch { }
-                        if (answer == MessageBoxResult.Yes)
-                        {
-                            try { view.UnhideElements(new List<ElementId> { id }); } catch { }
-                        }
-                    }
-                }
-                tx.Commit();
-            }
-
-            IsResetRequested = true;
-            DialogResult = true;
-            Close();
-        }
-
-        private void TraverseTreeAndCollect(ItemCollection items)
-        {
-            foreach (var item in items)
-            {
-                if (item is TreeViewItem tvi && tvi.Header is CheckBox cb && cb.IsChecked == true && cb.Tag is ElementId vid)
-                {
-                    var view = _allViews.FirstOrDefault(v => v.Id == vid);
-                    if (view != null && !SelectedViews.Contains(view))
-                        SelectedViews.Add(view);
-                }
-                if (item is ItemsControl ic) TraverseTreeAndCollect(ic.Items);
-            }
-        }
-
-
-        public OverrideGraphicSettings GetOverrideGraphicSettings()
-        {
-            var ogs = new OverrideGraphicSettings();
-
-            // Couleur & motifs
-            var hasFillColor = SelectedColor.HasValue;
-            var fillColor = hasFillColor
-                ? new Autodesk.Revit.DB.Color(SelectedColor.Value.R, SelectedColor.Value.G, SelectedColor.Value.B)
-                : null;
-
-            if (SurfaceForegroundCheckBox.IsChecked == true)
-            {
-                ogs.SetSurfaceForegroundPatternId(SelectedSurfacePatternId);
-                ogs.SetSurfaceForegroundPatternVisible(SelectedSurfacePatternId != ElementId.InvalidElementId);
-                if (hasFillColor && SelectedSurfacePatternId != ElementId.InvalidElementId)
-                {
-                    ogs.SetSurfaceForegroundPatternColor(fillColor);
-                }
-            }
-
-            if (SurfaceBackgroundCheckBox.IsChecked == true)
-            {
-                ogs.SetSurfaceBackgroundPatternId(SelectedSurfacePatternId);
-                ogs.SetSurfaceBackgroundPatternVisible(SelectedSurfacePatternId != ElementId.InvalidElementId);
-                if (hasFillColor && SelectedSurfacePatternId != ElementId.InvalidElementId)
-                {
-                    ogs.SetSurfaceBackgroundPatternColor(fillColor);
-                }
-            }
-
-            if (CutForegroundCheckBox.IsChecked == true)
-            {
-                ogs.SetCutForegroundPatternId(SelectedCutPatternId);
-                ogs.SetCutForegroundPatternVisible(SelectedCutPatternId != ElementId.InvalidElementId);
-                if (hasFillColor && SelectedCutPatternId != ElementId.InvalidElementId)
-                {
-                    ogs.SetCutForegroundPatternColor(fillColor);
-                }
-            }
-
-            if (CutBackgroundCheckBox.IsChecked == true)
-            {
-                ogs.SetCutBackgroundPatternId(SelectedCutPatternId);
-                ogs.SetCutBackgroundPatternVisible(SelectedCutPatternId != ElementId.InvalidElementId);
-                if (hasFillColor && SelectedCutPatternId != ElementId.InvalidElementId)
-                {
-                    ogs.SetCutBackgroundPatternColor(fillColor);
-                }
-            }
-
-            // Lignes & contours (optionnel)
-            if (ModifyLineColor && SelectedLineColor.HasValue)
-            {
-                var lc = new Autodesk.Revit.DB.Color(
-                    SelectedLineColor.Value.R,
-                    SelectedLineColor.Value.G,
-                    SelectedLineColor.Value.B);
-
-                ogs.SetProjectionLineColor(lc);
-                ogs.SetProjectionLinePatternId(SelectedProjectionLinePatternId);
-                ogs.SetProjectionLineWeight(SelectedProjectionLineWeight);
-
-                if (SelectedCutPatternId != ElementId.InvalidElementId)
-                {
-                    ogs.SetCutForegroundPatternColor(lc);
-                    ogs.SetCutBackgroundPatternColor(lc);
-                }
-            }
-
-            // Transparence & demi-teinte
-            ogs.SetSurfaceTransparency(SelectedTransparency);
-            ogs.SetHalftone(ApplyHalftone);
-
-            return ogs;
-        }
-        private void UpdateFillPreview()
-        {
-            if (SurfacePreviewRectangle == null || CutPreviewRectangle == null)
-                return;
-
-            var baseColor = SelectedColor ?? Color.FromRgb(120, 126, 138);
-
-            var surfaceOption = SurfacePatternComboBox?.SelectedItem as FillPatternOption;
-            var cutOption = CutPatternComboBox?.SelectedItem as FillPatternOption;
-
-            SurfacePreviewRectangle.Fill = BuildFillPreviewBrush(
-                surfaceOption,
-                SurfaceForegroundCheckBox.IsChecked == true,
-                SurfaceBackgroundCheckBox.IsChecked == true,
-                baseColor);
-
-            CutPreviewRectangle.Fill = BuildFillPreviewBrush(
-                cutOption,
-                CutForegroundCheckBox.IsChecked == true,
-                CutBackgroundCheckBox.IsChecked == true,
-                baseColor);
-        }
-
-        private Brush BuildFillPreviewBrush(
-         FillPatternOption option,
-         bool showForeground,
-         bool showBackground,
-         Color baseColor)
-        {
-            var neutralBackground = Colors.White;
-
-            if (option == null || option.Pattern == null)
-            {
-                if (showForeground && showBackground)
-                {
-                    return CreateLinePreviewBrush(baseColor, AdjustBackgroundColor(baseColor));
-                }
-
-                if (showForeground)
-                {
-                    return CreateLinePreviewBrush(baseColor, neutralBackground);
-                }
-
-                if (showBackground)
-                {
-                    return CreateSolidBrush(AdjustBackgroundColor(baseColor));
-                }
-
-                return CreateSolidBrush(neutralBackground);
-            }
-
-            if (!showForeground)
-            {
-                if (showBackground)
-                {
-                    return CreateSolidBrush(AdjustBackgroundColor(baseColor));
-                }
-
-                return CreateSolidBrush(neutralBackground);
-            }
-
-            var backgroundColor = showBackground ? (Color?)AdjustBackgroundColor(baseColor) : neutralBackground;
-            return CreateFillPatternPreview(option.Pattern, option.Element, baseColor, backgroundColor);
-        }
-
-        private Brush CreateFillPatternPreview(
-            FillPattern pattern,
-            FillPatternElement element,
-            Color? foregroundColor,
-            Color? backgroundColor)
-        {
-            return CreateFallbackFillPatternBrush(pattern, foregroundColor, backgroundColor);
-        }
-
-        private Brush CreateLinePreviewBrush(Color lineColor, Color backgroundColor)
-        {
-            const double tile = 48.0;
-
-            var drawingGroup = new DrawingGroup();
-
-            var backgroundBrush = new SolidColorBrush(backgroundColor);
-            if (backgroundBrush.CanFreeze)
-                backgroundBrush.Freeze();
-            drawingGroup.Children.Add(new GeometryDrawing(backgroundBrush, null, new RectangleGeometry(new Rect(0, 0, tile, tile))));
-
-            var stroke = new SolidColorBrush(lineColor);
-            if (stroke.CanFreeze)
-                stroke.Freeze();
-
-            var pen = new System.Windows.Media.Pen(stroke, 2.2);
-            if (pen.CanFreeze)
-                pen.Freeze();
-
-            var geometryGroup = new GeometryGroup();
-            geometryGroup.Children.Add(new LineGeometry(new System.Windows.Point(6, tile / 3.0), new System.Windows.Point(tile - 6, tile / 3.0)));
-            geometryGroup.Children.Add(new LineGeometry(new System.Windows.Point(6, 2 * tile / 3.0), new System.Windows.Point(tile - 6, 2 * tile / 3.0)));
-            geometryGroup.Children.Add(new LineGeometry(new System.Windows.Point(6, 6), new System.Windows.Point(tile - 6, tile - 6)));
-
-            drawingGroup.Children.Add(new GeometryDrawing(null, pen, geometryGroup));
-
-            var brush = new DrawingBrush(drawingGroup)
-            {
-                TileMode = TileMode.Tile,
-                Viewport = new Rect(0, 0, tile, tile),
-                ViewportUnits = BrushMappingMode.Absolute,
-                Viewbox = new Rect(0, 0, tile, tile),
-                ViewboxUnits = BrushMappingMode.Absolute,
-                Stretch = Stretch.Fill
-            };
-
-            if (brush.CanFreeze)
-                brush.Freeze();
-
-            return brush;
-        }
-
-        private static Brush CreateSolidBrush(Color color, double opacity = 1.0)
-        {
-            var brush = new SolidColorBrush(color) { Opacity = opacity };
-            if (brush.CanFreeze)
-                brush.Freeze();
-            return brush;
-        }
-
-        private void FillPatternOptionChanged(object sender, RoutedEventArgs e)
-            => UpdateFillPreview();
-
-        private void UpdateLinePreview(Color? color)
-        {
-            if (LinePreview == null)
-                return;
-
-            var lineColor = color ?? SelectedLineColor ?? Color.FromRgb(42, 46, 55);
-            LinePreview.Stroke = new SolidColorBrush(lineColor);
-            RefreshLinePatternPreview();
-        }
-
-        private void RefreshLinePatternPreview()
-        {
-            if (LinePreview == null)
-                return;
-
-            if (ProjectionLinePatternComboBox?.SelectedItem is LinePatternOption option && option.DashArray != null)
-            {
-                LinePreview.StrokeDashArray = new DoubleCollection(option.DashArray);
+                activeGroup.Items.Add(CreateViewItem(activeView, true));
             }
             else
             {
-                LinePreview.StrokeDashArray = null;
-            }
-        }
-
-        private static Brush CreateFallbackFillPatternBrush(
-     FillPattern pattern,
-     Color? foregroundColor,
-     Color? backgroundColor)
-        {
-            var neutralBackground = backgroundColor ?? Colors.White;
-
-            if (pattern == null)
-                return CreateSolidBrush(neutralBackground);
-
-            if (pattern.IsSolidFill)
-            {
-                var fillColor = (backgroundColor ?? foregroundColor) ?? Color.FromRgb(180, 184, 193);
-                return CreateSolidBrush(fillColor);
+                activeGroup.Items.Add(CreateInfoItem("La vue active ne supporte pas les surcharges graphiques."));
             }
 
-            if (foregroundColor == null)
-                return CreateSolidBrush(neutralBackground);
+            ViewsTreeView.Items.Add(activeGroup);
 
-            double tile = PatternPreviewTileSize;
-
-            var drawingGroup = new DrawingGroup();
-
-            var backgroundBrush = new SolidColorBrush(neutralBackground);
-            if (backgroundBrush.CanFreeze)
-                backgroundBrush.Freeze();
-
-            drawingGroup.Children.Add(
-                new GeometryDrawing(
-                    backgroundBrush,
-                    null,
-                    new RectangleGeometry(new Rect(0, 0, tile, tile))));
-
-            var grids = pattern.GetFillGrids();
-            if (grids == null || grids.Count == 0)
-                return CreateSolidBrush(neutralBackground);
-
-            var strokeBrush = new SolidColorBrush(foregroundColor.Value);
-            if (strokeBrush.CanFreeze)
-                strokeBrush.Freeze();
-
-            // 🔹 échelle commune calculée à partir du plus petit espacement du motif
-            double patternScale = ComputePatternPreviewScale(grids);
-
-            foreach (var grid in grids)
+            TreeViewItem sheetsGroup = CreateGroup("Feuilles - appliquer aux vues placées");
+            foreach (ViewSheet sheet in _allSheets)
             {
-                var geometryGroup = new GeometryGroup();
+                List<View> placedViews = GetPlacedGraphicViews(sheet);
 
-                double spacing = ComputePreviewSpacing(grid, patternScale);
-                if (spacing <= 0.0)
+                if (placedViews.Count == 0)
                     continue;
 
-                int lineCount = (int)(tile / spacing) + 4;
-
-                for (int i = -lineCount; i <= lineCount; i++)
+                string sheetLabel = $"{sheet.SheetNumber} - {sheet.Name}";
+                CheckBox sheetCheckBox = new CheckBox
                 {
-                    double offset = i * spacing + ComputePreviewShift(grid, spacing, patternScale);
+                    Content = sheetLabel,
+                    Tag = sheet.Id,
+                    IsChecked = false
+                };
 
-                    var start = new System.Windows.Point(-tile, offset);
-                    var end = new System.Windows.Point(tile * 2, offset);
+                TreeViewItem sheetItem = new TreeViewItem
+                {
+                    Header = sheetCheckBox,
+                    IsExpanded = false
+                };
 
-                    var matrix = new Matrix();
-                    matrix.Rotate(GetFillGridAngle(grid) * 180.0 / System.Math.PI);
-                    matrix.Translate(tile / 2.0, tile / 2.0);
+                sheetCheckBox.Checked += (s, e) => SetChildCheckBoxes(sheetItem, true);
+                sheetCheckBox.Unchecked += (s, e) => SetChildCheckBoxes(sheetItem, false);
 
-                    start = matrix.Transform(start);
-                    end = matrix.Transform(end);
-
-                    geometryGroup.Children.Add(new LineGeometry(start, end));
+                foreach (View view in placedViews)
+                {
+                    sheetItem.Items.Add(CreateViewItem(view, false));
                 }
 
-                double penThickness = ComputePreviewPenThickness(spacing);
-
-                var pen = new System.Windows.Media.Pen(strokeBrush, penThickness);
-                if (pen.CanFreeze)
-                    pen.Freeze();
-
-                drawingGroup.Children.Add(new GeometryDrawing(null, pen, geometryGroup));
+                sheetsGroup.Items.Add(sheetItem);
             }
 
-            var drawingBrush = new DrawingBrush(drawingGroup)
+            ViewsTreeView.Items.Add(sheetsGroup);
+
+            TreeViewItem viewsGroup = CreateGroup("Toutes les vues du projet");
+            foreach (IGrouping<ViewType, View> group in _allGraphicViews.GroupBy(v => v.ViewType).OrderBy(g => GetViewTypeLabel(g.Key)))
             {
-                TileMode = TileMode.Tile,
-                Viewport = new Rect(0, 0, tile, tile),
-                ViewportUnits = BrushMappingMode.Absolute,
-                Viewbox = new Rect(0, 0, tile, tile),
-                ViewboxUnits = BrushMappingMode.Absolute,
-                Stretch = Stretch.Fill
+                CheckBox typeCheckBox = new CheckBox
+                {
+                    Content = GetViewTypeLabel(group.Key),
+                    IsChecked = false
+                };
+
+                TreeViewItem typeItem = new TreeViewItem
+                {
+                    Header = typeCheckBox,
+                    IsExpanded = false
+                };
+
+                typeCheckBox.Checked += (s, e) => SetChildCheckBoxes(typeItem, true);
+                typeCheckBox.Unchecked += (s, e) => SetChildCheckBoxes(typeItem, false);
+
+                foreach (View view in group.OrderBy(v => v.Name))
+                {
+                    typeItem.Items.Add(CreateViewItem(view, false));
+                }
+
+                viewsGroup.Items.Add(typeItem);
+            }
+
+            ViewsTreeView.Items.Add(viewsGroup);
+        }
+
+        private TreeViewItem CreateGroup(string title)
+        {
+            TextBlock header = new TextBlock
+            {
+                Text = title,
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(2, 6, 2, 6)
             };
 
-            if (drawingBrush.CanFreeze)
-                drawingBrush.Freeze();
-
-            return drawingBrush;
+            return new TreeViewItem
+            {
+                Header = header,
+                IsExpanded = true
+            };
         }
 
-
-        private static DoubleCollection CreateDashArray(LinePattern pattern)
+        private TreeViewItem CreateViewItem(View view, bool highlight)
         {
-            if (pattern == null)
-                return null;
-
-            var values = new List<double>();
-            foreach (var segment in pattern.GetSegments())
+            CheckBox checkBox = new CheckBox
             {
-                var length = System.Math.Max(GetLinePatternSegmentLength(segment), 1e-6);
-                var dipLength = FeetToDiu(length);
-                switch (GetLinePatternSegmentType(segment))
-                {
-                    case LinePatternSegmentType.Dash:
-                        values.Add(System.Math.Max(dipLength, 2.0));
-                        break;
-                    case LinePatternSegmentType.Space:
-                        values.Add(System.Math.Max(dipLength, 2.0));
-                        break;
-                    case LinePatternSegmentType.Dot:
-                        values.Add(2.0);
-                        values.Add(System.Math.Max(dipLength, 2.0));
-                        break;
-                    default:
-                        values.Add(System.Math.Max(dipLength, 2.0));
-                        break;
-                }
+                Content = $"{GetViewTypeLabel(view.ViewType)} - {view.Name}",
+                Tag = view.Id,
+                IsChecked = false
+            };
+
+            if (highlight)
+            {
+                checkBox.Background = Brushes.LightBlue;
             }
 
-            if (values.Count == 0)
+            return new TreeViewItem
             {
-                values.Add(16);
-                values.Add(10);
+                Header = checkBox,
+                IsExpanded = false
+            };
+        }
+
+        private TreeViewItem CreateInfoItem(string text)
+        {
+            TextBlock textBlock = new TextBlock
+            {
+                Text = text,
+                Opacity = 0.7,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(6)
+            };
+
+            return new TreeViewItem
+            {
+                Header = textBlock,
+                IsEnabled = false
+            };
+        }
+
+        private List<View> GetPlacedGraphicViews(ViewSheet sheet)
+        {
+            List<View> result = new List<View>();
+
+            if (sheet == null)
+                return result;
+
+            ICollection<ElementId> placedViewIds;
+
+            try
+            {
+                placedViewIds = sheet.GetAllPlacedViews();
             }
-            else if (values.Count % 2 == 1)
+            catch
             {
-                values.Add(values.Last());
-            }
-
-            const double previewScale = 1.6;
-            var scaled = values.Select(v => System.Math.Min(System.Math.Max(v * previewScale, 1.5), 240)).ToList();
-
-            return new DoubleCollection(scaled);
-        }
-
-        private static double FeetToDiu(double feet)
-            => feet * 12.0 * 96.0;
-
-        private static double GetFillGridSpacing(FillGrid grid)
-            => GetDoubleValue(grid, 1.0, "LineSpacing", "Spacing", "GetLineSpacing", "GetSpacing");
-
-        private static double GetFillGridShift(FillGrid grid)
-            => GetDoubleValue(grid, 0.0, "Shift", "GetShift");
-
-        private static double GetFillGridAngle(FillGrid grid)
-            => GetDoubleValue(grid, 0.0, "Angle", "GetAngle");
-
-        private static double GetLinePatternSegmentLength(LinePatternSegment segment)
-            => GetDoubleValue(segment, 1.0, "Length", "GetLength");
-        /// <summary>
-        /// Calcule un facteur d'échelle tel que le plus petit espacement du motif
-        /// ait environ PatternPreviewDesiredMinSpacingDip pixels.
-        /// </summary>
-        private static double ComputePatternPreviewScale(IList<FillGrid> grids)
-        {
-            if (grids == null || grids.Count == 0)
-                return 1.0;
-
-            var spacingsFeet = grids
-                .Select(g => GetFillGridSpacing(g))
-                .Where(s => s > 1e-9)
-                .ToList();
-
-            if (spacingsFeet.Count == 0)
-                return 1.0;
-
-            double minSpacingFeet = spacingsFeet.Min();
-            double minSpacingDiu = FeetToDiu(minSpacingFeet);   // DIP "brut" pour le plus petit espacement
-
-            if (minSpacingDiu < 1e-6)
-                return 1.0;
-
-            // On vise un espacement voulu (en DIP) mais on évite de dépasser 1/3 de la tuile
-            double target = System.Math.Min(
-                PatternPreviewDesiredMinSpacingDip,
-                PatternPreviewTileSize / 3.0);
-
-            double scale = target / minSpacingDiu;
-
-            // Garde-fous : évite des échelles complètement délirantes
-            if (scale < 0.005) scale = 0.005;
-            if (scale > 50.0) scale = 50.0;
-
-            return scale;
-        }
-
-        private static double ComputePreviewSpacing(FillGrid grid, double patternScale)
-        {
-            const double minSpacing = 0.5;                           // ~1/2 px mini
-            double maxSpacing = PatternPreviewTileSize * 0.9;        // pas plus large que la tuile
-
-            double spacingFeet = System.Math.Max(GetFillGridSpacing(grid), 1e-9);
-            double spacingDip = FeetToDiu(spacingFeet) * patternScale;
-
-            if (spacingDip < minSpacing) spacingDip = minSpacing;
-            if (spacingDip > maxSpacing) spacingDip = maxSpacing;
-
-            return spacingDip;
-        }
-
-        private static double ComputePreviewShift(FillGrid grid, double spacing, double patternScale)
-        {
-            if (spacing <= 0.0)
-                return 0.0;
-
-            double shiftFeet = System.Math.Max(GetFillGridShift(grid), 0.0);
-            double shiftDip = FeetToDiu(shiftFeet) * patternScale;
-
-            shiftDip %= spacing;
-            if (shiftDip < 0)
-                shiftDip += spacing;
-
-            return shiftDip;
-        }
-
-        private static double ComputePreviewPenThickness(double spacing)
-        {
-            const double minThickness = 0.35;
-            const double maxThickness = 1.6;
-
-            if (spacing <= 0.0)
-                return minThickness;
-
-            // Traits plus fins pour motifs denses, un peu plus épais sinon
-            double t = spacing * 0.12;
-            if (t < minThickness) t = minThickness;
-            if (t > maxThickness) t = maxThickness;
-
-            return t;
-        }
-
-
-        private static LinePatternSegmentType GetLinePatternSegmentType(LinePatternSegment segment)
-        {
-            if (segment == null) return LinePatternSegmentType.Dash;
-
-            var typeMember = segment.GetType().GetProperty("SegmentType", BindingFlags.Public | BindingFlags.Instance);
-            if (typeMember != null)
-            {
-                var raw = typeMember.GetValue(segment);
-                if (raw is LinePatternSegmentType value)
-                    return value;
-                if (raw is int enumInt)
-                    return (LinePatternSegmentType)enumInt;
+                return result;
             }
 
-            var method = segment.GetType().GetMethod("GetSegmentType", BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null);
-            if (method != null)
+            foreach (ElementId viewId in placedViewIds)
             {
-                var raw = method.Invoke(segment, null);
-                if (raw is LinePatternSegmentType methodValue)
-                {
-                    return methodValue;
-                }
-                if (raw is int enumInt)
-                {
-                    return (LinePatternSegmentType)enumInt;
-                }
-            }
+                View view = _document.GetElement(viewId) as View;
 
-            return LinePatternSegmentType.Dash;
-        }
-
-        private static double GetDoubleValue(object source, double fallback, params string[] memberNames)
-        {
-            if (source == null || memberNames == null)
-                return fallback;
-
-            var type = source.GetType();
-            foreach (var name in memberNames)
-            {
-                if (string.IsNullOrWhiteSpace(name))
+                if (view == null)
                     continue;
 
-                var property = type.GetProperty(name, BindingFlags.Public | BindingFlags.Instance);
-                if (property != null && (property.PropertyType == typeof(double) || property.PropertyType == typeof(float)))
-                {
-                    try
-                    {
-                        var raw = property.GetValue(source);
-                        if (raw is double d) return d;
-                        if (raw is float f) return f;
-                    }
-                    catch
-                    {
-                        // ignore and try next
-                    }
-                }
+                if (view.IsTemplate)
+                    continue;
 
-                var method = type.GetMethod(name, BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null);
-                if (method != null && (method.ReturnType == typeof(double) || method.ReturnType == typeof(float)))
-                {
-                    try
-                    {
-                        var raw = method.Invoke(source, null);
-                        if (raw is double d) return d;
-                        if (raw is float f) return f;
-                    }
-                    catch
-                    {
-                        // ignore and try next
-                    }
-                }
+                if (!view.AreGraphicsOverridesAllowed())
+                    continue;
+
+                if (result.All(v => v.Id != view.Id))
+                    result.Add(view);
             }
 
-            return fallback;
+            return result
+                .OrderBy(v => GetViewTypeLabel(v.ViewType))
+                .ThenBy(v => v.Name)
+                .ToList();
         }
 
-        private class FillPatternOption
+        private void SelectActiveViewButton_Click(object sender, RoutedEventArgs e)
         {
-            public FillPatternOption(string name, ElementId id, FillPattern pattern, FillPatternElement element, Brush previewBrush)
+            SetAllCheckBoxes(ViewsTreeView.Items, false);
+            SelectActiveView();
+        }
+
+        private void SelectAllButton_Click(object sender, RoutedEventArgs e)
+        {
+            SetAllCheckBoxes(ViewsTreeView.Items, true);
+        }
+
+        private void DeselectAllButton_Click(object sender, RoutedEventArgs e)
+        {
+            SetAllCheckBoxes(ViewsTreeView.Items, false);
+        }
+
+        private void ApplyButton_Click(object sender, RoutedEventArgs e)
+        {
+            IsResetRequested = false;
+            UnhideElements = false;
+
+            HideInView = HideInViewCheckBox.IsChecked == true;
+            ApplyHalftone = HalftoneCheckBox.IsChecked == true;
+            SelectedTransparency = Convert.ToInt32(Math.Round(TransparencySlider.Value));
+
+            SelectedViews = CollectSelectedViews();
+
+            if (SelectedViews.Count == 0)
             {
-                Name = name;
-                Id = id;
-                Pattern = pattern;
-                Element = element;
-                if (previewBrush != null)
+                MessageBox.Show(
+                    "Sélectionne au moins une vue ou une feuille contenant des vues.",
+                    "BIMaestro",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            DialogResult = true;
+            Close();
+        }
+
+        private void ResetButton_Click(object sender, RoutedEventArgs e)
+        {
+            SelectedViews = CollectSelectedViews();
+
+            if (SelectedViews.Count == 0)
+            {
+                MessageBox.Show(
+                    "Sélectionne au moins une vue ou une feuille contenant des vues à réinitialiser.",
+                    "BIMaestro",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            MessageBoxResult answer = MessageBox.Show(
+                "Voulez-vous aussi réafficher les éléments masqués dans les vues sélectionnées ?",
+                "Réinitialisation",
+                MessageBoxButton.YesNoCancel,
+                MessageBoxImage.Question);
+
+            if (answer == MessageBoxResult.Cancel)
+                return;
+
+            IsResetRequested = true;
+            UnhideElements = answer == MessageBoxResult.Yes;
+
+            DialogResult = true;
+            Close();
+        }
+
+        private void CancelButton_Click(object sender, RoutedEventArgs e)
+        {
+            DialogResult = false;
+            Close();
+        }
+
+        private void HideInViewCheckBox_Checked(object sender, RoutedEventArgs e)
+        {
+            if (!_optionsEnabled)
+                return;
+
+            TransparencySlider.IsEnabled = false;
+            HalftoneCheckBox.IsEnabled = false;
+        }
+
+        private void HideInViewCheckBox_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (!_optionsEnabled)
+                return;
+
+            TransparencySlider.IsEnabled = true;
+            HalftoneCheckBox.IsEnabled = true;
+        }
+
+        private void TransparencySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            UpdateTransparencyText();
+        }
+
+        private void UpdateTransparencyText()
+        {
+            if (TransparencyValueText == null || TransparencySlider == null)
+                return;
+
+            TransparencyValueText.Text = $"{Convert.ToInt32(Math.Round(TransparencySlider.Value))} %";
+        }
+
+        private void SelectActiveView()
+        {
+            View activeView = _uidoc?.ActiveView;
+
+            if (activeView == null)
+                return;
+
+            SetCheckBoxByViewId(ViewsTreeView.Items, activeView.Id, true);
+        }
+
+        private List<View> CollectSelectedViews()
+        {
+            HashSet<int> collectedIds = new HashSet<int>();
+            List<View> result = new List<View>();
+
+            CollectSelectedViewsRecursive(ViewsTreeView.Items, collectedIds, result);
+
+            return result
+                .Where(v => v != null && v.IsValidObject)
+                .Where(v => v.AreGraphicsOverridesAllowed())
+                .GroupBy(v => v.Id)
+                .Select(g => g.First())
+                .ToList();
+        }
+
+        private void CollectSelectedViewsRecursive(ItemCollection items, HashSet<int> collectedIds, List<View> result)
+        {
+            foreach (object item in items)
+            {
+                if (item is TreeViewItem treeViewItem)
                 {
-                    var clone = previewBrush.IsFrozen ? (Brush)previewBrush.Clone() : previewBrush.CloneCurrentValue();
-                    if (clone.CanFreeze)
-                        clone.Freeze();
-                    PreviewBrush = clone;
+                    if (treeViewItem.Header is CheckBox checkBox &&
+                        checkBox.IsChecked == true &&
+                        checkBox.Tag is ElementId viewId)
+                    {
+                        View view = _document.GetElement(viewId) as View;
+
+                        if (view != null && collectedIds.Add(view.Id.IntegerValue))
+                        {
+                            result.Add(view);
+                        }
+                    }
+
+                    CollectSelectedViewsRecursive(treeViewItem.Items, collectedIds, result);
+                }
+            }
+        }
+
+        private void SetAllCheckBoxes(ItemCollection items, bool isChecked)
+        {
+            foreach (object item in items)
+            {
+                if (item is TreeViewItem treeViewItem)
+                {
+                    if (treeViewItem.Header is CheckBox checkBox)
+                    {
+                        checkBox.IsChecked = isChecked;
+                    }
+
+                    SetAllCheckBoxes(treeViewItem.Items, isChecked);
+                }
+            }
+        }
+
+        private void SetChildCheckBoxes(TreeViewItem parent, bool isChecked)
+        {
+            if (parent == null)
+                return;
+
+            foreach (object item in parent.Items)
+            {
+                if (item is TreeViewItem treeViewItem)
+                {
+                    if (treeViewItem.Header is CheckBox checkBox)
+                    {
+                        checkBox.IsChecked = isChecked;
+                    }
+
+                    SetChildCheckBoxes(treeViewItem, isChecked);
+                }
+            }
+        }
+
+        private bool SetCheckBoxByViewId(ItemCollection items, ElementId viewId, bool isChecked)
+        {
+            foreach (object item in items)
+            {
+                if (item is TreeViewItem treeViewItem)
+                {
+                    if (treeViewItem.Header is CheckBox checkBox &&
+                        checkBox.Tag is ElementId checkBoxViewId &&
+                        checkBoxViewId == viewId)
+                    {
+                        checkBox.IsChecked = isChecked;
+                        ExpandParents(treeViewItem);
+                        return true;
+                    }
+
+                    if (SetCheckBoxByViewId(treeViewItem.Items, viewId, isChecked))
+                    {
+                        treeViewItem.IsExpanded = true;
+                        return true;
+                    }
                 }
             }
 
-            public string Name { get; }
-            public ElementId Id { get; }
-            public FillPattern Pattern { get; }
-            public FillPatternElement Element { get; }
-            public Brush PreviewBrush { get; }
+            return false;
         }
 
-        private class LinePatternOption
+        private void ExpandParents(TreeViewItem item)
         {
-            public LinePatternOption(string name, ElementId id, LinePattern pattern, DoubleCollection dashArray)
-            {
-                Name = name;
-                Id = id;
-                Pattern = pattern;
-                if (dashArray != null)
-                {
-                    var clone = new DoubleCollection(dashArray);
-                    if (clone.CanFreeze)
-                        clone.Freeze();
-                    DashArray = clone;
-                }
-            }
+            if (item == null)
+                return;
 
-            public string Name { get; }
-            public ElementId Id { get; }
-            public LinePattern Pattern { get; }
-            public DoubleCollection DashArray { get; }
+            item.IsExpanded = true;
         }
 
-        private static Color AdjustBackgroundColor(Color color)
+        private static bool IsBrowserView(View view)
         {
-            const double blendFactor = 0.3;
-            byte Blend(byte component)
-            {
-                return (byte)(component * blendFactor + 255 * (1 - blendFactor));
-            }
+            if (view == null)
+                return true;
 
-            return Color.FromRgb(Blend(color.R), Blend(color.G), Blend(color.B));
+            string viewTypeName = view.ViewType.ToString();
+
+            return viewTypeName.IndexOf("Browser", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   view.ViewType == ViewType.ProjectBrowser ||
+                   view.ViewType == ViewType.SystemBrowser;
+        }
+
+        private static string GetViewTypeLabel(ViewType viewType)
+        {
+            switch (viewType)
+            {
+                case ViewType.FloorPlan:
+                    return "Plan d'étage";
+
+                case ViewType.CeilingPlan:
+                    return "Plan de plafond";
+
+                case ViewType.EngineeringPlan:
+                    return "Plan d'ingénierie";
+
+                case ViewType.AreaPlan:
+                    return "Plan de surface";
+
+                case ViewType.ThreeD:
+                    return "Vue 3D";
+
+                case ViewType.Section:
+                    return "Coupe";
+
+                case ViewType.Elevation:
+                    return "Élévation";
+
+                case ViewType.Detail:
+                    return "Détail";
+
+                case ViewType.DraftingView:
+                    return "Vue de dessin";
+
+                case ViewType.Legend:
+                    return "Légende";
+
+                case ViewType.DrawingSheet:
+                    return "Feuille";
+
+                case ViewType.Schedule:
+                    return "Nomenclature";
+
+                default:
+                    return viewType.ToString();
+            }
         }
     }
 }

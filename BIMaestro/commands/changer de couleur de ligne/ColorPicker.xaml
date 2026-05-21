@@ -1,260 +1,255 @@
-﻿<Window x:Class="Modification.ColorPickerWindow"
+﻿<Window x:Class="Modification.GraphicOverrideWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:xctk="http://schemas.xceed.com/wpf/xaml/toolkit"
-        Title="BIMaestro - Sélectionner la couleur"
-        Height="700" Width="720"
+        Title="BIMaestro - Surcharges vues"
+        Height="660"
+        Width="760"
+        MinHeight="560"
+        MinWidth="680"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource App.Background}"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True">
+
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="/BIMaestro;component/Themes/BIMaestroTheme.xaml"/>
             </ResourceDictionary.MergedDictionaries>
 
-            <Style TargetType="GroupBox">
-                <Setter Property="Margin" Value="10"/>
-                <Setter Property="Padding" Value="12"/>
-                <Setter Property="FontSize" Value="14"/>
-                <Setter Property="BorderBrush" Value="{DynamicResource Border}"/>
-                <Setter Property="BorderThickness" Value="1"/>
-            </Style>
             <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
-                <Setter Property="Margin" Value="6"/>
-                <Setter Property="Padding" Value="8,4"/>
-                <Setter Property="MinWidth" Value="110"/>
+                <Setter Property="Margin" Value="4"/>
+                <Setter Property="Padding" Value="10,5"/>
+                <Setter Property="MinWidth" Value="120"/>
                 <Setter Property="Height" Value="34"/>
             </Style>
-            <Style TargetType="CheckBox">
-                <Setter Property="Margin" Value="4"/>
+
+            <Style x:Key="HelpButtonStyle" TargetType="Button">
+                <Setter Property="Width" Value="34"/>
+                <Setter Property="Height" Value="34"/>
+                <Setter Property="MinWidth" Value="34"/>
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="Margin" Value="0"/>
+                <Setter Property="Background" Value="#F1F3F5"/>
+                <Setter Property="Foreground" Value="#111827"/>
+                <Setter Property="BorderBrush" Value="#D1D5DB"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="FontWeight" Value="Bold"/>
+                <Setter Property="FontSize" Value="15"/>
+                <Setter Property="Cursor" Value="Hand"/>
             </Style>
 
-            <DataTemplate x:Key="FillPatternTemplate">
-                <StackPanel Orientation="Horizontal" Margin="2" VerticalAlignment="Center">
-                    <Border Width="64" Height="36" BorderBrush="#FFB9C1CA" BorderThickness="1" CornerRadius="4"
-                           Background="{DynamicResource Surface}" SnapsToDevicePixels="True">
-                        <Rectangle Fill="{Binding PreviewBrush}" RadiusX="3" RadiusY="3" Stroke="{DynamicResource Divider}" StrokeThickness="0.8"/>
-                    </Border>
-                    <TextBlock Text="{Binding Name}" Margin="10,0,0,0" VerticalAlignment="Center"/>
-                </StackPanel>
-            </DataTemplate>
+            <Style TargetType="CheckBox">
+                <Setter Property="Margin" Value="4"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+            </Style>
 
-            <DataTemplate x:Key="LinePatternTemplate">
-                <StackPanel Orientation="Horizontal" Margin="2" VerticalAlignment="Center">
-                    <Border Width="96" Height="32" BorderBrush="#FFB9C1CA" BorderThickness="1" CornerRadius="4" Background="{DynamicResource Surface}">
-                        <Canvas Margin="6,0" Width="84" Height="32">
-                            <Line X1="4" X2="80" Y1="16" Y2="16" StrokeThickness="3"
-                              Stroke="#FF2A2E37"
-                              StrokeDashCap="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
-                              StrokeDashArray="{Binding DashArray}"/>
-                        </Canvas>
-                    </Border>
-                    <TextBlock Text="{Binding Name}" Margin="10,0,0,0" VerticalAlignment="Center"/>
-                </StackPanel>
-            </DataTemplate>
+            <Style TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource Text}"/>
+            </Style>
         </ResourceDictionary>
     </Window.Resources>
 
-    <Grid Margin="12">
+    <Grid Margin="16">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0" Background="{DynamicResource Surface}" CornerRadius="12" BorderBrush="{DynamicResource Border}" BorderThickness="1">
-            <TabControl Margin="12">
+        <!-- Header vert BIMaestro -->
+        <Border Grid.Row="0"
+                Padding="22"
+                CornerRadius="18"
+                Background="#0F5A36"
+                BorderBrush="#0B4429"
+                BorderThickness="1"
+                Margin="0,0,0,14">
 
-                <!-- Options générales -->
-                <TabItem x:Name="GeneralOptionsTab" Header="Options générales">
-                    <StackPanel Margin="15">
-                        <TextBlock Text="Affinage des réglages graphiques" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                        <UniformGrid Columns="2" Margin="0,0,0,10">
-                            <CheckBox x:Name="HalftoneCheckBox" Content="Appliquer la demi-teinte"/>
-                            <CheckBox x:Name="HideInViewCheckBox" Content="Masquer dans la vue"/>
-                        </UniformGrid>
-                        <GroupBox Header="Transparence">
-                            <StackPanel>
-                                <TextBlock Text="Définissez la transparence générale appliquée aux éléments sélectionnés." Margin="0,0,0,6"/>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Slider x:Name="TransparencySlider"
-                                            Minimum="0" Maximum="100" Value="0"
-                                            Width="260" TickFrequency="10"
-                                            IsSnapToTickEnabled="True"/>
-                                    <Border Margin="12,0,0,0" Padding="10,4" Background="{DynamicResource Surface.Subtle}" CornerRadius="4">
-                                        <TextBlock Text="{Binding ElementName=TransparencySlider, Path=Value, StringFormat={} {0}%}"/>
-                                    </Border>
-                                </StackPanel>
-                            </StackPanel>
-                        </GroupBox>
-                    </StackPanel>
-                </TabItem>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-                <!-- Couleurs et motifs -->
-                <TabItem x:Name="ColorsTab" Header="Couleurs et motifs">
-                    <Grid Margin="15">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
-                        <TextBlock Text="Couleurs de remplissage" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12"/>
+                <StackPanel Grid.Column="0"
+                            VerticalAlignment="Center">
 
-                        <Grid Grid.Row="1" Margin="0,0,0,14">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="2*"/>
-                                <ColumnDefinition Width="3*"/>
-                            </Grid.ColumnDefinitions>
+                    <TextBlock Text="Surcharges graphiques par vues"
+                               FontSize="24"
+                               FontWeight="SemiBold"
+                               Foreground="White"/>
 
-                            <Border Background="{DynamicResource Surface}" CornerRadius="8" BorderBrush="{DynamicResource Border}" BorderThickness="1" Padding="12">
-                                <StackPanel>
-                                    <TextBlock Text="Sélection de la couleur" FontWeight="Bold"/>
-                                    <xctk:ColorPicker x:Name="ColorPickerControl"
-                                                      SelectedColor="Red"
-                                                      Width="240" Margin="0,6,0,0"
-                                                      ShowDropDownButton="True"
-                                                      StandardColorsHeader="Palette"/>
-                                </StackPanel>
-                            </Border>
+                    <TextBlock Text="Applique ou réinitialise rapidement la demi-teinte, la transparence ou le masquage des éléments sélectionnés dans les vues choisies."
+                               Margin="0,6,24,0"
+                               TextWrapping="Wrap"
+                               Foreground="#DDEFE6"
+                               Opacity="0.95"/>
+                </StackPanel>
 
-                            <Border Grid.Column="1" Margin="14,0,0,0" Padding="14" Background="{DynamicResource Surface}" CornerRadius="8" BorderBrush="{DynamicResource Border}" BorderThickness="1">
-                                <StackPanel>
-                                    <TextBlock Text="Aperçu" FontWeight="Bold" HorizontalAlignment="Center"/>
-                                    <UniformGrid Rows="2" Margin="0,12,0,0">
-                                        <StackPanel>
-                                            <TextBlock Text="Surface" FontWeight="SemiBold" HorizontalAlignment="Center"/>
-                                            <Border Margin="0,6,0,0" Width="200" Height="76" CornerRadius="8"
-                                                    BorderBrush="{DynamicResource Border}" BorderThickness="1" Background="{DynamicResource Surface}">
-                                                <Rectangle x:Name="SurfacePreviewRectangle" RadiusX="6" RadiusY="6" Stroke="{DynamicResource Divider}" StrokeThickness="1"/>
-                                            </Border>
-                                        </StackPanel>
-                                        <StackPanel>
-                                            <TextBlock Text="Coupe" FontWeight="SemiBold" HorizontalAlignment="Center"/>
-                                            <Border Margin="0,6,0,0" Width="200" Height="76" CornerRadius="8"
-                                                    BorderBrush="{DynamicResource Border}" BorderThickness="1" Background="{DynamicResource Surface}">
-                                                <Rectangle x:Name="CutPreviewRectangle" RadiusX="6" RadiusY="6" Stroke="{DynamicResource Divider}" StrokeThickness="1"/>
-                                            </Border>
-                                        </StackPanel>
-                                    </UniformGrid>
-                                </StackPanel>
-                            </Border>
-                        </Grid>
-
-                        <Grid Grid.Row="2">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-
-                            <GroupBox Header="Motifs de surface" Grid.Column="0" Margin="0,0,8,0">
-                                <StackPanel>
-                                    <ComboBox x:Name="SurfacePatternComboBox" Margin="0,0,0,8"
-                                              ItemTemplate="{StaticResource FillPatternTemplate}"/>
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <CheckBox x:Name="SurfaceForegroundCheckBox" Content="Premier plan" IsChecked="True"/>
-                                        <CheckBox x:Name="SurfaceBackgroundCheckBox" Content="Arrière-plan" IsChecked="False" Margin="20,0,0,0"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </GroupBox>
-
-                            <GroupBox Header="Motifs de coupe" Grid.Column="1" Margin="8,0,0,0">
-                                <StackPanel>
-                                    <ComboBox x:Name="CutPatternComboBox" Margin="0,0,0,8"
-                                              ItemTemplate="{StaticResource FillPatternTemplate}"/>
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <CheckBox x:Name="CutForegroundCheckBox" Content="Premier plan" IsChecked="True"/>
-                                        <CheckBox x:Name="CutBackgroundCheckBox" Content="Arrière-plan" IsChecked="False" Margin="20,0,0,0"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </GroupBox>
-                        </Grid>
-                    </Grid>
-                </TabItem>
-
-                <!-- Lignes et contours -->
-                <TabItem x:Name="LinesTab" Header="Lignes et contours">
-                    <StackPanel Margin="15">
-                        <CheckBox x:Name="ModifyLineColorCheckBox"
-                                  Content="Modifier lignes et contours" Margin="0,0,0,10"/>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12" VerticalAlignment="Center">
-                            <StackPanel>
-                                <TextBlock Text="Couleur des lignes" FontWeight="Bold"/>
-                                <xctk:ColorPicker x:Name="LineColorPicker"
-                                                  SelectedColor="Blue"
-                                                  Width="230" Margin="0,6,0,0"
-                                                  ShowDropDownButton="True"
-                                                  StandardColorsHeader="Palette"/>
-                            </StackPanel>
-                            <Border Margin="24,0,0,0" Padding="12" Background="{DynamicResource Surface.Subtle}" CornerRadius="6" Width="220" Height="120"                                    IsEnabled="{Binding ElementName=ModifyLineColorCheckBox, Path=IsChecked}">
-                                <StackPanel>
-                                    <TextBlock Text="Aperçu" FontWeight="Bold" HorizontalAlignment="Center"/>
-                                    <Canvas Margin="0,16,0,0" Width="180" Height="60" HorizontalAlignment="Center">
-                                        <Line x:Name="LinePreview"
-                                              X1="10" X2="170" Y1="30" Y2="30"
-                                              StrokeThickness="{Binding ElementName=ProjectionLineWeightSlider, Path=Value}"
-                                              Stroke="#FF2A2E37" StrokeDashCap="Round"
-                                              StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
-                                    </Canvas>
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
-
-                        <GroupBox Header="Style des lignes" Margin="0,0,0,12">
-                            <Grid Margin="4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-
-                                <StackPanel Grid.Column="0" IsEnabled="{Binding ElementName=ModifyLineColorCheckBox, Path=IsChecked}">
-                                    <TextBlock Text="Type de ligne" FontWeight="Bold" Margin="0,0,0,4"/>
-                                    <ComboBox x:Name="ProjectionLinePatternComboBox"
-                                              ItemTemplate="{StaticResource LinePatternTemplate}"/>
-                                </StackPanel>
-
-                                <StackPanel Grid.Column="1" Margin="12,0,0,0" IsEnabled="{Binding ElementName=ModifyLineColorCheckBox, Path=IsChecked}">
-                                    <TextBlock Text="Épaisseur" FontWeight="Bold" Margin="0,0,0,4"/>
-                                    <Slider x:Name="ProjectionLineWeightSlider"
-                                            Minimum="1" Maximum="16" Value="1"
-                                            TickFrequency="1" IsSnapToTickEnabled="True"/>
-                                    <TextBlock Text="{Binding ElementName=ProjectionLineWeightSlider, Path=Value, StringFormat={}Épaisseur : {0:F0}}" Margin="0,6,0,0"/>
-                                </StackPanel>
-                            </Grid>
-                        </GroupBox>
-                    </StackPanel>
-                </TabItem>
-
-                <!-- Sélection des vues -->
-                <TabItem x:Name="ViewsTab" Header="Sélection des vues">
-                    <DockPanel Margin="15" LastChildFill="True">
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,12" DockPanel.Dock="Top">
-                            <Button x:Name="SelectAllViewsButton"
-                                    Content="Tout sélectionner"
-                                    Click="SelectAllViewsButton_Click"/>
-                            <Button x:Name="DeselectAllViewsButton"
-                                    Content="Tout désélectionner"
-                                    Click="DeselectAllViewsButton_Click"/>
-                        </StackPanel>
-                        <Border BorderBrush="{DynamicResource Border}" BorderThickness="1" CornerRadius="6">                            <TreeView x:Name="ViewsTreeView" Margin="5"
-                                      ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                                      ScrollViewer.CanContentScroll="True"/>
-                        </Border>
-                    </DockPanel>
-                </TabItem>
-
-            </TabControl>
+                <Button Grid.Column="1"
+                        x:Name="HelpButton"
+                        Content="?"
+                        Style="{StaticResource HelpButtonStyle}"
+                        ToolTip="Ouvrir l’aide en ligne"
+                        Click="HelpButton_Click"
+                        VerticalAlignment="Top"
+                        HorizontalAlignment="Right"/>
+            </Grid>
         </Border>
 
+        <!-- Content -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="280"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Options -->
+            <Border Grid.Column="0"
+                    Padding="16"
+                    CornerRadius="14"
+                    Background="{DynamicResource Surface}"
+                    BorderBrush="{DynamicResource Border}"
+                    BorderThickness="1"
+                    Margin="0,0,12,0">
+
+                <StackPanel>
+                    <TextBlock Text="Options générales"
+                               FontSize="17"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,12"/>
+
+                    <CheckBox x:Name="HalftoneCheckBox"
+                              Content="Appliquer la demi-teinte"/>
+
+                    <CheckBox x:Name="HideInViewCheckBox"
+                              Content="Masquer dans les vues"
+                              Checked="HideInViewCheckBox_Checked"
+                              Unchecked="HideInViewCheckBox_Unchecked"/>
+
+                    <Border Margin="0,16,0,16"
+                            Height="1"
+                            Background="{DynamicResource Divider}"/>
+
+                    <TextBlock Text="Transparence"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+
+                    <TextBlock Text="Valeur appliquée aux éléments sélectionnés."
+                               TextWrapping="Wrap"
+                               Opacity="0.72"
+                               Margin="0,0,0,8"/>
+
+                    <Slider x:Name="TransparencySlider"
+                            Minimum="0"
+                            Maximum="100"
+                            Value="0"
+                            TickFrequency="10"
+                            IsSnapToTickEnabled="True"
+                            ValueChanged="TransparencySlider_ValueChanged"/>
+
+                    <Border Margin="0,8,0,0"
+                            Padding="10,6"
+                            CornerRadius="8"
+                            Background="{DynamicResource Surface.Subtle}"
+                            HorizontalAlignment="Left">
+                        <TextBlock x:Name="TransparencyValueText"
+                                   Text="0 %"
+                                   FontWeight="SemiBold"/>
+                    </Border>
+
+                    <Border Margin="0,18,0,12"
+                            Height="1"
+                            Background="{DynamicResource Divider}"/>
+
+                    <TextBlock Text="À savoir"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+
+                    <TextBlock Text="Si tu coches une feuille, BIMaestro applique les réglages aux vues placées sur cette feuille. La feuille elle-même n’est pas modifiée."
+                               TextWrapping="Wrap"
+                               Opacity="0.72"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Views / Sheets -->
+            <Border Grid.Column="1"
+                    Padding="16"
+                    CornerRadius="14"
+                    Background="{DynamicResource Surface}"
+                    BorderBrush="{DynamicResource Border}"
+                    BorderThickness="1">
+
+                <DockPanel LastChildFill="True">
+                    <StackPanel DockPanel.Dock="Top"
+                                Margin="0,0,0,12">
+
+                        <TextBlock Text="Sélection des vues et feuilles"
+                                   FontSize="17"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,8"/>
+
+                        <WrapPanel>
+                            <Button x:Name="SelectActiveViewButton"
+                                    Content="Vue active"
+                                    Click="SelectActiveViewButton_Click"/>
+
+                            <Button x:Name="SelectAllButton"
+                                    Content="Tout sélectionner"
+                                    Click="SelectAllButton_Click"/>
+
+                            <Button x:Name="DeselectAllButton"
+                                    Content="Tout désélectionner"
+                                    Click="DeselectAllButton_Click"/>
+                        </WrapPanel>
+                    </StackPanel>
+
+                    <Border BorderBrush="{DynamicResource Border}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Background="{DynamicResource Surface.Subtle}">
+
+                        <TreeView x:Name="ViewsTreeView"
+                                  Margin="8"
+                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                  ScrollViewer.CanContentScroll="True"/>
+                    </Border>
+                </DockPanel>
+            </Border>
+        </Grid>
+
         <!-- Actions -->
-        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,18,0,0">
-            <Button x:Name="ApplyButton"
-                    Content="Appliquer"
-                    Click="Apply_Click"/>
-            <Button x:Name="ResetButton"
-                    Content="Réinitialiser"
-                    Click="Reset_Click"/>
-        </StackPanel>
+        <Border Grid.Row="2"
+                Margin="0,14,0,0"
+                Padding="12"
+                CornerRadius="14"
+                Background="{DynamicResource Surface}"
+                BorderBrush="{DynamicResource Border}"
+                BorderThickness="1">
+
+            <DockPanel LastChildFill="False">
+                <StackPanel Orientation="Horizontal"
+                            DockPanel.Dock="Left">
+                    <Button x:Name="ResetButton"
+                            Content="Réinitialiser"
+                            Click="ResetButton_Click"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal"
+                            DockPanel.Dock="Right"
+                            HorizontalAlignment="Right">
+                    <Button x:Name="CancelButton"
+                            Content="Annuler"
+                            Click="CancelButton_Click"/>
+
+                    <Button x:Name="ApplyButton"
+                            Content="Appliquer"
+                            Style="{StaticResource PrimaryButton}"
+                            Click="ApplyButton_Click"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
     </Grid>
 </Window>

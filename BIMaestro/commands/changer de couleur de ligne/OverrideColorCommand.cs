@@ -1,9 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using Autodesk.Revit.Attributes;
+﻿using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Licensing;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Modification
 {
@@ -14,161 +15,405 @@ namespace Modification
 
         protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
-            var uiapp = data.Application;
-            var uidoc = uiapp.ActiveUIDocument;
-            var doc = uidoc.Document;
-            var selectedElementIds = uidoc.Selection.GetElementIds();
-
-            if (selectedElementIds.Count == 0)
+            UIDocument uidoc = data.Application.ActiveUIDocument;
+            if (uidoc == null)
             {
-                TaskDialog.Show("Erreur", "Veuillez sélectionner au moins un élément avant d’appliquer une opération.");
+                TaskDialog.Show("BIMaestro", "Aucun document Revit actif.");
                 return Result.Failed;
             }
 
-            var activeView = uidoc.ActiveView;
+            Document doc = uidoc.Document;
+            ICollection<ElementId> selectedElementIds = uidoc.Selection.GetElementIds();
 
-            // Détecte s’il existe déjà des overrides sur l’un des éléments sélectionnés
-            var (hasExistingOverrides, referenceOverrides, referenceElementId) = TryGetExistingOverrides(activeView, selectedElementIds);
-
-            bool useExistingOverrides = false;
-            if (hasExistingOverrides)
+            if (selectedElementIds == null || selectedElementIds.Count == 0)
             {
-                var referenceElement = doc.GetElement(referenceElementId);
-                var elementName = referenceElement?.Name ?? referenceElementId.GetIdValue().ToString();
+                TaskDialog.Show(
+                    "Surcharges vues",
+                    "Sélectionne d’abord un ou plusieurs éléments Revit avant de lancer l’outil.");
+                return Result.Cancelled;
+            }
 
-                var dialog = new TaskDialog("Copier les graphismes existants")
+            View activeView = uidoc.ActiveView;
+
+            ExistingOverrideInfo existingOverrideInfo = TryFindExistingOverride(doc, activeView, selectedElementIds);
+
+            bool copyExistingOverrides = false;
+
+            if (existingOverrideInfo.HasOverride)
+            {
+                Element referenceElement = doc.GetElement(existingOverrideInfo.ElementId);
+                string referenceName = GetReadableElementName(referenceElement, existingOverrideInfo.ElementId);
+
+                TaskDialog dialog = new TaskDialog("Surcharges graphiques existantes")
                 {
-                    MainInstruction = "Certains éléments sélectionnés possèdent déjà des graphismes spécifiques à la vue active.",
-                    MainContent = $"Souhaitez-vous copier les paramètres de \"{elementName}\" sur les autres éléments sélectionnés ?\n" +
-                                  "(Les options de modification seront désactivées si vous choisissez Oui.)",
+                    MainInstruction = "Un des éléments sélectionnés possède déjà une surcharge graphique dans la vue active.",
+                    MainContent =
+                        $"Élément détecté : {referenceName}\n\n" +
+                        "Voulez-vous copier ses réglages graphiques sur les autres éléments sélectionnés et dans les vues choisies ?\n\n" +
+                        "Oui : copier la surcharge existante.\n" +
+                        "Non : ouvrir les options normales de l’outil.",
                     CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No | TaskDialogCommonButtons.Cancel,
                     DefaultButton = TaskDialogResult.Yes
                 };
 
-                var response = dialog.Show();
-                if (response == TaskDialogResult.Cancel) return Result.Cancelled;
-                if (response == TaskDialogResult.Yes) useExistingOverrides = true;
+                TaskDialogResult response = dialog.Show();
+
+                if (response == TaskDialogResult.Cancel)
+                    return Result.Cancelled;
+
+                copyExistingOverrides = response == TaskDialogResult.Yes;
             }
 
-            var picker = new ColorPickerWindow(uiapp, allowOverrideEditing: !useExistingOverrides);
-            bool? ok = picker.ShowDialog();
-            if (ok != true) return Result.Cancelled;
-            if (picker.IsResetRequested) return Result.Succeeded;
+            GraphicOverrideWindow window = new GraphicOverrideWindow(
+                data.Application,
+                optionsEnabled: !copyExistingOverrides,
+                copyExistingOverridesMode: copyExistingOverrides);
 
-            var views = picker.SelectedViews;
-            if (views.Count == 0)
+            bool? dialogResult = window.ShowDialog();
+
+            if (dialogResult != true)
+                return Result.Cancelled;
+
+            List<View> targetViews = window.SelectedViews
+                .Where(v => v != null && v.IsValidObject)
+                .Where(v => v.AreGraphicsOverridesAllowed())
+                .GroupBy(v => v.Id)
+                .Select(g => g.First())
+                .ToList();
+
+            if (targetViews.Count == 0)
             {
-                TaskDialog.Show("Erreur", "Aucune vue sélectionnée.");
+                TaskDialog.Show(
+                    "Surcharges vues",
+                    "Aucune vue valide sélectionnée.\n\nNote : les feuilles ne supportent pas directement les surcharges graphiques. L’outil applique les réglages aux vues placées sur les feuilles sélectionnées.");
                 return Result.Cancelled;
             }
 
-            var ogs = useExistingOverrides && referenceOverrides != null
-                ? referenceOverrides
-                : picker.GetOverrideGraphicSettings();
+            if (window.IsResetRequested)
+            {
+                ResetOverrides(doc, selectedElementIds, targetViews, window.UnhideElements);
+                return Result.Succeeded;
+            }
 
-            bool hideElements = picker.HideInView && !useExistingOverrides;
+            if (copyExistingOverrides)
+            {
+                if (!existingOverrideInfo.HasOverride || existingOverrideInfo.OverrideSettings == null)
+                {
+                    TaskDialog.Show(
+                        "Surcharges vues",
+                        "Impossible de récupérer la surcharge graphique existante.");
+                    return Result.Failed;
+                }
 
-            using (var tx = new Transaction(doc, "Override Color and Patterns"))
+                CopyExistingOverrides(
+                    doc,
+                    selectedElementIds,
+                    targetViews,
+                    existingOverrideInfo.OverrideSettings);
+
+                return Result.Succeeded;
+            }
+
+            ApplyOverrides(doc, selectedElementIds, targetViews, window);
+
+            return Result.Succeeded;
+        }
+
+        private static void ApplyOverrides(
+            Document doc,
+            ICollection<ElementId> selectedElementIds,
+            IList<View> targetViews,
+            GraphicOverrideWindow window)
+        {
+            using (Transaction tx = new Transaction(doc, "BIMaestro - Surcharges vues"))
             {
                 tx.Start();
 
-                foreach (var view in views)
+                foreach (View view in targetViews)
                 {
-                    // Ignore les vues qui ne supportent pas les VG overrides (ex. feuilles, légendes… selon cas)
-                    if (view == null || !view.AreGraphicsOverridesAllowed())
+                    if (view == null || !view.IsValidObject || !view.AreGraphicsOverridesAllowed())
                         continue;
 
-                    foreach (var id in selectedElementIds)
+                    foreach (ElementId elementId in selectedElementIds)
                     {
+                        if (elementId == ElementId.InvalidElementId)
+                            continue;
+
+                        Element element = doc.GetElement(elementId);
+                        if (element == null)
+                            continue;
+
                         try
                         {
-                            if (hideElements)
+                            if (window.HideInView)
                             {
-                                view.HideElements(new List<ElementId> { id });
+                                if (element.CanBeHidden(view))
+                                {
+                                    view.HideElements(new List<ElementId> { elementId });
+                                }
+
+                                continue;
                             }
-                            else
-                            {
-                                view.SetElementOverrides(id, ogs);
-                            }
-                        }
-                        catch (Autodesk.Revit.Exceptions.InvalidOperationException)
-                        {
-                            // ignore vues non supportées
+
+                            OverrideGraphicSettings ogs = new OverrideGraphicSettings();
+
+                            ogs.SetHalftone(window.ApplyHalftone);
+                            ogs.SetSurfaceTransparency(window.SelectedTransparency);
+
+                            view.SetElementOverrides(elementId, ogs);
                         }
                         catch
                         {
-                            // ignore autres erreurs
+                            // Certaines vues ou certains éléments ne supportent pas l’opération.
+                            // On continue pour ne pas bloquer le traitement global.
                         }
                     }
                 }
 
                 tx.Commit();
             }
-
-            return Result.Succeeded;
         }
 
-        private static (bool hasOverrides, OverrideGraphicSettings overrides, ElementId elementId)
-            TryGetExistingOverrides(View view, ICollection<ElementId> elementIds)
+        private static void CopyExistingOverrides(
+            Document doc,
+            ICollection<ElementId> selectedElementIds,
+            IList<View> targetViews,
+            OverrideGraphicSettings referenceOverrides)
         {
-            if (view == null || elementIds == null || elementIds.Count == 0 || !view.AreGraphicsOverridesAllowed())
-                return (false, null, ElementId.InvalidElementId);
-
-            foreach (var id in elementIds)
+            using (Transaction tx = new Transaction(doc, "BIMaestro - Copier surcharges vues"))
             {
-                var ogs = view.GetElementOverrides(id);
-                if (HasAnyOverrides(ogs))
-                    return (true, ogs, id);
+                tx.Start();
+
+                foreach (View view in targetViews)
+                {
+                    if (view == null || !view.IsValidObject || !view.AreGraphicsOverridesAllowed())
+                        continue;
+
+                    foreach (ElementId elementId in selectedElementIds)
+                    {
+                        if (elementId == ElementId.InvalidElementId)
+                            continue;
+
+                        Element element = doc.GetElement(elementId);
+                        if (element == null)
+                            continue;
+
+                        try
+                        {
+                            view.SetElementOverrides(elementId, referenceOverrides);
+                        }
+                        catch
+                        {
+                            // Vue ou élément non compatible.
+                        }
+                    }
+                }
+
+                tx.Commit();
+            }
+        }
+
+        private static void ResetOverrides(
+            Document doc,
+            ICollection<ElementId> selectedElementIds,
+            IList<View> targetViews,
+            bool unhideElements)
+        {
+            using (Transaction tx = new Transaction(doc, "BIMaestro - Réinitialiser surcharges vues"))
+            {
+                tx.Start();
+
+                foreach (View view in targetViews)
+                {
+                    if (view == null || !view.IsValidObject || !view.AreGraphicsOverridesAllowed())
+                        continue;
+
+                    foreach (ElementId elementId in selectedElementIds)
+                    {
+                        if (elementId == ElementId.InvalidElementId)
+                            continue;
+
+                        try
+                        {
+                            view.SetElementOverrides(elementId, new OverrideGraphicSettings());
+                        }
+                        catch
+                        {
+                            // Vue ou élément non compatible.
+                        }
+
+                        if (unhideElements)
+                        {
+                            try
+                            {
+                                view.UnhideElements(new List<ElementId> { elementId });
+                            }
+                            catch
+                            {
+                                // L’élément n’était peut-être pas masqué ou la vue ne le permet pas.
+                            }
+                        }
+                    }
+                }
+
+                tx.Commit();
+            }
+        }
+
+        private static ExistingOverrideInfo TryFindExistingOverride(
+            Document doc,
+            View activeView,
+            ICollection<ElementId> selectedElementIds)
+        {
+            if (doc == null ||
+                activeView == null ||
+                selectedElementIds == null ||
+                selectedElementIds.Count == 0 ||
+                !activeView.AreGraphicsOverridesAllowed())
+            {
+                return ExistingOverrideInfo.None;
             }
 
-            return (false, null, ElementId.InvalidElementId);
+            foreach (ElementId elementId in selectedElementIds)
+            {
+                if (elementId == ElementId.InvalidElementId)
+                    continue;
+
+                Element element = doc.GetElement(elementId);
+                if (element == null)
+                    continue;
+
+                try
+                {
+                    OverrideGraphicSettings ogs = activeView.GetElementOverrides(elementId);
+
+                    if (HasAnyOverrides(ogs))
+                    {
+                        return new ExistingOverrideInfo
+                        {
+                            HasOverride = true,
+                            ElementId = elementId,
+                            OverrideSettings = ogs
+                        };
+                    }
+                }
+                catch
+                {
+                    // Certains éléments peuvent ne pas être compatibles.
+                }
+            }
+
+            return ExistingOverrideInfo.None;
         }
 
-        /// <summary>
-        /// Détermine si un OverrideGraphicSettings contient au moins une surcharge effective.
-        /// Compatible Revit 2023+ (on ne dépend pas de méthodes absentes).
-        /// </summary>
         private static bool HasAnyOverrides(OverrideGraphicSettings ogs)
         {
-            if (ogs == null || !ogs.IsValidObject) return false;
+            if (ogs == null || !ogs.IsValidObject)
+                return false;
 
-            // Lignes (projection/coupe)
-            if (HasColorOverride(ogs.ProjectionLineColor)) return true;
-            if (HasColorOverride(ogs.CutLineColor)) return true;
-            if (ogs.ProjectionLinePatternId != ElementId.InvalidElementId) return true;
-            if (ogs.CutLinePatternId != ElementId.InvalidElementId) return true;
-            if (ogs.ProjectionLineWeight != OverrideGraphicSettings.InvalidPenNumber) return true;
-            if (ogs.CutLineWeight != OverrideGraphicSettings.InvalidPenNumber) return true;
+            if (HasColorOverride(ogs.ProjectionLineColor))
+                return true;
 
-            // Motifs / couleurs (surface & coupe)
-            if (ogs.SurfaceBackgroundPatternId != ElementId.InvalidElementId) return true;
-            if (ogs.SurfaceForegroundPatternId != ElementId.InvalidElementId) return true;
-            if (ogs.CutBackgroundPatternId != ElementId.InvalidElementId) return true;
-            if (ogs.CutForegroundPatternId != ElementId.InvalidElementId) return true;
-            if (HasColorOverride(ogs.SurfaceBackgroundPatternColor)) return true;
-            if (HasColorOverride(ogs.SurfaceForegroundPatternColor)) return true;
-            if (HasColorOverride(ogs.CutBackgroundPatternColor)) return true;
-            if (HasColorOverride(ogs.CutForegroundPatternColor)) return true;
+            if (HasColorOverride(ogs.CutLineColor))
+                return true;
 
-            // Détail & trame
-            if (ogs.DetailLevel != ViewDetailLevel.Undefined) return true;
+            if (ogs.ProjectionLinePatternId != ElementId.InvalidElementId)
+                return true;
 
-            // Halftone: on considère qu’uniquement TRUE révèle un override (FALSE est indistinguable du défaut).
-            if (ogs.Halftone) return true;
+            if (ogs.CutLinePatternId != ElementId.InvalidElementId)
+                return true;
 
-            // Transparence :
-            // - En 2025+, propriété getter 'Transparency' existe (renvoie -1 si pas d’override).
-            // - En 2023/2024, pas de getter public fiable -> on n’y touche pas pour rester compatible.
+            if (ogs.ProjectionLineWeight != OverrideGraphicSettings.InvalidPenNumber)
+                return true;
+
+            if (ogs.CutLineWeight != OverrideGraphicSettings.InvalidPenNumber)
+                return true;
+
+            if (ogs.SurfaceBackgroundPatternId != ElementId.InvalidElementId)
+                return true;
+
+            if (ogs.SurfaceForegroundPatternId != ElementId.InvalidElementId)
+                return true;
+
+            if (ogs.CutBackgroundPatternId != ElementId.InvalidElementId)
+                return true;
+
+            if (ogs.CutForegroundPatternId != ElementId.InvalidElementId)
+                return true;
+
+            if (HasColorOverride(ogs.SurfaceBackgroundPatternColor))
+                return true;
+
+            if (HasColorOverride(ogs.SurfaceForegroundPatternColor))
+                return true;
+
+            if (HasColorOverride(ogs.CutBackgroundPatternColor))
+                return true;
+
+            if (HasColorOverride(ogs.CutForegroundPatternColor))
+                return true;
+
+            if (ogs.DetailLevel != ViewDetailLevel.Undefined)
+                return true;
+
+            if (ogs.Halftone)
+                return true;
+
 #if REVIT_2025_OR_GREATER
-            if (ogs.Transparency >= 0) return true;
+            if (ogs.Transparency >= 0)
+                return true;
 #endif
 
             return false;
         }
 
-        private static bool HasColorOverride(Color color)
+        private static bool HasColorOverride(Autodesk.Revit.DB.Color color)
         {
             return color != null && color.IsValid;
+        }
+
+        private static string GetReadableElementName(Element element, ElementId fallbackId)
+        {
+            if (element == null)
+                return $"Id {fallbackId.IntegerValue}";
+
+            string name = null;
+
+            try
+            {
+                name = element.Name;
+            }
+            catch
+            {
+                // Certains éléments n’exposent pas toujours Name proprement.
+            }
+
+            if (!string.IsNullOrWhiteSpace(name))
+                return $"{name} - Id {element.Id.IntegerValue}";
+
+            return $"Id {element.Id.IntegerValue}";
+        }
+
+        private class ExistingOverrideInfo
+        {
+            public bool HasOverride { get; set; }
+
+            public ElementId ElementId { get; set; }
+
+            public OverrideGraphicSettings OverrideSettings { get; set; }
+
+            public static ExistingOverrideInfo None
+            {
+                get
+                {
+                    return new ExistingOverrideInfo
+                    {
+                        HasOverride = false,
+                        ElementId = ElementId.InvalidElementId,
+                        OverrideSettings = null
+                    };
+                }
+            }
         }
     }
 }
