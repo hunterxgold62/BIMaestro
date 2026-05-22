@@ -113,17 +113,17 @@ namespace Visualisation
                 int firstRow = 1;
                 int nHeaderCols = header.NumberOfColumns;
                 int nBodyCols = body.NumberOfColumns;
-                int nCols = Math.Max(nHeaderCols, nBodyCols);
+                int nCols = GetEffectiveColumnCount(schedule, nHeaderCols, nBodyCols, body.NumberOfRows);
                 bool shouldMergeTitle = ShouldMergeHeaderTitle(schedule, nHeaderCols);
 
 
                 // En-têtes (1ère ligne du header Revit)
-                for (int c = 0; c < nHeaderCols; c++)
+                for (int c = 0; c < nCols; c++)
                     ws.Cells[firstRow, c + 1] = schedule.GetCellText(SectionType.Header, 0, c);
 
                 // Corps
                 for (int r = 0; r < body.NumberOfRows; r++)
-                    for (int c = 0; c < nBodyCols; c++)
+                    for (int c = 0; c < nCols; c++)
                         ws.Cells[firstRow + 1 + r, c + 1] = schedule.GetCellText(SectionType.Body, r, c);
 
                 used = ws.UsedRange;
@@ -131,7 +131,7 @@ namespace Visualisation
                 used.Rows.AutoFit();
 
                 int totalRows = used.Rows.Count;
-                int totalCols = Math.Max(used.Columns.Count, nCols);
+                int totalCols = nCols;
 
                 fullRange = ws.Range[ws.Cells[firstRow, 1], ws.Cells[firstRow + totalRows - 1, totalCols]];
 
@@ -208,14 +208,14 @@ namespace Visualisation
                 int firstRow = 1;
                 int nHeaderCols = header.NumberOfColumns;
                 int nBodyCols = body.NumberOfColumns;
-                int nCols = Math.Max(nHeaderCols, nBodyCols);
+                int nCols = GetEffectiveColumnCount(schedule, nHeaderCols, nBodyCols, body.NumberOfRows);
                 bool shouldMergeTitle = ShouldMergeHeaderTitle(schedule, nHeaderCols);
 
-                for (int c = 0; c < nHeaderCols; c++)
+                for (int c = 0; c < nCols; c++)
                     ws.Cells[firstRow, c + 1] = schedule.GetCellText(SectionType.Header, 0, c);
 
                 for (int r = 0; r < body.NumberOfRows; r++)
-                    for (int c = 0; c < nBodyCols; c++)
+                    for (int c = 0; c < nCols; c++)
                         ws.Cells[firstRow + 1 + r, c + 1] = schedule.GetCellText(SectionType.Body, r, c);
 
                 used = ws.UsedRange;
@@ -223,7 +223,7 @@ namespace Visualisation
                 used.Rows.AutoFit();
 
                 int totalRows = used.Rows.Count;
-                int totalCols = Math.Max(used.Columns.Count, nCols);
+                int totalCols = nCols;
 
                 fullRange = ws.Range[ws.Cells[firstRow, 1], ws.Cells[firstRow + totalRows - 1, totalCols]];
 
@@ -337,7 +337,7 @@ namespace Visualisation
                 return false;
             }
 
-            string firstCellText = schedule.GetCellText(SectionType.Header, 0, 0);
+            string firstCellText = GetCellTextSafe(schedule, SectionType.Header, 0, 0, 1, headerColumnCount);
             if (string.IsNullOrWhiteSpace(firstCellText))
             {
                 return false;
@@ -345,7 +345,7 @@ namespace Visualisation
 
             for (int c = 1; c < headerColumnCount; c++)
             {
-                string cellText = schedule.GetCellText(SectionType.Header, 0, c);
+                string cellText = GetCellTextSafe(schedule, SectionType.Header, 0, c, 1, headerColumnCount);
                 if (!string.IsNullOrWhiteSpace(cellText))
                 {
                     return false;
@@ -353,6 +353,39 @@ namespace Visualisation
             }
 
             return true;
+        }
+
+        private static int GetEffectiveColumnCount(ViewSchedule schedule, int headerColumnCount, int bodyColumnCount, int bodyRowCount)
+        {
+            int maxColumns = Math.Max(headerColumnCount, bodyColumnCount);
+            int lastUsedCol = 0;
+
+            for (int c = 0; c < maxColumns; c++)
+            {
+                if (!string.IsNullOrWhiteSpace(GetCellTextSafe(schedule, SectionType.Header, 0, c, 1, headerColumnCount)))
+                    lastUsedCol = c + 1;
+
+                for (int r = 0; r < bodyRowCount; r++)
+                {
+                    if (!string.IsNullOrWhiteSpace(GetCellTextSafe(schedule, SectionType.Body, r, c, bodyRowCount, bodyColumnCount)))
+                    {
+                        lastUsedCol = c + 1;
+                        break;
+                    }
+                }
+            }
+
+            return Math.Max(1, lastUsedCol);
+        }
+
+        private static string GetCellTextSafe(ViewSchedule schedule, SectionType section, int row, int col, int rowCount, int colCount)
+        {
+            if (row < 0 || col < 0 || row >= rowCount || col >= colCount)
+            {
+                return string.Empty;
+            }
+
+            return schedule.GetCellText(section, row, col) ?? string.Empty;
         }
     }
 }

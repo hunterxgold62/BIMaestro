@@ -206,7 +206,7 @@ namespace IA
 
         private static string ExportViewAsPng(Document doc, ElementId viewId)
         {
-            string folder = Path.Combine(Path.GetTempPath(), "BIMaestro", "IAImage");
+            string folder = Path.Combine(Path.GetTempPath(), "AImage");
             Directory.CreateDirectory(folder);
 
             foreach (string oldFile in Directory.GetFiles(folder, "*.png"))
@@ -719,8 +719,7 @@ namespace IA
                 string folder = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
                     "RevitLogs",
-                    "BIMaestro",
-                    "IAImage"
+                    "AImage"
                 );
 
                 Directory.CreateDirectory(folder);

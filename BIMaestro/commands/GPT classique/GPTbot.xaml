@@ -117,12 +117,17 @@
                          Foreground="{DynamicResource Text.Primary}"
                          ScrollViewer.VerticalScrollBarVisibility="Auto"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                        ScrollViewer.CanContentScroll="True"
+                         ScrollViewer.IsDeferredScrollingEnabled="False"
+                         VirtualizingPanel.IsVirtualizing="True"
+                         VirtualizingPanel.VirtualizationMode="Recycling"
+                         VirtualizingPanel.ScrollUnit="Pixel"
                          Padding="2">
 
                     <!-- ✅ Chat = mieux sans virtualisation (sinon clipping/mesure) -->
                     <ListBox.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <StackPanel/>
+                            <VirtualizingStackPanel/>
                         </ItemsPanelTemplate>
                     </ListBox.ItemsPanel>
 

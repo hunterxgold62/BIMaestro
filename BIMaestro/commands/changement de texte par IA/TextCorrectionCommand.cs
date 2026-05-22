@@ -24,10 +24,20 @@ namespace IA
             Document doc = uidoc.Document;
 
             // 2) Sélection des TextNote
-            var refs = uidoc.Selection.PickObjects(
-                Autodesk.Revit.UI.Selection.ObjectType.Element,
-                "Sélectionnez des TextNote à corriger"
-            );
+            System.Collections.Generic.IList<Autodesk.Revit.DB.Reference> refs;
+            try
+            {
+                refs = uidoc.Selection.PickObjects(
+                    Autodesk.Revit.UI.Selection.ObjectType.Element,
+                    "Sélectionnez des TextNote à corriger"
+                );
+            }
+            catch (Autodesk.Revit.Exceptions.OperationCanceledException)
+            {
+                // L'utilisateur a annulé (Échap / clic droit) :
+                // on quitte proprement sans faire remonter l'exception Revit.
+                return Result.Cancelled;
+            }
             if (refs == null || refs.Count == 0)
                 return Result.Cancelled;
 
