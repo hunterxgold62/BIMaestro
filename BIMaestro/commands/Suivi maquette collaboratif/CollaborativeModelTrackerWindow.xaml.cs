@@ -300,6 +300,50 @@ namespace Analyse
             Dispatcher.BeginInvoke(new Action(ApplyFilters), DispatcherPriority.Background);
         }
 
+
+        private void ChangeSharedPath_Click(object sender, RoutedEventArgs e)
+        {
+            var explanation =
+                "Pour un suivi collaboratif fiable, choisissez un dossier sur un serveur commun. " +
+                "Si le chemin reste local (PC perso), les autres utilisateurs ne pourront pas lire ou écrire les mêmes fichiers JSON/Excel.";
+
+            var userChoice = MessageBox.Show(
+                explanation + "\n\nVoulez-vous choisir ou modifier ce chemin maintenant ?",
+                "Chemin commun recommandé",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Information);
+
+            if (userChoice != MessageBoxResult.Yes)
+                return;
+
+            using (var dialog = new Forms.FolderBrowserDialog())
+            {
+                dialog.Description = "Sélectionnez le dossier commun (serveur) pour le suivi des maquettes";
+                dialog.SelectedPath = CollaborativeModelTrackerStore.ActiveDirectory;
+
+                if (dialog.ShowDialog() != Forms.DialogResult.OK || string.IsNullOrWhiteSpace(dialog.SelectedPath))
+                    return;
+
+                if (!CollaborativeModelTrackerStore.TrySetSharedDirectory(dialog.SelectedPath, out var error))
+                {
+                    MessageBox.Show($"Le chemin sélectionné n'est pas utilisable : {error}",
+                        "Chemin invalide",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                LoadRecords();
+                ApplyFilters();
+
+                MessageBox.Show(
+                    "Chemin commun mis à jour avec succès. Tous les utilisateurs pointant ce même dossier partageront les mêmes fichiers de suivi.",
+                    "Chemin mis à jour",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+        }
+
         private void OpenFolder_Click(object sender, RoutedEventArgs e)
         {
             OpenCurrentSelectedModelFolder();
