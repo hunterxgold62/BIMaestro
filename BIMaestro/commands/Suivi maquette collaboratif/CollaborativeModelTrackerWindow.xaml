@@ -148,6 +148,7 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
             <TextBlock x:Name="InfoText"
@@ -157,12 +158,18 @@
                        TextWrapping="Wrap"
                        VerticalAlignment="Center"/>
 
-            <Button Grid.Column="1"
-                    Content="Ouvrir dossier"
-                    Width="150"
-                    Style="{StaticResource PrimaryButton}"
-                    HorizontalAlignment="Right"
-                    Click="OpenFolder_Click"/>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Modifier chemin"
+                        Width="160"
+                        Margin="0,0,10,0"
+                        Style="{StaticResource SecondaryButton}"
+                        Click="ChangeSharedPath_Click"/>
+
+                <Button Content="Ouvrir dossier"
+                        Width="150"
+                        Style="{StaticResource PrimaryButton}"
+                        Click="OpenFolder_Click"/>
+            </StackPanel>
         </Grid>
     </Grid>
 </Window>
