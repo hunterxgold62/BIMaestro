@@ -11,7 +11,6 @@ namespace Modification
     [Transaction(TransactionMode.Manual)]
     public class DeleteUnusedSchedulesCommand : IExternalCommand
     {
-        private const double MaxDeletionRatio = 0.30; // filet de sécurité : au-delà, on annule.
 
         public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
         {
@@ -53,19 +52,7 @@ namespace Modification
                 .Where(s => !HasAnySheetInstance(doc, s.Id))
                 .ToList();
 
-            // Filet de sécurité automatique : évite les suppressions massives imprévues.
-            if (schedules.Count > 0)
-            {
-                double ratio = (double)finalList.Count / schedules.Count;
-                if (ratio > MaxDeletionRatio)
-                {
-                    TaskDialog.Show("Supprimer nomenclatures inutilisées",
-                        "Suppression annulée automatiquement : le volume de suppression détecté est trop élevé.\n" +
-                        $"Candidats : {finalList.Count}/{schedules.Count} ({ratio:P0}).\n\n" +
-                        "Aucune nomenclature n'a été supprimée pour protéger le projet.");
-                    return Result.Cancelled;
-                }
-            }
+            
 
             if (finalList.Count == 0)
             {

@@ -89,6 +89,10 @@ namespace BIMaestro.Bonus
         private WriteableBitmap _wb;
         private int[] _px;
         private int _bmpW, _bmpH, _stride;
+        private int[] _backgroundCache;
+        private bool _backgroundDirty = true;
+        private Color _cachedBackgroundColor;
+        private Color _cachedGridColor;
 
         // -------------------------------
         // Timing (render loop)
@@ -672,6 +676,8 @@ namespace BIMaestro.Bonus
 
             _wb = new WriteableBitmap(_bmpW, _bmpH, 96, 96, PixelFormats.Bgra32, null);
             _px = new int[_bmpW * _bmpH];
+            _backgroundCache = null;
+            _backgroundDirty = true;
 
             GameImage.Source = _wb;
             GameImage.Width = _bmpW;
@@ -1106,41 +1112,26 @@ namespace BIMaestro.Bonus
 
         private void RenderFrame(double t)
         {
-            if (_wb == null || _px == null || _activeSkin == null) return;
+            if (_wb == null || _px == null || _activeSkin == null)
+                return;
 
-            Color bg = _playfieldBackgroundBrush.Color;
-            int w = _bmpW;
-            int h = _bmpH;
+            EnsureBackgroundCache();
 
-            for (int y = 0; y < h; y++)
-            {
-                double f = 0.90 + 0.10 * (y / (double)(h - 1));
-                Color row = Shade(bg, f);
-                int argb = Pack(row);
-
-                int rowStart = y * w;
-                for (int x = 0; x < w; x++)
-                    _px[rowStart + x] = argb;
-            }
-
-            Color gridBase = _activeSkin.GridColor;
-            Color grid = Color.FromArgb(26, gridBase.R, gridBase.G, gridBase.B);
-            int gridC = Pack(grid);
-
-            for (int gx = 0; gx < w; gx += CellSize)
-                DrawVLine(gx, 0, h - 1, gridC);
-
-            for (int gy = 0; gy < h; gy += CellSize)
-                DrawHLine(0, w - 1, gy, gridC);
-
-            DrawVLine(w - 1, 0, h - 1, gridC);
-            DrawHLine(0, w - 1, h - 1, gridC);
+            Buffer.BlockCopy(
+                _backgroundCache,
+                0,
+                _px,
+                0,
+                _backgroundCache.Length * sizeof(int));
 
             if (_mode == GameMode.Hardcore && _walls.Count > 0)
             {
                 Color baseWall = _activeSkin.WallColor;
+
                 foreach (var c in _walls)
-                    DrawBevelCell(c, baseWall, 0.10, 0.18);
+                {
+                    DrawWallCell(c, baseWall);
+                }
             }
 
             foreach (var fruit in _fruits)
@@ -1154,25 +1145,32 @@ namespace BIMaestro.Bonus
                     c = LerpColor(c, Colors.White, k);
                 }
 
-                DrawFruit(fruit.Pos, c, fruit.Type);
+                DrawFruitPremium(fruit.Pos, c, fruit.Type, t);
             }
 
             int segIndex = 0;
+            int snakeCount = Math.Max(1, _snake.Count);
+
             foreach (var seg in _snake)
             {
-                bool isHead = (segIndex == 0);
+                bool isHead = segIndex == 0;
 
                 if (isHead)
                 {
-                    DrawHead(seg, _dir, _activeSkin.HeadColor);
+                    DrawHeadPremium(seg, _dir, _activeSkin.HeadColor);
 
                     if (_speedActive && _mode != GameMode.Hardcore)
+                    {
                         DrawSpeedParticles(seg, _dir, t);
+                    }
                 }
                 else
                 {
-                    double shade = 1.0 - Math.Min(0.22, segIndex * 0.006);
-                    DrawBevelCell(seg, Shade(_activeSkin.BodyColor, shade), 0.10, 0.16);
+                    double progress = segIndex / (double)snakeCount;
+                    double shade = 1.0 - Math.Min(0.28, progress * 0.34);
+
+                    Color body = Shade(_activeSkin.BodyColor, shade);
+                    DrawSnakeBodyCell(seg, body, segIndex);
                 }
 
                 segIndex++;
@@ -1181,6 +1179,336 @@ namespace BIMaestro.Bonus
             _wb.WritePixels(new Int32Rect(0, 0, _bmpW, _bmpH), _px, _stride, 0);
         }
 
+        private void EnsureBackgroundCache()
+        {
+            if (_backgroundCache == null || _backgroundCache.Length != _bmpW * _bmpH)
+            {
+                _backgroundCache = new int[_bmpW * _bmpH];
+                _backgroundDirty = true;
+            }
+
+            Color bg = _playfieldBackgroundBrush.Color;
+
+            Color gridBase = _activeSkin.GridColor;
+            Color grid = Color.FromArgb(22, gridBase.R, gridBase.G, gridBase.B);
+
+            bool sameColors =
+                _cachedBackgroundColor.Equals(bg) &&
+                _cachedGridColor.Equals(grid);
+
+            if (!_backgroundDirty && sameColors)
+                return;
+
+            _cachedBackgroundColor = bg;
+            _cachedGridColor = grid;
+
+            int w = _bmpW;
+            int h = _bmpH;
+
+            for (int y = 0; y < h; y++)
+            {
+                double vertical = h <= 1 ? 0.0 : y / (double)(h - 1);
+                double vignetteY = Math.Abs(vertical - 0.5) * 2.0;
+
+                double f = 0.92 + 0.10 * vertical - 0.05 * vignetteY;
+                Color row = Shade(bg, f);
+                int argb = Pack(row);
+
+                int rowStart = y * w;
+
+                for (int x = 0; x < w; x++)
+                {
+                    double horizontal = w <= 1 ? 0.0 : x / (double)(w - 1);
+                    double vignetteX = Math.Abs(horizontal - 0.5) * 2.0;
+                    double edge = Math.Max(vignetteX, vignetteY);
+
+                    if (edge > 0.72)
+                    {
+                        double darken = 1.0 - ((edge - 0.72) * 0.16);
+                        Color darker = Shade(row, darken);
+                        _backgroundCache[rowStart + x] = Pack(darker);
+                    }
+                    else
+                    {
+                        _backgroundCache[rowStart + x] = argb;
+                    }
+                }
+            }
+
+            int gridC = Pack(grid);
+
+            for (int gx = 0; gx < w; gx += CellSize)
+                DrawVLineOnBuffer(_backgroundCache, gx, 0, h - 1, gridC);
+
+            for (int gy = 0; gy < h; gy += CellSize)
+                DrawHLineOnBuffer(_backgroundCache, 0, w - 1, gy, gridC);
+
+            DrawVLineOnBuffer(_backgroundCache, w - 1, 0, h - 1, gridC);
+            DrawHLineOnBuffer(_backgroundCache, 0, w - 1, h - 1, gridC);
+
+            _backgroundDirty = false;
+        }
+        private void DrawVLineOnBuffer(int[] buffer, int x, int y1, int y2, int color)
+        {
+            if (buffer == null || x < 0 || x >= _bmpW)
+                return;
+
+            if (y1 > y2)
+            {
+                int tmp = y1;
+                y1 = y2;
+                y2 = tmp;
+            }
+
+            y1 = Math.Max(0, y1);
+            y2 = Math.Min(_bmpH - 1, y2);
+
+            for (int y = y1; y <= y2; y++)
+            {
+                buffer[y * _bmpW + x] = color;
+            }
+        }
+
+        private void DrawHLineOnBuffer(int[] buffer, int x1, int x2, int y, int color)
+        {
+            if (buffer == null || y < 0 || y >= _bmpH)
+                return;
+
+            if (x1 > x2)
+            {
+                int tmp = x1;
+                x1 = x2;
+                x2 = tmp;
+            }
+
+            x1 = Math.Max(0, x1);
+            x2 = Math.Min(_bmpW - 1, x2);
+
+            int offset = y * _bmpW;
+
+            for (int x = x1; x <= x2; x++)
+            {
+                buffer[offset + x] = color;
+            }
+        }
+
+        private void DrawSnakeBodyCell(Cell cell, Color baseColor, int index)
+        {
+            int x0 = cell.X * CellSize;
+            int y0 = cell.Y * CellSize;
+
+            Color shadow = Color.FromArgb(70, 0, 0, 0);
+            FillRect(x0 + 3, y0 + 3, CellSize - 4, CellSize - 4, Pack(shadow));
+
+            Color edge = Darken(baseColor, 0.20);
+            Color center = Lighten(baseColor, 0.12);
+            Color highlight = Lighten(baseColor, 0.32);
+
+            FillRect(x0 + 2, y0 + 2, CellSize - 4, CellSize - 4, Pack(edge));
+            FillRect(x0 + 3, y0 + 3, CellSize - 6, CellSize - 6, Pack(baseColor));
+            FillRect(x0 + 5, y0 + 5, CellSize - 10, CellSize - 10, Pack(center));
+
+            DrawHLine(x0 + 4, x0 + CellSize - 5, y0 + 3, Pack(Color.FromArgb(120, highlight.R, highlight.G, highlight.B)));
+            DrawVLine(x0 + 3, y0 + 4, y0 + CellSize - 5, Pack(Color.FromArgb(70, highlight.R, highlight.G, highlight.B)));
+
+            if (index % 3 == 0)
+            {
+                Color dot = Lighten(baseColor, 0.42);
+                SetPixel(x0 + CellSize / 2, y0 + CellSize / 2, Pack(Color.FromArgb(115, dot.R, dot.G, dot.B)));
+            }
+        }
+
+        private void DrawHeadPremium(Cell cell, Direction dir, Color baseColor)
+        {
+            int x0 = cell.X * CellSize;
+            int y0 = cell.Y * CellSize;
+
+            Color shadow = Color.FromArgb(90, 0, 0, 0);
+            FillRect(x0 + 3, y0 + 3, CellSize - 4, CellSize - 4, Pack(shadow));
+
+            Color edge = Darken(baseColor, 0.22);
+            Color hi = Lighten(baseColor, 0.36);
+
+            FillRect(x0 + 1, y0 + 1, CellSize - 2, CellSize - 2, Pack(edge));
+
+            for (int py = 2; py < CellSize - 2; py++)
+            {
+                for (int px = 2; px < CellSize - 2; px++)
+                {
+                    double f;
+
+                    switch (dir)
+                    {
+                        case Direction.Right:
+                            f = px / (double)(CellSize - 1);
+                            break;
+
+                        case Direction.Left:
+                            f = 1.0 - px / (double)(CellSize - 1);
+                            break;
+
+                        case Direction.Down:
+                            f = py / (double)(CellSize - 1);
+                            break;
+
+                        default:
+                            f = 1.0 - py / (double)(CellSize - 1);
+                            break;
+                    }
+
+                    Color c = LerpColor(baseColor, hi, 0.55 * f);
+                    SetPixel(x0 + px, y0 + py, Pack(c));
+                }
+            }
+
+            DrawRectOutline(x0 + 1, y0 + 1, CellSize - 2, CellSize - 2, Pack(Color.FromArgb(125, 255, 255, 255)));
+
+            DrawEyesPremium(cell, dir);
+        }
+
+        private void DrawEyesPremium(Cell cell, Direction dir)
+        {
+            int x0 = cell.X * CellSize;
+            int y0 = cell.Y * CellSize;
+
+            int white = Pack(Color.FromArgb(235, 255, 255, 255));
+            int pupil = Pack(Color.FromArgb(235, 0, 0, 0));
+
+            int ax = x0 + CellSize / 2;
+            int ay = y0 + CellSize / 2;
+
+            int ex1 = ax - 4;
+            int ex2 = ax + 3;
+            int ey1 = ay - 4;
+            int ey2 = ay - 4;
+
+            int pxOffset1 = 0;
+            int pxOffset2 = 0;
+            int pyOffset1 = 0;
+            int pyOffset2 = 0;
+
+            switch (dir)
+            {
+                case Direction.Down:
+                    ey1 = ay + 3;
+                    ey2 = ay + 3;
+                    pyOffset1 = 1;
+                    pyOffset2 = 1;
+                    break;
+
+                case Direction.Left:
+                    ex1 = ax - 5;
+                    ex2 = ax - 5;
+                    ey1 = ay - 4;
+                    ey2 = ay + 3;
+                    pxOffset1 = -1;
+                    pxOffset2 = -1;
+                    break;
+
+                case Direction.Right:
+                    ex1 = ax + 5;
+                    ex2 = ax + 5;
+                    ey1 = ay - 4;
+                    ey2 = ay + 3;
+                    pxOffset1 = 1;
+                    pxOffset2 = 1;
+                    break;
+
+                default:
+                    pyOffset1 = -1;
+                    pyOffset2 = -1;
+                    break;
+            }
+
+            DrawCircle(ex1, ey1, 2, white, true);
+            DrawCircle(ex2, ey2, 2, white, true);
+
+            SetPixel(ex1 + pxOffset1, ey1 + pyOffset1, pupil);
+            SetPixel(ex2 + pxOffset2, ey2 + pyOffset2, pupil);
+        }
+
+        private void DrawWallCell(Cell cell, Color baseColor)
+        {
+            int x0 = cell.X * CellSize;
+            int y0 = cell.Y * CellSize;
+
+            Color dark = Darken(baseColor, 0.24);
+            Color light = Lighten(baseColor, 0.16);
+
+            FillRect(x0 + 1, y0 + 1, CellSize - 2, CellSize - 2, Pack(dark));
+            FillRect(x0 + 3, y0 + 3, CellSize - 6, CellSize - 6, Pack(baseColor));
+
+            DrawHLine(x0 + 3, x0 + CellSize - 4, y0 + 5, Pack(Color.FromArgb(110, light.R, light.G, light.B)));
+            DrawHLine(x0 + 3, x0 + CellSize - 4, y0 + CellSize - 5, Pack(Color.FromArgb(130, 0, 0, 0)));
+
+            int crack = Pack(Color.FromArgb(110, 0, 0, 0));
+            SetPixel(x0 + 6, y0 + 6, crack);
+            SetPixel(x0 + 7, y0 + 7, crack);
+            SetPixel(x0 + 8, y0 + 8, crack);
+            SetPixel(x0 + 8, y0 + 9, crack);
+        }
+
+        private void DrawFruitPremium(Cell cell, Color baseColor, FruitType type, double t)
+        {
+            int x0 = cell.X * CellSize;
+            int y0 = cell.Y * CellSize;
+
+            int cx = x0 + CellSize / 2;
+            int cy = y0 + CellSize / 2;
+
+            double pulse = 0.5 + 0.5 * Math.Sin(t * Math.PI * 2.0 * 2.0);
+            int haloAlpha = 45 + (int)(pulse * 35);
+
+            Color halo = Color.FromArgb((byte)haloAlpha, baseColor.R, baseColor.G, baseColor.B);
+            DrawCircle(cx, cy, (int)(CellSize * 0.43), Pack(halo), true);
+
+            Color shadow = Color.FromArgb(85, 0, 0, 0);
+            DrawCircle(cx + 1, cy + 2, (int)(CellSize * 0.29), Pack(shadow), true);
+
+            Color body = baseColor;
+            Color hi = Lighten(baseColor, 0.38);
+            Color edge = Darken(baseColor, 0.20);
+
+            DrawCircle(cx, cy, (int)(CellSize * 0.31), Pack(edge), true);
+            DrawCircle(cx, cy, (int)(CellSize * 0.26), Pack(body), true);
+            DrawCircle(cx - 3, cy - 3, 2, Pack(Color.FromArgb(170, hi.R, hi.G, hi.B)), true);
+
+            DrawFruitIcon(cx, cy, type);
+        }
+
+        private void DrawFruitIcon(int cx, int cy, FruitType type)
+        {
+            int dark = Pack(Color.FromArgb(185, 0, 0, 0));
+            int light = Pack(Color.FromArgb(210, 255, 255, 255));
+
+            switch (type)
+            {
+                case FruitType.Multiplier:
+                    DrawHLine(cx - 3, cx + 3, cy, dark);
+                    DrawVLine(cx, cy - 3, cy + 3, dark);
+                    SetPixel(cx - 2, cy - 2, light);
+                    SetPixel(cx + 2, cy + 2, light);
+                    break;
+
+                case FruitType.Speed:
+                    DrawHLine(cx - 4, cx + 2, cy - 2, dark);
+                    DrawHLine(cx - 2, cx + 4, cy, dark);
+                    DrawHLine(cx - 4, cx + 2, cy + 2, dark);
+                    SetPixel(cx + 4, cy, light);
+                    break;
+
+                case FruitType.Rain:
+                    DrawVLine(cx - 2, cy - 3, cy + 2, dark);
+                    DrawVLine(cx + 2, cy - 3, cy + 2, dark);
+                    SetPixel(cx, cy + 3, light);
+                    break;
+
+                default:
+                    DrawCircle(cx, cy, 1, dark, true);
+                    SetPixel(cx - 2, cy - 2, light);
+                    break;
+            }
+        }
         private void DrawFruit(Cell cell, Color baseColor, FruitType type)
         {
             int x0 = cell.X * CellSize;
@@ -1490,6 +1818,7 @@ namespace BIMaestro.Bonus
             AnimatePlayfieldBackground(to: chosen.BackgroundColor);
 
             _activeSkin = chosen;
+            _backgroundDirty = true;
 
             ScanlinesOverlay.Opacity = _activeSkin.ScanlinesOpacity;
             VignetteOverlay.Opacity = _activeSkin.VignetteOpacity;
