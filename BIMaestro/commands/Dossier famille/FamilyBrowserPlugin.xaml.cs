@@ -29,6 +29,7 @@ namespace Famille
 {
     public partial class FamilyBrowserWindow : Window, INotifyPropertyChanged
     {
+        private const string HelpUrl = "https://bimaestro.net/";
         // ===== Constantes =====
         private const string FavoritesCollectionId = "builtin_favoris";
         private const string FavoritesCollectionName = "Favoris";
@@ -1314,6 +1315,26 @@ namespace Famille
                 FamilyBrowserCommand.ReloadFamilyHandlerInstance.FamilyPaths = targets;
                 FamilyBrowserCommand.ReloadFamilyHandlerInstance.FamilyPath = targets.FirstOrDefault();
                 FamilyBrowserCommand.ReloadFamilyEventInstance.Raise();
+            }
+        }
+
+        private void HelpButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = HelpUrl,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this,
+                    $"Impossible d'ouvrir l'aide en ligne :\n{ex.Message}",
+                    "Aide",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
             }
         }
         public class Preview3DHandler : IExternalEventHandler
