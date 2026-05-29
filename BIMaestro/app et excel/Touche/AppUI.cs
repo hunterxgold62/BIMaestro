@@ -101,9 +101,10 @@ public class AppUI : IExternalApplication
                 new RibbonItemDefinition("Temps par projet", "Temps par projet", panel => AddSplitButton(panel, "Temps par projet", "Temps par\nprojet", assemblyPath, new List<(string, string, string, string, string)>
                 {
                     ("Temps par projet", "Temps par\nprojet", "BIMaestro.Dashboard.ShowTimeDashboard", "Temps par projet.png", "Affiche le temps passé par projet."),
-                    ("Suivi maquette collaboratif", "Suivi\nmaquette", "Analyse.CollaborativeModelTrackerCommand", "suivie maquette.png", "Crée/consulte un registre JSON + Excel pour toutes les maquettes (suivi auto ouverture/fermeture). Si la maquette n'existe pas, le créateur devient le premier ouvreur.")
+                   ("Suivi maquette collaboratif", "Suivi\nmaquette", "Analyse.CollaborativeModelTrackerCommand", "suivie maquette.png", "Crée/consulte un registre JSON + Excel pour toutes les maquettes (suivi auto ouverture/fermeture). Si la maquette n'existe pas, le créateur devient le premier ouvreur."),
+                    ("Historique élément", "Historique", "Analyse.ElementHistoryCommand", "qui à fait ça (2).png", "Affiche l'historique JSON des modifications pour l'élément sélectionné.")
                 })),
-               
+
                 new RibbonItemDefinition("Clash 3D", "Clash 3D", panel => AddPushButton(panel, "Clash 3D", "Clash\n3D", assemblyPath, "Analyse.SmartClashCommand", "Clash 3D.png", "Vérifie les éléments 3D sélectionnés pour détecter les incohérences."))
             }),
             

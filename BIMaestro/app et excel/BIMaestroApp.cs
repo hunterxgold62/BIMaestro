@@ -106,6 +106,8 @@ public class BIMaestroApp : IExternalApplication
             }
 
             // --- Events Revit ---
+            application.ControlledApplication.DocumentChanged += OnDocumentChangedSafe;
+            Analyse.ElementHistoryTracker.Start();
             application.ControlledApplication.DocumentOpened += OnDocumentOpenedSafe;
             application.ControlledApplication.DocumentClosing += OnDocumentClosingSafe;
             application.ViewActivated += OnViewActivatedSafe;
@@ -158,6 +160,7 @@ public class BIMaestroApp : IExternalApplication
             catch { }
             finally { Telemetry.Shutdown(); }
 
+            Analyse.ElementHistoryTracker.Stop();
             ExcelLogger.Shutdown();
             WpfApp?.Shutdown();
         }
@@ -208,6 +211,7 @@ public class BIMaestroApp : IExternalApplication
         try
         {
             _uiApp ??= new UIApplication(args.Document.Application);
+            Analyse.ElementHistoryTracker.PrimeDocument(args.Document);
             ExcelLogger.OnViewActivated(args.Document, _uiApp);
         }
         catch (Autodesk.Revit.Exceptions.InvalidObjectException ex)
@@ -261,6 +265,16 @@ public class BIMaestroApp : IExternalApplication
         }
     }
 
+    private void OnDocumentChangedSafe(object sender, DocumentChangedEventArgs e)
+    {
+        try
+        {
+            Analyse.ElementHistoryTracker.CaptureDocumentChanges(e.GetDocument(), e);
+        }
+        catch
+        {
+        }
+    }
     private static string GetPluginVersion()
     {
         try
