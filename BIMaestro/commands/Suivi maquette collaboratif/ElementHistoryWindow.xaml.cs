@@ -21,15 +21,26 @@ namespace Analyse
         private sealed class RowVm
         {
             public int ElementId { get; set; }
+            public string ElementIdText { get; set; }
             public string DateText { get; set; }
             public ElementHistoryEvent Source { get; set; }
+            public List<ElementHistoryEvent> Events { get; set; } = new List<ElementHistoryEvent>();
+            public int EventCount => Events?.Count > 0 ? Events.Count : 1;
+            public bool IsCluster => EventCount > 1;
             public string Action { get; set; }
+            public string ActionText { get; set; }
             public string User { get; set; }
             public string Category { get; set; }
             public string Family { get; set; }
             public string TypeName { get; set; }
             public string PositionText { get; set; }
             public string Tx { get; set; }
+        }
+
+        private sealed class ClusterItemVm
+        {
+            public ElementHistoryEvent Source { get; set; }
+            public string Display { get; set; }
         }
 
         private enum UiRequestType { None, Focus, VisualizeEvents, CleanPreviews }
@@ -39,6 +50,7 @@ namespace Analyse
             public UiRequestType Type { get; set; }
             public List<ElementHistoryEvent> Events { get; set; } = new List<ElementHistoryEvent>();
             public int? FocusElementId { get; set; }
+            public List<int> FocusElementIds { get; set; } = new List<int>();
         }
 
         private sealed class UiRequestHandler : IExternalEventHandler
@@ -62,7 +74,11 @@ namespace Analyse
                 {
                     if (req.Type == UiRequestType.Focus)
                     {
-                        _owner.ExecuteFocus(req.FocusElementId);
+                        _owner.ExecuteFocus(req.FocusElementIds.Count > 0
+                            ? req.FocusElementIds
+                            : req.FocusElementId.HasValue
+                                ? new List<int> { req.FocusElementId.Value }
+                                : new List<int>());
                         return;
                     }
 
@@ -109,8 +125,8 @@ namespace Analyse
             }
             else
             {
-                HeaderText.Text = "Historique des éléments supprimés récents";
-                Bind(ElementHistoryTracker.LoadRecentDeletedHistory(_doc));
+                HeaderText.Text = "Historique récent de la maquette";
+                Bind(ElementHistoryTracker.LoadRecentModelHistory(_doc, 1000), "delete");
             }
         }
 
@@ -120,32 +136,137 @@ namespace Analyse
             base.OnClosed(e);
         }
 
-        private void Bind(List<ElementHistoryEvent> eventsData)
+        private void Bind(List<ElementHistoryEvent> eventsData, string defaultAction = null)
         {
-            _rows = eventsData
+            var events = eventsData
+                .Where(ElementHistoryTracker.IsDisplayableHistoryEvent)
                 .OrderByDescending(e => e.Ts)
-                .Take(400)
-                .Select(e => new RowVm
-                {
-                    ElementId = e.ElementId,
-                    DateText = e.Ts.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
-                    Source = e,
-                    Action = e.Action,
-                    User = e.User,
-                    Category = e.Category,
-                    Family = e.Family,
-                    TypeName = e.TypeName,
-                    PositionText = GetPositionText(e),
-                    Tx = e.Tx
-                })
+                .Take(1000)
                 .ToList();
 
-            ActionFilterCombo.ItemsSource = new[] { "Toutes" }.Concat(_rows.Select(x => x.Action).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().OrderBy(x => x)).ToList();
+            _rows = BuildRows(events);
+            ActionFilterCombo.ItemsSource = new[] { "Toutes" }.Concat(_rows.Select(x => x.ActionText).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().OrderBy(x => x)).ToList();
             UserFilterCombo.ItemsSource = new[] { "Tous" }.Concat(_rows.Select(x => x.User).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().OrderBy(x => x)).ToList();
-            ActionFilterCombo.SelectedIndex = 0;
+            var defaultActionText = GetActionText(defaultAction);
+            ActionFilterCombo.SelectedItem = !string.IsNullOrWhiteSpace(defaultActionText) && ActionFilterCombo.Items.Contains(defaultActionText)
+                ? defaultActionText
+                : "Toutes";
             UserFilterCombo.SelectedIndex = 0;
             UpdateStats(_rows);
             ApplyFilters();
+        }
+
+        private static List<RowVm> BuildRows(List<ElementHistoryEvent> events)
+        {
+            var rows = new List<RowVm>();
+            foreach (var group in events.GroupBy(GetClusterKey))
+            {
+                var items = group.OrderByDescending(e => e.Ts).ToList();
+                if (items.Count > 1 && CanCluster(items))
+                    rows.Add(CreateClusterRow(items));
+                else
+                    rows.AddRange(items.Select(CreateSingleRow));
+            }
+
+            return rows
+                .OrderByDescending(r => r.Source?.Ts ?? DateTime.MinValue)
+                .ToList();
+        }
+
+        private static RowVm CreateSingleRow(ElementHistoryEvent e)
+        {
+            return new RowVm
+            {
+                ElementId = e.ElementId,
+                ElementIdText = e.ElementId.ToString(CultureInfo.InvariantCulture),
+                DateText = e.Ts.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
+                Source = e,
+                Events = new List<ElementHistoryEvent> { e },
+                Action = e.Action,
+                ActionText = GetActionText(e.Action),
+                User = e.User,
+                Category = CleanCellText(e.Category),
+                Family = CleanCellText(e.Family),
+                TypeName = CleanCellText(e.TypeName),
+                PositionText = GetPositionText(e),
+                Tx = CleanCellText(e.Tx)
+            };
+        }
+
+        private static RowVm CreateClusterRow(List<ElementHistoryEvent> events)
+        {
+            var first = events.OrderByDescending(e => e.Ts).First();
+            return new RowVm
+            {
+                ElementId = first.ElementId,
+                ElementIdText = "Cluster x" + events.Count.ToString(CultureInfo.InvariantCulture),
+                DateText = first.Ts.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
+                Source = first,
+                Events = events,
+                Action = first.Action,
+                ActionText = GetActionText(first.Action),
+                User = first.User,
+                Category = SummarizeText(events.Select(e => CleanCellText(e.Category)), "catégories"),
+                Family = SummarizeText(events.Select(e => CleanCellText(e.Family)), "familles"),
+                TypeName = SummarizeText(events.Select(e => CleanCellText(e.TypeName)), "types"),
+                PositionText = events.Count.ToString(CultureInfo.InvariantCulture) + " évènements groupés",
+                Tx = CleanCellText(first.Tx)
+            };
+        }
+
+        private static string GetClusterKey(ElementHistoryEvent e)
+        {
+            var ticks = e.Ts.ToUniversalTime().Ticks / TimeSpan.FromSeconds(5).Ticks;
+            return string.Join("|",
+                CleanCellText(e.Action),
+                CleanCellText(e.User),
+                CleanCellText(e.Tx),
+                ticks.ToString(CultureInfo.InvariantCulture));
+        }
+
+        private static bool CanCluster(List<ElementHistoryEvent> events)
+        {
+            var first = events.FirstOrDefault();
+            if (first == null || string.IsNullOrWhiteSpace(first.Tx)) return false;
+            return events.All(e =>
+                string.Equals(e.Action, first.Action, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(e.User, first.User, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(e.Tx, first.Tx, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static string SummarizeText(IEnumerable<string> values, string label)
+        {
+            var distinct = values
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(x => x)
+                .ToList();
+
+            if (distinct.Count == 0) return string.Empty;
+            if (distinct.Count == 1) return distinct[0];
+            return distinct.Count.ToString(CultureInfo.InvariantCulture) + " " + label;
+        }
+
+        private static string CleanCellText(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+            var text = value.Trim();
+            return text.Equals("Unknown", StringComparison.OrdinalIgnoreCase) ? string.Empty : text;
+        }
+
+        private static string GetActionText(string action)
+        {
+            if (string.IsNullOrWhiteSpace(action)) return string.Empty;
+            switch (action.Trim().ToLowerInvariant())
+            {
+                case "delete": return "Suppression";
+                case "move": return "Déplacement";
+                case "create": return "Création";
+                case "type_change": return "Changement de type";
+                case "param_change": return "Modification paramètres";
+                case "modify": return "Modification";
+                default: return action.Trim();
+            }
         }
 
         private void HistoryGrid_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
@@ -163,7 +284,9 @@ namespace Analyse
                 return;
             }
 
-            if (string.Equals(row.Source.Action, "delete", StringComparison.OrdinalIgnoreCase))
+            if (row.IsCluster)
+                VisualizeDeletedButton.Content = "Visualiser cluster";
+            else if (string.Equals(row.Source.Action, "delete", StringComparison.OrdinalIgnoreCase))
                 VisualizeDeletedButton.Content = "Visualiser suppression";
             else if (string.Equals(row.Source.Action, "move", StringComparison.OrdinalIgnoreCase))
                 VisualizeDeletedButton.Content = "Visualiser déplacement";
@@ -194,7 +317,7 @@ namespace Analyse
 
             IEnumerable<RowVm> rows = _rows;
             if (!string.Equals(action, "Toutes", StringComparison.OrdinalIgnoreCase))
-                rows = rows.Where(r => string.Equals(r.Action, action, StringComparison.OrdinalIgnoreCase));
+                rows = rows.Where(r => string.Equals(r.ActionText, action, StringComparison.OrdinalIgnoreCase));
             if (!string.Equals(user, "Tous", StringComparison.OrdinalIgnoreCase))
                 rows = rows.Where(r => string.Equals(r.User, user, StringComparison.OrdinalIgnoreCase));
             if (!string.IsNullOrWhiteSpace(q))
@@ -203,7 +326,8 @@ namespace Analyse
                                    || (r.Family ?? string.Empty).IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0
                                    || (r.TypeName ?? string.Empty).IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0
                                    || (r.Tx ?? string.Empty).IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0
-                                   || r.ElementId.ToString(CultureInfo.InvariantCulture).Contains(q));
+                                   || (r.ElementIdText ?? string.Empty).IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0
+                                   || r.Events.Any(ev => ev.ElementId.ToString(CultureInfo.InvariantCulture).Contains(q)));
             }
 
             var filtered = rows.ToList();
@@ -216,11 +340,18 @@ namespace Analyse
         private void UpdateStats(List<RowVm> rows)
         {
             if (TotalStatText == null) return;
-            TotalStatText.Text = rows.Count.ToString(CultureInfo.InvariantCulture);
-            DeleteStatText.Text = rows.Count(r => string.Equals(r.Action, "delete", StringComparison.OrdinalIgnoreCase)).ToString(CultureInfo.InvariantCulture);
-            MoveStatText.Text = rows.Count(r => string.Equals(r.Action, "move", StringComparison.OrdinalIgnoreCase)).ToString(CultureInfo.InvariantCulture);
-            CreateStatText.Text = rows.Count(r => string.Equals(r.Action, "create", StringComparison.OrdinalIgnoreCase)).ToString(CultureInfo.InvariantCulture);
-            UserStatText.Text = rows.Select(r => r.User).Where(u => !string.IsNullOrWhiteSpace(u)).Distinct(StringComparer.OrdinalIgnoreCase).Count().ToString(CultureInfo.InvariantCulture);
+            var events = rows.SelectMany(GetRowEvents).ToList();
+            TotalStatText.Text = events.Count.ToString(CultureInfo.InvariantCulture);
+            DeleteStatText.Text = events.Count(e => string.Equals(e.Action, "delete", StringComparison.OrdinalIgnoreCase)).ToString(CultureInfo.InvariantCulture);
+            MoveStatText.Text = events.Count(e => string.Equals(e.Action, "move", StringComparison.OrdinalIgnoreCase)).ToString(CultureInfo.InvariantCulture);
+            CreateStatText.Text = events.Count(e => string.Equals(e.Action, "create", StringComparison.OrdinalIgnoreCase)).ToString(CultureInfo.InvariantCulture);
+            UserStatText.Text = events.Select(e => e.User).Where(u => !string.IsNullOrWhiteSpace(u)).Distinct(StringComparer.OrdinalIgnoreCase).Count().ToString(CultureInfo.InvariantCulture);
+
+            if (ResultText != null)
+            {
+                var total = _rows.SelectMany(GetRowEvents).Count();
+                ResultText.Text = events.Count.ToString(CultureInfo.InvariantCulture) + " / " + total.ToString(CultureInfo.InvariantCulture) + " évènements affichés";
+            }
         }
 
         private void HistoryGrid_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
@@ -251,31 +382,72 @@ namespace Analyse
         private void FocusSelectedElement()
         {
             if (!(HistoryGrid.SelectedItem is RowVm row)) return;
-            RaiseRequest(new UiRequest { Type = UiRequestType.Focus, FocusElementId = row.ElementId });
+            RaiseRequest(new UiRequest
+            {
+                Type = UiRequestType.Focus,
+                FocusElementIds = GetRowEvents(row).Select(e => e.ElementId).Distinct().ToList()
+            });
+        }
+
+        private void FocusHistoryEvent(ElementHistoryEvent ev)
+        {
+            if (ev == null) return;
+            RaiseRequest(new UiRequest
+            {
+                Type = UiRequestType.Focus,
+                FocusElementIds = new List<int> { ev.ElementId }
+            });
         }
 
         private void VisualizeDeletedButton_Click(object sender, RoutedEventArgs e)
         {
             var selectedRows = HistoryGrid.SelectedItems
                 .Cast<RowVm>()
-                .Where(r => r?.Source != null && CanVisualize(r.Source))
+                .Where(r => r?.Source != null && GetRowEvents(r).Any(CanVisualize))
                 .ToList();
 
-            if (selectedRows.Count == 0 && HistoryGrid.SelectedItem is RowVm single && single.Source != null && CanVisualize(single.Source))
+            if (selectedRows.Count == 0 && HistoryGrid.SelectedItem is RowVm single && single.Source != null && GetRowEvents(single).Any(CanVisualize))
                 selectedRows.Add(single);
             if (selectedRows.Count == 0) return;
 
             RaiseRequest(new UiRequest
             {
                 Type = UiRequestType.VisualizeEvents,
-                Events = selectedRows.Select(r => r.Source).ToList()
+                Events = selectedRows.SelectMany(GetRowEvents).Where(CanVisualize).ToList()
             });
+        }
+
+        private static IEnumerable<ElementHistoryEvent> GetRowEvents(RowVm row)
+        {
+            if (row?.Events != null && row.Events.Count > 0) return row.Events;
+            return row?.Source == null ? Enumerable.Empty<ElementHistoryEvent>() : new[] { row.Source };
         }
 
         private static bool CanVisualize(ElementHistoryEvent ev)
         {
             return string.Equals(ev.Action, "delete", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(ev.Action, "move", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void ClusterFocusButton_Click(object sender, RoutedEventArgs e)
+        {
+            FocusHistoryEvent((ClusterListBox?.SelectedItem as ClusterItemVm)?.Source);
+        }
+
+        private void ClusterVisualizeButton_Click(object sender, RoutedEventArgs e)
+        {
+            var ev = (ClusterListBox?.SelectedItem as ClusterItemVm)?.Source;
+            if (ev == null || !CanVisualize(ev)) return;
+            RaiseRequest(new UiRequest
+            {
+                Type = UiRequestType.VisualizeEvents,
+                Events = new List<ElementHistoryEvent> { ev }
+            });
+        }
+
+        private void ClusterListBox_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            FocusHistoryEvent((ClusterListBox?.SelectedItem as ClusterItemVm)?.Source);
         }
 
         private void RaiseRequest(UiRequest request)
@@ -290,14 +462,33 @@ namespace Analyse
             if (!(HistoryGrid.SelectedItem is RowVm row) || row.Source == null)
             {
                 DetailsText.Text = "Sélectionne une ligne pour afficher ses détails.";
+                SetClusterDetails(null);
                 return;
             }
 
             var ev = row.Source;
+            if (row.IsCluster)
+            {
+                DetailsText.Text =
+                    $"Cluster: {row.EventCount} évènements\n" +
+                    $"Action: {row.ActionText}\n" +
+                    $"Utilisateur: {row.User}\n" +
+                    $"Date UTC: {ev.Ts:O}\n" +
+                    $"Projet: {ev.Project}\n" +
+                    $"Maquette: {ev.ModelKey}\n" +
+                    $"Catégorie: {row.Category}\n" +
+                    $"Famille: {row.Family}\n" +
+                    $"Type: {row.TypeName}\n" +
+                    $"Transaction: {row.Tx}";
+                SetClusterDetails(row.Events);
+                return;
+            }
+
+            SetClusterDetails(null);
             DetailsText.Text =
                 $"Id: {ev.ElementId}\n" +
                 $"UniqueId: {ev.UniqueId}\n" +
-                $"Action: {ev.Action}\n" +
+                $"Action: {GetActionText(ev.Action)}\n" +
                 $"Utilisateur: {ev.User}\n" +
                 $"Date UTC: {ev.Ts:O}\n" +
                 $"Projet: {ev.Project}\n" +
@@ -310,28 +501,66 @@ namespace Analyse
                 (ev.Delta == null ? "-" : JsonConvert.SerializeObject(ev.Delta, Formatting.Indented));
         }
 
-        private void ExecuteFocus(int? focusElementId)
+        private void SetClusterDetails(List<ElementHistoryEvent> events)
         {
-            if (!focusElementId.HasValue) return;
-
-            var id = new ElementId(focusElementId.Value);
-            var el = _doc.GetElement(id);
-            if (el != null)
+            if (ClusterListBox == null || ClusterActionsPanel == null) return;
+            if (events == null || events.Count == 0)
             {
-                _uidoc.Selection.SetElementIds(new List<ElementId> { id });
-                _uidoc.ShowElements(id);
+                ClusterListBox.ItemsSource = null;
+                ClusterListBox.Visibility = System.Windows.Visibility.Collapsed;
+                ClusterActionsPanel.Visibility = System.Windows.Visibility.Collapsed;
                 return;
             }
 
-            var preview = GetPreviewElements(_doc)
-                .Where(x => x.Name.EndsWith("_" + focusElementId.Value.ToString(CultureInfo.InvariantCulture), StringComparison.OrdinalIgnoreCase))
-                .OrderByDescending(x => x.Id.IntegerValue)
-                .FirstOrDefault();
+            ClusterListBox.ItemsSource = events
+                .OrderBy(e => e.ElementId)
+                .Select(e => new ClusterItemVm
+                {
+                    Source = e,
+                    Display = "Id " + e.ElementId.ToString(CultureInfo.InvariantCulture) +
+                              " | " + CleanCellText(e.Category) +
+                              " | " + CleanCellText(e.Family) +
+                              " | " + CleanCellText(e.TypeName)
+                })
+                .ToList();
+            ClusterListBox.SelectedIndex = 0;
+            ClusterListBox.Visibility = System.Windows.Visibility.Visible;
+            ClusterActionsPanel.Visibility = System.Windows.Visibility.Visible;
+        }
 
-            if (preview != null)
+        private void ExecuteFocus(List<int> focusElementIds)
+        {
+            if (focusElementIds == null || focusElementIds.Count == 0) return;
+
+            var ids = focusElementIds
+                .Distinct()
+                .Select(x => new ElementId(x))
+                .Where(id => _doc.GetElement(id) != null)
+                .ToList();
+
+            if (ids.Count > 0)
             {
-                _uidoc.Selection.SetElementIds(new List<ElementId> { preview.Id });
-                _uidoc.ShowElements(preview.Id);
+                _uidoc.Selection.SetElementIds(ids);
+                if (ids.Count == 1)
+                    _uidoc.ShowElements(ids[0]);
+                else
+                    _uidoc.ShowElements(ids);
+                return;
+            }
+
+            var requestedIds = new HashSet<string>(focusElementIds.Select(x => "_" + x.ToString(CultureInfo.InvariantCulture)), StringComparer.OrdinalIgnoreCase);
+            var preview = GetPreviewElements(_doc)
+                .Where(x => requestedIds.Any(suffix => x.Name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)))
+                .Select(x => x.Id)
+                .ToList();
+
+            if (preview.Count > 0)
+            {
+                _uidoc.Selection.SetElementIds(preview);
+                if (preview.Count == 1)
+                    _uidoc.ShowElements(preview[0]);
+                else
+                    _uidoc.ShowElements(preview);
             }
         }
 

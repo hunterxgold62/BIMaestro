@@ -60,30 +60,35 @@
             </Border>
         </UniformGrid>
 
-        <DockPanel Grid.Row="2" Grid.Column="0" Margin="0,10,0,0" LastChildFill="False">
-            <WrapPanel DockPanel.Dock="Left" VerticalAlignment="Center">
+        <Grid Grid.Row="2" Grid.Column="0" Margin="0,10,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <WrapPanel Grid.Row="0" VerticalAlignment="Center">
                 <TextBlock Text="Action" VerticalAlignment="Center" Margin="0,0,8,0"/>
                 <ComboBox x:Name="ActionFilterCombo" Width="140" SelectionChanged="ActionFilterCombo_SelectionChanged"/>
                 <TextBlock Text="Utilisateur" VerticalAlignment="Center" Margin="12,0,8,0"/>
                 <ComboBox x:Name="UserFilterCombo" Width="160" SelectionChanged="UserFilterCombo_SelectionChanged"/>
                 <TextBlock Text="Recherche" VerticalAlignment="Center" Margin="12,0,8,0"/>
                 <TextBox x:Name="SearchBox" Width="220" TextChanged="SearchBox_TextChanged"/>
+                <TextBlock x:Name="ResultText" VerticalAlignment="Center" Margin="12,0,0,0" Opacity="0.65" Text="0 / 0 évènements affichés"/>
             </WrapPanel>
-            <WrapPanel DockPanel.Dock="Right" Margin="12,0,0,0">
-                <Button x:Name="VisualizeDeletedButton" Content="Visualiser évènement" Width="180" Height="30" Margin="0,0,8,6" Click="VisualizeDeletedButton_Click"/>
+            <WrapPanel Grid.Row="1" Margin="0,8,0,0">
+                <Button x:Name="VisualizeDeletedButton" Content="Visualiser évènement" Width="170" Height="30" Margin="0,0,8,6" Click="VisualizeDeletedButton_Click"/>
                 <Button x:Name="FocusButton" Content="Focus élément" Width="120" Height="30" Margin="0,0,8,6" Click="FocusButton_Click"/>
                 <Button x:Name="DetailsButton" Content="Détails" Width="90" Height="30" Margin="0,0,8,6" Click="DetailsButton_Click"/>
                 <Button x:Name="CleanPreviewsButton" Content="Nettoyer previews" Width="140" Height="30" Margin="0,0,0,6" Click="CleanPreviewsButton_Click"/>
             </WrapPanel>
-        </DockPanel>
+        </Grid>
 
         <DataGrid Grid.Row="3" Grid.Column="0" Margin="0,12,0,0" x:Name="HistoryGrid" AutoGenerateColumns="False" IsReadOnly="True"
                   HeadersVisibility="Column" CanUserAddRows="False" CanUserDeleteRows="False" RowHeaderWidth="0" SelectionMode="Extended"
                   MouseDoubleClick="HistoryGrid_MouseDoubleClick" SelectionChanged="HistoryGrid_SelectionChanged">
             <DataGrid.Columns>
-                <DataGridTextColumn Header="Id" Binding="{Binding ElementId}" Width="70"/>
+                <DataGridTextColumn Header="Id / Groupe" Binding="{Binding ElementIdText}" Width="95"/>
                 <DataGridTextColumn Header="Date" Binding="{Binding DateText}" Width="160"/>
-                <DataGridTextColumn Header="Action" Binding="{Binding Action}" Width="120"/>
+                <DataGridTextColumn Header="Action" Binding="{Binding ActionText}" Width="150"/>
                 <DataGridTextColumn Header="Utilisateur" Binding="{Binding User}" Width="130"/>
                 <DataGridTextColumn Header="Catégorie" Binding="{Binding Category}" Width="140"/>
                 <DataGridTextColumn Header="Famille" Binding="{Binding Family}" Width="140"/>
@@ -93,14 +98,27 @@
             </DataGrid.Columns>
         </DataGrid>
 
-        <Border x:Name="DetailsPanel" Grid.Row="0" Grid.RowSpan="4" Grid.Column="1" Width="360" Margin="14,0,0,0"
+        <Border x:Name="DetailsPanel" Grid.Row="0" Grid.RowSpan="4" Grid.Column="1" Width="430" Margin="14,0,0,0"
                 Background="White" CornerRadius="10" Padding="14" BorderBrush="#FFDDE3EA" BorderThickness="1" Visibility="Collapsed">
-            <DockPanel>
-                <TextBlock DockPanel.Dock="Top" Text="Détails évènement" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,10"/>
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="0" Text="Détails évènement" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,10"/>
+                <ScrollViewer Grid.Row="1" MaxHeight="220" VerticalScrollBarVisibility="Auto" Margin="0,0,0,10">
                     <TextBlock x:Name="DetailsText" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12"/>
                 </ScrollViewer>
-            </DockPanel>
+                <ListBox Grid.Row="2" x:Name="ClusterListBox" DisplayMemberPath="Display" Visibility="Collapsed"
+                         HorizontalContentAlignment="Stretch" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         MouseDoubleClick="ClusterListBox_MouseDoubleClick"/>
+                <WrapPanel Grid.Row="3" x:Name="ClusterActionsPanel" Visibility="Collapsed" Margin="0,10,0,0">
+                    <Button x:Name="ClusterFocusButton" Content="Focus sélection" Width="130" Height="30" Margin="0,0,8,0" Click="ClusterFocusButton_Click"/>
+                    <Button x:Name="ClusterVisualizeButton" Content="Visualiser sélection" Width="145" Height="30" Click="ClusterVisualizeButton_Click"/>
+                </WrapPanel>
+            </Grid>
         </Border>
     </Grid>
 </Window>

@@ -172,6 +172,12 @@ namespace Analyse
                 .ToList();
         }
 
+        internal static bool IsDisplayableHistoryEvent(ElementHistoryEvent ev)
+        {
+            if (ev == null) return false;
+            return IsUsefulHistoryText(ev.Category);
+        }
+
         private static List<ElementHistoryEvent> LoadAllHistory(Document doc)
         {
             var files = Directory.Exists(CollaborativeModelTrackerStore.ActiveDirectory)
@@ -239,6 +245,7 @@ namespace Analyse
         {
             string family = null;
             string typeName = null;
+            var categoryName = CleanHistoryText(el.Category?.Name);
             try
             {
                 var type = el.Document.GetElement(el.GetTypeId()) as ElementType;
@@ -250,9 +257,9 @@ namespace Analyse
             return new ElementSnapshot
             {
                 UniqueId = el.UniqueId,
-                Category = el.Category?.Name ?? "Unknown",
-                Family = family ?? "",
-                TypeName = typeName ?? "",
+                Category = categoryName,
+                Family = CleanHistoryText(family),
+                TypeName = CleanHistoryText(typeName),
                 Name = el.Name ?? string.Empty,
                 Location = GetLocation(el),
                 BBoxMin = GetBBoxMin(el),
@@ -299,6 +306,8 @@ namespace Analyse
 
         private static void EnqueueDeleted(Document doc, ElementId id, string user, string tx)
         {
+            if (id == null || id == ElementId.InvalidElementId) return;
+
             ElementSnapshot snapshot = null;
             lock (SnapshotByElementId)
             {
@@ -316,7 +325,7 @@ namespace Analyse
                 ModelKey = GetDocumentKey(doc),
                 ElementId = id.IntegerValue,
                 UniqueId = "deleted:" + id.IntegerValue,
-                Category = snapshot?.Category ?? "Unknown",
+                Category = snapshot.Category,
                 Family = snapshot?.Family ?? string.Empty,
                 TypeName = snapshot?.TypeName ?? string.Empty,
                 Action = "delete",
@@ -362,11 +371,12 @@ namespace Analyse
 
         private static bool ShouldIgnoreSnapshot(ElementSnapshot snapshot)
         {
-            if (snapshot == null) return false;
+            if (snapshot == null) return true;
             if (!string.IsNullOrWhiteSpace(snapshot.Name) &&
                 snapshot.Name.StartsWith("BIMaestro_Preview_", StringComparison.OrdinalIgnoreCase))
                 return true;
-            if (!string.IsNullOrWhiteSpace(snapshot.Category) && IsIgnoredCategoryName(snapshot.Category))
+            if (!IsUsefulHistoryText(snapshot.Category)) return true;
+            if (IsIgnoredCategoryName(snapshot.Category))
                 return true;
             return false;
         }
@@ -407,6 +417,22 @@ namespace Analyse
                 || name.Equals("Project Information", StringComparison.OrdinalIgnoreCase)
                 || name.Equals("RVT Links", StringComparison.OrdinalIgnoreCase)
                 || name.Equals("CAD Links", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string CleanHistoryText(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+            var text = value.Trim();
+            return text.Equals("Unknown", StringComparison.OrdinalIgnoreCase) ? string.Empty : text;
+        }
+
+        private static bool IsUsefulHistoryText(string value)
+        {
+            var text = CleanHistoryText(value);
+            return !string.IsNullOrWhiteSpace(text)
+                && !text.Equals("-", StringComparison.OrdinalIgnoreCase)
+                && !text.Equals("?", StringComparison.OrdinalIgnoreCase)
+                && !text.Equals("N/A", StringComparison.OrdinalIgnoreCase);
         }
 
         private static string GetDocumentKey(Document doc)
