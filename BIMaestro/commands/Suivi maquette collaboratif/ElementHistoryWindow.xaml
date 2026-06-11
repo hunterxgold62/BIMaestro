@@ -1,17 +1,36 @@
 ﻿<Window x:Class="Analyse.ElementHistoryWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Historique élément" Height="760" Width="1320"
+        Title="Historique élément" Height="760" Width="1320" MinWidth="1180"
         WindowStartupLocation="CenterOwner"
-        Background="#FFF6F8FB">
+        ResizeMode="CanResize"
+        Background="{DynamicResource App.Background}"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True">
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="/BIMaestro;component/Themes/BIMaestroTheme.xaml"/>
             </ResourceDictionary.MergedDictionaries>
+            <Style x:Key="FilterLabel" TargetType="TextBlock" BasedOn="{StaticResource Label}">
+                <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+                <Setter Property="Margin" Value="0,0,8,0"/>
+            </Style>
+            <Style x:Key="StatCard" TargetType="Border" BasedOn="{StaticResource Card}">
+                <Setter Property="Padding" Value="12"/>
+                <Setter Property="Margin" Value="0,0,10,0"/>
+            </Style>
+            <Style x:Key="StatLabel" TargetType="TextBlock" BasedOn="{StaticResource Hint}">
+                <Setter Property="Margin" Value="0"/>
+            </Style>
+            <Style x:Key="HistoryButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                <Setter Property="Height" Value="34"/>
+                <Setter Property="MinWidth" Value="0"/>
+                <Setter Property="Margin" Value="0,0,8,6"/>
+            </Style>
         </ResourceDictionary>
     </Window.Resources>
-    <Grid Margin="16">
+    <Grid Margin="18">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*"/>
             <ColumnDefinition Width="Auto"/>
@@ -23,66 +42,80 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <Border Grid.Column="0" Background="White" CornerRadius="10" Padding="14" BorderBrush="#FFDDE3EA" BorderThickness="1">
-            <TextBlock x:Name="HeaderText" FontSize="18" FontWeight="SemiBold" Text="Historique"/>
+        <Border Grid.Column="0"
+                CornerRadius="16"
+                Background="{StaticResource Brand}"
+                Padding="18"
+                Margin="0,0,0,12">
+            <StackPanel>
+                <TextBlock x:Name="HeaderText" Style="{StaticResource H1}" Text="Historique"/>
+                <TextBlock Margin="0,6,0,0"
+                           Text="BETA - Consultez les événements enregistrés, les clusters et les aperçus temporaires de modifications."
+                           Foreground="#E7F6EE"
+                           TextWrapping="Wrap"/>
+            </StackPanel>
         </Border>
 
-        <UniformGrid Grid.Row="1" Grid.Column="0" Columns="5" Margin="0,10,0,0">
-            <Border Background="White" CornerRadius="8" Padding="10" Margin="0,0,8,0" BorderBrush="#FFE5EAF0" BorderThickness="1">
+        <UniformGrid Grid.Row="1" Grid.Column="0" Columns="5" Margin="0,0,0,0">
+            <Border Style="{StaticResource StatCard}">
                 <StackPanel>
-                    <TextBlock Text="Evènements" Opacity="0.65"/>
-                    <TextBlock x:Name="TotalStatText" FontSize="18" FontWeight="Bold" Text="0"/>
+                    <TextBlock Text="Evènements" Style="{StaticResource StatLabel}"/>
+                    <TextBlock x:Name="TotalStatText" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource Text.Primary}" Text="0"/>
                 </StackPanel>
             </Border>
-            <Border Background="White" CornerRadius="8" Padding="10" Margin="0,0,8,0" BorderBrush="#FFE5EAF0" BorderThickness="1">
+            <Border Style="{StaticResource StatCard}">
                 <StackPanel>
-                    <TextBlock Text="Suppressions" Opacity="0.65"/>
+                    <TextBlock Text="Suppressions" Style="{StaticResource StatLabel}"/>
                     <TextBlock x:Name="DeleteStatText" FontSize="18" FontWeight="Bold" Foreground="#FFD83030" Text="0"/>
                 </StackPanel>
             </Border>
-            <Border Background="White" CornerRadius="8" Padding="10" Margin="0,0,8,0" BorderBrush="#FFE5EAF0" BorderThickness="1">
+            <Border Style="{StaticResource StatCard}">
                 <StackPanel>
-                    <TextBlock Text="Déplacements" Opacity="0.65"/>
+                    <TextBlock Text="Déplacements" Style="{StaticResource StatLabel}"/>
                     <TextBlock x:Name="MoveStatText" FontSize="18" FontWeight="Bold" Foreground="#FFE28A00" Text="0"/>
                 </StackPanel>
             </Border>
-            <Border Background="White" CornerRadius="8" Padding="10" Margin="0,0,8,0" BorderBrush="#FFE5EAF0" BorderThickness="1">
+            <Border Style="{StaticResource StatCard}">
                 <StackPanel>
-                    <TextBlock Text="Créations" Opacity="0.65"/>
+                    <TextBlock Text="Créations" Style="{StaticResource StatLabel}"/>
                     <TextBlock x:Name="CreateStatText" FontSize="18" FontWeight="Bold" Foreground="#FF278D42" Text="0"/>
                 </StackPanel>
             </Border>
-            <Border Background="White" CornerRadius="8" Padding="10" BorderBrush="#FFE5EAF0" BorderThickness="1">
+            <Border Style="{StaticResource StatCard}" Margin="0">
                 <StackPanel>
-                    <TextBlock Text="Utilisateurs" Opacity="0.65"/>
-                    <TextBlock x:Name="UserStatText" FontSize="18" FontWeight="Bold" Text="0"/>
+                    <TextBlock Text="Utilisateurs" Style="{StaticResource StatLabel}"/>
+                    <TextBlock x:Name="UserStatText" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource Text.Primary}" Text="0"/>
                 </StackPanel>
             </Border>
         </UniformGrid>
 
-        <Grid Grid.Row="2" Grid.Column="0" Margin="0,10,0,0">
+        <Border Grid.Row="2" Grid.Column="0" Style="{StaticResource Card}" Margin="0,12,0,0">
+        <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <WrapPanel Grid.Row="0" VerticalAlignment="Center">
-                <TextBlock Text="Action" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                <ComboBox x:Name="ActionFilterCombo" Width="140" SelectionChanged="ActionFilterCombo_SelectionChanged"/>
-                <TextBlock Text="Utilisateur" VerticalAlignment="Center" Margin="12,0,8,0"/>
-                <ComboBox x:Name="UserFilterCombo" Width="160" SelectionChanged="UserFilterCombo_SelectionChanged"/>
-                <TextBlock Text="Recherche" VerticalAlignment="Center" Margin="12,0,8,0"/>
-                <TextBox x:Name="SearchBox" Width="220" TextChanged="SearchBox_TextChanged"/>
-                <TextBlock x:Name="ResultText" VerticalAlignment="Center" Margin="12,0,0,0" Opacity="0.65" Text="0 / 0 évènements affichés"/>
+                <TextBlock Text="Action" Style="{StaticResource FilterLabel}"/>
+                <ComboBox x:Name="ActionFilterCombo" Width="170" Margin="0,0,12,0" SelectionChanged="ActionFilterCombo_SelectionChanged"/>
+                <TextBlock Text="Utilisateur" Style="{StaticResource FilterLabel}"/>
+                <ComboBox x:Name="UserFilterCombo" Width="170" Margin="0,0,12,0" SelectionChanged="UserFilterCombo_SelectionChanged"/>
+                <TextBlock Text="Recherche" Style="{StaticResource FilterLabel}"/>
+                <TextBox x:Name="SearchBox" Width="240" Margin="0,0,12,0" TextChanged="SearchBox_TextChanged"/>
+                <TextBlock x:Name="ResultText" VerticalAlignment="Center" Foreground="{DynamicResource Text.Secondary}" Text="0 / 0 évènements affichés"/>
             </WrapPanel>
             <WrapPanel Grid.Row="1" Margin="0,8,0,0">
-                <Button x:Name="VisualizeDeletedButton" Content="Visualiser évènement" Width="170" Height="30" Margin="0,0,8,6" Click="VisualizeDeletedButton_Click"/>
-                <Button x:Name="FocusButton" Content="Focus élément" Width="120" Height="30" Margin="0,0,8,6" Click="FocusButton_Click"/>
-                <Button x:Name="DetailsButton" Content="Détails" Width="90" Height="30" Margin="0,0,8,6" Click="DetailsButton_Click"/>
-                <Button x:Name="CleanPreviewsButton" Content="Nettoyer previews" Width="140" Height="30" Margin="0,0,0,6" Click="CleanPreviewsButton_Click"/>
+                <Button x:Name="VisualizeDeletedButton" Content="Visualiser évènement" Width="175" Style="{StaticResource HistoryButton}" Click="VisualizeDeletedButton_Click"/>
+                <Button x:Name="FocusButton" Content="Focus élément" Width="135" Style="{StaticResource HistoryButton}" Click="FocusButton_Click"/>
+                <Button x:Name="DetailsButton" Content="Détails" Width="100" Style="{StaticResource HistoryButton}" Click="DetailsButton_Click"/>
+                <Button x:Name="CleanPreviewsButton" Content="Nettoyer previews" Width="155" Style="{StaticResource HistoryButton}" Click="CleanPreviewsButton_Click"/>
             </WrapPanel>
         </Grid>
+        </Border>
 
-        <DataGrid Grid.Row="3" Grid.Column="0" Margin="0,12,0,0" x:Name="HistoryGrid" AutoGenerateColumns="False" IsReadOnly="True"
+        <Border Grid.Row="3" Grid.Column="0" Style="{StaticResource Card}" Padding="8" Margin="0,12,0,0">
+        <DataGrid x:Name="HistoryGrid" AutoGenerateColumns="False" IsReadOnly="True"
+                  Background="Transparent" BorderThickness="0"
                   HeadersVisibility="Column" CanUserAddRows="False" CanUserDeleteRows="False" RowHeaderWidth="0" SelectionMode="Extended"
                   MouseDoubleClick="HistoryGrid_MouseDoubleClick" SelectionChanged="HistoryGrid_SelectionChanged">
             <DataGrid.Columns>
@@ -97,9 +130,10 @@
                 <DataGridTextColumn Header="Transaction" Binding="{Binding Tx}" Width="*"/>
             </DataGrid.Columns>
         </DataGrid>
+        </Border>
 
         <Border x:Name="DetailsPanel" Grid.Row="0" Grid.RowSpan="4" Grid.Column="1" Width="430" Margin="14,0,0,0"
-                Background="White" CornerRadius="10" Padding="14" BorderBrush="#FFDDE3EA" BorderThickness="1" Visibility="Collapsed">
+                Style="{StaticResource Card}" Visibility="Collapsed">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -107,7 +141,7 @@
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                <TextBlock Grid.Row="0" Text="Détails évènement" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,10"/>
+                <TextBlock Grid.Row="0" Text="Détails évènement" Style="{StaticResource H2}" FontSize="16" Margin="0,0,0,10"/>
                 <ScrollViewer Grid.Row="1" MaxHeight="220" VerticalScrollBarVisibility="Auto" Margin="0,0,0,10">
                     <TextBlock x:Name="DetailsText" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12"/>
                 </ScrollViewer>
@@ -115,8 +149,8 @@
                          HorizontalContentAlignment="Stretch" ScrollViewer.VerticalScrollBarVisibility="Auto"
                          MouseDoubleClick="ClusterListBox_MouseDoubleClick"/>
                 <WrapPanel Grid.Row="3" x:Name="ClusterActionsPanel" Visibility="Collapsed" Margin="0,10,0,0">
-                    <Button x:Name="ClusterFocusButton" Content="Focus sélection" Width="130" Height="30" Margin="0,0,8,0" Click="ClusterFocusButton_Click"/>
-                    <Button x:Name="ClusterVisualizeButton" Content="Visualiser sélection" Width="145" Height="30" Click="ClusterVisualizeButton_Click"/>
+                    <Button x:Name="ClusterFocusButton" Content="Focus sélection" Width="140" Style="{StaticResource HistoryButton}" Click="ClusterFocusButton_Click"/>
+                    <Button x:Name="ClusterVisualizeButton" Content="Visualiser sélection" Width="160" Style="{StaticResource HistoryButton}" Click="ClusterVisualizeButton_Click"/>
                 </WrapPanel>
             </Grid>
         </Border>
