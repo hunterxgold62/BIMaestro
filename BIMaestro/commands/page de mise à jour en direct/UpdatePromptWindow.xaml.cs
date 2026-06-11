@@ -27,7 +27,7 @@ namespace Page
             TitleText.Text = $"Nouvelle version BIMaestro : v{latestVersion}";
             ContentText.Text = $"Version installée : v{currentVersion}\n\nVoulez-vous ouvrir la page de mise à jour ?";
 
-            TryAttachEmbeddedGif(GifImage, "BIMaestro.Resources.Mickey.gif");
+            TryAttachEmbeddedGif(GifImage, "BIMaestro.Resources.OLD.Mickey.gif");
         }
 
         private void UpdateButton_Click(object sender, RoutedEventArgs e)
