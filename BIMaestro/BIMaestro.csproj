@@ -313,9 +313,8 @@
     <Compile Include="commands\Suivi maquette collaboratif\CollaborativeModelTrackerWindow.xaml.cs">
       <DependentUpon>CollaborativeModelTrackerWindow.xaml</DependentUpon>
     </Compile>
-    <Compile Include="commands\Suivi maquette collaboratif\ElementHistoryCommand.cs" />
-    <Compile Include="commands\Suivi maquette collaboratif\ElementHistoryTracker.cs" />
-    <Compile Include="commands\Suivi maquette collaboratif\ElementHistoryWindow.xaml.cs">
+    <Compile Include="commands\qui est le coupable\ElementHistoryTracker.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryWindow.xaml.cs">
       <DependentUpon>ElementHistoryWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="Themes\ThemeManager.cs" />
@@ -698,7 +697,7 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="commands\Suivi maquette collaboratif\ElementHistoryWindow.xaml">
+    <Page Include="commands\qui est le coupable\ElementHistoryWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
