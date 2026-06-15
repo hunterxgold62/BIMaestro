@@ -71,6 +71,7 @@ namespace Famille
         private string currentFolderPath;
         private readonly int _revitMajorVersion;
 
+        public ObservableCollection<FolderBreadcrumb> BreadcrumbItems { get; } = new();
         public string RootFolderName => System.IO.Path.GetFileName(rootFolderPath);
 
         public string ActiveCategoryFilter
@@ -308,6 +309,10 @@ namespace Famille
 
             if (!recursive)
             {
+                var parentPath = GetNavigableParentPath(path);
+                if (!string.IsNullOrWhiteSpace(parentPath))
+                    allFamilies.Add(CreateBackFolderItem(parentPath));
+
                 foreach (var dir in SafeEnumerateDirectories(path).OrderBy(d => d, NaturalSort.Directories))
                     allFamilies.Add(CreateFolderItemFromDirectory(dir));
             }
@@ -331,11 +336,12 @@ namespace Famille
             if (!recursive)
             {
                 var folderItems = allFamilies
-                    .Where(f => f.IsFolder)
+                    .Where(f => f.IsFolder && !f.IsBackNavigation)
                     .OrderBy(f => f.Name, NaturalSort.Strings)
                     .ToList();
 
-                allFamilies = folderItems.Concat(familyItems).ToList();
+                var backItems = allFamilies.Where(f => f.IsBackNavigation).ToList();
+                allFamilies = backItems.Concat(folderItems).Concat(familyItems).ToList();
             }
             else
             {
@@ -349,10 +355,93 @@ namespace Famille
         private void RefreshCurrentFolder()
         {
             LoadFamilies(currentFolderPath, recursive: false);
+            UpdateFolderHeader();
             BeginPaging(ApplyInteractiveSorting(new List<FamilyItem>(allFamilies)));
 
             TopFamiliesView.Visibility = Visibility.Collapsed;
             TopSeparator.Visibility = Visibility.Collapsed;
+        }
+
+        private string GetNavigableParentPath(string path)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(path) ||
+                    string.Equals(Path.GetFullPath(path), Path.GetFullPath(rootFolderPath), StringComparison.OrdinalIgnoreCase))
+                {
+                    return null;
+                }
+
+                var parent = Directory.GetParent(path);
+                if (parent == null)
+                    return null;
+
+                var root = Path.GetFullPath(rootFolderPath).TrimEnd(Path.DirectorySeparatorChar);
+                var parentFull = parent.FullName.TrimEnd(Path.DirectorySeparatorChar);
+                return parentFull.StartsWith(root, StringComparison.OrdinalIgnoreCase) ? parent.FullName : null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private void UpdateFolderHeader()
+        {
+            UpdateBreadcrumbItems();
+
+            int folderCount = allFamilies.Count(f => f.IsFolder && !f.IsBackNavigation);
+            int familyCount = allFamilies.Count(f => !f.IsFolder);
+
+            if (FolderSummaryText != null)
+                FolderSummaryText.Text = string.Format(CultureInfo.CurrentCulture, "{0} dossier{1} | {2} famille{3}",
+                    folderCount,
+                    folderCount > 1 ? "s" : string.Empty,
+                    familyCount,
+                    familyCount > 1 ? "s" : string.Empty);
+        }
+
+        private void UpdateBreadcrumbItems()
+        {
+            BreadcrumbItems.Clear();
+
+            var rootName = string.IsNullOrWhiteSpace(RootFolderName) ? "Bibliothèque" : RootFolderName;
+            BreadcrumbItems.Add(new FolderBreadcrumb
+            {
+                Name = rootName,
+                Path = rootFolderPath,
+                SeparatorVisibility = Visibility.Collapsed
+            });
+
+            try
+            {
+                if (string.IsNullOrWhiteSpace(currentFolderPath))
+                    return;
+
+                var root = Path.GetFullPath(rootFolderPath).TrimEnd(Path.DirectorySeparatorChar);
+                var current = Path.GetFullPath(currentFolderPath).TrimEnd(Path.DirectorySeparatorChar);
+                if (string.Equals(root, current, StringComparison.OrdinalIgnoreCase) ||
+                    !current.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                var relative = GetRelativePath(rootFolderPath, currentFolderPath);
+                foreach (var segment in relative.Split(Path.DirectorySeparatorChar))
+                {
+                    if (string.IsNullOrWhiteSpace(segment))
+                        continue;
+
+                    var previous = BreadcrumbItems.Last().Path;
+                    BreadcrumbItems.Add(new FolderBreadcrumb
+                    {
+                        Name = segment,
+                        Path = Path.Combine(previous, segment),
+                        SeparatorVisibility = Visibility.Visible
+                    });
+                }
+            }
+            catch { }
         }
 
         private void ClearSearchForFolderNavigation()
@@ -621,6 +710,16 @@ namespace Famille
 
             result.Sort((a, b) =>
             {
+                if (a?.IsBackNavigation == true && b?.IsBackNavigation != true)
+                    return -1;
+                if (b?.IsBackNavigation == true && a?.IsBackNavigation != true)
+                    return 1;
+
+                if (a?.IsFolder == true && b?.IsFolder != true)
+                    return -1;
+                if (b?.IsFolder == true && a?.IsFolder != true)
+                    return 1;
+
                 if (hasDateSort)
                 {
                     var aDate = a?.LastUpdatedUtc ?? DateTime.MinValue;
@@ -798,7 +897,7 @@ namespace Famille
             {
                 IEnumerable<FamilyItem> baseSet = allFamilies;
                 if (!string.IsNullOrEmpty(txt))
-                    baseSet = baseSet.Where(f => f.NormalizedName.Contains(txt));
+                    baseSet = baseSet.Where(f => !f.IsBackNavigation && f.NormalizedName.Contains(txt));
 
                 BeginPaging(ApplyInteractiveSorting(baseSet.ToList()));
             }
@@ -1429,6 +1528,12 @@ namespace Famille
                 NavigateToFolder(fam.Path);
         }
 
+        private void BreadcrumbButton_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as Button)?.Tag is string folderPath)
+                NavigateToFolder(folderPath);
+        }
+
         private void NavigateToFolder(string folderPath)
         {
             if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
@@ -1652,17 +1757,9 @@ namespace Famille
             if (_globalSearchMode)
             {
                 _globalSearchMode = false;
-                BeginPaging(ApplyInteractiveSorting(new List<FamilyItem>()));
-                PagingStatusText.Text = "Tape au moins 2 caractères pour rechercher partout.";
-                UpdateCount(0);
-                RefreshTop8_UsageOnly();
-                return;
             }
 
-            allFamilies.Clear();
-            displayedFamilies.Clear();
-            FamilyListView.ItemsSource = displayedFamilies;
-            UpdateCount(0);
+            NavigateToFolder(rootFolderPath);
             RefreshTop8_UsageOnly();
         }
 
@@ -1867,7 +1964,7 @@ namespace Famille
 
         private void LoadFolderPreviewForItem(FamilyItem folder)
         {
-            if (folder == null || !folder.IsFolder || folder.HasFolderPreview)
+            if (folder == null || !folder.IsFolder || folder.IsBackNavigation || folder.HasFolderPreview)
                 return;
 
             Task.Run(async () =>
@@ -3212,7 +3309,29 @@ namespace Famille
             };
         }
 
+        private FamilyItem CreateBackFolderItem(string parentPath)
+        {
+            return new FamilyItem
+            {
+                Name = "Retour",
+                Path = parentPath,
+                IsFolder = true,
+                IsBackNavigation = true,
+                NormalizedName = "retour",
+                Category = "Navigation",
+                DocumentationAvailable = false,
+                HasFolderPreview = true
+            };
+        }
+
         #endregion
+    }
+
+    public class FolderBreadcrumb
+    {
+        public string Name { get; set; }
+        public string Path { get; set; }
+        public Visibility SeparatorVisibility { get; set; }
     }
 
     // ======================= FamilyItem =======================
@@ -3253,6 +3372,27 @@ namespace Famille
 
         public Visibility FamilyControlVisibility => IsFolder ? Visibility.Collapsed : Visibility.Visible;
         public Visibility FolderControlVisibility => IsFolder ? Visibility.Visible : Visibility.Collapsed;
+
+        private bool _isBackNavigation;
+        public bool IsBackNavigation
+        {
+            get => _isBackNavigation;
+            set
+            {
+                if (_isBackNavigation != value)
+                {
+                    _isBackNavigation = value;
+                    OnPropertyChanged(nameof(IsBackNavigation));
+                    OnPropertyChanged(nameof(BackNavigationVisibility));
+                    OnPropertyChanged(nameof(FolderPreviewVisibility));
+                    OnPropertyChanged(nameof(FolderBadgeText));
+                }
+            }
+        }
+
+        public Visibility BackNavigationVisibility => IsBackNavigation ? Visibility.Visible : Visibility.Collapsed;
+        public Visibility FolderPreviewVisibility => IsBackNavigation ? Visibility.Collapsed : Visibility.Visible;
+        public string FolderBadgeText => IsBackNavigation ? "RETOUR" : "DOSSIER";
 
         private bool _hasFolderPreview;
         public bool HasFolderPreview
