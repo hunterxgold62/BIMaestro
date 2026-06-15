@@ -63,6 +63,7 @@ namespace Famille
         private bool _isResorting;
         private bool _isMultiSelectionEnabled;
         private bool _suppressFolderSelectionChanged;
+        private bool _updatingSearchScope;
         private FamilyItem _lastSelectedFamily;
 
         // ===== Données UI =====
@@ -98,6 +99,78 @@ namespace Famille
 
         public bool IsSizeSortActive => _sizeSortDescending;
         public bool IsDateSortActive => _dateSortDescending;
+
+        private double _tileCardWidth = 214;
+        public double TileCardWidth
+        {
+            get => _tileCardWidth;
+            private set
+            {
+                if (Math.Abs(_tileCardWidth - value) < 0.1) return;
+                _tileCardWidth = value;
+                NotifyPropertyChanged(nameof(TileCardWidth));
+            }
+        }
+
+        private double _tilePreviewSize = 194;
+        public double TilePreviewSize
+        {
+            get => _tilePreviewSize;
+            private set
+            {
+                if (Math.Abs(_tilePreviewSize - value) < 0.1) return;
+                _tilePreviewSize = value;
+                NotifyPropertyChanged(nameof(TilePreviewSize));
+            }
+        }
+
+        private double _tileNameFontSize = 12;
+        public double TileNameFontSize
+        {
+            get => _tileNameFontSize;
+            private set
+            {
+                if (Math.Abs(_tileNameFontSize - value) < 0.1) return;
+                _tileNameFontSize = value;
+                NotifyPropertyChanged(nameof(TileNameFontSize));
+            }
+        }
+
+        private double _tileNameLineHeight = 16;
+        public double TileNameLineHeight
+        {
+            get => _tileNameLineHeight;
+            private set
+            {
+                if (Math.Abs(_tileNameLineHeight - value) < 0.1) return;
+                _tileNameLineHeight = value;
+                NotifyPropertyChanged(nameof(TileNameLineHeight));
+            }
+        }
+
+        private double _tileNameMaxHeight = 38;
+        public double TileNameMaxHeight
+        {
+            get => _tileNameMaxHeight;
+            private set
+            {
+                if (Math.Abs(_tileNameMaxHeight - value) < 0.1) return;
+                _tileNameMaxHeight = value;
+                NotifyPropertyChanged(nameof(TileNameMaxHeight));
+            }
+        }
+
+        private double _tileNameMaxWidth = 166;
+        public double TileNameMaxWidth
+        {
+            get => _tileNameMaxWidth;
+            private set
+            {
+                if (Math.Abs(_tileNameMaxWidth - value) < 0.1) return;
+                _tileNameMaxWidth = value;
+                NotifyPropertyChanged(nameof(TileNameMaxWidth));
+            }
+        }
 
         public event PropertyChangedEventHandler PropertyChanged;
         private void NotifyPropertyChanged(string propertyName)
@@ -243,18 +316,8 @@ namespace Famille
                 FolderTreeView.Items.Add(node);
             }
 
-            bool showTop8AtStartup = (ShowTop8CheckBox?.IsChecked == true);
-
-            allFamilies.Clear();
-            displayedFamilies.Clear();
-            FamilyListView.ItemsSource = displayedFamilies;
-            UpdateFamilyListViewMode();
-            UpdateCount(0);
-
+            RefreshCurrentFolder();
             RefreshTop8_UsageOnly();
-
-            if (!showTop8AtStartup && FolderTreeView.Items.Count > 0)
-                ((TreeViewItem)FolderTreeView.Items[0]).IsSelected = true;
         }
 
 
@@ -447,10 +510,10 @@ namespace Famille
         private void ClearSearchForFolderNavigation()
         {
             ResetInteractiveFilters();
+            SetSearchScope(global: false, refresh: false);
 
             if (!string.IsNullOrWhiteSpace(SearchBox.Text) || _globalSearchMode)
             {
-                _globalSearchMode = false;
                 SearchBox.Text = "";
                 _searchDebounce.Stop();
                 Keyboard.ClearFocus();
@@ -826,8 +889,6 @@ namespace Famille
 
         private void SearchBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
         {
-            _globalSearchMode = true;
-
             _searchDebounce.Stop();
             _searchDebounce.Start();
         }
@@ -836,8 +897,7 @@ namespace Famille
         {
             if (string.IsNullOrWhiteSpace(SearchBox.Text))
             {
-                _globalSearchMode = false;
-                BeginPaging(ApplyInteractiveSorting(new List<FamilyItem>(allFamilies)));
+                ApplyFilters();
             }
         }
 
@@ -848,6 +908,52 @@ namespace Famille
                 ? Visibility.Visible : Visibility.Collapsed;
             _searchDebounce.Stop();
             _searchDebounce.Start();
+        }
+
+        private void SearchScopeButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_updatingSearchScope)
+                return;
+
+            bool global = ReferenceEquals(sender, SearchAllButton);
+            if (global && SearchBox != null && !string.IsNullOrWhiteSpace(SearchBox.Text))
+            {
+                SearchBox.Text = string.Empty;
+                _searchDebounce.Stop();
+            }
+
+            SetSearchScope(global, refresh: true);
+        }
+
+        private void SetSearchScope(bool global, bool refresh)
+        {
+            _globalSearchMode = global;
+
+            try
+            {
+                _updatingSearchScope = true;
+
+                if (SearchCurrentButton != null)
+                    SearchCurrentButton.IsChecked = !global;
+
+                if (SearchAllButton != null)
+                    SearchAllButton.IsChecked = global;
+
+                if (PlaceholderText != null && string.IsNullOrWhiteSpace(SearchBox?.Text))
+                {
+                    PlaceholderText.Text = global
+                        ? "Rechercher dans toute la bibliothèque…"
+                        : "Rechercher dans le dossier…";
+                    PlaceholderText.Visibility = Visibility.Visible;
+                }
+            }
+            finally
+            {
+                _updatingSearchScope = false;
+            }
+
+            if (refresh)
+                ApplyFilters();
         }
 
         private void ApplyFilters()
@@ -865,28 +971,19 @@ namespace Famille
                     return;
                 }
 
-                if (txt.Length < 2)
-                {
-                    BeginPaging(ApplyInteractiveSorting(new List<FamilyItem>()));
-                    PagingStatusText.Visibility = Visibility.Visible;
-                    PagingStatusText.Text = "Tape au moins 2 caractères pour rechercher partout.";
-                    UpdateCount(0);
-                    return;
-                }
+                var hits = txt.Length == 0
+                    ? _index.GetAll(max: 0)
+                    : _index.Search(txt, max: 8000);
 
-                var hits = _index.Search(txt, max: 8000);
                 var items = hits.Select(e =>
                 {
-                    var size = TryGetFileSize(e.Path);
                     return new FamilyItem
                     {
                         Name = e.Name,
                         Path = e.Path,
                         Category = e.Category,
                         NormalizedName = e.NormalizedName,
-                        FileSizeBytes = size,
-                        FileSizeText = FormatFileSize(size),
-                        DocumentationAvailable = HasDocumentationFile(e.Path)
+                        DocumentationAvailable = false
                     };
                 }).ToList();
 
@@ -1975,13 +2072,11 @@ namespace Famille
                     var icons = new List<ImageSource>();
                     foreach (var familyPath in GetFolderPreviewFamilyPaths(folder.Path, 4))
                     {
-                        var image = LoadPreviewImageForFamilyPath(familyPath, 128)
-                                    ?? CreateSolidPlaceholder(90, 90);
-                        icons.Add(image);
+                        icons.Add(LoadPreviewImageForFamilyPath(familyPath, 320));
                     }
 
                     while (icons.Count < 4)
-                        icons.Add(CreateSolidPlaceholder(90, 90));
+                        icons.Add(null);
 
                     Dispatcher.Invoke(() =>
                     {
@@ -2576,7 +2671,8 @@ namespace Famille
         private void LoadConfig()
         {
             string top = "#FFF2F2F2", bottom = "#FFFFFFFF", panel = "#F0F0F0",
-                   treeBg = "#F0F0F0", itemsBg = "Transparent", tabBg = "Transparent";
+                   contentPanel = "#F0F0F0", treeBg = "#F0F0F0", itemsBg = "Transparent", tabBg = "Transparent",
+                   tileSize = "Normal";
             bool dark = false;
             bool showTop8 = false;
             bool alwaysOnTop = false;
@@ -2589,9 +2685,11 @@ namespace Famille
                     if (line.StartsWith("TopColor=", StringComparison.OrdinalIgnoreCase)) top = line.Substring("TopColor=".Length);
                     else if (line.StartsWith("BottomColor=", StringComparison.OrdinalIgnoreCase)) bottom = line.Substring("BottomColor=".Length);
                     else if (line.StartsWith("PanelBackground=", StringComparison.OrdinalIgnoreCase)) panel = line.Substring("PanelBackground=".Length);
+                    else if (line.StartsWith("ContentPanelBackground=", StringComparison.OrdinalIgnoreCase)) contentPanel = line.Substring("ContentPanelBackground=".Length);
                     else if (line.StartsWith("TreeViewBackground=", StringComparison.OrdinalIgnoreCase)) treeBg = line.Substring("TreeViewBackground=".Length);
                     else if (line.StartsWith("ItemsBackground=", StringComparison.OrdinalIgnoreCase)) itemsBg = line.Substring("ItemsBackground=".Length);
                     else if (line.StartsWith("TabBackground=", StringComparison.OrdinalIgnoreCase)) tabBg = line.Substring("TabBackground=".Length);
+                    else if (line.StartsWith("TileSize=", StringComparison.OrdinalIgnoreCase)) tileSize = line.Substring("TileSize=".Length);
                     else if (line.StartsWith("DarkMode=", StringComparison.OrdinalIgnoreCase)) bool.TryParse(line.Substring("DarkMode=".Length), out dark);
                     else if (line.StartsWith("ShowTop8=", StringComparison.OrdinalIgnoreCase)) bool.TryParse(line.Substring("ShowTop8=".Length), out showTop8);
                     else if (line.StartsWith("AlwaysOnTop=", StringComparison.OrdinalIgnoreCase)) bool.TryParse(line.Substring("AlwaysOnTop=".Length), out alwaysOnTop);
@@ -2604,9 +2702,12 @@ namespace Famille
             TopColorPicker.SelectedColor = ColorFromHex(top);
             BottomColorPicker.SelectedColor = ColorFromHex(bottom);
             PanelBackgroundPicker.SelectedColor = ColorFromHex(panel);
+            ContentPanelBackgroundPicker.SelectedColor = ColorFromHex(contentPanel);
             TreeViewBackgroundPicker.SelectedColor = ColorFromHex(treeBg);
             ItemsBackgroundPicker.SelectedColor = ColorFromHex(itemsBg);
             TabBackgroundPicker.SelectedColor = ColorFromHex(tabBg);
+            SetTileSizeSelection(tileSize);
+            ApplyTileLayout(tileSize, resizeWindow: true);
             if (DarkModeSwitch != null) DarkModeSwitch.IsOn = dark; if (ShowTop8CheckBox != null) ShowTop8CheckBox.IsChecked = showTop8;
             if (AlwaysOnTopSwitch != null) AlwaysOnTopSwitch.IsOn = alwaysOnTop;
             detailedViewMode = detailedView;
@@ -2622,9 +2723,11 @@ namespace Famille
                 "TopColor="    + ColorToHex(TopColorPicker.SelectedColor ?? Colors.White),
                 "BottomColor=" + ColorToHex(BottomColorPicker.SelectedColor ?? Colors.White),
                 "PanelBackground="    + ColorToHex(PanelBackgroundPicker.SelectedColor ?? Colors.Transparent),
+                "ContentPanelBackground=" + ColorToHex(ContentPanelBackgroundPicker.SelectedColor ?? Colors.Transparent),
                 "TreeViewBackground=" + ColorToHex(TreeViewBackgroundPicker.SelectedColor ?? Colors.Transparent),
                 "ItemsBackground="    + (ItemsBackgroundPicker.SelectedColor == Colors.Transparent ? "Transparent" : ColorToHex(ItemsBackgroundPicker.SelectedColor.Value)),
                 "TabBackground="      + (TabBackgroundPicker.SelectedColor   == Colors.Transparent ? "Transparent" : ColorToHex(TabBackgroundPicker.SelectedColor.Value)),
+                "TileSize=" + GetSelectedTileSize(),
                 "DarkMode="   + ((DarkModeSwitch?.IsOn == true) ? "true" : "false"),
                 "ShowTop8="   + ((ShowTop8CheckBox?.IsChecked == true) ? "true" : "false"),
                 "AlwaysOnTop="+ ((AlwaysOnTopSwitch?.IsOn == true) ? "true" : "false"),
@@ -2642,9 +2745,12 @@ namespace Famille
             TopColorPicker.SelectedColor = ColorFromHex("#FFF2F2F2");
             BottomColorPicker.SelectedColor = ColorFromHex("#FFFFFFFF");
             PanelBackgroundPicker.SelectedColor = ColorFromHex("#F0F0F0");
+            ContentPanelBackgroundPicker.SelectedColor = ColorFromHex("#F0F0F0");
             TreeViewBackgroundPicker.SelectedColor = ColorFromHex("#F0F0F0");
             ItemsBackgroundPicker.SelectedColor = Colors.Transparent;
             TabBackgroundPicker.SelectedColor = Colors.Transparent;
+            SetTileSizeSelection("Normal");
+            ApplyTileLayout("Normal", resizeWindow: true);
             if (DarkModeSwitch != null) DarkModeSwitch.IsOn = false;
             if (ShowTop8CheckBox != null) ShowTop8CheckBox.IsChecked = false;
             if (AlwaysOnTopSwitch != null) AlwaysOnTopSwitch.IsOn = false;
@@ -2661,7 +2767,73 @@ namespace Famille
         }
         private void DarkModeSwitch_Toggled(object sender, RoutedPropertyChangedEventArgs<bool> e) => UpdateTheme();
 
-        private void ApplyColors_Click(object sender, RoutedEventArgs e) => UpdateTheme();
+        private void ApplyColors_Click(object sender, RoutedEventArgs e)
+        {
+            UpdateTheme();
+            ApplyTileLayout(GetSelectedTileSize(), resizeWindow: true);
+        }
+
+        private string GetSelectedTileSize()
+            => TileSizeCombo?.SelectedValue as string ?? "Normal";
+
+        private void SetTileSizeSelection(string tileSize)
+        {
+            if (TileSizeCombo == null) return;
+            TileSizeCombo.SelectedValue = NormalizeTileSize(tileSize);
+        }
+
+        private void TileSizeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+        }
+
+        private void ApplyTileLayout(string tileSize, bool resizeWindow)
+        {
+            switch (NormalizeTileSize(tileSize))
+            {
+                case "Compact":
+                    TileCardWidth = 188;
+                    TilePreviewSize = 168;
+                    TileNameFontSize = 11;
+                    TileNameLineHeight = 14;
+                    TileNameMaxHeight = 32;
+                    TileNameMaxWidth = 142;
+                    if (resizeWindow) ApplyWindowWidthForTileSize(1160);
+                    break;
+                case "Large":
+                    TileCardWidth = 244;
+                    TilePreviewSize = 224;
+                    TileNameFontSize = 12;
+                    TileNameLineHeight = 16;
+                    TileNameMaxHeight = 42;
+                    TileNameMaxWidth = 196;
+                    if (resizeWindow) ApplyWindowWidthForTileSize(1480);
+                    break;
+                default:
+                    TileCardWidth = 214;
+                    TilePreviewSize = 194;
+                    TileNameFontSize = 12;
+                    TileNameLineHeight = 16;
+                    TileNameMaxHeight = 38;
+                    TileNameMaxWidth = 166;
+                    if (resizeWindow) ApplyWindowWidthForTileSize(1280);
+                    break;
+            }
+        }
+
+        private void ApplyWindowWidthForTileSize(double width)
+        {
+            if (WindowState == WindowState.Maximized)
+                return;
+
+            Width = Math.Max(MinWidth, width);
+        }
+
+        private static string NormalizeTileSize(string tileSize)
+        {
+            if (string.Equals(tileSize, "Compact", StringComparison.OrdinalIgnoreCase)) return "Compact";
+            if (string.Equals(tileSize, "Large", StringComparison.OrdinalIgnoreCase)) return "Large";
+            return "Normal";
+        }
 
         private void UpdateTheme()
         {
@@ -2675,10 +2847,11 @@ namespace Famille
                         new GradientStop(Colors.DarkGray, 1)
                     }, new Point(0, 0), new Point(0, 1));
                 Resources["PanelBackground"] = new SolidColorBrush(Color.FromRgb(51, 51, 51));
+                Resources["ContentPanelBackground"] = new SolidColorBrush(Color.FromRgb(51, 51, 51));
                 Resources["TreeViewBackground"] = new SolidColorBrush(Color.FromRgb(51, 51, 51));
                 Resources["ItemsBackground"] = new SolidColorBrush(Color.FromRgb(34, 34, 34));
                 Resources["TabBackground"] = new SolidColorBrush(Color.FromRgb(68, 68, 68));
-                Resources["ImageBackground"] = new SolidColorBrush(Color.FromRgb(30, 30, 30));
+                Resources["ImageBackground"] = new SolidColorBrush(Colors.Transparent);
                 Resources["PrimaryText"] = new SolidColorBrush(Colors.White);
                 Resources["TabInactiveForeground"] = new SolidColorBrush(Colors.White);
                 Resources["TabActiveForeground"] = new SolidColorBrush(Colors.Black);
@@ -2696,10 +2869,12 @@ namespace Famille
                         new GradientStop(bot, 1)
                     }, new Point(0, 0), new Point(0, 1));
                 var panel = PanelBackgroundPicker.SelectedColor ?? Colors.White;
+                var contentPanel = ContentPanelBackgroundPicker.SelectedColor ?? Colors.White;
                 var treeBg = TreeViewBackgroundPicker.SelectedColor ?? Colors.White;
                 var itemsBg = ItemsBackgroundPicker.SelectedColor ?? Colors.Transparent;
                 var tabBg = TabBackgroundPicker.SelectedColor ?? Colors.Transparent;
                 Resources["PanelBackground"] = new SolidColorBrush(panel);
+                Resources["ContentPanelBackground"] = new SolidColorBrush(contentPanel);
                 Resources["TreeViewBackground"] = new SolidColorBrush(treeBg);
                 Resources["ItemsBackground"] = new SolidColorBrush(itemsBg);
                 Resources["TabBackground"] = new SolidColorBrush(tabBg);
@@ -3298,15 +3473,40 @@ namespace Famille
         private FamilyItem CreateFolderItemFromDirectory(DirectoryInfo directory)
         {
             var name = directory?.Name ?? string.Empty;
+            var path = directory?.FullName;
             return new FamilyItem
             {
                 Name = name,
-                Path = directory?.FullName,
+                Path = path,
                 IsFolder = true,
                 NormalizedName = StripDiacritics(name).ToLowerInvariant(),
                 Category = "Dossier",
+                FolderFamilyCount = CountFamiliesInFolder(path),
                 DocumentationAvailable = false
             };
+        }
+
+        private static int CountFamiliesInFolder(string folderPath)
+        {
+            if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
+                return 0;
+
+            try
+            {
+                int count = 0;
+                foreach (var _ in Directory.EnumerateFiles(folderPath, "*.rfa", SearchOption.AllDirectories))
+                {
+                    count++;
+                    if (count >= 9999)
+                        return count;
+                }
+
+                return count;
+            }
+            catch
+            {
+                return 0;
+            }
         }
 
         private FamilyItem CreateBackFolderItem(string parentPath)
@@ -3392,7 +3592,29 @@ namespace Famille
 
         public Visibility BackNavigationVisibility => IsBackNavigation ? Visibility.Visible : Visibility.Collapsed;
         public Visibility FolderPreviewVisibility => IsBackNavigation ? Visibility.Collapsed : Visibility.Visible;
-        public string FolderBadgeText => IsBackNavigation ? "RETOUR" : "DOSSIER";
+        public string FolderBadgeText
+        {
+            get
+            {
+                if (IsBackNavigation)
+                    return "RETOUR";
+
+                return FolderFamilyCount == 1 ? "1 famille" : $"{FolderFamilyCount} familles";
+            }
+        }
+
+        private int _folderFamilyCount;
+        public int FolderFamilyCount
+        {
+            get => _folderFamilyCount;
+            set
+            {
+                if (_folderFamilyCount == value) return;
+                _folderFamilyCount = value;
+                OnPropertyChanged(nameof(FolderFamilyCount));
+                OnPropertyChanged(nameof(FolderBadgeText));
+            }
+        }
 
         private bool _hasFolderPreview;
         public bool HasFolderPreview

@@ -754,6 +754,74 @@ namespace Analyse
             ApplyFilters();
         }
 
+        private void QuickFilterFamily_Click(object sender, RoutedEventArgs e)
+        {
+            var row = GetMenuRow(sender);
+            var family = GetSingleDistinctValue(row, x => x.Family);
+            ApplyQuickFilter("Toutes", "Tous", family);
+        }
+
+        private void QuickFilterType_Click(object sender, RoutedEventArgs e)
+        {
+            var row = GetMenuRow(sender);
+            var type = GetSingleDistinctValue(row, x => x.TypeName);
+            ApplyQuickFilter("Toutes", "Tous", type);
+        }
+
+        private void QuickFilterUser_Click(object sender, RoutedEventArgs e)
+        {
+            var row = GetMenuRow(sender);
+            ApplyQuickFilter("Toutes", FirstNonEmpty(row?.User, "Tous"), string.Empty);
+        }
+
+        private void QuickFilterAction_Click(object sender, RoutedEventArgs e)
+        {
+            var row = GetMenuRow(sender);
+            ApplyQuickFilter(FirstNonEmpty(row?.ActionText, "Toutes"), "Tous", string.Empty);
+        }
+
+        private void QuickFilterReset_Click(object sender, RoutedEventArgs e)
+        {
+            ApplyQuickFilter("Toutes", "Tous", string.Empty);
+        }
+
+        private static RowVm GetMenuRow(object sender)
+        {
+            return (sender as MenuItem)?.CommandParameter as RowVm;
+        }
+
+        private static string GetSingleDistinctValue(RowVm row, Func<ElementHistoryEvent, string> selector)
+        {
+            if (row == null) return string.Empty;
+
+            var values = GetRowEvents(row)
+                .Select(selector)
+                .Select(CleanCellText)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            return values.Count == 1 ? values[0] : FirstNonEmpty(CleanCellText(row.TileTitle), CleanCellText(row.Family), CleanCellText(row.TypeName), CleanCellText(row.Category));
+        }
+
+        private void ApplyQuickFilter(string action, string user, string search)
+        {
+            if (ActionFilterCombo?.Items.Contains(action) == true)
+                ActionFilterCombo.SelectedItem = action;
+            else if (ActionFilterCombo?.Items.Contains("Toutes") == true)
+                ActionFilterCombo.SelectedItem = "Toutes";
+
+            if (UserFilterCombo?.Items.Contains(user) == true)
+                UserFilterCombo.SelectedItem = user;
+            else if (UserFilterCombo?.Items.Contains("Tous") == true)
+                UserFilterCombo.SelectedItem = "Tous";
+
+            if (SearchBox != null)
+                SearchBox.Text = search ?? string.Empty;
+
+            ApplyFilters();
+        }
+
         private void ApplyFilters()
         {
             var action = ActionFilterCombo?.SelectedItem as string ?? "Toutes";
@@ -920,23 +988,54 @@ namespace Analyse
 
         private void ClusterFocusButton_Click(object sender, RoutedEventArgs e)
         {
-            FocusHistoryEvent((ClusterListBox?.SelectedItem as ClusterItemVm)?.Source);
+            var ids = GetSelectedClusterItems()
+                .Select(x => x.Source)
+                .Where(x => x != null)
+                .Select(x => x.ElementId)
+                .Distinct()
+                .ToList();
+            if (ids.Count == 0) return;
+
+            RaiseRequest(new UiRequest
+            {
+                Type = UiRequestType.Focus,
+                FocusElementIds = ids
+            });
         }
 
         private void ClusterVisualizeButton_Click(object sender, RoutedEventArgs e)
         {
-            var ev = (ClusterListBox?.SelectedItem as ClusterItemVm)?.Source;
-            if (ev == null || !CanVisualize(ev)) return;
+            var events = GetSelectedClusterItems()
+                .Select(x => x.Source)
+                .Where(x => x != null && CanVisualize(x))
+                .GroupBy(x => x.ElementId)
+                .Select(x => x.First())
+                .ToList();
+            if (events.Count == 0) return;
+
             RaiseRequest(new UiRequest
             {
                 Type = UiRequestType.VisualizeEvents,
-                Events = new List<ElementHistoryEvent> { ev }
+                Events = events
             });
         }
 
         private void ClusterListBox_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
-            FocusHistoryEvent((ClusterListBox?.SelectedItem as ClusterItemVm)?.Source);
+            ClusterFocusButton_Click(sender, e);
+        }
+
+        private List<ClusterItemVm> GetSelectedClusterItems()
+        {
+            var selected = ClusterListBox?.SelectedItems
+                .Cast<ClusterItemVm>()
+                .Where(x => x?.Source != null)
+                .ToList() ?? new List<ClusterItemVm>();
+
+            if (selected.Count == 0 && ClusterListBox?.SelectedItem is ClusterItemVm item && item.Source != null)
+                selected.Add(item);
+
+            return selected;
         }
 
         private void RaiseRequest(UiRequest request)

@@ -101,6 +101,16 @@ namespace Famille
             return q.ToList();
         }
 
+        public IEnumerable<Entry> GetAll(int max = 0)
+        {
+            List<Entry> snapshot;
+            lock (_lock) snapshot = _items;
+
+            var q = snapshot.AsEnumerable();
+            if (max > 0) q = q.Take(max);
+            return q.ToList();
+        }
+
         private void UpdateStatus(string s)
         {
             StatusText = s;
