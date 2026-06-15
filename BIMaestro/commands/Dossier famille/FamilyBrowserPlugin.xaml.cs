@@ -62,6 +62,7 @@ namespace Famille
         private bool _dateSortDescending;
         private bool _isResorting;
         private bool _isMultiSelectionEnabled;
+        private bool _suppressFolderSelectionChanged;
         private FamilyItem _lastSelectedFamily;
 
         // ===== Données UI =====
@@ -270,24 +271,13 @@ namespace Famille
 
         private void FolderTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
+            if (_suppressFolderSelectionChanged) return;
             if (FolderTreeView.SelectedItem is not TreeViewItem tv) return;
 
-            ResetInteractiveFilters();
-
-            if (!string.IsNullOrWhiteSpace(SearchBox.Text) || _globalSearchMode)
-            {
-                _globalSearchMode = false;
-                SearchBox.Text = "";
-                Keyboard.ClearFocus();
-            }
+            ClearSearchForFolderNavigation();
 
             currentFolderPath = tv.Tag.ToString();
-            LoadFamilies(currentFolderPath, recursive: false);
-
-            BeginPaging(ApplyInteractiveSorting(new List<FamilyItem>(allFamilies)));
-
-            TopFamiliesView.Visibility = Visibility.Collapsed;
-            TopSeparator.Visibility = Visibility.Collapsed;
+            RefreshCurrentFolder();
         }
 
         // --- Comparateurs "tri naturel" façon Explorateur Windows ---
@@ -315,12 +305,20 @@ namespace Famille
         {
             ResetInteractiveFilters();
             allFamilies.Clear();
+
+            if (!recursive)
+            {
+                foreach (var dir in SafeEnumerateDirectories(path).OrderBy(d => d, NaturalSort.Directories))
+                    allFamilies.Add(CreateFolderItemFromDirectory(dir));
+            }
+
             var opt = recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
 
             foreach (var f in Directory.EnumerateFiles(path, "*.rfa", opt))
                 allFamilies.Add(CreateFamilyItemFromPath(f));
 
-            allFamilies = allFamilies
+            var familyItems = allFamilies
+                .Where(f => !f.IsFolder)
                 .OrderBy(f =>
                 {
                     var p = f.Name.Split('-');
@@ -330,8 +328,57 @@ namespace Famille
                 })
                 .ToList();
 
+            if (!recursive)
+            {
+                var folderItems = allFamilies
+                    .Where(f => f.IsFolder)
+                    .OrderBy(f => f.Name, NaturalSort.Strings)
+                    .ToList();
+
+                allFamilies = folderItems.Concat(familyItems).ToList();
+            }
+            else
+            {
+                allFamilies = familyItems;
+            }
+
             TopFamiliesView.Visibility = Visibility.Collapsed;
             TopSeparator.Visibility = Visibility.Collapsed;
+        }
+
+        private void RefreshCurrentFolder()
+        {
+            LoadFamilies(currentFolderPath, recursive: false);
+            BeginPaging(ApplyInteractiveSorting(new List<FamilyItem>(allFamilies)));
+
+            TopFamiliesView.Visibility = Visibility.Collapsed;
+            TopSeparator.Visibility = Visibility.Collapsed;
+        }
+
+        private void ClearSearchForFolderNavigation()
+        {
+            ResetInteractiveFilters();
+
+            if (!string.IsNullOrWhiteSpace(SearchBox.Text) || _globalSearchMode)
+            {
+                _globalSearchMode = false;
+                SearchBox.Text = "";
+                _searchDebounce.Stop();
+                Keyboard.ClearFocus();
+                PlaceholderText.Visibility = Visibility.Visible;
+            }
+        }
+
+        private IEnumerable<DirectoryInfo> SafeEnumerateDirectories(string path)
+        {
+            try
+            {
+                return new DirectoryInfo(path).EnumerateDirectories().ToList();
+            }
+            catch
+            {
+                return Enumerable.Empty<DirectoryInfo>();
+            }
         }
 
         #endregion
@@ -411,6 +458,7 @@ namespace Famille
         private void FavoriteButton_Click(object s, RoutedEventArgs e)
         {
             if (s is not Button btn || btn.DataContext is not FamilyItem fam) return;
+            if (fam.IsFolder) return;
 
             // toggle visuel
             fam.IsFavorite = !fam.IsFavorite;
@@ -438,7 +486,10 @@ namespace Famille
                 var favCol = GetFavoritesCollection();
                 var set = new HashSet<string>(favCol.Paths, StringComparer.OrdinalIgnoreCase);
                 foreach (var fam in items)
+                {
+                    if (fam.IsFolder) continue;
                     fam.IsFavorite = set.Contains(fam.Path);
+                }
             }
             catch { }
         }
@@ -653,8 +704,7 @@ namespace Famille
 
                 foreach (var item in displayedFamilies)
                 {
-                    LoadThumbnailForFamilyItem(item);
-                    LoadMetadataForFamilyItem(item);
+                    LoadVisualsForItem(item);
                 }
 
                 MarkFavoritesInView(displayedFamilies);
@@ -787,8 +837,7 @@ namespace Famille
             foreach (var item in slice)
             {
                 displayedFamilies.Add(item);
-                LoadThumbnailForFamilyItem(item);
-                LoadMetadataForFamilyItem(item);
+                LoadVisualsForItem(item);
             }
 
             // rafraîchit source
@@ -1352,6 +1401,13 @@ namespace Famille
             if (sender is not Border b || b.DataContext is not FamilyItem fam)
                 return;
 
+            if (fam.IsFolder)
+            {
+                NavigateToFolder(fam.Path);
+                e.Handled = true;
+                return;
+            }
+
             if (_isMultiSelectionEnabled)
             {
                 if (e.ClickCount == 1)
@@ -1367,10 +1423,71 @@ namespace Famille
             FamilyBrowserCommand.LoadFamilyEventInstance.Raise();
         }
 
+        private void OpenFolderItem_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as MenuItem)?.DataContext is FamilyItem fam && fam.IsFolder)
+                NavigateToFolder(fam.Path);
+        }
+
+        private void NavigateToFolder(string folderPath)
+        {
+            if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
+                return;
+
+            ClearSearchForFolderNavigation();
+            currentFolderPath = folderPath;
+
+            try
+            {
+                _suppressFolderSelectionChanged = true;
+                TrySelectTreeItemByPath(folderPath);
+            }
+            finally
+            {
+                _suppressFolderSelectionChanged = false;
+            }
+
+            RefreshCurrentFolder();
+        }
+
+        private bool TrySelectTreeItemByPath(string folderPath)
+        {
+            foreach (var item in FolderTreeView.Items.OfType<TreeViewItem>())
+            {
+                if (TrySelectTreeItemByPath(item, folderPath))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private bool TrySelectTreeItemByPath(TreeViewItem item, string folderPath)
+        {
+            if (item?.Tag is string tag &&
+                string.Equals(tag, folderPath, StringComparison.OrdinalIgnoreCase))
+            {
+                item.IsSelected = true;
+                item.BringIntoView();
+                return true;
+            }
+
+            foreach (var child in item.Items.OfType<TreeViewItem>())
+            {
+                if (TrySelectTreeItemByPath(child, folderPath))
+                {
+                    item.IsExpanded = true;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private void FamilyItem_RightClickSelect(object sender, MouseButtonEventArgs e)
         {
             if (!_isMultiSelectionEnabled) return;
             if (sender is not Border b || b.DataContext is not FamilyItem fam) return;
+            if (fam.IsFolder) return;
 
             var selectedFamilies = GetSelectedFamilies();
             if (!selectedFamilies.Contains(fam))
@@ -1384,13 +1501,21 @@ namespace Famille
             if (sender is not Border border || border.ContextMenu == null)
                 return;
 
+            var contextFamily = border.DataContext as FamilyItem;
+            bool isFolder = contextFamily?.IsFolder == true;
             bool hasMultipleSelection = _isMultiSelectionEnabled && GetSelectedFamilies().Count > 1;
             foreach (var item in border.ContextMenu.Items)
             {
                 if (item is MenuItem menuItem)
                 {
                     var header = menuItem.Header?.ToString();
-                    if (hasMultipleSelection)
+                    if (isFolder)
+                    {
+                        menuItem.Visibility = string.Equals(header, "Ouvrir le dossier", StringComparison.OrdinalIgnoreCase)
+                            ? Visibility.Visible
+                            : Visibility.Collapsed;
+                    }
+                    else if (hasMultipleSelection)
                     {
                         bool keepVisible =
                             string.Equals(header, "Ajouter à la collection active", StringComparison.OrdinalIgnoreCase) ||
@@ -1399,12 +1524,14 @@ namespace Famille
                     }
                     else
                     {
-                        menuItem.Visibility = Visibility.Visible;
+                        menuItem.Visibility = string.Equals(header, "Ouvrir le dossier", StringComparison.OrdinalIgnoreCase)
+                            ? Visibility.Collapsed
+                            : Visibility.Visible;
                     }
                 }
                 else if (item is Separator separator)
                 {
-                    separator.Visibility = hasMultipleSelection ? Visibility.Collapsed : Visibility.Visible;
+                    separator.Visibility = (isFolder || hasMultipleSelection) ? Visibility.Collapsed : Visibility.Visible;
                 }
             }
         }
@@ -1461,7 +1588,7 @@ namespace Famille
         }
 
         private List<FamilyItem> GetSelectedFamilies()
-            => displayedFamilies.Where(f => f.IsSelected).ToList();
+            => displayedFamilies.Where(f => f.IsSelected && !f.IsFolder).ToList();
 
         private List<FamilyItem> GetEffectiveSelection(FamilyItem contextFamily = null)
         {
@@ -1469,7 +1596,7 @@ namespace Famille
             if (selected.Count > 0)
                 return selected;
 
-            if (contextFamily != null)
+            if (contextFamily != null && !contextFamily.IsFolder)
                 return new List<FamilyItem> { contextFamily };
 
             return new List<FamilyItem>();
@@ -1485,6 +1612,7 @@ namespace Famille
         {
             if ((sender as MenuItem)?.DataContext is FamilyItem fam)
             {
+                if (fam.IsFolder) return;
                 try
                 {
                     Directory.CreateDirectory(workFolder);
@@ -1723,12 +1851,137 @@ namespace Famille
 
         #region Vignettes (catalogue -> cache -> Shell -> placeholder)
 
+        private void LoadVisualsForItem(FamilyItem item)
+        {
+            if (item == null) return;
+
+            if (item.IsFolder)
+            {
+                LoadFolderPreviewForItem(item);
+                return;
+            }
+
+            LoadThumbnailForFamilyItem(item);
+            LoadMetadataForFamilyItem(item);
+        }
+
+        private void LoadFolderPreviewForItem(FamilyItem folder)
+        {
+            if (folder == null || !folder.IsFolder || folder.HasFolderPreview)
+                return;
+
+            Task.Run(async () =>
+            {
+                await _thumbGate.WaitAsync().ConfigureAwait(false);
+                try
+                {
+                    var icons = new List<ImageSource>();
+                    foreach (var familyPath in GetFolderPreviewFamilyPaths(folder.Path, 4))
+                    {
+                        var image = LoadPreviewImageForFamilyPath(familyPath, 128)
+                                    ?? CreateSolidPlaceholder(90, 90);
+                        icons.Add(image);
+                    }
+
+                    while (icons.Count < 4)
+                        icons.Add(CreateSolidPlaceholder(90, 90));
+
+                    Dispatcher.Invoke(() =>
+                    {
+                        folder.FolderPreviewIcon1 = icons[0];
+                        folder.FolderPreviewIcon2 = icons[1];
+                        folder.FolderPreviewIcon3 = icons[2];
+                        folder.FolderPreviewIcon4 = icons[3];
+                        folder.HasFolderPreview = true;
+                    });
+                }
+                finally
+                {
+                    _thumbGate.Release();
+                }
+            });
+        }
+
+        private ImageSource LoadPreviewImageForFamilyPath(string familyPath, int size)
+        {
+            if (string.IsNullOrWhiteSpace(familyPath))
+                return null;
+
+            if (_bitmapCache.TryGetValue(familyPath, out var memCached))
+                return memCached;
+
+            if (TryGetCatalogImagePath(familyPath, out var plannedImagePath))
+            {
+                var planned = LoadBitmapImage(plannedImagePath, size);
+                if (planned != null)
+                {
+                    _bitmapCache[familyPath] = planned;
+                    return planned;
+                }
+            }
+
+            if (ThumbnailCache.TryGet(thumbCacheFolder, familyPath, size, out var cached) && File.Exists(cached))
+            {
+                var cachedImage = LoadBitmapImage(cached, size);
+                if (cachedImage != null)
+                {
+                    _bitmapCache[familyPath] = cachedImage;
+                    return cachedImage;
+                }
+            }
+
+            if (useShellThumbs && ShellThumbnailProvider.TryGetThumbnail(familyPath, size, out var shellBmp))
+            {
+                try { ThumbnailCache.Save(thumbCacheFolder, familyPath, size, shellBmp); } catch { }
+                _bitmapCache[familyPath] = shellBmp;
+                return shellBmp;
+            }
+
+            return null;
+        }
+
+        private IEnumerable<string> GetFolderPreviewFamilyPaths(string folderPath, int max)
+        {
+            var result = new List<string>();
+            if (string.IsNullOrWhiteSpace(folderPath) || max <= 0 || !Directory.Exists(folderPath))
+                return result;
+
+            var pending = new Queue<string>();
+            pending.Enqueue(folderPath);
+
+            while (pending.Count > 0 && result.Count < max)
+            {
+                var current = pending.Dequeue();
+
+                try
+                {
+                    foreach (var family in Directory.EnumerateFiles(current, "*.rfa", SearchOption.TopDirectoryOnly)
+                                                    .OrderBy(p => Path.GetFileNameWithoutExtension(p), NaturalSort.Strings))
+                    {
+                        result.Add(family);
+                        if (result.Count >= max)
+                            return result;
+                    }
+                }
+                catch { }
+
+                try
+                {
+                    foreach (var sub in new DirectoryInfo(current).EnumerateDirectories().OrderBy(d => d, NaturalSort.Directories))
+                        pending.Enqueue(sub.FullName);
+                }
+                catch { }
+            }
+
+            return result;
+        }
+
         // Affiche l’image "catalogue" si elle existe (PNG/JPG).
         // Sinon : cache → Shell → placeholder. IMPORTANT : le Shell NE s’active PAS si une image "prévue" existe.
         // ====== VIGNETTES (catalogue -> cache -> Revit(type) -> Shell -> placeholder) ======
         private void LoadThumbnailForFamilyItem(FamilyItem fam)
         {
-            if (fam == null || fam.Icon != null) return;
+            if (fam == null || fam.IsFolder || fam.Icon != null) return;
 
             Task.Run(async () =>
             {
@@ -1810,7 +2063,7 @@ namespace Famille
 
         private void LoadMetadataForFamilyItem(FamilyItem fam)
         {
-            if (fam == null || string.IsNullOrEmpty(fam.Path)) return;
+            if (fam == null || fam.IsFolder || string.IsNullOrEmpty(fam.Path)) return;
 
             FamilyPartAtomMeta cached;
             lock (_metadataLock)
@@ -2782,7 +3035,7 @@ namespace Famille
 
         private void AddFamiliesToActiveCollection(IEnumerable<FamilyItem> families)
         {
-            var familyList = families?.Where(f => f != null).ToList() ?? new List<FamilyItem>();
+            var familyList = families?.Where(f => f != null && !f.IsFolder).ToList() ?? new List<FamilyItem>();
             if (familyList.Count == 0) return;
 
             if (_selectedCollection == null)
@@ -2945,6 +3198,20 @@ namespace Famille
             };
         }
 
+        private FamilyItem CreateFolderItemFromDirectory(DirectoryInfo directory)
+        {
+            var name = directory?.Name ?? string.Empty;
+            return new FamilyItem
+            {
+                Name = name,
+                Path = directory?.FullName,
+                IsFolder = true,
+                NormalizedName = StripDiacritics(name).ToLowerInvariant(),
+                Category = "Dossier",
+                DocumentationAvailable = false
+            };
+        }
+
         #endregion
     }
 
@@ -2967,6 +3234,60 @@ namespace Famille
             set { if (_category != value) { _category = value; OnPropertyChanged(nameof(Category)); } }
         }
         public string NormalizedName { get; set; }
+
+        private bool _isFolder;
+        public bool IsFolder
+        {
+            get => _isFolder;
+            set
+            {
+                if (_isFolder != value)
+                {
+                    _isFolder = value;
+                    OnPropertyChanged(nameof(IsFolder));
+                    OnPropertyChanged(nameof(FamilyControlVisibility));
+                    OnPropertyChanged(nameof(FolderControlVisibility));
+                }
+            }
+        }
+
+        public Visibility FamilyControlVisibility => IsFolder ? Visibility.Collapsed : Visibility.Visible;
+        public Visibility FolderControlVisibility => IsFolder ? Visibility.Visible : Visibility.Collapsed;
+
+        private bool _hasFolderPreview;
+        public bool HasFolderPreview
+        {
+            get => _hasFolderPreview;
+            set { if (_hasFolderPreview != value) { _hasFolderPreview = value; OnPropertyChanged(nameof(HasFolderPreview)); } }
+        }
+
+        private ImageSource _folderPreviewIcon1;
+        public ImageSource FolderPreviewIcon1
+        {
+            get => _folderPreviewIcon1;
+            set { if (_folderPreviewIcon1 != value) { _folderPreviewIcon1 = value; OnPropertyChanged(nameof(FolderPreviewIcon1)); } }
+        }
+
+        private ImageSource _folderPreviewIcon2;
+        public ImageSource FolderPreviewIcon2
+        {
+            get => _folderPreviewIcon2;
+            set { if (_folderPreviewIcon2 != value) { _folderPreviewIcon2 = value; OnPropertyChanged(nameof(FolderPreviewIcon2)); } }
+        }
+
+        private ImageSource _folderPreviewIcon3;
+        public ImageSource FolderPreviewIcon3
+        {
+            get => _folderPreviewIcon3;
+            set { if (_folderPreviewIcon3 != value) { _folderPreviewIcon3 = value; OnPropertyChanged(nameof(FolderPreviewIcon3)); } }
+        }
+
+        private ImageSource _folderPreviewIcon4;
+        public ImageSource FolderPreviewIcon4
+        {
+            get => _folderPreviewIcon4;
+            set { if (_folderPreviewIcon4 != value) { _folderPreviewIcon4 = value; OnPropertyChanged(nameof(FolderPreviewIcon4)); } }
+        }
 
         private string _omniClassNumber;
         public string OmniClassNumber

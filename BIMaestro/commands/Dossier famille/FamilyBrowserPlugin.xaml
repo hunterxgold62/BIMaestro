@@ -159,6 +159,10 @@
                     </Border.Style>
                     <Border.ContextMenu>
                         <ContextMenu>
+                            <MenuItem Header="Ouvrir le dossier"
+                                  Click="OpenFolderItem_Click"
+                                  DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                            <Separator/>
                             <MenuItem Header="Documentation"
                                   Click="DocumentationMenuItem_Click"
                                   DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
@@ -186,13 +190,41 @@
                         </Grid.RowDefinitions>
 
                         <Grid Grid.Row="0">
-                            <Border Background="{DynamicResource ImageBackground}" Padding="3">
+                            <Border Background="{DynamicResource ImageBackground}" Padding="3"
+                                    Visibility="{Binding FamilyControlVisibility}">
                                 <Image Source="{Binding Icon}"
                                    Width="180" Height="180"
                                    Stretch="UniformToFill"
                                    HorizontalAlignment="Center"
                                    VerticalAlignment="Center"
                                    Style="{StaticResource ImageStyle}"/>
+                            </Border>
+                            <Border Background="{DynamicResource ImageBackground}"
+                                    Padding="8"
+                                    Visibility="{Binding FolderControlVisibility}"
+                                    ToolTip="Ouvrir le sous-dossier">
+                                <Grid Width="180" Height="180">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border Grid.Row="0" Grid.Column="0" Margin="2" CornerRadius="4" ClipToBounds="True" Background="#FFE6EAF0">
+                                        <Image Source="{Binding FolderPreviewIcon1}" Stretch="UniformToFill"/>
+                                    </Border>
+                                    <Border Grid.Row="0" Grid.Column="1" Margin="2" CornerRadius="4" ClipToBounds="True" Background="#FFE6EAF0">
+                                        <Image Source="{Binding FolderPreviewIcon2}" Stretch="UniformToFill"/>
+                                    </Border>
+                                    <Border Grid.Row="1" Grid.Column="0" Margin="2" CornerRadius="4" ClipToBounds="True" Background="#FFE6EAF0">
+                                        <Image Source="{Binding FolderPreviewIcon3}" Stretch="UniformToFill"/>
+                                    </Border>
+                                    <Border Grid.Row="1" Grid.Column="1" Margin="2" CornerRadius="4" ClipToBounds="True" Background="#FFE6EAF0">
+                                        <Image Source="{Binding FolderPreviewIcon4}" Stretch="UniformToFill"/>
+                                    </Border>
+                                </Grid>
                             </Border>
                             <Button Style="{StaticResource DocumentationBadgeStyle}"
                                 HorizontalAlignment="Left"
@@ -208,7 +240,8 @@
                             Background="Transparent"
                             BorderThickness="0"
                             BorderBrush="Transparent"
-                            FocusVisualStyle="{x:Null}"/>
+                            FocusVisualStyle="{x:Null}"
+                            Visibility="{Binding FamilyControlVisibility}"/>
                         <Grid Grid.Row="1">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
@@ -224,7 +257,8 @@
                                 FontSize="16"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Top"
-                                Margin="0,0,5,0">
+                                Margin="0,0,5,0"
+                                Visibility="{Binding FamilyControlVisibility}">
                                 <Button.Style>
                                     <Style TargetType="Button">
                                         <Setter Property="Foreground" Value="SkyBlue"/>
@@ -274,6 +308,10 @@
                     </Border.Style>
                     <Border.ContextMenu>
                         <ContextMenu>
+                            <MenuItem Header="Ouvrir le dossier"
+                                  Click="OpenFolderItem_Click"
+                                  DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                            <Separator/>
                             <MenuItem Header="Documentation"
                                   Click="DocumentationMenuItem_Click"
                                   DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
@@ -301,13 +339,41 @@
 
                         <Grid Grid.Column="0" HorizontalAlignment="Left">
                             <Border Background="{DynamicResource ImageBackground}"
-                                Padding="3">
+                                Padding="3"
+                                Visibility="{Binding FamilyControlVisibility}">
                                 <Image Source="{Binding Icon}"
                                    Width="200" Height="200"
                                    Stretch="Uniform"
                                    HorizontalAlignment="Center"
                                    VerticalAlignment="Center"
                                    Style="{StaticResource ImageStyle}"/>
+                            </Border>
+                            <Border Background="{DynamicResource ImageBackground}"
+                                    Padding="6"
+                                    Visibility="{Binding FolderControlVisibility}"
+                                    ToolTip="Ouvrir le sous-dossier">
+                                <Grid Width="170" Height="170">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border Grid.Row="0" Grid.Column="0" Margin="2" CornerRadius="4" ClipToBounds="True" Background="#FFE6EAF0">
+                                        <Image Source="{Binding FolderPreviewIcon1}" Stretch="UniformToFill"/>
+                                    </Border>
+                                    <Border Grid.Row="0" Grid.Column="1" Margin="2" CornerRadius="4" ClipToBounds="True" Background="#FFE6EAF0">
+                                        <Image Source="{Binding FolderPreviewIcon2}" Stretch="UniformToFill"/>
+                                    </Border>
+                                    <Border Grid.Row="1" Grid.Column="0" Margin="2" CornerRadius="4" ClipToBounds="True" Background="#FFE6EAF0">
+                                        <Image Source="{Binding FolderPreviewIcon3}" Stretch="UniformToFill"/>
+                                    </Border>
+                                    <Border Grid.Row="1" Grid.Column="1" Margin="2" CornerRadius="4" ClipToBounds="True" Background="#FFE6EAF0">
+                                        <Image Source="{Binding FolderPreviewIcon4}" Stretch="UniformToFill"/>
+                                    </Border>
+                                </Grid>
                             </Border>
                             <Button Style="{StaticResource DocumentationBadgeStyle}"
                                 HorizontalAlignment="Left"
@@ -335,7 +401,8 @@
                                         Background="Transparent"
                                         BorderThickness="0"
                                         BorderBrush="Transparent"
-                                        FocusVisualStyle="{x:Null}"/>
+                                        FocusVisualStyle="{x:Null}"
+                                        Visibility="{Binding FamilyControlVisibility}"/>
                                     <Button Content="★"
                                         Click="FavoriteButton_Click"
                                         ToolTip="Ajouter/retirer des Favoris"
@@ -344,7 +411,8 @@
                                         FontSize="18"
                                         Width="32"
                                         HorizontalAlignment="Right"
-                                        Margin="0,0,0,0">
+                                        Margin="0,0,0,0"
+                                        Visibility="{Binding FamilyControlVisibility}">
                                         <Button.Style>
                                             <Style TargetType="Button">
                                                 <Setter Property="Foreground" Value="SkyBlue"/>
@@ -821,7 +889,7 @@
                                           Unchecked="DetailedViewCheckBox_Changed" Width="92"/>
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
-                                        <TextBlock Foreground="{DynamicResource PrimaryText}" Margin="5,0,0,0" Text="Familles affichées : "/>
+                                        <TextBlock Foreground="{DynamicResource PrimaryText}" Margin="5,0,0,0" Text="Éléments affichés : "/>
                                         <TextBlock x:Name="CountTextBlock" Foreground="{DynamicResource PrimaryText}" FontWeight="Bold"/>
                                     </StackPanel>
                                 </DockPanel>
