@@ -342,6 +342,19 @@
                                                                    HorizontalAlignment="Center"
                                                                    VerticalAlignment="Center"/>
                                                     </Border>
+
+                                                    <Border HorizontalAlignment="Left"
+                                                            VerticalAlignment="Bottom"
+                                                            Margin="9"
+                                                            Background="#FF111827"
+                                                            CornerRadius="10"
+                                                            Padding="8,3"
+                                                            Visibility="{Binding ImportanceBadgeVisibility}">
+                                                        <TextBlock Text="{Binding ImportanceBadgeText}"
+                                                                   Foreground="White"
+                                                                   FontSize="10"
+                                                                   FontWeight="Bold"/>
+                                                    </Border>
                                                 </Grid>
                                             </Border>
 

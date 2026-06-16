@@ -44,6 +44,7 @@ namespace Analyse
             public string VisualCueText { get; set; }
             public string ActionBadgeShort { get; set; }
             public string ClusterBadgeText { get; set; }
+            public string ImportanceBadgeText { get; set; }
             public string VisualInitials { get; set; }
             public string TileTitle { get; set; }
             public string TileSubtitle { get; set; }
@@ -58,6 +59,7 @@ namespace Analyse
             public Brush AccentSoftBrush { get; set; }
             public System.Windows.Visibility TimelineSeparatorVisibility => IsTimelineSeparator ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
             public System.Windows.Visibility CardVisibility => IsTimelineSeparator ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
+            public System.Windows.Visibility ImportanceBadgeVisibility => string.IsNullOrWhiteSpace(ImportanceBadgeText) ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
             public bool HasMosaic => MosaicImages != null && MosaicImages.Count > 1;
             public System.Windows.Visibility MosaicVisibility => HasMosaic ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
             public System.Windows.Visibility ImageVisibility => !HasMosaic && !string.IsNullOrWhiteSpace(ImagePath) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
@@ -121,6 +123,8 @@ namespace Analyse
                     if (req.Type == UiRequestType.VisualizeEvents)
                     {
                         _owner.ExecuteVisualize(req.Events);
+                        if (req.FocusElementIds.Count > 0)
+                            _owner.ExecuteFocus(req.FocusElementIds);
                         return;
                     }
 
@@ -266,6 +270,7 @@ namespace Analyse
             row.ClusterBadgeText = row.IsCluster
                 ? row.EventCount.ToString(CultureInfo.InvariantCulture) + " éléments"
                 : string.Empty;
+            row.ImportanceBadgeText = GetImportanceBadgeText(row);
             row.VisualInitials = BuildVisualInitials(row, events);
             row.MosaicImages = ResolveMosaicImagePaths(events);
             row.ImagePath = ResolveBestImagePath(events);
@@ -292,6 +297,11 @@ namespace Analyse
 
         private static string BuildTileSubtitle(RowVm row, List<ElementHistoryEvent> events)
         {
+            var typeChangeSummary = GetTypeChangeSummary(events);
+            if (string.Equals(row.Action, "type_change", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(typeChangeSummary))
+                return typeChangeSummary;
+
             var parameterSummary = GetParameterDeltaSummary(events);
             if (string.Equals(row.Action, "param_change", StringComparison.OrdinalIgnoreCase)
                 && !string.IsNullOrWhiteSpace(parameterSummary))
@@ -317,6 +327,14 @@ namespace Analyse
                 row.Family != row.TileTitle ? row.Family : null,
                 row.Category != row.TileTitle ? row.Category : null,
                 row.ActionText);
+        }
+
+        private static string GetImportanceBadgeText(RowVm row)
+        {
+            if (row == null || !row.IsCluster) return string.Empty;
+            if (row.EventCount >= 50) return "MASSIF";
+            if (row.EventCount >= 20) return "IMPORTANT";
+            return string.Empty;
         }
 
         private static string BuildStoryText(RowVm row, List<ElementHistoryEvent> events)
@@ -433,6 +451,91 @@ namespace Analyse
             if (distinct.Count == 0) return string.Empty;
             if (distinct.Count == 1) return distinct[0];
             return string.Join(", ", distinct);
+        }
+
+        private static string GetTypeChangeSummary(IEnumerable<ElementHistoryEvent> events)
+        {
+            foreach (var ev in events ?? Enumerable.Empty<ElementHistoryEvent>())
+            {
+                if (ev?.Delta == null) continue;
+                var oldType = ReadDeltaString(ev.Delta, "oldType");
+                var newType = ReadDeltaString(ev.Delta, "newType");
+                if (!string.IsNullOrWhiteSpace(oldType) && !string.IsNullOrWhiteSpace(newType))
+                    return oldType + " -> " + newType;
+            }
+
+            return string.Empty;
+        }
+
+        private static string GetReadableDeltaSummary(ElementHistoryEvent ev)
+        {
+            if (ev == null) return string.Empty;
+
+            var action = (ev.Action ?? string.Empty).Trim().ToLowerInvariant();
+            if (action == "type_change")
+            {
+                var summary = GetTypeChangeSummary(new[] { ev });
+                return string.IsNullOrWhiteSpace(summary) ? string.Empty : "Avant / après: " + summary;
+            }
+
+            if (action == "param_change")
+            {
+                var summary = GetParameterBeforeAfterSummary(ev);
+                return string.IsNullOrWhiteSpace(summary) ? string.Empty : "Avant / après: " + summary;
+            }
+
+            if (action == "move" && ev.Delta != null && ev.Delta.TryGetValue("new", out var newPos) && ev.Delta.TryGetValue("old", out var oldPos))
+                return "Avant / après: " + CompactPoint(oldPos) + " -> " + CompactPoint(newPos);
+
+            return string.Empty;
+        }
+
+        private static string GetParameterBeforeAfterSummary(ElementHistoryEvent ev)
+        {
+            if (ev?.Delta == null || !ev.Delta.TryGetValue("parameters", out var raw) || raw == null)
+                return string.Empty;
+
+            var changes = ReadParameterChangeLines(raw).Take(3).ToList();
+            return changes.Count == 0 ? string.Empty : string.Join("; ", changes);
+        }
+
+        private static IEnumerable<string> ReadParameterChangeLines(object raw)
+        {
+            if (raw is JArray jArray)
+            {
+                foreach (var item in jArray.OfType<JObject>())
+                {
+                    var name = CleanCellText(item.Value<string>("Name") ?? item.Value<string>("name"));
+                    var oldValue = CleanCellText(item.Value<string>("OldValue") ?? item.Value<string>("oldValue"));
+                    var newValue = CleanCellText(item.Value<string>("NewValue") ?? item.Value<string>("newValue"));
+                    if (!string.IsNullOrWhiteSpace(name) && (!string.IsNullOrWhiteSpace(oldValue) || !string.IsNullOrWhiteSpace(newValue)))
+                        yield return name + ": " + FirstNonEmpty(oldValue, "-") + " -> " + FirstNonEmpty(newValue, "-");
+                }
+
+                yield break;
+            }
+
+            if (raw is string) yield break;
+            if (raw is System.Collections.IEnumerable enumerable)
+            {
+                foreach (var item in enumerable)
+                {
+                    if (item == null) continue;
+                    var type = item.GetType();
+                    var name = CleanCellText(type.GetProperty("Name")?.GetValue(item, null) as string);
+                    var oldValue = CleanCellText(type.GetProperty("OldValue")?.GetValue(item, null) as string);
+                    var newValue = CleanCellText(type.GetProperty("NewValue")?.GetValue(item, null) as string);
+                    if (!string.IsNullOrWhiteSpace(name) && (!string.IsNullOrWhiteSpace(oldValue) || !string.IsNullOrWhiteSpace(newValue)))
+                        yield return name + ": " + FirstNonEmpty(oldValue, "-") + " -> " + FirstNonEmpty(newValue, "-");
+                }
+            }
+        }
+
+        private static string ReadDeltaString(Dictionary<string, object> delta, string key)
+        {
+            if (delta == null || !delta.TryGetValue(key, out var value) || value == null) return string.Empty;
+            if (value is JValue jv) return CleanCellText(Convert.ToString(jv.Value, CultureInfo.InvariantCulture));
+            return CleanCellText(value.ToString());
         }
 
         private static IEnumerable<string> ReadParameterNames(object raw)
@@ -716,8 +819,7 @@ namespace Analyse
 
         private void VisualCardsList_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
-            FocusSelectedElement();
-            VisualizeDeletedButton_Click(sender, e);
+            HandleSmartDoubleClick();
         }
 
         private void UpdateVisualizeButtonLabel()
@@ -904,8 +1006,7 @@ namespace Analyse
 
         private void HistoryGrid_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
-            FocusSelectedElement();
-            VisualizeDeletedButton_Click(sender, e);
+            HandleSmartDoubleClick();
         }
 
         private void FocusButton_Click(object sender, RoutedEventArgs e)
@@ -948,6 +1049,45 @@ namespace Analyse
             });
         }
 
+        private void HandleSmartDoubleClick()
+        {
+            var row = GetPrimarySelectedRow();
+            if (row == null || row.Source == null) return;
+
+            var events = GetRowEvents(row).ToList();
+            if (events.Any(e => string.Equals(e.Action, "move", StringComparison.OrdinalIgnoreCase)))
+            {
+                VisualizeRows(new List<RowVm> { row }, true);
+                return;
+            }
+
+            if (events.Any(e => string.Equals(e.Action, "delete", StringComparison.OrdinalIgnoreCase)))
+            {
+                VisualizeRows(new List<RowVm> { row }, true);
+                return;
+            }
+
+            if (events.Any(CanVisualize))
+            {
+                VisualizeRows(new List<RowVm> { row });
+                return;
+            }
+
+            ShowDetails();
+        }
+
+        private void ShowDetails()
+        {
+            if (!_detailsVisible)
+            {
+                _detailsVisible = true;
+                DetailsPanel.Visibility = System.Windows.Visibility.Visible;
+                DetailsButton.Content = "Masquer détails";
+            }
+
+            UpdateDetails();
+        }
+
         private void VisualizeDeletedButton_Click(object sender, RoutedEventArgs e)
         {
             var selectedRows = HistoryGrid.SelectedItems
@@ -960,10 +1100,24 @@ namespace Analyse
                 selectedRows.Add(single);
             if (selectedRows.Count == 0) return;
 
+            VisualizeRows(selectedRows);
+        }
+
+        private void VisualizeRows(List<RowVm> rows, bool focusAfterVisualize = false)
+        {
+            var events = (rows ?? new List<RowVm>())
+                .SelectMany(GetRowEvents)
+                .Where(CanVisualize)
+                .ToList();
+            if (events.Count == 0) return;
+
             RaiseRequest(new UiRequest
             {
                 Type = UiRequestType.VisualizeEvents,
-                Events = selectedRows.SelectMany(GetRowEvents).Where(CanVisualize).ToList()
+                Events = events,
+                FocusElementIds = focusAfterVisualize
+                    ? events.Select(e => e.ElementId).Distinct().ToList()
+                    : new List<int>()
             });
         }
 
@@ -1075,6 +1229,7 @@ namespace Analyse
             }
 
             SetClusterDetails(null);
+            var readableDelta = GetReadableDeltaSummary(ev);
             DetailsText.Text =
                 $"Id: {ev.ElementId}\n" +
                 $"UniqueId: {ev.UniqueId}\n" +
@@ -1086,7 +1241,9 @@ namespace Analyse
                 $"Catégorie: {ev.Category}\n" +
                 $"Famille: {ev.Family}\n" +
                 $"Type: {ev.TypeName}\n" +
-                $"Transaction: {ev.Tx}\n\n" +
+                $"Transaction: {ev.Tx}\n" +
+                (string.IsNullOrWhiteSpace(readableDelta) ? string.Empty : readableDelta + "\n") +
+                "\n" +
                 "Delta:\n" +
                 (ev.Delta == null ? "-" : JsonConvert.SerializeObject(ev.Delta, Formatting.Indented));
         }
@@ -1291,6 +1448,9 @@ namespace Analyse
         private static string GetPositionText(ElementHistoryEvent ev)
         {
             if (ev?.Delta == null) return "-";
+            var readableDelta = GetReadableDeltaSummary(ev);
+            if (!string.IsNullOrWhiteSpace(readableDelta))
+                return readableDelta.Replace("Avant / après: ", string.Empty);
             if (ev.Delta.TryGetValue("lastKnown", out var lastKnown))
                 return "Supprimé @ " + CompactPoint(lastKnown);
             if (ev.Delta.TryGetValue("new", out var newPos) && ev.Delta.TryGetValue("old", out var oldPos))
