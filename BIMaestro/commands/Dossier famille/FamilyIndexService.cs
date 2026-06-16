@@ -17,6 +17,13 @@ namespace Famille
             public string Path { get; set; }
             public string Category { get; set; }
             public string NormalizedName { get; set; }
+            public string NormalizedFolder { get; set; }
+            public string RevitSavedVersion { get; set; }
+            public long? FileSizeBytes { get; set; }
+            public DateTime? CreatedUtc { get; set; }
+            public DateTime? LastModifiedUtc { get; set; }
+            public bool HasDocumentation { get; set; }
+            public bool HasCatalogImage { get; set; }
         }
 
         private readonly string _familiesRoot;
@@ -61,13 +68,24 @@ namespace Famille
                     string cat = "Général";
                     if (low.Contains("porte")) cat = "Porte";
                     else if (low.Contains("fenetre") || low.Contains("fenêtre")) cat = "Fenêtre";
+                    var info = SafeGetFileInfo(f);
+                    var meta = FamilyMetadataProvider.RequestFastMetadataAsync(f).GetAwaiter().GetResult();
+                    if (!string.IsNullOrWhiteSpace(meta?.Category))
+                        cat = meta.Category.Trim();
 
                     list.Add(new Entry
                     {
                         Name = name,
                         Path = f,
                         Category = cat,
-                        NormalizedName = StripDiacritics(name).ToLowerInvariant()
+                        NormalizedName = StripDiacritics(name).ToLowerInvariant(),
+                        NormalizedFolder = StripDiacritics(GetRelativeFolder(f)).ToLowerInvariant(),
+                        RevitSavedVersion = string.IsNullOrWhiteSpace(meta?.RevitSavedVersion) ? null : meta.RevitSavedVersion.Trim(),
+                        FileSizeBytes = meta?.FileSizeBytes ?? info?.Length,
+                        CreatedUtc = info?.CreationTimeUtc,
+                        LastModifiedUtc = info?.LastWriteTimeUtc,
+                        HasDocumentation = HasDocumentationFile(f),
+                        HasCatalogImage = HasCatalogImage(f)
                     });
 
                     n++;
@@ -115,6 +133,82 @@ namespace Famille
         {
             StatusText = s;
             IndexUpdated?.Invoke();
+        }
+
+        private FileInfo SafeGetFileInfo(string path)
+        {
+            try
+            {
+                var info = new FileInfo(path);
+                return info.Exists ? info : null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private string GetRelativeFolder(string familyPath)
+        {
+            try
+            {
+                var root = _familiesRoot.EndsWith(Path.DirectorySeparatorChar.ToString())
+                    ? _familiesRoot
+                    : _familiesRoot + Path.DirectorySeparatorChar;
+                var rootUri = new Uri(root);
+                var pathUri = new Uri(familyPath);
+                var relative = Uri.UnescapeDataString(rootUri.MakeRelativeUri(pathUri).ToString())
+                    .Replace('/', Path.DirectorySeparatorChar);
+                return Path.GetDirectoryName(relative) ?? string.Empty;
+            }
+            catch
+            {
+                return Path.GetDirectoryName(familyPath) ?? string.Empty;
+            }
+        }
+
+        private static bool HasDocumentationFile(string familyPath)
+            => !string.IsNullOrWhiteSpace(familyPath) && File.Exists(familyPath + ".docs.json");
+
+        private bool HasCatalogImage(string familyPath)
+        {
+            try
+            {
+                string rel = GetRelativePath(_familiesRoot, familyPath);
+                string fileNameNoExt = Path.GetFileNameWithoutExtension(familyPath);
+
+                string InImgMirror(string ext) => Path.ChangeExtension(Path.Combine(_imagesRoot, rel), ext);
+                string InImgFlat(string ext) => Path.Combine(_imagesRoot, fileNameNoExt + ext);
+                string NextToFamily(string ext) => Path.ChangeExtension(familyPath, ext);
+
+                string[] candidates =
+                {
+                    InImgMirror(".png"), NextToFamily(".png"), InImgFlat(".png"),
+                    InImgMirror(".jpg"), NextToFamily(".jpg"), InImgFlat(".jpg"),
+                };
+
+                return candidates.Any(c => !string.IsNullOrEmpty(c) && File.Exists(c));
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static string GetRelativePath(string relativeTo, string path)
+        {
+            try
+            {
+                var fromUri = new Uri(relativeTo.EndsWith(Path.DirectorySeparatorChar.ToString())
+                    ? relativeTo : relativeTo + Path.DirectorySeparatorChar);
+                var toUri = new Uri(path);
+                return Uri.UnescapeDataString(fromUri.MakeRelativeUri(toUri).ToString())
+                    .Replace('/', Path.DirectorySeparatorChar);
+            }
+            catch
+            {
+                return Path.GetFileName(path);
+            }
         }
 
         private static string StripDiacritics(string text)

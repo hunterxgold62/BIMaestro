@@ -154,6 +154,17 @@
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
+            <Style x:Key="FreshnessBadgeStyle" TargetType="Border">
+                <Setter Property="HorizontalAlignment" Value="Right"/>
+                <Setter Property="VerticalAlignment" Value="Top"/>
+                <Setter Property="CornerRadius" Value="9"/>
+                <Setter Property="Padding" Value="7,2"/>
+                <Setter Property="Margin" Value="0,34,8,0"/>
+                <Setter Property="Background" Value="#F8FFFFFF"/>
+                <Setter Property="BorderBrush" Value="#FFDCE6FA"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Visibility" Value="Collapsed"/>
+            </Style>
 
             <!-- Vignette famille (onglet Dossiers) -->
             <DataTemplate x:Key="FamilyItemTemplate" DataType="{x:Type local:FamilyItem}">
@@ -276,6 +287,30 @@
                                 VerticalAlignment="Top"
                                 Margin="6"
                                 Click="DocumentationBadge_Click"/>
+                            <Border>
+                                <Border.Style>
+                                    <Style TargetType="Border" BasedOn="{StaticResource FreshnessBadgeStyle}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsNew}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <TextBlock Text="NEW" Foreground="{DynamicResource Brand}" FontWeight="SemiBold" FontSize="10"/>
+                            </Border>
+                            <Border>
+                                <Border.Style>
+                                    <Style TargetType="Border" BasedOn="{StaticResource FreshnessBadgeStyle}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsUpdated}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <TextBlock Text="MAJ" Foreground="{DynamicResource Brand}" FontWeight="SemiBold" FontSize="10"/>
+                            </Border>
                         </Grid>
                         <Button Content="3D"
                             Width="28" Height="20" FontSize="10" Padding="0"
@@ -440,6 +475,30 @@
                                 VerticalAlignment="Top"
                                 Margin="6"
                                 Click="DocumentationBadge_Click"/>
+                            <Border>
+                                <Border.Style>
+                                    <Style TargetType="Border" BasedOn="{StaticResource FreshnessBadgeStyle}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsNew}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <TextBlock Text="NEW" Foreground="{DynamicResource Brand}" FontWeight="SemiBold" FontSize="10"/>
+                            </Border>
+                            <Border>
+                                <Border.Style>
+                                    <Style TargetType="Border" BasedOn="{StaticResource FreshnessBadgeStyle}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsUpdated}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <TextBlock Text="MAJ" Foreground="{DynamicResource Brand}" FontWeight="SemiBold" FontSize="10"/>
+                            </Border>
                         </Grid>
 
                         <Grid Grid.Column="1" Margin="20,0,10,0">
@@ -697,6 +756,30 @@
                                 VerticalAlignment="Top"
                                 Margin="6"
                                 Click="DocumentationBadge_Click"/>
+                            <Border>
+                                <Border.Style>
+                                    <Style TargetType="Border" BasedOn="{StaticResource FreshnessBadgeStyle}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsNew}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <TextBlock Text="NEW" Foreground="{DynamicResource Brand}" FontWeight="SemiBold" FontSize="10"/>
+                            </Border>
+                            <Border>
+                                <Border.Style>
+                                    <Style TargetType="Border" BasedOn="{StaticResource FreshnessBadgeStyle}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsUpdated}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <TextBlock Text="MAJ" Foreground="{DynamicResource Brand}" FontWeight="SemiBold" FontSize="10"/>
+                            </Border>
                         </Grid>
 
                         <Grid Grid.Row="1">

@@ -38,6 +38,7 @@ namespace Analyse
             catch (Exception ex) { TaskDialog.Show("Smart Check", $"Scan raccords ouverts : {ex.Message}"); }
 
             var docKey = SmartCheckState.GetDocKey(doc);
+            EnrichIssues(doc, issues);
             SmartCheckState.RestoreIgnored(docKey, issues);
 
             var handler = new SmartExternalHandler(uiapp);
@@ -219,6 +220,7 @@ namespace Analyse
                     Kind = IssueKind.LinkPipeClash,
                     Category = "Collisions tuyaux/liens",
                     Message = $"Tuyau #{entry.PipeId.GetIdValue()} en collision avec lien '{info?.Name}' (Id {(info?.LinkId.GetIdValue() ?? 0)}){countSuffix}",
+                    LinkName = info?.Name,
                     BBox = entry.Box
                 };
             }
@@ -641,6 +643,143 @@ namespace Analyse
 
 
         private static string NiceType(Element e) => e?.Category?.Name ?? e?.GetType().Name ?? "Élément";
+
+        private static void EnrichIssues(Document doc, IList<ModelIssue> issues)
+        {
+            if (doc == null || issues == null) return;
+
+            var levels = new FilteredElementCollector(doc)
+                .OfClass(typeof(Level))
+                .Cast<Level>()
+                .OrderBy(l => l.Elevation)
+                .ToList();
+
+            foreach (var issue in issues)
+            {
+                if (issue == null) continue;
+
+                var element = issue.ElementId != null && issue.ElementId != ElementId.InvalidElementId
+                    ? doc.GetElement(issue.ElementId)
+                    : null;
+                var related = issue.RelatedId != null && issue.RelatedId != ElementId.InvalidElementId
+                    ? doc.GetElement(issue.RelatedId)
+                    : null;
+
+                issue.ElementCategory = element?.Category?.Name ?? issue.ElementCategory;
+                issue.ElementTypeName = GetElementTypeLabel(doc, element) ?? issue.ElementTypeName;
+                issue.LevelName = GetLevelName(doc, element, issue.BBox, levels) ?? issue.LevelName;
+
+                if (string.IsNullOrWhiteSpace(issue.LinkName))
+                {
+                    if (related is RevitLinkInstance || related is ImportInstance)
+                        issue.LinkName = CleanLinkName(related.Name);
+                    else if (issue.Kind == IssueKind.LinkPipeClash)
+                        issue.LinkName = "Lien externe";
+                }
+            }
+        }
+
+        private static string GetElementTypeLabel(Document doc, Element element)
+        {
+            if (doc == null || element == null) return null;
+
+            if (element is FamilyInstance fi)
+            {
+                var family = fi.Symbol?.Family?.Name;
+                var type = fi.Symbol?.Name;
+                if (!string.IsNullOrWhiteSpace(family) && !string.IsNullOrWhiteSpace(type))
+                    return family + " - " + type;
+                if (!string.IsNullOrWhiteSpace(type)) return type;
+                if (!string.IsNullOrWhiteSpace(family)) return family;
+            }
+
+            try
+            {
+                var typeId = element.GetTypeId();
+                if (typeId != null && typeId != ElementId.InvalidElementId)
+                {
+                    var typeEl = doc.GetElement(typeId);
+                    if (!string.IsNullOrWhiteSpace(typeEl?.Name))
+                        return typeEl.Name;
+                }
+            }
+            catch { }
+
+            return !string.IsNullOrWhiteSpace(element.Name) ? element.Name : element.Category?.Name;
+        }
+
+        private static string GetLevelName(Document doc, Element element, BoundingBoxXYZ box, IList<Level> levels)
+        {
+            if (doc == null) return null;
+
+            var level = GetLevelFromElementId(doc, element);
+            if (level != null) return level.Name;
+
+            level = GetLevelFromParameters(doc, element);
+            if (level != null) return level.Name;
+
+            if (box != null && levels != null && levels.Count > 0)
+            {
+                var z = box.Min.Z;
+                var closest = levels
+                    .OrderBy(l => Math.Abs(l.Elevation - z))
+                    .FirstOrDefault();
+                if (closest != null) return closest.Name;
+            }
+
+            return null;
+        }
+
+        private static Level GetLevelFromElementId(Document doc, Element element)
+        {
+            if (doc == null || element == null) return null;
+            try
+            {
+                var levelId = element.LevelId;
+                if (levelId != null && levelId != ElementId.InvalidElementId)
+                    return doc.GetElement(levelId) as Level;
+            }
+            catch { }
+
+            return null;
+        }
+
+        private static Level GetLevelFromParameters(Document doc, Element element)
+        {
+            if (doc == null || element == null) return null;
+
+            var ids = new[]
+            {
+                BuiltInParameter.FAMILY_LEVEL_PARAM,
+                BuiltInParameter.INSTANCE_REFERENCE_LEVEL_PARAM,
+                BuiltInParameter.WALL_BASE_CONSTRAINT,
+                BuiltInParameter.RBS_START_LEVEL_PARAM,
+                BuiltInParameter.SCHEDULE_LEVEL_PARAM
+            };
+
+            foreach (var bip in ids)
+            {
+                try
+                {
+                    var p = element.get_Parameter(bip);
+                    if (p != null && p.StorageType == StorageType.ElementId)
+                    {
+                        var level = doc.GetElement(p.AsElementId()) as Level;
+                        if (level != null) return level;
+                    }
+                }
+                catch { }
+            }
+
+            return null;
+        }
+
+        private static string CleanLinkName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return null;
+            return name.Replace(".rvt", string.Empty).Replace(".ifc", string.Empty).Trim();
+        }
+
         private static double MmToFeet(double mm) => mm / 304.8;
         private static double FeetToMm(double ft) => ft * 304.8;
         private static double Mm3ToFt3(double mm3) => mm3 / Math.Pow(304.8, 3);

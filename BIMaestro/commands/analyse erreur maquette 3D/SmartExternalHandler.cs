@@ -2,7 +2,9 @@
 using Autodesk.Revit.UI;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Threading;
 
 namespace Analyse
 {
@@ -23,6 +25,9 @@ namespace Analyse
         public bool ShowAllEnabled { get; set; } = false;
 
         public bool AutoSectionBox { get; set; } = true;
+        public IList<ModelIssue> ThumbnailIssues { get; set; } = new List<ModelIssue>();
+        public string ThumbnailFolder { get; set; }
+        public int ThumbnailLimit { get; set; } = 12;
 
         public SmartExternalHandler(UIApplication app) { _uiapp = app; }
         public string GetName() => "BIMaestro.SmartExternalHandler";
@@ -81,6 +86,12 @@ namespace Analyse
                                 t.Commit();
                             }
                             TryRefresh(uidoc);
+                            break;
+                        }
+
+                    case SmartAction.GenerateThumbnails:
+                        {
+                            GenerateThumbnails(uidoc, doc);
                             break;
                         }
 
@@ -318,6 +329,134 @@ namespace Analyse
                 .Where(e => e?.Category != null)
                 .Select(e => e.Id)
                 .ToList();
+        }
+
+        private void GenerateThumbnails(UIDocument uidoc, Document doc)
+        {
+            var queue = (ThumbnailIssues ?? new List<ModelIssue>())
+                .Where(i => i != null)
+                .Distinct()
+                .Take(Math.Max(1, ThumbnailLimit))
+                .ToList();
+            if (queue.Count == 0) return;
+
+            var folder = string.IsNullOrWhiteSpace(ThumbnailFolder)
+                ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "Clash3D", "Miniatures")
+                : ThumbnailFolder;
+            Directory.CreateDirectory(folder);
+
+            var v = EnsureSmart3D(doc);
+            uidoc.ActiveView = v;
+
+            foreach (var issue in queue)
+            {
+                var target = Path.Combine(folder, MakeSafeFileName(issue.IssueKey) + ".png");
+                if (File.Exists(target))
+                {
+                    issue.ThumbnailPath = target;
+                    issue.ThumbnailLoading = false;
+                    continue;
+                }
+
+                issue.ThumbnailLoading = true;
+                try
+                {
+                    BoundingBoxXYZ focusBox = null;
+                    using (var t = new Transaction(doc, "BIMaestro miniature Clash 3D"))
+                    {
+                        t.Start();
+                        ClearOverrides(uidoc, v);
+                        focusBox = FocusIn3D(
+                            uidoc,
+                            v,
+                            issue.ElementId ?? ElementId.InvalidElementId,
+                            issue.RelatedId ?? ElementId.InvalidElementId,
+                            issue.Kind,
+                            issue.BBox,
+                            setSection: true);
+                        doc.Regenerate();
+                        t.Commit();
+                    }
+
+                    ZoomTo(uidoc, v, focusBox, issue.ElementId);
+                    var exported = ExportViewToPng(doc, v, target, 420);
+                    if (!string.IsNullOrWhiteSpace(exported) && File.Exists(exported))
+                        issue.ThumbnailPath = exported;
+                }
+                catch
+                {
+                    // Une miniature ratée ne doit pas interrompre tout le lot.
+                }
+                finally
+                {
+                    issue.ThumbnailLoading = false;
+                }
+            }
+
+            TryRefresh(uidoc);
+        }
+
+        private static string ExportViewToPng(Document doc, View3D view, string targetPng, int pixelSize)
+        {
+            var outDir = Path.GetDirectoryName(targetPng);
+            if (string.IsNullOrWhiteSpace(outDir)) return null;
+            Directory.CreateDirectory(outDir);
+
+            var baseName = Path.GetFileNameWithoutExtension(targetPng);
+            var basePath = Path.Combine(outDir, baseName);
+            var before = new HashSet<string>(Directory.EnumerateFiles(outDir, "*.png"), StringComparer.OrdinalIgnoreCase);
+
+            var options = new ImageExportOptions
+            {
+                ExportRange = ExportRange.SetOfViews,
+                FilePath = basePath,
+                HLRandWFViewsFileType = ImageFileType.PNG,
+                ShadowViewsFileType = ImageFileType.PNG,
+                ZoomType = ZoomFitType.FitToPage,
+                PixelSize = Math.Max(256, pixelSize),
+                FitDirection = FitDirectionType.Horizontal,
+                ImageResolution = ImageResolution.DPI_150
+            };
+
+            options.SetViewsAndSheets(new List<ElementId> { view.Id });
+            doc.ExportImage(options);
+
+            string picked = null;
+            var deadline = DateTime.UtcNow.AddMilliseconds(2500);
+            while (DateTime.UtcNow < deadline)
+            {
+                var after = Directory.EnumerateFiles(outDir, "*.png").ToList();
+                picked = after
+                    .Where(f => !before.Contains(f) || Path.GetFileName(f).StartsWith(baseName, StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(File.GetLastWriteTimeUtc)
+                    .FirstOrDefault();
+                if (!string.IsNullOrWhiteSpace(picked)) break;
+                Thread.Sleep(100);
+            }
+
+            if (string.IsNullOrWhiteSpace(picked)) return null;
+
+            try
+            {
+                if (!string.Equals(picked, targetPng, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (File.Exists(targetPng)) File.Delete(targetPng);
+                    File.Copy(picked, targetPng, overwrite: true);
+                }
+
+                return targetPng;
+            }
+            catch
+            {
+                return picked;
+            }
+        }
+
+        private static string MakeSafeFileName(string value)
+        {
+            var invalid = Path.GetInvalidFileNameChars();
+            var safe = new string((value ?? "issue").Select(ch => invalid.Contains(ch) ? '_' : ch).ToArray());
+            return safe.Length > 120 ? safe.Substring(0, 120) : safe;
         }
 
         private static BoundingBoxXYZ EnsureMinimumBoxSize(BoundingBoxXYZ bb, double minSizeFt)

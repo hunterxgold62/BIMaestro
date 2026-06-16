@@ -45,6 +45,8 @@ namespace Famille
         private readonly string configFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "SauvegardePréférence", "Config.txt");
         private readonly string pathsFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "SauvegardePréférence", "CheminsFamille.json");
         private readonly string workFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "FamilleRevit");
+        private static readonly TimeSpan NewFamilyAge = TimeSpan.FromDays(14);
+        private static readonly TimeSpan UpdatedFamilyAge = TimeSpan.FromDays(30);
 
         // Cache de vignettes (disque)
         private readonly string thumbCacheFolder =
@@ -971,9 +973,11 @@ namespace Famille
                     return;
                 }
 
-                var hits = txt.Length == 0
-                    ? _index.GetAll(max: 0)
-                    : _index.Search(txt, max: 8000);
+                var query = FamilySearchQuery.Parse(txt);
+                var hits = _index.GetAll(max: 0)
+                    .Where(e => MatchesGlobalSearch(e, query))
+                    .Take(8000)
+                    .ToList();
 
                 var items = hits.Select(e =>
                 {
@@ -983,7 +987,14 @@ namespace Famille
                         Path = e.Path,
                         Category = e.Category,
                         NormalizedName = e.NormalizedName,
-                        DocumentationAvailable = false
+                        RevitSavedVersion = e.RevitSavedVersion,
+                        FileSizeBytes = e.FileSizeBytes,
+                        FileSizeText = FormatFileSize(e.FileSizeBytes),
+                        CreatedUtc = e.CreatedUtc,
+                        LastModifiedUtc = e.LastModifiedUtc,
+                        LastUpdatedUtc = e.LastModifiedUtc,
+                        DocumentationAvailable = e.HasDocumentation,
+                        HasCatalogImage = e.HasCatalogImage
                     };
                 }).ToList();
 
@@ -997,6 +1008,242 @@ namespace Famille
                     baseSet = baseSet.Where(f => !f.IsBackNavigation && f.NormalizedName.Contains(txt));
 
                 BeginPaging(ApplyInteractiveSorting(baseSet.ToList()));
+            }
+        }
+
+        private bool MatchesGlobalSearch(FamilyIndexService.Entry entry, FamilySearchQuery query)
+        {
+            if (entry == null)
+                return false;
+
+            foreach (var term in query.Terms)
+            {
+                if (!ContainsNormalized(entry.NormalizedName, term) &&
+                    !ContainsNormalized(entry.NormalizedFolder, term) &&
+                    !ContainsNormalized(entry.Category, term) &&
+                    !ContainsNormalized(entry.RevitSavedVersion, term))
+                {
+                    return false;
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(query.Folder) && !ContainsNormalized(entry.NormalizedFolder, query.Folder))
+                return false;
+
+            if (!string.IsNullOrWhiteSpace(query.Category) && !ContainsNormalized(entry.Category, query.Category))
+                return false;
+
+            if (!string.IsNullOrWhiteSpace(query.RevitVersion) && !ContainsNormalized(entry.RevitSavedVersion, query.RevitVersion))
+                return false;
+
+            if (query.HasDocumentation.HasValue && entry.HasDocumentation != query.HasDocumentation.Value)
+                return false;
+
+            if (query.HasCatalogImage.HasValue && entry.HasCatalogImage != query.HasCatalogImage.Value)
+                return false;
+
+            if (query.IsFavorite.HasValue)
+            {
+                bool isFavorite = IsFavoritePath(entry.Path);
+                if (isFavorite != query.IsFavorite.Value)
+                    return false;
+            }
+
+            if (query.IsNew && !IsNewFamily(entry.CreatedUtc))
+                return false;
+
+            if (query.IsUpdated && !IsUpdatedFamily(entry.CreatedUtc, entry.LastModifiedUtc))
+                return false;
+
+            return true;
+        }
+
+        private static bool ContainsNormalized(string source, string term)
+        {
+            if (string.IsNullOrWhiteSpace(term))
+                return true;
+
+            if (string.IsNullOrWhiteSpace(source))
+                return false;
+
+            return StripDiacritics(source).ToLowerInvariant().Contains(term);
+        }
+
+        private bool IsFavoritePath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                return false;
+
+            try
+            {
+                return GetFavoritesCollection()?.Paths?.Any(p => p.Equals(path, StringComparison.OrdinalIgnoreCase)) == true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool IsNewFamily(DateTime? createdUtc)
+        {
+            if (!createdUtc.HasValue)
+                return false;
+
+            var age = DateTime.UtcNow - createdUtc.Value;
+            return age >= TimeSpan.Zero && age <= NewFamilyAge;
+        }
+
+        private static bool IsUpdatedFamily(DateTime? createdUtc, DateTime? modifiedUtc)
+        {
+            if (!modifiedUtc.HasValue || IsNewFamily(createdUtc))
+                return false;
+
+            var age = DateTime.UtcNow - modifiedUtc.Value;
+            return age >= TimeSpan.Zero && age <= UpdatedFamilyAge;
+        }
+
+        private sealed class FamilySearchQuery
+        {
+            public List<string> Terms { get; } = new();
+            public string Folder { get; private set; }
+            public string Category { get; private set; }
+            public string RevitVersion { get; private set; }
+            public bool? HasDocumentation { get; private set; }
+            public bool? HasCatalogImage { get; private set; }
+            public bool? IsFavorite { get; private set; }
+            public bool IsNew { get; private set; }
+            public bool IsUpdated { get; private set; }
+
+            public bool HasAdvancedFilters =>
+                !string.IsNullOrWhiteSpace(Folder) ||
+                !string.IsNullOrWhiteSpace(Category) ||
+                !string.IsNullOrWhiteSpace(RevitVersion) ||
+                HasDocumentation.HasValue ||
+                HasCatalogImage.HasValue ||
+                IsFavorite.HasValue ||
+                IsNew ||
+                IsUpdated;
+
+            public static FamilySearchQuery Parse(string normalizedText)
+            {
+                var query = new FamilySearchQuery();
+                if (string.IsNullOrWhiteSpace(normalizedText))
+                    return query;
+
+                foreach (var token in normalizedText.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var idx = token.IndexOf(':');
+                    if (idx > 0)
+                    {
+                        var key = token.Substring(0, idx);
+                        var value = token.Substring(idx + 1);
+                        if (ApplyKeyValue(query, key, value))
+                            continue;
+                    }
+
+                    if (token == "new" || token == "nouveau")
+                    {
+                        query.IsNew = true;
+                        continue;
+                    }
+
+                    if (token == "maj" || token == "modifie" || token == "modifié")
+                    {
+                        query.IsUpdated = true;
+                        continue;
+                    }
+
+                    query.Terms.Add(token);
+                }
+
+                return query;
+            }
+
+            private static bool ApplyKeyValue(FamilySearchQuery query, string key, string value)
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                    return false;
+
+                switch (key)
+                {
+                    case "dossier":
+                    case "folder":
+                    case "dir":
+                        query.Folder = value;
+                        return true;
+
+                    case "cat":
+                    case "categorie":
+                    case "category":
+                        query.Category = value;
+                        return true;
+
+                    case "rvt":
+                    case "revit":
+                    case "version":
+                        query.RevitVersion = value;
+                        return true;
+
+                    case "doc":
+                    case "docs":
+                    case "documentation":
+                        if (TryParseBooleanFilter(value, out var hasDoc))
+                        {
+                            query.HasDocumentation = hasDoc;
+                            return true;
+                        }
+                        return false;
+
+                    case "image":
+                    case "img":
+                    case "apercu":
+                    case "aperçu":
+                        if (TryParseBooleanFilter(value, out var hasImage))
+                        {
+                            query.HasCatalogImage = hasImage;
+                            return true;
+                        }
+                        return false;
+
+                    case "fav":
+                    case "favori":
+                    case "favoris":
+                        if (TryParseBooleanFilter(value, out var isFavorite))
+                        {
+                            query.IsFavorite = isFavorite;
+                            return true;
+                        }
+                        return false;
+
+                    default:
+                        return false;
+                }
+            }
+
+            private static bool TryParseBooleanFilter(string value, out bool result)
+            {
+                switch (value)
+                {
+                    case "1":
+                    case "oui":
+                    case "yes":
+                    case "true":
+                    case "avec":
+                        result = true;
+                        return true;
+
+                    case "0":
+                    case "non":
+                    case "no":
+                    case "false":
+                    case "sans":
+                        result = false;
+                        return true;
+
+                    default:
+                        result = false;
+                        return false;
+                }
             }
         }
 
@@ -3458,6 +3705,20 @@ namespace Famille
         {
             var name = System.IO.Path.GetFileNameWithoutExtension(path);
             var size = TryGetFileSize(path);
+            DateTime? createdUtc = null;
+            DateTime? modifiedUtc = null;
+            try
+            {
+                var info = new FileInfo(path);
+                if (info.Exists)
+                {
+                    createdUtc = info.CreationTimeUtc;
+                    modifiedUtc = info.LastWriteTimeUtc;
+                }
+            }
+            catch { }
+
+            var hasCatalogImage = TryGetCatalogImagePath(path, out _);
             return new FamilyItem
             {
                 Name = name,
@@ -3466,6 +3727,10 @@ namespace Famille
                 NormalizedName = StripDiacritics(name).ToLowerInvariant(),
                 FileSizeBytes = size,
                 FileSizeText = FormatFileSize(size),
+                CreatedUtc = createdUtc,
+                LastModifiedUtc = modifiedUtc,
+                LastUpdatedUtc = modifiedUtc,
+                HasCatalogImage = hasCatalogImage,
                 DocumentationAvailable = HasDocumentationFile(path)
             };
         }
@@ -3748,6 +4013,61 @@ namespace Famille
             get => _fileSizeBytes;
             set { if (_fileSizeBytes != value) { _fileSizeBytes = value; OnPropertyChanged(nameof(FileSizeBytes)); } }
         }
+
+        private static readonly TimeSpan NewBadgeAge = TimeSpan.FromDays(14);
+        private static readonly TimeSpan UpdatedBadgeAge = TimeSpan.FromDays(30);
+
+        private DateTime? _createdUtc;
+        public DateTime? CreatedUtc
+        {
+            get => _createdUtc;
+            set
+            {
+                if (_createdUtc == value) return;
+                _createdUtc = value;
+                OnPropertyChanged(nameof(CreatedUtc));
+                OnPropertyChanged(nameof(IsNew));
+                OnPropertyChanged(nameof(IsUpdated));
+            }
+        }
+
+        private DateTime? _lastModifiedUtc;
+        public DateTime? LastModifiedUtc
+        {
+            get => _lastModifiedUtc;
+            set
+            {
+                if (_lastModifiedUtc == value) return;
+                _lastModifiedUtc = value;
+                OnPropertyChanged(nameof(LastModifiedUtc));
+                OnPropertyChanged(nameof(IsUpdated));
+            }
+        }
+
+        private bool _hasCatalogImage;
+        public bool HasCatalogImage
+        {
+            get => _hasCatalogImage;
+            set { if (_hasCatalogImage != value) { _hasCatalogImage = value; OnPropertyChanged(nameof(HasCatalogImage)); } }
+        }
+
+        public bool IsNew
+        {
+            get
+            {
+                if (!CreatedUtc.HasValue)
+                    return false;
+
+                var age = DateTime.UtcNow - CreatedUtc.Value;
+                return age >= TimeSpan.Zero && age <= NewBadgeAge;
+            }
+        }
+
+        public bool IsUpdated =>
+            !IsNew &&
+            LastModifiedUtc.HasValue &&
+            DateTime.UtcNow - LastModifiedUtc.Value >= TimeSpan.Zero &&
+            DateTime.UtcNow - LastModifiedUtc.Value <= UpdatedBadgeAge;
 
         private bool _documentationAvailable;
         public bool DocumentationAvailable
