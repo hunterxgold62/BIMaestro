@@ -180,6 +180,7 @@ namespace Famille
 
         // Pagination & recherche
         private const int PageSize = 200;
+        private const int ScrollTopActionThreshold = 16;
         private int _nextIndex = 0;
         private List<FamilyItem> _currentResult = new();
         private readonly DispatcherTimer _searchDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
@@ -1269,6 +1270,7 @@ namespace Famille
         {
             if (_nextIndex >= _currentResult.Count)
             {
+                AddScrollTopActionIfNeeded();
                 PagingStatusText.Text = "Fin de la liste.";
                 return;
             }
@@ -1290,9 +1292,25 @@ namespace Famille
             // Met à jour les étoiles selon la collection Favoris
             MarkFavoritesInView(displayedFamilies);
 
+            if (_nextIndex >= _currentResult.Count)
+                AddScrollTopActionIfNeeded();
+
             PagingStatusText.Text = _nextIndex >= _currentResult.Count
                 ? "Fin de la liste."
                 : $"Affichés : {displayedFamilies.Count}/{_currentResult.Count}";
+        }
+
+        private void AddScrollTopActionIfNeeded()
+        {
+            if (_currentResult == null || _currentResult.Count <= ScrollTopActionThreshold)
+                return;
+
+            if (displayedFamilies.Any(f => f.IsScrollTopNavigation))
+                return;
+
+            displayedFamilies.Add(CreateScrollTopItem());
+            FamilyListView.ItemsSource = null;
+            FamilyListView.ItemsSource = displayedFamilies;
         }
 
         private void ItemsScroll_ScrollChanged(object sender, ScrollChangedEventArgs e)
@@ -1844,6 +1862,13 @@ namespace Famille
             if (sender is not Border b || b.DataContext is not FamilyItem fam)
                 return;
 
+            if (fam.IsScrollTopNavigation)
+            {
+                ItemsScroll?.ScrollToTop();
+                e.Handled = true;
+                return;
+            }
+
             if (fam.IsFolder)
             {
                 NavigateToFolder(fam.Path);
@@ -1951,6 +1976,12 @@ namespace Famille
                 return;
 
             var contextFamily = border.DataContext as FamilyItem;
+            if (contextFamily?.IsScrollTopNavigation == true)
+            {
+                e.Handled = true;
+                return;
+            }
+
             bool isFolder = contextFamily?.IsFolder == true;
             bool hasMultipleSelection = _isMultiSelectionEnabled && GetSelectedFamilies().Count > 1;
             foreach (var item in border.ContextMenu.Items)
@@ -3789,6 +3820,20 @@ namespace Famille
             };
         }
 
+        private FamilyItem CreateScrollTopItem()
+        {
+            return new FamilyItem
+            {
+                Name = "Haut de page",
+                IsFolder = true,
+                IsScrollTopNavigation = true,
+                NormalizedName = "haut de page",
+                Category = "Navigation",
+                DocumentationAvailable = false,
+                HasFolderPreview = true
+            };
+        }
+
         #endregion
     }
 
@@ -3855,14 +3900,34 @@ namespace Famille
             }
         }
 
+        private bool _isScrollTopNavigation;
+        public bool IsScrollTopNavigation
+        {
+            get => _isScrollTopNavigation;
+            set
+            {
+                if (_isScrollTopNavigation != value)
+                {
+                    _isScrollTopNavigation = value;
+                    OnPropertyChanged(nameof(IsScrollTopNavigation));
+                    OnPropertyChanged(nameof(ScrollTopNavigationVisibility));
+                    OnPropertyChanged(nameof(FolderPreviewVisibility));
+                    OnPropertyChanged(nameof(FolderBadgeText));
+                }
+            }
+        }
+
         public Visibility BackNavigationVisibility => IsBackNavigation ? Visibility.Visible : Visibility.Collapsed;
-        public Visibility FolderPreviewVisibility => IsBackNavigation ? Visibility.Collapsed : Visibility.Visible;
+        public Visibility ScrollTopNavigationVisibility => IsScrollTopNavigation ? Visibility.Visible : Visibility.Collapsed;
+        public Visibility FolderPreviewVisibility => (IsBackNavigation || IsScrollTopNavigation) ? Visibility.Collapsed : Visibility.Visible;
         public string FolderBadgeText
         {
             get
             {
                 if (IsBackNavigation)
                     return "RETOUR";
+                if (IsScrollTopNavigation)
+                    return "HAUT";
 
                 return FolderFamilyCount == 1 ? "1 famille" : $"{FolderFamilyCount} familles";
             }

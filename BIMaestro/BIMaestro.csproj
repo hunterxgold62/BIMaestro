@@ -279,6 +279,7 @@
     <Compile Include="app et excel\Supabase\Bienvenue\WelcomeWindow.xaml.cs">
       <DependentUpon>WelcomeWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="app et excel\Supabase\IssueReporter.cs" />
     <Compile Include="app et excel\Touche\AppUI.cs" />
     <Compile Include="app et excel\Supabase\ApiKeys.cs" />
     <Compile Include="app et excel\Touche\roue gta des touches\ButtonRecentManager.cs" />

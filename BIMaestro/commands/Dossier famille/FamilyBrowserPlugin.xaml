@@ -267,6 +267,13 @@
                                                Foreground="{DynamicResource Brand}"
                                                HorizontalAlignment="Center"
                                                VerticalAlignment="Center"/>
+                                    <TextBlock Text="↑"
+                                               Visibility="{Binding ScrollTopNavigationVisibility}"
+                                               FontSize="64"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource Brand}"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"/>
                                     <Border HorizontalAlignment="Left"
                                             VerticalAlignment="Bottom"
                                             Margin="8"
@@ -463,6 +470,13 @@
                                     </Grid>
                                     <TextBlock Text="←"
                                                Visibility="{Binding BackNavigationVisibility}"
+                                               FontSize="58"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource Brand}"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"/>
+                                    <TextBlock Text="↑"
+                                               Visibility="{Binding ScrollTopNavigationVisibility}"
                                                FontSize="58"
                                                FontWeight="SemiBold"
                                                Foreground="{DynamicResource Brand}"

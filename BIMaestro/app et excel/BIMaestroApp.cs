@@ -124,35 +124,15 @@ public class BIMaestroApp : IExternalApplication
        
          return Result.Succeeded;
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException ex)
         {
-            const string linkedInUrl = "https://www.linkedin.com/in/paul-lemert-b40921207";
-
-            var td = new TaskDialog("BIMaestro – Erreur")
-            {
-                MainInstruction = "Une erreur est survenue au démarrage",
-                MainContent =
-                    "Impossible de lancer BIMaestro pour le moment.\n\n" +
-                    "Si le problème continue, contacte-moi sur LinkedIn."
-            };
-            td.CommonButtons = TaskDialogCommonButtons.Close;
-            td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Me contacter");
-            var result = td.Show();
-            if (result == TaskDialogResult.CommandLink1)
-            {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = linkedInUrl,
-                    UseShellExecute = true
-                });
-            }
-
+            IssueReporter.ShowStartupError(ex);
             return Result.Failed;
         }
         catch (Exception ex)
         {
             AppendLog($"OnStartup : {ex.Message}\n{ex.StackTrace}");
-            TaskDialog.Show("Erreur OnStartup", ex.ToString());
+            IssueReporter.ShowStartupError(ex);
             return Result.Failed;
         }
     }

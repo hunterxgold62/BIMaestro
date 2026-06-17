@@ -91,7 +91,9 @@ namespace Licensing
             {
                 var trackedButtonLabel = ResolveButtonDisplayName();
                 Telemetry.TrackButton(trackedButtonLabel, false, new { error = ex.GetType().Name, ex.Message });
-                throw;
+                message = ex.Message;
+                IssueReporter.ShowCommandError(trackedButtonLabel, ex, data);
+                return Result.Failed;
             }
         }
     }
