@@ -10,6 +10,7 @@ namespace BIMaestro.Welcome
     public partial class WelcomeWindow : Window
     {
         private const string GuideUrl = "https://www.bimaestro.fr";
+        private const string LinkedInUrl = "https://www.linkedin.com/in/paul-lemert-b40921207";
 
         public WelcomeResultAction ResultAction { get; private set; } = WelcomeResultAction.None;
 
@@ -26,7 +27,7 @@ namespace BIMaestro.Welcome
 
         private void OpenGuide_Click(object sender, RoutedEventArgs e)
         {
-            // ✅ Bonus : ouvre le site, mais NE ferme PAS la fenêtre
+            // Ouvre le site sans fermer la fenêtre, pour laisser le choix de renseigner le contact.
             try
             {
                 Process.Start(new ProcessStartInfo
@@ -44,12 +45,28 @@ namespace BIMaestro.Welcome
             // On ne change pas ResultAction, on ne Close() pas.
         }
 
+        private void Contact_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = LinkedInUrl,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, "Impossible d’ouvrir LinkedIn : " + ex.Message,
+                    "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
 
         private void OptIn_Click(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrWhiteSpace(Email))
             {
-                MessageBox.Show(this, "Indique un email (ou clique “Plus tard / Non merci”).",
+                MessageBox.Show(this, "Indique un email, ou clique sur “Plus tard” si tu préfères passer.",
                     "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
@@ -86,20 +103,47 @@ namespace BIMaestro.Welcome
         private static BitmapImage LoadBitmapFromResource(string resourceFileName)
         {
             var asm = Assembly.GetExecutingAssembly();
-            string resourcePath = $"BIMaestro.Resources.{resourceFileName}";
-
-            using (var stream = asm.GetManifestResourceStream(resourcePath))
+            string[] resourcePaths =
             {
-                if (stream == null) return null;
+                $"BIMaestro.Resources.{resourceFileName}",
+                $"BIMaestro.Resources.OLD.{resourceFileName}"
+            };
 
-                var bmp = new BitmapImage();
-                bmp.BeginInit();
-                bmp.CacheOption = BitmapCacheOption.OnLoad;
-                bmp.StreamSource = stream;
-                bmp.EndInit();
-                bmp.Freeze();
-                return bmp;
+            foreach (var resourcePath in resourcePaths)
+            {
+                using (var stream = asm.GetManifestResourceStream(resourcePath))
+                {
+                    if (stream == null) continue;
+
+                    var bmp = new BitmapImage();
+                    bmp.BeginInit();
+                    bmp.CacheOption = BitmapCacheOption.OnLoad;
+                    bmp.StreamSource = stream;
+                    bmp.EndInit();
+                    bmp.Freeze();
+                    return bmp;
+                }
             }
+
+            foreach (var resourcePath in asm.GetManifestResourceNames())
+            {
+                if (!resourcePath.EndsWith("." + resourceFileName, StringComparison.OrdinalIgnoreCase)) continue;
+
+                using (var stream = asm.GetManifestResourceStream(resourcePath))
+                {
+                    if (stream == null) return null;
+
+                    var bmp = new BitmapImage();
+                    bmp.BeginInit();
+                    bmp.CacheOption = BitmapCacheOption.OnLoad;
+                    bmp.StreamSource = stream;
+                    bmp.EndInit();
+                    bmp.Freeze();
+                    return bmp;
+                }
+            }
+
+            return null;
         }
     }
 }

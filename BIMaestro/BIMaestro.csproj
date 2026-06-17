@@ -302,6 +302,7 @@
     <Compile Include="commands\page de mise à jour en direct\UpdatePromptWindow.xaml.cs">
       <DependentUpon>UpdatePromptWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="commands\page de mise à jour en direct\ContactCommand.cs" />
     <Compile Include="commands\paramétre partagé en famillle\ConvertSharedToFamilyParametersCommand.cs" />
     <Compile Include="commands\Réservation auto\résa auto v3\ReservationAutoV3Command.cs" />
     <Compile Include="commands\Réservation auto\résa auto v3\ReservationAutoV3Config.cs" />

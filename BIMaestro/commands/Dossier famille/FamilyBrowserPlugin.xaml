@@ -995,8 +995,35 @@
                                      Background="{DynamicResource SearchBoxBackground}"
                                      Foreground="{DynamicResource SearchBoxForeground}"
                                      BorderBrush="{DynamicResource SearchBoxBorder}"
+                                     ToolTipService.InitialShowDelay="650"
+                                     ToolTipService.ShowDuration="30000"
                                      Padding="8,4"
-                                     Margin="2,0,8,0"/>
+                                     Margin="2,0,8,0">
+                                        <TextBox.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel MaxWidth="360">
+                                                    <TextBlock Text="Astuces de recherche"
+                                                               FontWeight="SemiBold"
+                                                               Margin="0,0,0,6"/>
+                                                    <TextBlock TextWrapping="Wrap"
+                                                               Text="En mode Tout, tu peux chercher dans toute la bibliothèque. Écris simplement un nom, ou ajoute un mot-clé pour préciser ce que tu veux trouver."/>
+                                                    <TextBlock Text="Exemples utiles"
+                                                               FontWeight="SemiBold"
+                                                               Margin="0,10,0,4"/>
+                                                    <TextBlock TextWrapping="Wrap" Text="new : familles ajoutées récemment" Margin="0,0,0,2"/>
+                                                    <TextBlock TextWrapping="Wrap" Text="maj : familles modifiées récemment" Margin="0,0,0,2"/>
+                                                    <TextBlock TextWrapping="Wrap" Text="rvt:2024 : familles enregistrées en Revit 2024" Margin="0,0,0,2"/>
+                                                    <TextBlock TextWrapping="Wrap" Text="doc:oui : familles avec documentation" Margin="0,0,0,2"/>
+                                                    <TextBlock TextWrapping="Wrap" Text="image:non : familles sans image d'aperçu" Margin="0,0,0,2"/>
+                                                    <TextBlock TextWrapping="Wrap" Text="dossier:skid : chercher uniquement dans les dossiers contenant SKID"/>
+                                                    <TextBlock Text="Tu peux combiner : pompe rvt:2024 doc:oui"
+                                                               Foreground="{DynamicResource Text.Secondary}"
+                                                               Margin="0,10,0,0"
+                                                               TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </TextBox.ToolTip>
+                                    </TextBox>
                                     <TextBlock x:Name="PlaceholderText"
                                        Grid.Column="0"
                                        Text="Rechercher dans le dossier…"
@@ -1019,7 +1046,7 @@
                                                   MinWidth="58"
                                                   Height="30"
                                                   Click="SearchScopeButton_Click"
-                                                  ToolTip="Rechercher dans toute la bibliothèque indexée"/>
+                                                  ToolTip="Rechercher dans toute la bibliothèque indexée. Exemples : new, maj, rvt:2024, dossier:skid, doc:oui."/>
                                 </Grid>
 
                                 <Rectangle Grid.Row="2" Height="1" Fill="{DynamicResource Divider}" Margin="0,5"/>

@@ -153,6 +153,7 @@ public class AppUI : IExternalApplication
                     ("CustomizeRibbon", "Option", new List<(string, string, string, string, string)>
                     {
                         ("CustomizeRibbon", "Option", "BIMaestro.RibbonLayout.RibbonLayoutCommand", "Option.png", "Configurer le ruban BIMaestro et les paramètres utilisateur."),
+                        ("ContactCommand", "Contact", "Page.ContactCommand", "Information (2).png", "Ouvre le LinkedIn de Paul Lemert pour envoyer un retour, signaler un bouton qui bloque ou proposer une idée."),
                         ("RadialMenuButtonsCommand", "Rosace\nBoutons", "BIMaestro.UI.RadialMenuButtonsCommand", "Option.png", "Rosace des 16 derniers boutons BIMaestro utilisés.")
                     })
                 ))

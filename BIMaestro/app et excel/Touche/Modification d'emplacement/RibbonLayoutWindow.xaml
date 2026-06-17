@@ -150,7 +150,7 @@
                             <TextBlock Style="{StaticResource H2}" Text="Informations (optionnel)"/>
                             <TextBlock Style="{StaticResource Hint}"
                                        Margin="0,0,0,14"
-                                       Text="Renseigne ton email, prénom et nom si tu veux recevoir des infos ou corrections importantes."/>
+                                       Text="Renseigne ton email si tu veux recevoir les infos importantes. Pour me contacter directement, passe par LinkedIn."/>
 
                             <TextBlock Style="{StaticResource Label}" Text="Email (optionnel)"/>
                             <TextBox x:Name="EmailBox" Text="{Binding Email, UpdateSourceTrigger=PropertyChanged}"/>
@@ -187,16 +187,12 @@
                                         <Run Text="LinkedIn : "/>
                                         <Hyperlink NavigateUri="https://www.linkedin.com/in/paul-lemert-b40921207"
                                                    RequestNavigate="OnRequestNavigate">
-                                            <Run Text="paul-lemert"/>
+                                            <Run Text="Paul Lemert"/>
                                         </Hyperlink>
                                     </TextBlock>
-                                    <TextBlock Margin="0,6,0,0">
-                                        <Run Text="Email : "/>
-                                        <Hyperlink NavigateUri="mailto:bimaestro.plugin@gmail.com"
-                                                   RequestNavigate="OnRequestNavigate">
-                                            <Run Text="bimaestro.plugin@gmail.com"/>
-                                        </Hyperlink>
-                                    </TextBlock>
+                                    <TextBlock Style="{StaticResource Hint}"
+                                               Margin="0,6,0,0"
+                                               Text="Bouton qui marche mal, commande pas claire, idée d'amélioration : envoie-moi un message ici."/>
                                 </StackPanel>
                             </Border>
                         </StackPanel>
