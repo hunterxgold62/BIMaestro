@@ -202,7 +202,7 @@ namespace BIMaestro.Dashboard
             {
                 string ev = (ws.Cells[r, 1].Value ?? "").ToString();
                 if (string.IsNullOrWhiteSpace(ev)) continue;
-                string docId = (ws.Cells[r, 2].Value ?? "").ToString();
+                string docId = NormalizeDocumentId((ws.Cells[r, 2].Value ?? "").ToString());
                 string docName = (ws.Cells[r, 3].Value ?? "").ToString();
                 string revitVer = (ws.Cells[r, 4].Value ?? "").ToString();
                 string dateStr = (ws.Cells[r, 5].Value ?? "").ToString();
@@ -780,6 +780,19 @@ namespace BIMaestro.Dashboard
             else
             { try { s = Path.GetFileNameWithoutExtension(s); } catch { } }
             return string.IsNullOrWhiteSpace(s) ? "(sans nom)" : s;
+        }
+
+        private static string NormalizeDocumentId(string docId)
+        {
+            if (string.IsNullOrWhiteSpace(docId))
+                return docId;
+
+            var parts = docId.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries)
+                             .Select(p => p.Trim())
+                             .Where(p => !string.IsNullOrWhiteSpace(p))
+                             .ToArray();
+
+            return parts.Length > 1 ? parts[parts.Length - 1] : docId.Trim();
         }
 
 
