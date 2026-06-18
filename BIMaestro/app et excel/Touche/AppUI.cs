@@ -77,6 +77,7 @@ public class AppUI : IExternalApplication
                     ("dynamo réglage", "Auto dynamo\nréglage", "Modification.ConfigureDynamoButtonCommand", "paramétre.png","Configure les paramètres Dynamo"),
                 })),
                 new RibbonItemDefinition("GestionExcelCmd", "Gestion Excel", panel => AddPushButton(panel, "GestionExcelCmd", "Gestion\nExcel", assemblyPath, "ScheduleIO.ScheduleExcelIOCommand", "Gestion Excel.png", "Exporter ou importer une nomenclature au format Excel")),
+                new RibbonItemDefinition("PhaseQuickEditButton", "Phases rapides", panel => AddPushButton(panel, "PhaseQuickEditButton", "Phases\nrapides", assemblyPath, "Modification.PhaseQuickEditCommand", "paramétre.png", "Modifie rapidement la phase de creation et la phase de demolition des objets selectionnes.")),
                 new RibbonItemDefinition("ModificationQuickTools", "Outils rapides", panel => AddStackedPushButtons(
                         panel,
                         assemblyPath,

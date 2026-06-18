@@ -375,6 +375,10 @@
       <DependentUpon>ColorPicker.xaml</DependentUpon>
     </Compile>
     <Compile Include="commands\changer de couleur de ligne\OverrideColorCommand.cs" />
+    <Compile Include="commands\phase rapide\PhaseQuickEditCommand.cs" />
+    <Compile Include="commands\phase rapide\PhaseQuickEditWindow.xaml.cs">
+      <DependentUpon>PhaseQuickEditWindow.xaml</DependentUpon>
+    </Compile>
     <None Include="commands\changer de couleur de ligne\ResetOverridesCommand.cs" />
     <Compile Include="commands\correction automatique\AiGrammarCache.cs" />
     <Compile Include="commands\correction automatique\AiGrammarChecker.cs" />
@@ -592,6 +596,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="commands\changer de couleur de ligne\ColorPicker.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\phase rapide\PhaseQuickEditWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
