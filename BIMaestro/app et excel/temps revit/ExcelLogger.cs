@@ -16,7 +16,7 @@ public static class ExcelLogger
 {
     private const string WorksheetName = "Historique_Temps_Revit";
     private const string StorageMutexName = "BIMaestro_TimeLogger_Storage_v2";
-    private const string SnapshotFormatVersion = "v2";
+    private const string SnapshotFormatVersion = "v3";
 
     private static string _excelFilePath;
     private static readonly object _storageLock = new object();
@@ -184,7 +184,7 @@ public static class ExcelLogger
                     if (ws.LastKnownDocument != null && _uiApp != null)
                         EndDocumentSessionLog(ws.LastKnownDocument, _uiApp, ws);
                     else
-                        EndDocumentSessionLogFallback(key, ws.DocumentName, ws.RevitVersion, ws.GetTotalActiveDuration(), ws.GetDailySeconds());
+                        EndDocumentSessionLogFallback(key, ws.DocumentName, ws.RevitVersion, ws.GetTotalActiveDuration(), ws.GetDailySeconds(), ws.Classification);
 
                     RemoveSnapshot(key);
                 }
@@ -210,11 +210,12 @@ public static class ExcelLogger
             {
                 LastKnownDocument = document,
                 DocumentName = SafeGetDocumentName(document),
-                RevitVersion = SafeGetRevitVersion(uiApp)
+                RevitVersion = SafeGetRevitVersion(uiApp),
+                Classification = TimeLogMetadataExtractor.Classify(document, uiApp, key, SafeGetDocumentName(document))
             };
 
             _sessions[key] = ws;
-            StartDocumentSessionLog(document, uiApp);
+            StartDocumentSessionLog(document, uiApp, ws.Classification);
             UpsertSnapshot(key, ws, true);
         }
         else
@@ -352,13 +353,26 @@ public static class ExcelLogger
         ws.Cells["E1"].Value = "Date";
         ws.Cells["F1"].Value = "Time";
         ws.Cells["G1"].Value = "Duration";
+        ws.Cells["H1"].Value = "Session ID";
+        ws.Cells["I1"].Value = "Document Kind";
+        ws.Cells["J1"].Value = "Is Workshared";
+        ws.Cells["K1"].Value = "Central Path";
+        ws.Cells["L1"].Value = "Local Path";
+        ws.Cells["M1"].Value = "Path Hash";
+        ws.Cells["N1"].Value = "Revit User";
+        ws.Cells["O1"].Value = "Windows User";
+        ws.Cells["P1"].Value = "Machine";
+        ws.Cells["Q1"].Value = "Process ID";
+        ws.Cells["R1"].Value = "Project Info JSON";
         ws.Column(7).Style.Numberformat.Format = "[hh]:mm:ss";
-    }
+        }
 
-    private static void LogEvent(string eventType, Document document, UIApplication uiApp, TimeSpan duration)
+    private static void LogEvent(string eventType, Document document, UIApplication uiApp, TimeSpan duration, TimeLogMetadata classification = null)
     {
         try
         {
+            classification = classification ?? TimeLogMetadataExtractor.Classify(document, uiApp, SafeGetDocumentKey(document), SafeGetDocumentName(document));
+
             var entry = new LogEntry
             {
                 EventType = eventType,
@@ -366,7 +380,8 @@ public static class ExcelLogger
                 DocumentName = SafeGetDocumentName(document),
                 RevitVersion = SafeGetRevitVersion(uiApp),
                 When = DateTime.Now,
-                Duration = duration
+                Duration = duration,
+                Classification = classification
             };
 
             AppendLogEntries(new[] { entry });
@@ -374,11 +389,17 @@ public static class ExcelLogger
         catch { }
     }
 
-    private static void LogClosedSession(string documentKey, string documentName, string revitVersion, IEnumerable<WorkTimeSlice> activeSlices, TimeSpan fallbackDuration)
+    private static void LogClosedSession(
+        string documentKey,
+        string documentName,
+        string revitVersion,
+        IEnumerable<WorkTimeSlice> activeSlices,
+        TimeSpan fallbackDuration,
+        TimeLogMetadata classification)
     {
         try
         {
-            var entries = BuildClosedLogEntries(documentKey, documentName, revitVersion, activeSlices, fallbackDuration);
+            var entries = BuildClosedLogEntries(documentKey, documentName, revitVersion, activeSlices, fallbackDuration, classification);
             AppendLogEntries(entries);
         }
         catch { }
@@ -389,7 +410,8 @@ public static class ExcelLogger
         string documentName,
         string revitVersion,
         IEnumerable<WorkTimeSlice> activeSlices,
-        TimeSpan fallbackDuration)
+        TimeSpan fallbackDuration,
+        TimeLogMetadata classification)
     {
         var entries = new List<LogEntry>();
 
@@ -402,15 +424,15 @@ public static class ExcelLogger
             while (start.Date < end.Date)
             {
                 var boundary = start.Date.AddDays(1);
-                AddClosedEntry(entries, documentKey, documentName, revitVersion, boundary.AddTicks(-1), boundary - start);
+                AddClosedEntry(entries, documentKey, documentName, revitVersion, boundary.AddTicks(-1), boundary - start, classification);
                 start = boundary;
             }
 
-            AddClosedEntry(entries, documentKey, documentName, revitVersion, end, end - start);
+            AddClosedEntry(entries, documentKey, documentName, revitVersion, end, end - start, classification);
         }
 
         if (entries.Count == 0 && fallbackDuration > TimeSpan.Zero)
-            AddClosedEntry(entries, documentKey, documentName, revitVersion, DateTime.Now, fallbackDuration);
+            AddClosedEntry(entries, documentKey, documentName, revitVersion, DateTime.Now, fallbackDuration, classification);
 
         return entries;
     }
@@ -421,7 +443,8 @@ public static class ExcelLogger
         string documentName,
         string revitVersion,
         DateTime when,
-        TimeSpan duration)
+        TimeSpan duration,
+        TimeLogMetadata classification)
     {
         if (duration.TotalSeconds < 1) return;
 
@@ -432,7 +455,8 @@ public static class ExcelLogger
             DocumentName = string.IsNullOrWhiteSpace(documentName) ? "(unknown)" : documentName,
             RevitVersion = string.IsNullOrWhiteSpace(revitVersion) ? "(unknown)" : revitVersion,
             When = when,
-            Duration = duration
+            Duration = duration,
+            Classification = classification ?? TimeLogMetadataExtractor.ClassifyFromLog(documentKey, documentName, null, null, null, null)
         });
     }
 
@@ -464,6 +488,17 @@ public static class ExcelLogger
                 ws.Cells[lastRow, 6].Value = entry.When.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
                 ws.Cells[lastRow, 7].Value = entry.Duration;
                 ws.Cells[lastRow, 7].Style.Numberformat.Format = "[hh]:mm:ss";
+                ws.Cells[lastRow, 8].Value = entry.Classification?.SessionId;
+                ws.Cells[lastRow, 9].Value = entry.Classification?.DocumentKind;
+                ws.Cells[lastRow, 10].Value = entry.Classification?.IsWorkshared;
+                ws.Cells[lastRow, 11].Value = entry.Classification?.CentralPath;
+                ws.Cells[lastRow, 12].Value = entry.Classification?.LocalPath;
+                ws.Cells[lastRow, 13].Value = entry.Classification?.PathHash;
+                ws.Cells[lastRow, 14].Value = entry.Classification?.RevitUser;
+                ws.Cells[lastRow, 15].Value = entry.Classification?.WindowsUser;
+                ws.Cells[lastRow, 16].Value = entry.Classification?.MachineName;
+                ws.Cells[lastRow, 17].Value = entry.Classification?.ProcessId;
+                ws.Cells[lastRow, 18].Value = entry.Classification?.ProjectInfoJson;
             }
 
             package.Save();
@@ -473,13 +508,25 @@ public static class ExcelLogger
     public static void StartDocumentSessionLog(Document document, UIApplication uiApp)
         => LogEvent("Ouvert", document, uiApp, TimeSpan.Zero);
 
+    public static void StartDocumentSessionLog(Document document, UIApplication uiApp, TimeLogMetadata classification)
+        => LogEvent("Ouvert", document, uiApp, TimeSpan.Zero, classification);
+
     public static void EndDocumentSessionLog(Document document, UIApplication uiApp, WorkSession session)
     {
         string documentKey = SafeGetDocumentKey(document);
         string documentName = SafeGetDocumentName(document);
         string revitVersion = SafeGetRevitVersion(uiApp);
 
-        LogClosedSession(documentKey, documentName, revitVersion, session?.GetActiveSlices(), session?.GetTotalActiveDuration() ?? TimeSpan.Zero);
+        var classification = session?.Classification
+                             ?? TimeLogMetadataExtractor.Classify(document, uiApp, documentKey, documentName);
+
+        LogClosedSession(
+            documentKey,
+            documentName,
+            revitVersion,
+            session?.GetActiveSlices(),
+            session?.GetTotalActiveDuration() ?? TimeSpan.Zero,
+            classification);
     }
 
     public static void EndDocumentSessionLog(Document document, UIApplication uiApp, TimeSpan activeDuration)
@@ -488,14 +535,15 @@ public static class ExcelLogger
     public static void TouchHeartbeat(Document document, UIApplication uiApp, TimeSpan activeDuration) { }
 
     public static void EndDocumentSessionLogFallback(string documentKey, TimeSpan activeDuration)
-        => EndDocumentSessionLogFallback(documentKey, "(unknown)", "(unknown)", activeDuration, null);
+        => EndDocumentSessionLogFallback(documentKey, "(unknown)", "(unknown)", activeDuration, null, null);
 
     private static void EndDocumentSessionLogFallback(
         string documentKey,
         string documentName,
         string revitVersion,
         TimeSpan activeDuration,
-        Dictionary<string, long> dailySeconds)
+        Dictionary<string, long> dailySeconds,
+        TimeLogMetadata classification)
     {
         try
         {
@@ -513,7 +561,8 @@ public static class ExcelLogger
                         documentName,
                         revitVersion,
                         day.AddDays(1).AddTicks(-1),
-                        TimeSpan.FromSeconds(Math.Max(0, kv.Value)));
+                        TimeSpan.FromSeconds(Math.Max(0, kv.Value)),
+                        classification ?? TimeLogMetadataExtractor.ClassifyFromLog(documentKey, documentName, null, null, null, null));
                 }
 
                 AppendLogEntries(entries);
@@ -527,7 +576,8 @@ public static class ExcelLogger
                 DocumentName = documentName,
                 RevitVersion = revitVersion,
                 When = DateTime.Now,
-                Duration = activeDuration
+                Duration = activeDuration,
+                Classification = classification ?? TimeLogMetadataExtractor.ClassifyFromLog(documentKey, documentName, null, null, null, null)
             };
 
             AppendLogEntries(new[] { entry });
@@ -608,6 +658,7 @@ public static class ExcelLogger
         public bool IsOpen;
         public int ProcessId;
         public Dictionary<string, long> DailySeconds = new Dictionary<string, long>(StringComparer.Ordinal);
+        public TimeLogMetadata Classification;
     }
 
     private static void UpsertSnapshotIfDue(string docKey, WorkSession session)
@@ -641,7 +692,8 @@ public static class ExcelLogger
                 LastUpdateTicks = DateTime.UtcNow.Ticks,
                 IsOpen = true,
                 ProcessId = CurrentProcessId,
-                DailySeconds = dailySeconds
+                DailySeconds = dailySeconds,
+                Classification = session.Classification ?? TimeLogMetadataExtractor.ClassifyFromLog(docKey, session.DocumentName, null, null, null, null)
             };
 
             SaveSnapshotsCore(map);
@@ -694,12 +746,13 @@ public static class ExcelLogger
 
             if (!IsProcessAlive(s.ProcessId))
             {
-                EndDocumentSessionLogFallbackCore(
-                    s.DocKey,
-                    string.IsNullOrWhiteSpace(s.DocName) ? "(unknown)" : s.DocName,
-                    string.IsNullOrWhiteSpace(s.RevitVersion) ? "(unknown)" : s.RevitVersion,
-                    TimeSpan.FromSeconds(Math.Max(0, s.ActiveSeconds)),
-                    s.DailySeconds);
+                    EndDocumentSessionLogFallbackCore(
+                        s.DocKey,
+                        string.IsNullOrWhiteSpace(s.DocName) ? "(unknown)" : s.DocName,
+                        string.IsNullOrWhiteSpace(s.RevitVersion) ? "(unknown)" : s.RevitVersion,
+                        TimeSpan.FromSeconds(Math.Max(0, s.ActiveSeconds)),
+                        s.DailySeconds,
+                        s.Classification);
 
                 toRemove.Add(kv.Key);
             }
@@ -719,7 +772,8 @@ public static class ExcelLogger
         string documentName,
         string revitVersion,
         TimeSpan activeDuration,
-        Dictionary<string, long> dailySeconds)
+        Dictionary<string, long> dailySeconds,
+        TimeLogMetadata classification)
     {
         if (dailySeconds != null && dailySeconds.Count > 0)
         {
@@ -735,7 +789,8 @@ public static class ExcelLogger
                     documentName,
                     revitVersion,
                     day.AddDays(1).AddTicks(-1),
-                    TimeSpan.FromSeconds(Math.Max(0, kv.Value)));
+                    TimeSpan.FromSeconds(Math.Max(0, kv.Value)),
+                    classification ?? TimeLogMetadataExtractor.ClassifyFromLog(documentKey, documentName, null, null, null, null));
             }
 
             AppendLogEntriesCore(entries);
@@ -751,7 +806,8 @@ public static class ExcelLogger
                 DocumentName = documentName,
                 RevitVersion = revitVersion,
                 When = DateTime.Now,
-                Duration = activeDuration
+                Duration = activeDuration,
+                Classification = classification ?? TimeLogMetadataExtractor.ClassifyFromLog(documentKey, documentName, null, null, null, null)
             }
         });
     }
@@ -787,9 +843,47 @@ public static class ExcelLogger
         if (parts.Length == 0) return null;
 
         if (string.Equals(parts[0], SnapshotFormatVersion, StringComparison.Ordinal))
+            return ParseV3Snapshot(parts);
+
+        if (string.Equals(parts[0], "v2", StringComparison.Ordinal))
             return ParseV2Snapshot(parts);
 
         return ParseLegacySnapshot(parts);
+    }
+
+    private static Snapshot ParseV3Snapshot(string[] parts)
+    {
+        try
+        {
+            if (parts.Length < 10) return null;
+
+            var snapshot = ParseV2Snapshot(parts);
+            if (snapshot == null) return null;
+
+            if (parts.Length >= 21)
+            {
+                snapshot.Classification = new TimeLogMetadata
+                {
+                    SessionId = DecodeField(parts[10]),
+                    DocumentKind = DecodeField(parts[11]),
+                    IsWorkshared = DecodeField(parts[12]),
+                    CentralPath = DecodeField(parts[13]),
+                    LocalPath = DecodeField(parts[14]),
+                    PathHash = DecodeField(parts[15]),
+                    RevitUser = DecodeField(parts[16]),
+                    WindowsUser = DecodeField(parts[17]),
+                    MachineName = DecodeField(parts[18]),
+                    ProcessId = DecodeField(parts[19]),
+                    ProjectInfoJson = DecodeField(parts[20])
+                };
+            }
+
+            return snapshot;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static Snapshot ParseV2Snapshot(string[] parts)
@@ -816,7 +910,8 @@ public static class ExcelLogger
                 LastUpdateTicks = ticks,
                 IsOpen = parts[7] == "1",
                 ProcessId = pid,
-                DailySeconds = daily
+                DailySeconds = daily,
+                Classification = TimeLogMetadataExtractor.ClassifyFromLog(DecodeField(parts[2]), DecodeField(parts[3]), null, null, null, null)
             };
         }
         catch
@@ -862,7 +957,8 @@ public static class ExcelLogger
                 LastUpdateTicks = ticks,
                 IsOpen = parts[isOpenIndex] == "1",
                 ProcessId = pid,
-                DailySeconds = new Dictionary<string, long>(StringComparer.Ordinal)
+                DailySeconds = new Dictionary<string, long>(StringComparer.Ordinal),
+                Classification = TimeLogMetadataExtractor.ClassifyFromLog(docKey, parts[nameIndex], null, null, null, null)
             };
         }
         catch
@@ -904,7 +1000,18 @@ public static class ExcelLogger
                         s.LastUpdateTicks.ToString(CultureInfo.InvariantCulture),
                         s.IsOpen ? "1" : "0",
                         s.ProcessId.ToString(CultureInfo.InvariantCulture),
-                        EncodeField(SerializeDailySeconds(s.DailySeconds))
+                        EncodeField(SerializeDailySeconds(s.DailySeconds)),
+                        EncodeField(s.Classification?.SessionId),
+                        EncodeField(s.Classification?.DocumentKind),
+                        EncodeField(s.Classification?.IsWorkshared),
+                        EncodeField(s.Classification?.CentralPath),
+                        EncodeField(s.Classification?.LocalPath),
+                        EncodeField(s.Classification?.PathHash),
+                        EncodeField(s.Classification?.RevitUser),
+                        EncodeField(s.Classification?.WindowsUser),
+                        EncodeField(s.Classification?.MachineName),
+                        EncodeField(s.Classification?.ProcessId),
+                        EncodeField(s.Classification?.ProjectInfoJson)
                     }));
                 }
             }
@@ -1021,7 +1128,241 @@ public static class ExcelLogger
         public string RevitVersion;
         public DateTime When;
         public TimeSpan Duration;
+        public TimeLogMetadata Classification;
     }
+}
+
+public class TimeLogMetadata
+{
+    public string SessionId { get; set; }
+    public string DocumentKind { get; set; }
+    public string IsWorkshared { get; set; }
+    public string CentralPath { get; set; }
+    public string LocalPath { get; set; }
+    public string PathHash { get; set; }
+    public string RevitUser { get; set; }
+    public string WindowsUser { get; set; }
+    public string MachineName { get; set; }
+    public string ProcessId { get; set; }
+    public string ProjectInfoJson { get; set; }
+}
+
+public static class TimeLogMetadataExtractor
+{
+    public static TimeLogMetadata Classify(Document document, UIApplication uiApp, string documentKey, string documentName)
+    {
+        string localPath = TryGetLocalPath(document);
+        string centralPath = TryGetCentralPath(document);
+        string stablePath = NormalizeDocumentId(FirstNonEmpty(centralPath, localPath, documentKey));
+
+        return new TimeLogMetadata
+        {
+            SessionId = Guid.NewGuid().ToString("N"),
+            DocumentKind = GetDocumentKind(FirstNonEmpty(localPath, centralPath, documentKey, documentName)),
+            IsWorkshared = SafeIsWorkshared(document),
+            CentralPath = centralPath,
+            LocalPath = localPath,
+            PathHash = ComputeStableHash(stablePath),
+            RevitUser = TryGetRevitUser(uiApp),
+            WindowsUser = Environment.UserName,
+            MachineName = Environment.MachineName,
+            ProcessId = Process.GetCurrentProcess().Id.ToString(CultureInfo.InvariantCulture),
+            ProjectInfoJson = ExtractProjectInfoJson(document)
+        };
+    }
+
+    public static TimeLogMetadata ClassifyFromLog(
+        string documentId,
+        string documentName,
+        string sessionId,
+        string documentKind,
+        string isWorkshared,
+        string centralPath)
+    {
+        string localPath = NormalizeDocumentId(documentId);
+        string stablePath = FirstNonEmpty(centralPath, localPath, documentName);
+
+        return new TimeLogMetadata
+        {
+            SessionId = FirstNonEmpty(sessionId, Guid.NewGuid().ToString("N")),
+            DocumentKind = FirstNonEmpty(documentKind, GetDocumentKind(stablePath)),
+            IsWorkshared = FirstNonEmpty(isWorkshared, string.Empty),
+            CentralPath = centralPath,
+            LocalPath = localPath,
+            PathHash = ComputeStableHash(stablePath),
+            RevitUser = string.Empty,
+            WindowsUser = Environment.UserName,
+            MachineName = Environment.MachineName,
+            ProcessId = Process.GetCurrentProcess().Id.ToString(CultureInfo.InvariantCulture),
+            ProjectInfoJson = string.Empty
+        };
+    }
+
+    public static string NormalizeDocumentId(string documentId)
+    {
+        if (string.IsNullOrWhiteSpace(documentId))
+            return documentId;
+
+        var parts = documentId.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries)
+                              .Select(p => p.Trim())
+                              .Where(p => !string.IsNullOrWhiteSpace(p))
+                              .ToArray();
+
+        return parts.Length > 1 ? parts[parts.Length - 1] : documentId.Trim();
+    }
+
+    private static string TryGetLocalPath(Document document)
+    {
+        try { return CleanValue(document?.PathName); }
+        catch { return null; }
+    }
+
+    private static string TryGetCentralPath(Document document)
+    {
+        try
+        {
+            if (document == null || !document.IsWorkshared) return null;
+
+            var centralModelPath = document.GetWorksharingCentralModelPath();
+            return centralModelPath == null
+                ? null
+                : CleanValue(ModelPathUtils.ConvertModelPathToUserVisiblePath(centralModelPath));
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string SafeIsWorkshared(Document document)
+    {
+        try { return document?.IsWorkshared == true ? "true" : "false"; }
+        catch { return string.Empty; }
+    }
+
+    private static string GetDocumentKind(string pathOrName)
+    {
+        string text = (pathOrName ?? string.Empty).Trim().ToLowerInvariant();
+        if (text.EndsWith(".rfa")) return "RFA";
+        if (text.EndsWith(".rvt")) return "RVT";
+
+        return string.Empty;
+    }
+
+    private static string TryGetRevitUser(UIApplication uiApp)
+    {
+        try { return CleanValue(uiApp?.Application?.Username); }
+        catch { return null; }
+    }
+
+    private static string ExtractProjectInfoJson(Document document)
+    {
+        try
+        {
+            var info = document?.ProjectInformation;
+            if (info == null) return string.Empty;
+
+            var items = new SortedDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (Parameter parameter in info.Parameters)
+            {
+                string name = CleanValue(parameter?.Definition?.Name);
+                if (string.IsNullOrWhiteSpace(name)) continue;
+
+                string value = ReadParameterValue(parameter);
+                if (!string.IsNullOrWhiteSpace(value))
+                    items[name] = value;
+            }
+
+            return ToJson(items);
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    private static string ReadParameterValue(Parameter parameter)
+    {
+        try
+        {
+            if (parameter == null) return null;
+
+            string asValueString = CleanValue(parameter.AsValueString());
+            if (!string.IsNullOrWhiteSpace(asValueString))
+                return asValueString;
+
+            switch (parameter.StorageType)
+            {
+                case StorageType.String:
+                    return CleanValue(parameter.AsString());
+                case StorageType.Integer:
+                    return parameter.AsInteger().ToString(CultureInfo.InvariantCulture);
+                case StorageType.Double:
+                    return parameter.AsDouble().ToString("R", CultureInfo.InvariantCulture);
+                case StorageType.ElementId:
+                    return parameter.AsElementId()?.IntegerValue.ToString(CultureInfo.InvariantCulture);
+                default:
+                    return null;
+            }
+        }
+        catch { return null; }
+    }
+
+    private static string ToJson(SortedDictionary<string, string> items)
+    {
+        if (items == null || items.Count == 0) return string.Empty;
+
+        var sb = new StringBuilder();
+        sb.Append('{');
+
+        bool first = true;
+        foreach (var item in items)
+        {
+            if (!first) sb.Append(',');
+            first = false;
+
+            sb.Append('"').Append(JsonEscape(item.Key)).Append("\":\"");
+            sb.Append(JsonEscape(item.Value)).Append('"');
+        }
+
+        sb.Append('}');
+        return sb.ToString();
+    }
+
+    private static string JsonEscape(string value)
+    {
+        if (string.IsNullOrEmpty(value)) return string.Empty;
+
+        return value
+            .Replace("\\", "\\\\")
+            .Replace("\"", "\\\"")
+            .Replace("\r", "\\r")
+            .Replace("\n", "\\n")
+            .Replace("\t", "\\t");
+    }
+
+    private static string ComputeStableHash(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+
+        unchecked
+        {
+            ulong hash = 14695981039346656037UL;
+            foreach (char c in value.Trim().ToUpperInvariant())
+            {
+                hash ^= c;
+                hash *= 1099511628211UL;
+            }
+
+            return hash.ToString("X16", CultureInfo.InvariantCulture);
+        }
+    }
+
+    private static string FirstNonEmpty(params string[] values)
+        => values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v))?.Trim();
+
+    private static string CleanValue(string value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
 
 public class WorkSession
@@ -1039,6 +1380,7 @@ public class WorkSession
     public Document LastKnownDocument { get; set; }
     public string DocumentName { get; set; }
     public string RevitVersion { get; set; }
+    public TimeLogMetadata Classification { get; set; }
     public bool HasOpenSegment => _segmentStart != null;
 
     public void RefreshMetadata(Document document, UIApplication uiApp)
@@ -1056,6 +1398,16 @@ public class WorkSession
         {
             if (uiApp?.Application != null)
                 RevitVersion = uiApp.Application.VersionNumber;
+        }
+        catch { }
+
+        try
+        {
+            var updated = TimeLogMetadataExtractor.Classify(document, uiApp, null, DocumentName);
+            if (!string.IsNullOrWhiteSpace(Classification?.SessionId))
+                updated.SessionId = Classification.SessionId;
+
+            Classification = updated;
         }
         catch { }
     }

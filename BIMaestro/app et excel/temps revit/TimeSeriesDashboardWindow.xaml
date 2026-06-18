@@ -192,7 +192,6 @@
 
                     <WrapPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
                         <Button Style="{StaticResource DashboardGhostButton}" Content="Exporter PNG" Click="ExportPng_Click"/>
-                        <Button Style="{StaticResource DashboardGhostButton}" Content="Exporter CSV" Click="ExportCsv_Click"/>
                         <Button Style="{StaticResource DashboardPrimaryButton}" Content="Ouvrir Excel" Click="OpenExcel_Click"/>
                         <Button Style="{StaticResource DashboardGhostButton}" Content="Réinitialiser" Click="Reset_Click"/>
                     </WrapPanel>

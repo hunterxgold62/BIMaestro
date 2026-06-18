@@ -104,7 +104,6 @@ namespace BIMaestro.Dashboard
             InputBindings.Add(new KeyBinding(new RelayCommand(_ => FocusSearch()), new KeyGesture(Key.F, ModifierKeys.Control)));
             InputBindings.Add(new KeyBinding(new RelayCommand(_ => ExportPng()), new KeyGesture(Key.E, ModifierKeys.Control)));
             InputBindings.Add(new KeyBinding(new RelayCommand(_ => CopyChartToClipboard()), new KeyGesture(Key.C, ModifierKeys.Control)));
-            InputBindings.Add(new KeyBinding(new RelayCommand(_ => ExportCsv()), new KeyGesture(Key.C, ModifierKeys.Control | ModifierKeys.Shift)));
             InputBindings.Add(new KeyBinding(new RelayCommand(_ => ResetFilters()), new KeyGesture(Key.R, ModifierKeys.Control)));
         }
 
@@ -180,7 +179,6 @@ namespace BIMaestro.Dashboard
         private void ChipTop_Click(object sender, RoutedEventArgs e) { if (!_uiReady) return; if (sender is Button b && int.TryParse(b.Content?.ToString(), out int n)) SetTopN(n); }
 
         private void OpenExcel_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; OpenExcel(); }
-        private void ExportCsv_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; ExportCsv(); }
         private void ExportPng_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; ExportPng(); }
         private void Reset_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; ResetFilters(); }
 
@@ -208,11 +206,11 @@ namespace BIMaestro.Dashboard
                 string dateStr = (ws.Cells[r, 5].Value ?? "").ToString();
                 string timeStr = (ws.Cells[r, 6].Value ?? "").ToString();
                 object durObj = ws.Cells[r, 7].Value;
-
                 _rows.Add(new LogRow
                 {
                     Event = ev,
                     DocumentId = docId,
+                    GroupId = docId,
                     DocumentName = docName,
                     RevitVersion = revitVer,
                     When = ParseDateTimeFlexible(dateStr, timeStr),
@@ -231,7 +229,7 @@ namespace BIMaestro.Dashboard
             return DocumentKind.Rvt;
         }
 
-        private bool MatchesDocumentKind(ProjectItem item) => MatchesDocumentKind(item?.DocumentId, item?.Name);
+        private bool MatchesDocumentKind(ProjectItem item) => MatchesDocumentKind(item?.LocationId ?? item?.DocumentId, item?.Name);
 
         private bool MatchesDocumentKind(string documentId, string documentName)
         {
@@ -242,8 +240,8 @@ namespace BIMaestro.Dashboard
         private void BuildProjectList()
         {
             _projects = (_rows ?? Enumerable.Empty<LogRow>())
-                .Where(r => !string.IsNullOrWhiteSpace(r.DocumentId))
-                .GroupBy(r => r.DocumentId)
+                .Where(r => !string.IsNullOrWhiteSpace(r.GroupId))
+                .GroupBy(r => r.GroupId)
                 .Select(g =>
                 {
                     var ordered = g.OrderByDescending(r => r.When)
@@ -257,13 +255,15 @@ namespace BIMaestro.Dashboard
 
                     string id = g.Key;
                     string name = string.IsNullOrWhiteSpace(latestEntry?.DocumentName) ? "(sans nom)" : latestEntry.DocumentName;
+                    string locationId = latestEntry?.DocumentId ?? id;
                     return new ProjectItem
                     {
                         DocumentId = id,
+                        LocationId = locationId,
                         Name = name,
-                        BaseName = GetBaseName(name, id),
-                        Folder = GetLastFolder(id),
-                        Tail = SafeDocIdTail(id),
+                        BaseName = GetBaseName(name, locationId),
+                        Folder = GetLastFolder(locationId),
+                        Tail = SafeDocIdTail(locationId),
                         RevitVersion = NormalizeRevitVersion(versionSource?.RevitVersion),
                         RevitVersionLabel = BuildRevitVersionLabel(versionSource?.RevitVersion),
                         RevitVersionBrush = GetVersionBrush(versionSource?.RevitVersion),
@@ -286,7 +286,7 @@ namespace BIMaestro.Dashboard
                 .Where(r => MatchesDocumentKind(r.DocumentId, r.DocumentName))
                 .Where(r => !d0.HasValue || r.When >= d0.Value)
                 .Where(r => !d1.HasValue || r.When <= d1.Value)
-                .GroupBy(r => r.DocumentId)
+                .GroupBy(r => r.GroupId)
                 .ToDictionary(g => g.Key, g => g.Sum(x => x.Duration.TotalHours), StringComparer.Ordinal);
 
             BuildDisplayProjects();
@@ -380,8 +380,8 @@ namespace BIMaestro.Dashboard
             if (_tgOverview.IsChecked == true)
             {
                 var totals = closed
-                    .Where(r => selected.Any(s => s.DocumentId == r.DocumentId))
-                    .GroupBy(r => r.DocumentId)
+                    .Where(r => selected.Any(s => s.DocumentId == r.GroupId))
+                    .GroupBy(r => r.GroupId)
                     .Select(g => new
                     {
                         DocId = g.Key,
@@ -445,8 +445,8 @@ namespace BIMaestro.Dashboard
                 };
 
                 var grouped = closed
-                    .Where(r => selected.Any(s => s.DocumentId == r.DocumentId))
-                    .GroupBy(r => r.DocumentId)
+                    .Where(r => selected.Any(s => s.DocumentId == r.GroupId))
+                    .GroupBy(r => r.GroupId)
                     .OrderByDescending(g => g.Sum(x => x.Duration.TotalHours))
                     .Take(topN)
                     .ToList();
@@ -528,7 +528,7 @@ namespace BIMaestro.Dashboard
 
             var inRangeAll = _rows.Where(r => r.Event.Equals("Fermé", StringComparison.OrdinalIgnoreCase))
                                   .Where(r => r.When >= d0 && r.When <= d1)
-                                  .Where(r => selected.Contains(r.DocumentId));
+                                  .Where(r => selected.Contains(r.GroupId));
 
             var inRangeWeekdays = inRangeAll
                 .Where(r => r.When.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday)
@@ -578,44 +578,6 @@ namespace BIMaestro.Dashboard
             Clipboard.SetImage(bmp);
         }
 
-        private void ExportCsv()
-        {
-            var dlg = new Microsoft.Win32.SaveFileDialog { FileName = "dashboard_temps.csv", Filter = "CSV|*.csv" };
-            if (dlg.ShowDialog() != true) return;
-
-            var selected = new HashSet<string>((_displayProjects?.Count > 0 ? _displayProjects : _projects.Where(MatchesDocumentKind)).Select(p => p.DocumentId));
-            DateTime d0 = _dpFrom.SelectedDate ?? DateTime.MinValue;
-            DateTime d1 = _dpTo.SelectedDate.HasValue ? _dpTo.SelectedDate.Value.AddDays(1).AddTicks(-1) : DateTime.MaxValue;
-
-            var rows = _rows.Where(r => r.Event.Equals("Fermé", StringComparison.OrdinalIgnoreCase))
-                            .Where(r => r.When >= d0 && r.When <= d1)
-                            .Where(r => selected.Contains(r.DocumentId))
-                            .Select(r => new
-                            {
-                                r.DocumentName,
-                                r.DocumentId,
-                                Date = r.When.ToString("yyyy-MM-dd"),
-                                Time = r.When.ToString("HH:mm:ss"),
-                                Hours = r.Duration.TotalHours
-                            });
-
-            var sb = new StringBuilder();
-            sb.AppendLine("DocumentName,DocumentId,Date,Time,Hours");
-            foreach (var r in rows)
-                sb.AppendLine($"{Csv(r.DocumentName)},{Csv(r.DocumentId)},{r.Date},{r.Time},{r.Hours:0.###}");
-
-            File.WriteAllText(dlg.FileName, sb.ToString(), Encoding.UTF8);
-            MessageBox.Show("Exporté : " + dlg.FileName);
-        }
-
-        private static string Csv(string s)
-        {
-            if (s == null) return "";
-            if (s.Contains(",") || s.Contains("\"") || s.Contains("\n"))
-                return "\"" + s.Replace("\"", "\"\"") + "\"";
-            return s;
-        }
-
         private void OpenExcel()
         {
             try
@@ -639,7 +601,7 @@ namespace BIMaestro.Dashboard
                 {
                     var firstMatch = _filteredProjects?.FirstOrDefault();
                     if (!string.IsNullOrWhiteSpace(_tbSearch?.Text) && firstMatch != null)
-                        path = firstMatch.DocumentId;
+                        path = firstMatch.LocationId;
                     else if (!string.IsNullOrWhiteSpace(_currentDocumentPath))
                         path = _currentDocumentPath;
                 }
@@ -1019,12 +981,13 @@ namespace BIMaestro.Dashboard
         // ===== Models & Prefs =====
         // Ces classes sont utilisées par le XAML (Binding). Il FAUT conserver les noms publics.
         [Obfuscation(Exclude = true, ApplyToMembers = true, StripAfterObfuscation = false)]
-        private class LogRow { public string Event, DocumentId, DocumentName, RevitVersion; public DateTime When; public TimeSpan Duration; }
+        private class LogRow { public string Event, GroupId, DocumentId, DocumentName, RevitVersion; public DateTime When; public TimeSpan Duration; }
 
         [Obfuscation(Exclude = true, ApplyToMembers = true, StripAfterObfuscation = false)]
         private class ProjectItem
         {
             public string DocumentId { get; set; }
+            public string LocationId { get; set; }
             public string Name { get; set; }
             public string BaseName { get; set; }
             public string Folder { get; set; }
