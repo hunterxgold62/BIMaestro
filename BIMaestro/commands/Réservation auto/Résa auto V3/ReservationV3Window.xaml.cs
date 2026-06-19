@@ -19,7 +19,7 @@ namespace Modification
 {
     public partial class ReservationAutoV3Window : Window
     {
-        private const string HelpUrl = "https://www.bimaestro.fr";
+        private const string HelpUrl = "https://www.bimaestro.fr/modification?outil=auto-reservation";
         public enum HostTarget { Mur, Sol }
         public enum ShapeTarget { Rectangulaire, Circulaire }
         public enum ObjectType { Canalisation, Gaine, Porte, Fenetre, Autre }

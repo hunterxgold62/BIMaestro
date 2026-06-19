@@ -6,6 +6,7 @@ namespace Famille
 {
     public partial class ParameterSelectionWindow : Window
     {
+        private const string HelpUrl = "https://www.bimaestro.fr/famille?outil=purge-parametres";
         public ObservableCollection<ParameterSelection> Parameters { get; set; }
 
         public ParameterSelectionWindow(ObservableCollection<ParameterSelection> parameters)
@@ -14,6 +15,18 @@ namespace Famille
             InitializeComponent();
             Parameters = parameters;
             DataContext = this;
+        }
+
+        private void HelpButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(HelpUrl) { UseShellExecute = true });
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         private void OK_Click(object sender, RoutedEventArgs e)

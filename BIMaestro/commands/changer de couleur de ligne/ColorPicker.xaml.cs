@@ -34,7 +34,7 @@ namespace Modification
         private List<View> _allGraphicViews = new List<View>();
         private List<ViewSheet> _allSheets = new List<ViewSheet>();
 
-        private const string HelpUrl = "https://bimaestro.fr";
+        private const string HelpUrl = "https://www.bimaestro.fr/modification?outil=surcharges-vues";
 
         public GraphicOverrideWindow(
             UIApplication uiapp,

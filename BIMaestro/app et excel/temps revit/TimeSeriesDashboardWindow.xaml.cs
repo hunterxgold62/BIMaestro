@@ -25,6 +25,7 @@ namespace BIMaestro.Dashboard
     [Obfuscation(Exclude = true, ApplyToMembers = true, StripAfterObfuscation = false)]
     public partial class TimeSeriesDashboardWindow : Window
     {
+        private const string HelpUrl = "https://www.bimaestro.fr/analyse?outil=temps-par-projet";
         // ===== FICHIERS =====
         private readonly string _excelPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
@@ -108,6 +109,18 @@ namespace BIMaestro.Dashboard
         }
 
         // ===== Handlers XAML (ils doivent garder leur NOM exact) =====
+        private void HelpButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(HelpUrl) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
         private void OnDateChanged(object sender, SelectionChangedEventArgs e) { if (!_uiReady) return; RefreshAll(); }
 
         private void Mode_Checked(object sender, RoutedEventArgs e)

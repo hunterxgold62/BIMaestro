@@ -7,6 +7,8 @@ namespace Modification
 {
     public partial class PhaseQuickEditWindow : Window
     {
+        private const string HelpUrl = "https://www.bimaestro.fr/modification?outil=phases-rapides";
+
         public PhaseQuickEditWindow(IEnumerable<Phase> phases, int selectedElementCount)
         {
             InitializeComponent();
@@ -30,6 +32,18 @@ namespace Modification
             DemolishedPhaseCombo.ItemsSource = demolishedOptions;
             CreatedPhaseCombo.SelectedIndex = 0;
             DemolishedPhaseCombo.SelectedIndex = 0;
+        }
+
+        private void HelpButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(HelpUrl) { UseShellExecute = true });
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         public bool ChangeCreatedPhase

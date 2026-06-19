@@ -14,6 +14,7 @@ namespace Modification
     /// <summary>Fenêtre minimaliste : filtre live (sur Famille) + double-clic, pas de persistance disque.</summary>
     public partial class PickDefaultFlangeWindow : Window
     {
+        private const string HelpUrl = "https://www.bimaestro.fr/modification?outil=bride-auto";
         private readonly List<FlangeItem> _all;   // liste complète (famille/type)
         private List<FlangeItem> _filtered;       // vue filtrée
 
@@ -38,6 +39,18 @@ namespace Modification
                 FlangeList.SelectedIndex = 0;
 
             SearchBox.Focus();
+        }
+
+        private void HelpButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(HelpUrl) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         public FamilySymbol SelectedSymbol =>

@@ -21,6 +21,20 @@
             <Setter Property="Height" Value="30"/>
             <Setter Property="Margin" Value="8,0,0,0"/>
         </Style>
+        <Style x:Key="HelpButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="30"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="MinWidth" Value="30"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="8,0,0,0"/>
+            <Setter Property="Background" Value="#FFF1F3F5"/>
+            <Setter Property="Foreground" Value="#FF111827"/>
+            <Setter Property="BorderBrush" Value="#FFD1D5DB"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
     </Window.Resources>
 
     <Grid Margin="18">
@@ -30,14 +44,28 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0" Margin="0,0,0,14">
-            <TextBlock Text="Modifier les phases des objets selectionnes"
-                       FontSize="17"
-                       FontWeight="SemiBold"/>
-            <TextBlock x:Name="SelectionCountText"
-                       Margin="0,5,0,0"
-                       Foreground="#FF5C6B73"/>
-        </StackPanel>
+        <Grid Grid.Row="0" Margin="0,0,0,14">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0">
+                <TextBlock Text="Modifier les phases des objets selectionnes"
+                           FontSize="17"
+                           FontWeight="SemiBold"/>
+                <TextBlock x:Name="SelectionCountText"
+                           Margin="0,5,0,0"
+                           Foreground="#FF5C6B73"/>
+            </StackPanel>
+
+            <Button Grid.Column="1"
+                    x:Name="HelpButton"
+                    Content="?"
+                    Style="{StaticResource HelpButtonStyle}"
+                    ToolTip="Ouvrir l’aide en ligne"
+                    Click="HelpButton_Click"/>
+        </Grid>
 
         <StackPanel Grid.Row="1">
             <TextBlock Text="Phase de creation"/>
