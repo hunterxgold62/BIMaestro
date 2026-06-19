@@ -15,6 +15,7 @@ namespace IA
 {
     public partial class CorrectionWindow : Window
     {
+        private const string HelpUrl = "https://www.bimaestro.fr/ia?outil=correction-texte-ia";
         public enum CorrectionDialogResult { None, OK, Cancel }
         public CorrectionDialogResult CorrectionResult { get; set; } = CorrectionDialogResult.None;
         public string CorrectedText { get; private set; } = "";
@@ -42,6 +43,18 @@ namespace IA
             // Événements UI
             styleComboBox.SelectionChanged += styleComboBox_SelectionChanged;
             proposalsListBox.MouseDoubleClick += proposalsListBox_MouseDoubleClick;
+        }
+
+        private void HelpButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(HelpUrl) { UseShellExecute = true });
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         private void okButton_Click(object sender, RoutedEventArgs e)

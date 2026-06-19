@@ -9,7 +9,7 @@ namespace Modification
 {
     public partial class ElementRenamerWindow : Window, INotifyPropertyChanged
     {
-        private const string HelpUrl = "https://bimaestro.net/";
+        private const string HelpUrl = "https://www.bimaestro.fr/modification?outil=organisateur";
         public event PropertyChangedEventHandler PropertyChanged;
 
         // Méthode pour notifier les changements de propriété

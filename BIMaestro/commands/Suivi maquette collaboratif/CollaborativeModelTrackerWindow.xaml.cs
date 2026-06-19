@@ -18,6 +18,7 @@ namespace Analyse
 {
     public partial class CollaborativeModelTrackerWindow : Window
     {
+        private const string HelpUrl = "https://www.bimaestro.fr/analyse?outil=suivi-maquette";
         private const string AllUsersLabel = "Tout le monde";
         private const string AllVersionsLabel = "Toutes versions";
         private const string AllFilesLabel = "Tous fichiers";
@@ -45,6 +46,18 @@ namespace Analyse
             _uiapp = uiapp;
             LoadRecords();
             ApplyFilters();
+        }
+
+        private void HelpButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(HelpUrl) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         private void LoadRecords()

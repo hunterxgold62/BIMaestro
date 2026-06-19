@@ -15,6 +15,20 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="/BIMaestro;component/Themes/BIMaestroTheme.xaml"/>
             </ResourceDictionary.MergedDictionaries>
+            <Style x:Key="HelpButtonStyle" TargetType="Button">
+                <Setter Property="Width" Value="34"/>
+                <Setter Property="Height" Value="34"/>
+                <Setter Property="MinWidth" Value="34"/>
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="Margin" Value="0"/>
+                <Setter Property="Background" Value="#F1F3F5"/>
+                <Setter Property="Foreground" Value="#111827"/>
+                <Setter Property="BorderBrush" Value="#D1D5DB"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="FontWeight" Value="Bold"/>
+                <Setter Property="FontSize" Value="15"/>
+                <Setter Property="Cursor" Value="Hand"/>
+            </Style>
             <Style TargetType="TreeViewItem">
                 <Setter Property="Foreground"
                         Value="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=Foreground}" />
@@ -29,10 +43,27 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0"
-                   Text="Sélection des vues et feuilles"
-                   Style="{StaticResource H2}"
-                   Margin="0,0,0,10"/>
+        <Grid Grid.Row="0" Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0"
+                       Text="Sélection des vues et feuilles"
+                       Style="{StaticResource H2}"
+                       VerticalAlignment="Center"
+                       Margin="0,0,12,0"/>
+
+            <Button Grid.Column="1"
+                    x:Name="HelpButton"
+                    Content="?"
+                    VerticalAlignment="Top"
+                    HorizontalAlignment="Right"
+                    Style="{StaticResource HelpButtonStyle}"
+                    ToolTip="Ouvrir l’aide en ligne"
+                    Click="HelpButton_Click"/>
+        </Grid>
 
         <Border Grid.Row="1" Style="{StaticResource Card}" Padding="8">
             <TreeView x:Name="ViewsTreeView"

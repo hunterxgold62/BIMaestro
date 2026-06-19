@@ -20,6 +20,7 @@ namespace Analyse
 {
     public partial class SmartCheckWindow : Window
     {
+        private const string HelpUrl = "https://www.bimaestro.fr/analyse?outil=clash-3d";
         private static readonly string[] StatusFilters =
         {
             "Tous",
@@ -79,6 +80,18 @@ namespace Analyse
             GridMEP.PreviewMouseRightButtonDown += OnGridRightClick;
             GridLinks.PreviewMouseRightButtonDown += OnGridRightClick;
             GridOpen.PreviewMouseRightButtonDown += OnGridRightClick;
+        }
+
+        private void HelpButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(HelpUrl) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         private void PopulateFilters()

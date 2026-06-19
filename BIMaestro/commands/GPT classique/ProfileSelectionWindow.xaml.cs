@@ -4,12 +4,25 @@ namespace IA
 {
     public partial class ProfileSelectionWindow : Window
     {
+        private const string HelpUrl = "https://www.bimaestro.fr/ia?outil=chatbot-element";
         public string SelectedProfile { get; private set; }
 
         public ProfileSelectionWindow()
         {
             ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
+        }
+
+        private void HelpButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(HelpUrl) { UseShellExecute = true });
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         private void OKButton_Click(object sender, RoutedEventArgs e)

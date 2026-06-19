@@ -17,6 +17,7 @@ namespace ScanTextRevit
 {
     public partial class CorrectionResultWindow : Window
     {
+        private const string HelpUrl = "https://www.bimaestro.fr/ia?outil=audit-texte-ia";
         public UIDocument UiDoc { get; set; }
 
         // Stocke les corrections regroupées par clé (ex. "Feuille : …" ou "Vue : …")
@@ -58,6 +59,18 @@ namespace ScanTextRevit
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
             this.Close();
+        }
+
+        private void HelpButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(HelpUrl) { UseShellExecute = true });
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         /// <summary>

@@ -10,6 +10,7 @@ namespace Analyse
     /// </summary>
     public partial class PipeSystemTypeSelectionWindowV2 : Window
     {
+        private const string HelpUrl = "https://www.bimaestro.fr/analyse?outil=calcul-canalisations";
         public bool IncludeDucts { get; private set; }
         public bool FilterBySystemType { get; private set; }
         public List<string> SelectedSystemTypes { get; private set; }
@@ -27,6 +28,18 @@ namespace Analyse
             InstructionText.Visibility = Visibility.Collapsed;
             SystemTypeScrollViewer.Visibility = Visibility.Collapsed;
             DeselectAllButton.Visibility = Visibility.Collapsed;
+        }
+
+        private void HelpButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(HelpUrl) { UseShellExecute = true });
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         private void EnableSystemTypeFilterCheckBox_Checked(object sender, RoutedEventArgs e)

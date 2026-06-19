@@ -15,6 +15,7 @@ namespace Analyse
 {
     public partial class ElementHistoryWindow : Window
     {
+        private const string HelpUrl = "https://www.bimaestro.fr/analyse?outil=qui-a-fait-ca";
         private const string PreviewPrefix = "BIMaestro_Preview_";
         private const string DeletedPreviewPrefix = PreviewPrefix + "Deleted_";
         private const string MoveOldPreviewPrefix = PreviewPrefix + "MoveOld_";
@@ -170,6 +171,18 @@ namespace Analyse
                 HeaderText.Text = "Qui a fait ça ??";
                 HeaderSubtitleText.Text = "BETA - Lecture visuelle des suppressions, déplacements, créations et clusters de la maquette.";
                 Bind(ElementHistoryTracker.LoadRecentModelHistory(_doc, 1000), "delete");
+            }
+        }
+
+        private void HelpButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(HelpUrl) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 

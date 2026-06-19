@@ -507,7 +507,7 @@ namespace Famille
 
         private static IEnumerable<object> BuildGroupCandidates(Type groupArgumentType, Definition definition)
         {
-            if (groupArgumentType == typeof(BuiltInParameterGroup))
+            if (IsBuiltInParameterGroupType(groupArgumentType))
             {
                 foreach (var candidate in BuildBuiltInGroupCandidates(definition))
                     yield return candidate;
@@ -521,24 +521,37 @@ namespace Famille
             }
         }
 
-        private static IEnumerable<BuiltInParameterGroup> BuildBuiltInGroupCandidates(Definition definition)
+        private static bool IsBuiltInParameterGroupType(Type type)
         {
-            var seen = new HashSet<BuiltInParameterGroup>();
+            return type != null
+                   && type.IsEnum
+                   && string.Equals(type.FullName, "Autodesk.Revit.DB.BuiltInParameterGroup", StringComparison.Ordinal);
+        }
+
+        private static IEnumerable<object> BuildBuiltInGroupCandidates(Definition definition)
+        {
+            Type builtInGroupType = definition?.GetType().Assembly.GetType("Autodesk.Revit.DB.BuiltInParameterGroup")
+                                    ?? typeof(FamilyManager).Assembly.GetType("Autodesk.Revit.DB.BuiltInParameterGroup");
+
+            if (builtInGroupType == null || !builtInGroupType.IsEnum)
+                yield break;
+
+            var seen = new HashSet<string>(StringComparer.Ordinal);
 
             var parameterGroupProperty = definition.GetType().GetProperty("ParameterGroup", BindingFlags.Public | BindingFlags.Instance);
             if (parameterGroupProperty != null)
             {
                 var rawValue = parameterGroupProperty.GetValue(definition);
-                if (rawValue is BuiltInParameterGroup fromDefinition && seen.Add(fromDefinition))
-                    yield return fromDefinition;
+                if (rawValue != null && builtInGroupType.IsInstanceOfType(rawValue) && seen.Add(rawValue.ToString()))
+                    yield return rawValue;
             }
 
-            foreach (BuiltInParameterGroup group in Enum.GetValues(typeof(BuiltInParameterGroup)))
+            foreach (var group in Enum.GetValues(builtInGroupType))
             {
-                if (group == BuiltInParameterGroup.INVALID)
+                if (string.Equals(group.ToString(), "INVALID", StringComparison.Ordinal))
                     continue;
 
-                if (seen.Add(group))
+                if (seen.Add(group.ToString()))
                     yield return group;
             }
         }

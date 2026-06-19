@@ -12,6 +12,7 @@ namespace Analyse
 {
     public partial class ResultWindow : Window
     {
+        private const string HelpUrl = "https://www.bimaestro.fr/analyse?outil=analyse-poids";
         private readonly ObservableCollection<ElementInfo> _elements;
         private readonly SelectionRequestHandler _selectionHandler;
         private readonly ExternalEvent _selectionEvent;
@@ -42,6 +43,18 @@ namespace Analyse
 
             ElementDataGrid.MouseDoubleClick += OnRowDoubleClick;
             ElementDataGrid.LoadingRow += OnLoadingRow;
+        }
+
+        private void HelpButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(HelpUrl) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         private void OnLoadingRow(object sender, DataGridRowEventArgs e)

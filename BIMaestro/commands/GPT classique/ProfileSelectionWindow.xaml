@@ -15,26 +15,67 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="/BIMaestro;component/Themes/BIMaestroTheme.xaml"/>
             </ResourceDictionary.MergedDictionaries>
+            <Style x:Key="HelpButtonStyle" TargetType="Button">
+                <Setter Property="Width" Value="34"/>
+                <Setter Property="Height" Value="34"/>
+                <Setter Property="MinWidth" Value="34"/>
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="Margin" Value="0"/>
+                <Setter Property="Background" Value="#F1F3F5"/>
+                <Setter Property="Foreground" Value="#111827"/>
+                <Setter Property="BorderBrush" Value="#D1D5DB"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="FontWeight" Value="Bold"/>
+                <Setter Property="FontSize" Value="15"/>
+                <Setter Property="Cursor" Value="Hand"/>
+            </Style>
         </ResourceDictionary>
     </Window.Resources>
 
     <Grid Margin="16">
         <Border Style="{StaticResource Card}">
-            <StackPanel>
-                <TextBlock Text="Veuillez sélectionner un profil :" Style="{StaticResource H2}"/>
-                <RadioButton x:Name="BasiqueRadio" Content="Basique" IsChecked="True" Margin="0,0,0,8"/>
-                <RadioButton x:Name="PersonnelleRevitRadio" Content="Personnelle Revit" Margin="0,0,0,8"/>
-                <RadioButton x:Name="BIMManagerRadio" Content="BIM Manager" Margin="0,0,0,8"/>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+                <TextBlock Grid.Row="0"
+                           Grid.Column="0"
+                           Text="Veuillez sélectionner un profil :"
+                           Style="{StaticResource H2}"
+                           VerticalAlignment="Center"
+                           Margin="0,0,12,12"/>
+
+                <Button Grid.Row="0"
+                        Grid.Column="1"
+                        x:Name="HelpButton"
+                        Content="?"
+                        VerticalAlignment="Top"
+                        HorizontalAlignment="Right"
+                        Style="{StaticResource HelpButtonStyle}"
+                        ToolTip="Ouvrir l’aide en ligne"
+                        Click="HelpButton_Click"/>
+
+                <StackPanel Grid.Row="1" Grid.ColumnSpan="2">
+                    <RadioButton x:Name="BasiqueRadio" Content="Basique" IsChecked="True" Margin="0,0,0,8"/>
+                    <RadioButton x:Name="PersonnelleRevitRadio" Content="Personnelle Revit" Margin="0,0,0,8"/>
+                    <RadioButton x:Name="BIMManagerRadio" Content="BIM Manager" Margin="0,0,0,8"/>
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
                     <Button Content="Annuler"
                             Width="120"
                             Margin="0,0,8,0"
                             Style="{StaticResource SecondaryButton}"
                             Click="CancelButton_Click"/>
-                    <Button Content="OK" Width="120" Click="OKButton_Click"/>
+                        <Button Content="OK" Width="120" Click="OKButton_Click"/>
+                    </StackPanel>
                 </StackPanel>
-            </StackPanel>
+            </Grid>
         </Border>
     </Grid>
 </Window>

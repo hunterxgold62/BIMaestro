@@ -29,7 +29,7 @@ namespace Famille
 {
     public partial class FamilyBrowserWindow : Window, INotifyPropertyChanged
     {
-        private const string HelpUrl = "https://bimaestro.net/";
+        private const string HelpUrl = "https://www.bimaestro.fr/famille?outil=dossier-famille";
         // ===== Constantes =====
         private const string FavoritesCollectionId = "builtin_favoris";
         private const string FavoritesCollectionName = "Favoris";

@@ -10,7 +10,7 @@ namespace Visualisation
 {
     public partial class FamilySelectionWindow : Window
     {
-        private const string HelpUrl = "https://bimaestro.net/";
+        private const string HelpUrl = "https://www.bimaestro.fr/visualisation?outil=selection-elements";
         /// <summary>
         /// Noms de familles parent cochées. Ex. ["Simple (T)", "BarreAP", ...]
         /// </summary>

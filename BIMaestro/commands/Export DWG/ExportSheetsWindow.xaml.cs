@@ -17,7 +17,7 @@ namespace Visualisation
     {
         private readonly Document _doc;
         private readonly List<ViewSheetSet> _sheetSets;
-        private const string HelpUrl = "https://bimaestro.net/";
+        private const string HelpUrl = "https://www.bimaestro.fr/visualisation?outil=dwg-export";
 
         public ExportWindow(ExternalCommandData cmdData)
         {

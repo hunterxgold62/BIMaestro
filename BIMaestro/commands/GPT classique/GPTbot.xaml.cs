@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Text;
 using System.Threading.Tasks;
 using System.Collections.ObjectModel;
@@ -22,6 +23,7 @@ namespace IA
 {
     public partial class GPTBotWindow : Window, INotifyPropertyChanged
     {
+        private const string HelpUrl = "https://www.bimaestro.fr/ia?outil=chatbot-element";
         private ObservableCollection<MessageModel> conversationHistory = new ObservableCollection<MessageModel>();
         private readonly string _jwt;
         private bool isAwaitingResponse = false; // Indicateur de réponse en attente
@@ -64,6 +66,18 @@ namespace IA
             {
                 var systemMessageModel = new MessageModel { Role = "system", Content = systemMessage };
                 conversationHistory.Add(systemMessageModel);
+            }
+        }
+
+        private void HelpButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(HelpUrl) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 

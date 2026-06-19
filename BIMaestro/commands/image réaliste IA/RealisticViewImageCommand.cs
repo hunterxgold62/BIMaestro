@@ -29,6 +29,7 @@ namespace IA
         private const int OutputMultiple = 16;
         private const int OutputMinPixels = 655360;
         private const string ImageQuality = "low";
+        private const string HelpUrl = "https://www.bimaestro.fr/ia?outil=rendu-plan-ia";
 
         private enum RenderMode
         {
@@ -36,6 +37,43 @@ namespace IA
             Fidele,
             Presentation,
             Ambiance
+        }
+
+        private static Button CreateHelpButton()
+        {
+            var button = new Button
+            {
+                Content = "?",
+                Width = 34,
+                Height = 34,
+                MinWidth = 34,
+                Padding = new Thickness(0),
+                Background = new SolidColorBrush(Color.FromRgb(241, 243, 245)),
+                Foreground = new SolidColorBrush(Color.FromRgb(17, 24, 39)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(209, 213, 219)),
+                BorderThickness = new Thickness(1),
+                FontWeight = FontWeights.Bold,
+                FontSize = 15,
+                Cursor = System.Windows.Input.Cursors.Hand,
+                ToolTip = "Ouvrir l’aide en ligne",
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Top
+            };
+
+            button.Click += (s, e) => OpenHelpUrl();
+            return button;
+        }
+
+        private static void OpenHelpUrl()
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(HelpUrl) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
@@ -848,7 +886,7 @@ namespace IA
                 var header = new StackPanel
                 {
                     Orientation = Orientation.Vertical,
-                    Margin = new Thickness(0, 0, 0, 12)
+                    Margin = new Thickness(0, 0, 46, 12)
                 };
 
                 header.Children.Add(new TextBlock
@@ -871,6 +909,10 @@ namespace IA
 
                 Grid.SetRow(header, 0);
                 grid.Children.Add(header);
+
+                var helpButton = CreateHelpButton();
+                Grid.SetRow(helpButton, 0);
+                grid.Children.Add(helpButton);
 
                 _list = new ListBox
                 {
@@ -1141,7 +1183,7 @@ namespace IA
                 var header = new StackPanel
                 {
                     Orientation = Orientation.Vertical,
-                    Margin = new Thickness(0, 0, 0, 10)
+                    Margin = new Thickness(0, 0, 46, 10)
                 };
 
                 header.Children.Add(new TextBlock
@@ -1175,6 +1217,10 @@ namespace IA
 
                 Grid.SetRow(header, 0);
                 root.Children.Add(header);
+
+                var helpButton = CreateHelpButton();
+                Grid.SetRow(helpButton, 0);
+                root.Children.Add(helpButton);
 
                 var comparisonGrid = new Grid();
 

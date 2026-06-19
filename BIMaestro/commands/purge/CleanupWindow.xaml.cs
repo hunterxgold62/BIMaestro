@@ -7,7 +7,7 @@ namespace Modification
 {
     public partial class CleanupWindow : Window
     {
-        private const string HelpUrl = "https://bimaestro.net/";
+        private const string HelpUrl = "https://www.bimaestro.fr/modification?outil=purge";
         public bool DeleteViews => ViewsCheckbox.IsChecked == true;
         public bool DeleteFamilies => FamiliesCheckbox.IsChecked == true;
         public bool DeleteSchedules => SchedulesCheckbox.IsChecked == true;

@@ -13,7 +13,7 @@ namespace Modification
 {
     public partial class ConfigureDynamoWindow : Window
     {
-        private const string HelpUrl = "https://bimaestro.net/";
+        private const string HelpUrl = "https://www.bimaestro.fr/modification?outil=dynamo-auto";
         private class PathEntry : INotifyPropertyChanged
         {
             private string path;

@@ -21,6 +21,20 @@
                 <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
                 <Setter Property="Margin" Value="0,0,8,0"/>
             </Style>
+            <Style x:Key="HelpButtonStyle" TargetType="Button">
+                <Setter Property="Width" Value="34"/>
+                <Setter Property="Height" Value="34"/>
+                <Setter Property="MinWidth" Value="34"/>
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="Margin" Value="0"/>
+                <Setter Property="Background" Value="#F1F3F5"/>
+                <Setter Property="Foreground" Value="#111827"/>
+                <Setter Property="BorderBrush" Value="#D1D5DB"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="FontWeight" Value="Bold"/>
+                <Setter Property="FontSize" Value="15"/>
+                <Setter Property="Cursor" Value="Hand"/>
+            </Style>
         </ResourceDictionary>
     </Window.Resources>
 
@@ -37,13 +51,30 @@
                 Background="{StaticResource Brand}"
                 Padding="18"
                 Margin="0,0,0,14">
-            <StackPanel>
-                <TextBlock Text="Suivi des maquettes collaboratives" Style="{StaticResource H1}"/>
-                <TextBlock Margin="0,6,0,0"
-                           Text="Filtrez rapidement par utilisateur, version Revit et type de fichier pour ouvrir le bon dossier de travail."
-                           Foreground="#E7F6EE"
-                           TextWrapping="Wrap"/>
-            </StackPanel>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="Suivi des maquettes collaboratives" Style="{StaticResource H1}"/>
+                    <TextBlock Margin="0,6,0,0"
+                               Text="Filtrez rapidement par utilisateur, version Revit et type de fichier pour ouvrir le bon dossier de travail."
+                               Foreground="#E7F6EE"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+
+                <Button Grid.Column="1"
+                        x:Name="HelpButton"
+                        Content="?"
+                        Margin="12,0,0,0"
+                        VerticalAlignment="Top"
+                        HorizontalAlignment="Right"
+                        Style="{StaticResource HelpButtonStyle}"
+                        ToolTip="Ouvrir l’aide en ligne"
+                        Click="HelpButton_Click"/>
+            </Grid>
         </Border>
 
         <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,0,0,12">

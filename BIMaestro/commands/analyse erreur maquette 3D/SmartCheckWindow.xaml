@@ -85,6 +85,21 @@
                 <Setter Property="Margin" Value="0,0,8,6"/>
             </Style>
 
+            <Style x:Key="HelpButtonStyle" TargetType="Button">
+                <Setter Property="Width" Value="34"/>
+                <Setter Property="Height" Value="34"/>
+                <Setter Property="MinWidth" Value="34"/>
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="Margin" Value="0"/>
+                <Setter Property="Background" Value="#F1F3F5"/>
+                <Setter Property="Foreground" Value="#111827"/>
+                <Setter Property="BorderBrush" Value="#D1D5DB"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="FontWeight" Value="Bold"/>
+                <Setter Property="FontSize" Value="15"/>
+                <Setter Property="Cursor" Value="Hand"/>
+            </Style>
+
             <Style x:Key="OkButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
                 <Setter Property="Content" Value="Marquer OK"/>
                 <Setter Property="MinWidth" Value="110"/>
@@ -207,6 +222,16 @@
                            TextWrapping="Wrap"/>
             </StackPanel>
         </Border>
+
+        <Button Grid.Row="0"
+                x:Name="HelpButton"
+                Content="?"
+                Margin="0,18,18,0"
+                VerticalAlignment="Top"
+                HorizontalAlignment="Right"
+                Style="{StaticResource HelpButtonStyle}"
+                ToolTip="Ouvrir l’aide en ligne"
+                Click="HelpButton_Click"/>
 
         <UniformGrid Grid.Row="1" Columns="5">
             <Border Style="{StaticResource StatCard}">
