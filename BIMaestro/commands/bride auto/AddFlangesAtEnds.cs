@@ -88,7 +88,7 @@ namespace Modification
         const double MM = 1.0 / 304.8;
         const double SAFETY_MARGIN = 5 * MM;
         const double RADIAL_SCAN = 150 * MM;
-        private const bool ACCESSORY_SIDE_IS_IN = true;   // logique 2023 conservée
+        private static readonly bool ACCESSORY_SIDE_IS_IN = true;   // logique 2023 conservée
         private const double PLACE_OFFSET_BETWEEN = 0.05; // ~15 mm (2023)
         private const double PLACE_OFFSET_ONESIDE = 0.02; // ~6 mm  (2023)
         private const double EPS = 1e-9;

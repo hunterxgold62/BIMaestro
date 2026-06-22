@@ -207,7 +207,6 @@ namespace Famille
         // ===== Collections =====
         private ObservableCollection<Collection> _collections = new();
         private Collection _selectedCollection;
-        private bool _useGhostSwitch;
 
         public FamilyBrowserWindow()
         {

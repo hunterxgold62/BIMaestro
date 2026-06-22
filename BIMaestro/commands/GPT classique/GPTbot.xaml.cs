@@ -34,7 +34,6 @@ namespace IA
 
         // Variable pour stocker les informations des éléments
         private string storedElementInfo = null;
-        private string categoryName;
 
         public GPTBotWindow(string systemMessage, UIDocument uidoc)
         {

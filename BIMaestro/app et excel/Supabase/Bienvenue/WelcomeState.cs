@@ -21,5 +21,7 @@ namespace BIMaestro.Welcome
         public string FirstName { get; set; } = null;
         public string LastName { get; set; } = null;
         public bool ProfilePending { get; set; } = false;
+
+        public string LastWelcomePromptVersion { get; set; } = null;
     }
 }

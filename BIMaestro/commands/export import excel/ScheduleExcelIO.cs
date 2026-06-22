@@ -693,7 +693,6 @@ namespace ScheduleIO
 
             elements.RemoveAll(e =>
             {
-                bool anyEvaluated = false;
                 for (int i = 0; i < count; i++)
                 {
                     var f = def.GetFilter(i);
@@ -701,7 +700,6 @@ namespace ScheduleIO
                     var res = Passes(e, f, fld);
                     if (res.HasValue)
                     {
-                        anyEvaluated = true;
                         if (!res.Value) return true;
                     }
                 }

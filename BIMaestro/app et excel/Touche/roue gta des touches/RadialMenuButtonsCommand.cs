@@ -183,7 +183,7 @@ namespace BIMaestro.UI
 
                    
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     
                 }

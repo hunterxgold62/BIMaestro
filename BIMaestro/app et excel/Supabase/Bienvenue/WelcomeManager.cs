@@ -67,10 +67,7 @@ namespace BIMaestro.Welcome
 
                 _state ??= WelcomeStorage.LoadOrCreate();
 
-                if (_state.HardDismissed || _state.WelcomeShown) return;
-
-                if (_state.SnoozeUntilUtc.HasValue && _state.SnoozeUntilUtc.Value > DateTime.UtcNow)
-                    return;
+                if (!ShouldPromptForCurrentVersion(_state)) return;
 
                 if (!_state.FirstCommandUtc.HasValue)
                 {
@@ -151,9 +148,7 @@ namespace BIMaestro.Welcome
             {
                 _state ??= WelcomeStorage.LoadOrCreate();
 
-                if (_state.HardDismissed || _state.WelcomeShown) { _shouldShow = false; return; }
-                if (_state.SnoozeUntilUtc.HasValue && _state.SnoozeUntilUtc.Value > DateTime.UtcNow) { _shouldShow = false; return; }
-
+                if (!ShouldPromptForCurrentVersion(_state)) { _shouldShow = false; return; }
                 if (_state.LastAttemptUtc.HasValue && DateTime.UtcNow - _state.LastAttemptUtc.Value < MinAttemptSpacing)
                 {
                     _shouldShow = false;
@@ -186,6 +181,9 @@ namespace BIMaestro.Welcome
 
                 lock (_sync)
                 {
+                    _state.LastWelcomePromptVersion = CurrentPluginVersion;
+                    WelcomeStorage.Save(_state);
+
                     if (win.ResultAction == WelcomeResultAction.OpenGuide)
                     {
                         // Option : on considère le welcome terminé pour éviter qu’il revienne.
@@ -293,6 +291,20 @@ namespace BIMaestro.Welcome
         private static string NormalizeValue(string value)
         {
             return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        }
+
+        private static string CurrentPluginVersion =>
+            NormalizeValue(BIMaestroApp.PluginVersion) ?? "dev";
+
+        private static bool ShouldPromptForCurrentVersion(WelcomeState state)
+        {
+            if (state == null) return true;
+            if (!string.IsNullOrWhiteSpace(state.Email)) return false;
+
+            return !string.Equals(
+                NormalizeValue(state.LastWelcomePromptVersion),
+                CurrentPluginVersion,
+                StringComparison.OrdinalIgnoreCase);
         }
     }
 

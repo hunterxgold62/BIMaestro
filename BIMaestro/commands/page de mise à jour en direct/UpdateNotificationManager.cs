@@ -17,6 +17,7 @@ namespace Page
         private const string DownloadUrl = "https://www.bimaestro.fr/telechargement";
         private const string ReasonMuteToday = "mute_today";
         private const string ReasonLater = "later";
+        private static readonly TimeSpan LaterSuppressDuration = TimeSpan.FromDays(7);
 
         private static readonly object Sync = new object();
 
@@ -189,7 +190,7 @@ namespace Page
                 else if (prompt.Result == UpdatePromptResult.Later)
                 {
                     _state.SuppressReason = ReasonLater;
-                    _state.SuppressUntilUtc = DateTime.UtcNow.AddDays(1);
+                    _state.SuppressUntilUtc = DateTime.UtcNow + LaterSuppressDuration;
                 }
                 else
                 {
