@@ -1,7 +1,7 @@
-<Window x:Class="Analyse.ElementHistoryWindow"
+﻿<Window x:Class="Analyse.ElementHistoryWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Qui a fait ça ??" Height="860" Width="1320" MinWidth="1080" MinHeight="720"
+        Title="Qui a fait ça ??" Height="860" Width="1330" MinWidth="1080" MinHeight="720"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
         Background="{DynamicResource App.Background}"
@@ -46,6 +46,39 @@
                 <Setter Property="FontWeight" Value="Bold"/>
                 <Setter Property="FontSize" Value="15"/>
                 <Setter Property="Cursor" Value="Hand"/>
+            </Style>
+
+            <Style x:Key="ScopeRadioStyle" TargetType="RadioButton">
+                <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="FontSize" Value="12"/>
+                <Setter Property="Margin" Value="0,0,6,6"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="RadioButton">
+                            <Border x:Name="Pill"
+                                    Background="{DynamicResource Surface.Subtle}"
+                                    BorderBrush="{DynamicResource Border}"
+                                    BorderThickness="1"
+                                    CornerRadius="12"
+                                    Padding="10,5">
+                                <ContentPresenter HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="Pill" Property="Background" Value="{DynamicResource Focus}"/>
+                                    <Setter TargetName="Pill" Property="BorderBrush" Value="{DynamicResource Focus}"/>
+                                    <Setter Property="Foreground" Value="White"/>
+                                </Trigger>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Pill" Property="BorderBrush" Value="{DynamicResource Focus}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
             </Style>
 
             <Style x:Key="HistoryTabItem" TargetType="TabItem">
@@ -144,26 +177,29 @@
                 Background="{StaticResource Brand}"
                 Padding="18"
                 Margin="0,0,0,12">
-            <StackPanel>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Margin="0,0,14,0">
                 <TextBlock x:Name="HeaderText" Style="{StaticResource H1}" Text="Qui a fait ça ??"/>
                 <TextBlock x:Name="HeaderSubtitleText"
                            Margin="0,6,0,0"
                            Text="BETA - Lecture visuelle des suppressions, déplacements, créations et clusters de la maquette."
                            Foreground="#E7F6EE"
                            TextWrapping="Wrap"/>
-            </StackPanel>
+                </StackPanel>
+                <Button Grid.Column="1"
+                        x:Name="HelpButton"
+                        Content="?"
+                        VerticalAlignment="Top"
+                        HorizontalAlignment="Right"
+                        Style="{StaticResource HelpButtonStyle}"
+                        ToolTip="Ouvrir l'aide en ligne"
+                        Click="HelpButton_Click"/>
+            </Grid>
         </Border>
-
-        <Button Grid.Row="0"
-                Grid.Column="1"
-                x:Name="HelpButton"
-                Content="?"
-                Margin="12,0,0,12"
-                VerticalAlignment="Top"
-                HorizontalAlignment="Right"
-                Style="{StaticResource HelpButtonStyle}"
-                ToolTip="Ouvrir l’aide en ligne"
-                Click="HelpButton_Click"/>
 
         <UniformGrid Grid.Row="1" Grid.Column="0" Columns="5">
             <Border Style="{StaticResource StatCard}">
@@ -203,6 +239,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <WrapPanel Grid.Row="0" VerticalAlignment="Center">
                     <TextBlock Text="Action" Style="{StaticResource FilterLabel}"/>
@@ -213,16 +250,49 @@
                     <TextBox x:Name="SearchBox" Width="210" Margin="0,0,12,0" TextChanged="SearchBox_TextChanged"/>
                     <TextBlock x:Name="ResultText" VerticalAlignment="Center" Foreground="{DynamicResource Text.Secondary}" Text="0 / 0 évènements affichés"/>
                 </WrapPanel>
-                <WrapPanel Grid.Row="1" Margin="0,8,0,0">
+                <WrapPanel x:Name="ContextScopePanel" Grid.Row="1" Margin="0,8,0,0" Visibility="Collapsed">
+                    <TextBlock x:Name="ContextScopeText"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Margin="0,0,10,6"
+                               Text="Portée"/>
+                    <RadioButton x:Name="ScopeElementRadio"
+                                 Content="Élément"
+                                 GroupName="HistoryScope"
+                                 Tag="element"
+                                 IsChecked="True"
+                                 Style="{StaticResource ScopeRadioStyle}"
+                                 Checked="ScopeFilter_Checked"/>
+                    <RadioButton x:Name="ScopeTypeRadio"
+                                 Content="Type"
+                                 GroupName="HistoryScope"
+                                 Tag="type"
+                                 Style="{StaticResource ScopeRadioStyle}"
+                                 Checked="ScopeFilter_Checked"/>
+                    <RadioButton x:Name="ScopeFamilyRadio"
+                                 Content="Famille"
+                                 GroupName="HistoryScope"
+                                 Tag="family"
+                                 Style="{StaticResource ScopeRadioStyle}"
+                                 Checked="ScopeFilter_Checked"/>
+                    <RadioButton x:Name="ScopeModelRadio"
+                                 Content="Maquette"
+                                 GroupName="HistoryScope"
+                                 Tag="model"
+                                 Style="{StaticResource ScopeRadioStyle}"
+                                 Checked="ScopeFilter_Checked"/>
+                </WrapPanel>
+                <WrapPanel Grid.Row="2" Margin="0,8,0,0">
                     <Button x:Name="VisualizeDeletedButton" Content="Visualiser évènement" Width="175" Style="{StaticResource HistoryButton}" Click="VisualizeDeletedButton_Click"/>
                     <Button x:Name="FocusButton" Content="Focus élément" Width="135" Style="{StaticResource HistoryButton}" Click="FocusButton_Click"/>
                     <Button x:Name="DetailsButton" Content="Détails" Width="100" Style="{StaticResource HistoryButton}" Click="DetailsButton_Click"/>
+                    <Button x:Name="RestoreParametersButton" Content="Restaurer avant" Width="145" Style="{StaticResource HistoryButton}" Click="RestoreParametersButton_Click" IsEnabled="False"/>
                     <Button x:Name="CleanPreviewsButton" Content="Nettoyer previews" Width="155" Style="{StaticResource HistoryButton}" Click="CleanPreviewsButton_Click"/>
                 </WrapPanel>
             </Grid>
         </Border>
 
-        <TabControl Grid.Row="3" Grid.Column="0" Margin="0,12,0,0" Padding="0" ClipToBounds="False">
+        <TabControl x:Name="HistoryTabs" Grid.Row="3" Grid.Column="0" Margin="0,12,0,0" Padding="0" ClipToBounds="False">
             <TabItem Header="Vue visuelle" Style="{StaticResource HistoryTabItem}">
                 <Border Style="{StaticResource Card}" Padding="10,10,18,10" Margin="0,10,0,0">
                     <ListBox x:Name="VisualCardsList"
@@ -455,7 +525,7 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <TextBlock Grid.Row="0" Text="Détails évènement" Style="{StaticResource H2}" FontSize="16" Margin="0,0,0,10"/>
-                <ScrollViewer Grid.Row="1" MaxHeight="220" VerticalScrollBarVisibility="Auto" Margin="0,0,0,10">
+                <ScrollViewer x:Name="DetailsScroll" Grid.Row="1" MaxHeight="220" VerticalScrollBarVisibility="Auto" Margin="0,0,0,10">
                     <TextBlock x:Name="DetailsText" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12"/>
                 </ScrollViewer>
                 <ListBox Grid.Row="2" x:Name="ClusterListBox" DisplayMemberPath="Display" Visibility="Collapsed"

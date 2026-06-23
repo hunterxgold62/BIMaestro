@@ -2,6 +2,7 @@ using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Licensing;
+using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Interop;
 
@@ -22,7 +23,18 @@ namespace Analyse
             if (selectedId != null && selectedId != ElementId.InvalidElementId)
                 selected = uidoc.Document.GetElement(selectedId);
 
-            var win = new ElementHistoryWindow(uidoc, selected);
+            var defaultAction = selected == null ? "delete" : null;
+            List<ElementHistoryEvent> initialEvents = null;
+            try
+            {
+                ElementHistoryTracker.PrimeDocument(uidoc.Document);
+                initialEvents = ElementHistoryWindow.LoadInitialHistory(uidoc.Document, selected, out defaultAction);
+            }
+            catch
+            {
+            }
+
+            var win = new ElementHistoryWindow(uidoc, selected, initialEvents, defaultAction);
             new WindowInteropHelper(win) { Owner = data.Application.MainWindowHandle };
             win.Show();
 

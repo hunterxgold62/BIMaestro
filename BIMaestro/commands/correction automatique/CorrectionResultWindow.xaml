@@ -87,8 +87,8 @@
                             <TextBlock Text="Légende :" FontWeight="Bold" Foreground="{DynamicResource Text.Primary}" Margin="0,0,8,0" VerticalAlignment="Center"/>
 
                             <Button x:Name="ErrorFilterButton"
-                                    Content="Vert = Erreur"
-                                    Foreground="Green"
+                                    Content="Rouge = Erreur"
+                                    Foreground="#C62828"
                                     Background="Transparent"
                                     BorderThickness="0"
                                     Click="ErrorFilterButton_Click"
@@ -98,7 +98,7 @@
 
                             <Button x:Name="MinorFilterButton"
                                     Content="Orange = Correction mineure"
-                                    Foreground="Orange"
+                                    Foreground="#C77700"
                                     Background="Transparent"
                                     BorderThickness="0"
                                     Click="MinorFilterButton_Click"

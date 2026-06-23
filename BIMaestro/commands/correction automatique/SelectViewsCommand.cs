@@ -93,7 +93,7 @@ namespace ScanTextRevit
             // 4) Lancement du scan
             ScanService service = new ScanService();
             var scanResults = service.ScanSelectedViewsAndSheets(doc, selectedIds);
-            if (scanResults.Count == 0)
+            if (scanResults.Count == 0 || !scanResults.Any(kvp => kvp.Value != null && kvp.Value.Count > 0))
             {
                 TaskDialog.Show("Info", "Aucun texte trouvé.");
                 return Result.Cancelled;
@@ -133,7 +133,28 @@ namespace ScanTextRevit
             // 7) Traitement asynchrone
             Task.Run(async () =>
             {
-                var finalResults = await grammarChecker.CheckGrammarInChunksAsync(scanResults);
+                try
+                {
+                    var finalResults = await grammarChecker.CheckGrammarInChunksAsync(scanResults);
+                }
+                catch (Exception ex)
+                {
+                    resultWindow.Dispatcher.Invoke(() =>
+                    {
+                        resultWindow.AddPartialResults("Analyse IA", new List<CorrectionItem>
+                        {
+                            new CorrectionItem
+                            {
+                                LineNumber = 0,
+                                OriginalText = "Analyse interrompue",
+                                CorrectedText = "Erreur pendant l'analyse IA",
+                                Explanation = ex.Message,
+                                Category = "Erreur"
+                            }
+                        });
+                        resultWindow.OnAllChunksCompleted();
+                    });
+                }
             });
 
             return Result.Succeeded;

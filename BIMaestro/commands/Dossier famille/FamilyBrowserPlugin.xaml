@@ -218,6 +218,7 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
                         <Grid Grid.Row="0">
@@ -374,6 +375,23 @@
                                    Margin="0,4,5,0"
                                    ToolTip="{Binding Name}"/>
                         </Grid>
+                        <StackPanel Grid.Row="2"
+                                    Margin="26,3,8,0"
+                                    Visibility="{Binding SearchLocationVisibility}">
+                            <TextBlock Text="{Binding SearchLocationLabel}"
+                                       Foreground="{DynamicResource Brand}"
+                                       FontWeight="SemiBold"
+                                       FontSize="10"
+                                       TextAlignment="Center"/>
+                            <TextBlock Text="{Binding SearchFolderPath}"
+                                       Foreground="#FF6C7A92"
+                                       FontSize="10"
+                                       TextWrapping="Wrap"
+                                       TextTrimming="CharacterEllipsis"
+                                       MaxHeight="28"
+                                       TextAlignment="Center"
+                                       ToolTip="{Binding SearchFolderPath}"/>
+                        </StackPanel>
                     </Grid>
                 </Border>
             </DataTemplate>
@@ -566,7 +584,19 @@
                                        Margin="0,0,10,0"
                                        VerticalAlignment="Center"/>
                             </DockPanel>
-                            <WrapPanel Grid.Row="1" Margin="0,14,0,0">
+                            <StackPanel Grid.Row="1"
+                                        Margin="0,8,10,0"
+                                        Visibility="{Binding SearchLocationVisibility}">
+                                <TextBlock Text="{Binding SearchLocationLabel}"
+                                           Foreground="{DynamicResource Brand}"
+                                           FontWeight="SemiBold"
+                                           FontSize="11"/>
+                                <TextBlock Text="{Binding SearchFolderPath}"
+                                           Foreground="#FF6C7A92"
+                                           TextWrapping="Wrap"
+                                           ToolTip="{Binding SearchFolderPath}"/>
+                            </StackPanel>
+                            <WrapPanel Grid.Row="2" Margin="0,14,0,0">
                                 <Button Click="CategoryPill_Click">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource PillButtonStyle}">
@@ -631,7 +661,7 @@
                                 </Button>
                             </WrapPanel>
 
-                            <Border Grid.Row="2"
+                            <Border Grid.Row="3"
                                 Margin="0,16,0,0"
                                 Background="#FFFFFFFF"
                                 BorderBrush="#22000000"

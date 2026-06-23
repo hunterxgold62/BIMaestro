@@ -108,6 +108,7 @@ public class BIMaestroApp : IExternalApplication
             // --- Events Revit ---
             application.ControlledApplication.DocumentChanged += OnDocumentChangedSafe;
             Analyse.ElementHistoryTracker.Start();
+            application.ControlledApplication.DocumentCreated += OnDocumentCreatedSafe;
             application.ControlledApplication.DocumentOpened += OnDocumentOpenedSafe;
             application.ControlledApplication.DocumentClosing += OnDocumentClosingSafe;
             application.ViewActivated += OnViewActivatedSafe;
@@ -234,6 +235,19 @@ public class BIMaestroApp : IExternalApplication
         catch (Exception ex)
         {
             TaskDialog.Show("Erreur DocumentOpened", ex.ToString());
+        }
+    }
+
+    private void OnDocumentCreatedSafe(object sender, DocumentCreatedEventArgs e)
+    {
+        try
+        {
+            _uiApp ??= new UIApplication(e.Document.Application);
+            Analyse.ElementHistoryTracker.PrimeDocument(e.Document);
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"OnDocumentCreated : {ex.Message}\n{ex.StackTrace}");
         }
     }
 

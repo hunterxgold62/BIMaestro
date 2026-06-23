@@ -72,11 +72,20 @@ namespace Analyse
             new ConcurrentDictionary<string, List<ImageFileCandidate>>(StringComparer.OrdinalIgnoreCase);
         private static readonly object StartSync = new object();
         private static readonly object FileSync = new object();
-        private static readonly Dictionary<int, ElementSnapshot> SnapshotByElementId = new Dictionary<int, ElementSnapshot>();
+        private static readonly Dictionary<string, ElementSnapshot> SnapshotByElementId =
+            new Dictionary<string, ElementSnapshot>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, ElementSnapshot> FamilyTypeSnapshotByKey =
+            new Dictionary<string, ElementSnapshot>(StringComparer.OrdinalIgnoreCase);
         private static readonly HashSet<string> PrimedDocumentKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly ConcurrentDictionary<int, string> RuntimeDocumentKeys =
+            new ConcurrentDictionary<int, string>();
+        private static readonly string RuntimeSessionId = Guid.NewGuid().ToString("N");
         private static CancellationTokenSource _cts;
         private static Task _worker;
         private const double MinMoveFeet = 0.00656168; // ~2 mm
+        private const int DefaultElementHistoryTake = 1000;
+        private const int DefaultModelHistoryTake = 1000;
+        private const int DefaultDeletedHistoryTake = 1000;
         private const int MaxIndexedImageFiles = 12000;
         private const bool IncludeAnnotationCategoriesForFuture = false;
         private static readonly string[] ImageExtensions = { ".png", ".jpg", ".jpeg", ".bmp" };
@@ -84,7 +93,8 @@ namespace Analyse
         {
             "BIMaestro - Visualisation historique",
             "BIMaestro - Visualisation suppression",
-            "BIMaestro - Nettoyer previews historique"
+            "BIMaestro - Nettoyer previews historique",
+            "BIMaestro - Restaurer paramètres historique"
         };
 
 
@@ -125,20 +135,28 @@ namespace Analyse
             {
                 foreach (var el in new FilteredElementCollector(doc).WhereElementIsNotElementType())
                 {
-                    try
-                    {
-                        if (el == null || ShouldIgnoreElement(el)) continue;
-                        var snapshot = BuildSnapshot(el, includeOrientedCorners: false);
-                        snapshot.LastLogged = DateTime.UtcNow;
-                        lock (SnapshotByElementId)
-                        {
-                            SnapshotByElementId[el.Id.IntegerValue] = snapshot;
-                        }
-                    }
-                    catch
-                    {
-                    }
+                    PrimeElementSnapshot(el);
                 }
+
+                foreach (var symbol in new FilteredElementCollector(doc).OfClass(typeof(FamilySymbol)))
+                {
+                    PrimeElementSnapshot(symbol);
+                }
+
+                PrimeFamilyDocumentTypes(doc);
+            }
+            catch
+            {
+            }
+        }
+
+        private static void PrimeElementSnapshot(Element el)
+        {
+            try
+            {
+                if (el == null || ShouldIgnoreElement(el)) return;
+                var snapshot = BuildSnapshot(el, includeOrientedCorners: false);
+                StoreSnapshot(el.Document, el.Id, snapshot);
             }
             catch
             {
@@ -162,8 +180,6 @@ namespace Analyse
             var tx = e.GetTransactionNames()?.FirstOrDefault() ?? "Transaction";
             if (IsIgnoredTransaction(tx)) return;
             var wasPrimed = IsDocumentPrimed(doc);
-            if (wasPrimed)
-                PrimeDocument(doc);
 
             var addedIds = e.GetAddedElementIds().ToList();
             var modifiedIds = e.GetModifiedElementIds().ToList();
@@ -172,10 +188,13 @@ namespace Analyse
 
             foreach (var id in addedIds)
                 CaptureAddedOrModified(doc, id, user, tx, isCreate: true);
-            foreach (var id in modifiedIds)
+            foreach (var id in modifiedIds.OrderBy(id => IsFamilySymbolElementId(doc, id) ? 1 : 0))
                 CaptureAddedOrModified(doc, id, user, tx, isCreate: false, suppressSecondaryModification: suppressSecondaryModifications);
             foreach (var id in deletedIds)
                 EnqueueDeleted(doc, id, user, tx);
+
+            CaptureFamilyDocumentTypeChanges(doc, user, tx);
+            CaptureProjectFamilySymbolChanges(doc, user, tx);
 
             if (!wasPrimed)
                 PrimeDocument(doc);
@@ -186,34 +205,31 @@ namespace Analyse
             var uniqueId = element?.UniqueId;
             if (string.IsNullOrWhiteSpace(uniqueId)) return new List<ElementHistoryEvent>();
             var key = GetDocumentKey(doc);
-            return LoadAllHistory(doc)
-                .Where(ev => string.Equals(ev.ModelKey ?? string.Empty, key, StringComparison.OrdinalIgnoreCase))
-                .Where(ev => string.Equals(ev.UniqueId, uniqueId, StringComparison.OrdinalIgnoreCase))
-                .OrderByDescending(x => x.Ts)
-                .Take(300)
-                .ToList();
+            return LoadElementHistory(key, uniqueId, DefaultElementHistoryTake);
+        }
+
+        internal static List<ElementHistoryEvent> LoadElementHistory(string modelKey, string uniqueId, int take)
+        {
+            if (string.IsNullOrWhiteSpace(uniqueId)) return new List<ElementHistoryEvent>();
+            return LoadMatchingHistory(modelKey, uniqueId, null, take);
         }
 
 
-        public static List<ElementHistoryEvent> LoadRecentModelHistory(Document doc, int take = 400)
+        public static List<ElementHistoryEvent> LoadRecentModelHistory(Document doc, int take = DefaultModelHistoryTake)
         {
             var key = GetDocumentKey(doc);
-            return LoadAllHistory(doc)
-                .Where(ev => string.Equals(ev.ModelKey ?? string.Empty, key, StringComparison.OrdinalIgnoreCase))
-                .OrderByDescending(x => x.Ts)
-                .Take(Math.Max(1, take))
-                .ToList();
+            return LoadRecentModelHistory(key, take);
+        }
+
+        internal static List<ElementHistoryEvent> LoadRecentModelHistory(string modelKey, int take = DefaultModelHistoryTake)
+        {
+            return LoadMatchingHistory(modelKey, null, null, take);
         }
 
         public static List<ElementHistoryEvent> LoadRecentDeletedHistory(Document doc)
         {
             var key = GetDocumentKey(doc);
-            return LoadAllHistory(doc)
-                .Where(ev => string.Equals(ev.ModelKey ?? string.Empty, key, StringComparison.OrdinalIgnoreCase))
-                .Where(ev => string.Equals(ev.Action, "delete", StringComparison.OrdinalIgnoreCase))
-                .OrderByDescending(x => x.Ts)
-                .Take(400)
-                .ToList();
+            return LoadMatchingHistory(key, null, "delete", DefaultDeletedHistoryTake);
         }
 
         internal static bool IsDisplayableHistoryEvent(ElementHistoryEvent ev)
@@ -226,12 +242,12 @@ namespace Analyse
         private static List<ElementHistoryEvent> LoadAllHistory(Document doc)
         {
             var files = Directory.Exists(CollaborativeModelTrackerStore.ActiveDirectory)
-                ? Directory.GetFiles(CollaborativeModelTrackerStore.ActiveDirectory, "element-history-*.jsonl")
+                ? GetHistoryFiles(CollaborativeModelTrackerStore.ActiveDirectory)
                 : Array.Empty<string>();
             var result = new List<ElementHistoryEvent>();
             foreach (var f in files)
             {
-                foreach (var line in File.ReadLines(f))
+                foreach (var line in ReadHistoryLines(f))
                 {
                     try
                     {
@@ -244,24 +260,123 @@ namespace Analyse
             return result;
         }
 
+        private static List<ElementHistoryEvent> LoadMatchingHistory(string modelKey, string uniqueId, string action, int take)
+        {
+            if (string.IsNullOrWhiteSpace(modelKey))
+                return new List<ElementHistoryEvent>();
+
+            var limit = Math.Max(1, take);
+            var dir = CollaborativeModelTrackerStore.ActiveDirectory;
+            var files = Directory.Exists(dir) ? GetHistoryFiles(dir) : Array.Empty<string>();
+            var result = new List<ElementHistoryEvent>();
+
+            foreach (var f in files)
+            {
+                var fileMatches = new List<ElementHistoryEvent>();
+                foreach (var line in ReadHistoryLines(f))
+                {
+                    try
+                    {
+                        var ev = JsonConvert.DeserializeObject<ElementHistoryEvent>(line);
+                        if (!MatchesHistoryFilter(ev, modelKey, uniqueId, action)) continue;
+                        fileMatches.Add(ev);
+                    }
+                    catch { }
+                }
+
+                if (fileMatches.Count == 0) continue;
+                result.AddRange(fileMatches.OrderByDescending(x => x.Ts));
+                if (result.Count >= limit)
+                    break;
+            }
+
+            return result
+                .OrderByDescending(x => x.Ts)
+                .Take(limit)
+                .ToList();
+        }
+
+        private static bool MatchesHistoryFilter(ElementHistoryEvent ev, string modelKey, string uniqueId, string action)
+        {
+            if (ev == null) return false;
+            if (!string.IsNullOrWhiteSpace(modelKey)
+                && !string.Equals(ev.ModelKey ?? string.Empty, modelKey, StringComparison.OrdinalIgnoreCase))
+                return false;
+            if (!string.IsNullOrWhiteSpace(uniqueId)
+                && !string.Equals(ev.UniqueId ?? string.Empty, uniqueId, StringComparison.OrdinalIgnoreCase))
+                return false;
+            if (!string.IsNullOrWhiteSpace(action)
+                && !string.Equals(ev.Action ?? string.Empty, action, StringComparison.OrdinalIgnoreCase))
+                return false;
+            return true;
+        }
+
+        private static string[] GetHistoryFiles(string dir)
+        {
+            try
+            {
+                return Directory.GetFiles(dir, "element-history-*.jsonl")
+                    .Concat(Directory.GetFiles(dir, "element-history-*.jsonl.gz"))
+                    .OrderByDescending(GetHistoryFileSortDate)
+                    .ToArray();
+            }
+            catch
+            {
+                return Array.Empty<string>();
+            }
+        }
+
+        private static IEnumerable<string> ReadHistoryLines(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+                yield break;
+
+            if (path.EndsWith(".gz", StringComparison.OrdinalIgnoreCase))
+            {
+                using (var file = File.OpenRead(path))
+                using (var gzip = new GZipStream(file, CompressionMode.Decompress))
+                using (var reader = new StreamReader(gzip, Encoding.UTF8))
+                {
+                    string line;
+                    while ((line = reader.ReadLine()) != null)
+                        yield return line;
+                }
+
+                yield break;
+            }
+
+            foreach (var line in File.ReadLines(path, Encoding.UTF8))
+                yield return line;
+        }
+
         private static void CaptureAddedOrModified(Document doc, ElementId id, string user, string tx, bool isCreate, bool suppressSecondaryModification = false)
         {
             if (id == null || id == ElementId.InvalidElementId) return;
             var el = doc.GetElement(id);
             if (el == null || ShouldIgnoreElement(el)) return;
 
+            Dictionary<string, object> relatedTypeParameterDelta = null;
+            if (!isCreate && !(el is FamilySymbol))
+                relatedTypeParameterDelta = CaptureRelatedFamilyTypeParameterDelta(doc, el);
+
             var current = BuildSnapshot(el, includeOrientedCorners: true);
             ElementSnapshot previous;
             lock (SnapshotByElementId)
             {
-                SnapshotByElementId.TryGetValue(id.IntegerValue, out previous);
+                SnapshotByElementId.TryGetValue(BuildElementSnapshotKey(doc, id), out previous);
             }
 
             var action = isCreate ? "create" : DetermineAction(previous, current);
             var delta = BuildDelta(action, previous, current);
+            if (!isCreate && HasParameterDelta(relatedTypeParameterDelta))
+            {
+                action = "param_change";
+                delta = relatedTypeParameterDelta;
+            }
+
             if (!isCreate && (suppressSecondaryModification || action == "modify_skip" || IsLowValueParameterChange(action, delta)))
             {
-                StoreSnapshot(id, current);
+                StoreSnapshot(doc, id, current);
                 return;
             }
 
@@ -283,17 +398,186 @@ namespace Analyse
                 Delta = delta
             });
 
-            StoreSnapshot(id, current);
+            StoreSnapshot(doc, id, current);
         }
 
-        private static void StoreSnapshot(ElementId id, ElementSnapshot snapshot)
+        private static bool IsFamilySymbolElementId(Document doc, ElementId id)
         {
-            if (id == null || id == ElementId.InvalidElementId || snapshot == null) return;
+            try
+            {
+                if (doc == null || id == null || id == ElementId.InvalidElementId) return false;
+                return doc.GetElement(id) is FamilySymbol;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static Dictionary<string, object> CaptureRelatedFamilyTypeParameterDelta(Document doc, Element el)
+        {
+            try
+            {
+                var typeId = el.GetTypeId();
+                if (typeId == null || typeId == ElementId.InvalidElementId) return null;
+
+                var type = doc.GetElement(typeId) as FamilySymbol;
+                if (type == null || ShouldIgnoreElement(type)) return null;
+
+                var current = BuildSnapshot(type, includeOrientedCorners: false);
+                ElementSnapshot previous;
+                lock (SnapshotByElementId)
+                {
+                    SnapshotByElementId.TryGetValue(BuildElementSnapshotKey(doc, type.Id), out previous);
+                }
+
+                var action = DetermineAction(previous, current);
+                var delta = BuildDelta(action, previous, current);
+                StoreSnapshot(doc, type.Id, current);
+
+                return string.Equals(action, "param_change", StringComparison.OrdinalIgnoreCase)
+                       && HasParameterDelta(delta)
+                    ? delta
+                    : null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static void PrimeFamilyDocumentTypes(Document doc)
+        {
+            foreach (var item in BuildFamilyDocumentTypeSnapshots(doc))
+                StoreFamilyTypeSnapshot(item.Key, item.Value);
+        }
+
+        private static void CaptureFamilyDocumentTypeChanges(Document doc, string user, string tx)
+        {
+            foreach (var item in BuildFamilyDocumentTypeSnapshots(doc))
+            {
+                ElementSnapshot previous;
+                lock (SnapshotByElementId)
+                {
+                    FamilyTypeSnapshotByKey.TryGetValue(item.Key, out previous);
+                }
+
+                var current = item.Value;
+                var action = DetermineAction(previous, current);
+                var delta = BuildDelta(action, previous, current);
+                if (previous == null || action == "modify_skip" || IsLowValueParameterChange(action, delta))
+                {
+                    StoreFamilyTypeSnapshot(item.Key, current);
+                    continue;
+                }
+
+                Queue.Enqueue(new ElementHistoryEvent
+                {
+                    Ts = DateTime.UtcNow,
+                    Project = doc.ProjectInformation?.Name ?? doc.Title ?? "Famille",
+                    ModelGuid = doc.GetHashCode().ToString(CultureInfo.InvariantCulture),
+                    ModelKey = GetDocumentKey(doc),
+                    ElementId = current.TypeId,
+                    UniqueId = current.UniqueId,
+                    Category = current.Category,
+                    Family = current.Family,
+                    TypeName = current.TypeName,
+                    ThumbnailPath = null,
+                    Action = action,
+                    User = user,
+                    Tx = tx,
+                    Delta = delta
+                });
+
+                StoreFamilyTypeSnapshot(item.Key, current);
+            }
+        }
+
+        private static void CaptureProjectFamilySymbolChanges(Document doc, string user, string tx)
+        {
+            try
+            {
+                if (doc == null || doc.IsFamilyDocument) return;
+
+                foreach (var symbol in new FilteredElementCollector(doc).OfClass(typeof(FamilySymbol)))
+                {
+                    try
+                    {
+                        if (symbol == null || ShouldIgnoreElement(symbol)) continue;
+
+                        var current = BuildSnapshot(symbol, includeOrientedCorners: false);
+                        ElementSnapshot previous;
+                        lock (SnapshotByElementId)
+                        {
+                            SnapshotByElementId.TryGetValue(BuildElementSnapshotKey(doc, symbol.Id), out previous);
+                        }
+
+                        var action = DetermineAction(previous, current);
+                        var delta = BuildDelta(action, previous, current);
+                        if (previous == null || action == "modify_skip" || IsLowValueParameterChange(action, delta))
+                        {
+                            StoreSnapshot(doc, symbol.Id, current);
+                            continue;
+                        }
+
+                        Queue.Enqueue(new ElementHistoryEvent
+                        {
+                            Ts = DateTime.UtcNow,
+                            Project = doc.ProjectInformation?.Name ?? doc.Title ?? "Projet",
+                            ModelGuid = doc.GetHashCode().ToString(CultureInfo.InvariantCulture),
+                            ModelKey = GetDocumentKey(doc),
+                            ElementId = symbol.Id.IntegerValue,
+                            UniqueId = current.UniqueId,
+                            Category = current.Category,
+                            Family = current.Family,
+                            TypeName = current.TypeName,
+                            ThumbnailPath = ResolveThumbnailPath(doc, current.TypeId, current.Family, current.TypeName),
+                            Action = action,
+                            User = user,
+                            Tx = tx,
+                            Delta = delta
+                        });
+
+                        StoreSnapshot(doc, symbol.Id, current);
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private static void StoreFamilyTypeSnapshot(string key, ElementSnapshot snapshot)
+        {
+            if (string.IsNullOrWhiteSpace(key) || snapshot == null) return;
             snapshot.LastLogged = DateTime.UtcNow;
             lock (SnapshotByElementId)
             {
-                SnapshotByElementId[id.IntegerValue] = snapshot;
+                FamilyTypeSnapshotByKey[key] = snapshot;
             }
+        }
+
+        private static void StoreSnapshot(Document doc, ElementId id, ElementSnapshot snapshot)
+        {
+            if (id == null || id == ElementId.InvalidElementId || snapshot == null) return;
+            snapshot.LastLogged = DateTime.UtcNow;
+            var key = BuildElementSnapshotKey(doc, id);
+            if (string.IsNullOrWhiteSpace(key)) return;
+            lock (SnapshotByElementId)
+            {
+                SnapshotByElementId[key] = snapshot;
+            }
+        }
+
+        private static string BuildElementSnapshotKey(Document doc, ElementId id)
+        {
+            if (doc == null || id == null || id == ElementId.InvalidElementId) return string.Empty;
+            var modelKey = GetDocumentKey(doc);
+            if (string.IsNullOrWhiteSpace(modelKey)) return string.Empty;
+            return modelKey + "|element|" + id.IntegerValue.ToString(CultureInfo.InvariantCulture);
         }
 
         private static ElementSnapshot BuildSnapshot(Element el, bool includeOrientedCorners)
@@ -302,14 +586,29 @@ namespace Analyse
             string typeName = null;
             var typeId = ElementId.InvalidElementId;
             var categoryName = CleanHistoryText(el.Category?.Name);
-            try
+
+            if (el is FamilySymbol symbol)
             {
-                typeId = el.GetTypeId();
-                var type = el.Document.GetElement(typeId) as ElementType;
-                typeName = type?.Name;
-                if (type is FamilySymbol fs) family = fs.FamilyName;
+                family = symbol.FamilyName;
+                typeName = symbol.Name;
+                typeId = symbol.Id;
+                if (!IsUsefulHistoryText(categoryName))
+                    categoryName = "Type de famille";
             }
-            catch { }
+            else
+            {
+                try
+                {
+                    typeId = el.GetTypeId();
+                    var type = el.Document.GetElement(typeId) as ElementType;
+                    typeName = type?.Name;
+                    if (type is FamilySymbol fs) family = fs.FamilyName;
+                }
+                catch { }
+            }
+
+            var parameters = CaptureWritableParameters(el);
+            AddTypeParametersToSnapshot(el, parameters);
 
             return new ElementSnapshot
             {
@@ -323,7 +622,7 @@ namespace Analyse
                 BBoxMin = GetBBoxMin(el),
                 BBoxMax = GetBBoxMax(el),
                 ObbCorners = includeOrientedCorners ? GetOrientedCorners(el) : null,
-                Parameters = CaptureWritableParameters(el)
+                Parameters = parameters
             };
         }
 
@@ -367,19 +666,40 @@ namespace Analyse
             {
                 var changes = GetParameterChanges(previous, current, 12);
                 if (changes.Count == 0) return null;
-                return new Dictionary<string, object>
+                var delta = new Dictionary<string, object>
                 {
                     ["parameters"] = changes.ToArray()
                 };
+
+                if (previous?.Location != null && current?.Location != null && HasMoved(previous.Location, current.Location))
+                {
+                    delta["old"] = new { x = previous.Location.X, y = previous.Location.Y, z = previous.Location.Z };
+                    delta["new"] = new { x = current.Location.X, y = current.Location.Y, z = current.Location.Z };
+                    delta["dx"] = current.Location.X - previous.Location.X;
+                    delta["dy"] = current.Location.Y - previous.Location.Y;
+                    delta["dz"] = current.Location.Z - previous.Location.Z;
+                }
+
+                return delta;
             }
 
             if (action == "geometry_change")
             {
-                return new Dictionary<string, object>
+                var delta = new Dictionary<string, object>
                 {
                     ["oldBox"] = BuildBoxDelta(previous),
                     ["newBox"] = BuildBoxDelta(current)
                 };
+
+                var oldSize = BuildBoxSizeDelta(previous);
+                var newSize = BuildBoxSizeDelta(current);
+                if (oldSize != null && newSize != null)
+                {
+                    delta["oldSize"] = oldSize;
+                    delta["newSize"] = newSize;
+                }
+
+                return delta;
             }
             return null;
         }
@@ -394,24 +714,38 @@ namespace Analyse
             };
         }
 
+        private static object BuildBoxSizeDelta(ElementSnapshot snapshot)
+        {
+            if (snapshot == null || snapshot.BBoxMin == null || snapshot.BBoxMax == null) return null;
+            return new
+            {
+                x = snapshot.BBoxMax.X - snapshot.BBoxMin.X,
+                y = snapshot.BBoxMax.Y - snapshot.BBoxMin.Y,
+                z = snapshot.BBoxMax.Z - snapshot.BBoxMin.Z
+            };
+        }
+
         private static Dictionary<string, string> CaptureWritableParameters(Element el)
         {
             var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             if (el == null) return result;
+            var captureReadOnlyParameters = el is FamilySymbol;
 
             try
             {
-                foreach (Parameter parameter in el.Parameters)
+                foreach (var parameter in GetElementParametersForHistory(el))
                 {
                     try
                     {
-                        if (parameter == null || parameter.IsReadOnly || !parameter.HasValue) continue;
+                        if (parameter == null) continue;
+                        if (parameter.IsReadOnly && !captureReadOnlyParameters) continue;
                         var name = CleanHistoryText(parameter.Definition?.Name);
                         if (!IsUsefulHistoryText(name) || IsIgnoredParameterName(name)) continue;
 
-                        var value = ReadParameterValue(parameter);
-                        if (value == null) continue;
-                        result[name] = value;
+                        var value = parameter.HasValue ? ReadParameterValue(parameter) : string.Empty;
+                        if (value == null) value = string.Empty;
+                        if (!result.ContainsKey(name))
+                            result[name] = value;
                     }
                     catch
                     {
@@ -423,6 +757,268 @@ namespace Analyse
             }
 
             return result;
+        }
+
+        private static void AddTypeParametersToSnapshot(Element el, Dictionary<string, string> parameters)
+        {
+            if (el == null || parameters == null || el is FamilySymbol) return;
+
+            try
+            {
+                var typeId = el.GetTypeId();
+                if (typeId == null || typeId == ElementId.InvalidElementId) return;
+
+                var type = el.Document?.GetElement(typeId);
+                if (type == null || type.Id == el.Id || ShouldIgnoreElement(type)) return;
+
+                foreach (var pair in CaptureWritableParameters(type))
+                {
+                    if (string.IsNullOrWhiteSpace(pair.Key)) continue;
+                    if (!parameters.ContainsKey(pair.Key))
+                        parameters[pair.Key] = pair.Value ?? string.Empty;
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private static List<Parameter> GetElementParametersForHistory(Element el)
+        {
+            var result = new List<Parameter>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (el == null) return result;
+
+            try
+            {
+                var ordered = el.GetOrderedParameters();
+                if (ordered != null)
+                {
+                    foreach (var parameter in ordered)
+                        AddParameterForHistory(result, seen, parameter);
+                }
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                foreach (Parameter parameter in el.Parameters)
+                    AddParameterForHistory(result, seen, parameter);
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                var map = el.ParametersMap;
+                var iterator = map?.ForwardIterator();
+                if (iterator != null)
+                {
+                    iterator.Reset();
+                    while (iterator.MoveNext())
+                        AddParameterForHistory(result, seen, iterator.Current as Parameter);
+                }
+            }
+            catch
+            {
+            }
+
+            return result;
+        }
+
+        private static void AddParameterForHistory(List<Parameter> result, HashSet<string> seen, Parameter parameter)
+        {
+            if (result == null || seen == null || parameter == null) return;
+            var key = GetParameterKeyForHistory(parameter);
+            if (string.IsNullOrWhiteSpace(key) || !seen.Add(key)) return;
+            result.Add(parameter);
+        }
+
+        private static string GetParameterKeyForHistory(Parameter parameter)
+        {
+            if (parameter == null) return string.Empty;
+            var name = CleanHistoryText(parameter.Definition?.Name);
+            if (!IsUsefulHistoryText(name)) return string.Empty;
+            return name + "|" + parameter.StorageType;
+        }
+
+        private static Dictionary<string, ElementSnapshot> BuildFamilyDocumentTypeSnapshots(Document doc)
+        {
+            var result = new Dictionary<string, ElementSnapshot>(StringComparer.OrdinalIgnoreCase);
+            if (doc == null) return result;
+
+            try
+            {
+                if (!doc.IsFamilyDocument) return result;
+            }
+            catch
+            {
+                return result;
+            }
+
+            FamilyManager manager;
+            try
+            {
+                manager = doc.FamilyManager;
+            }
+            catch
+            {
+                return result;
+            }
+
+            var familyName = CleanHistoryText(GetFamilyDocumentName(doc));
+            var typeId = GetFamilyDocumentElementId(doc);
+
+            foreach (FamilyType familyType in manager.Types)
+            {
+                try
+                {
+                    if (familyType == null) continue;
+                    var typeName = CleanHistoryText(familyType.Name);
+                    if (!IsUsefulHistoryText(typeName)) continue;
+
+                    var snapshot = new ElementSnapshot
+                    {
+                        UniqueId = BuildFamilyTypeUniqueId(doc, familyName, typeName),
+                        Category = "Famille",
+                        Family = familyName,
+                        TypeName = typeName,
+                        TypeId = typeId,
+                        Name = string.Join(" : ", new[] { familyName, typeName }.Where(IsUsefulHistoryText)),
+                        Parameters = CaptureFamilyTypeParameters(doc, manager, familyType)
+                    };
+
+                    result[BuildFamilyTypeSnapshotKey(doc, typeName)] = snapshot;
+                }
+                catch
+                {
+                }
+            }
+
+            return result;
+        }
+
+        private static Dictionary<string, string> CaptureFamilyTypeParameters(Document doc, FamilyManager manager, FamilyType familyType)
+        {
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (manager == null || familyType == null) return result;
+
+            foreach (FamilyParameter parameter in manager.Parameters)
+            {
+                try
+                {
+                    if (parameter == null) continue;
+                    var name = CleanHistoryText(parameter.Definition?.Name);
+                    if (!IsUsefulHistoryText(name) || IsIgnoredParameterName(name)) continue;
+
+                    var value = ReadFamilyTypeParameterValue(doc, familyType, parameter);
+                    if (value == null) continue;
+                    result[name] = value;
+
+                    var formula = CleanHistoryText(parameter.Formula);
+                    if (IsUsefulHistoryText(formula))
+                        result[name + " (formule)"] = formula;
+                }
+                catch
+                {
+                }
+            }
+
+            return result;
+        }
+
+        private static string ReadFamilyTypeParameterValue(Document doc, FamilyType familyType, FamilyParameter parameter)
+        {
+            try
+            {
+                switch (parameter.StorageType)
+                {
+                    case StorageType.String:
+                        return familyType.AsString(parameter)?.Trim();
+                    case StorageType.Integer:
+                        return familyType.AsInteger(parameter)?.ToString(CultureInfo.InvariantCulture);
+                    case StorageType.Double:
+                        var doubleValue = familyType.AsDouble(parameter);
+                        return doubleValue == null
+                            ? null
+                            : FormatFamilyDoubleValue(doc, parameter, doubleValue.Value);
+                    case StorageType.ElementId:
+                        var id = familyType.AsElementId(parameter);
+                        if (id == null) return string.Empty;
+                        var elementName = doc?.GetElement(id)?.Name;
+                        return IsUsefulHistoryText(elementName)
+                            ? elementName
+                            : id.IntegerValue.ToString(CultureInfo.InvariantCulture);
+                    default:
+                        return null;
+                }
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static string FormatFamilyDoubleValue(Document doc, FamilyParameter parameter, double value)
+        {
+            try
+            {
+                var units = doc?.GetUnits();
+                var specTypeId = parameter?.Definition?.GetDataType();
+                if (units != null && specTypeId != null && UnitUtils.IsMeasurableSpec(specTypeId))
+                {
+                    var formatted = UnitFormatUtils.Format(units, specTypeId, value, false);
+                    if (!string.IsNullOrWhiteSpace(formatted))
+                        return formatted.Trim();
+                }
+            }
+            catch
+            {
+            }
+
+            return value.ToString("G17", CultureInfo.InvariantCulture);
+        }
+
+        private static string BuildFamilyTypeSnapshotKey(Document doc, string typeName)
+        {
+            return GetDocumentKey(doc) + "|family-type|" + (typeName ?? string.Empty).Trim();
+        }
+
+        private static string BuildFamilyTypeUniqueId(Document doc, string familyName, string typeName)
+        {
+            return GetDocumentKey(doc) + "|family-type|" + (familyName ?? string.Empty).Trim() + "|" + (typeName ?? string.Empty).Trim();
+        }
+
+        private static string GetFamilyDocumentName(Document doc)
+        {
+            try
+            {
+                var ownerName = doc.OwnerFamily?.Name;
+                if (IsUsefulHistoryText(ownerName)) return ownerName;
+            }
+            catch
+            {
+            }
+
+            return doc?.Title ?? "Famille";
+        }
+
+        private static int GetFamilyDocumentElementId(Document doc)
+        {
+            try
+            {
+                var id = doc.OwnerFamily?.Id;
+                if (id != null && id != ElementId.InvalidElementId)
+                    return id.IntegerValue;
+            }
+            catch
+            {
+            }
+
+            return -1;
         }
 
         private static string ReadParameterValue(Parameter parameter)
@@ -552,10 +1148,11 @@ namespace Analyse
             if (id == null || id == ElementId.InvalidElementId) return;
 
             ElementSnapshot snapshot = null;
+            var key = BuildElementSnapshotKey(doc, id);
             lock (SnapshotByElementId)
             {
-                if (id != null) SnapshotByElementId.TryGetValue(id.IntegerValue, out snapshot);
-                if (id != null) SnapshotByElementId.Remove(id.IntegerValue);
+                if (!string.IsNullOrWhiteSpace(key)) SnapshotByElementId.TryGetValue(key, out snapshot);
+                if (!string.IsNullOrWhiteSpace(key)) SnapshotByElementId.Remove(key);
             }
 
             if (ShouldIgnoreSnapshot(snapshot)) return;
@@ -609,6 +1206,11 @@ namespace Analyse
         {
             if (element == null) return true;
             if (IsBIMaestroPreviewElement(element)) return true;
+            if (element is FamilySymbol familySymbol)
+            {
+                if (element.Category != null && ShouldIgnoreCategory(element.Category)) return true;
+                return !IsUsefulHistoryText(familySymbol.FamilyName) && !IsUsefulHistoryText(familySymbol.Name);
+            }
             if (ShouldIgnoreCategory(element.Category)) return true;
             return false;
         }
@@ -652,8 +1254,7 @@ namespace Analyse
         {
             if (string.IsNullOrWhiteSpace(categoryName)) return true;
             var name = categoryName.Trim();
-            return name.Equals("Views", StringComparison.OrdinalIgnoreCase)
-                || name.Equals("Sheets", StringComparison.OrdinalIgnoreCase)
+            return name.Equals("Sheets", StringComparison.OrdinalIgnoreCase)
                 || name.Equals("Schedules", StringComparison.OrdinalIgnoreCase)
                 || name.Equals("Viewports", StringComparison.OrdinalIgnoreCase)
                 || name.Equals("Materials", StringComparison.OrdinalIgnoreCase)
@@ -1008,9 +1609,49 @@ namespace Analyse
                     var mp = doc.GetWorksharingCentralModelPath();
                     if (mp != null) central = ModelPathUtils.ConvertModelPathToUserVisiblePath(mp);
                 }
-                return (central ?? doc.PathName ?? doc.Title ?? string.Empty).Trim();
+                var savedKey = (central ?? doc.PathName ?? string.Empty).Trim();
+                return !string.IsNullOrWhiteSpace(savedKey)
+                    ? savedKey
+                    : GetRuntimeDocumentKey(doc);
             }
-            catch { return (doc.PathName ?? doc.Title ?? string.Empty).Trim(); }
+            catch { return GetRuntimeDocumentKey(doc); }
+        }
+
+        private static string GetRuntimeDocumentKey(Document doc)
+        {
+            if (doc == null) return string.Empty;
+
+            var hash = doc.GetHashCode();
+            return RuntimeDocumentKeys.GetOrAdd(hash, _ =>
+            {
+                var title = string.Empty;
+                try { title = (doc.Title ?? string.Empty).Trim(); }
+                catch { }
+
+                if (string.IsNullOrWhiteSpace(title))
+                    title = "Projet sans nom";
+
+                return "unsaved|" + RuntimeSessionId + "|" +
+                       hash.ToString(CultureInfo.InvariantCulture) + "|" +
+                       title;
+            });
+        }
+
+        internal static string GetDocumentKeyForHistory(Document doc)
+        {
+            return GetDocumentKey(doc);
+        }
+
+        private static DateTime GetHistoryFileSortDate(string path)
+        {
+            var token = GetHistoryDateToken(path);
+            if (DateTime.TryParseExact(token, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day))
+                return day.Date.AddDays(1).AddTicks(-1);
+            if (DateTime.TryParseExact(token, "yyyy-MM", CultureInfo.InvariantCulture, DateTimeStyles.None, out var month))
+                return month.Date.AddMonths(1).AddTicks(-1);
+
+            try { return File.GetLastWriteTimeUtc(path); }
+            catch { return DateTime.MinValue; }
         }
 
         private static List<XYZ> GetOrientedCorners(Element el)
@@ -1186,22 +1827,147 @@ namespace Analyse
         {
             var dir = CollaborativeModelTrackerStore.ActiveDirectory;
             if (!Directory.Exists(dir)) return;
-            foreach (var file in Directory.GetFiles(dir, "element-history-*.jsonl"))
+            lock (FileSync)
+            {
+                foreach (var file in Directory.GetFiles(dir, "element-history-*.jsonl"))
+                {
+                    try
+                    {
+                        var dt = TryGetDailyHistoryDate(file) ?? File.GetLastWriteTimeUtc(file);
+                        if ((DateTime.UtcNow - File.GetLastWriteTimeUtc(file)).TotalDays < 7) continue;
+
+                        var archive = GetMonthlyArchivePath(dir, dt);
+                        AppendHistoryFileToArchive(file, archive);
+                        File.Delete(file);
+                    }
+                    catch { }
+                }
+
+                ConsolidateDailyGzipArchives(dir);
+            }
+        }
+
+        private static void ConsolidateDailyGzipArchives(string dir)
+        {
+            foreach (var file in Directory.GetFiles(dir, "element-history-*.jsonl.gz"))
             {
                 try
                 {
-                    var dt = File.GetLastWriteTimeUtc(file);
-                    if ((DateTime.UtcNow - dt).TotalDays < 7) continue;
-                    var gz = file + ".gz";
-                    if (File.Exists(gz)) continue;
-                    using (var src = File.OpenRead(file))
-                    using (var dst = File.Create(gz))
-                    using (var gzip = new GZipStream(dst, CompressionLevel.Optimal))
-                        src.CopyTo(gzip);
+                    var dt = TryGetDailyHistoryDate(file);
+                    if (dt == null) continue;
+
+                    var archive = GetMonthlyArchivePath(dir, dt.Value);
+                    if (string.Equals(Path.GetFullPath(file), Path.GetFullPath(archive), StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    AppendHistoryFileToArchive(file, archive);
                     File.Delete(file);
                 }
                 catch { }
             }
+        }
+
+        private static void AppendHistoryFileToArchive(string sourcePath, string archivePath)
+        {
+            if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath)) return;
+            if (string.IsNullOrWhiteSpace(archivePath)) return;
+
+            Directory.CreateDirectory(Path.GetDirectoryName(archivePath));
+            var tempPath = archivePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+
+            try
+            {
+                using (var dst = File.Create(tempPath))
+                using (var gzip = new GZipStream(dst, CompressionLevel.Optimal))
+                using (var writer = new StreamWriter(gzip, Encoding.UTF8))
+                {
+                    if (File.Exists(archivePath))
+                    {
+                        foreach (var line in ReadHistoryLines(archivePath))
+                            writer.WriteLine(line);
+                    }
+
+                    foreach (var line in ReadHistoryLines(sourcePath))
+                        writer.WriteLine(line);
+                }
+
+                ReplaceFile(tempPath, archivePath);
+            }
+            finally
+            {
+                try
+                {
+                    if (File.Exists(tempPath)) File.Delete(tempPath);
+                }
+                catch { }
+            }
+        }
+
+        private static void ReplaceFile(string tempPath, string destinationPath)
+        {
+            if (File.Exists(destinationPath))
+            {
+                var backup = destinationPath + ".bak";
+                try
+                {
+                    if (File.Exists(backup)) File.Delete(backup);
+                    File.Replace(tempPath, destinationPath, backup);
+                    if (File.Exists(backup)) File.Delete(backup);
+                    return;
+                }
+                catch
+                {
+                    try
+                    {
+                        if (File.Exists(backup)) File.Delete(backup);
+                    }
+                    catch { }
+                }
+
+                var fallbackBackup = destinationPath + "." + Guid.NewGuid().ToString("N") + ".bak";
+                File.Move(destinationPath, fallbackBackup);
+                try
+                {
+                    File.Move(tempPath, destinationPath);
+                    File.Delete(fallbackBackup);
+                    return;
+                }
+                catch
+                {
+                    if (!File.Exists(destinationPath) && File.Exists(fallbackBackup))
+                        File.Move(fallbackBackup, destinationPath);
+                    throw;
+                }
+            }
+
+            File.Move(tempPath, destinationPath);
+        }
+
+        private static string GetMonthlyArchivePath(string dir, DateTime date)
+        {
+            return Path.Combine(dir, $"element-history-{date:yyyy-MM}.jsonl.gz");
+        }
+
+        private static DateTime? TryGetDailyHistoryDate(string path)
+        {
+            var token = GetHistoryDateToken(path);
+            if (DateTime.TryParseExact(token, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+                return date;
+            return null;
+        }
+
+        private static string GetHistoryDateToken(string path)
+        {
+            var name = Path.GetFileName(path) ?? string.Empty;
+            if (!name.StartsWith("element-history-", StringComparison.OrdinalIgnoreCase))
+                return string.Empty;
+
+            var token = name.Substring("element-history-".Length);
+            if (token.EndsWith(".jsonl.gz", StringComparison.OrdinalIgnoreCase))
+                return token.Substring(0, token.Length - ".jsonl.gz".Length);
+            if (token.EndsWith(".jsonl", StringComparison.OrdinalIgnoreCase))
+                return token.Substring(0, token.Length - ".jsonl".Length);
+            return token;
         }
     }
 }

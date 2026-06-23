@@ -86,7 +86,32 @@ namespace ScanTextRevit
                         }
                     }
 
-                    // (4) Cartouche (TitleBlock)
+                    // (4) Paramètres texte de la feuille, dont "Révisions sur feuille"
+                    var sheetParamTexts = GetAllStringParameters(sheet, doc);
+                    foreach (var text in sheetParamTexts)
+                    {
+                        textsDirectlyOnSheet.Add(new ScannedTextItem
+                        {
+                            Text = text,
+                            ElementId = sheet.Id.GetIdValue().ToString()
+                        });
+                    }
+
+                    // (5) Révisions réellement associées à la feuille
+                    if (!HasPlacedRevisionSchedule(doc, sheet))
+                    {
+                        var revisionTexts = GetSheetRevisionTexts(sheet, doc);
+                        foreach (var text in revisionTexts)
+                        {
+                            textsDirectlyOnSheet.Add(new ScannedTextItem
+                            {
+                                Text = text,
+                                ElementId = sheet.Id.GetIdValue().ToString()
+                            });
+                        }
+                    }
+
+                    // (6) Cartouche (TitleBlock)
                     var titleBlocks = new FilteredElementCollector(doc, sheet.Id)
                         .OfCategory(BuiltInCategory.OST_TitleBlocks)
                         .WhereElementIsNotElementType()
@@ -108,7 +133,7 @@ namespace ScanTextRevit
                     string sheetKey = $"Feuille : {sheet.SheetNumber} - {sheet.Name} (Id {sheet.Id.GetIdValue()})";
                     allTextsByViewSheet[sheetKey] = FilterAndDeduplicate(textsDirectlyOnSheet);
 
-                    // (5) Vues placées (Viewport)
+                    // (7) Vues placées (Viewport)
                     var vports = new FilteredElementCollector(doc, sheet.Id)
                         .OfClass(typeof(Viewport))
                         .Cast<Viewport>()
@@ -126,7 +151,7 @@ namespace ScanTextRevit
                         }
                     }
 
-                    // (6) Nomenclatures placées (ScheduleSheetInstance)
+                    // (8) Nomenclatures placées (ScheduleSheetInstance)
                     var scheduleInstances = new FilteredElementCollector(doc, sheet.Id)
                         .OfClass(typeof(ScheduleSheetInstance))
                         .Cast<ScheduleSheetInstance>()
@@ -347,6 +372,60 @@ namespace ScanTextRevit
             return texts;
         }
 
+        private List<string> GetSheetRevisionTexts(ViewSheet sheet, Document doc)
+        {
+            var texts = new List<string>();
+            var revisionIds = sheet.GetAllRevisionIds();
+            if (revisionIds == null || revisionIds.Count == 0)
+                return texts;
+
+            foreach (ElementId revisionId in revisionIds)
+            {
+                var revision = doc.GetElement(revisionId) as Revision;
+                if (revision == null)
+                    continue;
+
+                var parts = new List<string>();
+
+                string number = sheet.GetRevisionNumberOnSheet(revisionId);
+                if (!string.IsNullOrWhiteSpace(number))
+                    parts.Add($"Indice {number}");
+
+                if (!string.IsNullOrWhiteSpace(revision.Description))
+                    parts.Add($"Description : {revision.Description}");
+
+                if (!string.IsNullOrWhiteSpace(revision.IssuedTo))
+                    parts.Add($"Remis à : {revision.IssuedTo}");
+
+                if (!string.IsNullOrWhiteSpace(revision.IssuedBy))
+                    parts.Add($"Par : {revision.IssuedBy}");
+
+                if (!string.IsNullOrWhiteSpace(revision.RevisionDate))
+                    parts.Add($"Date : {revision.RevisionDate}");
+
+                if (parts.Count > 0)
+                    texts.Add("Révision sur feuille : " + string.Join(" - ", parts));
+            }
+
+            return texts;
+        }
+
+        private bool HasPlacedRevisionSchedule(Document doc, ViewSheet sheet)
+        {
+            var scheduleInstances = new FilteredElementCollector(doc, sheet.Id)
+                .OfClass(typeof(ScheduleSheetInstance))
+                .Cast<ScheduleSheetInstance>();
+
+            foreach (var ssi in scheduleInstances)
+            {
+                var schedule = doc.GetElement(ssi.ScheduleId) as ViewSchedule;
+                if (schedule != null && schedule.IsTitleblockRevisionSchedule)
+                    return true;
+            }
+
+            return false;
+        }
+
         /// <summary>
         /// Exclut certains paramètres par nom (ex: "Chemin du fichier", "Echelle", etc.).
         /// </summary>
@@ -371,12 +450,10 @@ namespace ScanTextRevit
                 lower.Contains("figure dans la liste des feuilles") ||
                 lower.Contains("référencement de la feuille") ||
                 lower.Contains("référencement du détail") ||
-                lower.Contains("révision actuelle diffusée") ||
-                lower.Contains("révision actuelle diffusée par") ||
-                lower.Contains("révision actuelle remise à") ||
+                lower.Contains("révision actuelle") ||
+                lower.Contains("revision actuelle") ||
                 lower.Contains("echelle") ||      
                 lower.Contains("échelle") ||      
-                lower.Contains("révisions sur feuille") ||
                 lower.Contains("créateur") ||
                 lower.Contains("dessiné par") ||
                 lower.Contains("vérifié par") ||

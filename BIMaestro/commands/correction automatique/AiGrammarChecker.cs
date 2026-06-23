@@ -58,6 +58,12 @@ namespace ScanTextRevit
                 var scannedItems = kvp.Value ?? new List<ScannedTextItem>();
                 totalChunks += SplitScannedTextsIntoChunks(scannedItems, MAX_CHARS_PER_CHUNK).Count;
             }
+            if (totalChunks == 0)
+            {
+                ProgressUpdated?.Invoke(100);
+                OnAllChunksCompleted?.Invoke();
+                return finalResults;
+            }
             int processedChunks = 0;
 
             // 2) Pour chaque vue/feuille
@@ -97,7 +103,7 @@ namespace ScanTextRevit
                         else
                         {
                             string aiResponse = await CallChatGptApiAsync(prompt);
-                            corrections = ParseCorrectionsRobust(aiResponse, promptBuilder.ToString());
+                            corrections = ParseCorrectionsRobust(aiResponse, "Lot de textes envoyé à l'IA");
                             _cache.Add(promptHash, corrections);
                         }
 
@@ -166,10 +172,13 @@ namespace ScanTextRevit
             return
               "Tu es un correcteur expert en français. Pour chaque objet du tableau JSON ci‑dessous, "
             + "fournis LineNumber, OriginalText, CorrectedText, Explanation, Category. "
-            + "Ne signale PAS les micro-variantes de mise en forme (espaces en trop/en moins, doubles espaces, espace insécable, ponctuation cosmétique) sauf si le sens change réellement. "
+            + "Réponds uniquement avec un tableau JSON valide, sans markdown, sans texte avant ou après. "
+            + "Contrôle les fautes d'orthographe, accents, grammaire, accords, conjugaison, mots oubliés, mots doublés, ponctuation qui gêne la lecture et formulations manifestement incorrectes. "
+            + "Ne signale pas les micro-variantes de mise en forme (espaces en trop/en moins, doubles espaces, espace insécable, ponctuation purement cosmétique) sauf si la lecture ou le sens change réellement. "
             + "Pour les textes très courts ou de type étiquette/code (ex: 'Niv. 01', 'A-101', 'Lot CVC'), évite les corrections stylistiques et corrige uniquement les fautes évidentes qui nuisent à la lisibilité. "
-            + "Si une correction est uniquement cosmétique, renvoie Category=Mineur. Si c'est une vraie faute de langue (grammaire/conjugaison/accord/sens), renvoie Category=Erreur. "
-            + "Si aucun texte ne requiert de correction, réponds STRICTEMENT avec [] (tableau JSON vide).\n"
+            + "Ne modifie pas les codes, numéros de plans, indices de révision, noms de lots, abréviations techniques ou valeurs numériques sauf faute de langue évidente autour de ces valeurs. "
+            + "Si une correction est uniquement mineure mais utile, renvoie Category=Mineur. Si c'est une vraie faute de langue (orthographe/grammaire/conjugaison/accord/sens), renvoie Category=Erreur. "
+            + "Si aucun texte ne requiert de correction, réponds strictement avec [] (tableau JSON vide).\n"
             + linesJson;
         }
 

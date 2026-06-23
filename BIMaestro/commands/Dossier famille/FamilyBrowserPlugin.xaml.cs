@@ -290,7 +290,8 @@ namespace Famille
         {
             Dispatcher.Invoke(() =>
             {
-                if (_globalSearchMode) ApplyFilters();
+                if (_globalSearchMode || !string.IsNullOrWhiteSpace(SearchBox?.Text))
+                    ApplyFilters();
             });
         }
 
@@ -958,6 +959,147 @@ namespace Famille
                 ApplyFilters();
         }
 
+        private FamilyItem CreateSearchResultItem(FamilyIndexService.Entry entry, bool showLocation)
+        {
+            bool isInCurrentFolder = IsPathInCurrentFolder(entry.Path);
+            string folderPath = GetDisplayFolderPath(entry.Path);
+
+            return new FamilyItem
+            {
+                Name = entry.Name,
+                Path = entry.Path,
+                Category = entry.Category,
+                NormalizedName = entry.NormalizedName,
+                RevitSavedVersion = entry.RevitSavedVersion,
+                FileSizeBytes = entry.FileSizeBytes,
+                FileSizeText = FormatFileSize(entry.FileSizeBytes),
+                CreatedUtc = entry.CreatedUtc,
+                LastModifiedUtc = entry.LastModifiedUtc,
+                LastUpdatedUtc = entry.LastModifiedUtc,
+                DocumentationAvailable = entry.HasDocumentation,
+                HasCatalogImage = entry.HasCatalogImage,
+                IsInCurrentFolder = isInCurrentFolder,
+                SearchLocationLabel = isInCurrentFolder ? "Dans ce dossier" : "Trouvé dans",
+                SearchFolderPath = folderPath,
+                SearchLocationVisibility = showLocation ? Visibility.Visible : Visibility.Collapsed
+            };
+        }
+
+        private void MarkSearchLocation(FamilyItem item, string label)
+        {
+            if (item == null || item.IsFolder)
+                return;
+
+            item.IsInCurrentFolder = IsPathInCurrentFolder(item.Path);
+            item.SearchLocationLabel = label;
+            item.SearchFolderPath = GetDisplayFolderPath(item.Path);
+            item.SearchLocationVisibility = Visibility.Visible;
+        }
+
+        private bool IsPathInCurrentFolder(string familyPath)
+        {
+            if (string.IsNullOrWhiteSpace(familyPath) || string.IsNullOrWhiteSpace(currentFolderPath))
+                return false;
+
+            try
+            {
+                var current = Path.GetFullPath(currentFolderPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                var folder = Path.GetDirectoryName(Path.GetFullPath(familyPath))?.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                return string.Equals(current, folder, StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private string GetDisplayFolderPath(string familyPath)
+        {
+            if (string.IsNullOrWhiteSpace(familyPath))
+                return string.Empty;
+
+            try
+            {
+                var folder = Path.GetDirectoryName(familyPath) ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(folder))
+                    return string.Empty;
+
+                var relative = GetRelativePath(rootFolderPath, folder);
+                if (string.IsNullOrWhiteSpace(relative) || relative == ".")
+                    return RootFolderName;
+
+                return relative;
+            }
+            catch
+            {
+                return Path.GetDirectoryName(familyPath) ?? string.Empty;
+            }
+        }
+
+        private List<FamilyItem> ApplyGlobalSearchSorting(List<FamilyItem> items)
+        {
+            var sorted = ApplyInteractiveSorting(items);
+            sorted.Sort((a, b) =>
+            {
+                int folderCmp = b.IsInCurrentFolder.CompareTo(a.IsInCurrentFolder);
+                if (folderCmp != 0)
+                    return folderCmp;
+
+                var aPath = a?.SearchFolderPath ?? string.Empty;
+                var bPath = b?.SearchFolderPath ?? string.Empty;
+                int pathCmp = CultureInfo.CurrentCulture.CompareInfo.Compare(aPath, bPath, CompareOptions.IgnoreCase);
+                if (pathCmp != 0)
+                    return pathCmp;
+
+                var aName = a?.Name ?? string.Empty;
+                var bName = b?.Name ?? string.Empty;
+                return CultureInfo.CurrentCulture.CompareInfo.Compare(aName, bName, CompareOptions.IgnoreCase);
+            });
+
+            return sorted;
+        }
+
+        private List<FamilyItem> BuildGlobalSearchItems(FamilySearchQuery query, bool showLocation)
+        {
+            return _index.GetAll(max: 0)
+                .Where(e => MatchesGlobalSearch(e, query))
+                .Select(e => CreateSearchResultItem(e, showLocation))
+                .ToList();
+        }
+
+        private List<FamilyItem> BuildDirectLibraryItems(string normalizedSearch)
+        {
+            var items = new List<FamilyItem>();
+            if (string.IsNullOrWhiteSpace(familiesFolder) || !Directory.Exists(familiesFolder))
+                return items;
+
+            try
+            {
+                foreach (var path in Directory.EnumerateFiles(familiesFolder, "*.rfa", SearchOption.AllDirectories))
+                {
+                    var item = CreateFamilyItemFromPath(path);
+                    if (!string.IsNullOrWhiteSpace(normalizedSearch))
+                    {
+                        var folder = StripDiacritics(GetDisplayFolderPath(path) ?? string.Empty).ToLowerInvariant();
+                        if (!ContainsNormalized(item.NormalizedName, normalizedSearch) &&
+                            !ContainsNormalized(folder, normalizedSearch))
+                        {
+                            continue;
+                        }
+                    }
+
+                    items.Add(item);
+                    if (items.Count >= 8000)
+                        break;
+                }
+            }
+            catch
+            {
+            }
+
+            return items;
+        }
+
         private void ApplyFilters()
         {
             var txt = StripDiacritics(SearchBox.Text ?? "").ToLowerInvariant();
@@ -966,37 +1108,19 @@ namespace Famille
             {
                 if (!_index.IsReady)
                 {
-                    BeginPaging(ApplyInteractiveSorting(new List<FamilyItem>()));
+                    var directItems = BuildDirectLibraryItems(txt);
+                    BeginPaging(ApplyInteractiveSorting(directItems));
                     PagingStatusText.Visibility = Visibility.Visible;
-                    PagingStatusText.Text = "Index en cours de préparation…";
-                    UpdateCount(0);
+                    PagingStatusText.Text = directItems.Count == 0
+                        ? "Index en cours de préparation…"
+                        : $"Index en préparation, affichage direct : {directItems.Count}.";
                     return;
                 }
 
                 var query = FamilySearchQuery.Parse(txt);
-                var hits = _index.GetAll(max: 0)
-                    .Where(e => MatchesGlobalSearch(e, query))
+                var items = BuildGlobalSearchItems(query, showLocation: false)
                     .Take(8000)
                     .ToList();
-
-                var items = hits.Select(e =>
-                {
-                    return new FamilyItem
-                    {
-                        Name = e.Name,
-                        Path = e.Path,
-                        Category = e.Category,
-                        NormalizedName = e.NormalizedName,
-                        RevitSavedVersion = e.RevitSavedVersion,
-                        FileSizeBytes = e.FileSizeBytes,
-                        FileSizeText = FormatFileSize(e.FileSizeBytes),
-                        CreatedUtc = e.CreatedUtc,
-                        LastModifiedUtc = e.LastModifiedUtc,
-                        LastUpdatedUtc = e.LastModifiedUtc,
-                        DocumentationAvailable = e.HasDocumentation,
-                        HasCatalogImage = e.HasCatalogImage
-                    };
-                }).ToList();
 
                 BeginPaging(ApplyInteractiveSorting(items));
                 return;
@@ -1007,7 +1131,42 @@ namespace Famille
                 if (!string.IsNullOrEmpty(txt))
                     baseSet = baseSet.Where(f => !f.IsBackNavigation && f.NormalizedName.Contains(txt));
 
-                BeginPaging(ApplyInteractiveSorting(baseSet.ToList()));
+                var localItems = baseSet.ToList();
+                if (!string.IsNullOrEmpty(txt))
+                {
+                    foreach (var item in localItems)
+                        MarkSearchLocation(item, "Dans ce dossier");
+
+                    if (_index?.IsReady == true)
+                    {
+                        var localPaths = new HashSet<string>(
+                            localItems.Where(i => !string.IsNullOrWhiteSpace(i.Path)).Select(i => i.Path),
+                            StringComparer.OrdinalIgnoreCase);
+                        var query = FamilySearchQuery.Parse(txt);
+                        var otherItems = BuildGlobalSearchItems(query, showLocation: true)
+                            .Where(i => !i.IsInCurrentFolder && !localPaths.Contains(i.Path))
+                            .ToList();
+
+                        var combined = ApplyInteractiveSorting(localItems)
+                            .Concat(ApplyGlobalSearchSorting(otherItems))
+                            .Take(8000)
+                            .ToList();
+
+                        BeginPaging(combined);
+                        PagingStatusText.Visibility = Visibility.Visible;
+                        PagingStatusText.Text = otherItems.Count == 0
+                            ? $"Dans ce dossier : {localItems.Count}."
+                            : $"Dans ce dossier : {localItems.Count}. Autres dossiers : {otherItems.Count}.";
+                        return;
+                    }
+
+                    BeginPaging(ApplyInteractiveSorting(localItems));
+                    PagingStatusText.Visibility = Visibility.Visible;
+                    PagingStatusText.Text = "Recherche ailleurs en préparation…";
+                    return;
+                }
+
+                BeginPaging(ApplyInteractiveSorting(localItems));
             }
         }
 
@@ -3862,6 +4021,21 @@ namespace Famille
             set { if (_category != value) { _category = value; OnPropertyChanged(nameof(Category)); } }
         }
         public string NormalizedName { get; set; }
+        public bool IsInCurrentFolder { get; set; }
+        public string SearchLocationLabel { get; set; }
+        public string SearchFolderPath { get; set; }
+
+        private Visibility _searchLocationVisibility = Visibility.Collapsed;
+        public Visibility SearchLocationVisibility
+        {
+            get => _searchLocationVisibility;
+            set
+            {
+                if (_searchLocationVisibility == value) return;
+                _searchLocationVisibility = value;
+                OnPropertyChanged(nameof(SearchLocationVisibility));
+            }
+        }
 
         private bool _isFolder;
         public bool IsFolder

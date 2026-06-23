@@ -2,11 +2,10 @@
 using Autodesk.Revit.DB;
 using Autodesk.Revit.Attributes;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
 using Newtonsoft.Json;
 using System.Windows.Threading;
 using System.Windows.Interop;
@@ -21,6 +20,17 @@ namespace Analyse
     {
 
         protected override string ButtonId => "CommandAnalysePoids";
+        private static readonly TimeSpan FileSearchTimeLimit = TimeSpan.FromSeconds(20);
+        private static readonly TimeSpan PointCloudFallbackSearchTimeLimit = TimeSpan.FromSeconds(4);
+        private const int FileSearchMaxVisitedFiles = 60000;
+        private const int PointCloudFallbackMaxVisitedFiles = 12000;
+
+        private static readonly HashSet<string> SearchableImportExtensions =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ".dwg", ".dxf", ".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff",
+                ".rvt", ".ifc", ".rcp", ".rcs"
+            };
 
         protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
@@ -47,16 +57,23 @@ namespace Analyse
             string cacheFile = Path.Combine(logsFolder, "CacheTailleFamille.json");
             var cache = LoadCache(cacheFile);
 
-            // 3. Lancer l'indexation disque en tâche de fond
+            // 3. Préparer les fichiers à retrouver sur disque. La recherche est bornée plus bas.
             var importNames = GetImportNames(doc);
             var roots = GetSearchRoots(doc);
-            var indexTask = Task.Run(() => BuildFileIndex(importNames, roots));
 
             // 4. Analyser les familles
-            var famInfos = AnalyseFamilles(doc, commandData, cache, cacheFile);
+            List<ElementInfo> famInfos;
+            try
+            {
+                famInfos = AnalyseFamilles(doc, commandData, cache, cacheFile);
+            }
+            catch (OperationCanceledException)
+            {
+                return Result.Cancelled;
+            }
 
-            // 5. Attendre l'index puis analyser les imports & PDF
-            var fileIndex = indexTask.Result;
+            // 5. Recherche disque limitée, puis analyse des imports & PDF
+            var fileIndex = BuildFileIndex(importNames, roots);
             var impInfos = AnalyseImports(doc, fileIndex);
 
             // 6. Fusionner et calculer total
@@ -183,9 +200,9 @@ private List<string> GetImportNames(Document doc)
         /// <summary>
         /// Construit la liste de dossiers racine à parcourir.
         /// </summary>
-        private List<string> GetSearchRoots(Document doc)
+        private List<SearchRoot> GetSearchRoots(Document doc)
         {
-            var roots = new List<string>();
+            var roots = new List<SearchRoot>();
 
             string rvtPath = doc.IsWorkshared
                 ? ModelPathUtils.ConvertModelPathToUserVisiblePath(
@@ -200,73 +217,130 @@ private List<string> GetImportNames(Document doc)
             if (!string.IsNullOrEmpty(dirPath))
             {
                 var dir = new DirectoryInfo(dirPath);
-                for (int i = 0; i < 4 && dir != null; i++, dir = dir.Parent)
-                    roots.Add(dir.FullName);
+                AddSearchRoot(roots, dir.FullName, 6);
+
+                string[] nearbyFolders =
+                {
+                    "Liens", "Links", "Imports", "Xrefs", "DWG", "PDF",
+                    "Nuages de points", "PointClouds", "References"
+                };
+
+                foreach (var folder in nearbyFolders)
+                    AddSearchRoot(roots, Path.Combine(dir.FullName, folder), 5);
+
+                for (int i = 0; i < 2 && dir.Parent != null; i++)
+                {
+                    dir = dir.Parent;
+                    AddSearchRoot(roots, dir.FullName, 3);
+                }
             }
 
             var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            roots.AddRange(new[] {
-        docs,
-        Path.Combine(profile, "Downloads"),
-        Path.Combine(profile, "Téléchargements")
-    });
+            AddSearchRoot(roots, docs, 2);
+            AddSearchRoot(roots, Path.Combine(profile, "Downloads"), 2);
+            AddSearchRoot(roots, Path.Combine(profile, "Téléchargements"), 2);
 
-            return roots.Distinct().Where(Directory.Exists).ToList();
+            return roots
+                .GroupBy(r => r.Path, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.OrderByDescending(r => r.MaxDepth).First())
+                .Where(r => Directory.Exists(r.Path))
+                .ToList();
         }
 
         // ==== Indexation disque ====
         /// <summary>
-        /// Ne parcourt que les dossiers racine, et s’arrête quand tous les importNames ont un chemin.
+        /// Recherche seulement les fichiers utiles, avec limite de temps et de volume parcouru.
         /// </summary>
         private Dictionary<string, string> BuildFileIndex(
             IEnumerable<string> importNames,
-            IEnumerable<string> roots)
+            IEnumerable<SearchRoot> roots)
         {
-            // Dico thread-safe : clé = nom de fichier, valeur = chemin (null tant que non trouvé)
-            var remaining = new ConcurrentDictionary<string, string>(
-                importNames.ToDictionary(n => n, n => (string)null),
-                StringComparer.OrdinalIgnoreCase);
+            var exactTargets = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var baseNameTargets = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-            Parallel.ForEach(roots, (root, state) =>
+            foreach (var importName in importNames ?? Enumerable.Empty<string>())
             {
-                foreach (var file in SafeEnumerateFiles(root))
+                var name = NormalizeFileName(importName);
+                if (string.IsNullOrWhiteSpace(name)) continue;
+
+                var ext = Path.GetExtension(name);
+                if (!string.IsNullOrWhiteSpace(ext))
                 {
-                    var name = Path.GetFileName(file);
-                    if (remaining.ContainsKey(name) && remaining[name] == null)
+                    if (SearchableImportExtensions.Contains(ext))
+                        exactTargets[name] = name;
+                }
+                else
+                {
+                    baseNameTargets[name] = name;
+                }
+            }
+
+            if (exactTargets.Count == 0 && baseNameTargets.Count == 0)
+                return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            var found = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var watch = Stopwatch.StartNew();
+            int visited = 0;
+
+            bool CanContinue() =>
+                watch.Elapsed < FileSearchTimeLimit &&
+                visited < FileSearchMaxVisitedFiles &&
+                (exactTargets.Count > 0 || baseNameTargets.Count > 0);
+
+            foreach (var root in roots ?? Enumerable.Empty<SearchRoot>())
+            {
+                if (!CanContinue()) break;
+
+                foreach (var file in SafeEnumerateFiles(root.Path, root.MaxDepth, CanContinue))
+                {
+                    visited++;
+                    if (!CanContinue()) break;
+
+                    var ext = Path.GetExtension(file);
+                    if (!SearchableImportExtensions.Contains(ext)) continue;
+
+                    var fileName = Path.GetFileName(file);
+                    if (fileName != null && exactTargets.TryGetValue(fileName, out var exactKey))
                     {
-                        remaining[name] = file;
-                        // Si tout a été trouvé, on stoppe le Parallel.ForEach
-                        if (remaining.All(kv => kv.Value != null))
-                        {
-                            state.Break();
-                            break;
-                        }
+                        found[exactKey] = file;
+                        exactTargets.Remove(fileName);
+                        continue;
+                    }
+
+                    var baseName = Path.GetFileNameWithoutExtension(file);
+                    if (baseName != null && baseNameTargets.TryGetValue(baseName, out var baseKey))
+                    {
+                        found[baseKey] = file;
+                        baseNameTargets.Remove(baseName);
                     }
                 }
-            });
+            }
 
-            // Renvoie seulement les entrées où on a un chemin
-            return remaining
-                .Where(kv => kv.Value != null)
-                .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase);
+            return found;
         }
 
-        private IEnumerable<string> SafeEnumerateFiles(string root)
+        private IEnumerable<string> SafeEnumerateFiles(string root, int maxDepth, Func<bool> shouldContinue)
         {
             if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
                 yield break;
 
-            var stack = new Stack<string>();
-            stack.Push(root);
+            var stack = new Stack<SearchQueueItem>();
+            stack.Push(new SearchQueueItem(root, 0));
 
-            while (stack.Count > 0)
+            while (stack.Count > 0 && shouldContinue())
             {
-                var current = stack.Pop();
+                var item = stack.Pop();
+                var current = item.Path;
                 IEnumerable<string> files;
 
                 try
                 {
+                    var attrs = File.GetAttributes(current);
+                    if ((attrs & FileAttributes.ReparsePoint) != 0 ||
+                        (attrs & FileAttributes.System) != 0)
+                        continue;
+
                     files = Directory.EnumerateFiles(current);
                 }
                 catch (UnauthorizedAccessException)
@@ -279,7 +353,13 @@ private List<string> GetImportNames(Document doc)
                 }
 
                 foreach (var file in files)
+                {
+                    if (!shouldContinue()) yield break;
                     yield return file;
+                }
+
+                if (item.Depth >= maxDepth)
+                    continue;
 
                 IEnumerable<string> subDirs;
                 try
@@ -303,7 +383,7 @@ private List<string> GetImportNames(Document doc)
                         if ((attrs & FileAttributes.ReparsePoint) != 0)
                             continue;
 
-                        stack.Push(dir);
+                        stack.Push(new SearchQueueItem(dir, item.Depth + 1));
                     }
                     catch (UnauthorizedAccessException)
                     {
@@ -315,6 +395,46 @@ private List<string> GetImportNames(Document doc)
                     }
                 }
             }
+        }
+
+        private static void AddSearchRoot(ICollection<SearchRoot> roots, string path, int maxDepth)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return;
+
+            try
+            {
+                var fullPath = Path.GetFullPath(path);
+                if (!Directory.Exists(fullPath)) return;
+
+                var root = Path.GetPathRoot(fullPath);
+                if (string.Equals(fullPath.TrimEnd(Path.DirectorySeparatorChar), root?.TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                roots.Add(new SearchRoot(fullPath, maxDepth));
+            }
+            catch
+            {
+                // Chemin invalide ou inaccessible : on l'ignore.
+            }
+        }
+
+        private static string NormalizeFileName(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return null;
+
+            var name = value.Trim();
+            if (name.StartsWith("<") && name.EndsWith(">")) return null;
+
+            try
+            {
+                name = Path.GetFileName(name);
+            }
+            catch
+            {
+                return null;
+            }
+
+            return string.IsNullOrWhiteSpace(name) ? null : name;
         }
 
 
@@ -598,14 +718,7 @@ private List<string> GetImportNames(Document doc)
                 // 3) Si toujours rien, on scan le dossier du RVT (et parents) pour ce seul fichier
                 if (string.IsNullOrEmpty(fullPath) || !File.Exists(fullPath))
                 {
-                    string rvtFolder = Path.GetDirectoryName(doc.PathName);
-                    try
-                    {
-                        fullPath = Directory
-                            .EnumerateFiles(rvtFolder, pc.Name + ".*", SearchOption.AllDirectories)
-                            .FirstOrDefault(f => f.EndsWith(".rcp", StringComparison.OrdinalIgnoreCase));
-                    }
-                    catch { /* accès refusé ou autre, on ignore */ }
+                    fullPath = FindPointCloudFileNearModel(doc, pc.Name);
                 }
 
                 // 4) Calcul de la taille
@@ -628,6 +741,36 @@ private List<string> GetImportNames(Document doc)
 
 
             return infos;
+        }
+
+        private string FindPointCloudFileNearModel(Document doc, string pointCloudName)
+        {
+            var rvtFolder = string.IsNullOrWhiteSpace(doc.PathName)
+                ? null
+                : Path.GetDirectoryName(doc.PathName);
+
+            if (string.IsNullOrWhiteSpace(rvtFolder) || !Directory.Exists(rvtFolder))
+                return null;
+
+            var watch = Stopwatch.StartNew();
+            int visited = 0;
+            bool CanContinue() =>
+                watch.Elapsed < PointCloudFallbackSearchTimeLimit &&
+                visited < PointCloudFallbackMaxVisitedFiles;
+
+            foreach (var file in SafeEnumerateFiles(rvtFolder, 3, CanContinue))
+            {
+                visited++;
+                if (!CanContinue()) break;
+
+                if (!string.Equals(Path.GetExtension(file), ".rcp", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                if (string.Equals(Path.GetFileNameWithoutExtension(file), pointCloudName, StringComparison.OrdinalIgnoreCase))
+                    return file;
+            }
+
+            return null;
         }
 
         private string GetImportPath(ImportInstance imp, Document doc)
@@ -660,6 +803,30 @@ private List<string> GetImportNames(Document doc)
         private void SaveCache(string path, Dictionary<string, FamilyCacheEntry> cache)
         {
             File.WriteAllText(path, JsonConvert.SerializeObject(cache, Formatting.Indented));
+        }
+
+        private sealed class SearchRoot
+        {
+            public SearchRoot(string path, int maxDepth)
+            {
+                Path = path;
+                MaxDepth = maxDepth;
+            }
+
+            public string Path { get; }
+            public int MaxDepth { get; }
+        }
+
+        private sealed class SearchQueueItem
+        {
+            public SearchQueueItem(string path, int depth)
+            {
+                Path = path;
+                Depth = depth;
+            }
+
+            public string Path { get; }
+            public int Depth { get; }
         }
     }
 

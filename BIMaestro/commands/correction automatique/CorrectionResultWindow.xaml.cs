@@ -288,18 +288,20 @@ namespace ScanTextRevit
             grid.Children.Add(originalText);
 
             // Texte corrigé et boutons
-            StackPanel correctedPanel = new StackPanel
+            Grid correctedPanel = new Grid
             {
-                Orientation = Orientation.Horizontal,
                 Margin = new Thickness(0, 6, 0, 6)
             };
+            correctedPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            correctedPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            correctedPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            // Couleur selon la catégorie (Erreur = vert, Mineur = orange)
-            Color correctedColor = Colors.DarkGreen;
+            // Couleur selon la catégorie (Erreur = rouge, Mineur = orange)
+            Color correctedColor = Color.FromRgb(198, 40, 40);
             if (!string.IsNullOrEmpty(item.Category) &&
                 item.Category.Equals("Mineur", StringComparison.OrdinalIgnoreCase))
             {
-                correctedColor = Colors.Orange;
+                correctedColor = Color.FromRgb(199, 119, 0);
             }
             string correctedLabel = "Texte corrigé : " + item.CorrectedText;
             if (repetitionCount > 1)
@@ -312,16 +314,17 @@ namespace ScanTextRevit
                 FontSize = 13,
                 FontWeight = FontWeights.Bold,
                 TextWrapping = TextWrapping.Wrap,
-                Width = 600,
+                Margin = new Thickness(0, 0, 10, 0),
                 Foreground = new SolidColorBrush(correctedColor)
             };
+            Grid.SetColumn(correctedText, 0);
             correctedPanel.Children.Add(correctedText);
 
             // Bouton "Copier"
             Button copyButton = new Button
             {
                 Content = "Copier",
-                Margin = new Thickness(10, 0, 0, 0),
+                Margin = new Thickness(0, 0, 8, 0),
                 Padding = new Thickness(5, 2, 5, 2),
                 Cursor = Cursors.Hand,
                 Background = Brushes.Transparent,
@@ -330,13 +333,14 @@ namespace ScanTextRevit
                 BorderBrush = new SolidColorBrush(Colors.Black)
             };
             copyButton.Click += (s, e) => Clipboard.SetText(item.CorrectedText);
+            Grid.SetColumn(copyButton, 1);
             correctedPanel.Children.Add(copyButton);
 
             // Bouton "Afficher"
             Button showButton = new Button
             {
                 Content = repetitions != null && repetitions.Count > 1 ? "Afficher ▼" : "Afficher",
-                Margin = new Thickness(10, 0, 0, 0),
+                Margin = new Thickness(0),
                 Padding = new Thickness(5, 2, 5, 2),
                 Cursor = Cursors.Hand,
                 Background = Brushes.Transparent,
@@ -374,6 +378,7 @@ namespace ScanTextRevit
             {
                 showButton.Foreground = new SolidColorBrush(Colors.Black);
             }
+            Grid.SetColumn(showButton, 2);
             correctedPanel.Children.Add(showButton);
 
             Grid.SetRow(correctedPanel, 1);
@@ -410,25 +415,22 @@ namespace ScanTextRevit
                         return;
                     }
 
-                    // Tenter de déterminer la vue propriétaire de l'élément
-                    ElementId ownerViewId = null;
-                    if (element is TextNote tn)
+                    if (element is ViewSheet sheet)
                     {
-                        ownerViewId = tn.OwnerViewId;
+                        UiDoc.RequestViewChange(sheet);
                     }
-                    else if (element is IndependentTag tag)
+                    else
                     {
-                        ownerViewId = tag.OwnerViewId;
-                    }
-                    // Vous pouvez ajouter d'autres cas si nécessaire
-
-                    // Si on a trouvé une vue propriétaire et que ce n'est pas la vue active, on change de vue
-                    if (ownerViewId != null && !ownerViewId.Equals(UiDoc.ActiveView.Id))
-                    {
-                        View ownerView = UiDoc.Document.GetElement(ownerViewId) as View;
-                        if (ownerView != null)
+                        ElementId ownerViewId = element.OwnerViewId;
+                        if (ownerViewId != null &&
+                            ownerViewId != ElementId.InvalidElementId &&
+                            !ownerViewId.Equals(UiDoc.ActiveView.Id))
                         {
-                            UiDoc.RequestViewChange(ownerView);
+                            View ownerView = UiDoc.Document.GetElement(ownerViewId) as View;
+                            if (ownerView != null)
+                            {
+                                UiDoc.RequestViewChange(ownerView);
+                            }
                         }
                     }
 
