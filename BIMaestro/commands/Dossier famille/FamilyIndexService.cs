@@ -53,7 +53,7 @@ namespace Famille
             try
             {
                 IsReady = false;
-                UpdateStatus("Indexation des familles…");
+                UpdateStatus("Recherche des familles…");
 
                 var list = new List<Entry>(capacity: 8192);
                 int n = 0;
@@ -63,47 +63,81 @@ namespace Famille
                 {
                     if (ct.IsCancellationRequested) return;
 
-                    string name = Path.GetFileNameWithoutExtension(f);
-                    string low = name.ToLowerInvariant();
-                    string cat = "Général";
-                    if (low.Contains("porte")) cat = "Porte";
-                    else if (low.Contains("fenetre") || low.Contains("fenêtre")) cat = "Fenêtre";
-                    var info = SafeGetFileInfo(f);
-                    var meta = FamilyMetadataProvider.RequestFastMetadataAsync(f).GetAwaiter().GetResult();
-                    if (!string.IsNullOrWhiteSpace(meta?.Category))
-                        cat = meta.Category.Trim();
-
-                    list.Add(new Entry
-                    {
-                        Name = name,
-                        Path = f,
-                        Category = cat,
-                        NormalizedName = StripDiacritics(name).ToLowerInvariant(),
-                        NormalizedFolder = StripDiacritics(GetRelativeFolder(f)).ToLowerInvariant(),
-                        RevitSavedVersion = string.IsNullOrWhiteSpace(meta?.RevitSavedVersion) ? null : meta.RevitSavedVersion.Trim(),
-                        FileSizeBytes = meta?.FileSizeBytes ?? info?.Length,
-                        CreatedUtc = info?.CreationTimeUtc,
-                        LastModifiedUtc = info?.LastWriteTimeUtc,
-                        HasDocumentation = HasDocumentationFile(f),
-                        HasCatalogImage = HasCatalogImage(f)
-                    });
+                    list.Add(CreateFastEntry(f));
 
                     n++;
-                    if (n % 500 == 0)
+                    if (n == 1 || n % 25 == 0)
                     {
                         lock (_lock) _items = list.ToList();
-                        UpdateStatus($"Index : {n} familles…");
+                        UpdateStatus($"Familles trouvées : {n}…");
                     }
                 }
 
                 lock (_lock) _items = list;
                 IsReady = true;
-                UpdateStatus($"Index prêt ({_items.Count} familles).");
+                UpdateStatus($"Recherche prête ({_items.Count} familles).");
+
+                EnrichIndexMetadata(list, ct);
             }
             catch (Exception ex)
             {
                 UpdateStatus("Index erreur : " + ex.Message);
             }
+        }
+
+        private Entry CreateFastEntry(string familyPath)
+        {
+            string name = Path.GetFileNameWithoutExtension(familyPath);
+            string low = name.ToLowerInvariant();
+            string cat = "Général";
+            if (low.Contains("porte")) cat = "Porte";
+            else if (low.Contains("fenetre") || low.Contains("fenêtre")) cat = "Fenêtre";
+
+            return new Entry
+            {
+                Name = name,
+                Path = familyPath,
+                Category = cat,
+                NormalizedName = StripDiacritics(name).ToLowerInvariant(),
+                NormalizedFolder = StripDiacritics(GetRelativeFolder(familyPath)).ToLowerInvariant()
+            };
+        }
+
+        private void EnrichIndexMetadata(List<Entry> list, CancellationToken ct)
+        {
+            foreach (var entry in list)
+            {
+                if (ct.IsCancellationRequested) return;
+                if (entry == null || string.IsNullOrWhiteSpace(entry.Path))
+                    continue;
+
+                try
+                {
+                    var meta = FamilyMetadataProvider.RequestFastMetadataAsync(entry.Path).GetAwaiter().GetResult();
+                    if (!string.IsNullOrWhiteSpace(meta?.Category))
+                        entry.Category = meta.Category.Trim();
+
+                    if (!string.IsNullOrWhiteSpace(meta?.RevitSavedVersion))
+                        entry.RevitSavedVersion = meta.RevitSavedVersion.Trim();
+
+                    if (meta?.FileSizeBytes != null)
+                        entry.FileSizeBytes = meta.FileSizeBytes;
+
+                    var info = SafeGetFileInfo(entry.Path);
+                    entry.FileSizeBytes = entry.FileSizeBytes ?? info?.Length;
+                    entry.CreatedUtc = info?.CreationTimeUtc;
+                    entry.LastModifiedUtc = info?.LastWriteTimeUtc;
+
+                    entry.HasDocumentation = HasDocumentationFile(entry.Path);
+                    entry.HasCatalogImage = HasCatalogImage(entry.Path);
+                }
+                catch
+                {
+                }
+            }
+
+            lock (_lock) _items = list.ToList();
+            UpdateStatus($"Index complet ({list.Count} familles).");
         }
 
         public IEnumerable<Entry> Search(string term, int max = 8000)

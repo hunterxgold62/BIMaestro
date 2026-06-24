@@ -1427,15 +1427,12 @@ namespace Famille
                 {
                     var partialQuery = FamilySearchQuery.Parse(txt);
                     var indexedItems = BuildGlobalSearchItems(partialQuery, showLocation: false);
-                    var itemsToShow = indexedItems.Count > 0
-                        ? indexedItems
-                        : BuildDirectLibraryItems(txt);
 
-                    BeginPaging(ApplyInteractiveSorting(itemsToShow));
+                    BeginPaging(ApplyInteractiveSorting(indexedItems));
                     PagingStatusText.Visibility = Visibility.Visible;
-                    PagingStatusText.Text = itemsToShow.Count == 0
-                        ? "Chargement de la bibliothèque…"
-                        : $"Familles affichées : {itemsToShow.Count}. Les détails se complètent.";
+                    PagingStatusText.Text = indexedItems.Count == 0
+                        ? "Recherche en cours…"
+                        : $"Familles affichées : {indexedItems.Count}. Les détails se complètent.";
                     return;
                 }
 
