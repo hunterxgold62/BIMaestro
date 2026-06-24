@@ -28,6 +28,7 @@ namespace Analyse
             try
             {
                 ElementHistoryTracker.PrimeDocument(uidoc.Document);
+                ElementHistoryTracker.FlushPendingForHistory();
                 initialEvents = ElementHistoryWindow.LoadInitialHistory(uidoc.Document, selected, out defaultAction);
             }
             catch

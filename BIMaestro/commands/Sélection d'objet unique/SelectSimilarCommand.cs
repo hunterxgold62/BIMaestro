@@ -192,13 +192,18 @@ namespace Visualisation
 
             var dlg = new TaskDialog("Sélection similaire")
             {
-                MainInstruction = "Que voulez-vous faire ?",
+                MainInstruction = hasPreselection
+                    ? "Choisissez comment retrouver les éléments similaires à la sélection actuelle."
+                    : "Choisissez comment retrouver les éléments similaires aux éléments de référence.",
                 MainContent =
-                    "• Catégorie : même catégorie (Murs, Sols, Portes, …)\n" +
-                    "• Famille : même famille (Murs & Sols : clé = nom du Type)\n" +
-                    "• Type : même type exact",
+                    "1. Choisissez le critère.\n" +
+                    "2. Cliquez les éléments à garder dans la vue.\n" +
+                    "3. Terminez pour appliquer la sélection.\n\n" +
+                    "Catégorie : même catégorie (Murs, Sols, Portes, ...)\n" +
+                    "Famille : même famille (Murs et Sols : nom du type)\n" +
+                    "Type : type exact.",
                 CommonButtons = TaskDialogCommonButtons.Close,
-                VerificationText = "Colorier les éléments (préférence)"
+                VerificationText = "Colorier les éléments sélectionnés"
             };
             dlg.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Sélectionner par Catégorie");
             dlg.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, "Sélectionner par Famille");
@@ -261,20 +266,7 @@ namespace Visualisation
                 return Result.Succeeded;
             }
 
-            // 6) Groupage + palette
-            var groupKeys = selIds
-                .Select(id => ComputeKey(doc, wallCatId, floorCatId, doc.GetElement(id)))
-                .Distinct(StringComparer.Ordinal).ToList();
-
-            int n = Math.Max(1, groupKeys.Count);
-            var palette = new Dictionary<string, System.Drawing.Color>(StringComparer.Ordinal);
-            for (int i = 0; i < n; i++)
-            {
-                double hue = i / (double)n;
-                palette[groupKeys[i]] = ColorFromHSL(hue, 0.5, 0.8);
-            }
-
-            // 7) Appliquer & mémoriser la série
+            // 6) Appliquer une couleur stable par groupe, puis mémoriser la série.
             var coloredUniqueIds = new List<string>();
             using (var t = new Transaction(doc, "Surligner similaires"))
             {
@@ -292,7 +284,7 @@ namespace Visualisation
                     if (el == null) continue;
 
                     var key = ComputeKey(doc, wallCatId, floorCatId, el);
-                    var c = palette[key];
+                    var c = GetStableColorForKey(key);
                     var rc = new Autodesk.Revit.DB.Color(c.R, c.G, c.B);
 
                     var ogs = new OverrideGraphicSettings()
@@ -400,6 +392,30 @@ namespace Visualisation
 
             var et2 = doc.GetElement(el.GetTypeId()) as ElementType;
             return !string.IsNullOrEmpty(et2?.FamilyName) ? et2.FamilyName : et2?.Name ?? el.Category?.Name ?? "Autres";
+        }
+
+        private static System.Drawing.Color GetStableColorForKey(string key)
+        {
+            var normalized = string.IsNullOrWhiteSpace(key) ? "Autres" : key.Trim().ToUpperInvariant();
+            var hash = StableHash(normalized);
+            var hue = (hash % 360) / 360.0;
+            return ColorFromHSL(hue, 0.55, 0.78);
+        }
+
+        private static uint StableHash(string value)
+        {
+            unchecked
+            {
+                const uint offset = 2166136261;
+                const uint prime = 16777619;
+                uint hash = offset;
+                foreach (var ch in value ?? string.Empty)
+                {
+                    hash ^= ch;
+                    hash *= prime;
+                }
+                return hash;
+            }
         }
 
         private static System.Drawing.Color ColorFromHSL(double h, double s, double l)

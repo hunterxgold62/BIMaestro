@@ -164,6 +164,8 @@ public class BIMaestroApp : IExternalApplication
             _uiApp ??= sender as UIApplication;
             if (_uiApp == null) return;
 
+            Analyse.ElementHistoryTracker.PrimeDocument(_uiApp.ActiveUIDocument?.Document);
+
             if (!Couleur.ColoringStateManager.IsColoringActive)
             {
                 if (!_hasResetWhenOff)

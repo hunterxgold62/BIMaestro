@@ -120,6 +120,12 @@ namespace Analyse
             }
         }
 
+        internal static void FlushPendingForHistory()
+        {
+            try { Flush(); }
+            catch { }
+        }
+
         public static void PrimeDocument(Document doc)
         {
             if (doc == null) return;
@@ -386,7 +392,7 @@ namespace Analyse
                 Project = doc.ProjectInformation?.Name ?? "Projet",
                 ModelGuid = doc.GetHashCode().ToString(CultureInfo.InvariantCulture),
                 ModelKey = GetDocumentKey(doc),
-                ElementId = id.IntegerValue,
+                ElementId = id.GetIdValue(),
                 UniqueId = current.UniqueId,
                 Category = current.Category,
                 Family = current.Family,
@@ -526,7 +532,7 @@ namespace Analyse
                             Project = doc.ProjectInformation?.Name ?? doc.Title ?? "Projet",
                             ModelGuid = doc.GetHashCode().ToString(CultureInfo.InvariantCulture),
                             ModelKey = GetDocumentKey(doc),
-                            ElementId = symbol.Id.IntegerValue,
+                            ElementId = symbol.Id.GetIdValue(),
                             UniqueId = current.UniqueId,
                             Category = current.Category,
                             Family = current.Family,
@@ -577,7 +583,7 @@ namespace Analyse
             if (doc == null || id == null || id == ElementId.InvalidElementId) return string.Empty;
             var modelKey = GetDocumentKey(doc);
             if (string.IsNullOrWhiteSpace(modelKey)) return string.Empty;
-            return modelKey + "|element|" + id.IntegerValue.ToString(CultureInfo.InvariantCulture);
+            return modelKey + "|element|" + id.GetIdValue().ToString(CultureInfo.InvariantCulture);
         }
 
         private static ElementSnapshot BuildSnapshot(Element el, bool includeOrientedCorners)
@@ -616,7 +622,7 @@ namespace Analyse
                 Category = categoryName,
                 Family = CleanHistoryText(family),
                 TypeName = CleanHistoryText(typeName),
-                TypeId = typeId == null || typeId == ElementId.InvalidElementId ? -1 : typeId.IntegerValue,
+                TypeId = typeId == null || typeId == ElementId.InvalidElementId ? -1 : typeId.GetIdValue(),
                 Name = el.Name ?? string.Empty,
                 Location = GetLocation(el),
                 BBoxMin = GetBBoxMin(el),
@@ -951,7 +957,7 @@ namespace Analyse
                         var elementName = doc?.GetElement(id)?.Name;
                         return IsUsefulHistoryText(elementName)
                             ? elementName
-                            : id.IntegerValue.ToString(CultureInfo.InvariantCulture);
+                            : id.GetIdValue().ToString(CultureInfo.InvariantCulture);
                     default:
                         return null;
                 }
@@ -1012,7 +1018,7 @@ namespace Analyse
             {
                 var id = doc.OwnerFamily?.Id;
                 if (id != null && id != ElementId.InvalidElementId)
-                    return id.IntegerValue;
+                    return id.GetIdValue();
             }
             catch
             {
@@ -1044,7 +1050,7 @@ namespace Analyse
                         return parameter.AsDouble().ToString("G17", CultureInfo.InvariantCulture);
                     case StorageType.ElementId:
                         var id = parameter.AsElementId();
-                        return id == null ? string.Empty : id.IntegerValue.ToString(CultureInfo.InvariantCulture);
+                        return id == null ? string.Empty : id.GetIdValue().ToString(CultureInfo.InvariantCulture);
                     default:
                         return null;
                 }
@@ -1163,8 +1169,8 @@ namespace Analyse
                 Project = doc.ProjectInformation?.Name ?? "Projet",
                 ModelGuid = doc.GetHashCode().ToString(CultureInfo.InvariantCulture),
                 ModelKey = GetDocumentKey(doc),
-                ElementId = id.IntegerValue,
-                UniqueId = "deleted:" + id.IntegerValue,
+                ElementId = id.GetIdValue(),
+                UniqueId = "deleted:" + id.GetIdValue(),
                 Category = snapshot.Category,
                 Family = snapshot?.Family ?? string.Empty,
                 TypeName = snapshot?.TypeName ?? string.Empty,
@@ -1282,14 +1288,19 @@ namespace Analyse
 
         internal static string ResolveThumbnailPath(Document doc, int typeId, string family, string typeName)
         {
-            return ResolveThumbnailPath(family, typeName);
+            var catalog = ResolveThumbnailPath(family, typeName);
+            if (!string.IsNullOrWhiteSpace(catalog)) return catalog;
+
+            var revit = TryCreateRevitTypeThumbnail(doc, typeId, family, typeName);
+            if (!string.IsNullOrWhiteSpace(revit)) return revit;
+            return null;
         }
 
         internal static string ResolveThumbnailPath(string family, string typeName)
         {
             var roots = GetConfiguredImageRoots();
-            var key = "catalog|" + string.Join(";", roots) + "|" + (family ?? string.Empty).Trim() + "|" + (typeName ?? string.Empty).Trim();
-            if (string.IsNullOrWhiteSpace((family ?? string.Empty) + (typeName ?? string.Empty))) return null;
+            var key = "catalog-strict-family-v2|" + string.Join(";", roots) + "|" + (family ?? string.Empty).Trim() + "|" + (typeName ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(family)) return null;
             if (ThumbnailPathCache.TryGetValue(key, out var cached))
                 return string.IsNullOrWhiteSpace(cached) ? null : cached;
 
@@ -1302,7 +1313,7 @@ namespace Analyse
                     foreach (var ext in ImageExtensions)
                     {
                         var path = Path.Combine(root, name + ext);
-                        if (File.Exists(path))
+                        if (File.Exists(path) && ImageFileMatchesFamily(path, family))
                             return ThumbnailPathCache[key] = path;
                     }
                 }
@@ -1316,6 +1327,17 @@ namespace Analyse
             }
 
             return null;
+        }
+
+        internal static bool IsThumbnailPathValidForFamily(string path, string family)
+        {
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return false;
+
+            var normalizedPath = path.Replace('/', '\\');
+            if (normalizedPath.IndexOf("\\CacheVignettes\\QuiAFaitCa\\", StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+
+            return ImageFileMatchesFamily(path, family);
         }
 
         private static string TryCreateRevitTypeThumbnail(Document doc, int typeId, string family, string typeName)
@@ -1371,7 +1393,6 @@ namespace Analyse
             foreach (var value in new[]
             {
                 family,
-                typeName,
                 string.Join(" ", new[] { family, typeName }.Where(x => !string.IsNullOrWhiteSpace(x))),
                 string.Join(" ", new[] { typeName, family }.Where(x => !string.IsNullOrWhiteSpace(x)))
             }.Distinct(StringComparer.OrdinalIgnoreCase))
@@ -1404,8 +1425,11 @@ namespace Analyse
             if (index.Count == 0) return null;
 
             var familyKey = NormalizeImageKey(family);
+            if (string.IsNullOrWhiteSpace(familyKey)) return null;
             var typeKey = NormalizeImageKey(typeName);
-            var queries = BuildNormalizedImageQueries(family, typeName).ToList();
+            var queries = BuildNormalizedImageQueries(family, typeName)
+                .Where(q => !string.Equals(q, typeKey, StringComparison.OrdinalIgnoreCase))
+                .ToList();
             if (queries.Count == 0) return null;
 
             ImageFileCandidate best = null;
@@ -1420,7 +1444,7 @@ namespace Analyse
                 }
             }
 
-            return bestScore >= 65 ? best?.Path : null;
+            return bestScore >= 95 ? best?.Path : null;
         }
 
         private static List<ImageFileCandidate> BuildImageIndex(string root)
@@ -1476,7 +1500,6 @@ namespace Analyse
             foreach (var value in new[]
             {
                 family,
-                typeName,
                 string.Join(" ", new[] { family, typeName }.Where(x => !string.IsNullOrWhiteSpace(x))),
                 string.Join(" ", new[] { typeName, family }.Where(x => !string.IsNullOrWhiteSpace(x)))
             })
@@ -1490,16 +1513,17 @@ namespace Analyse
         private static int ScoreImageCandidate(ImageFileCandidate candidate, string familyKey, string typeKey, List<string> queries)
         {
             if (candidate == null || string.IsNullOrWhiteSpace(candidate.NameKey)) return 0;
+            if (!ImageCandidateMatchesFamily(candidate, familyKey)) return 0;
 
             var score = 0;
             foreach (var query in queries)
             {
                 if (candidate.NameKey.Equals(query, StringComparison.OrdinalIgnoreCase))
-                    score = Math.Max(score, query.Equals(typeKey, StringComparison.OrdinalIgnoreCase) ? 130 : 115);
+                    score = Math.Max(score, 130);
                 else if (query.Length >= 5 && candidate.NameKey.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0)
-                    score = Math.Max(score, query.Equals(typeKey, StringComparison.OrdinalIgnoreCase) ? 105 : 90);
+                    score = Math.Max(score, 110);
                 else if (candidate.NameKey.Length >= 5 && query.IndexOf(candidate.NameKey, StringComparison.OrdinalIgnoreCase) >= 0)
-                    score = Math.Max(score, 80);
+                    score = Math.Max(score, 95);
             }
 
             var familyTokens = GetImageTokens(familyKey).ToList();
@@ -1507,14 +1531,42 @@ namespace Analyse
             var familyHits = familyTokens.Count(t => CandidateContainsToken(candidate, t));
             var typeHits = typeTokens.Count(t => CandidateContainsToken(candidate, t));
 
-            if (typeTokens.Count > 0 && typeHits == typeTokens.Count)
-                score = Math.Max(score, 75 + typeHits * 7);
             if (familyTokens.Count > 0 && familyHits == familyTokens.Count)
-                score = Math.Max(score, 68 + familyHits * 5);
+                score = Math.Max(score, 95 + familyHits * 5);
             if (typeHits > 0 && familyHits > 0)
-                score = Math.Max(score, 72 + typeHits * 7 + familyHits * 5);
+                score = Math.Max(score, 105 + typeHits * 7 + familyHits * 5);
 
             return score;
+        }
+
+        private static bool ImageFileMatchesFamily(string path, string family)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return false;
+            var candidate = new ImageFileCandidate
+            {
+                Path = path,
+                NameKey = NormalizeImageKey(Path.GetFileNameWithoutExtension(path))
+            };
+            candidate.Tokens = new HashSet<string>(GetImageTokens(candidate.NameKey), StringComparer.OrdinalIgnoreCase);
+            return ImageCandidateMatchesFamily(candidate, NormalizeImageKey(family));
+        }
+
+        private static bool ImageCandidateMatchesFamily(ImageFileCandidate candidate, string familyKey)
+        {
+            if (candidate == null || string.IsNullOrWhiteSpace(candidate.NameKey) || string.IsNullOrWhiteSpace(familyKey))
+                return false;
+
+            if (candidate.NameKey.Equals(familyKey, StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (candidate.NameKey.StartsWith(familyKey + " ", StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (candidate.NameKey.EndsWith(" " + familyKey, StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (candidate.NameKey.IndexOf(" " + familyKey + " ", StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+
+            var familyTokens = GetImageTokens(familyKey).ToList();
+            return familyTokens.Count > 0 && familyTokens.All(t => candidate.Tokens.Contains(t));
         }
 
         private static bool CandidateContainsToken(ImageFileCandidate candidate, string token)
@@ -1648,7 +1700,7 @@ namespace Analyse
             if (DateTime.TryParseExact(token, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day))
                 return day.Date.AddDays(1).AddTicks(-1);
             if (DateTime.TryParseExact(token, "yyyy-MM", CultureInfo.InvariantCulture, DateTimeStyles.None, out var month))
-                return month.Date.AddMonths(1).AddTicks(-1);
+                return month.Date;
 
             try { return File.GetLastWriteTimeUtc(path); }
             catch { return DateTime.MinValue; }

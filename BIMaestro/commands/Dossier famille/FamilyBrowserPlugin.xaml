@@ -760,6 +760,63 @@
                 </Border>
             </DataTemplate>
 
+            <DataTemplate x:Key="SearchGroupHeaderTemplate" DataType="{x:Type local:FamilyItem}">
+                <Border Margin="6,14,6,6"
+                        Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                        Background="{DynamicResource Surface.Subtle}"
+                        BorderBrush="{DynamicResource Border}"
+                        BorderThickness="0,1,0,1"
+                        Padding="12,8">
+                    <DockPanel LastChildFill="True">
+                        <TextBlock DockPanel.Dock="Right"
+                                   Text="{Binding SearchGroupCountText}"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   FontWeight="SemiBold"
+                                   Margin="18,0,0,0"/>
+                        <TextBlock Text="{Binding SearchGroupTitle}"
+                                   Foreground="{DynamicResource Text.Primary}"
+                                   FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding SearchGroupTitle}"/>
+                    </DockPanel>
+                </Border>
+            </DataTemplate>
+
+            <DataTemplate x:Key="FamilySearchGroupTemplate" DataType="{x:Type local:FamilySearchGroup}">
+                <StackPanel Margin="0,0,0,16">
+                    <Border Margin="6,14,6,8"
+                            Background="{DynamicResource Surface.Subtle}"
+                            BorderBrush="{DynamicResource Border}"
+                            BorderThickness="0,1,0,1"
+                            Padding="12,8">
+                        <DockPanel LastChildFill="True">
+                            <TextBlock DockPanel.Dock="Right"
+                                       Text="{Binding CountText}"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       FontWeight="SemiBold"
+                                       Margin="18,0,0,0"/>
+                            <TextBlock Text="{Binding Title}"
+                                       Foreground="{DynamicResource Text.Primary}"
+                                       FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis"
+                                       ToolTip="{Binding Title}"/>
+                        </DockPanel>
+                    </Border>
+                    <ItemsControl ItemsSource="{Binding Families}"
+                                  ItemTemplate="{StaticResource FamilyItemTemplate}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel IsItemsHost="True"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                </StackPanel>
+            </DataTemplate>
+
+            <local:FamilyItemTemplateSelector x:Key="FamilyListItemTemplateSelector"
+                                              ItemTemplate="{StaticResource FamilyItemTemplate}"
+                                              HeaderTemplate="{StaticResource SearchGroupHeaderTemplate}"/>
+
             <!-- Vignette famille (onglet Favoris/Collections) : bouton 🗑 -->
             <DataTemplate x:Key="CollectionItemTemplate" DataType="{x:Type local:FamilyItem}">
                 <Border Margin="5"
@@ -1121,8 +1178,12 @@
 
                                         <!-- Résultats paginés -->
                                         <ItemsControl x:Name="FamilyListView"
-                                              ItemTemplate="{StaticResource FamilyItemTemplate}"
+                                              ItemTemplateSelector="{StaticResource FamilyListItemTemplateSelector}"
                                               ItemsPanel="{StaticResource FamilyListWrapPanel}"/>
+
+                                        <ItemsControl x:Name="GroupedFamilyListView"
+                                                      ItemTemplate="{StaticResource FamilySearchGroupTemplate}"
+                                                      Visibility="Collapsed"/>
 
                                         <TextBlock x:Name="PagingStatusText"
                                            Margin="8,12,8,20"

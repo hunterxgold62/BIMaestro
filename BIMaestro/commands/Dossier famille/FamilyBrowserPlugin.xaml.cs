@@ -181,8 +181,13 @@ namespace Famille
         // Pagination & recherche
         private const int PageSize = 200;
         private const int ScrollTopActionThreshold = 16;
+        private const int FolderSearchUiBatchSize = 6;
+        private const int FolderSearchUiPauseMs = 15;
         private int _nextIndex = 0;
         private List<FamilyItem> _currentResult = new();
+        private int _groupedVisualLoadVersion;
+        private int _folderSearchVersion;
+        private ObservableCollection<FamilySearchGroup> _activeSearchGroups;
         private readonly DispatcherTimer _searchDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
 
         // Index global (auto)
@@ -1059,12 +1064,16 @@ namespace Famille
             return sorted;
         }
 
-        private List<FamilyItem> BuildGlobalSearchItems(FamilySearchQuery query, bool showLocation)
+        private List<FamilyItem> BuildGlobalSearchItems(FamilySearchQuery query, bool showLocation, int max = 8000)
         {
-            return _index.GetAll(max: 0)
-                .Where(e => MatchesGlobalSearch(e, query))
-                .Select(e => CreateSearchResultItem(e, showLocation))
-                .ToList();
+            if (_index == null)
+                return new List<FamilyItem>();
+
+            var matches = _index.GetAll(max: 0).Where(e => MatchesGlobalSearch(e, query));
+            if (max > 0)
+                matches = matches.Take(max);
+
+            return matches.Select(e => CreateSearchResultItem(e, showLocation)).ToList();
         }
 
         private List<FamilyItem> BuildDirectLibraryItems(string normalizedSearch)
@@ -1077,7 +1086,7 @@ namespace Famille
             {
                 foreach (var path in Directory.EnumerateFiles(familiesFolder, "*.rfa", SearchOption.AllDirectories))
                 {
-                    var item = CreateFamilyItemFromPath(path);
+                    var item = CreateFastFamilyItemFromPath(path);
                     if (!string.IsNullOrWhiteSpace(normalizedSearch))
                     {
                         var folder = StripDiacritics(GetDisplayFolderPath(path) ?? string.Empty).ToLowerInvariant();
@@ -1100,6 +1109,314 @@ namespace Famille
             return items;
         }
 
+        private FamilyItem CreateFastFamilyItemFromPath(string path)
+        {
+            var name = System.IO.Path.GetFileNameWithoutExtension(path);
+            return new FamilyItem
+            {
+                Name = name,
+                Path = path,
+                Icon = null,
+                NormalizedName = StripDiacritics(name).ToLowerInvariant(),
+                DocumentationAvailable = HasDocumentationFile(path)
+            };
+        }
+
+        private FamilyItem CreateSearchGroupHeader(string folderPath, int count)
+        {
+            var displayFolder = string.IsNullOrWhiteSpace(folderPath) ? "Autre dossier" : folderPath;
+            return new FamilyItem
+            {
+                Name = displayFolder,
+                IsSearchGroupHeader = true,
+                SearchGroupTitle = $"Dossier : {displayFolder}",
+                SearchGroupCountText = count == 1 ? "1 famille" : $"{count} familles",
+                SearchLocationVisibility = Visibility.Collapsed
+            };
+        }
+
+        private List<FamilyItem> BuildGroupedFolderSearchResults(List<FamilyItem> localItems, List<FamilyItem> otherItems)
+        {
+            var result = ApplyInteractiveSorting(localItems).ToList();
+
+            var groups = otherItems
+                .Where(i => i != null && !i.IsSearchGroupHeader)
+                .GroupBy(i => string.IsNullOrWhiteSpace(i.SearchFolderPath) ? "Autre dossier" : i.SearchFolderPath)
+                .OrderBy(g => g.Key, StringComparer.CurrentCultureIgnoreCase);
+
+            foreach (var group in groups)
+            {
+                var sortedGroup = ApplyInteractiveSorting(group.ToList());
+                if (sortedGroup.Count == 0)
+                    continue;
+
+                result.Add(CreateSearchGroupHeader(group.Key, sortedGroup.Count));
+                result.AddRange(sortedGroup);
+            }
+
+            return result;
+        }
+
+        private List<FamilySearchGroup> BuildFolderSearchGroups(List<FamilyItem> localItems, List<FamilyItem> otherItems)
+        {
+            var groups = new List<FamilySearchGroup>();
+
+            var localSorted = ApplyInteractiveSorting(localItems).ToList();
+            if (localSorted.Count > 0)
+            {
+                groups.Add(new FamilySearchGroup
+                {
+                    Title = "Dans ce dossier",
+                    CountText = localSorted.Count == 1 ? "1 famille" : $"{localSorted.Count} familles",
+                    Families = new ObservableCollection<FamilyItem>(localSorted)
+                });
+            }
+
+            var externalGroups = otherItems
+                .Where(i => i != null)
+                .GroupBy(i => string.IsNullOrWhiteSpace(i.SearchFolderPath) ? "Autre dossier" : i.SearchFolderPath)
+                .OrderBy(g => g.Key, StringComparer.CurrentCultureIgnoreCase);
+
+            foreach (var group in externalGroups)
+            {
+                var sorted = ApplyInteractiveSorting(group.ToList());
+                if (sorted.Count == 0)
+                    continue;
+
+                groups.Add(new FamilySearchGroup
+                {
+                    Title = group.Key,
+                    CountText = sorted.Count == 1 ? "1 famille" : $"{sorted.Count} familles",
+                    Families = new ObservableCollection<FamilyItem>(sorted)
+                });
+            }
+
+            return groups;
+        }
+
+        private void ShowGroupedFolderSearchResults(List<FamilyItem> localItems, List<FamilyItem> otherItems)
+        {
+            _groupedVisualLoadVersion++;
+            _folderSearchVersion++;
+            ClearSelectedFamilies();
+            _lastSelectedFamily = null;
+
+            var groups = new ObservableCollection<FamilySearchGroup>(BuildFolderSearchGroups(localItems, otherItems));
+            var flatItems = groups.SelectMany(g => g.Families).Take(8000).ToList();
+
+            _currentResult = flatItems;
+            _nextIndex = flatItems.Count;
+            displayedFamilies = flatItems;
+            _activeSearchGroups = groups;
+
+            FamilyListView.Visibility = Visibility.Collapsed;
+            GroupedFamilyListView.Visibility = Visibility.Visible;
+            GroupedFamilyListView.ItemsSource = groups;
+
+            MarkFavoritesInView(flatItems);
+            UpdateCount(flatItems.Count);
+            LoadGroupedVisualsDeferred(flatItems);
+
+            PagingStatusText.Visibility = Visibility.Visible;
+            PagingStatusText.Text = flatItems.Count == 0 ? "Aucun résultat." : "Fin de la liste.";
+        }
+
+        private int ShowInitialGroupedFolderSearchResults(List<FamilyItem> localItems)
+        {
+            var initialItems = ApplyInteractiveSorting(localItems).ToList();
+            _groupedVisualLoadVersion++;
+            int version = ++_folderSearchVersion;
+
+            ClearSelectedFamilies();
+            _lastSelectedFamily = null;
+
+            _currentResult = initialItems;
+            _nextIndex = initialItems.Count;
+            displayedFamilies = initialItems;
+
+            _activeSearchGroups = new ObservableCollection<FamilySearchGroup>();
+            if (initialItems.Count > 0)
+            {
+                _activeSearchGroups.Add(new FamilySearchGroup
+                {
+                    Title = "Dans ce dossier",
+                    CountText = initialItems.Count == 1 ? "1 famille" : $"{initialItems.Count} familles",
+                    Families = new ObservableCollection<FamilyItem>(initialItems)
+                });
+            }
+
+            FamilyListView.Visibility = Visibility.Collapsed;
+            GroupedFamilyListView.Visibility = Visibility.Visible;
+            GroupedFamilyListView.ItemsSource = _activeSearchGroups;
+
+            MarkFavoritesInView(displayedFamilies);
+            UpdateCount(initialItems.Count);
+            LoadGroupedVisualsDeferred(initialItems);
+
+            PagingStatusText.Visibility = Visibility.Visible;
+            PagingStatusText.Text = initialItems.Count == 0
+                ? "Recherche dans les autres dossiers…"
+                : $"Dans ce dossier : {initialItems.Count}. Recherche ailleurs…";
+
+            return version;
+        }
+
+        private async void LoadOtherFolderSearchResultsDeferred(
+            FamilySearchQuery query,
+            HashSet<string> localPaths,
+            int searchVersion,
+            int localCount)
+        {
+            await Task.Run(() =>
+            {
+                var pendingByFolder = new Dictionary<string, List<FamilyItem>>(StringComparer.CurrentCultureIgnoreCase);
+                int otherCount = 0;
+                int scannedCount = 0;
+                var entries = _index?.GetAll(max: 0).ToList() ?? new List<FamilyIndexService.Entry>();
+
+                void FlushPending(bool pauseAfterBatch)
+                {
+                    var batches = pendingByFolder
+                        .Where(p => p.Value.Count > 0)
+                        .OrderBy(p => p.Key, StringComparer.CurrentCultureIgnoreCase)
+                        .Select(p => new { Folder = p.Key, Items = p.Value.ToList() })
+                        .ToList();
+
+                    foreach (var batch in batches)
+                    {
+                        pendingByFolder[batch.Folder] = new List<FamilyItem>();
+                        otherCount += batch.Items.Count;
+                        int otherCountSnapshot = otherCount;
+                        Dispatcher.Invoke(new Action(() =>
+                            AppendFolderSearchBatch(batch.Folder, batch.Items, searchVersion, localCount, otherCountSnapshot, false)),
+                            DispatcherPriority.Background);
+
+                        if (pauseAfterBatch)
+                            Thread.Sleep(FolderSearchUiPauseMs);
+                    }
+                }
+
+                foreach (var entry in entries)
+                {
+                    if (searchVersion != _folderSearchVersion)
+                        return;
+
+                    scannedCount++;
+
+                    if (!MatchesGlobalSearch(entry, query))
+                        continue;
+
+                    if (!string.IsNullOrWhiteSpace(entry.Path) && localPaths.Contains(entry.Path))
+                        continue;
+
+                    var item = CreateSearchResultItem(entry, showLocation: true);
+                    if (item.IsInCurrentFolder)
+                        continue;
+
+                    var folder = string.IsNullOrWhiteSpace(item.SearchFolderPath) ? "Autre dossier" : item.SearchFolderPath;
+                    if (!pendingByFolder.TryGetValue(folder, out var pending))
+                    {
+                        pending = new List<FamilyItem>();
+                        pendingByFolder[folder] = pending;
+                    }
+
+                    pending.Add(item);
+                    int pendingCount = pendingByFolder.Sum(p => p.Value.Count);
+                    if (otherCount == 0 || pendingCount >= FolderSearchUiBatchSize)
+                        FlushPending(pauseAfterBatch: true);
+                }
+
+                FlushPending(pauseAfterBatch: false);
+
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (searchVersion != _folderSearchVersion)
+                        return;
+
+                    PagingStatusText.Visibility = Visibility.Visible;
+                    PagingStatusText.Text = otherCount == 0
+                        ? $"Dans ce dossier : {localCount}."
+                        : $"Dans ce dossier : {localCount}. Autres dossiers : {otherCount}.";
+                }), DispatcherPriority.Background);
+            });
+        }
+
+        private void AppendFolderSearchBatch(
+            string folder,
+            List<FamilyItem> items,
+            int searchVersion,
+            int localCount,
+            int otherCount,
+            bool isComplete)
+        {
+            if (searchVersion != _folderSearchVersion || items == null || items.Count == 0)
+                return;
+
+            if (_activeSearchGroups == null)
+                _activeSearchGroups = new ObservableCollection<FamilySearchGroup>();
+
+            var group = _activeSearchGroups.FirstOrDefault(g =>
+                string.Equals(g.Title, folder, StringComparison.CurrentCultureIgnoreCase));
+            if (group == null)
+            {
+                group = new FamilySearchGroup
+                {
+                    Title = folder,
+                    Families = new ObservableCollection<FamilyItem>()
+                };
+                _activeSearchGroups.Add(group);
+            }
+
+            var existingPaths = new HashSet<string>(
+                group.Families
+                    .Where(f => !string.IsNullOrWhiteSpace(f.Path))
+                    .Select(f => f.Path),
+                StringComparer.OrdinalIgnoreCase);
+
+            foreach (var item in ApplyInteractiveSorting(items))
+            {
+                if (!string.IsNullOrWhiteSpace(item.Path) && !existingPaths.Add(item.Path))
+                    continue;
+
+                group.Families.Add(item);
+                displayedFamilies.Add(item);
+                _currentResult.Add(item);
+            }
+
+            group.RefreshCountText();
+            MarkFavoritesInView(displayedFamilies);
+            UpdateCount(_currentResult.Count);
+            LoadGroupedVisualsDeferred(items);
+
+            PagingStatusText.Visibility = Visibility.Visible;
+            PagingStatusText.Text = isComplete
+                ? $"Dans ce dossier : {localCount}. Autres dossiers : {otherCount}."
+                : $"Dans ce dossier : {localCount}. Autres dossiers trouvés : {otherCount}…";
+        }
+
+        private async void LoadGroupedVisualsDeferred(List<FamilyItem> items)
+        {
+            if (items == null || items.Count == 0)
+                return;
+
+            int version = _groupedVisualLoadVersion;
+            const int BatchSize = 12;
+
+            await Dispatcher.Yield(DispatcherPriority.Render);
+            await Task.Delay(120);
+
+            for (int i = 0; i < items.Count; i += BatchSize)
+            {
+                if (version != _groupedVisualLoadVersion)
+                    return;
+
+                foreach (var item in items.Skip(i).Take(BatchSize))
+                    LoadVisualsForItem(item);
+
+                await Task.Delay(10);
+            }
+        }
+
         private void ApplyFilters()
         {
             var txt = StripDiacritics(SearchBox.Text ?? "").ToLowerInvariant();
@@ -1108,19 +1425,22 @@ namespace Famille
             {
                 if (!_index.IsReady)
                 {
-                    var directItems = BuildDirectLibraryItems(txt);
-                    BeginPaging(ApplyInteractiveSorting(directItems));
+                    var partialQuery = FamilySearchQuery.Parse(txt);
+                    var indexedItems = BuildGlobalSearchItems(partialQuery, showLocation: false);
+                    var itemsToShow = indexedItems.Count > 0
+                        ? indexedItems
+                        : BuildDirectLibraryItems(txt);
+
+                    BeginPaging(ApplyInteractiveSorting(itemsToShow));
                     PagingStatusText.Visibility = Visibility.Visible;
-                    PagingStatusText.Text = directItems.Count == 0
-                        ? "Index en cours de préparation…"
-                        : $"Index en préparation, affichage direct : {directItems.Count}.";
+                    PagingStatusText.Text = itemsToShow.Count == 0
+                        ? "Chargement de la bibliothèque…"
+                        : $"Familles affichées : {itemsToShow.Count}. Les détails se complètent.";
                     return;
                 }
 
                 var query = FamilySearchQuery.Parse(txt);
-                var items = BuildGlobalSearchItems(query, showLocation: false)
-                    .Take(8000)
-                    .ToList();
+                var items = BuildGlobalSearchItems(query, showLocation: false);
 
                 BeginPaging(ApplyInteractiveSorting(items));
                 return;
@@ -1129,43 +1449,35 @@ namespace Famille
             {
                 IEnumerable<FamilyItem> baseSet = allFamilies;
                 if (!string.IsNullOrEmpty(txt))
-                    baseSet = baseSet.Where(f => !f.IsBackNavigation && f.NormalizedName.Contains(txt));
-
-                var localItems = baseSet.ToList();
-                if (!string.IsNullOrEmpty(txt))
                 {
-                    foreach (var item in localItems)
+                    baseSet = baseSet.Where(f => !f.IsBackNavigation && f.NormalizedName.Contains(txt));
+                    var currentFolderMatches = baseSet.ToList();
+
+                    foreach (var item in currentFolderMatches)
                         MarkSearchLocation(item, "Dans ce dossier");
 
-                    if (_index?.IsReady == true)
+                    if (_index != null)
                     {
                         var localPaths = new HashSet<string>(
-                            localItems.Where(i => !string.IsNullOrWhiteSpace(i.Path)).Select(i => i.Path),
+                            currentFolderMatches.Where(i => !string.IsNullOrWhiteSpace(i.Path)).Select(i => i.Path),
                             StringComparer.OrdinalIgnoreCase);
                         var query = FamilySearchQuery.Parse(txt);
-                        var otherItems = BuildGlobalSearchItems(query, showLocation: true)
-                            .Where(i => !i.IsInCurrentFolder && !localPaths.Contains(i.Path))
-                            .ToList();
-
-                        var combined = ApplyInteractiveSorting(localItems)
-                            .Concat(ApplyGlobalSearchSorting(otherItems))
-                            .Take(8000)
-                            .ToList();
-
-                        BeginPaging(combined);
+                        int searchVersion = ShowInitialGroupedFolderSearchResults(currentFolderMatches);
+                        LoadOtherFolderSearchResultsDeferred(query, localPaths, searchVersion, currentFolderMatches.Count);
                         PagingStatusText.Visibility = Visibility.Visible;
-                        PagingStatusText.Text = otherItems.Count == 0
-                            ? $"Dans ce dossier : {localItems.Count}."
-                            : $"Dans ce dossier : {localItems.Count}. Autres dossiers : {otherItems.Count}.";
+                        PagingStatusText.Text = currentFolderMatches.Count == 0
+                            ? "Recherche dans les autres dossiers…"
+                            : $"Dans ce dossier : {currentFolderMatches.Count}. Recherche ailleurs…";
                         return;
                     }
 
-                    BeginPaging(ApplyInteractiveSorting(localItems));
+                    BeginPaging(ApplyInteractiveSorting(currentFolderMatches));
                     PagingStatusText.Visibility = Visibility.Visible;
                     PagingStatusText.Text = "Recherche ailleurs en préparation…";
                     return;
                 }
 
+                var localItems = baseSet.ToList();
                 BeginPaging(ApplyInteractiveSorting(localItems));
             }
         }
@@ -1409,8 +1721,19 @@ namespace Famille
 
         private void BeginPaging(List<FamilyItem> fullResult)
         {
+            _groupedVisualLoadVersion++;
+            _folderSearchVersion++;
+
             ClearSelectedFamilies();
             _lastSelectedFamily = null;
+
+            if (FamilyListView != null)
+                FamilyListView.Visibility = Visibility.Visible;
+            if (GroupedFamilyListView != null)
+            {
+                GroupedFamilyListView.Visibility = Visibility.Collapsed;
+                GroupedFamilyListView.ItemsSource = null;
+            }
 
             _currentResult = fullResult ?? new List<FamilyItem>();
             _nextIndex = 0;
@@ -1426,6 +1749,9 @@ namespace Famille
 
         private void AppendNextPage()
         {
+            if (FamilyListView != null && FamilyListView.Visibility != Visibility.Visible)
+                return;
+
             if (_nextIndex >= _currentResult.Count)
             {
                 AddScrollTopActionIfNeeded();
@@ -1440,7 +1766,6 @@ namespace Famille
             foreach (var item in slice)
             {
                 displayedFamilies.Add(item);
-                LoadVisualsForItem(item);
             }
 
             // rafraîchit source
@@ -1449,6 +1774,7 @@ namespace Famille
 
             // Met à jour les étoiles selon la collection Favoris
             MarkFavoritesInView(displayedFamilies);
+            LoadGroupedVisualsDeferred(slice);
 
             if (_nextIndex >= _currentResult.Count)
                 AddScrollTopActionIfNeeded();
@@ -1473,6 +1799,9 @@ namespace Famille
 
         private void ItemsScroll_ScrollChanged(object sender, ScrollChangedEventArgs e)
         {
+            if (GroupedFamilyListView != null && GroupedFamilyListView.Visibility == Visibility.Visible)
+                return;
+
             if (e.VerticalChange <= 0) return;
             var sv = (ScrollViewer)sender;
             if (sv.ScrollableHeight <= 0) return;
@@ -2484,6 +2813,7 @@ namespace Famille
         private void LoadVisualsForItem(FamilyItem item)
         {
             if (item == null) return;
+            if (item.IsSearchGroupHeader) return;
 
             if (item.IsFolder)
             {
@@ -4002,6 +4332,45 @@ namespace Famille
         public Visibility SeparatorVisibility { get; set; }
     }
 
+    public class FamilyItemTemplateSelector : DataTemplateSelector
+    {
+        public DataTemplate ItemTemplate { get; set; }
+        public DataTemplate HeaderTemplate { get; set; }
+
+        public override DataTemplate SelectTemplate(object item, DependencyObject container)
+        {
+            if (item is FamilyItem familyItem && familyItem.IsSearchGroupHeader)
+                return HeaderTemplate ?? ItemTemplate;
+
+            return ItemTemplate ?? base.SelectTemplate(item, container);
+        }
+    }
+
+    public class FamilySearchGroup : INotifyPropertyChanged
+    {
+        public string Title { get; set; }
+        private string _countText;
+        public string CountText
+        {
+            get => _countText;
+            set
+            {
+                if (_countText == value) return;
+                _countText = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CountText)));
+            }
+        }
+
+        public ObservableCollection<FamilyItem> Families { get; set; } = new ObservableCollection<FamilyItem>();
+
+        public void RefreshCountText()
+        {
+            CountText = Families.Count == 1 ? "1 famille" : $"{Families.Count} familles";
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+    }
+
     // ======================= FamilyItem =======================
 
     public class FamilyItem : INotifyPropertyChanged
@@ -4021,6 +4390,9 @@ namespace Famille
             set { if (_category != value) { _category = value; OnPropertyChanged(nameof(Category)); } }
         }
         public string NormalizedName { get; set; }
+        public bool IsSearchGroupHeader { get; set; }
+        public string SearchGroupTitle { get; set; }
+        public string SearchGroupCountText { get; set; }
         public bool IsInCurrentFolder { get; set; }
         public string SearchLocationLabel { get; set; }
         public string SearchFolderPath { get; set; }

@@ -208,7 +208,7 @@ namespace Analyse
             if (selected != null)
             {
                 HeaderText.Text = "Qui a fait ça ??";
-                HeaderSubtitleText.Text = $"BETA - Lecture visuelle des évènements liés à {selected.Name} (Id {selected.Id.IntegerValue}).";
+                HeaderSubtitleText.Text = $"BETA - Lecture visuelle des évènements liés à {selected.Name} (Id {selected.Id.GetIdValue()}).";
                 if (initialEvents != null)
                     Bind(initialEvents, defaultAction);
                 else
@@ -219,15 +219,15 @@ namespace Analyse
                 HeaderText.Text = "Qui a fait ça ??";
                 HeaderSubtitleText.Text = "BETA - Lecture visuelle des suppressions, déplacements, créations et clusters de la maquette.";
                 if (initialEvents != null)
-                    Bind(initialEvents, defaultAction ?? "delete");
+                    Bind(initialEvents, defaultAction);
                 else
-                    BeginProgressiveLoad(ElementHistoryTracker.GetDocumentKeyForHistory(_doc), null, "delete");
+                    BeginProgressiveLoad(ElementHistoryTracker.GetDocumentKeyForHistory(_doc), null, null);
             }
         }
 
         internal static List<ElementHistoryEvent> LoadInitialHistory(Document doc, Element selected, out string defaultAction)
         {
-            defaultAction = selected == null ? "delete" : null;
+            defaultAction = null;
             var modelKey = ElementHistoryTracker.GetDocumentKeyForHistory(doc);
             var uniqueIds = selected == null ? null : GetSelectedHistoryUniqueIds(doc, selected);
             return LoadWindowHistory(modelKey, uniqueIds, MaxLoadedHistoryEvents);
@@ -315,7 +315,7 @@ namespace Analyse
 
             var context = new SelectedContext
             {
-                ElementId = selected.Id?.IntegerValue ?? -1,
+                ElementId = selected.Id?.GetIdValue() ?? -1,
                 ElementUniqueId = selected.UniqueId,
                 Category = CleanCellText(selected.Category?.Name)
             };
@@ -955,7 +955,7 @@ namespace Analyse
         {
             foreach (var ev in events ?? new List<ElementHistoryEvent>())
             {
-                var resolved = ElementHistoryTracker.ResolveThumbnailPath(CleanCellText(ev?.Family), CleanCellText(ev?.TypeName));
+                var resolved = ResolveEventThumbnailPath(ev);
                 if (!string.IsNullOrWhiteSpace(resolved)) return resolved;
             }
 
@@ -976,7 +976,7 @@ namespace Analyse
                 if (!string.IsNullOrWhiteSpace(familyKey) && seenFamilies.Contains(familyKey))
                     continue;
 
-                var image = ElementHistoryTracker.ResolveThumbnailPath(family, type);
+                var image = ResolveEventThumbnailPath(ev);
                 if (string.IsNullOrWhiteSpace(image) || seenImages.Contains(image))
                     continue;
 
@@ -990,6 +990,37 @@ namespace Analyse
             }
 
             return result.Count > 1 ? result : new List<string>();
+        }
+
+        private static string ResolveEventThumbnailPath(ElementHistoryEvent ev)
+        {
+            var stored = CleanCellText(ev?.ThumbnailPath);
+            var family = CleanCellText(ev?.Family);
+            var typeName = CleanCellText(ev?.TypeName);
+
+            if (!IsAnnotationOrTagCategory(CleanCellText(ev?.Category)))
+            {
+                var catalog = ElementHistoryTracker.ResolveThumbnailPath(family, typeName);
+                if (!string.IsNullOrWhiteSpace(catalog))
+                    return catalog;
+            }
+
+            if (ElementHistoryTracker.IsThumbnailPathValidForFamily(stored, family))
+                return stored;
+
+            return null;
+        }
+
+        private static bool IsAnnotationOrTagCategory(string category)
+        {
+            var text = CleanCellText(category);
+            if (string.IsNullOrWhiteSpace(text)) return false;
+            return text.IndexOf("étiquette", StringComparison.OrdinalIgnoreCase) >= 0
+                || text.IndexOf("etiquette", StringComparison.OrdinalIgnoreCase) >= 0
+                || text.IndexOf(" tag", StringComparison.OrdinalIgnoreCase) >= 0
+                || text.EndsWith("tag", StringComparison.OrdinalIgnoreCase)
+                || text.IndexOf("tags", StringComparison.OrdinalIgnoreCase) >= 0
+                || text.IndexOf("annotation", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private static string BuildVisualInitials(RowVm row, List<ElementHistoryEvent> events)
