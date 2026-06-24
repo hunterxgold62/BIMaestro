@@ -2417,6 +2417,13 @@ namespace Analyse
             var list = new List<GeometryObject>();
             if (ev?.Delta == null) return list;
 
+            if (ev.Delta.TryGetValue("ghostMesh", out var meshObj))
+            {
+                var mesh = BuildGhostMeshGeometry(meshObj);
+                if (mesh.Count > 0)
+                    return mesh;
+            }
+
             if (ev.Delta.TryGetValue("ghostFaces", out var ghostObj))
             {
                 var ghost = BuildGhostGeometry(ghostObj);
@@ -2444,6 +2451,62 @@ namespace Analyse
                     list.AddRange(BuildBox(min, max));
             }
             return list;
+        }
+
+        private static List<GeometryObject> BuildGhostMeshGeometry(object raw)
+        {
+            var faces = ReadGhostMeshFaces(raw);
+            return faces.Count == 0 ? new List<GeometryObject>() : BuildTessellatedGeometry(faces);
+        }
+
+        private static List<List<XYZ>> ReadGhostMeshFaces(object raw)
+        {
+            var result = new List<List<XYZ>>();
+            if (raw == null) return result;
+
+            try
+            {
+                var obj = raw as JObject ?? JObject.FromObject(raw);
+                var vertexTokens = obj["vertices"] as JArray;
+                var faceTokens = obj["faces"] as JArray;
+                if (vertexTokens == null || faceTokens == null) return result;
+
+                var vertices = vertexTokens
+                    .Select(x => ReadPoint(x))
+                    .ToList();
+
+                foreach (var faceToken in faceTokens)
+                {
+                    var indices = faceToken as JArray ?? JArray.FromObject(faceToken);
+                    var pts = new List<XYZ>();
+                    foreach (var indexToken in indices)
+                    {
+                        var index = indexToken.Value<int?>();
+                        if (!index.HasValue || index.Value < 0 || index.Value >= vertices.Count)
+                        {
+                            pts.Clear();
+                            break;
+                        }
+
+                        var pt = vertices[index.Value];
+                        if (pt == null)
+                        {
+                            pts.Clear();
+                            break;
+                        }
+
+                        pts.Add(pt);
+                    }
+
+                    if (pts.Count >= 3)
+                        result.Add(pts);
+                }
+            }
+            catch
+            {
+            }
+
+            return result;
         }
 
         private static List<GeometryObject> BuildGhostGeometry(object raw)
@@ -2582,6 +2645,15 @@ namespace Analyse
         {
             try
             {
+                if (o is JArray arr && arr.Count >= 3)
+                {
+                    var ax = arr[0].Value<double?>();
+                    var ay = arr[1].Value<double?>();
+                    var az = arr[2].Value<double?>();
+                    if (!ax.HasValue || !ay.HasValue || !az.HasValue) return null;
+                    return new XYZ(ax.Value, ay.Value, az.Value);
+                }
+
                 var j = o is JObject jo ? jo : JObject.FromObject(o);
                 var x = j.Value<double?>("x");
                 var y = j.Value<double?>("y");

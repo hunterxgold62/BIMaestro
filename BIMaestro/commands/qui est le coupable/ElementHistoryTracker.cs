@@ -47,9 +47,140 @@ namespace Analyse
             public XYZ BBoxMin { get; set; }
             public XYZ BBoxMax { get; set; }
             public List<XYZ> ObbCorners { get; set; }
-            public List<List<XYZ>> GhostFaces { get; set; }
+            public GhostMeshSnapshot GhostMesh { get; set; }
             public Dictionary<string, string> Parameters { get; set; }
             public DateTime LastLogged { get; set; }
+        }
+
+        private sealed class GhostMeshSnapshot
+        {
+            public List<double[]> Vertices { get; set; } = new List<double[]>();
+            public List<int[]> Faces { get; set; } = new List<int[]>();
+        }
+
+        private sealed class GhostMeshBuilder
+        {
+            private sealed class TriangleCandidate
+            {
+                public XYZ A { get; set; }
+                public XYZ B { get; set; }
+                public XYZ C { get; set; }
+                public double Area { get; set; }
+                public int Order { get; set; }
+            }
+
+            private readonly List<TriangleCandidate> _triangles = new List<TriangleCandidate>();
+            private int _nextOrder;
+            private int _minAreaIndex = -1;
+            private double _minArea = double.MaxValue;
+
+            public int CandidateCount => _triangles.Count;
+
+            public void AddTriangle(XYZ a, XYZ b, XYZ c)
+            {
+                if (!IsUsefulTriangle(a, b, c)) return;
+
+                var area = GetTriangleArea(a, b, c);
+                if (area <= 1e-8) return;
+
+                var candidate = new TriangleCandidate
+                {
+                    A = a,
+                    B = b,
+                    C = c,
+                    Area = area,
+                    Order = _nextOrder++
+                };
+
+                if (_triangles.Count < MaxGhostCandidateFaces)
+                {
+                    _triangles.Add(candidate);
+                    if (area < _minArea)
+                    {
+                        _minArea = area;
+                        _minAreaIndex = _triangles.Count - 1;
+                    }
+                    return;
+                }
+
+                if (area <= _minArea) return;
+
+                if (_minAreaIndex < 0 || _minAreaIndex >= _triangles.Count)
+                    RecalculateSmallestCandidate();
+
+                _triangles[_minAreaIndex] = candidate;
+                RecalculateSmallestCandidate();
+            }
+
+            public GhostMeshSnapshot ToSnapshot(out bool decimated)
+            {
+                decimated = _triangles.Count > MaxGhostPreviewFaces;
+                if (_triangles.Count == 0) return null;
+
+                var selected = _triangles
+                    .OrderByDescending(x => x.Area)
+                    .Take(MaxGhostPreviewFaces)
+                    .OrderBy(x => x.Order)
+                    .ToList();
+
+                var vertexIndex = new Dictionary<string, int>(StringComparer.Ordinal);
+                var vertices = new List<double[]>();
+                var faces = new List<int[]>();
+
+                foreach (var triangle in selected)
+                {
+                    var ia = GetVertexIndex(triangle.A, vertexIndex, vertices);
+                    var ib = GetVertexIndex(triangle.B, vertexIndex, vertices);
+                    var ic = GetVertexIndex(triangle.C, vertexIndex, vertices);
+                    if (ia < 0 || ib < 0 || ic < 0) continue;
+                    if (ia == ib || ib == ic || ia == ic) continue;
+
+                    faces.Add(new[] { ia, ib, ic });
+                }
+
+                if (faces.Count == 0 || vertices.Count == 0) return null;
+
+                return new GhostMeshSnapshot
+                {
+                    Vertices = vertices,
+                    Faces = faces
+                };
+            }
+
+            private int GetVertexIndex(XYZ point, Dictionary<string, int> vertexIndex, List<double[]> vertices)
+            {
+                if (point == null) return -1;
+
+                var key = BuildGhostVertexKey(point);
+                if (vertexIndex.TryGetValue(key, out var existing))
+                    return existing;
+
+                if (vertices.Count >= MaxGhostPreviewVertices)
+                    return -1;
+
+                var index = vertices.Count;
+                vertexIndex[key] = index;
+                vertices.Add(new[]
+                {
+                    RoundGhostCoord(point.X),
+                    RoundGhostCoord(point.Y),
+                    RoundGhostCoord(point.Z)
+                });
+                return index;
+            }
+
+            private void RecalculateSmallestCandidate()
+            {
+                _minAreaIndex = -1;
+                _minArea = double.MaxValue;
+
+                for (int i = 0; i < _triangles.Count; i++)
+                {
+                    if (_triangles[i].Area >= _minArea) continue;
+                    _minArea = _triangles[i].Area;
+                    _minAreaIndex = i;
+                }
+            }
         }
 
         private sealed class ParameterChangeInfo
@@ -88,7 +219,10 @@ namespace Analyse
         private const int DefaultModelHistoryTake = 1000;
         private const int DefaultDeletedHistoryTake = 1000;
         private const int MaxIndexedImageFiles = 12000;
-        private const int MaxGhostPreviewFaces = 160;
+        private const int MaxGhostPreviewFaces = 2400;
+        private const int MaxGhostPreviewVertices = 3600;
+        private const int MaxGhostCandidateFaces = 12000;
+        private const int GhostCoordinateDecimals = 5;
         private const bool IncludeAnnotationCategoriesForFuture = false;
         private static readonly string[] ImageExtensions = { ".png", ".jpg", ".jpeg", ".bmp" };
         private static readonly string[] IgnoredTransactionFragments =
@@ -244,7 +378,7 @@ namespace Analyse
         {
             if (ev == null) return false;
             if (IsLowValueParameterChange(ev)) return false;
-            return IsUsefulHistoryText(ev.Category);
+            return IsUsefulHistoryText(ev.Category) && !IsIgnoredCategoryName(ev.Category);
         }
 
         private static List<ElementHistoryEvent> LoadAllHistory(Document doc)
@@ -630,7 +764,7 @@ namespace Analyse
                 BBoxMin = GetBBoxMin(el),
                 BBoxMax = GetBBoxMax(el),
                 ObbCorners = includeOrientedCorners ? GetOrientedCorners(el) : null,
-                GhostFaces = includeOrientedCorners ? CaptureGhostFaces(el) : null,
+                GhostMesh = includeOrientedCorners ? CaptureGhostMesh(el) : null,
                 Parameters = parameters
             };
         }
@@ -1199,9 +1333,11 @@ namespace Analyse
                 ["bboxMin"] = snapshot.BBoxMin == null ? null : new { x = snapshot.BBoxMin.X, y = snapshot.BBoxMin.Y, z = snapshot.BBoxMin.Z },
                 ["bboxMax"] = snapshot.BBoxMax == null ? null : new { x = snapshot.BBoxMax.X, y = snapshot.BBoxMax.Y, z = snapshot.BBoxMax.Z },
                 ["obbCorners"] = snapshot.ObbCorners == null ? null : snapshot.ObbCorners.Select(pt => new { x = pt.X, y = pt.Y, z = pt.Z }).ToArray(),
-                ["ghostFaces"] = snapshot.GhostFaces == null ? null : snapshot.GhostFaces
-                    .Select(face => face.Select(pt => new { x = pt.X, y = pt.Y, z = pt.Z }).ToArray())
-                    .ToArray()
+                ["ghostMesh"] = snapshot.GhostMesh == null ? null : new
+                {
+                    vertices = snapshot.GhostMesh.Vertices,
+                    faces = snapshot.GhostMesh.Faces
+                }
             };
 
             return delta.Values.Any(v => v != null) ? delta : null;
@@ -1273,7 +1409,30 @@ namespace Analyse
                 || name.Equals("Line Styles", StringComparison.OrdinalIgnoreCase)
                 || name.Equals("Project Information", StringComparison.OrdinalIgnoreCase)
                 || name.Equals("RVT Links", StringComparison.OrdinalIgnoreCase)
-                || name.Equals("CAD Links", StringComparison.OrdinalIgnoreCase);
+                || name.Equals("CAD Links", StringComparison.OrdinalIgnoreCase)
+                || IsInsulationCategoryName(name);
+        }
+
+        private static bool IsInsulationCategoryName(string categoryName)
+        {
+            if (string.IsNullOrWhiteSpace(categoryName)) return false;
+            var name = categoryName.Trim();
+            return name.Equals("Pipe Insulations", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("Pipe Insulation", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("Duct Insulations", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("Duct Insulation", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("Isolants de canalisation", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("Isolant de canalisation", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("Isolation de canalisation", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("Isolants de gaine", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("Isolant de gaine", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("Isolation de gaine", StringComparison.OrdinalIgnoreCase)
+                || (name.IndexOf("insulation", StringComparison.OrdinalIgnoreCase) >= 0
+                    && (name.IndexOf("pipe", StringComparison.OrdinalIgnoreCase) >= 0
+                        || name.IndexOf("duct", StringComparison.OrdinalIgnoreCase) >= 0))
+                || (name.IndexOf("isol", StringComparison.OrdinalIgnoreCase) >= 0
+                    && (name.IndexOf("canalisation", StringComparison.OrdinalIgnoreCase) >= 0
+                        || name.IndexOf("gaine", StringComparison.OrdinalIgnoreCase) >= 0));
         }
 
         private static string CleanHistoryText(string value)
@@ -1779,26 +1938,38 @@ namespace Analyse
             }
         }
 
-        private static List<List<XYZ>> CaptureGhostFaces(Element el)
+        private static GhostMeshSnapshot CaptureGhostMesh(Element el)
         {
+            GhostMeshSnapshot bestDecimated = null;
+
+            foreach (var detailLevel in new[] { ViewDetailLevel.Fine, ViewDetailLevel.Medium, ViewDetailLevel.Coarse })
+            {
+                var snapshot = CaptureGhostMesh(el, detailLevel, out var decimated);
+                if (snapshot == null) continue;
+                if (!decimated) return snapshot;
+                bestDecimated = snapshot;
+            }
+
+            return bestDecimated;
+        }
+
+        private static GhostMeshSnapshot CaptureGhostMesh(Element el, ViewDetailLevel detailLevel, out bool decimated)
+        {
+            decimated = false;
             try
             {
                 if (el == null) return null;
-
                 var opts = new Options
                 {
                     ComputeReferences = false,
-                    DetailLevel = ViewDetailLevel.Coarse,
+                    DetailLevel = detailLevel,
                     IncludeNonVisibleObjects = false
                 };
                 var ge = el.get_Geometry(opts);
-                var faces = new List<List<XYZ>>();
-                CollectGhostFaces(ge, faces);
+                var builder = new GhostMeshBuilder();
+                CollectGhostMesh(ge, builder);
 
-                if (faces.Count == 0 || faces.Count > MaxGhostPreviewFaces)
-                    return null;
-
-                return faces;
+                return builder.ToSnapshot(out decimated);
             }
             catch
             {
@@ -1806,20 +1977,16 @@ namespace Analyse
             }
         }
 
-        private static void CollectGhostFaces(GeometryElement ge, List<List<XYZ>> faces)
+        private static void CollectGhostMesh(GeometryElement ge, GhostMeshBuilder builder)
         {
-            if (ge == null || faces == null || faces.Count > MaxGhostPreviewFaces) return;
+            if (ge == null || builder == null) return;
 
             foreach (var go in ge)
             {
-                if (faces.Count > MaxGhostPreviewFaces) return;
-
                 if (go is Solid solid && solid.Faces.Size > 0)
                 {
                     foreach (Face face in solid.Faces)
                     {
-                        if (faces.Count > MaxGhostPreviewFaces) return;
-
                         try
                         {
                             var mesh = face.Triangulate();
@@ -1831,10 +1998,7 @@ namespace Analyse
                                 var a = triangle.get_Vertex(0);
                                 var b = triangle.get_Vertex(1);
                                 var c = triangle.get_Vertex(2);
-                                if (!IsUsefulTriangle(a, b, c)) continue;
-
-                                faces.Add(new List<XYZ> { a, b, c });
-                                if (faces.Count > MaxGhostPreviewFaces) return;
+                                builder.AddTriangle(a, b, c);
                             }
                         }
                         catch
@@ -1846,7 +2010,7 @@ namespace Analyse
                 {
                     try
                     {
-                        CollectGhostFaces(gi.GetInstanceGeometry(), faces);
+                        CollectGhostMesh(gi.GetInstanceGeometry(), builder);
                     }
                     catch
                     {
@@ -1861,6 +2025,24 @@ namespace Analyse
             var ab = b - a;
             var ac = c - a;
             return ab.CrossProduct(ac).GetLength() > 1e-8;
+        }
+
+        private static double GetTriangleArea(XYZ a, XYZ b, XYZ c)
+        {
+            if (a == null || b == null || c == null) return 0;
+            return ((b - a).CrossProduct(c - a).GetLength()) * 0.5;
+        }
+
+        private static string BuildGhostVertexKey(XYZ point)
+        {
+            return RoundGhostCoord(point.X).ToString("G17", CultureInfo.InvariantCulture) + "|" +
+                   RoundGhostCoord(point.Y).ToString("G17", CultureInfo.InvariantCulture) + "|" +
+                   RoundGhostCoord(point.Z).ToString("G17", CultureInfo.InvariantCulture);
+        }
+
+        private static double RoundGhostCoord(double value)
+        {
+            return Math.Round(value, GhostCoordinateDecimals);
         }
 
         private static XYZ ApplyCov(List<XYZ> pts, XYZ c, XYZ v)
