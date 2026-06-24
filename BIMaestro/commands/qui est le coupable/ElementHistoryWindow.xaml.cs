@@ -2306,7 +2306,7 @@ namespace Analyse
             var geoms = BuildDeletedPreviewGeometry(ev);
             if (geoms.Count == 0) return;
             var ds = CreatePreviewDirectShape(DeletedPreviewPrefix + ev.ElementId.ToString(CultureInfo.InvariantCulture), geoms);
-            ApplyOverride(ds.Id, new Autodesk.Revit.DB.Color(220, 30, 30), 30);
+            ApplyOverride(ds.Id, new Autodesk.Revit.DB.Color(220, 30, 30), 65);
         }
 
         private void CreateMovePreview(ElementHistoryEvent ev)
@@ -2417,20 +2417,22 @@ namespace Analyse
             var list = new List<GeometryObject>();
             if (ev?.Delta == null) return list;
 
-            var category = ev.Category ?? string.Empty;
-            if (!category.Equals("Walls", StringComparison.OrdinalIgnoreCase)
-                && ev.Delta.TryGetValue("obbCorners", out var arrObj)
+            if (ev.Delta.TryGetValue("ghostFaces", out var ghostObj))
+            {
+                var ghost = BuildGhostGeometry(ghostObj);
+                if (ghost.Count > 0)
+                    return ghost;
+            }
+
+            if (ev.Delta.TryGetValue("obbCorners", out var arrObj)
                 && arrObj is JArray arr && arr.Count == 8)
             {
                 var pts = arr.Select(x => ReadPoint(x)).ToList();
                 if (pts.All(x => x != null))
                 {
-                    var obbSolid = BuildBoxSolidFromCorners(pts);
-                    if (obbSolid != null)
-                    {
-                        list.Add(obbSolid);
-                        return list;
-                    }
+                    var obbGeometry = BuildBoxGeometryFromCorners(pts);
+                    if (obbGeometry.Count > 0)
+                        return obbGeometry;
                 }
             }
 
@@ -2442,6 +2444,38 @@ namespace Analyse
                     list.AddRange(BuildBox(min, max));
             }
             return list;
+        }
+
+        private static List<GeometryObject> BuildGhostGeometry(object raw)
+        {
+            var faces = ReadGhostFaces(raw);
+            return faces.Count == 0 ? new List<GeometryObject>() : BuildTessellatedGeometry(faces);
+        }
+
+        private static List<List<XYZ>> ReadGhostFaces(object raw)
+        {
+            var result = new List<List<XYZ>>();
+            if (raw == null) return result;
+
+            try
+            {
+                var arr = raw as JArray ?? JArray.FromObject(raw);
+                foreach (var faceToken in arr)
+                {
+                    var faceArr = faceToken as JArray ?? JArray.FromObject(faceToken);
+                    var pts = faceArr
+                        .Select(x => ReadPoint(x))
+                        .Where(x => x != null)
+                        .ToList();
+                    if (pts.Count >= 3)
+                        result.Add(pts);
+                }
+            }
+            catch
+            {
+            }
+
+            return result;
         }
 
         private static List<GeometryObject> BuildPointMarker(XYZ point, double size, double height)
@@ -2485,37 +2519,63 @@ namespace Analyse
             return list;
         }
 
-        private static Solid BuildBoxSolidFromCorners(List<XYZ> pts)
+        private static List<GeometryObject> BuildBoxGeometryFromCorners(List<XYZ> pts)
         {
+            if (pts == null || pts.Count != 8) return new List<GeometryObject>();
+
+            var faces = new List<List<XYZ>>
+            {
+                new List<XYZ> { pts[0], pts[2], pts[6], pts[4] },
+                new List<XYZ> { pts[1], pts[5], pts[7], pts[3] },
+                new List<XYZ> { pts[0], pts[4], pts[5], pts[1] },
+                new List<XYZ> { pts[2], pts[3], pts[7], pts[6] },
+                new List<XYZ> { pts[0], pts[1], pts[3], pts[2] },
+                new List<XYZ> { pts[4], pts[6], pts[7], pts[5] }
+            };
+
+            return BuildTessellatedGeometry(faces);
+        }
+
+        private static List<GeometryObject> BuildTessellatedGeometry(List<List<XYZ>> faces)
+        {
+            var result = new List<GeometryObject>();
+            if (faces == null || faces.Count == 0) return result;
+
             try
             {
-                var ordered = pts.OrderBy(p => p.Z).ToList();
-                if (ordered.Count < 8) return null;
-
-                var bottom = ordered.Take(4).ToList();
-                var centerX = bottom.Average(q => q.X);
-                var centerY = bottom.Average(q => q.Y);
-                var bottom4 = bottom
-                    .OrderBy(p => Math.Atan2(p.Y - centerY, p.X - centerX))
-                    .ToList();
-
-                var loop = new CurveLoop();
-                for (int i = 0; i < 4; i++)
+                var builder = new TessellatedShapeBuilder
                 {
-                    var a = bottom4[i];
-                    var b = bottom4[(i + 1) % 4];
-                    loop.Append(Line.CreateBound(a, b));
-                }
+                    Target = TessellatedShapeBuilderTarget.AnyGeometry,
+                    Fallback = TessellatedShapeBuilderFallback.Mesh
+                };
 
-                var minZ = pts.Min(p => p.Z);
-                var maxZ = pts.Max(p => p.Z);
-                var h = Math.Max(0.1, maxZ - minZ);
-                return GeometryCreationUtilities.CreateExtrusionGeometry(new List<CurveLoop> { loop }, XYZ.BasisZ, h);
+                var added = 0;
+                builder.OpenConnectedFaceSet(false);
+                foreach (var face in faces)
+                {
+                    if (face == null || face.Count < 3) continue;
+
+                    try
+                    {
+                        builder.AddFace(new TessellatedFace(face, ElementId.InvalidElementId));
+                        added++;
+                    }
+                    catch
+                    {
+                    }
+                }
+                builder.CloseConnectedFaceSet();
+
+                if (added == 0) return result;
+
+                builder.Build();
+                result.AddRange(builder.GetBuildResult().GetGeometricalObjects());
             }
             catch
             {
-                return null;
             }
+
+            return result;
         }
 
         private static XYZ ReadPoint(object o)

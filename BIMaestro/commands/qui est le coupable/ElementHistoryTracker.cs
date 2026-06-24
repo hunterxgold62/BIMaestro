@@ -47,6 +47,7 @@ namespace Analyse
             public XYZ BBoxMin { get; set; }
             public XYZ BBoxMax { get; set; }
             public List<XYZ> ObbCorners { get; set; }
+            public List<List<XYZ>> GhostFaces { get; set; }
             public Dictionary<string, string> Parameters { get; set; }
             public DateTime LastLogged { get; set; }
         }
@@ -87,6 +88,7 @@ namespace Analyse
         private const int DefaultModelHistoryTake = 1000;
         private const int DefaultDeletedHistoryTake = 1000;
         private const int MaxIndexedImageFiles = 12000;
+        private const int MaxGhostPreviewFaces = 160;
         private const bool IncludeAnnotationCategoriesForFuture = false;
         private static readonly string[] ImageExtensions = { ".png", ".jpg", ".jpeg", ".bmp" };
         private static readonly string[] IgnoredTransactionFragments =
@@ -161,7 +163,7 @@ namespace Analyse
             try
             {
                 if (el == null || ShouldIgnoreElement(el)) return;
-                var snapshot = BuildSnapshot(el, includeOrientedCorners: false);
+                var snapshot = BuildSnapshot(el, includeOrientedCorners: true);
                 StoreSnapshot(el.Document, el.Id, snapshot);
             }
             catch
@@ -628,6 +630,7 @@ namespace Analyse
                 BBoxMin = GetBBoxMin(el),
                 BBoxMax = GetBBoxMax(el),
                 ObbCorners = includeOrientedCorners ? GetOrientedCorners(el) : null,
+                GhostFaces = includeOrientedCorners ? CaptureGhostFaces(el) : null,
                 Parameters = parameters
             };
         }
@@ -1195,7 +1198,10 @@ namespace Analyse
                 ["lastKnown"] = snapshot.Location == null ? null : new { x = snapshot.Location.X, y = snapshot.Location.Y, z = snapshot.Location.Z },
                 ["bboxMin"] = snapshot.BBoxMin == null ? null : new { x = snapshot.BBoxMin.X, y = snapshot.BBoxMin.Y, z = snapshot.BBoxMin.Z },
                 ["bboxMax"] = snapshot.BBoxMax == null ? null : new { x = snapshot.BBoxMax.X, y = snapshot.BBoxMax.Y, z = snapshot.BBoxMax.Z },
-                ["obbCorners"] = snapshot.ObbCorners == null ? null : snapshot.ObbCorners.Select(pt => new { x = pt.X, y = pt.Y, z = pt.Z }).ToArray()
+                ["obbCorners"] = snapshot.ObbCorners == null ? null : snapshot.ObbCorners.Select(pt => new { x = pt.X, y = pt.Y, z = pt.Z }).ToArray(),
+                ["ghostFaces"] = snapshot.GhostFaces == null ? null : snapshot.GhostFaces
+                    .Select(face => face.Select(pt => new { x = pt.X, y = pt.Y, z = pt.Z }).ToArray())
+                    .ToArray()
             };
 
             return delta.Values.Any(v => v != null) ? delta : null;
@@ -1771,6 +1777,90 @@ namespace Analyse
                     CollectPoints(gi.GetInstanceGeometry(), pts);
                 }
             }
+        }
+
+        private static List<List<XYZ>> CaptureGhostFaces(Element el)
+        {
+            try
+            {
+                if (el == null) return null;
+
+                var opts = new Options
+                {
+                    ComputeReferences = false,
+                    DetailLevel = ViewDetailLevel.Coarse,
+                    IncludeNonVisibleObjects = false
+                };
+                var ge = el.get_Geometry(opts);
+                var faces = new List<List<XYZ>>();
+                CollectGhostFaces(ge, faces);
+
+                if (faces.Count == 0 || faces.Count > MaxGhostPreviewFaces)
+                    return null;
+
+                return faces;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static void CollectGhostFaces(GeometryElement ge, List<List<XYZ>> faces)
+        {
+            if (ge == null || faces == null || faces.Count > MaxGhostPreviewFaces) return;
+
+            foreach (var go in ge)
+            {
+                if (faces.Count > MaxGhostPreviewFaces) return;
+
+                if (go is Solid solid && solid.Faces.Size > 0)
+                {
+                    foreach (Face face in solid.Faces)
+                    {
+                        if (faces.Count > MaxGhostPreviewFaces) return;
+
+                        try
+                        {
+                            var mesh = face.Triangulate();
+                            if (mesh == null) continue;
+
+                            for (int i = 0; i < mesh.NumTriangles; i++)
+                            {
+                                var triangle = mesh.get_Triangle(i);
+                                var a = triangle.get_Vertex(0);
+                                var b = triangle.get_Vertex(1);
+                                var c = triangle.get_Vertex(2);
+                                if (!IsUsefulTriangle(a, b, c)) continue;
+
+                                faces.Add(new List<XYZ> { a, b, c });
+                                if (faces.Count > MaxGhostPreviewFaces) return;
+                            }
+                        }
+                        catch
+                        {
+                        }
+                    }
+                }
+                else if (go is GeometryInstance gi)
+                {
+                    try
+                    {
+                        CollectGhostFaces(gi.GetInstanceGeometry(), faces);
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+        }
+
+        private static bool IsUsefulTriangle(XYZ a, XYZ b, XYZ c)
+        {
+            if (a == null || b == null || c == null) return false;
+            var ab = b - a;
+            var ac = c - a;
+            return ab.CrossProduct(ac).GetLength() > 1e-8;
         }
 
         private static XYZ ApplyCov(List<XYZ> pts, XYZ c, XYZ v)
