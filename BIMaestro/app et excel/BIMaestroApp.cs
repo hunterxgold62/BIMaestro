@@ -112,6 +112,7 @@ public class BIMaestroApp : IExternalApplication
             application.ControlledApplication.DocumentOpened += OnDocumentOpenedSafe;
             application.ControlledApplication.DocumentClosing += OnDocumentClosingSafe;
             application.ViewActivated += OnViewActivatedSafe;
+            application.SelectionChanged += OnSelectionChangedSafe;
             application.Idling += OnIdlingSafe;
 
             // --- Ruban ---
@@ -164,6 +165,8 @@ public class BIMaestroApp : IExternalApplication
             _uiApp ??= sender as UIApplication;
             if (_uiApp == null) return;
 
+            Analyse.ElementHistoryTracker.ProcessDeferredPrime(_uiApp.ActiveUIDocument?.Document);
+
             if (!Couleur.ColoringStateManager.IsColoringActive)
             {
                 if (!_hasResetWhenOff)
@@ -197,6 +200,7 @@ public class BIMaestroApp : IExternalApplication
         try
         {
             _uiApp ??= new UIApplication(args.Document.Application);
+            Analyse.ElementHistoryTracker.ScheduleDeferredPrime(args.Document);
             ExcelLogger.OnViewActivated(args.Document, _uiApp);
         }
         catch (Autodesk.Revit.Exceptions.InvalidObjectException ex)
@@ -222,11 +226,26 @@ public class BIMaestroApp : IExternalApplication
         }
     }
 
+    private void OnSelectionChangedSafe(object sender, SelectionChangedEventArgs args)
+    {
+        try
+        {
+            var doc = args.GetDocument();
+            var selectedIds = args.GetSelectedElements();
+            Analyse.ElementHistoryTracker.CaptureSelectedElementDetails(doc, selectedIds);
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"OnSelectionChanged : {ex.Message}\n{ex.StackTrace}");
+        }
+    }
+
     private void OnDocumentOpenedSafe(object sender, DocumentOpenedEventArgs e)
     {
         try
         {
             _uiApp ??= new UIApplication(e.Document.Application);
+            Analyse.ElementHistoryTracker.ScheduleDeferredPrime(e.Document);
             ExcelLogger.OnDocumentOpened(e.Document, _uiApp);
             Analyse.CollaborativeModelTrackerStore.TryAutoLog(e.Document, _uiApp);
         }
@@ -241,6 +260,7 @@ public class BIMaestroApp : IExternalApplication
         try
         {
             _uiApp ??= new UIApplication(e.Document.Application);
+            Analyse.ElementHistoryTracker.ScheduleDeferredPrime(e.Document);
         }
         catch (Exception ex)
         {

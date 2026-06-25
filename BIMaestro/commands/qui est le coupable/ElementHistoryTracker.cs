@@ -197,6 +197,13 @@ namespace Analyse
             public HashSet<string> Tokens { get; set; }
         }
 
+        private sealed class DeferredPrimeState
+        {
+            public DateTime NotBeforeUtc { get; set; }
+            public Queue<ElementId> PendingElementIds { get; set; } = new Queue<ElementId>();
+            public bool ElementIdsLoaded { get; set; }
+        }
+
         private static readonly ConcurrentQueue<ElementHistoryEvent> Queue = new ConcurrentQueue<ElementHistoryEvent>();
         private static readonly ConcurrentDictionary<string, string> ThumbnailPathCache =
             new ConcurrentDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -209,6 +216,8 @@ namespace Analyse
         private static readonly Dictionary<string, ElementSnapshot> FamilyTypeSnapshotByKey =
             new Dictionary<string, ElementSnapshot>(StringComparer.OrdinalIgnoreCase);
         private static readonly HashSet<string> PrimedDocumentKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, DeferredPrimeState> DeferredPrimeByDocumentKey =
+            new Dictionary<string, DeferredPrimeState>(StringComparer.OrdinalIgnoreCase);
         private static readonly ConcurrentDictionary<int, string> RuntimeDocumentKeys =
             new ConcurrentDictionary<int, string>();
         private static readonly string RuntimeSessionId = Guid.NewGuid().ToString("N");
@@ -223,6 +232,9 @@ namespace Analyse
         private const int MaxGhostPreviewVertices = 3600;
         private const int MaxGhostCandidateFaces = 12000;
         private const int GhostCoordinateDecimals = 5;
+        private const int DeferredPrimeBatchSize = 75;
+        private const int MaxDetailedSelectionSnapshots = 25;
+        private static readonly TimeSpan DeferredPrimeDelay = TimeSpan.FromSeconds(8);
         private const bool IncludeAnnotationCategoriesForFuture = false;
         private static readonly string[] ImageExtensions = { ".png", ".jpg", ".jpeg", ".bmp" };
         private static readonly string[] IgnoredTransactionFragments =
@@ -262,6 +274,94 @@ namespace Analyse
             catch { }
         }
 
+        public static void ScheduleDeferredPrime(Document doc)
+        {
+            if (doc == null) return;
+
+            var key = GetDocumentKey(doc);
+            if (string.IsNullOrWhiteSpace(key)) return;
+
+            lock (SnapshotByElementId)
+            {
+                if (PrimedDocumentKeys.Contains(key)) return;
+                if (DeferredPrimeByDocumentKey.ContainsKey(key)) return;
+
+                DeferredPrimeByDocumentKey[key] = new DeferredPrimeState
+                {
+                    NotBeforeUtc = DateTime.UtcNow.Add(DeferredPrimeDelay)
+                };
+            }
+        }
+
+        public static void ProcessDeferredPrime(Document doc)
+        {
+            if (doc == null) return;
+
+            var key = GetDocumentKey(doc);
+            if (string.IsNullOrWhiteSpace(key)) return;
+
+            DeferredPrimeState state;
+            lock (SnapshotByElementId)
+            {
+                if (PrimedDocumentKeys.Contains(key))
+                {
+                    DeferredPrimeByDocumentKey.Remove(key);
+                    return;
+                }
+
+                if (!DeferredPrimeByDocumentKey.TryGetValue(key, out state))
+                    return;
+            }
+
+            if (DateTime.UtcNow < state.NotBeforeUtc)
+                return;
+
+            try
+            {
+                if (!state.ElementIdsLoaded)
+                    LoadDeferredPrimeElementIds(doc, state);
+
+                int processed = 0;
+                while (processed < DeferredPrimeBatchSize && state.PendingElementIds.Count > 0)
+                {
+                    var id = state.PendingElementIds.Dequeue();
+                    var element = doc.GetElement(id);
+                    PrimeElementSnapshot(element);
+                    processed++;
+                }
+
+                if (state.PendingElementIds.Count > 0)
+                    return;
+
+                PrimeFamilyDocumentTypes(doc);
+                lock (SnapshotByElementId)
+                {
+                    PrimedDocumentKeys.Add(key);
+                    DeferredPrimeByDocumentKey.Remove(key);
+                }
+            }
+            catch
+            {
+                lock (SnapshotByElementId)
+                {
+                    DeferredPrimeByDocumentKey.Remove(key);
+                }
+            }
+        }
+
+        private static void LoadDeferredPrimeElementIds(Document doc, DeferredPrimeState state)
+        {
+            if (doc == null || state == null || state.ElementIdsLoaded) return;
+
+            foreach (var id in new FilteredElementCollector(doc).WhereElementIsNotElementType().ToElementIds())
+                state.PendingElementIds.Enqueue(id);
+
+            foreach (var id in new FilteredElementCollector(doc).OfClass(typeof(FamilySymbol)).ToElementIds())
+                state.PendingElementIds.Enqueue(id);
+
+            state.ElementIdsLoaded = true;
+        }
+
         public static void PrimeDocument(Document doc)
         {
             if (doc == null) return;
@@ -299,6 +399,31 @@ namespace Analyse
                 if (el == null || ShouldIgnoreElement(el)) return;
                 var snapshot = BuildSnapshot(el, includeOrientedCorners: false);
                 StoreSnapshot(el.Document, el.Id, snapshot);
+            }
+            catch
+            {
+            }
+        }
+
+        public static void CaptureSelectedElementDetails(Document doc, ICollection<ElementId> selectedIds)
+        {
+            if (doc == null || selectedIds == null || selectedIds.Count == 0) return;
+
+            try
+            {
+                int processed = 0;
+                foreach (var id in selectedIds)
+                {
+                    if (processed >= MaxDetailedSelectionSnapshots) break;
+                    if (id == null || id == ElementId.InvalidElementId) continue;
+
+                    var element = doc.GetElement(id);
+                    if (element == null || ShouldIgnoreElement(element)) continue;
+
+                    var snapshot = BuildSnapshot(element, includeOrientedCorners: true);
+                    StoreSnapshot(doc, id, snapshot);
+                    processed++;
+                }
             }
             catch
             {
