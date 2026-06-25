@@ -248,6 +248,9 @@
                     <ComboBox x:Name="UserFilterCombo" Width="150" Margin="0,0,12,0" SelectionChanged="UserFilterCombo_SelectionChanged"/>
                     <TextBlock Text="Recherche" Style="{StaticResource FilterLabel}"/>
                     <TextBox x:Name="SearchBox" Width="210" Margin="0,0,12,0" TextChanged="SearchBox_TextChanged"/>
+                    <TextBlock Text="Jour" Style="{StaticResource FilterLabel}"/>
+                    <DatePicker x:Name="HistoryDayPicker" Width="125" Margin="0,0,8,0"/>
+                    <Button x:Name="LoadDayButton" Content="Charger jour" Width="115" Style="{StaticResource HistoryButton}" Click="LoadDayButton_Click"/>
                     <TextBlock x:Name="ResultText" VerticalAlignment="Center" Foreground="{DynamicResource Text.Secondary}" Text="0 / 0 évènements affichés"/>
                 </WrapPanel>
                 <WrapPanel x:Name="ContextScopePanel" Grid.Row="1" Margin="0,8,0,0" Visibility="Collapsed">

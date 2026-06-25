@@ -368,6 +368,48 @@ namespace Analyse
             return LoadMatchingHistory(modelKey, null, null, take);
         }
 
+        internal static List<ElementHistoryEvent> LoadModelHistoryForLocalDate(string modelKey, DateTime localDate)
+        {
+            if (string.IsNullOrWhiteSpace(modelKey))
+                return new List<ElementHistoryEvent>();
+
+            var day = localDate.Date;
+            var startLocal = day;
+            var endLocal = day.AddDays(1);
+            var startUtc = startLocal.ToUniversalTime();
+            var endUtc = endLocal.ToUniversalTime();
+
+            var dir = CollaborativeModelTrackerStore.ActiveDirectory;
+            var files = Directory.Exists(dir)
+                ? GetHistoryFiles(dir).Where(f => MayContainUtcRange(f, startUtc, endUtc)).ToArray()
+                : Array.Empty<string>();
+            var result = new Dictionary<string, ElementHistoryEvent>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var f in files)
+            {
+                foreach (var line in ReadHistoryLines(f))
+                {
+                    try
+                    {
+                        var ev = JsonConvert.DeserializeObject<ElementHistoryEvent>(line);
+                        if (!MatchesHistoryFilter(ev, modelKey, null, null)) continue;
+
+                        var localTs = ev.Ts.ToLocalTime();
+                        if (localTs < startLocal || localTs >= endLocal) continue;
+
+                        var key = BuildHistoryEventIdentity(ev);
+                        if (!result.ContainsKey(key))
+                            result[key] = ev;
+                    }
+                    catch { }
+                }
+            }
+
+            return result.Values
+                .OrderByDescending(x => x.Ts)
+                .ToList();
+        }
+
         public static List<ElementHistoryEvent> LoadRecentDeletedHistory(Document doc)
         {
             var key = GetDocumentKey(doc);
@@ -450,6 +492,39 @@ namespace Analyse
             if (!string.IsNullOrWhiteSpace(action)
                 && !string.Equals(ev.Action ?? string.Empty, action, StringComparison.OrdinalIgnoreCase))
                 return false;
+            return true;
+        }
+
+        private static string BuildHistoryEventIdentity(ElementHistoryEvent ev)
+        {
+            if (ev == null) return Guid.NewGuid().ToString("N");
+            return string.Join("|", new[]
+            {
+                ev.ModelKey ?? string.Empty,
+                ev.UniqueId ?? string.Empty,
+                ev.Action ?? string.Empty,
+                ev.Ts.ToString("O", CultureInfo.InvariantCulture),
+                ev.ElementId.ToString(CultureInfo.InvariantCulture)
+            });
+        }
+
+        private static bool MayContainUtcRange(string path, DateTime startUtc, DateTime endUtc)
+        {
+            var token = GetHistoryDateToken(path);
+            if (DateTime.TryParseExact(token, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day))
+            {
+                var fileStart = DateTime.SpecifyKind(day.Date, DateTimeKind.Utc);
+                var fileEnd = fileStart.AddDays(1);
+                return fileStart < endUtc && fileEnd > startUtc;
+            }
+
+            if (DateTime.TryParseExact(token, "yyyy-MM", CultureInfo.InvariantCulture, DateTimeStyles.None, out var month))
+            {
+                var fileStart = DateTime.SpecifyKind(month.Date, DateTimeKind.Utc);
+                var fileEnd = fileStart.AddMonths(1);
+                return fileStart < endUtc && fileEnd > startUtc;
+            }
+
             return true;
         }
 

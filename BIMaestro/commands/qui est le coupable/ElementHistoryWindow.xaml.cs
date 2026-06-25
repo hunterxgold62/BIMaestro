@@ -179,6 +179,7 @@ namespace Analyse
         private readonly UIDocument _uidoc;
         private readonly Document _doc;
         private readonly SelectedContext _selectedContext;
+        private readonly List<string> _initialUniqueIds;
         private List<RowVm> _rows = new List<RowVm>();
         private ExternalEvent _externalEvent;
         private UiRequestHandler _requestHandler;
@@ -187,6 +188,7 @@ namespace Analyse
         private bool _syncingSelection;
         private int _loadVersion;
         private string _scopeFilter = "model";
+        private bool _showAllLoadedEvents;
 
         public ElementHistoryWindow(UIDocument uidoc, Element selected)
             : this(uidoc, selected, null, null)
@@ -200,10 +202,13 @@ namespace Analyse
             _uidoc = uidoc;
             _doc = uidoc?.Document;
             _selectedContext = BuildSelectedContext(_doc, selected);
+            _initialUniqueIds = selected == null ? null : GetSelectedHistoryUniqueIds(_doc, selected);
             _scopeFilter = _selectedContext?.HasSelection == true ? "element" : "model";
             _requestHandler = new UiRequestHandler(this);
             _externalEvent = ExternalEvent.Create(_requestHandler);
             ConfigureScopePanel();
+            if (HistoryDayPicker != null)
+                HistoryDayPicker.SelectedDate = DateTime.Today;
 
             if (selected != null)
             {
@@ -212,7 +217,7 @@ namespace Analyse
                 if (initialEvents != null)
                     Bind(initialEvents, defaultAction);
                 else
-                    BeginProgressiveLoad(ElementHistoryTracker.GetDocumentKeyForHistory(_doc), GetSelectedHistoryUniqueIds(_doc, selected), null);
+                    BeginProgressiveLoad(ElementHistoryTracker.GetDocumentKeyForHistory(_doc), _initialUniqueIds, null);
             }
             else
             {
@@ -255,7 +260,7 @@ namespace Analyse
         private void BeginProgressiveLoad(string modelKey, List<string> uniqueIds, string defaultAction)
         {
             var version = ++_loadVersion;
-            Bind(new List<ElementHistoryEvent>(), defaultAction);
+            Bind(new List<ElementHistoryEvent>(), defaultAction, false, false);
             ResultText.Text = "Chargement des évènements...";
 
             Task.Run(() =>
@@ -266,7 +271,7 @@ namespace Analyse
                     Dispatcher.BeginInvoke(new Action(() =>
                     {
                         if (version != _loadVersion) return;
-                        Bind(events, defaultAction);
+                        Bind(events, defaultAction, false, false);
                     }));
                 }
                 catch
@@ -307,6 +312,39 @@ namespace Analyse
             }
 
             return ElementHistoryTracker.LoadRecentModelHistory(modelKey, take);
+        }
+
+        private void BeginDayLoad(DateTime localDate)
+        {
+            var modelKey = ElementHistoryTracker.GetDocumentKeyForHistory(_doc);
+            var version = ++_loadVersion;
+            Bind(new List<ElementHistoryEvent>(), null, false, true);
+            ResultText.Text = "Chargement complet du " + localDate.Date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) + "...";
+
+            if (ScopeModelRadio != null)
+                ScopeModelRadio.IsChecked = true;
+
+            Task.Run(() =>
+            {
+                try
+                {
+                    var events = ElementHistoryTracker.LoadModelHistoryForLocalDate(modelKey, localDate.Date);
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        if (version != _loadVersion) return;
+                        Bind(events, null, false, true);
+                    }));
+                }
+                catch
+                {
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        if (version != _loadVersion) return;
+                        if (ResultText != null)
+                            ResultText.Text = "Historique du jour partiellement chargé.";
+                    }));
+                }
+            });
         }
 
         private static SelectedContext BuildSelectedContext(Document doc, Element selected)
@@ -380,17 +418,19 @@ namespace Analyse
             return ids;
         }
 
-        private void Bind(List<ElementHistoryEvent> eventsData, string defaultAction = null, bool preserveFilters = false)
+        private void Bind(List<ElementHistoryEvent> eventsData, string defaultAction = null, bool preserveFilters = false, bool showAllLoadedEvents = false)
         {
+            _showAllLoadedEvents = showAllLoadedEvents;
             var previousAction = preserveFilters ? ActionFilterCombo?.SelectedItem as string : null;
             var previousUser = preserveFilters ? UserFilterCombo?.SelectedItem as string : null;
             var previousSearch = preserveFilters ? SearchBox?.Text : null;
 
-            var events = (eventsData ?? new List<ElementHistoryEvent>())
+            var query = (eventsData ?? new List<ElementHistoryEvent>())
                 .Where(ElementHistoryTracker.IsDisplayableHistoryEvent)
-                .OrderByDescending(e => e.Ts)
-                .Take(MaxLoadedHistoryEvents)
-                .ToList();
+                .OrderByDescending(e => e.Ts);
+            var events = showAllLoadedEvents
+                ? query.ToList()
+                : query.Take(MaxLoadedHistoryEvents).ToList();
 
             _rows = BuildRows(events);
             ActionFilterCombo.ItemsSource = new[] { "Toutes" }.Concat(_rows.Select(x => x.ActionText).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().OrderBy(x => x)).ToList();
@@ -410,6 +450,8 @@ namespace Analyse
 
             if (preserveFilters && SearchBox != null)
                 SearchBox.Text = previousSearch ?? string.Empty;
+            else if (SearchBox != null && !string.IsNullOrEmpty(SearchBox.Text))
+                SearchBox.Text = string.Empty;
 
             ApplyFilters();
         }
@@ -1123,6 +1165,16 @@ namespace Analyse
         private static string GetClusterKey(ElementHistoryEvent e)
         {
             var ticks = e.Ts.ToUniversalTime().Ticks / TimeSpan.FromSeconds(5).Ticks;
+            if (string.Equals(e.Action, "create", StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Join("|",
+                    CleanCellText(e.Action),
+                    CleanCellText(e.User),
+                    CleanCellText(e.Tx),
+                    "bulk-create",
+                    ticks.ToString(CultureInfo.InvariantCulture));
+            }
+
             if (string.Equals(e.Action, "delete", StringComparison.OrdinalIgnoreCase))
             {
                 return string.Join("|",
@@ -1149,6 +1201,14 @@ namespace Analyse
             if (first == null || string.IsNullOrWhiteSpace(first.Tx)) return false;
 
             if (string.Equals(first.Action, "delete", StringComparison.OrdinalIgnoreCase))
+            {
+                return events.All(e =>
+                    string.Equals(e.Action, first.Action, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(e.User, first.User, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(e.Tx, first.Tx, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (string.Equals(first.Action, "create", StringComparison.OrdinalIgnoreCase))
             {
                 return events.All(e =>
                     string.Equals(e.Action, first.Action, StringComparison.OrdinalIgnoreCase) &&
@@ -1314,6 +1374,12 @@ namespace Analyse
             ApplyFilters();
         }
 
+        private void LoadDayButton_Click(object sender, RoutedEventArgs e)
+        {
+            var selectedDate = HistoryDayPicker?.SelectedDate ?? DateTime.Today;
+            BeginDayLoad(selectedDate);
+        }
+
         private void QuickFilterFamily_Click(object sender, RoutedEventArgs e)
         {
             var row = GetMenuRow(sender);
@@ -1408,9 +1474,9 @@ namespace Analyse
             }
 
             var matching = rows.ToList();
-            var filtered = matching
-                .Take(MaxVisibleHistoryEvents)
-                .ToList();
+            var filtered = _showAllLoadedEvents
+                ? matching.ToList()
+                : matching.Take(MaxVisibleHistoryEvents).ToList();
             HistoryGrid.ItemsSource = filtered;
             VisualCardsList.ItemsSource = BuildTimelineItems(filtered);
             if (filtered.Count > 0 && GetPrimarySelectedRow() == null)
@@ -1521,7 +1587,9 @@ namespace Analyse
             if (ResultText != null)
             {
                 var total = _rows.SelectMany(GetRowEvents).Count();
-                ResultText.Text = events.Count.ToString(CultureInfo.InvariantCulture) + " / " + total.ToString(CultureInfo.InvariantCulture) + " évènements affichés";
+                ResultText.Text = events.Count == total
+                    ? total.ToString(CultureInfo.InvariantCulture) + " évènements affichés"
+                    : events.Count.ToString(CultureInfo.InvariantCulture) + " / " + total.ToString(CultureInfo.InvariantCulture) + " évènements affichés";
             }
         }
 
@@ -1570,9 +1638,7 @@ namespace Analyse
         private bool ShouldUseWideDetails()
         {
             var row = GetPrimarySelectedRow();
-            if (row == null || row.Source == null || row.IsCluster) return false;
-            var visibleRows = HistoryGrid?.ItemsSource as IEnumerable<RowVm>;
-            return visibleRows != null && visibleRows.Count(r => r != null && !r.IsTimelineSeparator) == 1;
+            return row != null && row.Source != null && !row.IsCluster;
         }
 
 
