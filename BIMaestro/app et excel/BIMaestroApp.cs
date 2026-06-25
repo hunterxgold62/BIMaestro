@@ -164,8 +164,6 @@ public class BIMaestroApp : IExternalApplication
             _uiApp ??= sender as UIApplication;
             if (_uiApp == null) return;
 
-            Analyse.ElementHistoryTracker.PrimeDocument(_uiApp.ActiveUIDocument?.Document);
-
             if (!Couleur.ColoringStateManager.IsColoringActive)
             {
                 if (!_hasResetWhenOff)
@@ -199,7 +197,6 @@ public class BIMaestroApp : IExternalApplication
         try
         {
             _uiApp ??= new UIApplication(args.Document.Application);
-            Analyse.ElementHistoryTracker.PrimeDocument(args.Document);
             ExcelLogger.OnViewActivated(args.Document, _uiApp);
         }
         catch (Autodesk.Revit.Exceptions.InvalidObjectException ex)
@@ -230,7 +227,6 @@ public class BIMaestroApp : IExternalApplication
         try
         {
             _uiApp ??= new UIApplication(e.Document.Application);
-            Analyse.ElementHistoryTracker.PrimeDocument(e.Document);
             ExcelLogger.OnDocumentOpened(e.Document, _uiApp);
             Analyse.CollaborativeModelTrackerStore.TryAutoLog(e.Document, _uiApp);
         }
@@ -245,7 +241,6 @@ public class BIMaestroApp : IExternalApplication
         try
         {
             _uiApp ??= new UIApplication(e.Document.Application);
-            Analyse.ElementHistoryTracker.PrimeDocument(e.Document);
         }
         catch (Exception ex)
         {

@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Newtonsoft.Json;
 
 namespace Analyse
@@ -142,10 +143,35 @@ namespace Analyse
         {
             try
             {
-                AddEntryAndSave(doc, uiapp, Environment.UserName);
+                var entry = BuildAutoLogRecord(doc, uiapp, Environment.UserName);
+                Task.Run(() =>
+                {
+                    try
+                    {
+                        AddPreparedEntryAndSave(entry);
+                    }
+                    catch
+                    {
+                    }
+                });
             }
             catch
             {
+            }
+        }
+
+        private static void AddPreparedEntryAndSave(CollaborativeModelRecord entry)
+        {
+            if (entry == null) return;
+
+            lock (SyncObj)
+            {
+                EnsureActiveDirectory();
+
+                var records = LoadWithoutLock();
+                entry.CreatorName = ResolveCreator(records, entry.ModelPath, entry.ModelName, entry.UserName);
+                records.Add(entry);
+                SaveAndExportWithoutLock(records);
             }
         }
 
@@ -170,6 +196,28 @@ namespace Analyse
                 UserName = normalizedUser,
                 CreatorName = creatorName,
                 LastChangedBy = lastChangedBy,
+                RevitVersion = uiapp?.Application?.VersionNumber ?? "Inconnue",
+                TimestampDate = DateTime.Today
+            };
+        }
+
+        private static CollaborativeModelRecord BuildAutoLogRecord(
+            Document doc,
+            Autodesk.Revit.UI.UIApplication uiapp,
+            string userName)
+        {
+            string normalizedUser = string.IsNullOrWhiteSpace(userName) ? Environment.UserName : userName.Trim();
+            string modelPath = GetModelPath(doc);
+            string modelName = doc?.Title ?? "Maquette inconnue";
+
+            return new CollaborativeModelRecord
+            {
+                ProjectName = doc?.ProjectInformation?.Name ?? "Projet sans nom",
+                ModelName = modelName,
+                ModelPath = modelPath,
+                UserName = normalizedUser,
+                CreatorName = null,
+                LastChangedBy = GetLastChangedBy(doc, normalizedUser),
                 RevitVersion = uiapp?.Application?.VersionNumber ?? "Inconnue",
                 TimestampDate = DateTime.Today
             };

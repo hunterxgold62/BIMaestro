@@ -297,7 +297,7 @@ namespace Analyse
             try
             {
                 if (el == null || ShouldIgnoreElement(el)) return;
-                var snapshot = BuildSnapshot(el, includeOrientedCorners: true);
+                var snapshot = BuildSnapshot(el, includeOrientedCorners: false);
                 StoreSnapshot(el.Document, el.Id, snapshot);
             }
             catch
@@ -321,8 +321,6 @@ namespace Analyse
             var user = Environment.UserName;
             var tx = e.GetTransactionNames()?.FirstOrDefault() ?? "Transaction";
             if (IsIgnoredTransaction(tx)) return;
-            var wasPrimed = IsDocumentPrimed(doc);
-
             var addedIds = e.GetAddedElementIds().ToList();
             var modifiedIds = e.GetModifiedElementIds().ToList();
             var deletedIds = e.GetDeletedElementIds().ToList();
@@ -337,9 +335,6 @@ namespace Analyse
 
             CaptureFamilyDocumentTypeChanges(doc, user, tx);
             CaptureProjectFamilySymbolChanges(doc, user, tx);
-
-            if (!wasPrimed)
-                PrimeDocument(doc);
         }
 
         public static List<ElementHistoryEvent> LoadElementHistory(Document doc, Element element)

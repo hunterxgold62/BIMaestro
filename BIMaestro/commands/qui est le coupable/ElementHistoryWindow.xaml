@@ -33,6 +33,12 @@
                 <Setter Property="Margin" Value="0,0,8,6"/>
             </Style>
 
+            <Style x:Key="HistoryPrimaryButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+                <Setter Property="Height" Value="38"/>
+                <Setter Property="MinWidth" Value="0"/>
+                <Setter Property="Margin" Value="0,0,8,8"/>
+            </Style>
+
             <Style x:Key="HelpButtonStyle" TargetType="Button">
                 <Setter Property="Width" Value="34"/>
                 <Setter Property="Height" Value="34"/>
@@ -286,10 +292,10 @@
                                  Checked="ScopeFilter_Checked"/>
                 </WrapPanel>
                 <WrapPanel Grid.Row="2" Margin="0,8,0,0">
-                    <Button x:Name="VisualizeDeletedButton" Content="Visualiser évènement" Width="175" Style="{StaticResource HistoryButton}" Click="VisualizeDeletedButton_Click"/>
-                    <Button x:Name="FocusButton" Content="Focus élément" Width="135" Style="{StaticResource HistoryButton}" Click="FocusButton_Click"/>
-                    <Button x:Name="DetailsButton" Content="Détails" Width="100" Style="{StaticResource HistoryButton}" Click="DetailsButton_Click"/>
-                    <Button x:Name="RestoreParametersButton" Content="Restaurer avant" Width="145" Style="{StaticResource HistoryButton}" Click="RestoreParametersButton_Click" IsEnabled="False"/>
+                    <Button x:Name="VisualizeDeletedButton" Content="Visualiser" Width="185" Style="{StaticResource HistoryPrimaryButton}" Click="VisualizeDeletedButton_Click"/>
+                    <Button x:Name="FocusButton" Content="Focus" Width="88" Style="{StaticResource HistoryButton}" Click="FocusButton_Click"/>
+                    <Button x:Name="DetailsButton" Content="Détails" Width="96" Style="{StaticResource HistoryButton}" Click="DetailsButton_Click"/>
+                    <Button x:Name="RestoreParametersButton" Content="Restaurer" Width="108" Style="{StaticResource HistoryButton}" Click="RestoreParametersButton_Click" Visibility="Collapsed"/>
                     <Button x:Name="CleanPreviewsButton" Content="Nettoyer previews" Width="155" Style="{StaticResource HistoryButton}" Click="CleanPreviewsButton_Click"/>
                 </WrapPanel>
             </Grid>

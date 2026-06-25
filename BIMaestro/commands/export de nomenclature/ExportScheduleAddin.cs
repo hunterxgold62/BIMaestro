@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using Excel = Microsoft.Office.Interop.Excel;
@@ -244,8 +245,10 @@ namespace Visualisation
             var body = data.GetSectionData(SectionType.Body);
 
             var rows = new List<string[]>();
-            var headerRows = ReadSectionRows(header);
-            var bodyRows = ReadSectionRows(body);
+            var headerRows = ReadSectionRows(schedule, SectionType.Header, header);
+            var bodyRows = ReadSectionRows(schedule, SectionType.Body, body);
+
+            EnsureScheduleTitle(schedule, headerRows);
 
             rows.AddRange(headerRows);
             rows.AddRange(bodyRows);
@@ -330,35 +333,52 @@ namespace Visualisation
             return fullRange;
         }
 
-        private static List<string[]> ReadSectionRows(TableSectionData sectionData)
+        private static List<string[]> ReadSectionRows(ViewSchedule schedule, SectionType sectionType, TableSectionData sectionData)
         {
-            var rows = new List<string[]>();
             if (sectionData == null || !sectionData.IsValidObject ||
                 sectionData.NumberOfRows <= 0 || sectionData.NumberOfColumns <= 0)
             {
-                return rows;
+                return new List<string[]>();
             }
 
-            int firstRow = sectionData.FirstRowNumber;
-            int lastRow = sectionData.LastRowNumber;
-            int firstColumn = sectionData.FirstColumnNumber;
-            int lastColumn = sectionData.LastColumnNumber;
-            if (lastRow < firstRow || lastColumn < firstColumn)
+            var absoluteRows = BuildNumberRange(sectionData.FirstRowNumber, sectionData.LastRowNumber);
+            var absoluteColumns = BuildNumberRange(sectionData.FirstColumnNumber, sectionData.LastColumnNumber);
+            var relativeRows = BuildNumberRange(0, sectionData.NumberOfRows - 1);
+            var relativeColumns = BuildNumberRange(0, sectionData.NumberOfColumns - 1);
+
+            var candidates = new[]
+            {
+                ReadSectionRows(schedule, sectionType, sectionData, relativeRows, relativeColumns),
+                ReadSectionRows(schedule, sectionType, sectionData, absoluteRows, absoluteColumns),
+                ReadSectionRows(schedule, sectionType, sectionData, relativeRows, absoluteColumns),
+                ReadSectionRows(schedule, sectionType, sectionData, absoluteRows, relativeColumns)
+            };
+
+            return candidates
+                .OrderByDescending(CountFilledCells)
+                .ThenByDescending(r => r.Count)
+                .FirstOrDefault() ?? new List<string[]>();
+        }
+
+        private static List<string[]> ReadSectionRows(
+            ViewSchedule schedule,
+            SectionType sectionType,
+            TableSectionData sectionData,
+            IReadOnlyList<int> rowNumbers,
+            IReadOnlyList<int> columnNumbers)
+        {
+            var rows = new List<string[]>();
+            if (rowNumbers.Count == 0 || columnNumbers.Count == 0)
             {
                 return rows;
             }
 
-            for (int row = firstRow; row <= lastRow; row++)
+            foreach (int row in rowNumbers)
             {
-                if (!sectionData.IsValidRowNumber(row))
-                {
-                    continue;
-                }
-
                 var cells = new List<string>();
-                for (int column = firstColumn; column <= lastColumn; column++)
+                foreach (int column in columnNumbers)
                 {
-                    cells.Add(ReadCellText(sectionData, row, column));
+                    cells.Add(ReadCellText(schedule, sectionType, sectionData, row, column));
                 }
 
                 rows.Add(cells.ToArray());
@@ -367,15 +387,47 @@ namespace Visualisation
             return rows;
         }
 
-        private static string ReadCellText(TableSectionData sectionData, int row, int column)
+        private static string ReadCellText(ViewSchedule schedule, SectionType sectionType, TableSectionData sectionData, int row, int column)
         {
-            if (!sectionData.IsValidColumnNumber(column))
+            string text = TryReadViewCellText(schedule, sectionType, row, column);
+            if (!string.IsNullOrEmpty(text))
+            {
+                return text;
+            }
+
+            text = TryReadSectionCellText(sectionData, row, column);
+            return text ?? string.Empty;
+        }
+
+        private static string TryReadViewCellText(ViewSchedule schedule, SectionType sectionType, int row, int column)
+        {
+            try
+            {
+                return schedule.GetCellText(sectionType, row, column) ?? string.Empty;
+            }
+            catch (Autodesk.Revit.Exceptions.ArgumentException)
             {
                 return string.Empty;
             }
+            catch (Autodesk.Revit.Exceptions.InvalidOperationException)
+            {
+                return string.Empty;
+            }
+            catch (ArgumentException)
+            {
+                return string.Empty;
+            }
+        }
 
+        private static string TryReadSectionCellText(TableSectionData sectionData, int row, int column)
+        {
             try
             {
+                if (!sectionData.IsValidRowNumber(row) || !sectionData.IsValidColumnNumber(column))
+                {
+                    return string.Empty;
+                }
+
                 return sectionData.GetCellText(row, column) ?? string.Empty;
             }
             catch (Autodesk.Revit.Exceptions.ArgumentException)
@@ -390,6 +442,117 @@ namespace Visualisation
             {
                 return string.Empty;
             }
+        }
+
+        private static List<int> BuildNumberRange(int first, int last)
+        {
+            var result = new List<int>();
+            if (last < first)
+            {
+                return result;
+            }
+
+            for (int i = first; i <= last; i++)
+            {
+                result.Add(i);
+            }
+
+            return result;
+        }
+
+        private static int CountFilledCells(List<string[]> rows)
+        {
+            int count = 0;
+            foreach (string[] row in rows)
+            {
+                if (row == null)
+                {
+                    continue;
+                }
+
+                foreach (string cell in row)
+                {
+                    if (!string.IsNullOrWhiteSpace(cell))
+                    {
+                        count++;
+                    }
+                }
+            }
+
+            return count;
+        }
+
+        private static void EnsureScheduleTitle(ViewSchedule schedule, List<string[]> headerRows)
+        {
+            string title = schedule?.Name ?? "Nomenclature";
+            if (headerRows.Count == 0)
+            {
+                headerRows.Add(new[] { title });
+                return;
+            }
+
+            string[] firstRow = headerRows[0];
+            bool firstRowIsEmpty = firstRow == null || firstRow.All(string.IsNullOrWhiteSpace);
+            if (firstRowIsEmpty)
+            {
+                int columnCount = Math.Max(1, firstRow?.Length ?? 1);
+                var replacement = new string[columnCount];
+                replacement[0] = title;
+                for (int i = 1; i < columnCount; i++)
+                {
+                    replacement[i] = string.Empty;
+                }
+
+                headerRows[0] = replacement;
+            }
+            else if (IsScheduleTitleVisible(schedule) && !LooksLikeTitleRow(firstRow))
+            {
+                int columnCount = Math.Max(1, firstRow.Length);
+                var insertedTitle = new string[columnCount];
+                insertedTitle[0] = title;
+                for (int i = 1; i < columnCount; i++)
+                {
+                    insertedTitle[i] = string.Empty;
+                }
+
+                headerRows.Insert(0, insertedTitle);
+            }
+        }
+
+        private static bool IsScheduleTitleVisible(ViewSchedule schedule)
+        {
+            try
+            {
+                var definition = schedule?.Definition;
+                var prop = definition?.GetType().GetProperty("ShowTitle");
+                if (prop != null && prop.PropertyType == typeof(bool))
+                {
+                    return (bool)prop.GetValue(definition, null);
+                }
+            }
+            catch { }
+
+            return true;
+        }
+
+        private static bool LooksLikeTitleRow(string[] row)
+        {
+            var values = row
+                .Where(v => !string.IsNullOrWhiteSpace(v))
+                .Select(v => v.Trim())
+                .ToList();
+
+            if (values.Count == 0)
+            {
+                return false;
+            }
+
+            if (values.Count == 1)
+            {
+                return true;
+            }
+
+            return values.All(v => string.Equals(v, values[0], StringComparison.Ordinal));
         }
 
         private static int GetMaxColumnCount(List<string[]> rows)

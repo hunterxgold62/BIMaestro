@@ -1299,23 +1299,36 @@ namespace Analyse
         private void UpdateVisualizeButtonLabel()
         {
             var row = GetPrimarySelectedRow();
-            if (row == null || row.Source == null)
+            var hasRow = row?.Source != null;
+
+            if (VisualizeDeletedButton != null)
             {
-                VisualizeDeletedButton.Content = "Visualiser évènement";
-                UpdateRestoreButtonLabel(null);
-                return;
+                VisualizeDeletedButton.IsEnabled = hasRow;
+                VisualizeDeletedButton.Content = hasRow ? GetPrimaryActionText(row) : "Visualiser";
             }
 
-            if (row.IsCluster)
-                VisualizeDeletedButton.Content = "Visualiser cluster";
-            else if (string.Equals(row.Source.Action, "delete", StringComparison.OrdinalIgnoreCase))
-                VisualizeDeletedButton.Content = "Visualiser suppression";
-            else if (HasMoveDelta(row.Source))
-                VisualizeDeletedButton.Content = "Visualiser déplacement";
-            else
-                VisualizeDeletedButton.Content = "Visualiser évènement";
+            if (FocusButton != null)
+                FocusButton.IsEnabled = hasRow;
+            if (DetailsButton != null)
+                DetailsButton.IsEnabled = hasRow;
 
             UpdateRestoreButtonLabel(row);
+        }
+
+        private static string GetPrimaryActionText(RowVm row)
+        {
+            if (row == null || row.Source == null)
+                return "Visualiser";
+
+            if (row.IsCluster)
+                return GetRowEvents(row).Any(CanVisualize) ? "Visualiser cluster" : "Focus cluster";
+
+            if (string.Equals(row.Source.Action, "delete", StringComparison.OrdinalIgnoreCase))
+                return "Visualiser suppression";
+            if (HasMoveDelta(row.Source))
+                return "Visualiser déplacement";
+
+            return "Focus élément";
         }
 
         private void UpdateRestoreButtonLabel(RowVm row)
@@ -1323,7 +1336,8 @@ namespace Analyse
             if (RestoreParametersButton == null) return;
             var canRestore = CanRestoreParameters(row?.Source);
             RestoreParametersButton.IsEnabled = canRestore;
-            RestoreParametersButton.Content = canRestore ? "Restaurer avant" : "Restaurer avant";
+            RestoreParametersButton.Visibility = canRestore ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+            RestoreParametersButton.Content = "Restaurer";
             RestoreParametersButton.ToolTip = canRestore
                 ? "Réappliquer les anciennes valeurs de paramètres enregistrées pour cette ligne"
                 : "Disponible uniquement sur une modification de paramètres avec avant/après";
@@ -1607,7 +1621,8 @@ namespace Analyse
         {
             _detailsVisible = !_detailsVisible;
             UpdateDetailsLayout();
-            DetailsButton.Content = _detailsVisible ? "Masquer détails" : "Détails";
+            if (DetailsButton != null)
+                DetailsButton.Content = _detailsVisible ? "Masquer détails" : "Détails";
             UpdateDetails();
         }
 
@@ -1629,6 +1644,7 @@ namespace Analyse
 
             if (DetailsScroll != null)
             {
+                System.Windows.Controls.Grid.SetRow(DetailsScroll, 1);
                 System.Windows.Controls.Grid.SetRowSpan(DetailsScroll, wide ? 2 : 1);
                 DetailsScroll.MaxHeight = wide ? double.PositiveInfinity : 220;
                 DetailsScroll.VerticalAlignment = wide ? VerticalAlignment.Stretch : VerticalAlignment.Top;
@@ -1716,11 +1732,9 @@ namespace Analyse
 
         private void ShowDetails()
         {
-            if (!_detailsVisible)
-            {
-                _detailsVisible = true;
+            _detailsVisible = true;
+            if (DetailsButton != null)
                 DetailsButton.Content = "Masquer détails";
-            }
 
             UpdateDetailsLayout();
             UpdateDetails();
@@ -1728,17 +1742,13 @@ namespace Analyse
 
         private void VisualizeDeletedButton_Click(object sender, RoutedEventArgs e)
         {
-            var selectedRows = HistoryGrid.SelectedItems
-                .Cast<RowVm>()
-                .Where(r => r?.Source != null && GetRowEvents(r).Any(CanVisualize))
-                .ToList();
+            var row = GetPrimarySelectedRow();
+            if (row == null || row.Source == null) return;
 
-            var single = GetPrimarySelectedRow();
-            if (selectedRows.Count == 0 && single?.Source != null && GetRowEvents(single).Any(CanVisualize))
-                selectedRows.Add(single);
-            if (selectedRows.Count == 0) return;
-
-            VisualizeRows(selectedRows);
+            if (GetRowEvents(row).Any(CanVisualize))
+                VisualizeRows(new List<RowVm> { row });
+            else
+                FocusSelectedElement();
         }
 
         private void VisualizeRows(List<RowVm> rows, bool focusAfterVisualize = false)
