@@ -435,7 +435,7 @@ namespace Analyse
             _rows = BuildRows(events);
             ActionFilterCombo.ItemsSource = new[] { "Toutes" }.Concat(_rows.Select(x => x.ActionText).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().OrderBy(x => x)).ToList();
             UserFilterCombo.ItemsSource = new[] { "Tous" }.Concat(_rows.Select(x => x.User).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().OrderBy(x => x)).ToList();
-            var defaultActionText = GetActionText(defaultAction);
+            var defaultActionText = GetDefaultActionText(defaultAction, _rows);
             if (preserveFilters && !string.IsNullOrWhiteSpace(previousAction) && ActionFilterCombo.Items.Contains(previousAction))
                 ActionFilterCombo.SelectedItem = previousAction;
             else
@@ -506,7 +506,7 @@ namespace Analyse
                 Source = first,
                 Events = events,
                 Action = first.Action,
-                ActionText = GetActionText(first.Action),
+                ActionText = GetClusterActionText(first.Action),
                 User = first.User,
                 Category = SummarizeText(events.Select(e => CleanCellText(e.Category)), "catégories"),
                 Family = SummarizeText(events.Select(e => CleanCellText(e.Family)), "familles"),
@@ -545,6 +545,9 @@ namespace Analyse
 
         private static string BuildTileTitle(RowVm row, List<ElementHistoryEvent> events)
         {
+            if (row.IsCluster && string.Equals(row.Action, "move", StringComparison.OrdinalIgnoreCase))
+                return "Déplacements";
+
             var title = row.IsCluster
                 ? GetMostUsefulLabel(events)
                 : FirstNonEmpty(row.TypeName, row.Family, row.Category);
@@ -1185,6 +1188,16 @@ namespace Analyse
                     ticks.ToString(CultureInfo.InvariantCulture));
             }
 
+            if (string.Equals(e.Action, "move", StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Join("|",
+                    CleanCellText(e.Action),
+                    CleanCellText(e.User),
+                    CleanCellText(e.Tx),
+                    "bulk-move",
+                    ticks.ToString(CultureInfo.InvariantCulture));
+            }
+
             return string.Join("|",
                 CleanCellText(e.Action),
                 CleanCellText(e.User),
@@ -1209,6 +1222,14 @@ namespace Analyse
             }
 
             if (string.Equals(first.Action, "create", StringComparison.OrdinalIgnoreCase))
+            {
+                return events.All(e =>
+                    string.Equals(e.Action, first.Action, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(e.User, first.User, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(e.Tx, first.Tx, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (string.Equals(first.Action, "move", StringComparison.OrdinalIgnoreCase))
             {
                 return events.All(e =>
                     string.Equals(e.Action, first.Action, StringComparison.OrdinalIgnoreCase) &&
@@ -1259,6 +1280,34 @@ namespace Analyse
                 case "modify": return "Modification";
                 default: return action.Trim();
             }
+        }
+
+        private static string GetClusterActionText(string action)
+        {
+            if (string.IsNullOrWhiteSpace(action)) return string.Empty;
+            switch (action.Trim().ToLowerInvariant())
+            {
+                case "move": return "Déplacements";
+                case "delete": return "Suppressions";
+                case "create": return "Créations";
+                default: return GetActionText(action);
+            }
+        }
+
+        private static string GetDefaultActionText(string action, IEnumerable<RowVm> rows)
+        {
+            var single = GetActionText(action);
+            if (string.IsNullOrWhiteSpace(single)) return single;
+
+            var available = (rows ?? Enumerable.Empty<RowVm>())
+                .Select(r => r?.ActionText)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToList();
+
+            if (available.Contains(single)) return single;
+
+            var clustered = GetClusterActionText(action);
+            return available.Contains(clustered) ? clustered : single;
         }
 
         private void HistoryGrid_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
