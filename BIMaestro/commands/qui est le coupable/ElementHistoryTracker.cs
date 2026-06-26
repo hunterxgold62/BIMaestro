@@ -48,6 +48,7 @@ namespace Analyse
             public XYZ BBoxMax { get; set; }
             public List<XYZ> ObbCorners { get; set; }
             public GhostMeshSnapshot GhostMesh { get; set; }
+            public bool DetailCaptureAttempted { get; set; }
             public Dictionary<string, string> Parameters { get; set; }
             public DateTime LastLogged { get; set; }
         }
@@ -234,6 +235,7 @@ namespace Analyse
         private const int GhostCoordinateDecimals = 5;
         private const int DeferredPrimeBatchSize = 75;
         private const int MaxDetailedSelectionSnapshots = 25;
+        private const int SelectionDetailedGeometryTimeoutMs = 500;
         private static readonly TimeSpan DeferredPrimeDelay = TimeSpan.FromSeconds(8);
         private const bool IncludeAnnotationCategoriesForFuture = false;
         private static readonly string[] ImageExtensions = { ".png", ".jpg", ".jpeg", ".bmp" };
@@ -418,15 +420,45 @@ namespace Analyse
                     if (id == null || id == ElementId.InvalidElementId) continue;
 
                     var element = doc.GetElement(id);
-                    if (element == null || ShouldIgnoreElement(element)) continue;
+                    if (element == null) continue;
+                    var keepSimpleOnly = ShouldKeepSelectionSnapshotSimple(element);
+                    if (ShouldIgnoreElement(element) && !keepSimpleOnly) continue;
+                    if (HasDetailCaptureAttempted(doc, id)) continue;
 
-                    var snapshot = BuildSnapshot(element, includeOrientedCorners: true);
+                    var quickSnapshot = BuildSnapshot(element, includeOrientedCorners: false);
+                    StoreSnapshot(doc, id, quickSnapshot);
+
+                    if (keepSimpleOnly)
+                    {
+                        quickSnapshot.DetailCaptureAttempted = true;
+                        StoreSnapshot(doc, id, quickSnapshot);
+                        processed++;
+                        continue;
+                    }
+
+                    var snapshot = BuildSnapshot(
+                        element,
+                        includeOrientedCorners: true,
+                        detailedGeometryTimeoutMs: SelectionDetailedGeometryTimeoutMs);
                     StoreSnapshot(doc, id, snapshot);
                     processed++;
                 }
             }
             catch
             {
+            }
+        }
+
+        private static bool HasDetailCaptureAttempted(Document doc, ElementId id)
+        {
+            var key = BuildElementSnapshotKey(doc, id);
+            if (string.IsNullOrWhiteSpace(key)) return false;
+
+            lock (SnapshotByElementId)
+            {
+                return SnapshotByElementId.TryGetValue(key, out var snapshot)
+                    && snapshot != null
+                    && snapshot.DetailCaptureAttempted;
             }
         }
 
@@ -917,7 +949,7 @@ namespace Analyse
             return modelKey + "|element|" + id.GetIdValue().ToString(CultureInfo.InvariantCulture);
         }
 
-        private static ElementSnapshot BuildSnapshot(Element el, bool includeOrientedCorners)
+        private static ElementSnapshot BuildSnapshot(Element el, bool includeOrientedCorners, int detailedGeometryTimeoutMs = 0)
         {
             string family = null;
             string typeName = null;
@@ -947,7 +979,7 @@ namespace Analyse
             var parameters = CaptureWritableParameters(el);
             AddTypeParametersToSnapshot(el, parameters);
 
-            return new ElementSnapshot
+            var snapshot = new ElementSnapshot
             {
                 UniqueId = el.UniqueId,
                 Category = categoryName,
@@ -958,10 +990,22 @@ namespace Analyse
                 Location = GetLocation(el),
                 BBoxMin = GetBBoxMin(el),
                 BBoxMax = GetBBoxMax(el),
-                ObbCorners = includeOrientedCorners ? GetOrientedCorners(el) : null,
-                GhostMesh = includeOrientedCorners ? CaptureGhostMesh(el) : null,
+                DetailCaptureAttempted = includeOrientedCorners,
                 Parameters = parameters
             };
+
+            if (includeOrientedCorners)
+            {
+                var deadlineUtc = detailedGeometryTimeoutMs > 0
+                    ? DateTime.UtcNow.AddMilliseconds(detailedGeometryTimeoutMs)
+                    : DateTime.MaxValue;
+
+                snapshot.GhostMesh = CaptureGhostMesh(el, deadlineUtc);
+                if (!IsDeadlineExpired(deadlineUtc))
+                    snapshot.ObbCorners = GetOrientedCorners(el, deadlineUtc);
+            }
+
+            return snapshot;
         }
 
         private static string DetermineAction(ElementSnapshot previous, ElementSnapshot current)
@@ -1558,6 +1602,34 @@ namespace Analyse
             return false;
         }
 
+        private static bool ShouldKeepSelectionSnapshotSimple(Element element)
+        {
+            if (element == null) return true;
+            if (element is ImportInstance || element is RevitLinkInstance) return true;
+
+            var typeName = element.GetType().Name ?? string.Empty;
+            if (typeName.IndexOf("Import", StringComparison.OrdinalIgnoreCase) >= 0
+                || typeName.IndexOf("Link", StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+
+            var categoryName = element.Category?.Name ?? string.Empty;
+            if (categoryName.IndexOf("CAD", StringComparison.OrdinalIgnoreCase) >= 0
+                || categoryName.IndexOf("DWG", StringComparison.OrdinalIgnoreCase) >= 0
+                || categoryName.IndexOf("IFC", StringComparison.OrdinalIgnoreCase) >= 0
+                || categoryName.IndexOf("NWD", StringComparison.OrdinalIgnoreCase) >= 0
+                || categoryName.IndexOf("RVT", StringComparison.OrdinalIgnoreCase) >= 0
+                || categoryName.IndexOf("link", StringComparison.OrdinalIgnoreCase) >= 0
+                || categoryName.IndexOf("lien", StringComparison.OrdinalIgnoreCase) >= 0
+                || categoryName.IndexOf("import", StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+
+            var name = element.Name ?? string.Empty;
+            return name.IndexOf(".dwg", StringComparison.OrdinalIgnoreCase) >= 0
+                || name.IndexOf(".ifc", StringComparison.OrdinalIgnoreCase) >= 0
+                || name.IndexOf(".nwd", StringComparison.OrdinalIgnoreCase) >= 0
+                || name.IndexOf(".rvt", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
         private static bool ShouldIgnoreSnapshot(ElementSnapshot snapshot)
         {
             if (snapshot == null) return true;
@@ -2066,14 +2138,21 @@ namespace Analyse
             catch { return DateTime.MinValue; }
         }
 
-        private static List<XYZ> GetOrientedCorners(Element el)
+        private static bool IsDeadlineExpired(DateTime deadlineUtc)
+        {
+            return deadlineUtc != DateTime.MaxValue && DateTime.UtcNow >= deadlineUtc;
+        }
+
+        private static List<XYZ> GetOrientedCorners(Element el, DateTime deadlineUtc)
         {
             try
             {
+                if (IsDeadlineExpired(deadlineUtc)) return null;
                 var opts = new Options { ComputeReferences = false, DetailLevel = ViewDetailLevel.Fine };
                 var ge = el.get_Geometry(opts);
+                if (IsDeadlineExpired(deadlineUtc)) return null;
                 var pts = new List<XYZ>();
-                CollectPoints(ge, pts);
+                CollectPoints(ge, pts, deadlineUtc);
                 if (pts.Count < 8) return null;
 
                 double cx = pts.Average(p => p.X), cy = pts.Average(p => p.Y), cz = pts.Average(p => p.Z);
@@ -2113,33 +2192,37 @@ namespace Analyse
             catch { return null; }
         }
 
-        private static void CollectPoints(GeometryElement ge, List<XYZ> pts)
+        private static void CollectPoints(GeometryElement ge, List<XYZ> pts, DateTime deadlineUtc)
         {
             if (ge == null) return;
             foreach (var go in ge)
             {
+                if (IsDeadlineExpired(deadlineUtc)) return;
                 if (go is Solid s && s.Faces.Size > 0)
                 {
                     foreach (Face f in s.Faces)
                     {
+                        if (IsDeadlineExpired(deadlineUtc)) return;
                         var m = f.Triangulate();
                         for (int i = 0; i < m.Vertices.Count; i++) pts.Add(m.Vertices[i]);
                     }
                 }
                 else if (go is GeometryInstance gi)
                 {
-                    CollectPoints(gi.GetInstanceGeometry(), pts);
+                    if (IsDeadlineExpired(deadlineUtc)) return;
+                    CollectPoints(gi.GetInstanceGeometry(), pts, deadlineUtc);
                 }
             }
         }
 
-        private static GhostMeshSnapshot CaptureGhostMesh(Element el)
+        private static GhostMeshSnapshot CaptureGhostMesh(Element el, DateTime deadlineUtc)
         {
             GhostMeshSnapshot bestDecimated = null;
 
             foreach (var detailLevel in new[] { ViewDetailLevel.Fine, ViewDetailLevel.Medium, ViewDetailLevel.Coarse })
             {
-                var snapshot = CaptureGhostMesh(el, detailLevel, out var decimated);
+                if (IsDeadlineExpired(deadlineUtc)) break;
+                var snapshot = CaptureGhostMesh(el, detailLevel, deadlineUtc, out var decimated);
                 if (snapshot == null) continue;
                 if (!decimated) return snapshot;
                 bestDecimated = snapshot;
@@ -2148,12 +2231,12 @@ namespace Analyse
             return bestDecimated;
         }
 
-        private static GhostMeshSnapshot CaptureGhostMesh(Element el, ViewDetailLevel detailLevel, out bool decimated)
+        private static GhostMeshSnapshot CaptureGhostMesh(Element el, ViewDetailLevel detailLevel, DateTime deadlineUtc, out bool decimated)
         {
             decimated = false;
             try
             {
-                if (el == null) return null;
+                if (el == null || IsDeadlineExpired(deadlineUtc)) return null;
                 var opts = new Options
                 {
                     ComputeReferences = false,
@@ -2161,8 +2244,9 @@ namespace Analyse
                     IncludeNonVisibleObjects = false
                 };
                 var ge = el.get_Geometry(opts);
+                if (IsDeadlineExpired(deadlineUtc)) return null;
                 var builder = new GhostMeshBuilder();
-                CollectGhostMesh(ge, builder);
+                CollectGhostMesh(ge, builder, deadlineUtc);
 
                 return builder.ToSnapshot(out decimated);
             }
@@ -2172,23 +2256,26 @@ namespace Analyse
             }
         }
 
-        private static void CollectGhostMesh(GeometryElement ge, GhostMeshBuilder builder)
+        private static void CollectGhostMesh(GeometryElement ge, GhostMeshBuilder builder, DateTime deadlineUtc)
         {
             if (ge == null || builder == null) return;
 
             foreach (var go in ge)
             {
+                if (IsDeadlineExpired(deadlineUtc)) return;
                 if (go is Solid solid && solid.Faces.Size > 0)
                 {
                     foreach (Face face in solid.Faces)
                     {
                         try
                         {
+                            if (IsDeadlineExpired(deadlineUtc)) return;
                             var mesh = face.Triangulate();
                             if (mesh == null) continue;
 
                             for (int i = 0; i < mesh.NumTriangles; i++)
                             {
+                                if (IsDeadlineExpired(deadlineUtc)) return;
                                 var triangle = mesh.get_Triangle(i);
                                 var a = triangle.get_Vertex(0);
                                 var b = triangle.get_Vertex(1);
@@ -2205,7 +2292,8 @@ namespace Analyse
                 {
                     try
                     {
-                        CollectGhostMesh(gi.GetInstanceGeometry(), builder);
+                        if (IsDeadlineExpired(deadlineUtc)) return;
+                        CollectGhostMesh(gi.GetInstanceGeometry(), builder, deadlineUtc);
                     }
                     catch
                     {
