@@ -1826,9 +1826,40 @@ namespace Analyse
 
         private static bool CanVisualize(ElementHistoryEvent ev)
         {
+            if (IsAxisLineHistoryEvent(ev)) return false;
             return string.Equals(ev.Action, "delete", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(ev.Action, "move", StringComparison.OrdinalIgnoreCase)
                 || HasMoveDelta(ev);
+        }
+
+        private static bool IsAxisLineHistoryEvent(ElementHistoryEvent ev)
+        {
+            return ev != null
+                && (IsAxisLineText(ev.Category)
+                    || IsAxisLineText(ev.Family)
+                    || IsAxisLineText(ev.TypeName)
+                    || IsAxisLineText(ev.UniqueId));
+        }
+
+        private static bool IsAxisLineText(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return false;
+            var value = text.Trim();
+            var hasAxisWord = value.IndexOf("axe", StringComparison.OrdinalIgnoreCase) >= 0
+                || value.IndexOf("axis", StringComparison.OrdinalIgnoreCase) >= 0
+                || value.IndexOf("center", StringComparison.OrdinalIgnoreCase) >= 0
+                || value.IndexOf("centre", StringComparison.OrdinalIgnoreCase) >= 0;
+            var hasLineWord = value.IndexOf("ligne", StringComparison.OrdinalIgnoreCase) >= 0
+                || value.IndexOf("line", StringComparison.OrdinalIgnoreCase) >= 0;
+
+            return (hasAxisWord && hasLineWord)
+                || value.Equals("Axe", StringComparison.OrdinalIgnoreCase)
+                || value.Equals("Axes", StringComparison.OrdinalIgnoreCase)
+                || value.Equals("Axis", StringComparison.OrdinalIgnoreCase)
+                || value.Equals("Line", StringComparison.OrdinalIgnoreCase)
+                || value.Equals("Lines", StringComparison.OrdinalIgnoreCase)
+                || value.Equals("Ligne", StringComparison.OrdinalIgnoreCase)
+                || value.Equals("Lignes", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool HasMoveDelta(ElementHistoryEvent ev)
@@ -2396,6 +2427,11 @@ namespace Analyse
             using (var t = new Transaction(_doc, "BIMaestro - Visualisation historique"))
             {
                 t.Start();
+
+                var existingPreviewIds = GetPreviewElements(_doc).Select(e => e.Id).ToList();
+                if (existingPreviewIds.Count > 0)
+                    _doc.Delete(existingPreviewIds);
+
                 foreach (var ev in events ?? new List<ElementHistoryEvent>())
                 {
                     try

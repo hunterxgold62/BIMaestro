@@ -234,7 +234,6 @@ namespace Analyse
         private const int MaxGhostCandidateFaces = 12000;
         private const int GhostCoordinateDecimals = 5;
         private const int DeferredPrimeBatchSize = 75;
-        private const int MaxDetailedSelectionSnapshots = 25;
         private const int SelectionDetailedGeometryTimeoutMs = 500;
         private static readonly TimeSpan DeferredPrimeDelay = TimeSpan.FromSeconds(8);
         private const bool IncludeAnnotationCategoriesForFuture = false;
@@ -413,10 +412,8 @@ namespace Analyse
 
             try
             {
-                int processed = 0;
                 foreach (var id in selectedIds)
                 {
-                    if (processed >= MaxDetailedSelectionSnapshots) break;
                     if (id == null || id == ElementId.InvalidElementId) continue;
 
                     var element = doc.GetElement(id);
@@ -432,7 +429,6 @@ namespace Analyse
                     {
                         quickSnapshot.DetailCaptureAttempted = true;
                         StoreSnapshot(doc, id, quickSnapshot);
-                        processed++;
                         continue;
                     }
 
@@ -441,7 +437,6 @@ namespace Analyse
                         includeOrientedCorners: true,
                         detailedGeometryTimeoutMs: SelectionDetailedGeometryTimeoutMs);
                     StoreSnapshot(doc, id, snapshot);
-                    processed++;
                 }
             }
             catch
@@ -994,7 +989,7 @@ namespace Analyse
                 Parameters = parameters
             };
 
-            if (includeOrientedCorners)
+            if (includeOrientedCorners && !ShouldKeepDetailedSnapshotSimple(el))
             {
                 var deadlineUtc = detailedGeometryTimeoutMs > 0
                     ? DateTime.UtcNow.AddMilliseconds(detailedGeometryTimeoutMs)
@@ -1593,6 +1588,7 @@ namespace Analyse
         {
             if (element == null) return true;
             if (IsBIMaestroPreviewElement(element)) return true;
+            if (IsAxisLineElement(element)) return true;
             if (element is FamilySymbol familySymbol)
             {
                 if (element.Category != null && ShouldIgnoreCategory(element.Category)) return true;
@@ -1604,6 +1600,11 @@ namespace Analyse
 
         private static bool ShouldKeepSelectionSnapshotSimple(Element element)
         {
+            return ShouldKeepDetailedSnapshotSimple(element);
+        }
+
+        private static bool ShouldKeepDetailedSnapshotSimple(Element element)
+        {
             if (element == null) return true;
             if (element is ImportInstance || element is RevitLinkInstance) return true;
 
@@ -1613,6 +1614,9 @@ namespace Analyse
                 return true;
 
             var categoryName = element.Category?.Name ?? string.Empty;
+            if (IsInsulationCategoryName(categoryName))
+                return true;
+
             if (categoryName.IndexOf("CAD", StringComparison.OrdinalIgnoreCase) >= 0
                 || categoryName.IndexOf("DWG", StringComparison.OrdinalIgnoreCase) >= 0
                 || categoryName.IndexOf("IFC", StringComparison.OrdinalIgnoreCase) >= 0
@@ -1639,7 +1643,59 @@ namespace Analyse
             if (!IsUsefulHistoryText(snapshot.Category)) return true;
             if (IsIgnoredCategoryName(snapshot.Category))
                 return true;
+            if (IsAxisLineSnapshot(snapshot))
+                return true;
             return false;
+        }
+
+        private static bool IsAxisLineElement(Element element)
+        {
+            if (element == null) return false;
+
+            string typeName = null;
+            try
+            {
+                var typeId = element.GetTypeId();
+                if (typeId != null && typeId != ElementId.InvalidElementId)
+                    typeName = (element.Document?.GetElement(typeId) as ElementType)?.Name;
+            }
+            catch
+            {
+            }
+
+            return IsAxisLineText(element.Category?.Name)
+                || IsAxisLineText(element.Name)
+                || IsAxisLineText(typeName);
+        }
+
+        private static bool IsAxisLineSnapshot(ElementSnapshot snapshot)
+        {
+            return snapshot != null
+                && (IsAxisLineText(snapshot.Category)
+                    || IsAxisLineText(snapshot.Name)
+                    || IsAxisLineText(snapshot.Family)
+                    || IsAxisLineText(snapshot.TypeName));
+        }
+
+        private static bool IsAxisLineText(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return false;
+            var value = text.Trim();
+            var hasAxisWord = value.IndexOf("axe", StringComparison.OrdinalIgnoreCase) >= 0
+                || value.IndexOf("axis", StringComparison.OrdinalIgnoreCase) >= 0
+                || value.IndexOf("center", StringComparison.OrdinalIgnoreCase) >= 0
+                || value.IndexOf("centre", StringComparison.OrdinalIgnoreCase) >= 0;
+            var hasLineWord = value.IndexOf("ligne", StringComparison.OrdinalIgnoreCase) >= 0
+                || value.IndexOf("line", StringComparison.OrdinalIgnoreCase) >= 0;
+
+            return (hasAxisWord && hasLineWord)
+                || value.Equals("Axe", StringComparison.OrdinalIgnoreCase)
+                || value.Equals("Axes", StringComparison.OrdinalIgnoreCase)
+                || value.Equals("Axis", StringComparison.OrdinalIgnoreCase)
+                || value.Equals("Line", StringComparison.OrdinalIgnoreCase)
+                || value.Equals("Lines", StringComparison.OrdinalIgnoreCase)
+                || value.Equals("Ligne", StringComparison.OrdinalIgnoreCase)
+                || value.Equals("Lignes", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool IsBIMaestroPreviewElement(Element element)
@@ -1676,8 +1732,7 @@ namespace Analyse
                 || name.Equals("Line Styles", StringComparison.OrdinalIgnoreCase)
                 || name.Equals("Project Information", StringComparison.OrdinalIgnoreCase)
                 || name.Equals("RVT Links", StringComparison.OrdinalIgnoreCase)
-                || name.Equals("CAD Links", StringComparison.OrdinalIgnoreCase)
-                || IsInsulationCategoryName(name);
+                || name.Equals("CAD Links", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool IsInsulationCategoryName(string categoryName)
