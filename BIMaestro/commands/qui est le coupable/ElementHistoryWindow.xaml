@@ -246,6 +246,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <WrapPanel Grid.Row="0" VerticalAlignment="Center">
                     <TextBlock Text="Action" Style="{StaticResource FilterLabel}"/>
@@ -259,7 +260,27 @@
                     <Button x:Name="LoadDayButton" Content="Charger jour" Width="115" Style="{StaticResource HistoryButton}" Click="LoadDayButton_Click"/>
                     <TextBlock x:Name="ResultText" VerticalAlignment="Center" Foreground="{DynamicResource Text.Secondary}" Text="0 / 0 évènements affichés"/>
                 </WrapPanel>
-                <WrapPanel x:Name="ContextScopePanel" Grid.Row="1" Margin="0,8,0,0" Visibility="Collapsed">
+                <WrapPanel x:Name="DeletedMeshModePanel" Grid.Row="1" Margin="0,8,0,0">
+                    <TextBlock Text="Maillage suppression"
+                               Style="{StaticResource FilterLabel}"
+                               VerticalAlignment="Center"
+                               Margin="0,0,8,6"/>
+                    <RadioButton x:Name="SimpleMeshModeRadio"
+                                 Content="Simple"
+                                 GroupName="DeletedMeshMode"
+                                 Tag="simple"
+                                 Style="{StaticResource ScopeRadioStyle}"
+                                 ToolTip="Aperçu suppression rapide avec boîte estimative"
+                                 Checked="DeletedMeshMode_Checked"/>
+                    <RadioButton x:Name="DetailedMeshModeRadio"
+                                 Content="Détaillé"
+                                 GroupName="DeletedMeshMode"
+                                 Tag="detailed"
+                                 Style="{StaticResource ScopeRadioStyle}"
+                                 ToolTip="Capture le maillage réel des suppressions futures"
+                                 Checked="DeletedMeshMode_Checked"/>
+                </WrapPanel>
+                <WrapPanel x:Name="ContextScopePanel" Grid.Row="2" Margin="0,8,0,0" Visibility="Collapsed">
                     <TextBlock x:Name="ContextScopeText"
                                VerticalAlignment="Center"
                                Foreground="{DynamicResource Text.Secondary}"
@@ -291,7 +312,7 @@
                                  Style="{StaticResource ScopeRadioStyle}"
                                  Checked="ScopeFilter_Checked"/>
                 </WrapPanel>
-                <WrapPanel Grid.Row="2" Margin="0,8,0,0">
+                <WrapPanel Grid.Row="3" Margin="0,8,0,0">
                     <Button x:Name="VisualizeDeletedButton" Content="Visualiser" Width="185" Style="{StaticResource HistoryPrimaryButton}" Click="VisualizeDeletedButton_Click"/>
                     <Button x:Name="FocusButton" Content="Focus" Width="88" Style="{StaticResource HistoryButton}" Click="FocusButton_Click"/>
                     <Button x:Name="DetailsButton" Content="Détails" Width="96" Style="{StaticResource HistoryButton}" Click="DetailsButton_Click"/>

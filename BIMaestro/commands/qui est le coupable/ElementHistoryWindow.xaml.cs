@@ -22,8 +22,8 @@ namespace Analyse
         private const string MoveOldPreviewPrefix = PreviewPrefix + "MoveOld_";
         private const string MoveNewPreviewPrefix = PreviewPrefix + "MoveNew_";
         private const string MoveArrowPreviewPrefix = PreviewPrefix + "MoveArrow_";
-        private const int MaxVisibleHistoryEvents = 1000;
-        private const int MaxLoadedHistoryEvents = 1000;
+        private const int MaxVisibleHistoryEvents = 2000;
+        private const int MaxLoadedHistoryEvents = 2000;
 
         private sealed class RowVm
         {
@@ -109,7 +109,7 @@ namespace Analyse
             public bool HasSelection => ElementId > 0 || !string.IsNullOrWhiteSpace(ElementUniqueId);
         }
 
-        private enum UiRequestType { None, Focus, VisualizeEvents, CleanPreviews, RestoreParameters }
+        private enum UiRequestType { None, Focus, VisualizeEvents, CleanPreviews, RestoreParameters, CaptureSelectedDetails }
 
         private sealed class UiRequest
         {
@@ -164,6 +164,12 @@ namespace Analyse
                         return;
                     }
 
+                    if (req.Type == UiRequestType.CaptureSelectedDetails)
+                    {
+                        _owner.ExecuteCaptureSelectedDetails();
+                        return;
+                    }
+
                     if (req.Type == UiRequestType.RestoreParameters)
                     {
                         var result = _owner.ExecuteRestoreParameters(req.Event);
@@ -207,6 +213,7 @@ namespace Analyse
             _requestHandler = new UiRequestHandler(this);
             _externalEvent = ExternalEvent.Create(_requestHandler);
             ConfigureScopePanel();
+            ConfigureDeletedMeshMode();
             if (HistoryDayPicker != null)
                 HistoryDayPicker.SelectedDate = DateTime.Today;
 
@@ -217,7 +224,7 @@ namespace Analyse
                 if (initialEvents != null)
                     Bind(initialEvents, defaultAction);
                 else
-                    BeginProgressiveLoad(ElementHistoryTracker.GetDocumentKeyForHistory(_doc), _initialUniqueIds, null);
+                    BeginProgressiveLoad(ElementHistoryTracker.GetDocumentKeysForHistory(_doc), _initialUniqueIds, null);
             }
             else
             {
@@ -226,16 +233,16 @@ namespace Analyse
                 if (initialEvents != null)
                     Bind(initialEvents, defaultAction);
                 else
-                    BeginProgressiveLoad(ElementHistoryTracker.GetDocumentKeyForHistory(_doc), null, null);
+                    BeginProgressiveLoad(ElementHistoryTracker.GetDocumentKeysForHistory(_doc), null, null);
             }
         }
 
         internal static List<ElementHistoryEvent> LoadInitialHistory(Document doc, Element selected, out string defaultAction)
         {
             defaultAction = null;
-            var modelKey = ElementHistoryTracker.GetDocumentKeyForHistory(doc);
+            var modelKeys = ElementHistoryTracker.GetDocumentKeysForHistory(doc);
             var uniqueIds = selected == null ? null : GetSelectedHistoryUniqueIds(doc, selected);
-            return LoadWindowHistory(modelKey, uniqueIds, MaxLoadedHistoryEvents);
+            return LoadWindowHistory(modelKeys, uniqueIds, MaxLoadedHistoryEvents);
         }
 
         private void HelpButton_Click(object sender, RoutedEventArgs e)
@@ -257,7 +264,7 @@ namespace Analyse
             base.OnClosed(e);
         }
 
-        private void BeginProgressiveLoad(string modelKey, List<string> uniqueIds, string defaultAction)
+        private void BeginProgressiveLoad(List<string> modelKeys, List<string> uniqueIds, string defaultAction)
         {
             var version = ++_loadVersion;
             Bind(new List<ElementHistoryEvent>(), defaultAction, false, false);
@@ -267,7 +274,7 @@ namespace Analyse
             {
                 try
                 {
-                    var events = LoadWindowHistory(modelKey, uniqueIds, MaxLoadedHistoryEvents);
+                    var events = LoadWindowHistory(modelKeys, uniqueIds, MaxLoadedHistoryEvents);
                     Dispatcher.BeginInvoke(new Action(() =>
                     {
                         if (version != _loadVersion) return;
@@ -286,7 +293,7 @@ namespace Analyse
             });
         }
 
-        private static List<ElementHistoryEvent> LoadWindowHistory(string modelKey, List<string> uniqueIds, int take)
+        private static List<ElementHistoryEvent> LoadWindowHistory(List<string> modelKeys, List<string> uniqueIds, int take)
         {
             var ids = (uniqueIds ?? new List<string>())
                 .Where(x => !string.IsNullOrWhiteSpace(x))
@@ -296,12 +303,12 @@ namespace Analyse
             if (ids.Count > 0)
             {
                 var perElement = ids
-                    .SelectMany(id => ElementHistoryTracker.LoadElementHistory(modelKey, id, take))
+                    .SelectMany(id => ElementHistoryTracker.LoadElementHistory(modelKeys, id, take))
                     .GroupBy(ev => BuildHistoryEventKey(ev), StringComparer.OrdinalIgnoreCase)
                     .Select(g => g.OrderByDescending(ev => ev.Ts).First())
                     .ToList();
 
-                var modelEvents = ElementHistoryTracker.LoadRecentModelHistory(modelKey, take);
+                var modelEvents = ElementHistoryTracker.LoadRecentModelHistory(modelKeys, take);
                 return perElement
                     .Concat(modelEvents)
                     .GroupBy(ev => BuildHistoryEventKey(ev), StringComparer.OrdinalIgnoreCase)
@@ -311,12 +318,12 @@ namespace Analyse
                     .ToList();
             }
 
-            return ElementHistoryTracker.LoadRecentModelHistory(modelKey, take);
+            return ElementHistoryTracker.LoadRecentModelHistory(modelKeys, take);
         }
 
         private void BeginDayLoad(DateTime localDate)
         {
-            var modelKey = ElementHistoryTracker.GetDocumentKeyForHistory(_doc);
+            var modelKeys = ElementHistoryTracker.GetDocumentKeysForHistory(_doc);
             var version = ++_loadVersion;
             Bind(new List<ElementHistoryEvent>(), null, false, true);
             ResultText.Text = "Chargement complet du " + localDate.Date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) + "...";
@@ -328,7 +335,7 @@ namespace Analyse
             {
                 try
                 {
-                    var events = ElementHistoryTracker.LoadModelHistoryForLocalDate(modelKey, localDate.Date);
+                    var events = ElementHistoryTracker.LoadModelHistoryForLocalDate(modelKeys, localDate.Date);
                     Dispatcher.BeginInvoke(new Action(() =>
                     {
                         if (version != _loadVersion) return;
@@ -1429,12 +1436,33 @@ namespace Analyse
                 ScopeElementRadio.IsChecked = true;
         }
 
+        private void ConfigureDeletedMeshMode()
+        {
+            var detailed = ElementHistoryTracker.CaptureDetailedDeletedMesh;
+            if (SimpleMeshModeRadio != null)
+                SimpleMeshModeRadio.IsChecked = !detailed;
+            if (DetailedMeshModeRadio != null)
+                DetailedMeshModeRadio.IsChecked = detailed;
+        }
+
         private void ScopeFilter_Checked(object sender, RoutedEventArgs e)
         {
             var tag = (sender as RadioButton)?.Tag as string;
             _scopeFilter = string.IsNullOrWhiteSpace(tag) ? "model" : tag;
             if (!AreFilterControlsReady()) return;
             ApplyFilters();
+        }
+
+        private void DeletedMeshMode_Checked(object sender, RoutedEventArgs e)
+        {
+            var tag = (sender as RadioButton)?.Tag as string;
+            if (string.IsNullOrWhiteSpace(tag)) return;
+
+            var detailed = string.Equals(tag, "detailed", StringComparison.OrdinalIgnoreCase);
+            ElementHistoryTracker.CaptureDetailedDeletedMesh = detailed;
+
+            if (detailed)
+                RaiseRequest(new UiRequest { Type = UiRequestType.CaptureSelectedDetails });
         }
 
         private void LoadDayButton_Click(object sender, RoutedEventArgs e)
@@ -2462,6 +2490,19 @@ namespace Analyse
             }
         }
 
+        private void ExecuteCaptureSelectedDetails()
+        {
+            try
+            {
+                var ids = _uidoc?.Selection?.GetElementIds();
+                if (ids == null || ids.Count == 0) return;
+                ElementHistoryTracker.CaptureSelectedElementDetails(_doc, ids);
+            }
+            catch
+            {
+            }
+        }
+
         private void CreateDeletedPreview(ElementHistoryEvent ev)
         {
             var geoms = BuildDeletedPreviewGeometry(ev);
@@ -2578,29 +2619,32 @@ namespace Analyse
             var list = new List<GeometryObject>();
             if (ev?.Delta == null) return list;
 
-            if (ev.Delta.TryGetValue("ghostMesh", out var meshObj))
+            if (ElementHistoryTracker.CaptureDetailedDeletedMesh)
             {
-                var mesh = BuildGhostMeshGeometry(meshObj);
-                if (mesh.Count > 0)
-                    return mesh;
-            }
-
-            if (ev.Delta.TryGetValue("ghostFaces", out var ghostObj))
-            {
-                var ghost = BuildGhostGeometry(ghostObj);
-                if (ghost.Count > 0)
-                    return ghost;
-            }
-
-            if (ev.Delta.TryGetValue("obbCorners", out var arrObj)
-                && arrObj is JArray arr && arr.Count == 8)
-            {
-                var pts = arr.Select(x => ReadPoint(x)).ToList();
-                if (pts.All(x => x != null))
+                if (ev.Delta.TryGetValue("ghostMesh", out var meshObj))
                 {
-                    var obbGeometry = BuildBoxGeometryFromCorners(pts);
-                    if (obbGeometry.Count > 0)
-                        return obbGeometry;
+                    var mesh = BuildGhostMeshGeometry(meshObj);
+                    if (mesh.Count > 0)
+                        return mesh;
+                }
+
+                if (ev.Delta.TryGetValue("ghostFaces", out var ghostObj))
+                {
+                    var ghost = BuildGhostGeometry(ghostObj);
+                    if (ghost.Count > 0)
+                        return ghost;
+                }
+
+                if (ev.Delta.TryGetValue("obbCorners", out var arrObj)
+                    && arrObj is JArray arr && arr.Count == 8)
+                {
+                    var pts = arr.Select(x => ReadPoint(x)).ToList();
+                    if (pts.All(x => x != null))
+                    {
+                        var obbGeometry = BuildBoxGeometryFromCorners(pts);
+                        if (obbGeometry.Count > 0)
+                            return obbGeometry;
+                    }
                 }
             }
 

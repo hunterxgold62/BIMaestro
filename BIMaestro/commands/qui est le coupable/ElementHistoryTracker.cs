@@ -205,6 +205,12 @@ namespace Analyse
             public bool ElementIdsLoaded { get; set; }
         }
 
+        private sealed class HistoryModelScope
+        {
+            public HashSet<string> Keys { get; set; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            public HashSet<string> Names { get; set; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        }
+
         private static readonly ConcurrentQueue<ElementHistoryEvent> Queue = new ConcurrentQueue<ElementHistoryEvent>();
         private static readonly ConcurrentDictionary<string, string> ThumbnailPathCache =
             new ConcurrentDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -225,9 +231,9 @@ namespace Analyse
         private static CancellationTokenSource _cts;
         private static Task _worker;
         private const double MinMoveFeet = 0.00656168; // ~2 mm
-        private const int DefaultElementHistoryTake = 1000;
-        private const int DefaultModelHistoryTake = 1000;
-        private const int DefaultDeletedHistoryTake = 1000;
+        private const int DefaultElementHistoryTake = 2000;
+        private const int DefaultModelHistoryTake = 2000;
+        private const int DefaultDeletedHistoryTake = 2000;
         private const int MaxIndexedImageFiles = 12000;
         private const int MaxGhostPreviewFaces = 2400;
         private const int MaxGhostPreviewVertices = 3600;
@@ -237,6 +243,7 @@ namespace Analyse
         private const int SelectionDetailedGeometryTimeoutMs = 500;
         private static readonly TimeSpan DeferredPrimeDelay = TimeSpan.FromSeconds(8);
         private const bool IncludeAnnotationCategoriesForFuture = false;
+        private static volatile bool _captureDetailedDeletedMesh;
         private static readonly string[] ImageExtensions = { ".png", ".jpg", ".jpeg", ".bmp" };
         private static readonly string[] IgnoredTransactionFragments =
         {
@@ -255,6 +262,12 @@ namespace Analyse
                 _cts = new CancellationTokenSource();
                 _worker = Task.Run(() => WorkerLoop(_cts.Token));
             }
+        }
+
+        internal static bool CaptureDetailedDeletedMesh
+        {
+            get { return _captureDetailedDeletedMesh; }
+            set { _captureDetailedDeletedMesh = value; }
         }
 
         public static void Stop()
@@ -420,17 +433,20 @@ namespace Analyse
                     if (element == null) continue;
                     var keepSimpleOnly = ShouldKeepSelectionSnapshotSimple(element);
                     if (ShouldIgnoreElement(element) && !keepSimpleOnly) continue;
-                    if (HasDetailCaptureAttempted(doc, id)) continue;
+
+                    if (CaptureDetailedDeletedMesh && !keepSimpleOnly && HasDetailCaptureAttempted(doc, id)) continue;
 
                     var quickSnapshot = BuildSnapshot(element, includeOrientedCorners: false);
                     StoreSnapshot(doc, id, quickSnapshot);
 
-                    if (keepSimpleOnly)
+                    if (!CaptureDetailedDeletedMesh || keepSimpleOnly)
                     {
-                        quickSnapshot.DetailCaptureAttempted = true;
+                        quickSnapshot.DetailCaptureAttempted = keepSimpleOnly;
                         StoreSnapshot(doc, id, quickSnapshot);
                         continue;
                     }
+
+                    if (HasDetailCaptureAttempted(doc, id)) continue;
 
                     var snapshot = BuildSnapshot(
                         element,
@@ -493,31 +509,46 @@ namespace Analyse
         {
             var uniqueId = element?.UniqueId;
             if (string.IsNullOrWhiteSpace(uniqueId)) return new List<ElementHistoryEvent>();
-            var key = GetDocumentKey(doc);
-            return LoadElementHistory(key, uniqueId, DefaultElementHistoryTake);
+            return LoadMatchingHistory(GetDocumentKeysForHistory(doc), uniqueId, null, DefaultElementHistoryTake);
         }
 
         internal static List<ElementHistoryEvent> LoadElementHistory(string modelKey, string uniqueId, int take)
         {
             if (string.IsNullOrWhiteSpace(uniqueId)) return new List<ElementHistoryEvent>();
-            return LoadMatchingHistory(modelKey, uniqueId, null, take);
+            return LoadMatchingHistory(new[] { modelKey }, uniqueId, null, take);
+        }
+
+        internal static List<ElementHistoryEvent> LoadElementHistory(IEnumerable<string> modelKeys, string uniqueId, int take)
+        {
+            if (string.IsNullOrWhiteSpace(uniqueId)) return new List<ElementHistoryEvent>();
+            return LoadMatchingHistory(modelKeys, uniqueId, null, take);
         }
 
 
         public static List<ElementHistoryEvent> LoadRecentModelHistory(Document doc, int take = DefaultModelHistoryTake)
         {
-            var key = GetDocumentKey(doc);
-            return LoadRecentModelHistory(key, take);
+            return LoadMatchingHistory(GetDocumentKeysForHistory(doc), null, null, take);
         }
 
         internal static List<ElementHistoryEvent> LoadRecentModelHistory(string modelKey, int take = DefaultModelHistoryTake)
         {
-            return LoadMatchingHistory(modelKey, null, null, take);
+            return LoadMatchingHistory(new[] { modelKey }, null, null, take);
+        }
+
+        internal static List<ElementHistoryEvent> LoadRecentModelHistory(IEnumerable<string> modelKeys, int take = DefaultModelHistoryTake)
+        {
+            return LoadMatchingHistory(modelKeys, null, null, take);
         }
 
         internal static List<ElementHistoryEvent> LoadModelHistoryForLocalDate(string modelKey, DateTime localDate)
         {
-            if (string.IsNullOrWhiteSpace(modelKey))
+            return LoadModelHistoryForLocalDate(new[] { modelKey }, localDate);
+        }
+
+        internal static List<ElementHistoryEvent> LoadModelHistoryForLocalDate(IEnumerable<string> modelKeys, DateTime localDate)
+        {
+            var scope = BuildHistoryModelScope(modelKeys);
+            if (scope.Keys.Count == 0 && scope.Names.Count == 0)
                 return new List<ElementHistoryEvent>();
 
             var day = localDate.Date;
@@ -539,7 +570,7 @@ namespace Analyse
                     try
                     {
                         var ev = JsonConvert.DeserializeObject<ElementHistoryEvent>(line);
-                        if (!MatchesHistoryFilter(ev, modelKey, null, null)) continue;
+                        if (!MatchesHistoryFilter(ev, scope, null, null)) continue;
 
                         var localTs = ev.Ts.ToLocalTime();
                         if (localTs < startLocal || localTs >= endLocal) continue;
@@ -559,8 +590,7 @@ namespace Analyse
 
         public static List<ElementHistoryEvent> LoadRecentDeletedHistory(Document doc)
         {
-            var key = GetDocumentKey(doc);
-            return LoadMatchingHistory(key, null, "delete", DefaultDeletedHistoryTake);
+            return LoadMatchingHistory(GetDocumentKeysForHistory(doc), null, "delete", DefaultDeletedHistoryTake);
         }
 
         internal static bool IsDisplayableHistoryEvent(ElementHistoryEvent ev)
@@ -593,7 +623,13 @@ namespace Analyse
 
         private static List<ElementHistoryEvent> LoadMatchingHistory(string modelKey, string uniqueId, string action, int take)
         {
-            if (string.IsNullOrWhiteSpace(modelKey))
+            return LoadMatchingHistory(new[] { modelKey }, uniqueId, action, take);
+        }
+
+        private static List<ElementHistoryEvent> LoadMatchingHistory(IEnumerable<string> modelKeys, string uniqueId, string action, int take)
+        {
+            var scope = BuildHistoryModelScope(modelKeys);
+            if (scope.Keys.Count == 0 && scope.Names.Count == 0)
                 return new List<ElementHistoryEvent>();
 
             var limit = Math.Max(1, take);
@@ -609,7 +645,7 @@ namespace Analyse
                     try
                     {
                         var ev = JsonConvert.DeserializeObject<ElementHistoryEvent>(line);
-                        if (!MatchesHistoryFilter(ev, modelKey, uniqueId, action)) continue;
+                        if (!MatchesHistoryFilter(ev, scope, uniqueId, action)) continue;
                         fileMatches.Add(ev);
                     }
                     catch { }
@@ -629,9 +665,13 @@ namespace Analyse
 
         private static bool MatchesHistoryFilter(ElementHistoryEvent ev, string modelKey, string uniqueId, string action)
         {
+            return MatchesHistoryFilter(ev, BuildHistoryModelScope(new[] { modelKey }), uniqueId, action);
+        }
+
+        private static bool MatchesHistoryFilter(ElementHistoryEvent ev, HistoryModelScope scope, string uniqueId, string action)
+        {
             if (ev == null) return false;
-            if (!string.IsNullOrWhiteSpace(modelKey)
-                && !string.Equals(ev.ModelKey ?? string.Empty, modelKey, StringComparison.OrdinalIgnoreCase))
+            if (scope != null && (scope.Keys.Count > 0 || scope.Names.Count > 0) && !MatchesHistoryModelScope(ev.ModelKey, scope))
                 return false;
             if (!string.IsNullOrWhiteSpace(uniqueId)
                 && !string.Equals(ev.UniqueId ?? string.Empty, uniqueId, StringComparison.OrdinalIgnoreCase))
@@ -640,6 +680,85 @@ namespace Analyse
                 && !string.Equals(ev.Action ?? string.Empty, action, StringComparison.OrdinalIgnoreCase))
                 return false;
             return true;
+        }
+
+        private static HistoryModelScope BuildHistoryModelScope(IEnumerable<string> modelKeys)
+        {
+            var scope = new HistoryModelScope();
+            foreach (var key in modelKeys ?? Enumerable.Empty<string>())
+            {
+                AddHistoryModelKey(scope, key);
+            }
+            return scope;
+        }
+
+        private static void AddHistoryModelKey(HistoryModelScope scope, string key)
+        {
+            if (scope == null || string.IsNullOrWhiteSpace(key)) return;
+            var trimmed = key.Trim();
+            if (trimmed.Length == 0) return;
+
+            scope.Keys.Add(trimmed);
+            foreach (var name in GetHistoryModelNames(trimmed))
+                scope.Names.Add(name);
+        }
+
+        private static bool MatchesHistoryModelScope(string eventModelKey, HistoryModelScope scope)
+        {
+            if (scope == null) return true;
+            if (string.IsNullOrWhiteSpace(eventModelKey)) return false;
+
+            var key = eventModelKey.Trim();
+            if (scope.Keys.Contains(key)) return true;
+
+            foreach (var name in GetHistoryModelNames(key))
+            {
+                if (scope.Names.Contains(name))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static IEnumerable<string> GetHistoryModelNames(string modelKey)
+        {
+            if (string.IsNullOrWhiteSpace(modelKey)) yield break;
+
+            foreach (var value in GetHistoryModelNameCandidates(modelKey))
+            {
+                var normalized = NormalizeImageKey(value);
+                if (IsUsefulHistoryModelName(normalized))
+                    yield return normalized;
+            }
+        }
+
+        private static IEnumerable<string> GetHistoryModelNameCandidates(string modelKey)
+        {
+            var value = (modelKey ?? string.Empty).Trim();
+            if (value.Length == 0) yield break;
+
+            yield return value;
+
+            var unsavedParts = value.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
+            if (unsavedParts.Length > 0)
+                yield return unsavedParts[unsavedParts.Length - 1];
+
+            string fileName = null;
+            try { fileName = Path.GetFileNameWithoutExtension(value); }
+            catch { }
+
+            if (!string.IsNullOrWhiteSpace(fileName))
+                yield return fileName;
+        }
+
+        private static bool IsUsefulHistoryModelName(string normalizedName)
+        {
+            if (string.IsNullOrWhiteSpace(normalizedName)) return false;
+            var value = normalizedName.Trim();
+            return value.Length >= 3
+                && !value.Equals("unsaved", StringComparison.OrdinalIgnoreCase)
+                && !value.Equals("projet sans nom", StringComparison.OrdinalIgnoreCase)
+                && !value.Equals("project", StringComparison.OrdinalIgnoreCase);
         }
 
         private static string BuildHistoryEventIdentity(ElementHistoryEvent ev)
@@ -723,7 +842,7 @@ namespace Analyse
             if (!isCreate && !(el is FamilySymbol))
                 relatedTypeParameterDelta = CaptureRelatedFamilyTypeParameterDelta(doc, el);
 
-            var current = BuildSnapshot(el, includeOrientedCorners: true);
+            var current = BuildSnapshot(el, includeOrientedCorners: CaptureDetailedDeletedMesh);
             ElementSnapshot previous;
             lock (SnapshotByElementId)
             {
@@ -1560,14 +1679,15 @@ namespace Analyse
         {
             if (snapshot == null) return null;
 
+            var includeDetailedMesh = CaptureDetailedDeletedMesh;
             var delta = new Dictionary<string, object>
             {
                 ["deletedUniqueId"] = snapshot.UniqueId,
                 ["lastKnown"] = snapshot.Location == null ? null : new { x = snapshot.Location.X, y = snapshot.Location.Y, z = snapshot.Location.Z },
                 ["bboxMin"] = snapshot.BBoxMin == null ? null : new { x = snapshot.BBoxMin.X, y = snapshot.BBoxMin.Y, z = snapshot.BBoxMin.Z },
                 ["bboxMax"] = snapshot.BBoxMax == null ? null : new { x = snapshot.BBoxMax.X, y = snapshot.BBoxMax.Y, z = snapshot.BBoxMax.Z },
-                ["obbCorners"] = snapshot.ObbCorners == null ? null : snapshot.ObbCorners.Select(pt => new { x = pt.X, y = pt.Y, z = pt.Z }).ToArray(),
-                ["ghostMesh"] = snapshot.GhostMesh == null ? null : new
+                ["obbCorners"] = !includeDetailedMesh || snapshot.ObbCorners == null ? null : snapshot.ObbCorners.Select(pt => new { x = pt.X, y = pt.Y, z = pt.Z }).ToArray(),
+                ["ghostMesh"] = !includeDetailedMesh || snapshot.GhostMesh == null ? null : new
                 {
                     vertices = snapshot.GhostMesh.Vertices,
                     faces = snapshot.GhostMesh.Faces
@@ -2179,6 +2299,47 @@ namespace Analyse
         internal static string GetDocumentKeyForHistory(Document doc)
         {
             return GetDocumentKey(doc);
+        }
+
+        internal static List<string> GetDocumentKeysForHistory(Document doc)
+        {
+            var keys = new List<string>();
+            if (doc == null) return keys;
+
+            AddDocumentKeyCandidate(keys, GetDocumentKey(doc));
+
+            try
+            {
+                if (doc.IsWorkshared)
+                {
+                    var mp = doc.GetWorksharingCentralModelPath();
+                    if (mp != null)
+                        AddDocumentKeyCandidate(keys, ModelPathUtils.ConvertModelPathToUserVisiblePath(mp));
+                }
+            }
+            catch
+            {
+            }
+
+            try { AddDocumentKeyCandidate(keys, doc.PathName); }
+            catch { }
+
+            try { AddDocumentKeyCandidate(keys, doc.Title); }
+            catch { }
+
+            return keys
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private static void AddDocumentKeyCandidate(List<string> keys, string value)
+        {
+            if (keys == null || string.IsNullOrWhiteSpace(value)) return;
+            var key = value.Trim();
+            if (key.Length == 0) return;
+            if (!keys.Any(x => string.Equals(x, key, StringComparison.OrdinalIgnoreCase)))
+                keys.Add(key);
         }
 
         private static DateTime GetHistoryFileSortDate(string path)
