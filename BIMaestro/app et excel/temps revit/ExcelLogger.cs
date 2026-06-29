@@ -42,6 +42,9 @@ public static class ExcelLogger
     private static readonly string SnapshotPath =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "TimeSnapshots.dat");
 
+    private static readonly string SnapshotTempDirectory =
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BIMaestro", "RevitLogs", "Temp");
+
     public static void Initialize()
     {
         try
@@ -53,6 +56,8 @@ public static class ExcelLogger
             {
                 if (!Directory.Exists(LogDirectory))
                     Directory.CreateDirectory(LogDirectory);
+
+                CleanupSnapshotTempFilesCore();
 
                 _excelFilePath = Path.Combine(LogDirectory, "Historique_Temps_Revit.xlsx");
                 if (!File.Exists(_excelFilePath)) CreateExcelFileCore();
@@ -972,6 +977,8 @@ public static class ExcelLogger
 
     private static void SaveSnapshotsCore(Dictionary<string, Snapshot> map)
     {
+        string tempPath = null;
+
         try
         {
             if (map == null || map.Count == 0)
@@ -983,7 +990,12 @@ public static class ExcelLogger
             if (!Directory.Exists(LogDirectory))
                 Directory.CreateDirectory(LogDirectory);
 
-            string tempPath = SnapshotPath + "." + CurrentProcessId.ToString(CultureInfo.InvariantCulture) + ".tmp";
+            if (!Directory.Exists(SnapshotTempDirectory))
+                Directory.CreateDirectory(SnapshotTempDirectory);
+
+            tempPath = Path.Combine(
+                SnapshotTempDirectory,
+                "TimeSnapshots.dat." + CurrentProcessId.ToString(CultureInfo.InvariantCulture) + "." + Guid.NewGuid().ToString("N") + ".tmp");
 
             using (var sw = new StreamWriter(tempPath, false, Encoding.UTF8))
             {
@@ -1016,12 +1028,16 @@ public static class ExcelLogger
                 }
             }
 
-            File.Copy(tempPath, SnapshotPath, true);
-            File.Delete(tempPath);
+            CopyFileWithRetry(tempPath, SnapshotPath, true);
 
             try { File.SetAttributes(SnapshotPath, FileAttributes.Hidden); } catch { }
         }
         catch { }
+        finally
+        {
+            TryDeleteFileWithRetry(tempPath);
+            CleanupSnapshotTempFilesCore();
+        }
     }
 
     private static string BuildSnapshotStorageKey(string docKey, int processId)
@@ -1082,7 +1098,80 @@ public static class ExcelLogger
 
     private static void TryDeleteSnapshotFileCore()
     {
-        try { if (File.Exists(SnapshotPath)) File.Delete(SnapshotPath); } catch { }
+        TryDeleteFileWithRetry(SnapshotPath);
+    }
+
+    private static void CleanupSnapshotTempFilesCore()
+    {
+        try
+        {
+            if (Directory.Exists(LogDirectory))
+            {
+                foreach (var file in Directory.GetFiles(LogDirectory, "TimeSnapshots.dat.*.tmp"))
+                    TryDeleteFileWithRetry(file);
+            }
+
+            if (Directory.Exists(SnapshotTempDirectory))
+            {
+                foreach (var file in Directory.GetFiles(SnapshotTempDirectory, "TimeSnapshots.dat.*.tmp"))
+                    TryDeleteFileWithRetry(file);
+            }
+        }
+        catch { }
+    }
+
+    private static void CopyFileWithRetry(string sourcePath, string destinationPath, bool overwrite)
+    {
+        const int attempts = 6;
+
+        for (int i = 0; i < attempts; i++)
+        {
+            try
+            {
+                File.Copy(sourcePath, destinationPath, overwrite);
+                return;
+            }
+            catch (IOException) when (i < attempts - 1)
+            {
+                Thread.Sleep(150);
+            }
+            catch (UnauthorizedAccessException) when (i < attempts - 1)
+            {
+                Thread.Sleep(150);
+            }
+        }
+
+        File.Copy(sourcePath, destinationPath, overwrite);
+    }
+
+    private static void TryDeleteFileWithRetry(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return;
+
+        const int attempts = 6;
+
+        for (int i = 0; i < attempts; i++)
+        {
+            try
+            {
+                if (!File.Exists(path)) return;
+                File.SetAttributes(path, FileAttributes.Normal);
+                File.Delete(path);
+                return;
+            }
+            catch (IOException) when (i < attempts - 1)
+            {
+                Thread.Sleep(150);
+            }
+            catch (UnauthorizedAccessException) when (i < attempts - 1)
+            {
+                Thread.Sleep(150);
+            }
+            catch
+            {
+                return;
+            }
+        }
     }
 
     private static void WithStorageLock(Action action)

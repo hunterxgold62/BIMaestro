@@ -243,7 +243,13 @@ namespace Analyse
         private const int SelectionDetailedGeometryTimeoutMs = 500;
         private static readonly TimeSpan DeferredPrimeDelay = TimeSpan.FromSeconds(8);
         private const bool IncludeAnnotationCategoriesForFuture = false;
-        private static volatile bool _captureDetailedDeletedMesh;
+        private const bool DefaultCaptureDetailedDeletedMesh = false;
+        private static volatile bool _captureDetailedDeletedMesh = DefaultCaptureDetailedDeletedMesh;
+        private static readonly string DeletedMeshModePreferencePath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+            "RevitLogs",
+            "SauvegardePréférence",
+            "ElementHistoryDeletedMeshMode.json");
         private static readonly string[] ImageExtensions = { ".png", ".jpg", ".jpeg", ".bmp" };
         private static readonly string[] IgnoredTransactionFragments =
         {
@@ -256,6 +262,7 @@ namespace Analyse
 
         public static void Start()
         {
+            LoadDeletedMeshModePreference();
             lock (StartSync)
             {
                 if (_worker != null) return;
@@ -267,7 +274,52 @@ namespace Analyse
         internal static bool CaptureDetailedDeletedMesh
         {
             get { return _captureDetailedDeletedMesh; }
-            set { _captureDetailedDeletedMesh = value; }
+            set
+            {
+                _captureDetailedDeletedMesh = value;
+                SaveDeletedMeshModePreference(value);
+            }
+        }
+
+        private static void LoadDeletedMeshModePreference()
+        {
+            try
+            {
+                if (!File.Exists(DeletedMeshModePreferencePath))
+                {
+                    _captureDetailedDeletedMesh = DefaultCaptureDetailedDeletedMesh;
+                    return;
+                }
+
+                var json = File.ReadAllText(DeletedMeshModePreferencePath);
+                var pref = JsonConvert.DeserializeObject<DeletedMeshModePreference>(json);
+                _captureDetailedDeletedMesh = pref?.Detailed ?? DefaultCaptureDetailedDeletedMesh;
+            }
+            catch
+            {
+                _captureDetailedDeletedMesh = DefaultCaptureDetailedDeletedMesh;
+            }
+        }
+
+        private static void SaveDeletedMeshModePreference(bool detailed)
+        {
+            try
+            {
+                var dir = Path.GetDirectoryName(DeletedMeshModePreferencePath);
+                if (!string.IsNullOrWhiteSpace(dir))
+                    Directory.CreateDirectory(dir);
+
+                var json = JsonConvert.SerializeObject(new DeletedMeshModePreference { Detailed = detailed }, Formatting.Indented);
+                File.WriteAllText(DeletedMeshModePreferencePath, json, Encoding.UTF8);
+            }
+            catch
+            {
+            }
+        }
+
+        private sealed class DeletedMeshModePreference
+        {
+            public bool Detailed { get; set; }
         }
 
         public static void Stop()
@@ -597,6 +649,7 @@ namespace Analyse
         {
             if (ev == null) return false;
             if (IsLowValueParameterChange(ev)) return false;
+            if (IsNoisy3DViewEvent(ev)) return false;
             return IsUsefulHistoryText(ev.Category) && !IsIgnoredCategoryName(ev.Category);
         }
 
@@ -858,6 +911,12 @@ namespace Analyse
             }
 
             if (!isCreate && (suppressSecondaryModification || action == "modify_skip" || IsLowValueParameterChange(action, delta)))
+            {
+                StoreSnapshot(doc, id, current);
+                return;
+            }
+
+            if (!isCreate && IsNoisy3DViewChange(action, current, delta))
             {
                 StoreSnapshot(doc, id, current);
                 return;
@@ -1637,6 +1696,114 @@ namespace Analyse
             }
 
             return false;
+        }
+
+        private static bool IsNoisy3DViewEvent(ElementHistoryEvent ev)
+        {
+            if (ev == null) return false;
+            if (IsCameraCategoryName(ev.Category)) return true;
+            if (!Is3DViewText(ev.Category) && !Is3DViewText(ev.Family) && !Is3DViewText(ev.TypeName)) return false;
+
+            if (string.Equals(ev.Action, "move", StringComparison.OrdinalIgnoreCase)) return true;
+            return string.Equals(ev.Action, "param_change", StringComparison.OrdinalIgnoreCase)
+                   && IsNoisy3DViewParameterDelta(ev.Delta);
+        }
+
+        private static bool IsNoisy3DViewChange(string action, ElementSnapshot current, Dictionary<string, object> delta)
+        {
+            if (current == null) return false;
+            if (IsCameraCategoryName(current.Category)) return true;
+            if (!Is3DViewText(current.Category) && !Is3DViewText(current.Family) && !Is3DViewText(current.TypeName) && !Is3DViewText(current.Name)) return false;
+
+            if (string.Equals(action, "move", StringComparison.OrdinalIgnoreCase)) return true;
+            return string.Equals(action, "param_change", StringComparison.OrdinalIgnoreCase)
+                   && IsNoisy3DViewParameterDelta(delta);
+        }
+
+        private static bool IsNoisy3DViewParameterDelta(Dictionary<string, object> delta)
+        {
+            var names = ReadDeltaParameterNames(delta).ToList();
+            if (names.Count == 0) return false;
+
+            var hasCameraParameter = names.Any(Is3DViewCameraParameterName);
+            return hasCameraParameter
+                   && names.All(name => Is3DViewCameraParameterName(name) || Is3DViewSectionBoxParameterName(name));
+        }
+
+        private static IEnumerable<string> ReadDeltaParameterNames(Dictionary<string, object> delta)
+        {
+            if (delta == null || !delta.TryGetValue("parameters", out var value) || value == null) yield break;
+
+            if (value is JArray jArray)
+            {
+                foreach (var token in jArray)
+                {
+                    var name = token?["name"]?.ToString();
+                    if (!string.IsNullOrWhiteSpace(name)) yield return name;
+                }
+                yield break;
+            }
+
+            if (value is string) yield break;
+
+            if (value is System.Collections.IEnumerable enumerable)
+            {
+                foreach (var item in enumerable)
+                {
+                    if (item == null) continue;
+                    if (item is JObject jObject)
+                    {
+                        var name = jObject["name"]?.ToString();
+                        if (!string.IsNullOrWhiteSpace(name)) yield return name;
+                        continue;
+                    }
+
+                    var property = item.GetType().GetProperty("name") ?? item.GetType().GetProperty("Name");
+                    var propertyValue = property?.GetValue(item, null)?.ToString();
+                    if (!string.IsNullOrWhiteSpace(propertyValue)) yield return propertyValue;
+                }
+            }
+        }
+
+        private static bool IsCameraCategoryName(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return false;
+            return text.IndexOf("camera", StringComparison.OrdinalIgnoreCase) >= 0
+                   || text.IndexOf("caméra", StringComparison.OrdinalIgnoreCase) >= 0
+                   || text.IndexOf("caméras", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool Is3DViewText(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return false;
+            var value = text.Trim();
+            return value.IndexOf("vue 3d", StringComparison.OrdinalIgnoreCase) >= 0
+                   || value.IndexOf("3d view", StringComparison.OrdinalIgnoreCase) >= 0
+                   || value.IndexOf("{3d", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool Is3DViewCameraParameterName(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return false;
+            return text.IndexOf("élévation cible", StringComparison.OrdinalIgnoreCase) >= 0
+                   || text.IndexOf("elevation cible", StringComparison.OrdinalIgnoreCase) >= 0
+                   || text.IndexOf("target elevation", StringComparison.OrdinalIgnoreCase) >= 0
+                   || text.IndexOf("élévation de l'oeil", StringComparison.OrdinalIgnoreCase) >= 0
+                   || text.IndexOf("élévation de l'œil", StringComparison.OrdinalIgnoreCase) >= 0
+                   || text.IndexOf("elevation de l'oeil", StringComparison.OrdinalIgnoreCase) >= 0
+                   || text.IndexOf("eye elevation", StringComparison.OrdinalIgnoreCase) >= 0
+                   || text.IndexOf("camera", StringComparison.OrdinalIgnoreCase) >= 0
+                   || text.IndexOf("caméra", StringComparison.OrdinalIgnoreCase) >= 0
+                   || text.IndexOf("orientation", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool Is3DViewSectionBoxParameterName(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return false;
+            return text.IndexOf("zone de coupe", StringComparison.OrdinalIgnoreCase) >= 0
+                   || text.IndexOf("section box", StringComparison.OrdinalIgnoreCase) >= 0
+                   || text.IndexOf("boîte de coupe", StringComparison.OrdinalIgnoreCase) >= 0
+                   || text.IndexOf("boite de coupe", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private static void EnqueueDeleted(Document doc, ElementId id, string user, string tx)

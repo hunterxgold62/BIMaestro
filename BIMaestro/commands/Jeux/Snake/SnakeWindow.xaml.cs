@@ -1830,9 +1830,9 @@ namespace BIMaestro.Bonus
         {
             if (_activeSkin == null) return;
 
-            var mult = MakePastel(_activeSkin.FruitMultiplierColor, 0.78, 0.24);
-            var speed = MakePastel(_activeSkin.FruitSpeedColor, 0.78, 0.24);
-            var rain = MakePastel(_activeSkin.FruitRainColor, 0.80, 0.22);
+            var mult = MakePastel(_activeSkin.FruitMultiplierColor, 0.68, 0.88);
+            var speed = MakePastel(_activeSkin.FruitSpeedColor, 0.68, 0.88);
+            var rain = MakePastel(_activeSkin.FruitRainColor, 0.70, 0.88);
 
             MultiplierBadge.Background = new SolidColorBrush(mult);
             SpeedBadge.Background = new SolidColorBrush(speed);

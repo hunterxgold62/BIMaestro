@@ -225,6 +225,9 @@
     <Reference Include="System.Xml" />
     <Reference Include="WindowsBase" />
     <Reference Include="WindowsFormsIntegration" />
+    <Reference Include="Xceed.Wpf.Toolkit, Version=4.6.0.0, Culture=neutral, PublicKeyToken=3e4669d2f30244f4, processorArchitecture=MSIL">
+      <HintPath>..\packages\Extended.Wpf.Toolkit.4.6.1\lib\net40\Xceed.Wpf.Toolkit.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="animation touche\chargement et salto\StuntSpinner.xaml.cs">

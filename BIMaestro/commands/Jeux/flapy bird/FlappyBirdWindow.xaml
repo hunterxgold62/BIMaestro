@@ -19,29 +19,80 @@
             </LinearGradientBrush>
         </Grid.Background>
 
-        <Ellipse Width="150" Height="150" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,26,24,0" Fill="#24FFF8D8" IsHitTestVisible="False" />
+        <Rectangle VerticalAlignment="Bottom"
+                   Height="240"
+                   Margin="10,0,10,80"
+                   IsHitTestVisible="False"
+                   CacheMode="BitmapCache">
+            <Rectangle.Fill>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                    <GradientStop Color="#00FFFFFF" Offset="0" />
+                    <GradientStop Color="#46FFFFFF" Offset="0.64" />
+                    <GradientStop Color="#68D7F4FF" Offset="1" />
+                </LinearGradientBrush>
+            </Rectangle.Fill>
+        </Rectangle>
 
-        <Canvas IsHitTestVisible="False">
-            <Ellipse Width="120" Height="120" Fill="#30FFFFFF" Canvas.Left="26" Canvas.Top="40" />
-            <Ellipse Width="160" Height="90" Fill="#40FFFFFF" Canvas.Left="180" Canvas.Top="70" />
-            <Ellipse Width="110" Height="70" Fill="#35FFFFFF" Canvas.Left="250" Canvas.Top="150" />
-            <Ellipse Width="180" Height="80" Fill="#2AFFFFFF" Canvas.Left="40" Canvas.Top="220" />
+        <Canvas IsHitTestVisible="False" CacheMode="BitmapCache">
+            <Ellipse Width="88" Height="88" Fill="#66FFF1A8" Canvas.Left="286" Canvas.Top="34" />
+            <Ellipse Width="74" Height="74" Fill="#28FFFFFF" Canvas.Left="293" Canvas.Top="41" />
+
+            <Canvas Canvas.Left="28" Canvas.Top="52">
+                <Ellipse Width="62" Height="34" Fill="#EFFFFFFF" Canvas.Left="0" Canvas.Top="18" />
+                <Ellipse Width="48" Height="42" Fill="#F7FFFFFF" Canvas.Left="24" Canvas.Top="4" />
+                <Ellipse Width="70" Height="38" Fill="#EFFFFFFF" Canvas.Left="54" Canvas.Top="14" />
+                <Rectangle Width="104" Height="26" RadiusX="13" RadiusY="13" Fill="#EFFFFFFF" Canvas.Left="12" Canvas.Top="27" />
+            </Canvas>
+
+            <Canvas Canvas.Left="216" Canvas.Top="136" Opacity="0.82">
+                <Ellipse Width="50" Height="28" Fill="#F4FFFFFF" Canvas.Left="0" Canvas.Top="15" />
+                <Ellipse Width="42" Height="36" Fill="#FAFFFFFF" Canvas.Left="21" Canvas.Top="2" />
+                <Ellipse Width="62" Height="31" Fill="#F4FFFFFF" Canvas.Left="50" Canvas.Top="13" />
+                <Rectangle Width="92" Height="22" RadiusX="11" RadiusY="11" Fill="#F4FFFFFF" Canvas.Left="10" Canvas.Top="24" />
+            </Canvas>
+
+            <Canvas Canvas.Left="58" Canvas.Top="226" Opacity="0.58">
+                <Ellipse Width="70" Height="30" Fill="#FFFFFFFF" Canvas.Left="0" Canvas.Top="10" />
+                <Ellipse Width="44" Height="34" Fill="#FFFFFFFF" Canvas.Left="40" Canvas.Top="0" />
+                <Ellipse Width="80" Height="32" Fill="#FFFFFFFF" Canvas.Left="72" Canvas.Top="9" />
+                <Rectangle Width="132" Height="22" RadiusX="11" RadiusY="11" Fill="#FFFFFFFF" Canvas.Left="10" Canvas.Top="20" />
+            </Canvas>
         </Canvas>
 
-        <Rectangle VerticalAlignment="Bottom" Height="8" Margin="10,0,10,70" Fill="#55FFFFFF" IsHitTestVisible="False" />
+        <Canvas IsHitTestVisible="False" CacheMode="BitmapCache" VerticalAlignment="Bottom" Height="180" Margin="10,0,10,70">
+            <Path Fill="#7FC7E892" Opacity="0.74"
+                  Data="M0,112 C48,58 94,82 132,116 C182,40 250,66 296,118 C344,78 382,86 410,116 L410,180 L0,180 Z" />
+            <Path Fill="#65A7D878" Opacity="0.90"
+                  Data="M0,128 C42,94 86,104 124,132 C178,78 236,88 282,136 C326,104 374,108 410,132 L410,180 L0,180 Z" />
+        </Canvas>
 
-        <Border VerticalAlignment="Bottom" Height="70" Margin="10" CornerRadius="18">
+        <Rectangle VerticalAlignment="Bottom" Height="8" Margin="10,0,10,70" Fill="#AAFFFFFF" IsHitTestVisible="False" CacheMode="BitmapCache" />
+
+        <Border VerticalAlignment="Bottom" Height="70" Margin="10" CornerRadius="18" CacheMode="BitmapCache">
             <Border.Background>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                    <GradientStop Color="#FF9FE07A" Offset="0" />
-                    <GradientStop Color="#FF6FBB55" Offset="1" />
+                    <GradientStop Color="#FFAFE77A" Offset="0" />
+                    <GradientStop Color="#FF77C85C" Offset="0.45" />
+                    <GradientStop Color="#FF4E9848" Offset="1" />
                 </LinearGradientBrush>
             </Border.Background>
+            <Grid ClipToBounds="True">
+                <Rectangle Height="14" VerticalAlignment="Top" Fill="#5EFFFFFF" />
+                <Canvas Opacity="0.42">
+                    <Rectangle Width="3" Height="18" RadiusX="1.5" RadiusY="1.5" Fill="#FFFFFFFF" Canvas.Left="28" Canvas.Top="8" />
+                    <Rectangle Width="3" Height="13" RadiusX="1.5" RadiusY="1.5" Fill="#FFFFFFFF" Canvas.Left="76" Canvas.Top="4" />
+                    <Rectangle Width="3" Height="16" RadiusX="1.5" RadiusY="1.5" Fill="#FFFFFFFF" Canvas.Left="132" Canvas.Top="7" />
+                    <Rectangle Width="3" Height="12" RadiusX="1.5" RadiusY="1.5" Fill="#FFFFFFFF" Canvas.Left="188" Canvas.Top="5" />
+                    <Rectangle Width="3" Height="18" RadiusX="1.5" RadiusY="1.5" Fill="#FFFFFFFF" Canvas.Left="244" Canvas.Top="8" />
+                    <Rectangle Width="3" Height="14" RadiusX="1.5" RadiusY="1.5" Fill="#FFFFFFFF" Canvas.Left="310" Canvas.Top="5" />
+                    <Rectangle Width="3" Height="17" RadiusX="1.5" RadiusY="1.5" Fill="#FFFFFFFF" Canvas.Left="366" Canvas.Top="7" />
+                </Canvas>
+            </Grid>
         </Border>
 
         <Border Margin="10" CornerRadius="18" BorderBrush="#35FFFFFF" BorderThickness="1" IsHitTestVisible="False" />
 
-        <Canvas x:Name="GameCanvas" Background="Transparent" Margin="10" />
+        <Canvas x:Name="GameCanvas" Background="Transparent" Margin="10" ClipToBounds="True" />
 
         <Border HorizontalAlignment="Left"
                 VerticalAlignment="Top"
