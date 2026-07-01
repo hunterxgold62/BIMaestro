@@ -271,6 +271,12 @@
       <DependentUpon>SnakeWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="commands\page de mise à jour en direct\UpdateNotificationManager.cs" />
+    <Compile Include="commands\page de mise à jour en direct\ButtonUpdateNote.cs" />
+    <Compile Include="commands\page de mise à jour en direct\ButtonUpdateNotesCatalog.cs" />
+    <Compile Include="commands\page de mise à jour en direct\ButtonUpdateNotesManager.cs" />
+    <Compile Include="commands\page de mise à jour en direct\ButtonUpdateNotesWindow.xaml.cs">
+      <DependentUpon>ButtonUpdateNotesWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="commands\page de mise à jour en direct\UpdatePromptWindow.xaml.cs">
       <DependentUpon>UpdatePromptWindow.xaml</DependentUpon>
     </Compile>
@@ -623,6 +629,10 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Include="commands\page de mise à jour en direct\UpdatePromptWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="commands\page de mise à jour en direct\ButtonUpdateNotesWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

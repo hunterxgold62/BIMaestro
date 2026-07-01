@@ -1,6 +1,7 @@
 ﻿using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using BIMaestro.UI;
+using Page;
 using System;
 
 namespace Licensing
@@ -79,6 +80,7 @@ namespace Licensing
             try
             {
                 var trackedButtonLabel = ResolveButtonDisplayName();
+                ButtonUpdateNotesManager.TryShowButtonNotesBeforeLaunch(ButtonId, GetType().FullName, data.Application);
                 var res = OnExecute(data, ref message, elements);
                 Telemetry.TrackButton(trackedButtonLabel, res == Result.Succeeded, BuildContext(data));
                 if (res == Result.Succeeded)
