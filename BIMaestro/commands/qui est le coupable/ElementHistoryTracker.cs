@@ -223,6 +223,7 @@ namespace Analyse
         private static readonly Dictionary<string, ElementSnapshot> FamilyTypeSnapshotByKey =
             new Dictionary<string, ElementSnapshot>(StringComparer.OrdinalIgnoreCase);
         private static readonly HashSet<string> PrimedDocumentKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly HashSet<string> FamilyParameterPrimedDocumentKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private static readonly Dictionary<string, DeferredPrimeState> DeferredPrimeByDocumentKey =
             new Dictionary<string, DeferredPrimeState>(StringComparer.OrdinalIgnoreCase);
         private static readonly ConcurrentDictionary<int, string> RuntimeDocumentKeys =
@@ -344,6 +345,8 @@ namespace Analyse
         {
             if (doc == null) return;
 
+            PrimeFamilyParameterSnapshots(doc);
+
             var key = GetDocumentKey(doc);
             if (string.IsNullOrWhiteSpace(key)) return;
 
@@ -403,6 +406,7 @@ namespace Analyse
                 lock (SnapshotByElementId)
                 {
                     PrimedDocumentKeys.Add(key);
+                    FamilyParameterPrimedDocumentKeys.Add(key);
                     DeferredPrimeByDocumentKey.Remove(key);
                 }
             }
@@ -452,6 +456,40 @@ namespace Analyse
                 }
 
                 PrimeFamilyDocumentTypes(doc);
+            }
+            catch
+            {
+            }
+
+            lock (SnapshotByElementId)
+            {
+                FamilyParameterPrimedDocumentKeys.Add(key);
+            }
+        }
+
+        public static void PrimeFamilyParameterSnapshots(Document doc)
+        {
+            if (doc == null) return;
+
+            var key = GetDocumentKey(doc);
+            if (string.IsNullOrWhiteSpace(key)) return;
+
+            lock (SnapshotByElementId)
+            {
+                if (FamilyParameterPrimedDocumentKeys.Contains(key)) return;
+                FamilyParameterPrimedDocumentKeys.Add(key);
+            }
+
+            try
+            {
+                if (doc.IsFamilyDocument)
+                {
+                    PrimeFamilyDocumentTypes(doc);
+                    return;
+                }
+
+                foreach (var symbol in new FilteredElementCollector(doc).OfClass(typeof(FamilySymbol)))
+                    PrimeElementSnapshot(symbol);
             }
             catch
             {
