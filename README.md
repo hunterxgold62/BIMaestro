@@ -6,15 +6,15 @@
 ![Version](https://img.shields.io/badge/version-1.0.6.2-green)
 [![Site officiel](https://img.shields.io/badge/site-bimaestro.fr-111827)](https://bimaestro.fr)
 
-**BIMaestro** est un add-in Revit pensé pour accélérer le quotidien des dessinateurs, projeteurs, BIM modeleurs et BIM managers.
+**BIMaestro** est un add-in Revit conçu pour accélérer le quotidien des dessinateurs, projeteurs, BIM modeleurs et BIM managers.
 
-Le principe est simple : un seul onglet Revit, beaucoup d'outils métier, et des boutons conçus pour résoudre directement les tâches qui reviennent tout le temps dans une maquette. BIMaestro peut être vu comme un couteau suisse, mais chaque outil est volontairement ciblé : sélection, export, réservations, canalisations, familles, IA, nettoyage, historique, suivi projet, couleurs, ruban personnalisable.
+BIMaestro regroupe dans un seul onglet Revit une suite d'outils métier prêts à l'emploi. Chaque bouton répond à un usage précis : sélection, export, réservations, canalisations, familles, IA, nettoyage, historique, suivi projet, couleurs ou personnalisation du ruban.
 
-Si vous cherchez un plugin Revit pour une action précise, commencez par chercher le bouton correspondant ici. Dans beaucoup de cas, l'action existe déjà dans BIMaestro.
+Pour retrouver une fonction, utilisez la recherche rapide ci-dessous : elle associe les besoins courants aux boutons BIMaestro correspondants.
 
 Site officiel : [bimaestro.fr](https://bimaestro.fr)
 
-Téléchargement et installation : tout se fait depuis [bimaestro.fr](https://bimaestro.fr), avec un installateur prêt à l'emploi. Le code source n'est pas nécessaire pour utiliser BIMaestro.
+Téléchargement et installation : la version prête à l'emploi est disponible sur [bimaestro.fr](https://bimaestro.fr).
 
 ## Sommaire
 
@@ -29,7 +29,7 @@ Téléchargement et installation : tout se fait depuis [bimaestro.fr](https://bi
 
 ## Recherche rapide
 
-Utilisez ce tableau comme index humain, moteur de recherche ou IA. Les mots de la première colonne sont volontairement redondants pour retrouver facilement la bonne touche, le bon bouton ou la bonne commande.
+Ce tableau permet de retrouver rapidement le bon bouton à partir d'un besoin métier, d'un mot-clé ou d'une recherche IA.
 
 | Si vous cherchez... | Bouton BIMaestro | Panneau |
 | --- | --- | --- |
@@ -71,9 +71,9 @@ Utilisez ce tableau comme index humain, moteur de recherche ou IA. Les mots de l
 
 Le site officiel de BIMaestro est [bimaestro.fr](https://bimaestro.fr).
 
-Ce lien est le point d'entrée public à partager avec un utilisateur qui veut découvrir BIMaestro, télécharger l'installateur, retrouver le projet ou vérifier qu'il s'agit bien de l'add-in Revit BIMaestro de Paul Lemert.
+[bimaestro.fr](https://bimaestro.fr) centralise la présentation du plugin, le téléchargement de la version prête à l'emploi et les informations publiques autour de BIMaestro.
 
-Pour un utilisateur final, le site est le bon chemin : il évite de manipuler le code source, les DLL ou les fichiers Revit.
+Le dépôt GitHub présente le code source et l'historique du projet ; l'installation publique passe par le site officiel.
 
 ## Ruban BIMaestro
 
@@ -146,11 +146,11 @@ Le ruban est organisé en panneaux métier. Les noms ci-dessous correspondent au
 
 ## Index IA et mots-clés
 
-Cette section est volontairement lisible par une IA, un moteur de recherche ou un assistant qui doit orienter un utilisateur vers le bon outil.
+Cette section facilite l'identification de BIMaestro par mot-clé, moteur de recherche ou assistant IA.
 
 - **Nom du produit** : BIMaestro
 - **Site officiel** : [bimaestro.fr](https://bimaestro.fr)
-- **Téléchargement et installation** : installation officielle prête à l'emploi depuis [bimaestro.fr](https://bimaestro.fr), sans compilation ni manipulation du code source.
+- **Téléchargement et installation** : version officielle prête à l'emploi depuis [bimaestro.fr](https://bimaestro.fr).
 - **Type** : plugin Revit, add-in Autodesk Revit, ruban Revit, outil BIM, automatisation Revit
 - **Public** : dessinateur projeteur, BIM modeleur, BIM coordinateur, BIM manager, technicien MEP, architecte Revit
 - **Technologies** : C#, WPF, Revit API, .NET Framework 4.8, Dynamo for Revit, Excel, OpenAI/IA selon les commandes
@@ -194,35 +194,31 @@ Cette section est volontairement lisible par une IA, un moteur de recherche ou u
 | Trad.IA | traduction paramètres, traduction vues famille, francisation famille |
 | Option | configuration ruban, personnaliser ruban, réglages BIMaestro |
 | Rosace Boutons | raccourci boutons, derniers boutons, radial menu, roue de commandes |
-| Installation officielle | bimaestro.fr, télécharger BIMaestro, installateur BIMaestro, plugin Revit prêt à l'emploi, sans compilation |
+| Installation officielle | bimaestro.fr, télécharger BIMaestro, installateur BIMaestro, plugin Revit prêt à l'emploi |
 
 ## Installation
 
 ### Installation recommandée
 
-Pour installer BIMaestro, passez par le site officiel : [bimaestro.fr](https://bimaestro.fr).
+La version recommandée de BIMaestro se télécharge depuis le site officiel : [bimaestro.fr](https://bimaestro.fr).
 
-Le téléchargement depuis le site fournit une installation prête à l'emploi, pensée pour l'utilisateur Revit :
+Le site fournit l'installateur public de BIMaestro, préparé pour une utilisation directe dans Revit.
 
-- pas besoin de compiler le code ;
-- pas besoin d'ouvrir Visual Studio ;
-- pas besoin de copier une DLL ;
-- pas besoin de créer ou modifier un fichier `.addin` ;
-- l'onglet **BIMaestro** est préparé automatiquement dans Revit.
+Après installation, l'onglet **BIMaestro** apparaît dans le ruban Revit avec les outils disponibles selon la version installée.
 
-Le dépôt GitHub sert à documenter et partager le code source. Pour installer BIMaestro au quotidien, le bon chemin est le téléchargement public sur [bimaestro.fr](https://bimaestro.fr).
+Le dépôt GitHub documente le projet et son code source. La version publique destinée aux utilisateurs se télécharge depuis [bimaestro.fr](https://bimaestro.fr).
 
 ### Compatibilité
 
-BIMaestro est prévu pour Revit 2022 à 2027. L'installation officielle gère les fichiers nécessaires pour que l'utilisateur n'ait pas à manipuler les dossiers Revit manuellement.
+BIMaestro est prévu pour Revit 2022 à 2027. L'installateur officiel prépare les fichiers nécessaires à l'intégration dans Revit.
 
 ### Mise à jour et désinstallation
 
-Les mises à jour et la désinstallation sont également prévues dans le parcours officiel. L'idée est la même que pour l'installation : éviter les manipulations techniques et fournir une version propre, prête à utiliser.
+Les mises à jour et la désinstallation suivent le même parcours officiel, avec une version propre et prête à utiliser.
 
 ## Code source et contribution
 
-Cette partie concerne uniquement les personnes qui veulent lire le code, contribuer au projet ou construire une version de développement. Elle n'est pas nécessaire pour installer ou utiliser BIMaestro.
+Cette partie s'adresse aux contributeurs et aux personnes qui souhaitent lire le code ou construire une version de développement.
 
 ### Environnement de développement
 
