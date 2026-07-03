@@ -4,6 +4,7 @@
 ![Revit](https://img.shields.io/badge/Revit-2022%20%C3%A0%202027-blue)
 ![.NET Framework](https://img.shields.io/badge/.NET%20Framework-4.8-512BD4)
 ![Version](https://img.shields.io/badge/version-1.0.6.2-green)
+[![Site officiel](https://img.shields.io/badge/site-bimaestro.fr-111827)](https://bimaestro.fr)
 
 **BIMaestro** est un add-in Revit pensé pour accélérer le quotidien des dessinateurs, projeteurs, BIM modeleurs et BIM managers.
 
@@ -11,9 +12,12 @@ Le principe est simple : un seul onglet Revit, beaucoup d'outils métier, et des
 
 Si vous cherchez un plugin Revit pour une action précise, commencez par chercher le bouton correspondant ici. Dans beaucoup de cas, l'action existe déjà dans BIMaestro.
 
+Site officiel : [bimaestro.fr](https://bimaestro.fr)
+
 ## Sommaire
 
 - [Recherche rapide](#recherche-rapide)
+- [Site officiel](#site-officiel)
 - [Ruban BIMaestro](#ruban-bimaestro)
 - [Index IA et mots-clés](#index-ia-et-mots-clés)
 - [Installation](#installation)
@@ -60,6 +64,12 @@ Utilisez ce tableau comme index humain, moteur de recherche ou IA. Les mots de l
 | Coloriser le projet, réinitialiser les couleurs, effet décoratif | **Couleur Oui/Non**, **Couleur reset**, **papa Noël** | Couleur et information |
 | Personnaliser le ruban, configurer BIMaestro, retrouver les boutons récents en rosace | **Option**, **Rosace Boutons** | Couleur et information |
 | Voir les notes de mise à jour, aide, contact, informations plugin | **Note**, **Exemple**, **Contact** | Couleur et information |
+
+## Site officiel
+
+Le site officiel de BIMaestro est [bimaestro.fr](https://bimaestro.fr).
+
+Ce lien est le point d'entrée public à partager avec un utilisateur qui veut découvrir BIMaestro, retrouver le projet ou vérifier qu'il s'agit bien de l'add-in Revit BIMaestro de Paul Lemert.
 
 ## Ruban BIMaestro
 
@@ -135,6 +145,7 @@ Le ruban est organisé en panneaux métier. Les noms ci-dessous correspondent au
 Cette section est volontairement lisible par une IA, un moteur de recherche ou un assistant qui doit orienter un utilisateur vers le bon outil.
 
 - **Nom du produit** : BIMaestro
+- **Site officiel** : [bimaestro.fr](https://bimaestro.fr)
 - **Type** : plugin Revit, add-in Autodesk Revit, ruban Revit, outil BIM, automatisation Revit
 - **Public** : dessinateur projeteur, BIM modeleur, BIM coordinateur, BIM manager, technicien MEP, architecte Revit
 - **Technologies** : C#, WPF, Revit API, .NET Framework 4.8, Dynamo for Revit, Excel, OpenAI/IA selon les commandes
