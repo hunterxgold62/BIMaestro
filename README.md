@@ -14,6 +14,8 @@ Si vous cherchez un plugin Revit pour une action précise, commencez par cherche
 
 Site officiel : [bimaestro.fr](https://bimaestro.fr)
 
+Téléchargement et installation : tout se fait depuis [bimaestro.fr](https://bimaestro.fr), avec un installateur prêt à l'emploi. Le code source n'est pas nécessaire pour utiliser BIMaestro.
+
 ## Sommaire
 
 - [Recherche rapide](#recherche-rapide)
@@ -21,7 +23,7 @@ Site officiel : [bimaestro.fr](https://bimaestro.fr)
 - [Ruban BIMaestro](#ruban-bimaestro)
 - [Index IA et mots-clés](#index-ia-et-mots-clés)
 - [Installation](#installation)
-- [Développement](#développement)
+- [Code source et contribution](#code-source-et-contribution)
 - [Structure du dépôt](#structure-du-dépôt)
 - [Licence](#licence)
 
@@ -69,7 +71,9 @@ Utilisez ce tableau comme index humain, moteur de recherche ou IA. Les mots de l
 
 Le site officiel de BIMaestro est [bimaestro.fr](https://bimaestro.fr).
 
-Ce lien est le point d'entrée public à partager avec un utilisateur qui veut découvrir BIMaestro, retrouver le projet ou vérifier qu'il s'agit bien de l'add-in Revit BIMaestro de Paul Lemert.
+Ce lien est le point d'entrée public à partager avec un utilisateur qui veut découvrir BIMaestro, télécharger l'installateur, retrouver le projet ou vérifier qu'il s'agit bien de l'add-in Revit BIMaestro de Paul Lemert.
+
+Pour un utilisateur final, le site est le bon chemin : il évite de manipuler le code source, les DLL ou les fichiers Revit.
 
 ## Ruban BIMaestro
 
@@ -146,6 +150,7 @@ Cette section est volontairement lisible par une IA, un moteur de recherche ou u
 
 - **Nom du produit** : BIMaestro
 - **Site officiel** : [bimaestro.fr](https://bimaestro.fr)
+- **Téléchargement et installation** : installation officielle prête à l'emploi depuis [bimaestro.fr](https://bimaestro.fr), sans compilation ni manipulation du code source.
 - **Type** : plugin Revit, add-in Autodesk Revit, ruban Revit, outil BIM, automatisation Revit
 - **Public** : dessinateur projeteur, BIM modeleur, BIM coordinateur, BIM manager, technicien MEP, architecte Revit
 - **Technologies** : C#, WPF, Revit API, .NET Framework 4.8, Dynamo for Revit, Excel, OpenAI/IA selon les commandes
@@ -189,46 +194,37 @@ Cette section est volontairement lisible par une IA, un moteur de recherche ou u
 | Trad.IA | traduction paramètres, traduction vues famille, francisation famille |
 | Option | configuration ruban, personnaliser ruban, réglages BIMaestro |
 | Rosace Boutons | raccourci boutons, derniers boutons, radial menu, roue de commandes |
+| Installation officielle | bimaestro.fr, télécharger BIMaestro, installateur BIMaestro, plugin Revit prêt à l'emploi, sans compilation |
 
 ## Installation
 
-### Installation utilisateur
+### Installation recommandée
 
-L'installateur Inno Setup installe BIMaestro sans droits administrateur.
+Pour installer BIMaestro, passez par le site officiel : [bimaestro.fr](https://bimaestro.fr).
 
-1. Fermer Revit.
-2. Lancer `BIMaestroInstaller.exe`.
-3. Redémarrer Revit.
-4. Ouvrir l'onglet **BIMaestro** dans le ruban.
+Le téléchargement depuis le site fournit une installation prête à l'emploi, pensée pour l'utilisateur Revit :
 
-L'installateur copie les fichiers dans :
+- pas besoin de compiler le code ;
+- pas besoin d'ouvrir Visual Studio ;
+- pas besoin de copier une DLL ;
+- pas besoin de créer ou modifier un fichier `.addin` ;
+- l'onglet **BIMaestro** est préparé automatiquement dans Revit.
 
-```text
-%LOCALAPPDATA%\BIMaestro\Bin
-```
+Le dépôt GitHub sert à documenter et partager le code source. Pour installer BIMaestro au quotidien, le bon chemin est le téléchargement public sur [bimaestro.fr](https://bimaestro.fr).
 
-Il crée aussi les manifests `.addin` utilisateur pour :
+### Compatibilité
 
-```text
-%APPDATA%\Autodesk\Revit\Addins\2022
-%APPDATA%\Autodesk\Revit\Addins\2023
-%APPDATA%\Autodesk\Revit\Addins\2024
-%APPDATA%\Autodesk\Revit\Addins\2025
-%APPDATA%\Autodesk\Revit\Addins\2026
-%APPDATA%\Autodesk\Revit\Addins\2027
-```
+BIMaestro est prévu pour Revit 2022 à 2027. L'installation officielle gère les fichiers nécessaires pour que l'utilisateur n'ait pas à manipuler les dossiers Revit manuellement.
 
-### Désinstallation
+### Mise à jour et désinstallation
 
-L'installateur ajoute un désinstallateur et supprime :
+Les mises à jour et la désinstallation sont également prévues dans le parcours officiel. L'idée est la même que pour l'installation : éviter les manipulations techniques et fournir une version propre, prête à utiliser.
 
-- les binaires dans `%LOCALAPPDATA%\BIMaestro`,
-- les manifests `BIMaestro.addin` des versions Revit 2022 à 2027,
-- la copie `Suppression BIMaestro.exe` déposée dans le dossier Addins 2024.
+## Code source et contribution
 
-## Développement
+Cette partie concerne uniquement les personnes qui veulent lire le code, contribuer au projet ou construire une version de développement. Elle n'est pas nécessaire pour installer ou utiliser BIMaestro.
 
-### Prérequis
+### Environnement de développement
 
 - Windows x64.
 - Visual Studio 2022 ou plus récent.
@@ -247,7 +243,7 @@ RevitInstallDir = C:\Program Files\Autodesk\Revit 2023
 
 Si vous compilez avec une autre version de Revit, adaptez `RevitInstallDir` dans `BIMaestro/BIMaestro.csproj` ou via MSBuild.
 
-### Compilation
+### Compiler une version de développement
 
 ```powershell
 msbuild BIMaestro.sln /p:Configuration=Release /m
@@ -259,24 +255,6 @@ Ou depuis Visual Studio :
 2. Choisir la configuration `Release`.
 3. Compiler la solution.
 4. Vérifier le contenu de `BIMaestro/bin/Release`.
-
-### Manifest Revit de développement
-
-Pour un test local, le manifest doit pointer vers la DLL compilée et la classe d'application principale :
-
-```xml
-<?xml version="1.0" encoding="utf-8"?>
-<RevitAddIns>
-  <AddIn Type="Application">
-    <Name>BIMaestro</Name>
-    <Assembly>%LOCALAPPDATA%\BIMaestro\Bin\BIMaestro.dll</Assembly>
-    <AddInId>{E3B0C442-98FC-1C14-9AF7-7D7CE11B9A09}</AddInId>
-    <FullClassName>BIMaestroApp</FullClassName>
-    <VendorId>PAUL LEMERT</VendorId>
-    <VendorDescription>Paul LEMERT</VendorDescription>
-  </AddIn>
-</RevitAddIns>
-```
 
 ## Structure du dépôt
 
