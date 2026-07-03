@@ -73,7 +73,7 @@ Ce lien est le point d'entrée public à partager avec un utilisateur qui veut d
 
 ## Ruban BIMaestro
 
-<img width="2336" height="122" alt="Ruban BIMaestro dans Revit" src="https://github.com/user-attachments/assets/634778bd-dd70-4c3d-9cd5-c23019844c27" />
+<img width="2026" height="122" alt="Ruban BIMaestro dans Revit" src="https://github.com/user-attachments/assets/89cbb631-f81a-440d-b07d-98fbbfaff18e" />
 
 Le ruban est organisé en panneaux métier. Les noms ci-dessous correspondent aux libellés visibles dans Revit.
 
