@@ -240,9 +240,17 @@ namespace Analyse
         private const int MaxGhostPreviewVertices = 3600;
         private const int MaxGhostCandidateFaces = 12000;
         private const int GhostCoordinateDecimals = 5;
-        private const int DeferredPrimeBatchSize = 75;
+        private const int DeferredPrimeBatchSize = 25;
+        private const int DeferredPrimeTimeBudgetMs = 35;
+        private const int MaxSelectionSnapshotCount = 25;
+        private const int SelectionSnapshotTimeBudgetMs = 80;
+        private const int MaxChangedElementSnapshotsPerTransaction = 250;
+        private const int MaxDeletedElementSnapshotsPerTransaction = 500;
+        private const int DocumentChangedTimeBudgetMs = 300;
         private const int SelectionDetailedGeometryTimeoutMs = 500;
         private static readonly TimeSpan DeferredPrimeDelay = TimeSpan.FromSeconds(8);
+        private static readonly TimeSpan HistoryMaintenanceInitialDelay = TimeSpan.FromMinutes(10);
+        private static readonly TimeSpan HistoryMaintenanceInterval = TimeSpan.FromHours(1);
         private const bool IncludeAnnotationCategoriesForFuture = false;
         private const bool DefaultCaptureDetailedDeletedMesh = false;
         private static volatile bool _captureDetailedDeletedMesh = DefaultCaptureDetailedDeletedMesh;
@@ -344,8 +352,7 @@ namespace Analyse
         public static void ScheduleDeferredPrime(Document doc)
         {
             if (doc == null) return;
-
-            PrimeFamilyParameterSnapshots(doc);
+            if (!ShouldScheduleDeferredPrime(doc)) return;
 
             var key = GetDocumentKey(doc);
             if (string.IsNullOrWhiteSpace(key)) return;
@@ -359,6 +366,21 @@ namespace Analyse
                 {
                     NotBeforeUtc = DateTime.UtcNow.Add(DeferredPrimeDelay)
                 };
+            }
+        }
+
+        private static bool ShouldScheduleDeferredPrime(Document doc)
+        {
+            if (doc == null) return false;
+            if (CaptureDetailedDeletedMesh) return true;
+
+            try
+            {
+                return doc.IsFamilyDocument;
+            }
+            catch
+            {
+                return false;
             }
         }
 
@@ -391,7 +413,10 @@ namespace Analyse
                     LoadDeferredPrimeElementIds(doc, state);
 
                 int processed = 0;
-                while (processed < DeferredPrimeBatchSize && state.PendingElementIds.Count > 0)
+                var deadlineUtc = DateTime.UtcNow.AddMilliseconds(DeferredPrimeTimeBudgetMs);
+                while (processed < DeferredPrimeBatchSize
+                       && state.PendingElementIds.Count > 0
+                       && DateTime.UtcNow < deadlineUtc)
                 {
                     var id = state.PendingElementIds.Dequeue();
                     var element = doc.GetElement(id);
@@ -400,6 +425,9 @@ namespace Analyse
                 }
 
                 if (state.PendingElementIds.Count > 0)
+                    return;
+
+                if (DateTime.UtcNow >= deadlineUtc)
                     return;
 
                 PrimeFamilyDocumentTypes(doc);
@@ -515,8 +543,14 @@ namespace Analyse
 
             try
             {
+                var deadlineUtc = DateTime.UtcNow.AddMilliseconds(SelectionSnapshotTimeBudgetMs);
+                var processed = 0;
+
                 foreach (var id in selectedIds)
                 {
+                    if (processed >= MaxSelectionSnapshotCount || DateTime.UtcNow >= deadlineUtc)
+                        break;
+
                     if (id == null || id == ElementId.InvalidElementId) continue;
 
                     var element = doc.GetElement(id);
@@ -528,6 +562,7 @@ namespace Analyse
 
                     var quickSnapshot = BuildSnapshot(element, includeOrientedCorners: false);
                     StoreSnapshot(doc, id, quickSnapshot);
+                    processed++;
 
                     if (!CaptureDetailedDeletedMesh || keepSimpleOnly)
                     {
@@ -583,16 +618,45 @@ namespace Analyse
             var modifiedIds = e.GetModifiedElementIds().ToList();
             var deletedIds = e.GetDeletedElementIds().ToList();
             var suppressSecondaryModifications = deletedIds.Count > 0;
+            var deadlineUtc = DateTime.UtcNow.AddMilliseconds(DocumentChangedTimeBudgetMs);
+            var relatedTypeParameterDeltaCache = new Dictionary<int, Dictionary<string, object>>();
+            var processedChanges = 0;
+            var processedDeletes = 0;
 
             foreach (var id in addedIds)
-                CaptureAddedOrModified(doc, id, user, tx, isCreate: true);
-            foreach (var id in modifiedIds.OrderBy(id => IsFamilySymbolElementId(doc, id) ? 1 : 0))
-                CaptureAddedOrModified(doc, id, user, tx, isCreate: false, suppressSecondaryModification: suppressSecondaryModifications);
-            foreach (var id in deletedIds)
-                EnqueueDeleted(doc, id, user, tx);
+            {
+                if (!CanContinueDocumentChangedCapture(deadlineUtc, processedChanges, MaxChangedElementSnapshotsPerTransaction))
+                    break;
 
-            CaptureFamilyDocumentTypeChanges(doc, user, tx);
-            CaptureProjectFamilySymbolChanges(doc, user, tx);
+                if (CaptureAddedOrModified(doc, id, user, tx, isCreate: true, relatedTypeParameterDeltaCache: relatedTypeParameterDeltaCache))
+                    processedChanges++;
+            }
+
+            foreach (var id in modifiedIds.OrderBy(id => IsFamilySymbolElementId(doc, id) ? 1 : 0))
+            {
+                if (!CanContinueDocumentChangedCapture(deadlineUtc, processedChanges, MaxChangedElementSnapshotsPerTransaction))
+                    break;
+
+                if (CaptureAddedOrModified(doc, id, user, tx, isCreate: false, suppressSecondaryModification: suppressSecondaryModifications, relatedTypeParameterDeltaCache: relatedTypeParameterDeltaCache))
+                    processedChanges++;
+            }
+
+            foreach (var id in deletedIds)
+            {
+                if (!CanContinueDocumentChangedCapture(deadlineUtc, processedDeletes, MaxDeletedElementSnapshotsPerTransaction))
+                    break;
+
+                EnqueueDeleted(doc, id, user, tx);
+                processedDeletes++;
+            }
+
+            if (DateTime.UtcNow < deadlineUtc)
+                CaptureFamilyDocumentTypeChanges(doc, user, tx);
+        }
+
+        private static bool CanContinueDocumentChangedCapture(DateTime deadlineUtc, int processedCount, int maxCount)
+        {
+            return processedCount < maxCount && DateTime.UtcNow < deadlineUtc;
         }
 
         public static List<ElementHistoryEvent> LoadElementHistory(Document doc, Element element)
@@ -923,15 +987,22 @@ namespace Analyse
                 yield return line;
         }
 
-        private static void CaptureAddedOrModified(Document doc, ElementId id, string user, string tx, bool isCreate, bool suppressSecondaryModification = false)
+        private static bool CaptureAddedOrModified(
+            Document doc,
+            ElementId id,
+            string user,
+            string tx,
+            bool isCreate,
+            bool suppressSecondaryModification = false,
+            Dictionary<int, Dictionary<string, object>> relatedTypeParameterDeltaCache = null)
         {
-            if (id == null || id == ElementId.InvalidElementId) return;
+            if (id == null || id == ElementId.InvalidElementId) return false;
             var el = doc.GetElement(id);
-            if (el == null || ShouldIgnoreElement(el)) return;
+            if (el == null || ShouldIgnoreElement(el)) return false;
 
             Dictionary<string, object> relatedTypeParameterDelta = null;
             if (!isCreate && !(el is FamilySymbol))
-                relatedTypeParameterDelta = CaptureRelatedFamilyTypeParameterDelta(doc, el);
+                relatedTypeParameterDelta = CaptureRelatedFamilyTypeParameterDelta(doc, el, relatedTypeParameterDeltaCache);
 
             var current = BuildSnapshot(el, includeOrientedCorners: CaptureDetailedDeletedMesh);
             ElementSnapshot previous;
@@ -951,13 +1022,13 @@ namespace Analyse
             if (!isCreate && (suppressSecondaryModification || action == "modify_skip" || IsLowValueParameterChange(action, delta)))
             {
                 StoreSnapshot(doc, id, current);
-                return;
+                return true;
             }
 
             if (!isCreate && IsNoisy3DViewChange(action, current, delta))
             {
                 StoreSnapshot(doc, id, current);
-                return;
+                return true;
             }
 
             Queue.Enqueue(new ElementHistoryEvent
@@ -979,6 +1050,7 @@ namespace Analyse
             });
 
             StoreSnapshot(doc, id, current);
+            return true;
         }
 
         private static bool IsFamilySymbolElementId(Document doc, ElementId id)
@@ -994,15 +1066,27 @@ namespace Analyse
             }
         }
 
-        private static Dictionary<string, object> CaptureRelatedFamilyTypeParameterDelta(Document doc, Element el)
+        private static Dictionary<string, object> CaptureRelatedFamilyTypeParameterDelta(
+            Document doc,
+            Element el,
+            Dictionary<int, Dictionary<string, object>> relatedTypeParameterDeltaCache)
         {
             try
             {
                 var typeId = el.GetTypeId();
                 if (typeId == null || typeId == ElementId.InvalidElementId) return null;
+                var typeIdValue = typeId.GetIdValue();
+
+                if (relatedTypeParameterDeltaCache != null
+                    && relatedTypeParameterDeltaCache.TryGetValue(typeIdValue, out var cachedDelta))
+                    return cachedDelta;
 
                 var type = doc.GetElement(typeId) as FamilySymbol;
-                if (type == null || ShouldIgnoreElement(type)) return null;
+                if (type == null || ShouldIgnoreElement(type))
+                {
+                    relatedTypeParameterDeltaCache?.Add(typeIdValue, null);
+                    return null;
+                }
 
                 var current = BuildSnapshot(type, includeOrientedCorners: false);
                 ElementSnapshot previous;
@@ -1015,10 +1099,13 @@ namespace Analyse
                 var delta = BuildDelta(action, previous, current);
                 StoreSnapshot(doc, type.Id, current);
 
-                return string.Equals(action, "param_change", StringComparison.OrdinalIgnoreCase)
-                       && HasParameterDelta(delta)
+                var result = string.Equals(action, "param_change", StringComparison.OrdinalIgnoreCase)
+                             && HasParameterDelta(delta)
                     ? delta
                     : null;
+
+                relatedTypeParameterDeltaCache?.Add(typeIdValue, result);
+                return result;
             }
             catch
             {
@@ -2825,10 +2912,18 @@ namespace Analyse
 
         private static async Task WorkerLoop(CancellationToken token)
         {
+            var nextMaintenanceUtc = DateTime.UtcNow.Add(HistoryMaintenanceInitialDelay);
+
             while (!token.IsCancellationRequested)
             {
                 Flush();
-                CompressOldFiles();
+
+                if (DateTime.UtcNow >= nextMaintenanceUtc)
+                {
+                    CompressOldFiles();
+                    nextMaintenanceUtc = DateTime.UtcNow.Add(HistoryMaintenanceInterval);
+                }
+
                 await Task.Delay(2000, token).ConfigureAwait(false);
             }
         }

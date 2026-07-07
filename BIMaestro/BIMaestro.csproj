@@ -280,6 +280,11 @@
     <Compile Include="commands\page de mise à jour en direct\UpdatePromptWindow.xaml.cs">
       <DependentUpon>UpdatePromptWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="commands\page de mise à jour en direct\SecretGifShortcutManager.cs" />
+    <Compile Include="commands\page de mise à jour en direct\SecretEffectWindow.cs" />
+    <Compile Include="commands\page de mise à jour en direct\SecretGifWindow.xaml.cs">
+      <DependentUpon>SecretGifWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="commands\page de mise à jour en direct\ContactCommand.cs" />
     <Compile Include="commands\paramétre partagé en famillle\ConvertSharedToFamilyParametersCommand.cs" />
     <Compile Include="commands\Réservation auto\résa auto v3\ReservationAutoV3Command.cs" />
@@ -629,6 +634,10 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Include="commands\page de mise à jour en direct\UpdatePromptWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="commands\page de mise à jour en direct\SecretGifWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

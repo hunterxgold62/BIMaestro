@@ -117,6 +117,7 @@ public class BIMaestroApp : IExternalApplication
 
             // --- Ruban ---
             AppUI.CreateRibbonUI(application);
+            Page.SecretGifShortcutManager.Initialize();
 
             // "//" à rajouté pour retiré le message de bienvenue 
             BIMaestro.Welcome.WelcomeManager.Initialize(application);
@@ -147,6 +148,7 @@ public class BIMaestroApp : IExternalApplication
             catch { }
             finally { Telemetry.Shutdown(); }
 
+            Page.SecretGifShortcutManager.Shutdown();
             Analyse.ElementHistoryTracker.Stop();
             ExcelLogger.Shutdown();
             WpfApp?.Shutdown();
@@ -165,6 +167,7 @@ public class BIMaestroApp : IExternalApplication
             _uiApp ??= sender as UIApplication;
             if (_uiApp == null) return;
 
+            Page.SecretGifShortcutManager.PollKeyboardState();
             Analyse.ElementHistoryTracker.ProcessDeferredPrime(_uiApp.ActiveUIDocument?.Document);
 
             if (!Couleur.ColoringStateManager.IsColoringActive)
