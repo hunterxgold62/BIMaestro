@@ -1,0 +1,20 @@
+project_id = "xqovxfgghbqxwsadzhzl"
+
+[functions.validate]
+verify_jwt = true
+
+[functions.collect-usage]
+verify_jwt = true
+
+[functions.upsert-profile]
+verify_jwt = true
+
+[functions.ai-proxy]
+verify_jwt = true
+
+[functions.snake-leaderboard]
+verify_jwt = true
+
+[functions.refres_les_donn-es_d-analyse]
+verify_jwt = true
+

@@ -51,6 +51,11 @@ $RECYCLE.BIN/
 # Ignorer les packages npm
 node_modules/
 
+# Supabase local secrets
+supabase/functions/.env
+supabase/functions/.env.*
+!supabase/functions/.env.example
+
 # Ignorer les fichiers DLL et les fichiers Revit
 *.dll
 *.rvt
