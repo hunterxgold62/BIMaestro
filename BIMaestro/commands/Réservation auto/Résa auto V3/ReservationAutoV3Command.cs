@@ -725,6 +725,8 @@ namespace Modification
                     ? GetHostDepth(typedWall)
                     : EstimateWallDepth(bb);
 
+                XYZ pickPoint = NormalizeLinkedReferencePoint(reference.GlobalPoint, tr, bb);
+
                 return new WallScanCandidate
                 {
                     Element = linkedHost,
@@ -733,7 +735,7 @@ namespace Modification
                     IsLinked = true,
                     AxisX = axis,
                     DepthFt = depth,
-                    PickPointInCurrentDocument = reference.GlobalPoint
+                    PickPointInCurrentDocument = pickPoint
                 };
             }
             catch
@@ -1600,6 +1602,12 @@ namespace Modification
                 return true;
             }
 
+            if (TryGetEstimatedIfcWallPlane(host, out origin, out normal) &&
+                TryIntersectCurveWithPlane(curve, origin, normal, out point))
+            {
+                return true;
+            }
+
             if (host.PickPointInCurrentDocument != null &&
                 TryProjectPointOnCurve(curve, host.PickPointInCurrentDocument, out point))
             {
@@ -1607,6 +1615,54 @@ namespace Modification
             }
 
             return false;
+        }
+
+        private static XYZ NormalizeLinkedReferencePoint(XYZ rawPoint, Transform linkTransform, BoundingBoxXYZ linkedBoundingBoxInCurrentDocument)
+        {
+            if (rawPoint == null)
+                return null;
+
+            Transform tr = linkTransform ?? Transform.Identity;
+            XYZ transformedPoint = rawPoint;
+
+            try
+            {
+                if (!tr.IsIdentity)
+                    transformedPoint = tr.OfPoint(rawPoint);
+            }
+            catch
+            {
+                transformedPoint = rawPoint;
+            }
+
+            if (linkedBoundingBoxInCurrentDocument == null)
+                return rawPoint;
+
+            double rawDistance = DistanceToBoundingBox(rawPoint, linkedBoundingBoxInCurrentDocument);
+            double transformedDistance = DistanceToBoundingBox(transformedPoint, linkedBoundingBoxInCurrentDocument);
+
+            return transformedDistance + 1e-6 < rawDistance
+                ? transformedPoint
+                : rawPoint;
+        }
+
+        private static double DistanceToBoundingBox(XYZ point, BoundingBoxXYZ bb)
+        {
+            if (point == null || bb == null)
+                return double.MaxValue;
+
+            double dx = DistanceToInterval(point.X, bb.Min.X, bb.Max.X);
+            double dy = DistanceToInterval(point.Y, bb.Min.Y, bb.Max.Y);
+            double dz = DistanceToInterval(point.Z, bb.Min.Z, bb.Max.Z);
+
+            return Math.Sqrt(dx * dx + dy * dy + dz * dz);
+        }
+
+        private static double DistanceToInterval(double value, double min, double max)
+        {
+            if (value < min) return min - value;
+            if (value > max) return value - max;
+            return 0.0;
         }
 
         private static Curve GetElementCurveInCurrentDocument(Element elem, Transform transformToCurrentDocument)
@@ -1666,6 +1722,30 @@ namespace Modification
                 origin = (host.BoundingBoxInCurrentDocument.Min + host.BoundingBoxInCurrentDocument.Max) * 0.5;
 
             return origin != null;
+        }
+
+        private static bool TryGetEstimatedIfcWallPlane(WallScanCandidate host, out XYZ origin, out XYZ normal)
+        {
+            origin = null;
+            normal = null;
+
+            if (host == null || host.Element is Wall)
+                return false;
+
+            BoundingBoxXYZ bb = host.BoundingBoxInCurrentDocument;
+            if (bb == null)
+                return false;
+
+            origin = (bb.Min + bb.Max) * 0.5;
+
+            double dx = Math.Abs(bb.Max.X - bb.Min.X);
+            double dy = Math.Abs(bb.Max.Y - bb.Min.Y);
+
+            if (dx < 1e-6 && dy < 1e-6)
+                return false;
+
+            normal = dx <= dy ? XYZ.BasisX : XYZ.BasisY;
+            return true;
         }
 
         private static bool TryIntersectCurveWithPlane(Curve curve, XYZ planeOrigin, XYZ planeNormal, out XYZ point)
