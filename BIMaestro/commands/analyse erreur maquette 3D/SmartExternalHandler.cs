@@ -25,6 +25,7 @@ namespace Analyse
         public bool ShowAllEnabled { get; set; } = false;
 
         public bool AutoSectionBox { get; set; } = true;
+        public IList<ModelIssue> FocusIssues { get; set; } = new List<ModelIssue>();
         public IList<ModelIssue> ThumbnailIssues { get; set; } = new List<ModelIssue>();
         public string ThumbnailFolder { get; set; }
         public int ThumbnailLimit { get; set; } = 12;
@@ -57,15 +58,23 @@ namespace Analyse
                             uidoc.ActiveView = v;
 
                             BoundingBoxXYZ focusBox = null;
+                            var focusIssues = (FocusIssues ?? new List<ModelIssue>())
+                                .Where(i => i != null)
+                                .ToList();
                             using (var t = new Transaction(doc, "BIMaestro Focus"))
                             {
                                 t.Start();
                                 if (!ShowAllMode) ClearOverrides(uidoc, v);
-                                focusBox = FocusIn3D(uidoc, v, IssueId, RelatedId, CurrentKind, IssueBox, AutoSectionBox);
+                                focusBox = focusIssues.Count > 1
+                                    ? FocusIssuesIn3D(uidoc, v, focusIssues, AutoSectionBox)
+                                    : FocusIn3D(uidoc, v, IssueId, RelatedId, CurrentKind, IssueBox, AutoSectionBox);
                                 doc.Regenerate();
                                 t.Commit();
                             }
-                            ZoomTo(uidoc, v, focusBox, IssueId);
+                            var fallbackId = focusIssues.Count > 1
+                                ? CleanIds(focusIssues.SelectMany(GetIssueFocusIds)).FirstOrDefault() ?? IssueId
+                                : IssueId;
+                            ZoomTo(uidoc, v, focusBox, fallbackId);
                             TryRefresh(uidoc);
                             break;
                         }
@@ -268,6 +277,89 @@ namespace Analyse
             }
 
             return focus;
+        }
+
+        private BoundingBoxXYZ FocusIssuesIn3D(UIDocument uidoc, View3D v, IList<ModelIssue> issues, bool setSection)
+        {
+            var doc = uidoc.Document;
+            var ids = CleanIds(issues.SelectMany(GetIssueFocusIds));
+
+            if (ids.Count > 0)
+                uidoc.Selection.SetElementIds(ids);
+
+            var focus = Union(issues.Select(i => GetIssueFocusBox(doc, v, i)));
+
+            if (setSection)
+            {
+                if (focus != null)
+                {
+                    var pad = new XYZ(1, 1, 1) * (180.0 / 304.8);
+                    v.SetSectionBox(new BoundingBoxXYZ { Min = focus.Min - pad, Max = focus.Max + pad });
+                    TryEnableSectionBox(v);
+                }
+                else
+                {
+                    TryDisableSectionBox(v);
+                }
+            }
+
+            var emphasize = new OverrideGraphicSettings();
+            emphasize.SetProjectionLineColor(new Color(255, 0, 0));
+#if REVIT2022_OR_LATER
+            emphasize.SetProjectionLineWeight(8);
+#endif
+            emphasize.SetSurfaceTransparency(0);
+
+            var fade = new OverrideGraphicSettings();
+            fade.SetSurfaceTransparency(85);
+            fade.SetHalftone(true);
+
+            if (ids.Count > 0)
+            {
+                foreach (var eid in ids)
+                    v.SetElementOverrides(eid, emphasize);
+
+                var keep = new HashSet<ElementId>(ids, new ElemIdCmp());
+                foreach (var oid in CollectModelElementIds(doc))
+                    if (!keep.Contains(oid))
+                        v.SetElementOverrides(oid, fade);
+            }
+
+            return focus;
+        }
+
+        private static IEnumerable<ElementId> GetIssueFocusIds(ModelIssue issue)
+        {
+            if (issue == null) yield break;
+
+            if (IsValidId(issue.ElementId))
+                yield return issue.ElementId;
+
+            // Un lien complet casse la lecture d'un cluster de clashes: on garde les réseaux + boîtes de collision.
+            if (issue.Kind != IssueKind.LinkPipeClash && IsValidId(issue.RelatedId))
+                yield return issue.RelatedId;
+        }
+
+        private static BoundingBoxXYZ GetIssueFocusBox(Document doc, View3D view, ModelIssue issue)
+        {
+            if (doc == null || issue == null) return null;
+
+            var mainBox = GetElementBox(doc, view, issue.ElementId);
+            var relatedBox = issue.Kind == IssueKind.LinkPipeClash
+                ? null
+                : GetElementBox(doc, view, issue.RelatedId);
+
+            if (issue.Kind == IssueKind.MepUnconnected)
+                return EnsureMinimumBoxSize(mainBox ?? issue.BBox, 300.0 / 304.8);
+
+            return Union(new[] { issue.BBox, mainBox, relatedBox });
+        }
+
+        private static BoundingBoxXYZ GetElementBox(Document doc, View3D view, ElementId id)
+        {
+            if (!IsValidId(id)) return null;
+            var el = doc.GetElement(id);
+            return el?.get_BoundingBox(view) ?? el?.get_BoundingBox(null);
         }
 
         private void ZoomTo(UIDocument uidoc, View3D v, BoundingBoxXYZ focusBox, ElementId fallbackId)

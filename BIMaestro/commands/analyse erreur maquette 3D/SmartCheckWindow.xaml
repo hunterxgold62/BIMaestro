@@ -85,6 +85,14 @@
                 <Setter Property="Margin" Value="0,0,8,6"/>
             </Style>
 
+            <Style x:Key="CardActionButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                <Setter Property="Height" Value="28"/>
+                <Setter Property="MinWidth" Value="82"/>
+                <Setter Property="Padding" Value="10,0"/>
+                <Setter Property="Margin" Value="0,0,8,0"/>
+                <Setter Property="FontSize" Value="11"/>
+            </Style>
+
             <Style x:Key="HelpButtonStyle" TargetType="Button">
                 <Setter Property="Width" Value="34"/>
                 <Setter Property="Height" Value="34"/>
@@ -303,8 +311,10 @@
                                Foreground="{DynamicResource Text.Secondary}"
                                Text="Aucun filtre actif"/>
                     <WrapPanel DockPanel.Dock="Right" HorizontalAlignment="Right">
+                        <Button x:Name="BackToGroupsButton" Content="Retour groupes" Style="{StaticResource ActionButtonStyle}" Click="OnBackToGroups" Visibility="Collapsed"/>
                         <Button Content="Réinitialiser filtres" Style="{StaticResource ActionButtonStyle}" Click="QuickFilterReset_Click"/>
                         <Button x:Name="FocusIsolateButton" Content="Focus + isoler" Style="{StaticResource ActionButtonStyle}" Click="OnFocusIsolate"/>
+                        <Button Content="Miniatures" Style="{StaticResource ActionButtonStyle}" Click="OnGenerateThumbnails"/>
                         <Button Content="Rapport" Style="{StaticResource ActionButtonStyle}" Click="OnExportReport"/>
                         <ToggleButton x:Name="BtnShowAll"
                                       Content="Afficher toutes les erreurs"
@@ -343,14 +353,15 @@
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
                                     <Border Width="292"
-                                            Height="260"
+                                            Height="292"
                                             Style="{StaticResource Card}"
                                             Padding="0">
                                         <Border.ContextMenu>
                                             <ContextMenu>
                                                 <MenuItem Header="Voir ce groupe"
                                                           Click="QuickFilterGroup_Click"
-                                                          CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                                          CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                          Visibility="{Binding PlacementTarget.DataContext.DetailActionVisibility, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                                                 <MenuItem Header="Voir ce type d'erreur"
                                                           Click="QuickFilterKind_Click"
                                                           CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
@@ -398,19 +409,27 @@
                                                 <RowDefinition Height="96"/>
                                                 <RowDefinition Height="*"/>
                                                 <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
                                             </Grid.RowDefinitions>
 
                                             <Border Grid.Row="0"
                                                     CornerRadius="14,14,0,0"
-                                                    Background="{DynamicResource Surface.Subtle}">
+                                                    Background="{DynamicResource Surface.Subtle}"
+                                                    ClipToBounds="True">
                                                 <Grid>
+                                                    <Image Source="{Binding ThumbnailPath}"
+                                                           Stretch="UniformToFill"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"
+                                                           Visibility="{Binding ThumbnailVisibility}"/>
                                                     <TextBlock Text="{Binding VisualInitials}"
                                                                FontSize="32"
                                                                FontWeight="Bold"
                                                                Opacity="0.32"
                                                                Foreground="{DynamicResource Text.Primary}"
                                                                HorizontalAlignment="Center"
-                                                               VerticalAlignment="Center"/>
+                                                               VerticalAlignment="Center"
+                                                               Visibility="{Binding InitialsVisibility}"/>
                                                     <Border Style="{StaticResource SeverityBadge}"
                                                             HorizontalAlignment="Left"
                                                             VerticalAlignment="Top"
@@ -466,7 +485,17 @@
                                                            MaxHeight="34"/>
                                             </StackPanel>
 
-                                            <Grid Grid.Row="2" Margin="12,0,12,12">
+                                            <WrapPanel Grid.Row="2" Margin="12,0,12,10">
+                                                <Button Content="Détail"
+                                                        Style="{StaticResource CardActionButtonStyle}"
+                                                        Click="QuickFilterGroup_Click"
+                                                        Visibility="{Binding DetailActionVisibility}"/>
+                                                <Button Content="Focus + isoler"
+                                                        Style="{StaticResource CardActionButtonStyle}"
+                                                        Click="OnFocusIsolate"/>
+                                            </WrapPanel>
+
+                                            <Grid Grid.Row="3" Margin="12,0,12,12">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>

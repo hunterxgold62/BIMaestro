@@ -23,7 +23,10 @@ const hmacKey = await crypto.subtle.importKey(
 );
 
 const allowedModes = new Set(["classic", "arcade", "hardcore", "flappy_bird"]);
-const gameName = "snake";
+
+function gameForMode(mode: string): string {
+  return mode === "flappy_bird" ? "flappy_bird" : "snake";
+}
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -118,6 +121,7 @@ serve(async (req) => {
       const response: Record<string, unknown> = {};
 
       for (const mode of allowedModes) {
+        const gameName = gameForMode(mode);
         const { data, error } = await supabase
           .from("game_leaderboards")
           .select("player_name, score")
@@ -165,6 +169,7 @@ serve(async (req) => {
       }
 
       const installId = await stableLeaderboardInstallId(identity.licenseKey, identity.machineId, clientInstallId);
+      const gameName = gameForMode(mode);
 
       const { data: existing, error: existingError } = await supabase
         .from("game_leaderboards")
@@ -214,4 +219,3 @@ serve(async (req) => {
     return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, 500);
   }
 });
-

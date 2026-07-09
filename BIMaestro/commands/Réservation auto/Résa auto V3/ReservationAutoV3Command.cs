@@ -283,6 +283,12 @@ namespace Modification
         // =========================
         // MANUAL
         // =========================
+        private static bool IsLinkSource(ReservationAutoV3Window.PipeSource source)
+        {
+            return source == ReservationAutoV3Window.PipeSource.LienIFC
+                   || source == ReservationAutoV3Window.PipeSource.LienRVT;
+        }
+
         private void RunManual(UIDocument uiDoc, Document doc,
             ReservationAutoV3Window win,
             ReservationAutoV3Config cfg,
@@ -297,7 +303,7 @@ namespace Modification
 
             while (true)
             {
-                List<(Element el, Transform tr)> picked;
+                List<MepSelection> picked;
                 try
                 {
                     picked = PickElements(uiDoc, doc, win, multi: win.MultiEnabled && isRect);
@@ -310,11 +316,62 @@ namespace Modification
                 if (picked == null || picked.Count == 0)
                     break;
 
+                bool pickComesFromLink = picked.Any(x => x.IsLinked);
+                bool pickComesFromHost = picked.All(x => !x.IsLinked);
+                bool linkSourceSelected = IsLinkSource(win.SelectedPipeSource);
+                bool useLinkedHost = isWall && linkSourceSelected && pickComesFromHost;
+
+                if (useLinkedHost)
+                {
+                    var linkedHost = PickLinkedHostCandidate(uiDoc, doc, win.SelectedPipeSource, win.SelectedHost);
+                    if (linkedHost == null)
+                        break;
+
+                    if (picked.Count > 1)
+                    {
+                        TaskDialog.Show("BIMaestro", "La multi-sélection n'est pas disponible avec un mur lié.");
+                        continue;
+                    }
+
+                    CreateReservation_SingleAgainstCandidate(
+                        doc,
+                        linkedHost,
+                        reservationSymbol,
+                        win.SelectedObject,
+                        picked.First(),
+                        cfg,
+                        prof,
+                        isWall,
+                        isRect,
+                        win.NormeEnabled);
+
+                    var tdLinked = new TaskDialog("BIMaestro")
+                    {
+                        MainInstruction = "Créer une autre réservation ?",
+                        CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No
+                    };
+                    if (tdLinked.Show() != TaskDialogResult.Yes)
+                        break;
+
+                    continue;
+                }
+
+                if (linkSourceSelected && pickComesFromLink && picked.Count > 1)
+                {
+                    TaskDialog.Show("BIMaestro", "La multi-sélection reste limitée aux éléments de la maquette active.");
+                    continue;
+                }
+
                 Element host;
                 try
                 {
+                    string hostPrompt = pickComesFromLink
+                        ? (isWall ? "Sélectionne le mur de ta maquette" : "Sélectionne le sol de ta maquette")
+                        : (isWall ? "Sélectionne le mur" : "Sélectionne le sol");
+
                     var rHost = uiDoc.Selection.PickObject(ObjectType.Element,
-                        isWall ? "Sélectionne le mur (ESC pour annuler)" : "Sélectionne le sol (ESC pour annuler)");
+                        new LocalHostSelectionFilter(win.SelectedHost),
+                        hostPrompt + " (ESC pour annuler)");
                     host = doc.GetElement(rHost);
                 }
                 catch
@@ -338,12 +395,34 @@ namespace Modification
 
                 if (picked.Count > 1 && isRect)
                 {
-                    CreateRectReservation_Multi(doc, host, level, reservationSymbol, win.SelectedObject, picked, cfg, prof, isWall, win.NormeEnabled);
+                    CreateRectReservation_Multi(
+                        doc,
+                        host,
+                        level,
+                        reservationSymbol,
+                        win.SelectedObject,
+                        picked.Select(x => (x.Element, x.TransformToCurrentDocument)).ToList(),
+                        cfg,
+                        prof,
+                        isWall,
+                        win.NormeEnabled);
                 }
                 else
                 {
-                    var (el, tr) = picked.First();
-                    CreateReservation_Single(doc, host, level, reservationSymbol, win.SelectedObject, el, tr, cfg, prof, isWall, isRect, win.NormeEnabled);
+                    var selected = picked.First();
+                    CreateReservation_Single(
+                        doc,
+                        host,
+                        level,
+                        reservationSymbol,
+                        win.SelectedObject,
+                        selected.Element,
+                        selected.TransformToCurrentDocument,
+                        cfg,
+                        prof,
+                        isWall,
+                        isRect,
+                        win.NormeEnabled);
                 }
 
                 var td = new TaskDialog("BIMaestro")
@@ -365,10 +444,7 @@ namespace Modification
             ProfileConfig prof,
             FamilySymbol reservationSymbol)
         {
-            var walls = new FilteredElementCollector(doc)
-                .OfClass(typeof(Wall))
-                .Cast<Wall>()
-                .ToList();
+            var walls = GetAutomaticWallCandidates(doc);
 
             if (!walls.Any())
             {
@@ -410,17 +486,12 @@ namespace Modification
             }
 
             int created = 0;
+            int failedPlacements = 0;
 
             foreach (var wall in walls)
             {
-                var bbWall = wall.get_BoundingBox(null);
+                var bbWall = wall.BoundingBoxInCurrentDocument;
                 if (bbWall == null) continue;
-
-                var level = doc.GetElement(wall.LevelId) as Level
-                            ?? new FilteredElementCollector(doc)
-                                .OfClass(typeof(Level))
-                                .Cast<Level>()
-                                .FirstOrDefault();
 
                 foreach (var el in targets)
                 {
@@ -433,16 +504,35 @@ namespace Modification
                     XYZ center = (bbInt.Min + bbInt.Max) * 0.5;
                     center = ProjectPointOntoWallPlane(wall, center);
 
-                    var fi = doc.Create.NewFamilyInstance(
-                        center,
-                        reservationSymbol,
-                        wall,
-                        level,
-                        Autodesk.Revit.DB.Structure.StructuralType.NonStructural);
+                    var level = wall.CanHost
+                        ? doc.GetElement(((Wall)wall.Element).LevelId) as Level
+                        : GetNearestLevel(doc, center.Z);
+
+                    level = level ?? new FilteredElementCollector(doc)
+                        .OfClass(typeof(Level))
+                        .Cast<Level>()
+                        .FirstOrDefault();
+
+                    FamilyInstance fi = wall.CanHost
+                        ? doc.Create.NewFamilyInstance(
+                            center,
+                            reservationSymbol,
+                            wall.Element,
+                            level,
+                            Autodesk.Revit.DB.Structure.StructuralType.NonStructural)
+                        : CreateUnhostedFamilyInstance(doc, center, reservationSymbol, level);
+
+                    if (fi == null)
+                    {
+                        failedPlacements++;
+                        continue;
+                    }
+
+                    AlignReservationOrientationIfNeeded(doc, fi, reservationSymbol, wall.Element, center, wall.AxisX);
 
                     ApplySizing(
                         fi,
-                        wall,
+                        wall.Element,
                         bbInt,
                         cfg,
                         prof,
@@ -450,13 +540,15 @@ namespace Modification
                         el,
                         Transform.Identity,
                         win.SelectedShape == ReservationAutoV3Window.ShapeTarget.Rectangulaire,
-                        win.NormeEnabled);
+                        win.NormeEnabled,
+                        wall.AxisX,
+                        wall.DepthFt);
 
                     ApplyVerticalPlacementCorrection(
                         doc,
                         fi,
                         reservationSymbol,
-                        wall,
+                        wall.Element,
                         prof,
                         bbInt,
                         cfg,
@@ -465,18 +557,34 @@ namespace Modification
                         win.SelectedShape == ReservationAutoV3Window.ShapeTarget.Rectangulaire,
                         win.NormeEnabled);
 
-                    ForceVoidCutSafe(doc, wall, fi);
+                    if (wall.CanHost)
+                        ForceVoidCutSafe(doc, wall.Element, fi);
+
                     created++;
                 }
             }
 
-            TaskDialog.Show("BIMaestro", $"Réservations créées : {created}");
+            string message = $"Réservations créées : {created}";
+            if (failedPlacements > 0)
+            {
+                message += "\n\nNon créées : " + failedPlacements +
+                           "\nLa famille configurée semble nécessiter un hôte. Pour les murs d'un lien, utilise une famille de réservation non hébergée.";
+            }
+
+            TaskDialog.Show("BIMaestro", message);
         }
 
         // =========================
         // Picking helpers
         // =========================
-        private List<(Element el, Transform tr)> PickElements(UIDocument uiDoc, Document doc, ReservationAutoV3Window win, bool multi)
+        private class MepSelection
+        {
+            public Element Element { get; set; }
+            public Transform TransformToCurrentDocument { get; set; } = Transform.Identity;
+            public bool IsLinked { get; set; }
+        }
+
+        private List<MepSelection> PickElements(UIDocument uiDoc, Document doc, ReservationAutoV3Window win, bool multi)
         {
             if (!multi)
             {
@@ -487,23 +595,206 @@ namespace Modification
                 else
                     r = uiDoc.Selection.PickObject(ObjectType.Element, "Sélectionne l’objet (ESC pour annuler)");
 
-                if (!TryResolveReference(uiDoc, r, out var el, out var tr))
-                    return new List<(Element, Transform)>();
+                if (!TryResolveReference(uiDoc, r, out var el, out var tr, out bool isLinked))
+                    return new List<MepSelection>();
 
-                return new List<(Element, Transform)> { (el, tr) };
+                return new List<MepSelection>
+                {
+                    new MepSelection
+                    {
+                        Element = el,
+                        TransformToCurrentDocument = tr,
+                        IsLinked = isLinked
+                    }
+                };
             }
             else
             {
                 IList<Reference> refs = GetMepCurveReferencesBySource(uiDoc, doc, win.SelectedPipeSource, win.SelectedObject);
 
-                var list = new List<(Element, Transform)>();
+                var list = new List<MepSelection>();
                 foreach (var rr in refs)
                 {
-                    if (TryResolveReference(uiDoc, rr, out var el, out var tr))
-                        list.Add((el, tr));
+                    if (TryResolveReference(uiDoc, rr, out var el, out var tr, out bool isLinked))
+                    {
+                        list.Add(new MepSelection
+                        {
+                            Element = el,
+                            TransformToCurrentDocument = tr,
+                            IsLinked = isLinked
+                        });
+                    }
                 }
                 return list;
             }
+        }
+
+        private class WallScanCandidate
+        {
+            public Element Element { get; set; }
+            public BoundingBoxXYZ BoundingBoxInCurrentDocument { get; set; }
+            public Transform TransformToCurrentDocument { get; set; } = Transform.Identity;
+            public bool IsLinked { get; set; }
+            public XYZ AxisX { get; set; } = XYZ.BasisX;
+            public double DepthFt { get; set; }
+            public XYZ PickPointInCurrentDocument { get; set; }
+
+            public bool CanHost => !IsLinked && Element is Wall;
+        }
+
+        private List<WallScanCandidate> GetAutomaticWallCandidates(Document doc)
+        {
+            return CollectWallCandidates(doc, Transform.Identity, isLinked: false);
+        }
+
+        private static List<WallScanCandidate> CollectWallCandidates(Document sourceDoc, Transform transformToCurrentDoc, bool isLinked)
+        {
+            var result = new List<WallScanCandidate>();
+            if (sourceDoc == null) return result;
+
+            Transform tr = transformToCurrentDoc ?? Transform.Identity;
+
+            var wallElements = new FilteredElementCollector(sourceDoc)
+                .OfCategory(BuiltInCategory.OST_Walls)
+                .WhereElementIsNotElementType()
+                .ToElements();
+
+            foreach (var element in wallElements)
+            {
+                var bb = GetBoundingBoxInHostCoordinates(element, tr);
+                if (bb == null) continue;
+
+                XYZ axis = element is Wall wall
+                    ? GetWallDirectionXY(wall, tr)
+                    : EstimateWallAxisXY(bb);
+
+                double depth = element is Wall typedWall
+                    ? GetHostDepth(typedWall)
+                    : EstimateWallDepth(bb);
+
+                result.Add(new WallScanCandidate
+                {
+                    Element = element,
+                    BoundingBoxInCurrentDocument = bb,
+                    TransformToCurrentDocument = tr,
+                    IsLinked = isLinked,
+                    AxisX = axis,
+                    DepthFt = depth
+                });
+            }
+
+            return result;
+        }
+
+        private static WallScanCandidate PickLinkedHostCandidate(
+            UIDocument uiDoc,
+            Document doc,
+            ReservationAutoV3Window.PipeSource source,
+            ReservationAutoV3Window.HostTarget hostTarget)
+        {
+            try
+            {
+                string hostLabel = hostTarget == ReservationAutoV3Window.HostTarget.Sol ? "sol" : "mur";
+                Reference reference = uiDoc.Selection.PickObject(
+                    ObjectType.LinkedElement,
+                    new LinkHostSelectionFilter(doc, source, hostTarget),
+                    $"Sélectionne le {hostLabel} du lien (ESC pour annuler)");
+
+                if (reference == null || reference.LinkedElementId == ElementId.InvalidElementId)
+                    return null;
+
+                var linkInstance = doc.GetElement(reference.ElementId) as RevitLinkInstance;
+                Document linkDoc = linkInstance?.GetLinkDocument();
+                if (linkDoc == null)
+                    return null;
+
+                Element linkedHost = linkDoc.GetElement(reference.LinkedElementId);
+                if (linkedHost == null)
+                    return null;
+
+                Transform tr = linkInstance.GetTotalTransform();
+                var bb = GetBoundingBoxInHostCoordinates(linkedHost, tr);
+                if (bb == null)
+                    return null;
+
+                XYZ axis = linkedHost is Wall wall
+                    ? GetWallDirectionXY(wall, tr)
+                    : EstimateWallAxisXY(bb);
+
+                double depth = linkedHost is Wall typedWall
+                    ? GetHostDepth(typedWall)
+                    : EstimateWallDepth(bb);
+
+                return new WallScanCandidate
+                {
+                    Element = linkedHost,
+                    BoundingBoxInCurrentDocument = bb,
+                    TransformToCurrentDocument = tr,
+                    IsLinked = true,
+                    AxisX = axis,
+                    DepthFt = depth,
+                    PickPointInCurrentDocument = reference.GlobalPoint
+                };
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static FamilyInstance CreateUnhostedFamilyInstance(Document doc, XYZ center, FamilySymbol symbol, Level level)
+        {
+            if (doc == null || center == null || symbol == null) return null;
+
+            try
+            {
+                return doc.Create.NewFamilyInstance(
+                    center,
+                    symbol,
+                    Autodesk.Revit.DB.Structure.StructuralType.NonStructural);
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                if (level != null)
+                {
+                    return doc.Create.NewFamilyInstance(
+                        center,
+                        symbol,
+                        level,
+                        Autodesk.Revit.DB.Structure.StructuralType.NonStructural);
+                }
+            }
+            catch
+            {
+            }
+
+            return null;
+        }
+
+        private static void MoveInstanceToPoint(Document doc, FamilyInstance fi, XYZ target)
+        {
+            if (doc == null || fi == null || target == null)
+                return;
+
+            if (fi.Location is not LocationPoint location || location.Point == null)
+                return;
+
+            XYZ delta = target - location.Point;
+            if (delta.GetLength() > 1e-9)
+                ElementTransformUtils.MoveElement(doc, fi.Id, delta);
+        }
+
+        private static Level GetNearestLevel(Document doc, double z)
+        {
+            return new FilteredElementCollector(doc)
+                .OfClass(typeof(Level))
+                .Cast<Level>()
+                .OrderBy(l => Math.Abs(l.Elevation - z))
+                .FirstOrDefault();
         }
 
         // =========================
@@ -542,6 +833,97 @@ namespace Modification
             ApplyVerticalPlacementCorrection(doc, fi, sym, host, prof, bbInt, cfg, objType, el, isRect, normeEnabled);
 
             ForceVoidCutSafe(doc, host, fi);
+        }
+
+        private void CreateReservation_SingleAgainstCandidate(Document doc,
+            WallScanCandidate host,
+            FamilySymbol sym,
+            ReservationAutoV3Window.ObjectType objType,
+            MepSelection selected,
+            ReservationAutoV3Config cfg,
+            ProfileConfig prof,
+            bool isWall,
+            bool isRect,
+            bool normeEnabled)
+        {
+            if (doc == null || host == null || sym == null || selected?.Element == null)
+                return;
+
+            var bbHost = host.BoundingBoxInCurrentDocument;
+            var bbEl = GetBoundingBoxInHostCoordinates(selected.Element, selected.TransformToCurrentDocument);
+            if (bbHost == null || bbEl == null) return;
+
+            var bbInt = IntersectBoundingBoxes(bbHost, bbEl);
+            if (bbInt == null) return;
+
+            XYZ center;
+            if (!TryGetLinkedHostPlacementPoint(selected, host, out center))
+                center = (bbInt.Min + bbInt.Max) * 0.5;
+
+            if (isWall)
+                center = ProjectPointOntoWallPlane(host, center);
+
+            var level = GetNearestLevel(doc, center.Z)
+                        ?? new FilteredElementCollector(doc)
+                            .OfClass(typeof(Level))
+                            .Cast<Level>()
+                            .FirstOrDefault();
+
+            FamilyInstance fi = host.CanHost
+                ? doc.Create.NewFamilyInstance(
+                    center,
+                    sym,
+                    host.Element,
+                    level,
+                    Autodesk.Revit.DB.Structure.StructuralType.NonStructural)
+                : CreateUnhostedFamilyInstance(doc, center, sym, level);
+
+            if (fi == null)
+            {
+                TaskDialog.Show(
+                    "BIMaestro",
+                    "Impossible de créer la réservation sans hôte.\nUtilise une famille de réservation non hébergée pour traverser un mur de lien.");
+                return;
+            }
+
+            AlignReservationOrientationIfNeeded(doc, fi, sym, host.Element, center,
+                isWall ? host.AxisX : GetElementDirectionXY(selected.Element, selected.TransformToCurrentDocument));
+
+            ApplySizing(
+                fi,
+                host.Element,
+                bbInt,
+                cfg,
+                prof,
+                objType,
+                selected.Element,
+                selected.TransformToCurrentDocument,
+                isRect,
+                normeEnabled,
+                isWall ? host.AxisX : null,
+                host.DepthFt);
+
+            if (host.CanHost)
+            {
+                ApplyVerticalPlacementCorrection(
+                    doc,
+                    fi,
+                    sym,
+                    host.Element,
+                    prof,
+                    bbInt,
+                    cfg,
+                    objType,
+                    selected.Element,
+                    isRect,
+                    normeEnabled);
+
+                ForceVoidCutSafe(doc, host.Element, fi);
+            }
+            else
+            {
+                MoveInstanceToPoint(doc, fi, center);
+            }
         }
 
         private void CreateRectReservation_Multi(Document doc,
@@ -604,7 +986,9 @@ namespace Modification
             ReservationAutoV3Config cfg, ProfileConfig prof,
             ReservationAutoV3Window.ObjectType objType,
             Element intersecting, Transform trToHost,
-            bool isRect, bool normeEnabled)
+            bool isRect, bool normeEnabled,
+            XYZ wallAxisOverride = null,
+            double? depthOverrideFt = null)
         {
             if (fi == null || host == null || bbIntersect == null) return;
 
@@ -612,7 +996,7 @@ namespace Modification
                                 || objType == ReservationAutoV3Window.ObjectType.Gaine;
 
             double oversizeFt = MmToFt(isPipeOrDuct ? cfg.OversizeMm_PipeDuct : 0.0);
-            double depthFt = GetHostDepth(host);
+            double depthFt = depthOverrideFt ?? GetHostDepth(host);
 
             var world = ToWorldBoundingBox(bbIntersect);
             if (world == null) return;
@@ -632,9 +1016,10 @@ namespace Modification
                 return;
             }
 
-            if (host is Wall wall)
+            var typedWall = host as Wall;
+            if (typedWall != null || wallAxisOverride != null)
             {
-                XYZ wallDir = GetWallDirection(wall);
+                XYZ wallDir = wallAxisOverride ?? GetWallDirection(typedWall);
 
                 var corners = new List<XYZ>
                 {
@@ -1188,6 +1573,170 @@ namespace Modification
             return XYZ.BasisX;
         }
 
+        private static XYZ GetWallDirectionXY(Wall wall, Transform transformToCurrentDoc)
+        {
+            XYZ direction = GetWallDirectionXY(wall);
+            if (transformToCurrentDoc != null && !transformToCurrentDoc.IsIdentity)
+                direction = transformToCurrentDoc.OfVector(direction);
+
+            direction = new XYZ(direction.X, direction.Y, 0.0);
+            if (direction.IsZeroLength()) return XYZ.BasisX;
+            return direction.Normalize();
+        }
+
+        private static bool TryGetLinkedHostPlacementPoint(MepSelection selected, WallScanCandidate host, out XYZ point)
+        {
+            point = null;
+            if (selected?.Element == null || host == null)
+                return false;
+
+            Curve curve = GetElementCurveInCurrentDocument(selected.Element, selected.TransformToCurrentDocument);
+            if (curve == null)
+                return false;
+
+            if (TryGetWallPlaneInCurrentDocument(host, out XYZ origin, out XYZ normal) &&
+                TryIntersectCurveWithPlane(curve, origin, normal, out point))
+            {
+                return true;
+            }
+
+            if (host.PickPointInCurrentDocument != null &&
+                TryProjectPointOnCurve(curve, host.PickPointInCurrentDocument, out point))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private static Curve GetElementCurveInCurrentDocument(Element elem, Transform transformToCurrentDocument)
+        {
+            if (elem?.Location is not LocationCurve lc || lc.Curve == null)
+                return null;
+
+            Curve curve = lc.Curve;
+            if (transformToCurrentDocument != null && !transformToCurrentDocument.IsIdentity)
+            {
+                try
+                {
+                    curve = curve.CreateTransformed(transformToCurrentDocument);
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+
+            return curve;
+        }
+
+        private static bool TryGetWallPlaneInCurrentDocument(WallScanCandidate host, out XYZ origin, out XYZ normal)
+        {
+            origin = null;
+            normal = null;
+
+            if (host?.Element is not Wall wall)
+                return false;
+
+            Transform tr = host.TransformToCurrentDocument ?? Transform.Identity;
+
+            normal = wall.Orientation;
+            if (normal == null || normal.GetLength() < 1e-9)
+                return false;
+
+            normal = tr.OfVector(normal);
+            if (normal == null || normal.GetLength() < 1e-9)
+                return false;
+
+            normal = normal.Normalize();
+
+            if (wall.Location is LocationCurve lc && lc.Curve != null)
+            {
+                try
+                {
+                    origin = tr.OfPoint(lc.Curve.Evaluate(0.5, true));
+                }
+                catch
+                {
+                    origin = null;
+                }
+            }
+
+            if (origin == null && host.BoundingBoxInCurrentDocument != null)
+                origin = (host.BoundingBoxInCurrentDocument.Min + host.BoundingBoxInCurrentDocument.Max) * 0.5;
+
+            return origin != null;
+        }
+
+        private static bool TryIntersectCurveWithPlane(Curve curve, XYZ planeOrigin, XYZ planeNormal, out XYZ point)
+        {
+            point = null;
+            if (curve == null || planeOrigin == null || planeNormal == null || planeNormal.GetLength() < 1e-9)
+                return false;
+
+            try
+            {
+                XYZ p0 = curve.GetEndPoint(0);
+                XYZ p1 = curve.GetEndPoint(1);
+                XYZ direction = p1 - p0;
+
+                double denom = planeNormal.DotProduct(direction);
+                if (Math.Abs(denom) < 1e-9)
+                    return false;
+
+                double factor = planeNormal.DotProduct(planeOrigin - p0) / denom;
+                if (factor < -0.05 || factor > 1.05)
+                    return false;
+
+                factor = Math.Max(0.0, Math.Min(1.0, factor));
+                point = p0 + direction * factor;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool TryProjectPointOnCurve(Curve curve, XYZ referencePoint, out XYZ point)
+        {
+            point = null;
+            if (curve == null || referencePoint == null)
+                return false;
+
+            try
+            {
+                IntersectionResult result = curve.Project(referencePoint);
+                if (result?.XYZPoint != null)
+                {
+                    point = result.XYZPoint;
+                    return true;
+                }
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                XYZ p0 = curve.GetEndPoint(0);
+                XYZ p1 = curve.GetEndPoint(1);
+                XYZ direction = p1 - p0;
+                double lengthSquared = direction.DotProduct(direction);
+                if (lengthSquared < 1e-12)
+                    return false;
+
+                double factor = (referencePoint - p0).DotProduct(direction) / lengthSquared;
+                factor = Math.Max(0.0, Math.Min(1.0, factor));
+                point = p0 + direction * factor;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private static XYZ GetElementDirectionXY(Element e, Transform trToHost)
         {
             if (e == null) return null;
@@ -1322,6 +1871,57 @@ namespace Modification
             return point - normal * offset;
         }
 
+        private static XYZ ProjectPointOntoWallPlane(WallScanCandidate candidate, XYZ point)
+        {
+            if (candidate?.Element is not Wall wall || point == null)
+                return point;
+
+            if (!candidate.IsLinked)
+                return ProjectPointOntoWallPlane(wall, point);
+
+            Transform tr = candidate.TransformToCurrentDocument ?? Transform.Identity;
+
+            XYZ normal = wall.Orientation;
+            if (normal == null || normal.GetLength() < 1e-9) return point;
+            normal = tr.OfVector(normal).Normalize();
+
+            XYZ origin = null;
+            if (wall.Location is LocationCurve lc && lc.Curve != null)
+                origin = tr.OfPoint(lc.Curve.Evaluate(0.5, true));
+
+            origin ??= point;
+            double offset = normal.DotProduct(point - origin);
+
+            return point - normal * offset;
+        }
+
+        private static XYZ EstimateWallAxisXY(BoundingBoxXYZ bb)
+        {
+            if (bb == null) return XYZ.BasisX;
+
+            double dx = Math.Abs(bb.Max.X - bb.Min.X);
+            double dy = Math.Abs(bb.Max.Y - bb.Min.Y);
+
+            if (dx >= dy)
+                return XYZ.BasisX;
+
+            return XYZ.BasisY;
+        }
+
+        private static double EstimateWallDepth(BoundingBoxXYZ bb)
+        {
+            if (bb == null) return 0.0;
+
+            double dx = Math.Abs(bb.Max.X - bb.Min.X);
+            double dy = Math.Abs(bb.Max.Y - bb.Min.Y);
+            double dz = Math.Abs(bb.Max.Z - bb.Min.Z);
+
+            return new[] { dx, dy, dz }
+                .Where(v => v > 1e-9)
+                .DefaultIfEmpty(0.0)
+                .Min();
+        }
+
         private static XYZ GetPlacementPointOnFloor(Floor floor, XYZ fallbackCenter)
         {
             if (floor == null) return fallbackCenter;
@@ -1446,6 +2046,202 @@ namespace Modification
         // =========================
         // Link/host pipe selection
         // =========================
+        private static string GetElementSearchText(Element elem)
+        {
+            if (elem == null) return string.Empty;
+
+            var parts = new List<string>
+            {
+                elem.GetType().Name
+            };
+
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(elem.Name))
+                    parts.Add(elem.Name);
+            }
+            catch { }
+
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(elem.Category?.Name))
+                    parts.Add(elem.Category.Name);
+            }
+            catch { }
+
+            try
+            {
+                Element type = elem.Document?.GetElement(elem.GetTypeId());
+                if (!string.IsNullOrWhiteSpace(type?.Name))
+                    parts.Add(type.Name);
+            }
+            catch { }
+
+            return string.Join(" ", parts).ToLowerInvariant();
+        }
+
+        private static bool HasCategory(Element elem, params BuiltInCategory[] categories)
+        {
+            if (elem?.Category == null) return false;
+
+            int categoryId = elem.Category.Id.IntegerValue;
+            return categories.Any(category => categoryId == (int)category);
+        }
+
+        private static bool TextContainsAny(string text, params string[] tokens)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return false;
+            return tokens.Any(token => text.Contains(token));
+        }
+
+        private static bool IsPipeLikeElement(Element elem)
+        {
+            if (elem is Pipe) return true;
+
+            if (HasCategory(elem, BuiltInCategory.OST_PipeCurves))
+                return true;
+
+            string text = GetElementSearchText(elem);
+            return TextContainsAny(
+                text,
+                "ifcpipe",
+                "ifcflowsegment",
+                "flowsegment",
+                "pipe segment",
+                "pipesegment",
+                "pipe",
+                "canalisation",
+                "tuyau");
+        }
+
+        private static bool IsDuctLikeElement(Element elem)
+        {
+            if (elem is Duct) return true;
+
+            if (HasCategory(elem, BuiltInCategory.OST_DuctCurves))
+                return true;
+
+            string text = GetElementSearchText(elem);
+            return TextContainsAny(
+                text,
+                "ifcduct",
+                "ifcflowsegment",
+                "flowsegment",
+                "duct segment",
+                "ductsegment",
+                "duct",
+                "gaine");
+        }
+
+        private static bool IsExpectedMepElement(Element elem, ReservationAutoV3Window.ObjectType objectType)
+        {
+            return objectType switch
+            {
+                ReservationAutoV3Window.ObjectType.Canalisation => IsPipeLikeElement(elem),
+                ReservationAutoV3Window.ObjectType.Gaine => IsDuctLikeElement(elem),
+                _ => false
+            };
+        }
+
+        private static bool IsWallLikeElement(Element elem)
+        {
+            if (elem is Wall) return true;
+
+            if (HasCategory(elem, BuiltInCategory.OST_Walls))
+                return true;
+
+            string text = GetElementSearchText(elem);
+            return TextContainsAny(text, "ifcwall", "wall", "mur");
+        }
+
+        private static bool IsFloorLikeElement(Element elem)
+        {
+            if (elem is Floor) return true;
+
+            if (HasCategory(elem, BuiltInCategory.OST_Floors))
+                return true;
+
+            string text = GetElementSearchText(elem);
+            return TextContainsAny(text, "ifcslab", "slab", "floor", "dalle", "sol");
+        }
+
+        private static bool IsIfcLinkInstance(RevitLinkInstance linkInstance)
+        {
+            try
+            {
+                var extRef = linkInstance.GetExternalFileReference();
+                if (extRef != null)
+                {
+                    string kind = extRef.ExternalFileReferenceType.ToString();
+                    if (string.Equals(kind, "IFC", StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+            }
+            catch { }
+
+            var linkDoc = linkInstance.GetLinkDocument();
+            string pathOrName = string.Join(
+                " ",
+                linkDoc?.PathName,
+                linkDoc?.Title,
+                linkInstance.Name,
+                linkInstance.Document?.GetElement(linkInstance.GetTypeId())?.Name).ToLowerInvariant();
+            return pathOrName.EndsWith(".ifc") || pathOrName.Contains(".ifc");
+        }
+
+        private static bool IsRvtLinkInstance(RevitLinkInstance linkInstance)
+        {
+            try
+            {
+                var extRef = linkInstance.GetExternalFileReference();
+                if (extRef != null && extRef.ExternalFileReferenceType == ExternalFileReferenceType.RevitLink)
+                    return true;
+            }
+            catch { }
+
+            var linkDoc = linkInstance.GetLinkDocument();
+            string pathOrName = string.Join(
+                " ",
+                linkDoc?.PathName,
+                linkDoc?.Title,
+                linkInstance.Name,
+                linkInstance.Document?.GetElement(linkInstance.GetTypeId())?.Name).ToLowerInvariant();
+            bool hasIfc = pathOrName.Contains(".ifc");
+            bool hasRvt = pathOrName.EndsWith(".rvt");
+            return hasRvt && !hasIfc;
+        }
+
+        private static bool MatchesExpectedLinkType(RevitLinkInstance linkInstance, ReservationAutoV3Window.PipeSource source)
+        {
+            if (linkInstance == null) return false;
+
+            return source switch
+            {
+                ReservationAutoV3Window.PipeSource.LienIFC => linkInstance.GetLinkDocument() != null,
+                ReservationAutoV3Window.PipeSource.LienRVT => IsRvtLinkInstance(linkInstance),
+                _ => false
+            };
+        }
+
+        private class LinkInstanceSelectionFilter : ISelectionFilter
+        {
+            private readonly ReservationAutoV3Window.PipeSource _source;
+
+            public LinkInstanceSelectionFilter(Document doc, ReservationAutoV3Window.PipeSource source)
+            {
+                _source = source;
+            }
+
+            public bool AllowElement(Element elem)
+            {
+                var linkInstance = elem as RevitLinkInstance;
+                return linkInstance?.GetLinkDocument() != null &&
+                       MatchesExpectedLinkType(linkInstance, _source);
+            }
+
+            public bool AllowReference(Reference reference, XYZ position) => false;
+        }
+
         private class HostMepCurveSelectionFilter : ISelectionFilter
         {
             private readonly ReservationAutoV3Window.ObjectType _objectType;
@@ -1457,15 +2253,120 @@ namespace Modification
 
             public bool AllowElement(Element elem)
             {
-                return _objectType switch
+                return IsExpectedMepElement(elem, _objectType);
+            }
+
+            public bool AllowReference(Reference reference, XYZ position) => false;
+        }
+
+        private class LocalHostSelectionFilter : ISelectionFilter
+        {
+            private readonly ReservationAutoV3Window.HostTarget _hostTarget;
+
+            public LocalHostSelectionFilter(ReservationAutoV3Window.HostTarget hostTarget)
+            {
+                _hostTarget = hostTarget;
+            }
+
+            public bool AllowElement(Element elem)
+            {
+                return _hostTarget switch
                 {
-                    ReservationAutoV3Window.ObjectType.Canalisation => elem is Pipe,
-                    ReservationAutoV3Window.ObjectType.Gaine => elem is Duct,
+                    ReservationAutoV3Window.HostTarget.Mur => elem is Wall,
+                    ReservationAutoV3Window.HostTarget.Sol => elem is Floor,
                     _ => false
                 };
             }
 
             public bool AllowReference(Reference reference, XYZ position) => false;
+        }
+
+        private class LinkHostSelectionFilter : ISelectionFilter
+        {
+            private readonly Document _doc;
+            private readonly ReservationAutoV3Window.PipeSource _source;
+            private readonly ReservationAutoV3Window.HostTarget _hostTarget;
+
+            public LinkHostSelectionFilter(Document doc, ReservationAutoV3Window.PipeSource source, ReservationAutoV3Window.HostTarget hostTarget)
+            {
+                _doc = doc;
+                _source = source;
+                _hostTarget = hostTarget;
+            }
+
+            public bool AllowElement(Element elem)
+            {
+                var linkInstance = elem as RevitLinkInstance;
+                return linkInstance?.GetLinkDocument() != null &&
+                       MatchesExpectedLinkType(linkInstance, _source);
+            }
+
+            public bool AllowReference(Reference reference, XYZ position)
+            {
+                if (reference == null) return false;
+
+                var linkInstance = _doc.GetElement(reference.ElementId) as RevitLinkInstance;
+                Document linkDoc = linkInstance?.GetLinkDocument();
+                if (linkDoc == null || !MatchesExpectedLinkType(linkInstance, _source))
+                    return false;
+
+                Element linkedElem = linkDoc.GetElement(reference.LinkedElementId);
+                return _hostTarget switch
+                {
+                    ReservationAutoV3Window.HostTarget.Mur => IsWallLikeElement(linkedElem),
+                    ReservationAutoV3Window.HostTarget.Sol => IsFloorLikeElement(linkedElem),
+                    _ => false
+                };
+            }
+        }
+
+        private class HybridMepCurveSelectionFilter : ISelectionFilter
+        {
+            private readonly Document _doc;
+            private readonly ReservationAutoV3Window.PipeSource _source;
+            private readonly ReservationAutoV3Window.ObjectType _objectType;
+
+            public HybridMepCurveSelectionFilter(Document doc, ReservationAutoV3Window.PipeSource source, ReservationAutoV3Window.ObjectType objectType)
+            {
+                _doc = doc;
+                _source = source;
+                _objectType = objectType;
+            }
+
+            public bool AllowElement(Element elem)
+            {
+                if (IsExpectedMepCurve(elem))
+                    return true;
+
+                var linkInstance = elem as RevitLinkInstance;
+                return linkInstance?.GetLinkDocument() != null &&
+                       MatchesExpectedLinkType(linkInstance, _source);
+            }
+
+            public bool AllowReference(Reference reference, XYZ position)
+            {
+                if (reference == null)
+                    return false;
+
+                if (reference.LinkedElementId == ElementId.InvalidElementId)
+                {
+                    Element localElem = _doc.GetElement(reference.ElementId);
+                    return IsExpectedMepCurve(localElem);
+                }
+
+                var linkInstance = _doc.GetElement(reference.ElementId) as RevitLinkInstance;
+                Document linkDoc = linkInstance?.GetLinkDocument();
+                if (linkDoc == null || !MatchesExpectedLinkType(linkInstance, _source))
+                    return false;
+
+                Element linkedElem = linkDoc.GetElement(reference.LinkedElementId);
+                return IsExpectedMepCurve(linkedElem);
+            }
+
+            private bool IsExpectedMepCurve(Element elem)
+            {
+                return IsExpectedMepElement(elem, _objectType);
+            }
         }
 
         private class LinkPipeSelectionFilter : ISelectionFilter
@@ -1551,8 +2452,8 @@ namespace Modification
 
                 return _objectType switch
                 {
-                    ReservationAutoV3Window.ObjectType.Canalisation => linkedElem is Pipe,
-                    ReservationAutoV3Window.ObjectType.Gaine => linkedElem is Duct,
+                    ReservationAutoV3Window.ObjectType.Canalisation => IsPipeLikeElement(linkedElem),
+                    ReservationAutoV3Window.ObjectType.Gaine => IsDuctLikeElement(linkedElem),
                     _ => false
                 };
             }
@@ -1563,7 +2464,7 @@ namespace Modification
             ReservationAutoV3Window.ObjectType objectType)
         {
             var hostFilter = new HostMepCurveSelectionFilter(objectType);
-            var linkFilter = new LinkPipeSelectionFilter(doc, pipeSource, objectType);
+            var hybridFilter = new HybridMepCurveSelectionFilter(doc, pipeSource, objectType);
 
             string objectName = objectType == ReservationAutoV3Window.ObjectType.Gaine ? "gaine" : "canalisation";
 
@@ -1574,8 +2475,8 @@ namespace Modification
                     $"Sélectionne la {objectName} (maquette)"),
 
                 ReservationAutoV3Window.PipeSource.LienIFC or ReservationAutoV3Window.PipeSource.LienRVT => uiDoc.Selection.PickObject(
-                    ObjectType.LinkedElement, linkFilter,
-                    $"Sélectionne la {objectName} (lien)"),
+                    ObjectType.PointOnElement, hybridFilter,
+                    $"Sélectionne la {objectName} dans ta maquette ou dans le lien"),
 
                 _ => uiDoc.Selection.PickObject(ObjectType.Element, hostFilter, $"Sélectionne la {objectName}")
             };
@@ -1586,7 +2487,6 @@ namespace Modification
             ReservationAutoV3Window.ObjectType objectType)
         {
             var hostFilter = new HostMepCurveSelectionFilter(objectType);
-            var linkFilter = new LinkPipeSelectionFilter(doc, pipeSource, objectType);
             string objectLabelPlural = objectType == ReservationAutoV3Window.ObjectType.Gaine ? "gaines" : "canalisations";
 
             return pipeSource switch
@@ -1596,8 +2496,8 @@ namespace Modification
                     $"Sélectionne les {objectLabelPlural} (CTRL + clic, ESC pour terminer)"),
 
                 ReservationAutoV3Window.PipeSource.LienIFC or ReservationAutoV3Window.PipeSource.LienRVT => uiDoc.Selection.PickObjects(
-                    ObjectType.LinkedElement, linkFilter,
-                    $"Sélectionne les {objectLabelPlural} (lien) (CTRL + clic, ESC pour terminer)"),
+                    ObjectType.Element, hostFilter,
+                    $"Sélectionne les {objectLabelPlural} de ta maquette (CTRL + clic, ESC pour terminer)"),
 
                 _ => null
             };
@@ -1605,8 +2505,14 @@ namespace Modification
 
         private static bool TryResolveReference(UIDocument uiDoc, Reference reference, out Element element, out Transform transformToHost)
         {
+            return TryResolveReference(uiDoc, reference, out element, out transformToHost, out _);
+        }
+
+        private static bool TryResolveReference(UIDocument uiDoc, Reference reference, out Element element, out Transform transformToHost, out bool isLinked)
+        {
             element = null;
             transformToHost = Transform.Identity;
+            isLinked = false;
 
             if (reference == null)
                 return false;
@@ -1623,6 +2529,7 @@ namespace Modification
 
                 element = linkDoc.GetElement(reference.LinkedElementId);
                 transformToHost = linkInstance.GetTotalTransform();
+                isLinked = true;
                 return element != null;
             }
 

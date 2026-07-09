@@ -611,14 +611,21 @@
                                                    Style="{StaticResource Label}"
                                                    VerticalAlignment="Center"/>
 
-                                        <ComboBox Grid.Column="1"
-                                                  x:Name="comboPipeSource"
-                                                  Height="34"
-                                                  VerticalAlignment="Center">
-                                            <ComboBoxItem Content="Maquette"/>
-                                            <ComboBoxItem Content="Lien IFC"/>
-                                            <ComboBoxItem Content="Lien RVT"/>
-                                        </ComboBox>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="Canalisation / gaine"
+                                                       Style="{StaticResource Label}"/>
+                                            <ComboBox x:Name="comboPipeSource"
+                                                      Height="34"
+                                                      VerticalAlignment="Center">
+                                                <ComboBoxItem Content="Maquette"/>
+                                                <ComboBoxItem Content="Lien IFC"/>
+                                                <ComboBoxItem Content="Lien RVT"/>
+                                            </ComboBox>
+
+                                            <TextBlock Text="Lien IFC/RVT : clique soit une cana/gaine locale, soit une cana/gaine du lien. Le mur à sélectionner sera automatiquement de l'autre maquette."
+                                                       Style="{StaticResource Hint}"
+                                                       Margin="0,6,0,0"/>
+                                        </StackPanel>
                                     </Grid>
                                 </Border>
 
@@ -631,6 +638,8 @@
                                     <StackPanel>
                                         <CheckBox x:Name="chkAutomatique"
                                                   Content="Mode automatique (scan – mur uniquement)"
+                                                  Checked="OnModeChanged"
+                                                  Unchecked="OnModeChanged"
                                                   Margin="0,0,0,6"/>
 
                                         <CheckBox x:Name="chkMulti"

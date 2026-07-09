@@ -208,6 +208,7 @@ namespace Analyse
             UpdateResultText();
             UpdateActiveFilterText();
             UpdateIssueCount();
+            UpdateBackToGroupsButton();
         }
 
         private void RebuildVisualCards()
@@ -552,33 +553,42 @@ namespace Analyse
 
         private void DoFocus(ModelIssue issue, bool keepShowAll, bool forceSectionBox = false)
         {
-            if (issue == null) return;
-            UpdateSelection(issue);
+            DoFocus(new[] { issue }, keepShowAll, forceSectionBox);
+        }
+
+        private void DoFocus(IEnumerable<ModelIssue> issues, bool keepShowAll, bool forceSectionBox = false)
+        {
+            var list = (issues ?? Enumerable.Empty<ModelIssue>())
+                .Where(i => i != null)
+                .ToList();
+            if (list.Count == 0) return;
+
+            var first = list[0];
+            UpdateSelection(first);
 
             _handler.Action = SmartAction.FocusApply;
-            _handler.IssueId = issue.ElementId ?? ElementId.InvalidElementId;
-            _handler.RelatedId = issue.RelatedId ?? ElementId.InvalidElementId;
-            _handler.CurrentKind = issue.Kind;
-            _handler.IssueBox = issue.BBox;
+            _handler.FocusIssues = list;
+            _handler.IssueId = first.ElementId ?? ElementId.InvalidElementId;
+            _handler.RelatedId = first.RelatedId ?? ElementId.InvalidElementId;
+            _handler.CurrentKind = first.Kind;
+            _handler.IssueBox = first.BBox;
             _handler.ShowAllMode = keepShowAll;
             _handler.AutoSectionBox = forceSectionBox;
             SafeRaise();
 
-            UpdateCursor(issue);
+            UpdateCursor(first);
         }
 
         private void OnFocus(object sender, RoutedEventArgs e)
         {
-            var issue = ResolveIssueFromSender(sender);
-            if (issue == null) return;
-            DoFocus(issue, keepShowAll: BtnShowAll.IsChecked == true);
+            var issues = ResolveIssuesFromSender(sender);
+            DoFocus(issues, keepShowAll: BtnShowAll.IsChecked == true);
         }
 
         private void OnFocusIsolate(object sender, RoutedEventArgs e)
         {
-            var issue = ResolveIssueFromSender(sender);
-            if (issue == null) return;
-            DoFocus(issue, keepShowAll: false, forceSectionBox: true);
+            var issues = ResolveIssuesFromSender(sender);
+            DoFocus(issues, keepShowAll: false, forceSectionBox: true);
         }
 
         private void OnIgnore(object sender, RoutedEventArgs e)
@@ -776,6 +786,7 @@ namespace Analyse
         private void ApplyGroupFilter(IssueCard card)
         {
             if (card == null || card.PrimaryIssue == null) return;
+            if (!card.IsGroup) return;
             var issue = card.PrimaryIssue;
 
             ResetFilterBinding(() =>
@@ -789,6 +800,30 @@ namespace Analyse
                 SelectComboValue(ElementCategoryFilterCombo, issue.ElementCategory, "Toutes");
                 SelectComboValue(VisualModeCombo, "Anomalies", "Anomalies");
             });
+        }
+
+        private void OnBackToGroups(object sender, RoutedEventArgs e)
+        {
+            ResetFilterBinding(() =>
+            {
+                SeverityFilterCombo.SelectedIndex = 0;
+                TypeFilterCombo.SelectedIndex = 0;
+                StateFilterCombo.SelectedIndex = 0;
+                LevelFilterCombo.SelectedIndex = 0;
+                LinkFilterCombo.SelectedIndex = 0;
+                ElementCategoryFilterCombo.SelectedIndex = 0;
+                SearchBox.Text = string.Empty;
+                SelectComboValue(VisualModeCombo, "Groupes intelligents", "Groupes intelligents");
+            });
+        }
+
+        private void UpdateBackToGroupsButton()
+        {
+            if (BackToGroupsButton == null) return;
+
+            BackToGroupsButton.Visibility = SelectedText(VisualModeCombo, "Groupes intelligents") == "Anomalies"
+                ? System.Windows.Visibility.Visible
+                : System.Windows.Visibility.Collapsed;
         }
 
         private void QuickMarkOk_Click(object sender, RoutedEventArgs e)
@@ -899,7 +934,7 @@ namespace Analyse
 
         private void OnExportReport(object sender, RoutedEventArgs e)
         {
-            var path = ExportHtmlReport(_filtered.Count > 0 ? _filtered : _all);
+            var path = ExportHtmlReportV2(_filtered.Count > 0 ? _filtered : _all);
             if (string.IsNullOrWhiteSpace(path)) return;
 
             try
@@ -914,6 +949,81 @@ namespace Analyse
             {
                 TaskDialog.Show("Clash 3D", "Rapport exporté :\n" + path);
             }
+        }
+
+        private string ExportHtmlReportV2(IEnumerable<ModelIssue> issues)
+        {
+            var list = (issues ?? Enumerable.Empty<ModelIssue>()).ToList();
+            if (list.Count == 0) return null;
+
+            var folder = SmartCheckState.GetReportFolder();
+            Directory.CreateDirectory(folder);
+            var file = Path.Combine(folder, "Clash3D_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".html");
+
+            var groups = list.GroupBy(i => i.GroupTitle)
+                .OrderByDescending(g => g.Count(i => !i.Ignored))
+                .ThenBy(g => g.Key)
+                .ToList();
+
+            var sb = new StringBuilder();
+            sb.AppendLine("<!doctype html><html><head><meta charset=\"utf-8\"><title>Rapport Clash 3D</title>");
+            sb.AppendLine("<style>");
+            sb.AppendLine("body{font-family:Segoe UI,Arial,sans-serif;margin:0;color:#111827;background:#eef2f7}.page{max-width:1280px;margin:0 auto;padding:28px}.top{background:#115c3a;color:white;border-radius:18px;padding:24px;margin-bottom:18px}.top h1{margin:0 0 8px;font-size:30px}.top p{margin:0;color:#e7f6ee}.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:22px}.stat{background:white;border:1px solid #dbe3ea;border-radius:12px;padding:14px 16px}.stat strong{font-size:25px;display:block}.section-title{margin:24px 0 12px;font-size:21px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(265px,1fr));gap:16px}.card{background:white;border:1px solid #dbe3ea;border-radius:14px;overflow:hidden;box-shadow:0 8px 22px rgba(15,23,42,.06)}.visual{height:156px;background:#e8f1ed;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden}.thumb{width:100%;height:100%;object-fit:cover}.initials{font-size:42px;font-weight:800;color:#115c3a;opacity:.36}.badge{display:inline-block;border-radius:999px;padding:5px 10px;color:white;font-size:12px;font-weight:700}.badge-count{position:absolute;right:10px;top:10px;background:#111827;color:white;border-radius:999px;padding:6px 10px;font-weight:700;font-size:12px}.badge-kind{position:absolute;left:10px;top:10px}.crit{background:#d83030}.check{background:#e28a00}.info{background:#64748b}.ok{background:#278d42}.card-body{padding:14px}.card h3{margin:8px 0 7px;font-size:16px;line-height:1.25}.meta{color:#64748b;font-size:12px;margin:4px 0}.advice{color:#374151;font-size:13px;line-height:1.35}.button{display:inline-block;margin-top:10px;background:#115c3a;color:white;text-decoration:none;border-radius:8px;padding:8px 11px;font-size:12px;font-weight:700}.detail{background:white;border:1px solid #dbe3ea;border-radius:14px;margin:18px 0 0;overflow:hidden}.detail-head{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:15px 16px;background:#f8fafc;border-bottom:1px solid #e5e7eb}.detail-head h3{margin:0;font-size:17px}.detail-body{padding:0 16px 16px}table{border-collapse:collapse;width:100%;background:white;margin-top:14px}td,th{border-bottom:1px solid #e5e7eb;padding:9px 7px;text-align:left;font-size:12px;vertical-align:top}th{background:#f8fafc;color:#334155;font-weight:700}.message{min-width:280px}.comment{color:#64748b}.small{font-size:12px;color:#64748b}@media print{body{background:white}.page{padding:0}.button{display:none}.card{break-inside:avoid}.detail{break-inside:avoid}}");
+            sb.AppendLine("</style></head><body><div class=\"page\">");
+            sb.AppendLine("<div class=\"top\"><h1>Rapport Clash 3D</h1><p>BIMaestro - " + Html(DateTime.Now.ToString("dd/MM/yyyy HH:mm")) + " - " + list.Count + " anomalie(s), " + groups.Count + " groupe(s)</p></div>");
+            sb.AppendLine("<div class=\"stats\">");
+            AddStat(sb, "Anomalies", list.Count);
+            AddStat(sb, "Groupes", groups.Count);
+            AddStat(sb, "Critiques", list.Count(i => !i.Ignored && i.Severity == IssueSeverity.Critical));
+            AddStat(sb, "À corriger", list.Count(i => i.StatusText == ModelIssue.StatusToFix));
+            AddStat(sb, "À revoir", list.Count(i => i.StatusText == ModelIssue.StatusReview));
+            AddStat(sb, "OK / ignorées", list.Count(i => i.Ignored));
+            sb.AppendLine("</div>");
+            sb.AppendLine("<h2 class=\"section-title\">Vue par vignettes</h2><div class=\"grid\">");
+
+            for (int index = 0; index < groups.Count; index++)
+            {
+                var group = groups[index];
+                var first = group.OrderBy(i => i.PriorityRank).First();
+                var anchor = "detail-" + index.ToString("000");
+                var image = group.Select(i => i.ThumbnailPath).FirstOrDefault(IsUsableImagePath);
+
+                sb.AppendLine("<div class=\"card\"><div class=\"visual\">");
+                if (!string.IsNullOrWhiteSpace(image))
+                    sb.AppendLine("<img class=\"thumb\" src=\"" + HtmlAttr(ToFileUrl(image)) + "\" alt=\"Aperçu " + HtmlAttr(first.VisualTitle) + "\">");
+                else
+                    sb.AppendLine("<div class=\"initials\">" + Html(first.VisualInitials) + "</div>");
+                sb.AppendLine("<span class=\"badge badge-kind " + SeverityClass(first) + "\">" + Html(first.SeverityText) + "</span>");
+                sb.AppendLine("<span class=\"badge-count\">" + group.Count() + "</span>");
+                sb.AppendLine("</div><div class=\"card-body\">");
+                sb.AppendLine("<div class=\"meta\">" + Html(EmptyDash(first.LevelName)) + " · " + Html(EmptyDash(first.LinkName)) + "</div>");
+                sb.AppendLine("<h3>" + Html(group.Key) + "</h3>");
+                sb.AppendLine("<div class=\"advice\">" + Html(first.WhyText) + "<br>" + Html(first.AdviceText) + "</div>");
+                sb.AppendLine("<a class=\"button\" href=\"#" + anchor + "\">Voir le détail</a>");
+                sb.AppendLine("</div></div>");
+            }
+
+            sb.AppendLine("</div><h2 class=\"section-title\">Détail des groupes</h2>");
+            for (int index = 0; index < groups.Count; index++)
+            {
+                var group = groups[index];
+                var first = group.OrderBy(i => i.PriorityRank).First();
+                var anchor = "detail-" + index.ToString("000");
+
+                sb.AppendLine("<section class=\"detail\" id=\"" + anchor + "\">");
+                sb.AppendLine("<div class=\"detail-head\"><div><h3>" + Html(group.Key) + "</h3><div class=\"small\">" + group.Count() + " anomalie(s), " + group.Count(i => !i.Ignored) + " active(s)</div></div><span class=\"badge " + SeverityClass(first) + "\">" + Html(first.SeverityText) + "</span></div>");
+                sb.AppendLine("<div class=\"detail-body\"><table><thead><tr><th>Statut</th><th>Type</th><th>Niveau</th><th>Catégorie</th><th>Lien</th><th>Élément</th><th>Lié</th><th class=\"message\">Message</th><th>Commentaire</th></tr></thead><tbody>");
+                foreach (var issue in group.OrderBy(i => i.PriorityRank).ThenBy(i => i.ElementIdValue))
+                {
+                    var related = IsValidId(issue.RelatedId) ? issue.RelatedId.GetIdValue().ToString() : "-";
+                    sb.AppendLine("<tr><td>" + Html(issue.StatusText) + "</td><td>" + Html(issue.Category) + "</td><td>" + Html(EmptyDash(issue.LevelName)) + "</td><td>" + Html(EmptyDash(issue.ElementCategory)) + "</td><td>" + Html(EmptyDash(issue.LinkName)) + "</td><td>" + issue.ElementIdValue + "</td><td>" + Html(related) + "</td><td class=\"message\">" + Html(issue.Message) + "</td><td class=\"comment\">" + Html(issue.StatusComment) + "</td></tr>");
+                }
+                sb.AppendLine("</tbody></table></div></section>");
+            }
+
+            sb.AppendLine("</div></body></html>");
+            File.WriteAllText(file, sb.ToString(), Encoding.UTF8);
+            return file;
         }
 
         private string ExportHtmlReport(IEnumerable<ModelIssue> issues)
@@ -978,8 +1088,20 @@ namespace Analyse
         private static string Html(string value)
             => WebUtility.HtmlEncode(value ?? string.Empty);
 
+        private static string HtmlAttr(string value)
+            => Html(value);
+
         private static string EmptyDash(string value)
             => string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+        private static bool IsUsableImagePath(string path)
+            => !string.IsNullOrWhiteSpace(path) && File.Exists(path);
+
+        private static string ToFileUrl(string path)
+        {
+            try { return new Uri(Path.GetFullPath(path)).AbsoluteUri; }
+            catch { return path ?? string.Empty; }
+        }
 
         private static string MakeSafeFileName(string value)
         {
@@ -1041,6 +1163,9 @@ namespace Analyse
             public string ThumbnailPath => PrimaryIssue?.ThumbnailPath;
             public string ThumbnailStateText => PrimaryIssue?.ThumbnailStateText;
             public bool ThumbnailLoading => Issues.Any(i => i.ThumbnailLoading);
+            public System.Windows.Visibility ThumbnailVisibility => string.IsNullOrWhiteSpace(ThumbnailPath) ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
+            public System.Windows.Visibility InitialsVisibility => string.IsNullOrWhiteSpace(ThumbnailPath) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+            public System.Windows.Visibility DetailActionVisibility => IsGroup ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
             public string GroupBadgeText => IsGroup ? Count + " anomalies" : "1 anomalie";
 
             public bool Contains(ModelIssue issue)
@@ -1061,6 +1186,8 @@ namespace Analyse
                 OnPropertyChanged(nameof(ThumbnailPath));
                 OnPropertyChanged(nameof(ThumbnailStateText));
                 OnPropertyChanged(nameof(ThumbnailLoading));
+                OnPropertyChanged(nameof(ThumbnailVisibility));
+                OnPropertyChanged(nameof(InitialsVisibility));
                 OnPropertyChanged(nameof(ActiveCount));
                 OnPropertyChanged(nameof(VisualSubtitle));
             }

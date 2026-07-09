@@ -199,13 +199,24 @@ namespace Modification
 
             string obj = (comboObjectType.SelectedItem as ComboBoxItem)?.Content as string ?? "Canalisation";
             bool isCanal = obj == "Canalisation";
-            comboPipeSource.IsEnabled = isCanal;
+            bool isMepCurve = obj == "Canalisation" || obj == "Gaine";
+            bool auto = chkAutomatique?.IsChecked == true;
+
+            comboPipeSource.IsEnabled = isMepCurve && !auto;
+
+            if (!isMepCurve || auto)
+                comboPipeSource.SelectedIndex = 0;
 
             string shape = (comboShape.SelectedItem as ComboBoxItem)?.Content as string ?? "";
             bool isRect = shape.IndexOf("Rectangulaire", StringComparison.OrdinalIgnoreCase) >= 0;
 
-            chkMulti.IsEnabled = isCanal && isRect && comboShape.IsEnabled;
+            chkMulti.IsEnabled = !auto && isCanal && isRect && comboShape.IsEnabled;
             if (!chkMulti.IsEnabled) chkMulti.IsChecked = false;
+        }
+
+        private void OnModeChanged(object sender, RoutedEventArgs e)
+        {
+            OnCriteriaChanged(null, null);
         }
 
         private void RefreshShapeOptions()
