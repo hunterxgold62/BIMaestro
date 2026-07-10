@@ -327,23 +327,32 @@ namespace Modification
                     if (linkedHost == null)
                         break;
 
-                    if (picked.Count > 1)
+                    if (picked.Count > 1 && isRect)
                     {
-                        TaskDialog.Show("BIMaestro", "La multi-sélection n'est pas disponible avec un mur lié.");
-                        continue;
+                        CreateRectReservation_MultiAgainstCandidate(
+                            doc,
+                            linkedHost,
+                            reservationSymbol,
+                            win.SelectedObject,
+                            picked,
+                            cfg,
+                            prof,
+                            win.NormeEnabled);
                     }
-
-                    CreateReservation_SingleAgainstCandidate(
-                        doc,
-                        linkedHost,
-                        reservationSymbol,
-                        win.SelectedObject,
-                        picked.First(),
-                        cfg,
-                        prof,
-                        isWall,
-                        isRect,
-                        win.NormeEnabled);
+                    else
+                    {
+                        CreateReservation_SingleAgainstCandidate(
+                            doc,
+                            linkedHost,
+                            reservationSymbol,
+                            win.SelectedObject,
+                            picked.First(),
+                            cfg,
+                            prof,
+                            isWall,
+                            isRect,
+                            win.NormeEnabled);
+                    }
 
                     var tdLinked = new TaskDialog("BIMaestro")
                     {
@@ -353,12 +362,6 @@ namespace Modification
                     if (tdLinked.Show() != TaskDialogResult.Yes)
                         break;
 
-                    continue;
-                }
-
-                if (linkSourceSelected && pickComesFromLink && picked.Count > 1)
-                {
-                    TaskDialog.Show("BIMaestro", "La multi-sélection reste limitée aux éléments de la maquette active.");
                     continue;
                 }
 
@@ -790,6 +793,33 @@ namespace Modification
                 ElementTransformUtils.MoveElement(doc, fi.Id, delta);
         }
 
+        private static void CenterUnhostedReservationOnPoint(Document doc, FamilyInstance fi, XYZ target)
+        {
+            if (doc == null || fi == null || target == null)
+                return;
+
+            try
+            {
+                doc.Regenerate();
+
+                BoundingBoxXYZ boundingBox = ToWorldBoundingBox(fi.get_BoundingBox(null));
+                if (boundingBox == null)
+                {
+                    MoveInstanceToPoint(doc, fi, target);
+                    return;
+                }
+
+                XYZ geometryCenter = (boundingBox.Min + boundingBox.Max) * 0.5;
+                XYZ delta = target - geometryCenter;
+                if (delta.GetLength() > 1e-9)
+                    ElementTransformUtils.MoveElement(doc, fi.Id, delta);
+            }
+            catch
+            {
+                MoveInstanceToPoint(doc, fi, target);
+            }
+        }
+
         private static Level GetNearestLevel(Document doc, double z)
         {
             return new FilteredElementCollector(doc)
@@ -860,10 +890,10 @@ namespace Modification
 
             XYZ center;
             if (!TryGetLinkedHostPlacementPoint(selected, host, out center))
+            {
                 center = (bbInt.Min + bbInt.Max) * 0.5;
-
-            if (isWall)
                 center = ProjectPointOntoWallPlane(host, center);
+            }
 
             var level = GetNearestLevel(doc, center.Z)
                         ?? new FilteredElementCollector(doc)
@@ -924,7 +954,7 @@ namespace Modification
             }
             else
             {
-                MoveInstanceToPoint(doc, fi, center);
+                CenterUnhostedReservationOnPoint(doc, fi, center);
             }
         }
 
@@ -977,6 +1007,96 @@ namespace Modification
             ApplyVerticalPlacementCorrection(doc, fi, sym, host, prof, unionInt, cfg, objType, null, true, normeEnabled);
 
             ForceVoidCutSafe(doc, host, fi);
+        }
+
+        private void CreateRectReservation_MultiAgainstCandidate(Document doc,
+            WallScanCandidate host,
+            FamilySymbol sym,
+            ReservationAutoV3Window.ObjectType objType,
+            List<MepSelection> selectedElements,
+            ReservationAutoV3Config cfg,
+            ProfileConfig prof,
+            bool normeEnabled)
+        {
+            if (doc == null || host == null || sym == null || selectedElements == null || selectedElements.Count == 0)
+                return;
+
+            var bbHost = host.BoundingBoxInCurrentDocument;
+            if (bbHost == null) return;
+
+            var clipped = new List<BoundingBoxXYZ>();
+
+            foreach (var selected in selectedElements)
+            {
+                if (selected?.Element == null) continue;
+
+                var bbEl = GetBoundingBoxInHostCoordinates(selected.Element, selected.TransformToCurrentDocument);
+                if (bbEl == null) continue;
+
+                var bbInt = IntersectBoundingBoxes(bbHost, bbEl);
+                if (bbInt == null) continue;
+
+                clipped.Add(bbInt);
+            }
+
+            if (!clipped.Any()) return;
+
+            double minX = clipped.Min(bb => bb.Min.X);
+            double minY = clipped.Min(bb => bb.Min.Y);
+            double minZ = clipped.Min(bb => bb.Min.Z);
+            double maxX = clipped.Max(bb => bb.Max.X);
+            double maxY = clipped.Max(bb => bb.Max.Y);
+            double maxZ = clipped.Max(bb => bb.Max.Z);
+
+            var unionInt = new BoundingBoxXYZ { Min = new XYZ(minX, minY, minZ), Max = new XYZ(maxX, maxY, maxZ) };
+
+            XYZ center = GetMultiReservationCenterOnCandidate(host, unionInt, selectedElements);
+
+            var level = GetNearestLevel(doc, center.Z)
+                        ?? new FilteredElementCollector(doc)
+                            .OfClass(typeof(Level))
+                            .Cast<Level>()
+                            .FirstOrDefault();
+
+            FamilyInstance fi = host.CanHost
+                ? doc.Create.NewFamilyInstance(
+                    center,
+                    sym,
+                    host.Element,
+                    level,
+                    Autodesk.Revit.DB.Structure.StructuralType.NonStructural)
+                : CreateUnhostedFamilyInstance(doc, center, sym, level);
+
+            if (fi == null)
+            {
+                TaskDialog.Show(
+                    "BIMaestro",
+                    "Impossible de créer la réservation multi sans hôte.\nUtilise une famille de réservation non hébergée pour traverser un mur de lien.");
+                return;
+            }
+
+            AlignReservationOrientationIfNeeded(doc, fi, sym, host.Element, center, host.AxisX);
+
+            ApplySizing_MultiRect(
+                fi,
+                host.Element,
+                unionInt,
+                cfg,
+                prof,
+                objType,
+                normeEnabled,
+                host.AxisX,
+                host.DepthFt);
+
+            if (host.CanHost)
+            {
+                ApplyVerticalPlacementCorrection(doc, fi, sym, host.Element, prof, unionInt, cfg, objType, null, true, normeEnabled);
+                ForceVoidCutSafe(doc, host.Element, fi);
+            }
+            else
+            {
+                CenterUnhostedReservationOnPoint(doc, fi, center);
+            }
         }
 
         // =========================
@@ -1067,7 +1187,9 @@ namespace Modification
             BoundingBoxXYZ unionIntersect,
             ReservationAutoV3Config cfg, ProfileConfig prof,
             ReservationAutoV3Window.ObjectType objType,
-            bool normeEnabled)
+            bool normeEnabled,
+            XYZ wallAxisOverride = null,
+            double? depthOverrideFt = null)
         {
             if (fi == null || host == null || unionIntersect == null) return;
 
@@ -1075,14 +1197,15 @@ namespace Modification
                                 || objType == ReservationAutoV3Window.ObjectType.Gaine;
 
             double oversizeFt = MmToFt(isPipeOrDuct ? cfg.OversizeMm_PipeDuct : 0.0);
-            double depthFt = GetHostDepth(host);
+            double depthFt = depthOverrideFt ?? GetHostDepth(host);
 
             var world = ToWorldBoundingBox(unionIntersect);
             if (world == null) return;
 
-            if (host is Wall wall)
+            var typedWall = host as Wall;
+            if (typedWall != null || wallAxisOverride != null)
             {
-                XYZ wallDir = GetWallDirection(wall);
+                XYZ wallDir = wallAxisOverride ?? GetWallDirection(typedWall);
 
                 var corners = new List<XYZ>
                 {
@@ -1596,6 +1719,9 @@ namespace Modification
             if (curve == null)
                 return false;
 
+            if (TryGetHostSolidIntersectionCenter(curve, host, out point))
+                return true;
+
             if (TryGetWallPlaneInCurrentDocument(host, out XYZ origin, out XYZ normal) &&
                 TryIntersectCurveWithPlane(curve, origin, normal, out point))
             {
@@ -1611,10 +1737,208 @@ namespace Modification
             if (host.PickPointInCurrentDocument != null &&
                 TryProjectPointOnCurve(curve, host.PickPointInCurrentDocument, out point))
             {
+                point = ProjectPointOntoWallPlane(host, point);
                 return true;
             }
 
             return false;
+        }
+
+        private static bool TryGetHostSolidIntersectionCenter(
+            Curve curveInCurrentDocument,
+            WallScanCandidate host,
+            out XYZ point)
+        {
+            point = null;
+            if (curveInCurrentDocument == null || host?.Element == null)
+                return false;
+
+            try
+            {
+                var options = new Options
+                {
+                    ComputeReferences = false,
+                    IncludeNonVisibleObjects = false,
+                    DetailLevel = ViewDetailLevel.Fine
+                };
+
+                GeometryElement geometry = host.Element.get_Geometry(options);
+                if (geometry == null)
+                    return false;
+
+                var solids = new List<Solid>();
+                CollectGeometrySolids(geometry, solids);
+                if (solids.Count == 0)
+                    return false;
+
+                Transform transform = host.TransformToCurrentDocument ?? Transform.Identity;
+                double bestLength = -1.0;
+                XYZ bestPoint = null;
+
+                foreach (Solid sourceSolid in solids)
+                {
+                    Solid solid = sourceSolid;
+                    if (!transform.IsIdentity)
+                    {
+                        try
+                        {
+                            solid = SolidUtils.CreateTransformed(sourceSolid, transform);
+                        }
+                        catch
+                        {
+                            continue;
+                        }
+                    }
+
+                    SolidCurveIntersection intersection;
+                    try
+                    {
+                        intersection = solid.IntersectWithCurve(
+                            curveInCurrentDocument,
+                            new SolidCurveIntersectionOptions());
+                    }
+                    catch
+                    {
+                        continue;
+                    }
+
+                    for (int i = 0; i < intersection.SegmentCount; i++)
+                    {
+                        Curve segment = intersection.GetCurveSegment(i);
+                        if (segment == null)
+                            continue;
+
+                        double length;
+                        XYZ midpoint;
+                        try
+                        {
+                            length = segment.Length;
+                            midpoint = segment.Evaluate(0.5, true);
+                        }
+                        catch
+                        {
+                            continue;
+                        }
+
+                        if (midpoint != null && length > bestLength)
+                        {
+                            bestLength = length;
+                            bestPoint = midpoint;
+                        }
+                    }
+                }
+
+                point = bestPoint;
+                return point != null;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static void CollectGeometrySolids(GeometryElement geometry, ICollection<Solid> solids)
+        {
+            if (geometry == null || solids == null)
+                return;
+
+            foreach (GeometryObject geometryObject in geometry)
+            {
+                if (geometryObject is Solid solid && solid.Faces.Size > 0 && solid.Volume > 1e-9)
+                {
+                    solids.Add(solid);
+                }
+                else if (geometryObject is GeometryInstance instance)
+                {
+                    try
+                    {
+                        CollectGeometrySolids(instance.GetInstanceGeometry(), solids);
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+        }
+
+        private static XYZ GetMultiReservationCenterOnCandidate(
+            WallScanCandidate host,
+            BoundingBoxXYZ unionIntersect,
+            IEnumerable<MepSelection> selectedElements)
+        {
+            if (unionIntersect == null)
+                return null;
+
+            XYZ fallbackCenter = (unionIntersect.Min + unionIntersect.Max) * 0.5;
+            if (host == null)
+                return fallbackCenter;
+
+            if (!TryGetCandidatePlane(host, out XYZ planeOrigin, out XYZ planeNormal))
+                return fallbackCenter;
+
+            XYZ axis = host.AxisX;
+            axis = new XYZ(axis?.X ?? 0.0, axis?.Y ?? 0.0, 0.0);
+            if (axis.IsZeroLength())
+                axis = EstimateWallAxisXY(unionIntersect);
+            if (axis.IsZeroLength())
+                axis = XYZ.BasisX;
+            axis = axis.Normalize();
+
+            var crossingPoints = new List<XYZ>();
+            foreach (MepSelection selected in selectedElements ?? Enumerable.Empty<MepSelection>())
+            {
+                if (TryGetLinkedHostPlacementPoint(selected, host, out XYZ crossingPoint) && crossingPoint != null)
+                    crossingPoints.Add(crossingPoint);
+            }
+
+            var corners = new List<XYZ>
+            {
+                new XYZ(unionIntersect.Min.X, unionIntersect.Min.Y, unionIntersect.Min.Z),
+                new XYZ(unionIntersect.Min.X, unionIntersect.Max.Y, unionIntersect.Min.Z),
+                new XYZ(unionIntersect.Max.X, unionIntersect.Min.Y, unionIntersect.Min.Z),
+                new XYZ(unionIntersect.Max.X, unionIntersect.Max.Y, unionIntersect.Min.Z)
+            };
+
+            var axisValues = corners.Select(p => p.DotProduct(axis)).ToList();
+            double axisMid = (axisValues.Min() + axisValues.Max()) * 0.5;
+            double zMid = (unionIntersect.Min.Z + unionIntersect.Max.Z) * 0.5;
+
+            if (crossingPoints.Count > 0)
+            {
+                XYZ anchor = crossingPoints.Aggregate(XYZ.Zero, (sum, p) => sum + p) / crossingPoints.Count;
+                return anchor
+                       + axis * (axisMid - anchor.DotProduct(axis))
+                       + XYZ.BasisZ * (zMid - anchor.Z);
+            }
+
+            XYZ center = planeOrigin
+                         + axis * (axisMid - planeOrigin.DotProduct(axis))
+                         + XYZ.BasisZ * (zMid - planeOrigin.Z);
+
+            return ProjectPointOntoPlane(center, planeOrigin, planeNormal);
+        }
+
+        private static bool TryGetCandidatePlane(WallScanCandidate host, out XYZ origin, out XYZ normal)
+        {
+            if (TryGetWallPlaneInCurrentDocument(host, out origin, out normal))
+                return true;
+
+            if (TryGetEstimatedIfcWallPlane(host, out origin, out normal))
+                return true;
+
+            origin = null;
+            normal = null;
+            return false;
+        }
+
+        private static XYZ ProjectPointOntoPlane(XYZ point, XYZ planeOrigin, XYZ planeNormal)
+        {
+            if (point == null || planeOrigin == null || planeNormal == null || planeNormal.GetLength() < 1e-9)
+                return point;
+
+            XYZ normal = planeNormal.Normalize();
+            double offset = normal.DotProduct(point - planeOrigin);
+            return point - normal * offset;
         }
 
         private static XYZ NormalizeLinkedReferencePoint(XYZ rawPoint, Transform linkTransform, BoundingBoxXYZ linkedBoundingBoxInCurrentDocument)
@@ -2567,6 +2891,7 @@ namespace Modification
             ReservationAutoV3Window.ObjectType objectType)
         {
             var hostFilter = new HostMepCurveSelectionFilter(objectType);
+            var hybridFilter = new HybridMepCurveSelectionFilter(doc, pipeSource, objectType);
             string objectLabelPlural = objectType == ReservationAutoV3Window.ObjectType.Gaine ? "gaines" : "canalisations";
 
             return pipeSource switch
@@ -2576,8 +2901,8 @@ namespace Modification
                     $"Sélectionne les {objectLabelPlural} (CTRL + clic, ESC pour terminer)"),
 
                 ReservationAutoV3Window.PipeSource.LienIFC or ReservationAutoV3Window.PipeSource.LienRVT => uiDoc.Selection.PickObjects(
-                    ObjectType.Element, hostFilter,
-                    $"Sélectionne les {objectLabelPlural} de ta maquette (CTRL + clic, ESC pour terminer)"),
+                    ObjectType.PointOnElement, hybridFilter,
+                    $"Sélectionne les {objectLabelPlural} dans ta maquette ou dans le lien (CTRL + clic, ESC pour terminer)"),
 
                 _ => null
             };
