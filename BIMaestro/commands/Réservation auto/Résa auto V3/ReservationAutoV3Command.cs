@@ -319,7 +319,7 @@ namespace Modification
                 bool pickComesFromLink = picked.Any(x => x.IsLinked);
                 bool pickComesFromHost = picked.All(x => !x.IsLinked);
                 bool linkSourceSelected = IsLinkSource(win.SelectedPipeSource);
-                bool useLinkedHost = isWall && linkSourceSelected && pickComesFromHost;
+                bool useLinkedHost = linkSourceSelected && pickComesFromHost;
 
                 if (useLinkedHost)
                 {
@@ -329,15 +329,30 @@ namespace Modification
 
                     if (picked.Count > 1 && isRect)
                     {
-                        CreateRectReservation_MultiAgainstCandidate(
-                            doc,
-                            linkedHost,
-                            reservationSymbol,
-                            win.SelectedObject,
-                            picked,
-                            cfg,
-                            prof,
-                            win.NormeEnabled);
+                        if (isWall)
+                        {
+                            CreateRectReservation_MultiAgainstCandidate(
+                                doc,
+                                linkedHost,
+                                reservationSymbol,
+                                win.SelectedObject,
+                                picked,
+                                cfg,
+                                prof,
+                                win.NormeEnabled);
+                        }
+                        else
+                        {
+                            CreateRectReservation_MultiAgainstFloorCandidate(
+                                doc,
+                                linkedHost,
+                                reservationSymbol,
+                                win.SelectedObject,
+                                picked,
+                                cfg,
+                                prof,
+                                win.NormeEnabled);
+                        }
                     }
                     else
                     {
@@ -641,6 +656,7 @@ namespace Modification
             public XYZ AxisX { get; set; } = XYZ.BasisX;
             public double DepthFt { get; set; }
             public XYZ PickPointInCurrentDocument { get; set; }
+            public bool IsFloorLike { get; set; }
 
             public bool CanHost => !IsLinked && Element is Wall;
         }
@@ -724,8 +740,8 @@ namespace Modification
                     ? GetWallDirectionXY(wall, tr)
                     : EstimateWallAxisXY(bb);
 
-                double depth = linkedHost is Wall typedWall
-                    ? GetHostDepth(typedWall)
+                double depth = linkedHost is Wall || linkedHost is Floor
+                    ? GetHostDepth(linkedHost)
                     : EstimateWallDepth(bb);
 
                 XYZ pickPoint = NormalizeLinkedReferencePoint(reference.GlobalPoint, tr, bb);
@@ -738,7 +754,8 @@ namespace Modification
                     IsLinked = true,
                     AxisX = axis,
                     DepthFt = depth,
-                    PickPointInCurrentDocument = pickPoint
+                    PickPointInCurrentDocument = pickPoint,
+                    IsFloorLike = hostTarget == ReservationAutoV3Window.HostTarget.Sol || IsFloorLikeElement(linkedHost)
                 };
             }
             catch
@@ -892,7 +909,9 @@ namespace Modification
             if (!TryGetLinkedHostPlacementPoint(selected, host, out center))
             {
                 center = (bbInt.Min + bbInt.Max) * 0.5;
-                center = ProjectPointOntoWallPlane(host, center);
+                center = isWall
+                    ? ProjectPointOntoWallPlane(host, center)
+                    : ProjectPointOntoFloorPlane(host, center);
             }
 
             var level = GetNearestLevel(doc, center.Z)
@@ -914,7 +933,7 @@ namespace Modification
             {
                 TaskDialog.Show(
                     "BIMaestro",
-                    "Impossible de créer la réservation sans hôte.\nUtilise une famille de réservation non hébergée pour traverser un mur de lien.");
+                    $"Impossible de créer la réservation sans hôte.\nUtilise une famille de réservation non hébergée pour traverser un {(isWall ? "mur" : "sol")} de lien.");
                 return;
             }
 
@@ -933,7 +952,8 @@ namespace Modification
                 isRect,
                 normeEnabled,
                 isWall ? host.AxisX : null,
-                host.DepthFt);
+                host.DepthFt,
+                floorOverride: !isWall);
 
             if (host.CanHost)
             {
@@ -1099,6 +1119,101 @@ namespace Modification
             }
         }
 
+        private void CreateRectReservation_MultiAgainstFloorCandidate(Document doc,
+            WallScanCandidate host,
+            FamilySymbol sym,
+            ReservationAutoV3Window.ObjectType objType,
+            List<MepSelection> selectedElements,
+            ReservationAutoV3Config cfg,
+            ProfileConfig prof,
+            bool normeEnabled)
+        {
+            if (doc == null || host == null || sym == null || selectedElements == null || selectedElements.Count == 0)
+                return;
+
+            BoundingBoxXYZ floorBoundingBox = host.BoundingBoxInCurrentDocument;
+            if (floorBoundingBox == null)
+                return;
+
+            var clipped = new List<BoundingBoxXYZ>();
+            foreach (MepSelection selected in selectedElements)
+            {
+                if (selected?.Element == null)
+                    continue;
+
+                BoundingBoxXYZ elementBoundingBox = GetBoundingBoxInHostCoordinates(
+                    selected.Element,
+                    selected.TransformToCurrentDocument);
+                BoundingBoxXYZ intersection = IntersectBoundingBoxes(floorBoundingBox, elementBoundingBox);
+                if (intersection != null)
+                    clipped.Add(intersection);
+            }
+
+            if (clipped.Count == 0)
+                return;
+
+            var unionIntersect = new BoundingBoxXYZ
+            {
+                Min = new XYZ(
+                    clipped.Min(bb => bb.Min.X),
+                    clipped.Min(bb => bb.Min.Y),
+                    clipped.Min(bb => bb.Min.Z)),
+                Max = new XYZ(
+                    clipped.Max(bb => bb.Max.X),
+                    clipped.Max(bb => bb.Max.Y),
+                    clipped.Max(bb => bb.Max.Z))
+            };
+
+            XYZ center = (unionIntersect.Min + unionIntersect.Max) * 0.5;
+            var crossingPoints = new List<XYZ>();
+            foreach (MepSelection selected in selectedElements)
+            {
+                if (TryGetLinkedHostPlacementPoint(selected, host, out XYZ crossingPoint) && crossingPoint != null)
+                    crossingPoints.Add(crossingPoint);
+            }
+
+            center = crossingPoints.Count > 0
+                ? new XYZ(center.X, center.Y, crossingPoints.Average(p => p.Z))
+                : ProjectPointOntoFloorPlane(host, center);
+
+            Level level = GetNearestLevel(doc, center.Z)
+                          ?? new FilteredElementCollector(doc)
+                              .OfClass(typeof(Level))
+                              .Cast<Level>()
+                              .FirstOrDefault();
+
+            FamilyInstance fi = CreateUnhostedFamilyInstance(doc, center, sym, level);
+            if (fi == null)
+            {
+                TaskDialog.Show(
+                    "BIMaestro",
+                    "Impossible de créer la réservation multi sans hôte.\nUtilise une famille de réservation non hébergée pour traverser un sol de lien.");
+                return;
+            }
+
+            var elements = selectedElements
+                .Where(selected => selected?.Element != null)
+                .Select(selected => (selected.Element, selected.TransformToCurrentDocument))
+                .ToList();
+
+            XYZ floorAxis = GetPreferredFloorAxisXY(unionIntersect, elements);
+            AlignReservationOrientationIfNeeded(doc, fi, sym, host.Element, center, floorAxis);
+
+            ApplySizing_MultiRect(
+                fi,
+                host.Element,
+                unionIntersect,
+                cfg,
+                prof,
+                objType,
+                normeEnabled,
+                wallAxisOverride: null,
+                depthOverrideFt: host.DepthFt,
+                floorOverride: true);
+
+            CenterUnhostedReservationOnPoint(doc, fi, center);
+        }
+
         // =========================
         // Sizing
         // =========================
@@ -1110,7 +1225,8 @@ namespace Modification
             Element intersecting, Transform trToHost,
             bool isRect, bool normeEnabled,
             XYZ wallAxisOverride = null,
-            double? depthOverrideFt = null)
+            double? depthOverrideFt = null,
+            bool floorOverride = false)
         {
             if (fi == null || host == null || bbIntersect == null) return;
 
@@ -1165,7 +1281,7 @@ namespace Modification
                 TrySet(fi, prof.ParamHeight, hgt, "Hauteur", "COM_Hauteur", "Height");
                 TrySet(fi, prof.ParamDepth, depthFt, "Profondeur", "COM_Profondeur", "Depth");
             }
-            else if (host is Floor)
+            else if (host is Floor || floorOverride)
             {
                 double len = (world.Max.X - world.Min.X) + oversizeFt;
                 double wid = (world.Max.Y - world.Min.Y) + oversizeFt;
@@ -1189,7 +1305,8 @@ namespace Modification
             ReservationAutoV3Window.ObjectType objType,
             bool normeEnabled,
             XYZ wallAxisOverride = null,
-            double? depthOverrideFt = null)
+            double? depthOverrideFt = null,
+            bool floorOverride = false)
         {
             if (fi == null || host == null || unionIntersect == null) return;
 
@@ -1229,7 +1346,7 @@ namespace Modification
                 TrySet(fi, prof.ParamHeight, hgt, "Hauteur", "COM_Hauteur", "Height");
                 TrySet(fi, prof.ParamDepth, depthFt, "Profondeur", "COM_Profondeur", "Depth");
             }
-            else if (host is Floor)
+            else if (host is Floor || floorOverride)
             {
                 double len = (world.Max.X - world.Min.X) + oversizeFt;
                 double wid = (world.Max.Y - world.Min.Y) + oversizeFt;
@@ -1722,6 +1839,24 @@ namespace Modification
             if (TryGetHostSolidIntersectionCenter(curve, host, out point))
                 return true;
 
+            if (host.IsFloorLike)
+            {
+                if (TryGetFloorPlaneInCurrentDocument(host, out XYZ floorOrigin, out XYZ floorNormal) &&
+                    TryIntersectCurveWithPlane(curve, floorOrigin, floorNormal, out point))
+                {
+                    return true;
+                }
+
+                if (host.PickPointInCurrentDocument != null &&
+                    TryProjectPointOnCurve(curve, host.PickPointInCurrentDocument, out point))
+                {
+                    point = ProjectPointOntoFloorPlane(host, point);
+                    return true;
+                }
+
+                return false;
+            }
+
             if (TryGetWallPlaneInCurrentDocument(host, out XYZ origin, out XYZ normal) &&
                 TryIntersectCurveWithPlane(curve, origin, normal, out point))
             {
@@ -1931,6 +2066,48 @@ namespace Modification
             return false;
         }
 
+        private static bool TryGetFloorPlaneInCurrentDocument(
+            WallScanCandidate host,
+            out XYZ origin,
+            out XYZ normal)
+        {
+            origin = null;
+            normal = null;
+
+            if (host == null || !host.IsFloorLike || host.BoundingBoxInCurrentDocument == null)
+                return false;
+
+            BoundingBoxXYZ boundingBox = host.BoundingBoxInCurrentDocument;
+            origin = (boundingBox.Min + boundingBox.Max) * 0.5;
+
+            Transform transform = host.TransformToCurrentDocument ?? Transform.Identity;
+            try
+            {
+                normal = transform.OfVector(XYZ.BasisZ);
+            }
+            catch
+            {
+                normal = XYZ.BasisZ;
+            }
+
+            if (normal == null || normal.GetLength() < 1e-9)
+                normal = XYZ.BasisZ;
+            else
+                normal = normal.Normalize();
+
+            return true;
+        }
+
+        private static XYZ ProjectPointOntoFloorPlane(WallScanCandidate host, XYZ point)
+        {
+            if (point == null)
+                return null;
+
+            return TryGetFloorPlaneInCurrentDocument(host, out XYZ origin, out XYZ normal)
+                ? ProjectPointOntoPlane(point, origin, normal)
+                : point;
+        }
+
         private static XYZ ProjectPointOntoPlane(XYZ point, XYZ planeOrigin, XYZ planeNormal)
         {
             if (point == null || planeOrigin == null || planeNormal == null || planeNormal.GetLength() < 1e-9)
@@ -2053,7 +2230,7 @@ namespace Modification
             origin = null;
             normal = null;
 
-            if (host == null || host.Element is Wall)
+            if (host == null || host.Element is Wall || host.IsFloorLike)
                 return false;
 
             BoundingBoxXYZ bb = host.BoundingBoxInCurrentDocument;
