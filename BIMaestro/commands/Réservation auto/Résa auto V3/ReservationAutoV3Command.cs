@@ -1264,7 +1264,8 @@ namespace Modification
             bool isPipeOrDuct = objType == ReservationAutoV3Window.ObjectType.Canalisation
                                 || objType == ReservationAutoV3Window.ObjectType.Gaine;
 
-            double oversizeFt = MmToFt(isPipeOrDuct ? cfg.OversizeMm_PipeDuct : 0.0);
+            double oversizeFt = 0.0;
+
             double depthFt = depthOverrideFt ?? GetHostDepth(host);
 
             var world = ToWorldBoundingBox(bbIntersect);
@@ -1278,7 +1279,7 @@ namespace Modification
                     diamFt = CalculateFallbackDiameter(host, world, depthFt, oversizeFt);
                 }
 
-                if (normeEnabled) diamFt = RoundToNearest50mm(diamFt);
+                if (normeEnabled) diamFt = RoundUpToNext50mm(diamFt);
 
                 TrySet(fi, prof.ParamDiameter, diamFt, "Diamètre", "COM_Diamètre", "Diameter");
                 TrySet(fi, prof.ParamDepth, depthFt, "Profondeur", "COM_Profondeur", "Depth");
@@ -1322,8 +1323,8 @@ namespace Modification
 
                 if (normeEnabled)
                 {
-                    len = RoundToNearest50mm(len);
-                    hgt = RoundToNearest50mm(hgt);
+                    len = RoundUpToNext50mm(len);
+                    hgt = RoundUpToNext50mm(hgt);
                 }
 
                 TrySet(fi, prof.ParamLength, len, "Longueur", "COM_Longueur", "Largeur", "COM_Largeur", "Length", "Width");
@@ -1337,8 +1338,8 @@ namespace Modification
 
                 if (normeEnabled)
                 {
-                    len = RoundToNearest50mm(len);
-                    wid = RoundToNearest50mm(wid);
+                    len = RoundUpToNext50mm(len);
+                    wid = RoundUpToNext50mm(wid);
                 }
 
                 TrySet(fi, prof.ParamLength, len, "Longueur", "COM_Longueur", "Length");
@@ -1358,11 +1359,6 @@ namespace Modification
             bool floorOverride = false)
         {
             if (fi == null || host == null || unionIntersect == null) return;
-
-            bool isPipeOrDuct = objType == ReservationAutoV3Window.ObjectType.Canalisation
-                                || objType == ReservationAutoV3Window.ObjectType.Gaine;
-
-            double oversizeFt = MmToFt(isPipeOrDuct ? cfg.OversizeMm_PipeDuct : 0.0);
             double depthFt = depthOverrideFt ?? GetHostDepth(host);
 
             var world = ToWorldBoundingBox(unionIntersect);
@@ -1382,13 +1378,13 @@ namespace Modification
                 };
                 var projs = corners.Select(c => c.DotProduct(wallDir)).ToList();
 
-                double len = (projs.Max() - projs.Min()) + oversizeFt;
-                double hgt = (world.Max.Z - world.Min.Z) + oversizeFt;
+                double len = projs.Max() - projs.Min();
+                double hgt = world.Max.Z - world.Min.Z;
 
                 if (normeEnabled)
                 {
-                    len = RoundToNearest50mm(len);
-                    hgt = RoundToNearest50mm(hgt);
+                    len = RoundUpToNext50mm(len);
+                    hgt = RoundUpToNext50mm(hgt);
                 }
 
                 TrySet(fi, prof.ParamLength, len, "Longueur", "COM_Longueur", "Largeur", "COM_Largeur", "Length", "Width");
@@ -1397,13 +1393,13 @@ namespace Modification
             }
             else if (host is Floor || floorOverride)
             {
-                double len = (world.Max.X - world.Min.X) + oversizeFt;
-                double wid = (world.Max.Y - world.Min.Y) + oversizeFt;
+                double len = world.Max.X - world.Min.X;
+                double wid = world.Max.Y - world.Min.Y;
 
                 if (normeEnabled)
                 {
-                    len = RoundToNearest50mm(len);
-                    wid = RoundToNearest50mm(wid);
+                    len = RoundUpToNext50mm(len);
+                    wid = RoundUpToNext50mm(wid);
                 }
 
                 TrySet(fi, prof.ParamLength, len, "Longueur", "COM_Longueur", "Length");
@@ -1637,29 +1633,25 @@ namespace Modification
             if (host is Floor)
                 return depthFt;
 
-            bool isPipeOrDuct = objType == ReservationAutoV3Window.ObjectType.Canalisation
-                                || objType == ReservationAutoV3Window.ObjectType.Gaine;
-
-            double oversizeFt = MmToFt(isPipeOrDuct ? cfg.OversizeMm_PipeDuct : 0.0);
             var world = ToWorldBoundingBox(bbIntersect);
             if (world == null)
                 return 0.0;
 
             if (!isRect)
             {
-                double diamFt = CalculateDiameterForElement(intersecting, objType, oversizeFt);
+                double diamFt = CalculateDiameterForElement(intersecting, objType, 0.0);
                 if (diamFt <= 1e-9)
-                    diamFt = CalculateFallbackDiameter(host, world, depthFt, oversizeFt);
+                    diamFt = CalculateFallbackDiameter(host, world, depthFt, 0.0);
 
                 if (normeEnabled)
-                    diamFt = RoundToNearest50mm(diamFt);
+                    diamFt = RoundUpToNext50mm(diamFt);
 
                 return diamFt;
             }
 
-            double hgt = (world.Max.Z - world.Min.Z) + oversizeFt;
+            double hgt = world.Max.Z - world.Min.Z;
             if (normeEnabled)
-                hgt = RoundToNearest50mm(hgt);
+                hgt = RoundUpToNext50mm(hgt);
 
             return hgt;
         }
@@ -2972,7 +2964,7 @@ namespace Modification
             return diam + oversizeFt;
         }
 
-        private static double RoundToNearest50mm(double valueInFeet)
+        private static double RoundUpToNext50mm(double valueInFeet)
         {
             double mm = valueInFeet * 304.8;
             double mmRounded = Math.Ceiling(mm / 50.0) * 50.0;

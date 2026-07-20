@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
@@ -50,6 +51,8 @@ namespace Modification
         private bool _circShapeAvailable;
         private bool _isRefreshingShapeOptions;
         private bool _isRefreshingPlacementUi;
+        private bool _isRefreshingConfigurationContext;
+        private bool _isRestoringLastSelection;
 
         private GifPlaybackData _murGifData;
         private GifPlaybackData _solGifData;
@@ -78,11 +81,14 @@ namespace Modification
         {
             public FamilySymbol Symbol { get; }
             public string Display { get; }
+            public bool IsGenericModel { get; }
 
             public LoadedTypeItem(FamilySymbol s)
             {
                 Symbol = s;
-                Display = $"{s.Family.Name} — {s.Name}";
+                IsGenericModel = s?.Category?.Id?.IntegerValue == (int)BuiltInCategory.OST_GenericModel;
+                string category = s?.Category?.Name ?? "Catégorie inconnue";
+                Display = $"{s?.Family?.Name} — {s?.Name}  ·  {category}";
             }
         }
 
@@ -107,6 +113,7 @@ namespace Modification
             _doc = doc;
             Config = cfg ?? new ReservationAutoV3Config();
             _persoConfig = ReservationAutoV3PersoConfigStore.LoadOrDefault();
+            _persoConfig.EnsureInitialized();
 
             comboObjectType.SelectedIndex = 0;
             comboPipeSource.SelectedIndex = 0;
@@ -114,7 +121,6 @@ namespace Modification
 
             chkDefaultNorme.IsChecked = Config.DefaultNormeEnabled;
             chkDefaultDynamo.IsChecked = Config.DefaultDynamoAutoEnabled;
-            tbOversize.Text = Config.OversizeMm_PipeDuct.ToString("0");
             tbDynamoPath.Text = Config.DynamoPath ?? "";
 
             chkNorme.IsChecked = Config.DefaultNormeEnabled;
@@ -122,12 +128,14 @@ namespace Modification
 
             tbRfaPath.Text = Config.LastRfaPath ?? "";
 
-            InitializeHostGifSelectors();
-            InitializeShapeGifSelectors();
-            InitializeObjectGifSelectors();
+            ScheduleGifSelectorLoading();
 
+            RestoreLastExecutionCriteria();
+
+            RefreshConfigurationContext();
             RefreshProfilesSummary();
             RefreshShapeOptions();
+            RestoreLastShapeOption();
             UpdateHostSelectorUi();
             UpdateShapeSelectorUi();
             UpdateObjectSelectorUi();
@@ -138,60 +146,62 @@ namespace Modification
 
         private void RefreshProfilesSummary()
         {
-            txtWallRect.Text = DescribeProfilesByVariant(HostTarget.Mur, ShapeTarget.Rectangulaire, "Longueur/Hauteur/Profondeur");
-            txtWallCirc.Text = DescribeProfilesByVariant(HostTarget.Mur, ShapeTarget.Circulaire, "Diamètre/Profondeur");
-            txtFloorRect.Text = DescribeProfilesByVariant(HostTarget.Sol, ShapeTarget.Rectangulaire, "Longueur/Largeur/Profondeur");
-            txtFloorCirc.Text = DescribeProfilesByVariant(HostTarget.Sol, ShapeTarget.Circulaire, "Diamètre/Profondeur");
-        }
+            if (txtConfigProgress == null || txtSelectedConfigStatus == null)
+                return;
 
-        private string DescribeProfile(ProfileConfig p, string expected)
-        {
-            if (p == null || string.IsNullOrWhiteSpace(p.FamilyName))
-                return $"(Non configuré) — attendu : {expected}";
+            var loadedSymbols = new FilteredElementCollector(_doc)
+                .OfClass(typeof(FamilySymbol))
+                .Cast<FamilySymbol>()
+                .Where(s => s?.Family != null)
+                .ToList();
 
-            string type = string.IsNullOrWhiteSpace(p.TypeName) ? "(type auto)" : p.TypeName;
-            return $"{p.FamilyName} — {type}";
-        }
-
-        private string DescribeProfilesByVariant(HostTarget host, ShapeTarget shape, string expected)
-        {
-            string DescribeAvailable(ProfileConfig p)
+            var profiles = new[]
             {
-                if (p == null || string.IsNullOrWhiteSpace(p.FamilyName))
-                    return "(absent)";
-
-                string loaded = IsProfileLoadedInProject(p) ? "" : " (non chargée)";
-                string placement = DescribeVerticalPlacement(p);
-                return $"{p.FamilyName}{loaded} [{placement}]";
-            }
-
-            var v1 = FindBuiltInProfile(host, shape, isV2: false);
-            var v2 = FindBuiltInProfile(host, shape, isV2: true);
-            var perso = _persoConfig.Get(host, shape);
-
-            if (v1 == null && v2 == null && (perso == null || string.IsNullOrWhiteSpace(perso.FamilyName)))
-                return $"(Non configuré) — attendu : {expected}";
-
-            return $"Avec hôte : {DescribeAvailable(v1)} | Sans hôte : {DescribeAvailable(v2)} | Personnalisée : {DescribeAvailable(perso)}";
-        }
-
-        private static string DescribeVerticalPlacement(ProfileConfig profile)
-        {
-            if (profile == null) return "Auto";
-
-            string mode = profile.VerticalPlacementMode switch
-            {
-                VerticalPlacementMode.Center => "Centre",
-                VerticalPlacementMode.Bottom => "Bas",
-                VerticalPlacementMode.Top => "Haut",
-                _ => "Auto"
+                (Profile: _persoConfig.Get(HostTarget.Mur, ShapeTarget.Rectangulaire, false), Unhosted: false),
+                (Profile: _persoConfig.Get(HostTarget.Mur, ShapeTarget.Rectangulaire, true), Unhosted: true),
+                (Profile: _persoConfig.Get(HostTarget.Mur, ShapeTarget.Circulaire, false), Unhosted: false),
+                (Profile: _persoConfig.Get(HostTarget.Mur, ShapeTarget.Circulaire, true), Unhosted: true),
+                (Profile: _persoConfig.Get(HostTarget.Sol, ShapeTarget.Rectangulaire, false), Unhosted: false),
+                (Profile: _persoConfig.Get(HostTarget.Sol, ShapeTarget.Rectangulaire, true), Unhosted: true),
+                (Profile: _persoConfig.Get(HostTarget.Sol, ShapeTarget.Circulaire, false), Unhosted: false),
+                (Profile: _persoConfig.Get(HostTarget.Sol, ShapeTarget.Circulaire, true), Unhosted: true)
             };
 
-            if (Math.Abs(profile.VerticalPlacementOffsetMm) < 0.001)
-                return mode;
+            bool IsReady(ProfileConfig profile, bool unhosted)
+            {
+                if (profile?.IsConfigured != true)
+                    return false;
 
-            string sign = profile.VerticalPlacementOffsetMm > 0 ? "+" : "";
-            return $"{mode} {sign}{profile.VerticalPlacementOffsetMm:0.#} mm";
+                FamilyPlacementType expected = unhosted
+                    ? FamilyPlacementType.OneLevelBased
+                    : FamilyPlacementType.OneLevelBasedHosted;
+
+                return loadedSymbols.Any(s =>
+                    string.Equals(s.Family.Name, profile.FamilyName, StringComparison.OrdinalIgnoreCase) &&
+                    s.Family.FamilyPlacementType == expected);
+            }
+
+            int ready = profiles.Count(x => IsReady(x.Profile, x.Unhosted));
+            txtConfigProgress.Text = $"{ready} configuration{(ready > 1 ? "s" : "")} prête{(ready > 1 ? "s" : "")} sur 8";
+
+            ProfileConfig selected = GetSelectedTargetProfileConfig();
+            if (selected == null || !selected.IsConfigured)
+            {
+                txtSelectedConfigStatus.Text = "Aucune famille utilisateur configurée pour ce cas.";
+            }
+            else if (!loadedSymbols.Any(s => string.Equals(s.Family.Name, selected.FamilyName, StringComparison.OrdinalIgnoreCase)))
+            {
+                txtSelectedConfigStatus.Text = $"Configurée mais non chargée dans ce projet : {selected.FamilyName}";
+            }
+            else if (!IsReady(selected, SelectedConfigUnhosted))
+            {
+                txtSelectedConfigStatus.Text = $"Chargée mais incompatible avec ce mode d'hébergement : {selected.FamilyName}";
+            }
+            else
+            {
+                string type = string.IsNullOrWhiteSpace(selected.TypeName) ? "type automatique" : selected.TypeName;
+                txtSelectedConfigStatus.Text = $"Prête : {selected.FamilyName} — {type}";
+            }
         }
 
         public void OnCriteriaChanged(object sender, SelectionChangedEventArgs e)
@@ -223,7 +233,83 @@ namespace Modification
 
         private void OnModeChanged(object sender, RoutedEventArgs e)
         {
+            if (_isRestoringLastSelection)
+                return;
+
             OnCriteriaChanged(null, null);
+        }
+
+        private void RestoreLastExecutionCriteria()
+        {
+            _isRestoringLastSelection = true;
+            try
+            {
+                if (Enum.TryParse(Config.LastHostTarget, true, out HostTarget host))
+                    _selectedHost = host;
+
+                if (Enum.TryParse(Config.LastShapeTarget, true, out ShapeTarget shape))
+                    _selectedShapeBase = shape;
+
+                if (Enum.TryParse(Config.LastObjectType, true, out ObjectType objectType))
+                {
+                    comboObjectType.SelectedIndex = objectType switch
+                    {
+                        ObjectType.Canalisation => 0,
+                        ObjectType.Gaine => 1,
+                        ObjectType.Porte => 2,
+                        ObjectType.Fenetre => 3,
+                        _ => 4
+                    };
+                }
+
+                if (Enum.TryParse(Config.LastPipeSource, true, out PipeSource pipeSource))
+                {
+                    comboPipeSource.SelectedIndex = pipeSource switch
+                    {
+                        PipeSource.LienIFC => 1,
+                        PipeSource.LienRVT => 2,
+                        _ => 0
+                    };
+                }
+
+                chkAutomatique.IsChecked = Config.LastAutomaticEnabled;
+                chkDoubleLink.IsChecked = Config.LastDoubleLinkEnabled;
+                chkMulti.IsChecked = Config.LastMultiEnabled;
+            }
+            finally
+            {
+                _isRestoringLastSelection = false;
+            }
+        }
+
+        private void RestoreLastShapeOption()
+        {
+            string savedLabel = Config.LastShapeOptionLabel;
+            if (string.IsNullOrWhiteSpace(savedLabel) || !comboShape.IsEnabled)
+                return;
+
+            _isRestoringLastSelection = true;
+            try
+            {
+                for (int i = 0; i < comboShape.Items.Count; i++)
+                {
+                    if (!string.Equals(
+                            (comboShape.Items[i] as ComboBoxItem)?.Content as string,
+                            savedLabel,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    comboShape.SelectedIndex = i;
+                    comboShape.Text = savedLabel;
+                    break;
+                }
+            }
+            finally
+            {
+                _isRestoringLastSelection = false;
+            }
         }
 
         private void RefreshShapeOptions()
@@ -335,23 +421,30 @@ namespace Modification
         {
             yield return new ShapeOptionItem
             {
-                Label = $"{GetShapePrefix(shape)} - Avec hôte",
+                Label = $"{GetShapePrefix(shape)} - Ma famille avec hôte",
+                Shape = shape,
+                Profile = _persoConfig.Get(host, shape, false)
+            };
+
+            yield return new ShapeOptionItem
+            {
+                Label = $"{GetShapePrefix(shape)} - Ma famille sans hôte",
+                Shape = shape,
+                Profile = _persoConfig.Get(host, shape, true)
+            };
+
+            yield return new ShapeOptionItem
+            {
+                Label = $"{GetShapePrefix(shape)} - BIMaestro avec hôte",
                 Shape = shape,
                 Profile = FindBuiltInProfile(host, shape, isV2: false)
             };
 
             yield return new ShapeOptionItem
             {
-                Label = $"{GetShapePrefix(shape)} - Sans hôte",
+                Label = $"{GetShapePrefix(shape)} - BIMaestro sans hôte",
                 Shape = shape,
                 Profile = FindBuiltInProfile(host, shape, isV2: true)
-            };
-
-            yield return new ShapeOptionItem
-            {
-                Label = $"{GetShapePrefix(shape)} - Personnalisée",
-                Shape = shape,
-                Profile = _persoConfig.Get(host, shape)
             };
         }
 
@@ -461,29 +554,37 @@ namespace Modification
                 : value;
         }
 
-        private void InitializeHostGifSelectors()
+        private void ScheduleGifSelectorLoading()
         {
-            var murResource = FindBestGifResource("mur", null);
-            var solResource = FindBestGifResource("sol", murResource);
-
-            TryLoadGif(imgHostMur, txtHostMurFallback, murResource, out _murGifData, out _murFirstFrame);
-            TryLoadGif(imgHostSol, txtHostSolFallback, solResource, out _solGifData, out _solFirstFrame);
-            UpdateHostSelectorUi();
+            ContentRendered += LoadGifSelectorsAfterFirstRender;
         }
 
-        private void InitializeShapeGifSelectors()
+        private async void LoadGifSelectorsAfterFirstRender(object sender, EventArgs e)
         {
-            TryLoadGif(imgShapeRect, txtShapeRectFallback, FindBestGifResource("rect", null), out _shapeRectGifData, out _shapeRectFirstFrame);
-            TryLoadGif(imgShapeCirc, txtShapeCircFallback, FindBestGifResource("circ", null), out _shapeCircGifData, out _shapeCircFirstFrame);
-        }
+            ContentRendered -= LoadGifSelectorsAfterFirstRender;
 
-        private void InitializeObjectGifSelectors()
-        {
-            TryLoadGif(imgObjPipe, txtObjPipeFallback, FindBestGifResource("cana", null), out _objPipeGifData, out _objPipeFirstFrame);
-            TryLoadGif(imgObjDuct, txtObjDuctFallback, FindBestGifResource("gaine", null), out _objDuctGifData, out _objDuctFirstFrame);
-            TryLoadGif(imgObjDoor, txtObjDoorFallback, FindBestGifResource("porte", null), out _objDoorGifData, out _objDoorFirstFrame);
-            TryLoadGif(imgObjWindow, txtObjWindowFallback, FindBestGifResource("fenetre", null), out _objWindowGifData, out _objWindowFirstFrame);
-            TryLoadGif(imgObjOther, txtObjOtherFallback, FindBestGifResource("autre", null), out _objOtherGifData, out _objOtherFirstFrame);
+            string murResource = FindBestGifResource("mur", null);
+            string solResource = FindBestGifResource("sol", murResource);
+
+            await Task.WhenAll(
+                LoadGifSelectorAsync(imgHostMur, txtHostMurFallback, murResource,
+                    (data, frame) => { _murGifData = data; _murFirstFrame = frame; }),
+                LoadGifSelectorAsync(imgHostSol, txtHostSolFallback, solResource,
+                    (data, frame) => { _solGifData = data; _solFirstFrame = frame; }),
+                LoadGifSelectorAsync(imgShapeRect, txtShapeRectFallback, FindBestGifResource("rect", null),
+                    (data, frame) => { _shapeRectGifData = data; _shapeRectFirstFrame = frame; }),
+                LoadGifSelectorAsync(imgShapeCirc, txtShapeCircFallback, FindBestGifResource("circ", null),
+                    (data, frame) => { _shapeCircGifData = data; _shapeCircFirstFrame = frame; }),
+                LoadGifSelectorAsync(imgObjPipe, txtObjPipeFallback, FindBestGifResource("cana", null),
+                    (data, frame) => { _objPipeGifData = data; _objPipeFirstFrame = frame; }),
+                LoadGifSelectorAsync(imgObjDuct, txtObjDuctFallback, FindBestGifResource("gaine", null),
+                    (data, frame) => { _objDuctGifData = data; _objDuctFirstFrame = frame; }),
+                LoadGifSelectorAsync(imgObjDoor, txtObjDoorFallback, FindBestGifResource("porte", null),
+                    (data, frame) => { _objDoorGifData = data; _objDoorFirstFrame = frame; }),
+                LoadGifSelectorAsync(imgObjWindow, txtObjWindowFallback, FindBestGifResource("fenetre", null),
+                    (data, frame) => { _objWindowGifData = data; _objWindowFirstFrame = frame; }),
+                LoadGifSelectorAsync(imgObjOther, txtObjOtherFallback, FindBestGifResource("autre", null),
+                    (data, frame) => { _objOtherGifData = data; _objOtherFirstFrame = frame; }));
         }
 
         private string FindBestGifResource(string keyword, string excludedResource)
@@ -498,34 +599,48 @@ namespace Modification
                 !string.Equals(n, excludedResource, StringComparison.OrdinalIgnoreCase));
         }
 
-        private static bool TryLoadGif(Image image, TextBlock fallbackText, string resourceName, out GifPlaybackData gifData, out BitmapFrame firstFrame)
+        private async Task LoadGifSelectorAsync(
+            Image image,
+            TextBlock fallbackText,
+            string resourceName,
+            Action<GifPlaybackData, BitmapFrame> assign)
         {
-            gifData = null;
-            firstFrame = null;
-
             if (image == null || string.IsNullOrWhiteSpace(resourceName))
-                return false;
+                return;
 
             try
             {
-                var asm = Assembly.GetExecutingAssembly();
-                using (Stream stream = asm.GetManifestResourceStream(resourceName))
-                {
-                    if (stream == null) return false;
-                    gifData = BuildGifPlaybackData(stream);
-                    if (gifData?.Frames == null || gifData.Frames.Count == 0)
-                        return false;
+                var result = await Task.Run(() => LoadGifResource(resourceName));
+                if (result.Data?.Frames == null || result.Data.Frames.Count == 0 || !IsLoaded)
+                    return;
 
-                    firstFrame = BitmapFrame.Create(gifData.Frames[0]);
-                    image.Source = firstFrame;
-                    if (fallbackText != null)
-                        fallbackText.Visibility = System.Windows.Visibility.Collapsed;
-                    return true;
-                }
+                assign?.Invoke(result.Data, result.FirstFrame);
+                image.Source = result.FirstFrame;
+                if (fallbackText != null)
+                    fallbackText.Visibility = System.Windows.Visibility.Collapsed;
             }
             catch
             {
-                return false;
+            }
+        }
+
+        private static (GifPlaybackData Data, BitmapFrame FirstFrame) LoadGifResource(string resourceName)
+        {
+            var asm = Assembly.GetExecutingAssembly();
+            using (Stream stream = asm.GetManifestResourceStream(resourceName))
+            {
+                if (stream == null)
+                    return (null, null);
+
+                GifPlaybackData data = BuildGifPlaybackData(stream);
+                if (data?.Frames == null || data.Frames.Count == 0)
+                    return (null, null);
+
+                BitmapFrame firstFrame = BitmapFrame.Create(data.Frames[0]);
+                if (firstFrame.CanFreeze)
+                    firstFrame.Freeze();
+
+                return (data, firstFrame);
             }
         }
 
@@ -767,7 +882,7 @@ namespace Modification
 
         private void OnShapeVariantChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (_isRefreshingShapeOptions)
+            if (_isRefreshingShapeOptions || _isRestoringLastSelection)
                 return;
 
             string label = (comboShape.SelectedItem as ComboBoxItem)?.Content as string;
@@ -889,6 +1004,32 @@ namespace Modification
             }
         }
 
+        private void OnBrowseDynamo(object sender, RoutedEventArgs e)
+        {
+            var dlg = new OpenFileDialog
+            {
+                Filter = "Script Dynamo (*.dyn)|*.dyn",
+                Title = "Sélectionner le script Dynamo"
+            };
+
+            string currentPath = tbDynamoPath?.Text?.Trim();
+            if (!string.IsNullOrWhiteSpace(currentPath))
+            {
+                try
+                {
+                    string folder = System.IO.Path.GetDirectoryName(currentPath);
+                    if (!string.IsNullOrWhiteSpace(folder) && Directory.Exists(folder))
+                        dlg.InitialDirectory = folder;
+                }
+                catch
+                {
+                }
+            }
+
+            if (dlg.ShowDialog() == true)
+                tbDynamoPath.Text = dlg.FileName;
+        }
+
         private void OnLoadRfa(object sender, RoutedEventArgs e)
         {
             string path = tbRfaPath.Text?.Trim();
@@ -914,22 +1055,27 @@ namespace Modification
 
                     t.Commit();
 
-                    _loadedTypes = GetSymbolsFromFamily(_doc, fam)
-                        .Select(s => new LoadedTypeItem(s))
-                        .ToList();
-
-                    CollectAllParameterNames(path, _loadedTypes.Select(x => x.Symbol));
-
-                    cbLoadedType.ItemsSource = _loadedTypes;
-                    cbLoadedType.SelectedIndex = ResolvePreferredLoadedTypeIndex(_loadedTypes, GetSelectedTargetProfileConfig());
+                    var familySymbols = GetSymbolsFromFamily(_doc, fam);
+                    var preferred = familySymbols.FirstOrDefault(s => IsCompatibleWithSelectedHosting(s));
+                    CollectAllParameterNames(path, familySymbols);
+                    RefreshAvailableFamilyTypes(preferred);
 
                     RefreshProfilesSummary();
                     RefreshShapeOptions();
                     RefreshVerticalPlacementUiFromCurrentProfile();
                     FillParamCombosFromSelectedSymbol();
 
-                    MessageBox.Show("Famille chargée ✅\nChoisis ensuite le profil (mur/sol + forme) et mappe les paramètres.",
-                        "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
+                    if (preferred == null)
+                    {
+                        string expected = SelectedConfigUnhosted ? "sans hôte, basée sur un niveau" : "hébergée par un niveau";
+                        MessageBox.Show($"La famille est chargée, mais aucun de ses types n'est compatible avec le mode {expected}.",
+                            "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
+                    else
+                    {
+                        MessageBox.Show("Famille chargée. Vérifie les paramètres puis applique la configuration.",
+                            "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
                 }
             }
             catch (Exception ex)
@@ -953,13 +1099,95 @@ namespace Modification
 
         private void OnTargetProfileChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (_isRefreshingConfigurationContext)
+                return;
+
             UpdateMappingPanels();
             RefreshVerticalPlacementUiFromCurrentProfile();
+        }
+
+        private HostTarget SelectedConfigHost
+            => cbConfigSupport?.SelectedIndex == 1 ? HostTarget.Sol : HostTarget.Mur;
+
+        private ShapeTarget SelectedConfigShape
+            => cbConfigShape?.SelectedIndex == 1 ? ShapeTarget.Circulaire : ShapeTarget.Rectangulaire;
+
+        private bool SelectedConfigUnhosted
+            => cbConfigHosting?.SelectedIndex == 1;
+
+        private void OnConfigContextChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isRefreshingConfigurationContext || cbTargetProfile == null || cbLoadedType == null)
+                return;
+
+            RefreshConfigurationContext();
+        }
+
+        private void RefreshConfigurationContext()
+        {
+            if (cbTargetProfile == null || cbLoadedType == null)
+                return;
+
+            _isRefreshingConfigurationContext = true;
+            try
+            {
+                int targetIndex = SelectedConfigHost == HostTarget.Mur
+                    ? (SelectedConfigShape == ShapeTarget.Rectangulaire ? 0 : 1)
+                    : (SelectedConfigShape == ShapeTarget.Rectangulaire ? 2 : 3);
+
+                cbTargetProfile.SelectedIndex = targetIndex;
+                RefreshAvailableFamilyTypes();
+                UpdateMappingPanels();
+                RefreshVerticalPlacementUiFromCurrentProfile();
+                RefreshProfilesSummary();
+            }
+            finally
+            {
+                _isRefreshingConfigurationContext = false;
+            }
+        }
+
+        private void RefreshAvailableFamilyTypes(FamilySymbol preferredSymbol = null)
+        {
+            if (_doc == null || cbLoadedType == null)
+                return;
+
+            _loadedTypes = new FilteredElementCollector(_doc)
+                .OfClass(typeof(FamilySymbol))
+                .Cast<FamilySymbol>()
+                .Where(IsCompatibleWithSelectedHosting)
+                .Select(s => new LoadedTypeItem(s))
+                .OrderBy(x => x.IsGenericModel ? 0 : 1)
+                .ThenBy(x => x.Symbol?.Category?.Name ?? string.Empty, StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(x => x.Symbol?.Family?.Name ?? string.Empty, StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(x => x.Symbol?.Name ?? string.Empty, StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
+
+            cbLoadedType.ItemsSource = null;
+            cbLoadedType.ItemsSource = _loadedTypes;
+
+            int selectedIndex = preferredSymbol == null
+                ? ResolvePreferredLoadedTypeIndex(_loadedTypes, GetSelectedTargetProfileConfig())
+                : _loadedTypes.FindIndex(x => x.Symbol?.Id == preferredSymbol.Id);
+
+            cbLoadedType.SelectedIndex = selectedIndex >= 0 ? selectedIndex : (_loadedTypes.Count > 0 ? 0 : -1);
+        }
+
+        private bool IsCompatibleWithSelectedHosting(FamilySymbol symbol)
+        {
+            if (symbol?.Family == null)
+                return false;
+
+            FamilyPlacementType placement = symbol.Family.FamilyPlacementType;
+            return SelectedConfigUnhosted
+                ? placement == FamilyPlacementType.OneLevelBased
+                : placement == FamilyPlacementType.OneLevelBasedHosted;
         }
 
         private void OnLoadedTypeChanged(object sender, SelectionChangedEventArgs e)
         {
             FillParamCombosFromSelectedSymbol();
+            SuggestMappingsForSelectedSymbol();
         }
 
         private void OnVerticalPlacementChanged(object sender, SelectionChangedEventArgs e)
@@ -993,18 +1221,30 @@ namespace Modification
             }
             ApplyMappingFromSelectedProfileToUi();
             FillParamCombosFromSelectedSymbol();
+            SuggestMappingsForSelectedSymbol();
         }
 
         private void FillParamCombosFromSelectedSymbol()
         {
             var it = cbLoadedType.SelectedItem as LoadedTypeItem;
             var sym = it?.Symbol;
+            _allParameterNames.Clear();
+
             if (sym != null)
             {
                 CollectParameterNamesFromElement(sym, _allParameterNames);
 
                 foreach (var familySymbol in GetSymbolsFromFamily(_doc, sym.Family))
                     CollectParameterNamesFromElement(familySymbol, _allParameterNames);
+
+                foreach (var instance in new FilteredElementCollector(_doc)
+                    .WhereElementIsNotElementType()
+                    .OfClass(typeof(FamilyInstance))
+                    .Cast<FamilyInstance>()
+                    .Where(x => x.Symbol?.Family?.Id == sym.Family.Id))
+                {
+                    CollectParameterNamesFromElement(instance, _allParameterNames);
+                }
             }
 
             var names = _allParameterNames
@@ -1032,6 +1272,50 @@ namespace Modification
             fill(cbMapFloorDepth);
             fill(cbMapFloorDiam);
             fill(cbMapFloorDepth2);
+        }
+
+        private void SuggestMappingsForSelectedSymbol()
+        {
+            if (_allParameterNames.Count == 0)
+                return;
+
+            void suggest(ComboBox combo, params string[] candidates)
+            {
+                if (combo == null || !string.IsNullOrWhiteSpace(combo.Text))
+                    return;
+
+                string exact = _allParameterNames.FirstOrDefault(name =>
+                    candidates.Any(candidate => string.Equals(name, candidate, StringComparison.OrdinalIgnoreCase)));
+                string partial = exact ?? _allParameterNames.FirstOrDefault(name =>
+                    candidates.Any(candidate => name.IndexOf(candidate, StringComparison.OrdinalIgnoreCase) >= 0));
+
+                if (!string.IsNullOrWhiteSpace(partial))
+                    combo.Text = partial;
+            }
+
+            int idx = cbTargetProfile.SelectedIndex;
+            if (idx == 0)
+            {
+                suggest(cbMapWallLen, "Longueur", "Length");
+                suggest(cbMapWallHeight, "Hauteur", "Height");
+                suggest(cbMapWallDepth, "Profondeur", "Depth", "Épaisseur", "Epaisseur", "Thickness");
+            }
+            else if (idx == 1)
+            {
+                suggest(cbMapWallDiam, "Diamètre", "Diametre", "Diameter", "Diam");
+                suggest(cbMapWallDepth2, "Profondeur", "Depth", "Épaisseur", "Epaisseur", "Thickness");
+            }
+            else if (idx == 2)
+            {
+                suggest(cbMapFloorLen, "Longueur", "Length");
+                suggest(cbMapFloorWidth, "Largeur", "Width");
+                suggest(cbMapFloorDepth, "Profondeur", "Depth", "Épaisseur", "Epaisseur", "Thickness");
+            }
+            else if (idx == 3)
+            {
+                suggest(cbMapFloorDiam, "Diamètre", "Diametre", "Diameter", "Diam");
+                suggest(cbMapFloorDepth2, "Profondeur", "Depth", "Épaisseur", "Epaisseur", "Thickness");
+            }
         }
 
         private int ResolvePreferredLoadedTypeIndex(List<LoadedTypeItem> loadedTypes, ProfileConfig profile)
@@ -1166,15 +1450,7 @@ namespace Modification
 
         private ProfileConfig GetSelectedTargetProfileConfig()
         {
-            int idx = cbTargetProfile.SelectedIndex;
-            return idx switch
-            {
-                0 => Config.WallRect,
-                1 => Config.WallCirc,
-                2 => Config.FloorRect,
-                3 => Config.FloorCirc,
-                _ => Config.WallRect
-            };
+            return _persoConfig.Get(SelectedConfigHost, SelectedConfigShape, SelectedConfigUnhosted);
         }
 
         private void ApplyVerticalPlacementUiToProfile(ProfileConfig profile)
@@ -1202,25 +1478,18 @@ namespace Modification
 
             if (sym == null)
             {
-                MessageBox.Show("Charge une famille (.RFA) et choisis un type.", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Choisis une famille compatible chargée dans le projet.", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
-            if (!double.TryParse(tbOversize.Text?.Trim(), out var ov)) ov = 50.0;
-            Config.OversizeMm_PipeDuct = Math.Max(0.0, ov);
             Config.DynamoPath = tbDynamoPath.Text ?? "";
             Config.DefaultNormeEnabled = chkDefaultNorme.IsChecked == true;
             Config.DefaultDynamoAutoEnabled = chkDefaultDynamo.IsChecked == true;
 
             int idx = cbTargetProfile.SelectedIndex;
-            ProfileConfig p = idx switch
-            {
-                0 => Config.WallRect,
-                1 => Config.WallCirc,
-                2 => Config.FloorRect,
-                3 => Config.FloorCirc,
-                _ => Config.WallRect
-            };
+            ProfileConfig p = GetSelectedTargetProfileConfig();
+            if (p == null)
+                return;
 
             p.FamilyName = sym.Family.Name;
             p.TypeName = sym.Name;
@@ -1252,31 +1521,16 @@ namespace Modification
 
             if (ReservationAutoV3ConfigStore.Save(Config, out var err))
             {
-                var host = (idx == 0 || idx == 1) ? HostTarget.Mur : HostTarget.Sol;
-                var shape = (idx == 0 || idx == 2) ? ShapeTarget.Rectangulaire : ShapeTarget.Circulaire;
-                var targetPersoProfile = _persoConfig.Get(host, shape);
-                if (targetPersoProfile != null)
-                {
-                    targetPersoProfile.FamilyName = p.FamilyName;
-                    targetPersoProfile.TypeName = p.TypeName;
-                    targetPersoProfile.ParamLength = p.ParamLength;
-                    targetPersoProfile.ParamWidth = p.ParamWidth;
-                    targetPersoProfile.ParamHeight = p.ParamHeight;
-                    targetPersoProfile.ParamDiameter = p.ParamDiameter;
-                    targetPersoProfile.ParamDepth = p.ParamDepth;
-                    targetPersoProfile.VerticalPlacementMode = p.VerticalPlacementMode;
-                    targetPersoProfile.VerticalPlacementOffsetMm = p.VerticalPlacementOffsetMm;
-                }
-
                 if (!ReservationAutoV3PersoConfigStore.Save(_persoConfig, out var persoErr))
                 {
-                    MessageBox.Show("Profil configuré mais erreur sauvegarde perso : " + persoErr, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show("Famille configurée mais erreur de sauvegarde : " + persoErr, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
                 }
 
                 RefreshProfilesSummary();
                 RefreshShapeOptions();
                 RefreshVerticalPlacementUiFromCurrentProfile();
-                MessageBox.Show("Profil configuré + sauvegardé ✅", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Famille utilisateur configurée et sauvegardée.", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             else
             {
@@ -1286,9 +1540,6 @@ namespace Modification
 
         private void OnSaveOnly(object sender, RoutedEventArgs e)
         {
-            if (!double.TryParse(tbOversize.Text?.Trim(), out var ov)) ov = 50.0;
-            Config.OversizeMm_PipeDuct = Math.Max(0.0, ov);
-
             Config.DynamoPath = tbDynamoPath.Text ?? "";
             Config.DefaultNormeEnabled = chkDefaultNorme.IsChecked == true;
             Config.DefaultDynamoAutoEnabled = chkDefaultDynamo.IsChecked == true;
@@ -1296,10 +1547,20 @@ namespace Modification
             var selectedProfile = GetSelectedTargetProfileConfig();
             ApplyVerticalPlacementUiToProfile(selectedProfile);
 
-            if (ReservationAutoV3ConfigStore.Save(Config, out var err))
-                MessageBox.Show("Configuration sauvegardée ✅", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
-            else
+            if (!ReservationAutoV3ConfigStore.Save(Config, out var err))
+            {
                 MessageBox.Show("Erreur sauvegarde : " + err, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            if (!ReservationAutoV3PersoConfigStore.Save(_persoConfig, out var persoErr))
+            {
+                MessageBox.Show("Erreur sauvegarde familles : " + persoErr, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            RefreshProfilesSummary();
+            MessageBox.Show("Configuration sauvegardée.", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void OnOk(object sender, RoutedEventArgs e)
@@ -1345,6 +1606,14 @@ namespace Modification
 
             Config.DefaultNormeEnabled = NormeEnabled;
             Config.DefaultDynamoAutoEnabled = DynamoAutoEnabled;
+            Config.LastHostTarget = SelectedHost.ToString();
+            Config.LastShapeTarget = SelectedShape.ToString();
+            Config.LastShapeOptionLabel = shapeLabel ?? "";
+            Config.LastObjectType = SelectedObject.ToString();
+            Config.LastPipeSource = SelectedPipeSource.ToString();
+            Config.LastAutomaticEnabled = AutomatiqueEnabled;
+            Config.LastDoubleLinkEnabled = DoubleLinkEnabled;
+            Config.LastMultiEnabled = MultiEnabled;
             ReservationAutoV3ConfigStore.Save(Config, out _);
 
             DialogResult = true;

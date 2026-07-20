@@ -22,14 +22,23 @@ namespace Modification
         [DataMember] public ProfileConfig FloorRect { get; set; } = ProfileConfig.DefaultFloorRect();
         [DataMember] public ProfileConfig FloorCirc { get; set; } = ProfileConfig.DefaultFloorCirc();
 
-        // Oversize (mm) uniquement sur largeur/hauteur/longueur pour Pipe/Duct
-        [DataMember] public double OversizeMm_PipeDuct { get; set; } = 50.0;
+        // Ancien réglage conservé pour relire les fichiers de configuration existants.
+        [DataMember] public double OversizeMm_PipeDuct { get; set; } = 0.0;
 
         // Profondeur : pas d'oversize
         [DataMember] public double OversizeMm_Depth { get; set; } = 0.0;
 
         [DataMember] public bool DefaultNormeEnabled { get; set; } = true;
         [DataMember] public bool DefaultDynamoAutoEnabled { get; set; } = true;
+
+        [DataMember] public string LastHostTarget { get; set; } = "Mur";
+        [DataMember] public string LastShapeTarget { get; set; } = "Rectangulaire";
+        [DataMember] public string LastShapeOptionLabel { get; set; } = "";
+        [DataMember] public string LastObjectType { get; set; } = "Canalisation";
+        [DataMember] public string LastPipeSource { get; set; } = "Maquette";
+        [DataMember] public bool LastAutomaticEnabled { get; set; }
+        [DataMember] public bool LastDoubleLinkEnabled { get; set; }
+        [DataMember] public bool LastMultiEnabled { get; set; }
 
         [DataMember]
         public string DynamoPath { get; set; } =
@@ -157,6 +166,15 @@ namespace Modification
         [DataMember] public ProfileConfig FloorRectPerso { get; set; } = new ProfileConfig();
         [DataMember] public ProfileConfig FloorCircPerso { get; set; } = new ProfileConfig();
 
+        [DataMember] public ProfileConfig WallRectHosted { get; set; } = new ProfileConfig();
+        [DataMember] public ProfileConfig WallRectUnhosted { get; set; } = new ProfileConfig();
+        [DataMember] public ProfileConfig WallCircHosted { get; set; } = new ProfileConfig();
+        [DataMember] public ProfileConfig WallCircUnhosted { get; set; } = new ProfileConfig();
+        [DataMember] public ProfileConfig FloorRectHosted { get; set; } = new ProfileConfig();
+        [DataMember] public ProfileConfig FloorRectUnhosted { get; set; } = new ProfileConfig();
+        [DataMember] public ProfileConfig FloorCircHosted { get; set; } = new ProfileConfig();
+        [DataMember] public ProfileConfig FloorCircUnhosted { get; set; } = new ProfileConfig();
+
         public ProfileConfig Get(ReservationAutoV3Window.HostTarget host, ReservationAutoV3Window.ShapeTarget shape)
         {
             return (host, shape) switch
@@ -166,6 +184,88 @@ namespace Modification
                 (ReservationAutoV3Window.HostTarget.Sol, ReservationAutoV3Window.ShapeTarget.Rectangulaire) => FloorRectPerso,
                 (ReservationAutoV3Window.HostTarget.Sol, ReservationAutoV3Window.ShapeTarget.Circulaire) => FloorCircPerso,
                 _ => null
+            };
+        }
+
+        public ProfileConfig Get(
+            ReservationAutoV3Window.HostTarget host,
+            ReservationAutoV3Window.ShapeTarget shape,
+            bool unhosted)
+        {
+            EnsureInitialized();
+
+            return (host, shape, unhosted) switch
+            {
+                (ReservationAutoV3Window.HostTarget.Mur, ReservationAutoV3Window.ShapeTarget.Rectangulaire, false) => WallRectHosted,
+                (ReservationAutoV3Window.HostTarget.Mur, ReservationAutoV3Window.ShapeTarget.Rectangulaire, true) => WallRectUnhosted,
+                (ReservationAutoV3Window.HostTarget.Mur, ReservationAutoV3Window.ShapeTarget.Circulaire, false) => WallCircHosted,
+                (ReservationAutoV3Window.HostTarget.Mur, ReservationAutoV3Window.ShapeTarget.Circulaire, true) => WallCircUnhosted,
+                (ReservationAutoV3Window.HostTarget.Sol, ReservationAutoV3Window.ShapeTarget.Rectangulaire, false) => FloorRectHosted,
+                (ReservationAutoV3Window.HostTarget.Sol, ReservationAutoV3Window.ShapeTarget.Rectangulaire, true) => FloorRectUnhosted,
+                (ReservationAutoV3Window.HostTarget.Sol, ReservationAutoV3Window.ShapeTarget.Circulaire, false) => FloorCircHosted,
+                (ReservationAutoV3Window.HostTarget.Sol, ReservationAutoV3Window.ShapeTarget.Circulaire, true) => FloorCircUnhosted,
+                _ => null
+            };
+        }
+
+        public void EnsureInitialized()
+        {
+            WallRectPerso ??= new ProfileConfig();
+            WallCircPerso ??= new ProfileConfig();
+            FloorRectPerso ??= new ProfileConfig();
+            FloorCircPerso ??= new ProfileConfig();
+
+            WallRectHosted ??= new ProfileConfig();
+            WallRectUnhosted ??= new ProfileConfig();
+            WallCircHosted ??= new ProfileConfig();
+            WallCircUnhosted ??= new ProfileConfig();
+            FloorRectHosted ??= new ProfileConfig();
+            FloorRectUnhosted ??= new ProfileConfig();
+            FloorCircHosted ??= new ProfileConfig();
+            FloorCircUnhosted ??= new ProfileConfig();
+
+            (WallRectHosted, WallRectUnhosted) = MigrateLegacyProfile(WallRectPerso, WallRectHosted, WallRectUnhosted);
+            (WallCircHosted, WallCircUnhosted) = MigrateLegacyProfile(WallCircPerso, WallCircHosted, WallCircUnhosted);
+            (FloorRectHosted, FloorRectUnhosted) = MigrateLegacyProfile(FloorRectPerso, FloorRectHosted, FloorRectUnhosted);
+            (FloorCircHosted, FloorCircUnhosted) = MigrateLegacyProfile(FloorCircPerso, FloorCircHosted, FloorCircUnhosted);
+        }
+
+        private static (ProfileConfig Hosted, ProfileConfig Unhosted) MigrateLegacyProfile(
+            ProfileConfig legacy,
+            ProfileConfig hosted,
+            ProfileConfig unhosted)
+        {
+            if (legacy == null || !legacy.IsConfigured || hosted.IsConfigured || unhosted.IsConfigured)
+                return (hosted, unhosted);
+
+            string name = (legacy.FamilyName + " " + legacy.TypeName).ToLowerInvariant();
+            bool looksUnhosted = name.Contains("sans hôte")
+                                 || name.Contains("sans hote")
+                                 || name.Contains("unhost")
+                                 || name.Contains("non héberg")
+                                 || name.Contains("v2");
+
+            if (looksUnhosted)
+                unhosted = CopyProfile(legacy);
+            else
+                hosted = CopyProfile(legacy);
+
+            return (hosted, unhosted);
+        }
+
+        private static ProfileConfig CopyProfile(ProfileConfig source)
+        {
+            return new ProfileConfig
+            {
+                FamilyName = source.FamilyName,
+                TypeName = source.TypeName,
+                ParamLength = source.ParamLength,
+                ParamWidth = source.ParamWidth,
+                ParamHeight = source.ParamHeight,
+                ParamDiameter = source.ParamDiameter,
+                ParamDepth = source.ParamDepth,
+                VerticalPlacementMode = source.VerticalPlacementMode,
+                VerticalPlacementOffsetMm = source.VerticalPlacementOffsetMm
             };
         }
     }
@@ -189,7 +289,9 @@ namespace Modification
                 {
                     var ser = new DataContractJsonSerializer(typeof(ReservationAutoV3PersoConfig));
                     var cfg = ser.ReadObject(fs) as ReservationAutoV3PersoConfig;
-                    return cfg ?? new ReservationAutoV3PersoConfig();
+                    cfg ??= new ReservationAutoV3PersoConfig();
+                    cfg.EnsureInitialized();
+                    return cfg;
                 }
             }
             catch
@@ -204,11 +306,13 @@ namespace Modification
             try
             {
                 Directory.CreateDirectory(Folder);
+                cfg ??= new ReservationAutoV3PersoConfig();
+                cfg.EnsureInitialized();
 
                 using (var fs = File.Create(ConfigPath))
                 {
                     var ser = new DataContractJsonSerializer(typeof(ReservationAutoV3PersoConfig));
-                    ser.WriteObject(fs, cfg ?? new ReservationAutoV3PersoConfig());
+                    ser.WriteObject(fs, cfg);
                 }
                 return true;
             }
