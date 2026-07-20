@@ -358,6 +358,7 @@
     </Compile>
     <Compile Include="commands\changer de couleur de ligne\OverrideColorCommand.cs" />
     <Compile Include="commands\phase rapide\PhaseQuickEditCommand.cs" />
+    <Compile Include="commands\Déplacement protégé\SafeMoveCommand.cs" />
     <Compile Include="commands\phase rapide\PhaseQuickEditWindow.xaml.cs">
       <DependentUpon>PhaseQuickEditWindow.xaml</DependentUpon>
     </Compile>
@@ -917,6 +918,7 @@
     <EmbeddedResource Include="Resources\Auto réservation.png" />
     <EmbeddedResource Include="Resources\paramétre.png" />
     <EmbeddedResource Include="Resources\Purge famille.png" />
+    <EmbeddedResource Include="Resources\Déplacement protégé.png" />
     <Content Include="Themes\BIMaestro_Charte_Graphique.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

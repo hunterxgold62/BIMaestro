@@ -78,6 +78,7 @@ public class AppUI : IExternalApplication
                 })),
                 new RibbonItemDefinition("GestionExcelCmd", "Gestion Excel", panel => AddPushButton(panel, "GestionExcelCmd", "Gestion\nExcel", assemblyPath, "ScheduleIO.ScheduleExcelIOCommand", "Gestion Excel.png", "Exporter ou importer une nomenclature au format Excel")),
                 new RibbonItemDefinition("PhaseQuickEditButton", "Phases rapides", panel => AddPushButton(panel, "PhaseQuickEditButton", "Phases\nrapides", assemblyPath, "Modification.PhaseQuickEditCommand", "paramétre.png", "Modifie rapidement la phase de creation et la phase de demolition des objets selectionnes.")),
+                new RibbonItemDefinition("SafeMoveButton", "Déplacement protégé", panel => AddPushButton(panel, "SafeMoveButton", "Déplacement\nprotégé", assemblyPath, "Modification.SafeMoveCommand", "Déplacement protégé.png", "Déplace précisément les objets entre deux points sans les dissocier ni les recréer.\r\nAnnule intégralement l'opération si Revit détecte une contrainte ou un risque pour une étiquette ou une cotation.")),
                 new RibbonItemDefinition("ModificationQuickTools", "Outils rapides", panel => AddStackedPushButtons(
                         panel,
                         assemblyPath,

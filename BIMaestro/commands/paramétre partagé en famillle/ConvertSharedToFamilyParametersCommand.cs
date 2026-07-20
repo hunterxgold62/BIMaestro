@@ -49,55 +49,150 @@ namespace Famille
             bool tempTypeCreated = false;
             bool tempTypeInitialized = false;
 
-            foreach (var batch in Batch(sharedParameters, ConversionBatchSize))
+            using (var group = new TransactionGroup(doc, "BIMaestro - Conversion sécurisée des paramètres"))
             {
-                using (var tx = new Transaction(doc, "Convertir paramètres partagés en paramètres de famille"))
+                group.Start();
+
+                try
                 {
-                    tx.Start();
-
-                    if (!tempTypeInitialized)
+                    foreach (var batch in Batch(sharedParameters, ConversionBatchSize))
                     {
-                        EnsureCurrentTypeExists(familyManager, out tempTypeCreated);
-                        tempTypeInitialized = true;
+                        var failureGuard = new RollBackOnAnyFailure();
+                        bool batchFailed = false;
+
+                        using (var tx = new Transaction(doc, "Convertir paramètres partagés en paramètres de famille"))
+                        {
+                            tx.Start();
+                            ConfigureStrictFailureHandling(tx, failureGuard);
+
+                            if (!tempTypeInitialized)
+                            {
+                                EnsureCurrentTypeExists(familyManager, out tempTypeCreated);
+                                tempTypeInitialized = true;
+                            }
+
+                            foreach (var parameter in batch)
+                            {
+                                string error;
+                                if (TryReplaceSharedParameter(doc, familyManager, parameter, out error))
+                                {
+                                    converted++;
+                                }
+                                else
+                                {
+                                    string name = ParameterDisplayName(parameter);
+                                    failed.Add(string.IsNullOrWhiteSpace(error) ? name : $"{name} — {error}");
+                                    batchFailed = true;
+                                    break;
+                                }
+                            }
+
+                            if (batchFailed)
+                            {
+                                tx.RollBack();
+                            }
+                            else
+                            {
+                                doc.Regenerate();
+                                if (tx.Commit() != TransactionStatus.Committed)
+                                {
+                                    failed.Add(string.IsNullOrWhiteSpace(failureGuard.Message)
+                                        ? "Revit a refusé la conversion lors de la validation."
+                                        : failureGuard.Message);
+                                    batchFailed = true;
+                                }
+                            }
+                        }
+
+                        if (batchFailed)
+                            break;
                     }
 
-                    foreach (var parameter in batch)
+                    if (failed.Count == 0 && tempTypeCreated)
                     {
-                        string error;
-                        if (TryReplaceSharedParameter(doc, familyManager, parameter, out error))
+                        var cleanupGuard = new RollBackOnAnyFailure();
+                        using (var cleanupTx = new Transaction(doc, "Nettoyage type temporaire BIMaestro"))
                         {
-                            converted++;
-                        }
-                        else
-                        {
-                            string name = ParameterDisplayName(parameter);
-                            failed.Add(string.IsNullOrWhiteSpace(error) ? name : $"{name} — {error}");
+                            cleanupTx.Start();
+                            ConfigureStrictFailureHandling(cleanupTx, cleanupGuard);
+                            TryCleanupTemporaryType(familyManager);
+                            doc.Regenerate();
+
+                            if (cleanupTx.Commit() != TransactionStatus.Committed)
+                            {
+                                failed.Add(string.IsNullOrWhiteSpace(cleanupGuard.Message)
+                                    ? "Revit a refusé le nettoyage du type temporaire."
+                                    : cleanupGuard.Message);
+                            }
                         }
                     }
 
-                    tx.Commit();
+                    if (failed.Count > 0)
+                    {
+                        if (group.GetStatus() == TransactionStatus.Started)
+                            group.RollBack();
+                        converted = 0;
+                    }
+                    else if (group.Assimilate() != TransactionStatus.Committed)
+                    {
+                        if (group.GetStatus() == TransactionStatus.Started)
+                            group.RollBack();
+                        failed.Add("Revit n'a pas pu finaliser la conversion.");
+                        converted = 0;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (group.GetStatus() == TransactionStatus.Started)
+                        group.RollBack();
+
+                    converted = 0;
+                    failed.Add(FormatException(ex));
                 }
             }
 
-            if (tempTypeCreated)
-            {
-                using (var cleanupTx = new Transaction(doc, "Nettoyage type temporaire BIMaestro"))
-                {
-                    cleanupTx.Start();
-                    TryCleanupTemporaryType(familyManager);
-                    cleanupTx.Commit();
-                }
-            }
-
+            bool rolledBack = failed.Count > 0;
             string report = $"Paramètres partagés détectés : {sharedParameters.Count}\n" +
                             $"Convertis en paramètres de famille : {converted}\n" +
                             $"Échecs : {failed.Count}";
 
-            if (failed.Count > 0)
-                report += "\n\nDétails des échecs :\n- " + string.Join("\n- ", failed);
+            if (rolledBack)
+            {
+                report += "\n\nSÉCURITÉ : aucune modification n'a été conservée ; la famille est restée dans son état initial.";
+                report += "\n\nDétails :\n- " + string.Join("\n- ", failed.Distinct());
+            }
 
-            TaskDialog.Show("Conversion terminée", report);
+            TaskDialog.Show(rolledBack ? "Conversion annulée sans modification" : "Conversion terminée", report);
             return Result.Succeeded;
+        }
+
+        private static void ConfigureStrictFailureHandling(Transaction transaction, RollBackOnAnyFailure failureGuard)
+        {
+            FailureHandlingOptions options = transaction.GetFailureHandlingOptions();
+            options.SetFailuresPreprocessor(failureGuard);
+            options.SetClearAfterRollback(true);
+            transaction.SetFailureHandlingOptions(options);
+        }
+
+        private sealed class RollBackOnAnyFailure : IFailuresPreprocessor
+        {
+            public string Message { get; private set; }
+
+            public FailureProcessingResult PreprocessFailures(FailuresAccessor failuresAccessor)
+            {
+                IList<FailureMessageAccessor> failures = failuresAccessor.GetFailureMessages();
+                if (failures == null || failures.Count == 0)
+                    return FailureProcessingResult.Continue;
+
+                Message = string.Join(
+                    "\n",
+                    failures
+                        .Select(failure => failure.GetDescriptionText())
+                        .Where(text => !string.IsNullOrWhiteSpace(text))
+                        .Distinct());
+
+                return FailureProcessingResult.ProceedWithRollBack;
+            }
         }
 
         private static IEnumerable<List<FamilyParameter>> Batch(List<FamilyParameter> parameters, int size)
@@ -185,16 +280,8 @@ namespace Famille
             if (TryReplaceViaReplaceParameter(doc, familyManager, parameter, definition, invocationErrors))
                 return true;
 
-            // 2) Fallback: recréation d'un paramètre famille simple (utile quand ReplaceParameter échoue sur paramètres vides/simples)
-            string fallbackError;
-            if (TryFallbackByRecreate(doc, familyManager, parameter, definition, out fallbackError))
-                return true;
-
-            if (!string.IsNullOrWhiteSpace(fallbackError))
-                invocationErrors.Add(fallbackError);
-
             error = invocationErrors.Count == 0
-                ? "Aucune stratégie de conversion n'a abouti"
+                ? "ReplaceParameter n'a pas abouti ; la recréation destructive a été volontairement désactivée"
                 : string.Join(" | ", invocationErrors.Distinct().Take(3));
 
             return false;

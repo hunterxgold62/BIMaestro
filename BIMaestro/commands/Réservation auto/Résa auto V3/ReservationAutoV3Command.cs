@@ -298,8 +298,9 @@ namespace Modification
             bool isWall = win.SelectedHost == ReservationAutoV3Window.HostTarget.Mur;
             bool isRect = win.SelectedShape == ReservationAutoV3Window.ShapeTarget.Rectangulaire;
 
+            string linkScope = win.DoubleLinkEnabled ? " Les deux éléments doivent appartenir à un lien." : "";
             TaskDialog.Show("BIMaestro",
-                $"Mode manuel : sélectionne l’objet, puis le {(isWall ? "mur" : "sol")}.\nECHAP pour arrêter.");
+                $"Mode manuel : sélectionne l’objet, puis le {(isWall ? "mur" : "sol")}.{linkScope}\nECHAP pour arrêter.");
 
             while (true)
             {
@@ -319,11 +320,16 @@ namespace Modification
                 bool pickComesFromLink = picked.Any(x => x.IsLinked);
                 bool pickComesFromHost = picked.All(x => !x.IsLinked);
                 bool linkSourceSelected = IsLinkSource(win.SelectedPipeSource);
-                bool useLinkedHost = linkSourceSelected && pickComesFromHost;
+                bool useLinkedHost = win.DoubleLinkEnabled || (linkSourceSelected && pickComesFromHost);
 
                 if (useLinkedHost)
                 {
-                    var linkedHost = PickLinkedHostCandidate(uiDoc, doc, win.SelectedPipeSource, win.SelectedHost);
+                    var linkedHost = PickLinkedHostCandidate(
+                        uiDoc,
+                        doc,
+                        win.SelectedPipeSource,
+                        win.SelectedHost,
+                        allowAnyLink: win.DoubleLinkEnabled);
                     if (linkedHost == null)
                         break;
 
@@ -609,7 +615,12 @@ namespace Modification
                 Reference r;
                 if (win.SelectedObject == ReservationAutoV3Window.ObjectType.Canalisation
                     || win.SelectedObject == ReservationAutoV3Window.ObjectType.Gaine)
-                    r = PickSingleMepCurveBySource(uiDoc, doc, win.SelectedPipeSource, win.SelectedObject);
+                    r = PickSingleMepCurveBySource(
+                        uiDoc,
+                        doc,
+                        win.SelectedPipeSource,
+                        win.SelectedObject,
+                        win.DoubleLinkEnabled);
                 else
                     r = uiDoc.Selection.PickObject(ObjectType.Element, "Sélectionne l’objet (ESC pour annuler)");
 
@@ -628,7 +639,12 @@ namespace Modification
             }
             else
             {
-                IList<Reference> refs = GetMepCurveReferencesBySource(uiDoc, doc, win.SelectedPipeSource, win.SelectedObject);
+                IList<Reference> refs = GetMepCurveReferencesBySource(
+                    uiDoc,
+                    doc,
+                    win.SelectedPipeSource,
+                    win.SelectedObject,
+                    win.DoubleLinkEnabled);
 
                 var list = new List<MepSelection>();
                 foreach (var rr in refs)
@@ -709,14 +725,15 @@ namespace Modification
             UIDocument uiDoc,
             Document doc,
             ReservationAutoV3Window.PipeSource source,
-            ReservationAutoV3Window.HostTarget hostTarget)
+            ReservationAutoV3Window.HostTarget hostTarget,
+            bool allowAnyLink = false)
         {
             try
             {
                 string hostLabel = hostTarget == ReservationAutoV3Window.HostTarget.Sol ? "sol" : "mur";
                 Reference reference = uiDoc.Selection.PickObject(
                     ObjectType.LinkedElement,
-                    new LinkHostSelectionFilter(doc, source, hostTarget),
+                    new LinkHostSelectionFilter(doc, source, hostTarget, allowAnyLink),
                     $"Sélectionne le {hostLabel} du lien (ESC pour annuler)");
 
                 if (reference == null || reference.LinkedElementId == ElementId.InvalidElementId)
@@ -864,6 +881,18 @@ namespace Modification
             if (bbInt == null) return;
 
             XYZ center = (bbInt.Min + bbInt.Max) * 0.5;
+            bool isMepCurve = objType == ReservationAutoV3Window.ObjectType.Canalisation
+                              || objType == ReservationAutoV3Window.ObjectType.Gaine;
+
+            if (isMepCurve && TryGetElementHostIntersectionCenter(
+                    el,
+                    trToHost,
+                    host,
+                    Transform.Identity,
+                    out XYZ exactCenter))
+            {
+                center = exactCenter;
+            }
 
             if (isWall && host is Wall w)
                 center = ProjectPointOntoWallPlane(w, center);
@@ -953,7 +982,8 @@ namespace Modification
                 normeEnabled,
                 isWall ? host.AxisX : null,
                 host.DepthFt,
-                floorOverride: !isWall);
+                floorOverride: !isWall,
+                hostTransformToCurrentDocument: host.TransformToCurrentDocument);
 
             if (host.CanHost)
             {
@@ -1226,7 +1256,8 @@ namespace Modification
             bool isRect, bool normeEnabled,
             XYZ wallAxisOverride = null,
             double? depthOverrideFt = null,
-            bool floorOverride = false)
+            bool floorOverride = false,
+            Transform hostTransformToCurrentDocument = null)
         {
             if (fi == null || host == null || bbIntersect == null) return;
 
@@ -1258,18 +1289,36 @@ namespace Modification
             if (typedWall != null || wallAxisOverride != null)
             {
                 XYZ wallDir = wallAxisOverride ?? GetWallDirection(typedWall);
+                double len;
+                double hgt;
 
-                var corners = new List<XYZ>
+                if (isPipeOrDuct && TryCalculateWallOpeningSizeFromSolidIntersection(
+                        host,
+                        hostTransformToCurrentDocument,
+                        intersecting,
+                        trToHost,
+                        objType,
+                        wallDir,
+                        out double exactLength,
+                        out double exactHeight))
                 {
-                    new XYZ(world.Min.X, world.Min.Y, world.Min.Z),
-                    new XYZ(world.Min.X, world.Max.Y, world.Min.Z),
-                    new XYZ(world.Max.X, world.Min.Y, world.Min.Z),
-                    new XYZ(world.Max.X, world.Max.Y, world.Min.Z)
-                };
-                var projs = corners.Select(c => c.DotProduct(wallDir)).ToList();
+                    len = exactLength + oversizeFt;
+                    hgt = exactHeight + oversizeFt;
+                }
+                else
+                {
+                    var corners = new List<XYZ>
+                    {
+                        new XYZ(world.Min.X, world.Min.Y, world.Min.Z),
+                        new XYZ(world.Min.X, world.Max.Y, world.Min.Z),
+                        new XYZ(world.Max.X, world.Min.Y, world.Min.Z),
+                        new XYZ(world.Max.X, world.Max.Y, world.Min.Z)
+                    };
+                    var projs = corners.Select(c => c.DotProduct(wallDir)).ToList();
 
-                double len = (projs.Max() - projs.Min()) + oversizeFt;
-                double hgt = (world.Max.Z - world.Min.Z) + oversizeFt;
+                    len = (projs.Max() - projs.Min()) + oversizeFt;
+                    hgt = (world.Max.Z - world.Min.Z) + oversizeFt;
+                }
 
                 if (normeEnabled)
                 {
@@ -1890,6 +1939,250 @@ namespace Modification
 
             try
             {
+                if (!TryGetLongestCurveSegmentInsideHost(
+                        curveInCurrentDocument,
+                        host.Element,
+                        host.TransformToCurrentDocument,
+                        out Curve segment))
+                    return false;
+
+                point = segment.Evaluate(0.5, true);
+                return point != null;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool TryGetElementHostIntersectionCenter(
+            Element intersecting,
+            Transform intersectingTransformToCurrentDocument,
+            Element host,
+            Transform hostTransformToCurrentDocument,
+            out XYZ point)
+        {
+            point = null;
+            if (intersecting == null || host == null)
+                return false;
+
+            Curve curve = GetElementCurveInCurrentDocument(
+                intersecting,
+                intersectingTransformToCurrentDocument);
+            if (curve != null && TryGetLongestCurveSegmentInsideHost(
+                    curve,
+                    host,
+                    hostTransformToCurrentDocument,
+                    out Curve segment))
+            {
+                try
+                {
+                    point = segment.Evaluate(0.5, true);
+                    if (point != null)
+                        return true;
+                }
+                catch
+                {
+                }
+            }
+
+            List<Solid> hostSolids = GetElementSolidsInCurrentDocument(
+                host,
+                hostTransformToCurrentDocument);
+            List<Solid> intersectingSolids = GetElementSolidsInCurrentDocument(
+                intersecting,
+                intersectingTransformToCurrentDocument);
+
+            double totalVolume = 0.0;
+            XYZ weightedCenter = XYZ.Zero;
+
+            foreach (Solid hostSolid in hostSolids)
+            {
+                foreach (Solid intersectingSolid in intersectingSolids)
+                {
+                    try
+                    {
+                        Solid intersection = BooleanOperationsUtils.ExecuteBooleanOperation(
+                            hostSolid,
+                            intersectingSolid,
+                            BooleanOperationsType.Intersect);
+                        if (intersection == null || intersection.Volume <= 1e-9)
+                            continue;
+
+                        XYZ centroid = intersection.ComputeCentroid();
+                        if (centroid == null)
+                            continue;
+
+                        totalVolume += intersection.Volume;
+                        weightedCenter += centroid * intersection.Volume;
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+
+            if (totalVolume <= 1e-9)
+                return false;
+
+            point = weightedCenter / totalVolume;
+            return point != null;
+        }
+
+        private static bool TryCalculateWallOpeningSizeFromSolidIntersection(
+            Element host,
+            Transform hostTransformToCurrentDocument,
+            Element intersecting,
+            Transform intersectingTransformToCurrentDocument,
+            ReservationAutoV3Window.ObjectType objectType,
+            XYZ wallAxis,
+            out double length,
+            out double height)
+        {
+            length = 0.0;
+            height = 0.0;
+
+            if (TryCalculateWallOpeningSizeFromBooleanIntersection(
+                    host,
+                    hostTransformToCurrentDocument,
+                    intersecting,
+                    intersectingTransformToCurrentDocument,
+                    wallAxis,
+                    out length,
+                    out height))
+            {
+                return true;
+            }
+
+            double crossSectionSize = CalculateDiameterForElement(intersecting, objectType, 0.0);
+            if (crossSectionSize <= 1e-9)
+                return false;
+
+            Curve elementCurve = GetElementCurveInCurrentDocument(
+                intersecting,
+                intersectingTransformToCurrentDocument);
+            if (elementCurve == null ||
+                !TryGetLongestCurveSegmentInsideHost(
+                    elementCurve,
+                    host,
+                    hostTransformToCurrentDocument,
+                    out Curve segment))
+            {
+                return false;
+            }
+
+            XYZ axis = new XYZ(wallAxis?.X ?? 0.0, wallAxis?.Y ?? 0.0, 0.0);
+            if (axis.IsZeroLength())
+                return false;
+            axis = axis.Normalize();
+
+            IList<XYZ> points;
+            try
+            {
+                points = segment.Tessellate();
+            }
+            catch
+            {
+                points = new List<XYZ>();
+            }
+
+            if (points == null || points.Count < 2)
+            {
+                try
+                {
+                    points = new List<XYZ> { segment.GetEndPoint(0), segment.GetEndPoint(1) };
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+
+            double minAlongWall = points.Min(p => p.DotProduct(axis));
+            double maxAlongWall = points.Max(p => p.DotProduct(axis));
+            double minZ = points.Min(p => p.Z);
+            double maxZ = points.Max(p => p.Z);
+
+            length = Math.Max(0.0, maxAlongWall - minAlongWall) + crossSectionSize;
+            height = Math.Max(0.0, maxZ - minZ) + crossSectionSize;
+            return length > 1e-9 && height > 1e-9;
+        }
+
+        private static bool TryCalculateWallOpeningSizeFromBooleanIntersection(
+            Element host,
+            Transform hostTransformToCurrentDocument,
+            Element intersecting,
+            Transform intersectingTransformToCurrentDocument,
+            XYZ wallAxis,
+            out double length,
+            out double height)
+        {
+            length = 0.0;
+            height = 0.0;
+
+            XYZ axis = new XYZ(wallAxis?.X ?? 0.0, wallAxis?.Y ?? 0.0, 0.0);
+            if (host == null || intersecting == null || axis.IsZeroLength())
+                return false;
+            axis = axis.Normalize();
+
+            List<Solid> hostSolids = GetElementSolidsInCurrentDocument(
+                host,
+                hostTransformToCurrentDocument);
+            List<Solid> intersectingSolids = GetElementSolidsInCurrentDocument(
+                intersecting,
+                intersectingTransformToCurrentDocument);
+
+            if (hostSolids.Count == 0 || intersectingSolids.Count == 0)
+                return false;
+
+            var intersectionPoints = new List<XYZ>();
+            foreach (Solid hostSolid in hostSolids)
+            {
+                foreach (Solid intersectingSolid in intersectingSolids)
+                {
+                    Solid intersection;
+                    try
+                    {
+                        intersection = BooleanOperationsUtils.ExecuteBooleanOperation(
+                            hostSolid,
+                            intersectingSolid,
+                            BooleanOperationsType.Intersect);
+                    }
+                    catch
+                    {
+                        continue;
+                    }
+
+                    if (intersection == null || intersection.Volume <= 1e-9)
+                        continue;
+
+                    CollectSolidPoints(intersection, intersectionPoints);
+                }
+            }
+
+            if (intersectionPoints.Count < 2)
+                return false;
+
+            double minAlongWall = intersectionPoints.Min(p => p.DotProduct(axis));
+            double maxAlongWall = intersectionPoints.Max(p => p.DotProduct(axis));
+            double minZ = intersectionPoints.Min(p => p.Z);
+            double maxZ = intersectionPoints.Max(p => p.Z);
+
+            length = Math.Max(0.0, maxAlongWall - minAlongWall);
+            height = Math.Max(0.0, maxZ - minZ);
+            return length > 1e-9 && height > 1e-9;
+        }
+
+        private static List<Solid> GetElementSolidsInCurrentDocument(
+            Element element,
+            Transform transformToCurrentDocument)
+        {
+            var result = new List<Solid>();
+            if (element == null)
+                return result;
+
+            try
+            {
                 var options = new Options
                 {
                     ComputeReferences = false,
@@ -1897,7 +2190,102 @@ namespace Modification
                     DetailLevel = ViewDetailLevel.Fine
                 };
 
-                GeometryElement geometry = host.Element.get_Geometry(options);
+                GeometryElement geometry = element.get_Geometry(options);
+                if (geometry == null)
+                    return result;
+
+                var sourceSolids = new List<Solid>();
+                CollectGeometrySolids(geometry, sourceSolids);
+
+                Transform transform = transformToCurrentDocument ?? Transform.Identity;
+                foreach (Solid sourceSolid in sourceSolids)
+                {
+                    if (transform.IsIdentity)
+                    {
+                        result.Add(sourceSolid);
+                        continue;
+                    }
+
+                    try
+                    {
+                        result.Add(SolidUtils.CreateTransformed(sourceSolid, transform));
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return result;
+        }
+
+        private static void CollectSolidPoints(Solid solid, ICollection<XYZ> points)
+        {
+            if (solid == null || points == null)
+                return;
+
+            int countBefore = points.Count;
+
+            try
+            {
+                foreach (Edge edge in solid.Edges)
+                {
+                    IList<XYZ> tessellated = edge.Tessellate();
+                    foreach (XYZ point in tessellated)
+                    {
+                        if (point != null)
+                            points.Add(point);
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            if (points.Count > countBefore)
+                return;
+
+            try
+            {
+                foreach (Face face in solid.Faces)
+                {
+                    Mesh mesh = face.Triangulate();
+                    for (int i = 0; i < mesh.Vertices.Count; i++)
+                    {
+                        XYZ point = mesh.Vertices[i];
+                        if (point != null)
+                            points.Add(point);
+                    }
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private static bool TryGetLongestCurveSegmentInsideHost(
+            Curve curveInCurrentDocument,
+            Element host,
+            Transform hostTransformToCurrentDocument,
+            out Curve bestSegment)
+        {
+            bestSegment = null;
+            if (curveInCurrentDocument == null || host == null)
+                return false;
+
+            try
+            {
+                var options = new Options
+                {
+                    ComputeReferences = false,
+                    IncludeNonVisibleObjects = false,
+                    DetailLevel = ViewDetailLevel.Fine
+                };
+
+                GeometryElement geometry = host.get_Geometry(options);
                 if (geometry == null)
                     return false;
 
@@ -1906,9 +2294,8 @@ namespace Modification
                 if (solids.Count == 0)
                     return false;
 
-                Transform transform = host.TransformToCurrentDocument ?? Transform.Identity;
+                Transform transform = hostTransformToCurrentDocument ?? Transform.Identity;
                 double bestLength = -1.0;
-                XYZ bestPoint = null;
 
                 foreach (Solid sourceSolid in solids)
                 {
@@ -1943,28 +2330,25 @@ namespace Modification
                         if (segment == null)
                             continue;
 
-                        double length;
-                        XYZ midpoint;
+                        double segmentLength;
                         try
                         {
-                            length = segment.Length;
-                            midpoint = segment.Evaluate(0.5, true);
+                            segmentLength = segment.Length;
                         }
                         catch
                         {
                             continue;
                         }
 
-                        if (midpoint != null && length > bestLength)
+                        if (segmentLength > bestLength)
                         {
-                            bestLength = length;
-                            bestPoint = midpoint;
+                            bestLength = segmentLength;
+                            bestSegment = segment;
                         }
                     }
                 }
 
-                point = bestPoint;
-                return point != null;
+                return bestSegment != null;
             }
             catch
             {
@@ -2867,19 +3251,25 @@ namespace Modification
             private readonly Document _doc;
             private readonly ReservationAutoV3Window.PipeSource _source;
             private readonly ReservationAutoV3Window.HostTarget _hostTarget;
+            private readonly bool _allowAnyLink;
 
-            public LinkHostSelectionFilter(Document doc, ReservationAutoV3Window.PipeSource source, ReservationAutoV3Window.HostTarget hostTarget)
+            public LinkHostSelectionFilter(
+                Document doc,
+                ReservationAutoV3Window.PipeSource source,
+                ReservationAutoV3Window.HostTarget hostTarget,
+                bool allowAnyLink = false)
             {
                 _doc = doc;
                 _source = source;
                 _hostTarget = hostTarget;
+                _allowAnyLink = allowAnyLink;
             }
 
             public bool AllowElement(Element elem)
             {
                 var linkInstance = elem as RevitLinkInstance;
                 return linkInstance?.GetLinkDocument() != null &&
-                       MatchesExpectedLinkType(linkInstance, _source);
+                       (_allowAnyLink || MatchesExpectedLinkType(linkInstance, _source));
             }
 
             public bool AllowReference(Reference reference, XYZ position)
@@ -2888,7 +3278,7 @@ namespace Modification
 
                 var linkInstance = _doc.GetElement(reference.ElementId) as RevitLinkInstance;
                 Document linkDoc = linkInstance?.GetLinkDocument();
-                if (linkDoc == null || !MatchesExpectedLinkType(linkInstance, _source))
+                if (linkDoc == null || (!_allowAnyLink && !MatchesExpectedLinkType(linkInstance, _source)))
                     return false;
 
                 Element linkedElem = linkDoc.GetElement(reference.LinkedElementId);
@@ -2906,22 +3296,28 @@ namespace Modification
             private readonly Document _doc;
             private readonly ReservationAutoV3Window.PipeSource _source;
             private readonly ReservationAutoV3Window.ObjectType _objectType;
+            private readonly bool _linksOnly;
 
-            public HybridMepCurveSelectionFilter(Document doc, ReservationAutoV3Window.PipeSource source, ReservationAutoV3Window.ObjectType objectType)
+            public HybridMepCurveSelectionFilter(
+                Document doc,
+                ReservationAutoV3Window.PipeSource source,
+                ReservationAutoV3Window.ObjectType objectType,
+                bool linksOnly = false)
             {
                 _doc = doc;
                 _source = source;
                 _objectType = objectType;
+                _linksOnly = linksOnly;
             }
 
             public bool AllowElement(Element elem)
             {
-                if (IsExpectedMepCurve(elem))
+                if (!_linksOnly && IsExpectedMepCurve(elem))
                     return true;
 
                 var linkInstance = elem as RevitLinkInstance;
                 return linkInstance?.GetLinkDocument() != null &&
-                       MatchesExpectedLinkType(linkInstance, _source);
+                       (_linksOnly || MatchesExpectedLinkType(linkInstance, _source));
             }
 
             public bool AllowReference(Reference reference, XYZ position)
@@ -2932,12 +3328,12 @@ namespace Modification
                 if (reference.LinkedElementId == ElementId.InvalidElementId)
                 {
                     Element localElem = _doc.GetElement(reference.ElementId);
-                    return IsExpectedMepCurve(localElem);
+                    return !_linksOnly && IsExpectedMepCurve(localElem);
                 }
 
                 var linkInstance = _doc.GetElement(reference.ElementId) as RevitLinkInstance;
                 Document linkDoc = linkInstance?.GetLinkDocument();
-                if (linkDoc == null || !MatchesExpectedLinkType(linkInstance, _source))
+                if (linkDoc == null || (!_linksOnly && !MatchesExpectedLinkType(linkInstance, _source)))
                     return false;
 
                 Element linkedElem = linkDoc.GetElement(reference.LinkedElementId);
@@ -3042,12 +3438,21 @@ namespace Modification
 
         private static Reference PickSingleMepCurveBySource(UIDocument uiDoc, Document doc,
             ReservationAutoV3Window.PipeSource pipeSource,
-            ReservationAutoV3Window.ObjectType objectType)
+            ReservationAutoV3Window.ObjectType objectType,
+            bool linksOnly = false)
         {
             var hostFilter = new HostMepCurveSelectionFilter(objectType);
-            var hybridFilter = new HybridMepCurveSelectionFilter(doc, pipeSource, objectType);
+            var hybridFilter = new HybridMepCurveSelectionFilter(doc, pipeSource, objectType, linksOnly);
 
             string objectName = objectType == ReservationAutoV3Window.ObjectType.Gaine ? "gaine" : "canalisation";
+
+            if (linksOnly)
+            {
+                return uiDoc.Selection.PickObject(
+                    ObjectType.PointOnElement,
+                    hybridFilter,
+                    $"Sélectionne la {objectName} dans un lien");
+            }
 
             return pipeSource switch
             {
@@ -3065,11 +3470,20 @@ namespace Modification
 
         private static IList<Reference> GetMepCurveReferencesBySource(UIDocument uiDoc, Document doc,
             ReservationAutoV3Window.PipeSource pipeSource,
-            ReservationAutoV3Window.ObjectType objectType)
+            ReservationAutoV3Window.ObjectType objectType,
+            bool linksOnly = false)
         {
             var hostFilter = new HostMepCurveSelectionFilter(objectType);
-            var hybridFilter = new HybridMepCurveSelectionFilter(doc, pipeSource, objectType);
+            var hybridFilter = new HybridMepCurveSelectionFilter(doc, pipeSource, objectType, linksOnly);
             string objectLabelPlural = objectType == ReservationAutoV3Window.ObjectType.Gaine ? "gaines" : "canalisations";
+
+            if (linksOnly)
+            {
+                return uiDoc.Selection.PickObjects(
+                    ObjectType.PointOnElement,
+                    hybridFilter,
+                    $"Sélectionne les {objectLabelPlural} dans les liens (CTRL + clic, ESC pour terminer)");
+            }
 
             return pipeSource switch
             {

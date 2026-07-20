@@ -29,6 +29,7 @@ namespace Modification
         public ShapeTarget SelectedShape { get; private set; }
         public ObjectType SelectedObject { get; private set; }
         public PipeSource SelectedPipeSource { get; private set; }
+        public bool DoubleLinkEnabled { get; private set; }
         public bool AutomatiqueEnabled { get; private set; }
         public bool MultiEnabled { get; private set; }
         public bool NormeEnabled { get; private set; }
@@ -171,7 +172,7 @@ namespace Modification
             if (v1 == null && v2 == null && (perso == null || string.IsNullOrWhiteSpace(perso.FamilyName)))
                 return $"(Non configuré) — attendu : {expected}";
 
-            return $"V1: {DescribeAvailable(v1)} | V2: {DescribeAvailable(v2)} | Perso: {DescribeAvailable(perso)}";
+            return $"Avec hôte : {DescribeAvailable(v1)} | Sans hôte : {DescribeAvailable(v2)} | Personnalisée : {DescribeAvailable(perso)}";
         }
 
         private static string DescribeVerticalPlacement(ProfileConfig profile)
@@ -201,8 +202,14 @@ namespace Modification
             bool isCanal = obj == "Canalisation";
             bool isMepCurve = obj == "Canalisation" || obj == "Gaine";
             bool auto = chkAutomatique?.IsChecked == true;
+            bool doubleLinkAvailable = isMepCurve && !auto;
 
-            comboPipeSource.IsEnabled = isMepCurve && !auto;
+            chkDoubleLink.IsEnabled = doubleLinkAvailable;
+            if (!doubleLinkAvailable)
+                chkDoubleLink.IsChecked = false;
+
+            bool doubleLink = doubleLinkAvailable && chkDoubleLink.IsChecked == true;
+            comboPipeSource.IsEnabled = isMepCurve && !auto && !doubleLink;
 
             if (!isMepCurve || auto)
                 comboPipeSource.SelectedIndex = 0;
@@ -328,21 +335,21 @@ namespace Modification
         {
             yield return new ShapeOptionItem
             {
-                Label = $"{GetShapePrefix(shape)} V1",
+                Label = $"{GetShapePrefix(shape)} - Avec hôte",
                 Shape = shape,
                 Profile = FindBuiltInProfile(host, shape, isV2: false)
             };
 
             yield return new ShapeOptionItem
             {
-                Label = $"{GetShapePrefix(shape)} V2",
+                Label = $"{GetShapePrefix(shape)} - Sans hôte",
                 Shape = shape,
                 Profile = FindBuiltInProfile(host, shape, isV2: true)
             };
 
             yield return new ShapeOptionItem
             {
-                Label = $"{GetShapePrefix(shape)} perso",
+                Label = $"{GetShapePrefix(shape)} - Personnalisée",
                 Shape = shape,
                 Profile = _persoConfig.Get(host, shape)
             };
@@ -1331,6 +1338,7 @@ namespace Modification
             };
 
             AutomatiqueEnabled = chkAutomatique.IsChecked == true;
+            DoubleLinkEnabled = chkDoubleLink.IsChecked == true;
             MultiEnabled = chkMulti.IsChecked == true;
             NormeEnabled = chkNorme.IsChecked == true;
             DynamoAutoEnabled = chkDynamo.IsChecked == true;
