@@ -67,6 +67,7 @@ namespace Famille
         private bool _suppressFolderSelectionChanged;
         private bool _updatingSearchScope;
         private FamilyItem _lastSelectedFamily;
+        private PendingUnmatchedSearch _pendingUnmatchedSearch;
 
         // ===== Données UI =====
         private List<FamilyItem> allFamilies = new();
@@ -188,7 +189,7 @@ namespace Famille
         private int _groupedVisualLoadVersion;
         private int _folderSearchVersion;
         private ObservableCollection<FamilySearchGroup> _activeSearchGroups;
-        private readonly DispatcherTimer _searchDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
+        private readonly DispatcherTimer _searchDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
 
         // Index global (auto)
         private FamilyIndexService _index;
@@ -757,8 +758,9 @@ namespace Famille
             bool hasVersion = !string.IsNullOrEmpty(versionFilter);
             bool hasSizeSort = _sizeSortDescending;
             bool hasDateSort = _dateSortDescending;
+            bool hasSearchScore = result.Any(i => (i?.SearchScore ?? 0) > 0);
 
-            if (!hasCategory && !hasVersion && !hasSizeSort && !hasDateSort)
+            if (!hasCategory && !hasVersion && !hasSizeSort && !hasDateSort && !hasSearchScore)
                 return result;
 
             bool CategoryMatches(FamilyItem item)
@@ -790,6 +792,13 @@ namespace Famille
                     return -1;
                 if (b?.IsFolder == true && a?.IsFolder != true)
                     return 1;
+
+                if (hasSearchScore)
+                {
+                    int scoreCmp = (b?.SearchScore ?? 0).CompareTo(a?.SearchScore ?? 0);
+                    if (scoreCmp != 0)
+                        return scoreCmp;
+                }
 
                 if (hasDateSort)
                 {
@@ -918,6 +927,27 @@ namespace Famille
             _searchDebounce.Start();
         }
 
+        private void SearchBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Enter)
+                return;
+
+            _searchDebounce.Stop();
+            ApplyFilters();
+            e.Handled = true;
+
+            if (_index == null || !_index.IsReady || (_currentResult?.Count ?? 0) > 0)
+                return;
+
+            string text = StripDiacritics(SearchBox?.Text ?? string.Empty).ToLowerInvariant().Trim();
+            var query = FamilySearchQuery.Parse(text);
+            if (RememberUnmatchedSearch(query))
+            {
+                PagingStatusText.Visibility = Visibility.Visible;
+                PagingStatusText.Text = $"Aucun résultat. Recherche « {string.Join(" ", query.Terms)} » mémorisée : ouvre maintenant la famille correspondante.";
+            }
+        }
+
         private void SearchScopeButton_Click(object sender, RoutedEventArgs e)
         {
             if (_updatingSearchScope)
@@ -964,10 +994,19 @@ namespace Famille
                 ApplyFilters();
         }
 
-        private FamilyItem CreateSearchResultItem(FamilyIndexService.Entry entry, bool showLocation)
+        private FamilyItem CreateSearchResultItem(
+            FamilyIndexService.Entry entry,
+            bool showLocation,
+            FamilySearchQuery query = null,
+            bool isApproximate = false)
         {
             bool isInCurrentFolder = IsPathInCurrentFolder(entry.Path);
             string folderPath = GetDisplayFolderPath(entry.Path);
+            var matchedKeywords = GetMatchedKeywords(entry, query);
+            bool descriptionOnlyMatch = query?.Terms.Any(t =>
+                !ContainsPreNormalized(entry.NormalizedName, t) &&
+                !ContainsPreNormalized(entry.NormalizedKeywords, t) &&
+                ContainsPreNormalized(entry.NormalizedDescription, t)) == true;
 
             return new FamilyItem
             {
@@ -983,6 +1022,13 @@ namespace Famille
                 LastUpdatedUtc = entry.LastModifiedUtc,
                 DocumentationAvailable = entry.HasDocumentation,
                 HasCatalogImage = entry.HasCatalogImage,
+                SearchDescription = entry.Description,
+                SearchKeywords = entry.Keywords?.ToList() ?? new List<string>(),
+                MatchedKeywordsText = matchedKeywords.Count > 0
+                    ? "Trouvé grâce à : " + string.Join(", ", matchedKeywords)
+                    : descriptionOnlyMatch ? "Trouvé grâce à la description" : null,
+                ApproximateMatchText = isApproximate ? GetApproximateMatchText(entry, query) : null,
+                SearchScore = isApproximate ? 10 : CalculateSearchScore(entry, query),
                 IsInCurrentFolder = isInCurrentFolder,
                 SearchLocationLabel = isInCurrentFolder ? "Dans ce dossier" : "Trouvé dans",
                 SearchFolderPath = folderPath,
@@ -1046,6 +1092,10 @@ namespace Famille
             var sorted = ApplyInteractiveSorting(items);
             sorted.Sort((a, b) =>
             {
+                int scoreCmp = (b?.SearchScore ?? 0).CompareTo(a?.SearchScore ?? 0);
+                if (scoreCmp != 0)
+                    return scoreCmp;
+
                 int folderCmp = b.IsInCurrentFolder.CompareTo(a.IsInCurrentFolder);
                 if (folderCmp != 0)
                     return folderCmp;
@@ -1069,11 +1119,20 @@ namespace Famille
             if (_index == null)
                 return new List<FamilyItem>();
 
-            var matches = _index.GetAll(max: 0).Where(e => MatchesGlobalSearch(e, query));
-            if (max > 0)
-                matches = matches.Take(max);
+            var entries = _index.GetAll(max: 0).ToList();
+            var matchingEntries = entries.Where(e => MatchesGlobalSearch(e, query)).ToList();
+            bool approximate = false;
+            if (matchingEntries.Count == 0 && query.Terms.Any(CanUseApproximateSearch))
+            {
+                matchingEntries = entries.Where(e => MatchesApproximateSearch(e, query)).ToList();
+                approximate = matchingEntries.Count > 0;
+            }
 
-            return matches.Select(e => CreateSearchResultItem(e, showLocation)).ToList();
+            var items = matchingEntries
+                .Select(e => CreateSearchResultItem(e, showLocation, query, approximate))
+                .ToList();
+            items = ApplyGlobalSearchSorting(items);
+            return max > 0 ? items.Take(max).ToList() : items;
         }
 
         private List<FamilyItem> BuildDirectLibraryItems(string normalizedSearch)
@@ -1309,7 +1368,7 @@ namespace Famille
                     if (!string.IsNullOrWhiteSpace(entry.Path) && localPaths.Contains(entry.Path))
                         continue;
 
-                    var item = CreateSearchResultItem(entry, showLocation: true);
+                    var item = CreateSearchResultItem(entry, showLocation: true, query: query);
                     if (item.IsInCurrentFolder)
                         continue;
 
@@ -1447,28 +1506,31 @@ namespace Famille
                 IEnumerable<FamilyItem> baseSet = allFamilies;
                 if (!string.IsNullOrEmpty(txt))
                 {
-                    baseSet = baseSet.Where(f => !f.IsBackNavigation && f.NormalizedName.Contains(txt));
-                    var currentFolderMatches = baseSet.ToList();
-
-                    foreach (var item in currentFolderMatches)
-                        MarkSearchLocation(item, "Dans ce dossier");
-
                     if (_index != null)
                     {
-                        var localPaths = new HashSet<string>(
-                            currentFolderMatches.Where(i => !string.IsNullOrWhiteSpace(i.Path)).Select(i => i.Path),
-                            StringComparer.OrdinalIgnoreCase);
                         var query = FamilySearchQuery.Parse(txt);
-                        int searchVersion = ShowInitialGroupedFolderSearchResults(currentFolderMatches);
-                        LoadOtherFolderSearchResultsDeferred(query, localPaths, searchVersion, currentFolderMatches.Count);
-                        PagingStatusText.Visibility = Visibility.Visible;
-                        PagingStatusText.Text = currentFolderMatches.Count == 0
-                            ? "Recherche dans les autres dossiers…"
-                            : $"Dans ce dossier : {currentFolderMatches.Count}. Recherche ailleurs…";
+                        var allMatches = BuildGlobalSearchItems(query, showLocation: true);
+                        var currentFolderMatches = allMatches.Where(i => i.IsInCurrentFolder).ToList();
+                        var otherFolderMatches = allMatches.Where(i => !i.IsInCurrentFolder).ToList();
+                        foreach (var item in currentFolderMatches)
+                        {
+                            item.SearchLocationLabel = "Dans ce dossier";
+                            item.SearchLocationVisibility = Visibility.Visible;
+                        }
+
+                        ShowGroupedFolderSearchResults(currentFolderMatches, otherFolderMatches);
+                        PagingStatusText.Text = otherFolderMatches.Count == 0
+                            ? $"Dans ce dossier : {currentFolderMatches.Count}."
+                            : $"Dans ce dossier : {currentFolderMatches.Count}. Autres dossiers : {otherFolderMatches.Count}.";
                         return;
                     }
 
-                    BeginPaging(ApplyInteractiveSorting(currentFolderMatches));
+                    baseSet = baseSet.Where(f => !f.IsBackNavigation && f.NormalizedName.Contains(txt));
+                    var currentFolderMatchesFallback = baseSet.ToList();
+                    foreach (var item in currentFolderMatchesFallback)
+                        MarkSearchLocation(item, "Dans ce dossier");
+
+                    BeginPaging(ApplyInteractiveSorting(currentFolderMatchesFallback));
                     PagingStatusText.Visibility = Visibility.Visible;
                     PagingStatusText.Text = "Recherche ailleurs en préparation…";
                     return;
@@ -1486,22 +1548,17 @@ namespace Famille
 
             foreach (var term in query.Terms)
             {
-                if (!ContainsNormalized(entry.NormalizedName, term) &&
-                    !ContainsNormalized(entry.NormalizedFolder, term) &&
-                    !ContainsNormalized(entry.Category, term) &&
-                    !ContainsNormalized(entry.RevitSavedVersion, term))
-                {
+                if (!ContainsPreNormalized(entry.SearchText, term))
                     return false;
-                }
             }
 
-            if (!string.IsNullOrWhiteSpace(query.Folder) && !ContainsNormalized(entry.NormalizedFolder, query.Folder))
+            if (!string.IsNullOrWhiteSpace(query.Folder) && !ContainsPreNormalized(entry.NormalizedFolder, query.Folder))
                 return false;
 
-            if (!string.IsNullOrWhiteSpace(query.Category) && !ContainsNormalized(entry.Category, query.Category))
+            if (!string.IsNullOrWhiteSpace(query.Category) && !ContainsPreNormalized(entry.NormalizedCategory, query.Category))
                 return false;
 
-            if (!string.IsNullOrWhiteSpace(query.RevitVersion) && !ContainsNormalized(entry.RevitSavedVersion, query.RevitVersion))
+            if (!string.IsNullOrWhiteSpace(query.RevitVersion) && !ContainsPreNormalized(entry.NormalizedRevitSavedVersion, query.RevitVersion))
                 return false;
 
             if (query.HasDocumentation.HasValue && entry.HasDocumentation != query.HasDocumentation.Value)
@@ -1526,6 +1583,142 @@ namespace Famille
             return true;
         }
 
+        private static int CalculateSearchScore(FamilyIndexService.Entry entry, FamilySearchQuery query)
+        {
+            if (entry == null || query == null || query.Terms.Count == 0)
+                return 0;
+
+            int score = 0;
+            string phrase = string.Join(" ", query.Terms);
+            if (string.Equals(entry.NormalizedName, phrase, StringComparison.Ordinal))
+                score += 1000;
+
+            foreach (var term in query.Terms)
+            {
+                if (string.Equals(entry.NormalizedName, term, StringComparison.Ordinal)) score += 500;
+                else if ((entry.NormalizedName ?? string.Empty).StartsWith(term, StringComparison.Ordinal)) score += 400;
+                else if (ContainsPreNormalized(entry.NormalizedName, term)) score += 300;
+                else if (ContainsPreNormalized(entry.NormalizedKeywords, term)) score += 200;
+                else if (ContainsPreNormalized(entry.NormalizedDescription, term)) score += 100;
+                else if (ContainsPreNormalized(entry.NormalizedFolder, term) || ContainsPreNormalized(entry.NormalizedCategory, term)) score += 50;
+                else if (ContainsPreNormalized(entry.NormalizedRevitSavedVersion, term)) score += 25;
+            }
+            return score;
+        }
+
+        private static List<string> GetMatchedKeywords(FamilyIndexService.Entry entry, FamilySearchQuery query)
+        {
+            if (entry?.Keywords == null || query == null || query.Terms.Count == 0)
+                return new List<string>();
+
+            return entry.Keywords
+                .Where(keyword => query.Terms.Any(term =>
+                    !ContainsPreNormalized(entry.NormalizedName, term) &&
+                    ContainsNormalized(keyword, term)))
+                .Take(6)
+                .ToList();
+        }
+
+        private bool MatchesApproximateSearch(FamilyIndexService.Entry entry, FamilySearchQuery query)
+        {
+            if (entry == null || query == null || query.Terms.Count == 0)
+                return false;
+
+            foreach (var term in query.Terms)
+            {
+                if (ContainsPreNormalized(entry.SearchText, term))
+                    continue;
+                if (!CanUseApproximateSearch(term) ||
+                    !(entry.SearchTokens ?? Array.Empty<string>()).Any(token => IsApproximateTokenMatch(term, token)))
+                    return false;
+            }
+
+            if (!string.IsNullOrWhiteSpace(query.Folder) && !ContainsPreNormalized(entry.NormalizedFolder, query.Folder)) return false;
+            if (!string.IsNullOrWhiteSpace(query.Category) && !ContainsPreNormalized(entry.NormalizedCategory, query.Category)) return false;
+            if (!string.IsNullOrWhiteSpace(query.RevitVersion) && !ContainsPreNormalized(entry.NormalizedRevitSavedVersion, query.RevitVersion)) return false;
+            if (query.HasDocumentation.HasValue && entry.HasDocumentation != query.HasDocumentation.Value) return false;
+            if (query.HasCatalogImage.HasValue && entry.HasCatalogImage != query.HasCatalogImage.Value) return false;
+            if (query.IsFavorite.HasValue && IsFavoritePath(entry.Path) != query.IsFavorite.Value) return false;
+            if (query.IsNew && !IsNewFamily(entry.CreatedUtc)) return false;
+            if (query.IsUpdated && !IsUpdatedFamily(entry.CreatedUtc, entry.LastModifiedUtc)) return false;
+            return true;
+        }
+
+        private static bool CanUseApproximateSearch(string term)
+            => !string.IsNullOrWhiteSpace(term) && term.Length >= 4 && term.All(char.IsLetterOrDigit);
+
+        private static bool IsApproximateTokenMatch(string term, string token)
+        {
+            if (string.IsNullOrWhiteSpace(token))
+                return false;
+            int maxDistance = term.Length >= 8 ? 2 : 1;
+            if (Math.Abs(term.Length - token.Length) > maxDistance)
+                return false;
+            if (IsSingleAdjacentTransposition(term, token))
+                return true;
+            return BoundedEditDistance(term, token, maxDistance) <= maxDistance;
+        }
+
+        private static bool IsSingleAdjacentTransposition(string a, string b)
+        {
+            if (a.Length != b.Length || a.Length < 2)
+                return false;
+            int first = -1;
+            for (int i = 0; i < a.Length; i++)
+            {
+                if (a[i] == b[i]) continue;
+                if (first >= 0)
+                    return i == first + 1 && a[first] == b[i] && a[i] == b[first] &&
+                           a.Substring(i + 1) == b.Substring(i + 1);
+                first = i;
+            }
+            return false;
+        }
+
+        private static int BoundedEditDistance(string a, string b, int maxDistance)
+        {
+            if (a == b) return 0;
+            if (Math.Abs(a.Length - b.Length) > maxDistance) return maxDistance + 1;
+
+            var previous = Enumerable.Range(0, b.Length + 1).ToArray();
+            var current = new int[b.Length + 1];
+            for (int i = 1; i <= a.Length; i++)
+            {
+                current[0] = i;
+                int rowMinimum = current[0];
+                for (int j = 1; j <= b.Length; j++)
+                {
+                    int cost = a[i - 1] == b[j - 1] ? 0 : 1;
+                    current[j] = Math.Min(Math.Min(current[j - 1] + 1, previous[j] + 1), previous[j - 1] + cost);
+                    rowMinimum = Math.Min(rowMinimum, current[j]);
+                }
+                if (rowMinimum > maxDistance) return maxDistance + 1;
+                var swap = previous;
+                previous = current;
+                current = swap;
+            }
+            return previous[b.Length];
+        }
+
+        private static string GetApproximateMatchText(FamilyIndexService.Entry entry, FamilySearchQuery query)
+        {
+            if (entry == null || query == null)
+                return "Résultat approché";
+
+            foreach (var term in query.Terms.Where(CanUseApproximateSearch))
+            {
+                if (ContainsPreNormalized(entry.SearchText, term))
+                    continue;
+                string closest = (entry.SearchTokens ?? Array.Empty<string>())
+                    .Where(token => IsApproximateTokenMatch(term, token))
+                    .OrderBy(token => BoundedEditDistance(term, token, term.Length >= 8 ? 2 : 1))
+                    .FirstOrDefault();
+                if (!string.IsNullOrWhiteSpace(closest))
+                    return $"Recherche approchée : « {term} » ≈ « {closest} »";
+            }
+            return "Résultat approché";
+        }
+
         private static bool ContainsNormalized(string source, string term)
         {
             if (string.IsNullOrWhiteSpace(term))
@@ -1535,6 +1728,87 @@ namespace Famille
                 return false;
 
             return StripDiacritics(source).ToLowerInvariant().Contains(term);
+        }
+
+        private static bool ContainsPreNormalized(string source, string term)
+            => string.IsNullOrWhiteSpace(term) ||
+               (!string.IsNullOrWhiteSpace(source) && source.IndexOf(term, StringComparison.Ordinal) >= 0);
+
+        private bool RememberUnmatchedSearch(FamilySearchQuery query)
+        {
+            if (query == null || query.Terms.Count == 0 || query.HasAdvancedFilters)
+                return false;
+
+            var usefulTerms = query.Terms
+                .Where(t => !string.IsNullOrWhiteSpace(t) && t.Length >= 3)
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            if (usefulTerms.Count == 0)
+                return false;
+
+            _pendingUnmatchedSearch = new PendingUnmatchedSearch
+            {
+                Terms = usefulTerms,
+                CreatedUtc = DateTime.UtcNow
+            };
+            return true;
+        }
+
+        private void TryLearnPendingSearch(FamilyItem family)
+        {
+            var pending = _pendingUnmatchedSearch;
+            if (pending == null || family == null || family.IsFolder || string.IsNullOrWhiteSpace(family.Path))
+                return;
+
+            if (DateTime.UtcNow - pending.CreatedUtc > TimeSpan.FromMinutes(5))
+            {
+                _pendingUnmatchedSearch = null;
+                return;
+            }
+
+            var terms = pending.Terms
+                .Where(t => !ContainsNormalized(family.NormalizedName, t))
+                .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
+            _pendingUnmatchedSearch = null;
+            if (terms.Count == 0)
+                return;
+
+            string searched = string.Join(", ", terms);
+            var answer = MessageBox.Show(this,
+                $"Vous aviez recherché « {searched} » sans résultat.\n\n" +
+                $"Associer ce terme à la famille « {family.Name} » pour la retrouver plus facilement la prochaine fois ?",
+                "Améliorer la recherche",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+            if (answer != MessageBoxResult.Yes)
+                return;
+
+            var existing = FamilySearchMetadataService.Load(family.Path);
+            var metadata = new FamilySearchMetadata
+            {
+                Description = existing.Description,
+                Keywords = existing.Keywords.Concat(terms)
+                    .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                    .ToList(),
+                Source = "learned-from-search",
+                UpdatedBy = Environment.UserName
+            };
+
+            if (!FamilySearchMetadataService.TrySave(
+                family.Path,
+                metadata,
+                FamilySearchMetadataService.GetLastWriteUtc(family.Path),
+                out string error,
+                out _))
+            {
+                MessageBox.Show(this, error, "Améliorer la recherche", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            metadata = FamilySearchMetadataService.Normalize(metadata);
+            ApplySearchMetadataToVisibleItems(family.Path, metadata);
+            _index?.RefreshSearchMetadata(family.Path);
         }
 
         private bool IsFavoritePath(string path)
@@ -1817,6 +2091,137 @@ namespace Famille
         #endregion
 
         #region Documentation
+
+        private async void SearchMetadataMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as MenuItem)?.DataContext is not FamilyItem fam ||
+                fam.IsFolder || fam.IsBackNavigation || string.IsNullOrWhiteSpace(fam.Path))
+                return;
+
+            var selected = GetEffectiveSelection(fam);
+            if (_isMultiSelectionEnabled && selected.Count > 1)
+            {
+                await EnrichSearchMetadataForSelectionAsync(selected);
+                return;
+            }
+
+            var editor = new FamilySearchMetadataWindow(fam) { Owner = this };
+            if (editor.ShowDialog() != true || editor.SavedMetadata == null)
+                return;
+
+            ApplySearchMetadataToVisibleItems(fam.Path, editor.SavedMetadata);
+            _index?.RefreshSearchMetadata(fam.Path);
+            ApplyFilters();
+        }
+
+        private sealed class PendingUnmatchedSearch
+        {
+            public List<string> Terms { get; set; } = new List<string>();
+            public DateTime CreatedUtc { get; set; }
+        }
+
+        private async Task EnrichSearchMetadataForSelectionAsync(List<FamilyItem> families)
+        {
+            if (families == null || families.Count == 0)
+                return;
+
+            var answer = MessageBox.Show(this,
+                $"L’IA va proposer des mots-clés pour {families.Count} familles. " +
+                "Les mots-clés existants seront conservés et complétés. Continuer ?",
+                "Mots-clés de recherche",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+            if (answer != MessageBoxResult.Yes)
+                return;
+
+            int saved = 0;
+            var errors = new List<string>();
+            Mouse.OverrideCursor = Cursors.Wait;
+            try
+            {
+                for (int i = 0; i < families.Count; i++)
+                {
+                    var family = families[i];
+                    PagingStatusText.Visibility = Visibility.Visible;
+                    PagingStatusText.Text = $"Mots-clés IA : {i + 1}/{families.Count} — {family.Name}";
+
+                    try
+                    {
+                        var existing = FamilySearchMetadataService.Load(family.Path);
+                        var expected = FamilySearchMetadataService.GetLastWriteUtc(family.Path);
+                        var suggestion = await FamilySearchAiService.SuggestAsync(
+                            family.Name,
+                            Path.GetDirectoryName(family.Path),
+                            family.Category);
+
+                        var merged = new FamilySearchMetadata
+                        {
+                            Description = string.IsNullOrWhiteSpace(existing.Description)
+                                ? suggestion.Description
+                                : existing.Description,
+                            Keywords = existing.Keywords
+                                .Concat(suggestion.Keywords)
+                                .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                                .ToList(),
+                            Source = "ai-batch-reviewed",
+                            UpdatedBy = Environment.UserName
+                        };
+
+                        if (!FamilySearchMetadataService.TrySave(
+                            family.Path, merged, expected, out string error, out _))
+                        {
+                            errors.Add(family.Name + " : " + error);
+                            continue;
+                        }
+
+                        merged = FamilySearchMetadataService.Normalize(merged);
+                        ApplySearchMetadataToVisibleItems(family.Path, merged);
+                        _index?.RefreshSearchMetadata(family.Path, notify: false);
+                        saved++;
+                    }
+                    catch (Exception ex)
+                    {
+                        errors.Add(family.Name + " : " + ex.Message);
+                    }
+                }
+            }
+            finally
+            {
+                Mouse.OverrideCursor = null;
+            }
+
+            _index?.NotifySearchMetadataUpdated();
+            ApplyFilters();
+
+            string message = $"Mots-clés enregistrés pour {saved} famille(s).";
+            if (errors.Count > 0)
+            {
+                string details = string.Join("\n", errors.Take(8));
+                if (errors.Count > 8) details += $"\n… et {errors.Count - 8} autre(s).";
+                message += $"\n\n{errors.Count} échec(s) :\n" + details;
+            }
+            MessageBox.Show(this, message, "Mots-clés de recherche", MessageBoxButton.OK,
+                errors.Count == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        }
+
+        private void ApplySearchMetadataToVisibleItems(string familyPath, FamilySearchMetadata metadata)
+        {
+            if (string.IsNullOrWhiteSpace(familyPath) || metadata == null)
+                return;
+
+            var items = allFamilies
+                .Concat(displayedFamilies)
+                .Where(i => i != null && string.Equals(i.Path, familyPath, StringComparison.OrdinalIgnoreCase))
+                .Distinct()
+                .ToList();
+
+            foreach (var item in items)
+            {
+                item.SearchDescription = metadata.Description;
+                item.SearchKeywords = metadata.Keywords.ToList();
+                item.MatchedKeywordsText = null;
+            }
+        }
 
         private void DocumentationMenuItem_Click(object sender, RoutedEventArgs e)
         {
@@ -2306,6 +2711,9 @@ namespace Famille
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList();
 
+                if (targets.Count == 1)
+                    TryLearnPendingSearch(fam);
+
                 FamilyBrowserCommand.ReloadFamilyHandlerInstance.FamilyPaths = targets;
                 FamilyBrowserCommand.ReloadFamilyHandlerInstance.FamilyPath = targets.FirstOrDefault();
                 FamilyBrowserCommand.ReloadFamilyEventInstance.Raise();
@@ -2371,6 +2779,7 @@ namespace Famille
             }
 
             if (e.ClickCount != 2) return;
+            TryLearnPendingSearch(fam);
             FamilyBrowserCommand.LoadFamilyHandlerInstance.FamilyPath = fam.Path;
             FamilyBrowserCommand.LoadFamilyEventInstance.Raise();
         }
@@ -2483,11 +2892,17 @@ namespace Famille
                     {
                         bool keepVisible =
                             string.Equals(header, "Ajouter à la collection active", StringComparison.OrdinalIgnoreCase) ||
-                            string.Equals(header, "Charger la dernière version", StringComparison.OrdinalIgnoreCase);
+                            string.Equals(header, "Charger la dernière version", StringComparison.OrdinalIgnoreCase) ||
+                            (header?.StartsWith("Mots-clés", StringComparison.OrdinalIgnoreCase) == true ||
+                             header?.StartsWith("Proposer des mots-clés", StringComparison.OrdinalIgnoreCase) == true);
+                        if (header?.StartsWith("Mots-clés", StringComparison.OrdinalIgnoreCase) == true)
+                            menuItem.Header = "Proposer des mots-clés IA pour la sélection…";
                         menuItem.Visibility = keepVisible ? Visibility.Visible : Visibility.Collapsed;
                     }
                     else
                     {
+                        if (header?.StartsWith("Proposer des mots-clés", StringComparison.OrdinalIgnoreCase) == true)
+                            menuItem.Header = "Mots-clés de recherche…";
                         menuItem.Visibility = string.Equals(header, "Ouvrir le dossier", StringComparison.OrdinalIgnoreCase)
                             ? Visibility.Collapsed
                             : Visibility.Visible;
@@ -2577,6 +2992,7 @@ namespace Famille
             if ((sender as MenuItem)?.DataContext is FamilyItem fam)
             {
                 if (fam.IsFolder) return;
+                TryLearnPendingSearch(fam);
                 try
                 {
                     Directory.CreateDirectory(workFolder);
@@ -3528,6 +3944,42 @@ namespace Famille
 
             ApplySelectedFolders(selectedFamilies, selectedImages, showSuccessMessage: true);
         }
+
+        private void OpenSearchMetadataReview_Click(object sender, RoutedEventArgs e)
+        {
+            if (_index == null || !_index.IsReady)
+            {
+                MessageBox.Show(this,
+                    "La bibliothèque est encore en cours d’indexation. Réessayez dans quelques instants.",
+                    "Mots-clés intelligents",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var entries = _index.GetAll(max: 0).ToList();
+            if (entries.Count == 0)
+            {
+                MessageBox.Show(this, "Aucune famille n’a été trouvée dans la bibliothèque.",
+                    "Mots-clés intelligents", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var review = new FamilySearchReviewWindow(entries, familiesFolder, imagesFolder) { Owner = this };
+            review.ShowDialog();
+
+            if (review.SavedPaths.Count == 0)
+                return;
+
+            foreach (var path in review.SavedPaths)
+            {
+                var metadata = FamilySearchMetadataService.Load(path);
+                ApplySearchMetadataToVisibleItems(path, metadata);
+                _index.RefreshSearchMetadata(path, notify: false);
+            }
+            _index.NotifySearchMetadataUpdated();
+            ApplyFilters();
+        }
         private void DarkModeSwitch_Toggled(object sender, RoutedPropertyChangedEventArgs<bool> e) => UpdateTheme();
 
         private void ApplyColors_Click(object sender, RoutedEventArgs e)
@@ -4394,6 +4846,63 @@ namespace Famille
         public string SearchLocationLabel { get; set; }
         public string SearchFolderPath { get; set; }
 
+        private string _searchDescription;
+        public string SearchDescription
+        {
+            get => _searchDescription;
+            set { if (_searchDescription != value) { _searchDescription = value; OnPropertyChanged(nameof(SearchDescription)); } }
+        }
+
+        private List<string> _searchKeywords = new List<string>();
+        public List<string> SearchKeywords
+        {
+            get => _searchKeywords;
+            set { _searchKeywords = value ?? new List<string>(); OnPropertyChanged(nameof(SearchKeywords)); }
+        }
+
+        private string _matchedKeywordsText;
+        public string MatchedKeywordsText
+        {
+            get => _matchedKeywordsText;
+            set
+            {
+                if (_matchedKeywordsText == value) return;
+                _matchedKeywordsText = value;
+                OnPropertyChanged(nameof(MatchedKeywordsText));
+                OnPropertyChanged(nameof(MatchedKeywordsVisibility));
+                OnPropertyChanged(nameof(SearchDetailsVisibility));
+            }
+        }
+
+        public Visibility MatchedKeywordsVisibility =>
+            string.IsNullOrWhiteSpace(MatchedKeywordsText) ? Visibility.Collapsed : Visibility.Visible;
+
+        private string _approximateMatchText;
+        public string ApproximateMatchText
+        {
+            get => _approximateMatchText;
+            set
+            {
+                if (_approximateMatchText == value) return;
+                _approximateMatchText = value;
+                OnPropertyChanged(nameof(ApproximateMatchText));
+                OnPropertyChanged(nameof(ApproximateMatchVisibility));
+                OnPropertyChanged(nameof(SearchDetailsVisibility));
+            }
+        }
+
+        public Visibility ApproximateMatchVisibility =>
+            string.IsNullOrWhiteSpace(ApproximateMatchText) ? Visibility.Collapsed : Visibility.Visible;
+
+        public Visibility SearchDetailsVisibility =>
+            SearchLocationVisibility == Visibility.Visible ||
+            MatchedKeywordsVisibility == Visibility.Visible ||
+            ApproximateMatchVisibility == Visibility.Visible
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+        public int SearchScore { get; set; }
+
         private Visibility _searchLocationVisibility = Visibility.Collapsed;
         public Visibility SearchLocationVisibility
         {
@@ -4403,6 +4912,7 @@ namespace Famille
                 if (_searchLocationVisibility == value) return;
                 _searchLocationVisibility = value;
                 OnPropertyChanged(nameof(SearchLocationVisibility));
+                OnPropertyChanged(nameof(SearchDetailsVisibility));
             }
         }
 

@@ -1,0 +1,133 @@
+<Window x:Class="Famille.FamilySearchReviewWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="BIMaestro - Mots-clés de toute la bibliothèque"
+        Width="1240" Height="760" MinWidth="950" MinHeight="560"
+        WindowStartupLocation="CenterOwner"
+        Closing="Window_Closing"
+        FontFamily="Segoe UI" FontSize="12"
+        Background="#FFF7F9FC" Foreground="#FF0F172A">
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,0,0,14">
+            <TextBlock Text="Mots-clés intelligents de la bibliothèque"
+                       FontSize="20" FontWeight="SemiBold"/>
+            <TextBlock Margin="0,5,0,0" Foreground="#FF64748B" TextWrapping="Wrap"
+                       Text="Cochez les familles à analyser. La description et les mots-clés participent tous les deux à la recherche. Les propositions de l’IA restent modifiables et ne sont enregistrées qu’avec le bouton Enregistrer les modifications."/>
+        </StackPanel>
+
+        <Grid Grid.Row="1" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <WrapPanel VerticalAlignment="Center">
+                <Button Content="Tout cocher" Width="105" Height="32" Margin="0,0,8,6" Click="SelectAll_Click"/>
+                <Button Content="Sans mots-clés" Width="125" Height="32" Margin="0,0,8,6" Click="SelectMissing_Click"/>
+                <Button Content="Tout décocher" Width="115" Height="32" Margin="0,0,16,6" Click="SelectNone_Click"/>
+                <Button x:Name="GenerateButton" Content="Proposer avec l’IA pour les familles cochées"
+                        Width="285" Height="32" Margin="0,0,8,6" FontWeight="SemiBold"
+                        Click="Generate_Click"/>
+                <Button x:Name="CancelButton" Content="Arrêter" Width="90" Height="32"
+                        Margin="0,0,8,6" IsEnabled="False" Click="Cancel_Click"/>
+            </WrapPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="Filtrer" VerticalAlignment="Center" Margin="12,0,8,0"/>
+                <TextBox x:Name="FilterBox" Width="210" Height="30" Padding="7,4"
+                         TextChanged="FilterBox_TextChanged"/>
+            </StackPanel>
+        </Grid>
+
+        <Border Grid.Row="2" Background="White" BorderBrush="#FFDDE3EC" BorderThickness="1" CornerRadius="7">
+            <DataGrid x:Name="ReviewGrid" AutoGenerateColumns="False" CanUserAddRows="False"
+                      HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                      RowHeight="112" AlternatingRowBackground="#FFF8FAFC"
+                      EnableRowVirtualization="True" EnableColumnVirtualization="True"
+                      VirtualizingPanel.IsVirtualizing="True"
+                      VirtualizingPanel.VirtualizationMode="Recycling">
+                <DataGrid.Columns>
+                    <DataGridCheckBoxColumn Header="Traiter" Binding="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}" Width="62"/>
+                    <DataGridTemplateColumn Header="Aperçu" Width="112" IsReadOnly="True">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Grid Width="98" Height="92" Margin="5">
+                                    <Border Background="#FFF1F5F9" CornerRadius="5"/>
+                                    <Image Source="{Binding PreviewPath}" Stretch="Uniform" Margin="3"
+                                           RenderOptions.BitmapScalingMode="HighQuality"/>
+                                    <TextBlock Text="Aucun aperçu" Foreground="#FF94A3B8"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               FontSize="10" IsHitTestVisible="False">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding PreviewPath}" Value="{x:Null}">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding PreviewPath}" Value="">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Grid>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTemplateColumn Header="Famille" Width="230" IsReadOnly="True">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <StackPanel Margin="7">
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                    <TextBlock Text="{Binding Category}" Foreground="#FF64748B" Margin="0,5,0,0"/>
+                                    <TextBlock Text="{Binding Status}" Foreground="#FF7C3AED" Margin="0,5,0,0" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTemplateColumn Header="Description recherchable proposée" Width="2*">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}"
+                                         AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+                                         Margin="6" Padding="7" MaxLength="500"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTemplateColumn Header="Mots-clés proposés" Width="3*">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBox Text="{Binding KeywordsText, UpdateSourceTrigger=PropertyChanged}"
+                                         AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+                                         Margin="6" Padding="7"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+
+        <Grid Grid.Row="3" Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock x:Name="ProgressText" Foreground="#FF475569"/>
+                <ProgressBar x:Name="ProgressBar" Height="12" Margin="0,6,18,0" Minimum="0" Maximum="1" Visibility="Collapsed"/>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Content="Fermer" Width="100" Height="34" Margin="0,0,8,0" Click="Close_Click"/>
+                <Button x:Name="SaveButton" Content="Enregistrer les modifications" Width="205" Height="34"
+                        FontWeight="SemiBold" Click="Save_Click"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

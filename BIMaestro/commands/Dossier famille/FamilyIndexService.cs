@@ -16,8 +16,16 @@ namespace Famille
             public string Name { get; set; }
             public string Path { get; set; }
             public string Category { get; set; }
+            public string Description { get; set; }
+            public List<string> Keywords { get; set; } = new List<string>();
             public string NormalizedName { get; set; }
             public string NormalizedFolder { get; set; }
+            public string NormalizedCategory { get; set; }
+            public string NormalizedRevitSavedVersion { get; set; }
+            public string NormalizedDescription { get; set; }
+            public string NormalizedKeywords { get; set; }
+            public string SearchText { get; set; }
+            public string[] SearchTokens { get; set; } = Array.Empty<string>();
             public string RevitSavedVersion { get; set; }
             public long? FileSizeBytes { get; set; }
             public DateTime? CreatedUtc { get; set; }
@@ -93,7 +101,7 @@ namespace Famille
             if (low.Contains("porte")) cat = "Porte";
             else if (low.Contains("fenetre") || low.Contains("fenêtre")) cat = "Fenêtre";
 
-            return new Entry
+            var entry = new Entry
             {
                 Name = name,
                 Path = familyPath,
@@ -101,6 +109,9 @@ namespace Famille
                 NormalizedName = StripDiacritics(name).ToLowerInvariant(),
                 NormalizedFolder = StripDiacritics(GetRelativeFolder(familyPath)).ToLowerInvariant()
             };
+            entry.NormalizedCategory = NormalizeForSearch(entry.Category);
+            ApplySearchMetadata(entry, FamilySearchMetadataService.Load(familyPath));
+            return entry;
         }
 
         private void EnrichIndexMetadata(List<Entry> list, CancellationToken ct)
@@ -120,6 +131,9 @@ namespace Famille
                     if (!string.IsNullOrWhiteSpace(meta?.RevitSavedVersion))
                         entry.RevitSavedVersion = meta.RevitSavedVersion.Trim();
 
+                    entry.NormalizedCategory = NormalizeForSearch(entry.Category);
+                    entry.NormalizedRevitSavedVersion = NormalizeForSearch(entry.RevitSavedVersion);
+
                     if (meta?.FileSizeBytes != null)
                         entry.FileSizeBytes = meta.FileSizeBytes;
 
@@ -130,6 +144,7 @@ namespace Famille
 
                     entry.HasDocumentation = HasDocumentationFile(entry.Path);
                     entry.HasCatalogImage = HasCatalogImage(entry.Path);
+                    ApplySearchMetadata(entry, FamilySearchMetadataService.Load(entry.Path));
                 }
                 catch
                 {
@@ -138,6 +153,65 @@ namespace Famille
 
             lock (_lock) _items = list.ToList();
             UpdateStatus($"Index complet ({list.Count} familles).");
+        }
+
+        public bool RefreshSearchMetadata(string familyPath, bool notify = true)
+        {
+            if (string.IsNullOrWhiteSpace(familyPath))
+                return false;
+
+            Entry entry;
+            lock (_lock)
+                entry = _items.FirstOrDefault(e => string.Equals(e.Path, familyPath, StringComparison.OrdinalIgnoreCase));
+
+            if (entry == null)
+                return false;
+
+            ApplySearchMetadata(entry, FamilySearchMetadataService.Load(familyPath));
+            if (notify)
+                IndexUpdated?.Invoke();
+            return true;
+        }
+
+        public void NotifySearchMetadataUpdated() => IndexUpdated?.Invoke();
+
+        private static void ApplySearchMetadata(Entry entry, FamilySearchMetadata metadata)
+        {
+            if (entry == null)
+                return;
+
+            metadata = FamilySearchMetadataService.Normalize(metadata);
+            entry.Description = metadata.Description;
+            entry.Keywords = metadata.Keywords.ToList();
+            entry.NormalizedDescription = NormalizeForSearch(metadata.Description);
+            entry.NormalizedKeywords = NormalizeForSearch(string.Join(" ", metadata.Keywords));
+            RebuildSearchText(entry);
+        }
+
+        private static void RebuildSearchText(Entry entry)
+        {
+            entry.SearchText = string.Join(" ", new[]
+            {
+                entry.NormalizedName,
+                entry.NormalizedFolder,
+                entry.NormalizedCategory,
+                entry.NormalizedRevitSavedVersion,
+                entry.NormalizedDescription,
+                entry.NormalizedKeywords
+            }.Where(s => !string.IsNullOrWhiteSpace(s)));
+            entry.SearchTokens = Tokenize(entry.SearchText);
+        }
+
+        private static string[] Tokenize(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return Array.Empty<string>();
+
+            return text.Split(text.Where(c => !char.IsLetterOrDigit(c)).Distinct().ToArray(),
+                    StringSplitOptions.RemoveEmptyEntries)
+                .Where(t => t.Length >= 2)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
         }
 
         public IEnumerable<Entry> Search(string term, int max = 8000)
@@ -257,6 +331,9 @@ namespace Famille
             }
             return sb.ToString().Normalize(NormalizationForm.FormC);
         }
+
+        private static string NormalizeForSearch(string text)
+            => StripDiacritics(text ?? string.Empty).ToLowerInvariant();
 
         public void Dispose()
         {

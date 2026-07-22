@@ -381,6 +381,10 @@
       <DependentUpon>FamilyBrowserPlugin.xaml</DependentUpon>
     </Compile>
     <Compile Include="commands\Dossier famille\FamilyIndexService.cs" />
+    <Compile Include="commands\Dossier famille\FamilySearchMetadata.cs" />
+    <Compile Include="commands\Dossier famille\FamilySearchReviewWindow.xaml.cs">
+      <DependentUpon>FamilySearchReviewWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="commands\Dossier famille\FamilyMetadataProvider.cs" />
     <Compile Include="commands\Dossier famille\FamilyLoadOption.cs" />
     <Compile Include="commands\Dossier famille\FamilyUsageManager.cs" />
@@ -637,6 +641,10 @@
     <Page Include="commands\page de mise à jour en direct\UpdatePromptWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="commands\Dossier famille\FamilySearchReviewWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
     </Page>
     <Page Include="commands\page de mise à jour en direct\SecretGifWindow.xaml">
       <SubType>Designer</SubType>

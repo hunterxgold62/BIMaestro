@@ -197,6 +197,9 @@
                             <MenuItem Header="Documentation"
                                   Click="DocumentationMenuItem_Click"
                                   DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                            <MenuItem Header="Mots-clés de recherche…"
+                                  Click="SearchMetadataMenuItem_Click"
+                                  DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                             <Separator/>
                             <MenuItem Header="Rentrer dans la famille"
                                   Click="OpenFamilyFile_Click"
@@ -377,13 +380,30 @@
                         </Grid>
                         <StackPanel Grid.Row="2"
                                     Margin="26,3,8,0"
-                                    Visibility="{Binding SearchLocationVisibility}">
+                                    Visibility="{Binding SearchDetailsVisibility}">
+                            <TextBlock Text="{Binding ApproximateMatchText}"
+                                       Visibility="{Binding ApproximateMatchVisibility}"
+                                       Foreground="#FFD97706"
+                                       FontWeight="SemiBold"
+                                       FontSize="10"
+                                       TextWrapping="Wrap"
+                                       TextAlignment="Center"/>
+                            <TextBlock Text="{Binding MatchedKeywordsText}"
+                                       Visibility="{Binding MatchedKeywordsVisibility}"
+                                       Foreground="#FF7C3AED"
+                                       FontWeight="SemiBold"
+                                       FontSize="10"
+                                       TextWrapping="Wrap"
+                                       TextAlignment="Center"
+                                       ToolTip="{Binding SearchDescription}"/>
                             <TextBlock Text="{Binding SearchLocationLabel}"
+                                       Visibility="{Binding SearchLocationVisibility}"
                                        Foreground="{DynamicResource Brand}"
                                        FontWeight="SemiBold"
                                        FontSize="10"
                                        TextAlignment="Center"/>
                             <TextBlock Text="{Binding SearchFolderPath}"
+                                       Visibility="{Binding SearchLocationVisibility}"
                                        Foreground="#FF6C7A92"
                                        FontSize="10"
                                        TextWrapping="Wrap"
@@ -425,6 +445,9 @@
                             <Separator/>
                             <MenuItem Header="Documentation"
                                   Click="DocumentationMenuItem_Click"
+                                  DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                            <MenuItem Header="Mots-clés de recherche…"
+                                  Click="SearchMetadataMenuItem_Click"
                                   DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                             <Separator/>
                             <MenuItem Header="Rentrer dans la famille"
@@ -586,12 +609,25 @@
                             </DockPanel>
                             <StackPanel Grid.Row="1"
                                         Margin="0,8,10,0"
-                                        Visibility="{Binding SearchLocationVisibility}">
+                                        Visibility="{Binding SearchDetailsVisibility}">
+                                <TextBlock Text="{Binding ApproximateMatchText}"
+                                           Visibility="{Binding ApproximateMatchVisibility}"
+                                           Foreground="#FFD97706"
+                                           FontWeight="SemiBold"
+                                           TextWrapping="Wrap"/>
+                                <TextBlock Text="{Binding MatchedKeywordsText}"
+                                           Visibility="{Binding MatchedKeywordsVisibility}"
+                                           Foreground="#FF7C3AED"
+                                           FontWeight="SemiBold"
+                                           TextWrapping="Wrap"
+                                           ToolTip="{Binding SearchDescription}"/>
                                 <TextBlock Text="{Binding SearchLocationLabel}"
+                                           Visibility="{Binding SearchLocationVisibility}"
                                            Foreground="{DynamicResource Brand}"
                                            FontWeight="SemiBold"
                                            FontSize="11"/>
                                 <TextBlock Text="{Binding SearchFolderPath}"
+                                           Visibility="{Binding SearchLocationVisibility}"
                                            Foreground="#FF6C7A92"
                                            TextWrapping="Wrap"
                                            ToolTip="{Binding SearchFolderPath}"/>
@@ -831,6 +867,9 @@
                                   DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                             <MenuItem Header="Charger la dernière version"
                                   Click="ReloadFamily_Click"
+                                  DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                            <MenuItem Header="Mots-clés de recherche…"
+                                  Click="SearchMetadataMenuItem_Click"
                                   DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                         </ContextMenu>
                     </Border.ContextMenu>
@@ -1091,6 +1130,7 @@
                                      Height="30"
                                      VerticalAlignment="Center"
                                      TextChanged="SearchBox_TextChanged"
+                                     KeyDown="SearchBox_KeyDown"
                                      GotKeyboardFocus="SearchBox_GotKeyboardFocus"
                                      LostKeyboardFocus="SearchBox_LostKeyboardFocus"
                                      Background="{DynamicResource SearchBoxBackground}"
@@ -1117,6 +1157,8 @@
                                                     <TextBlock TextWrapping="Wrap" Text="doc:oui : familles avec documentation" Margin="0,0,0,2"/>
                                                     <TextBlock TextWrapping="Wrap" Text="image:non : familles sans image d'aperçu" Margin="0,0,0,2"/>
                                                     <TextBlock TextWrapping="Wrap" Text="dossier:skid : chercher uniquement dans les dossiers contenant SKID"/>
+                                                    <TextBlock TextWrapping="Wrap" Text="Une petite faute peut être corrigée automatiquement si aucun résultat exact n’existe." Margin="0,8,0,2"/>
+                                                    <TextBlock TextWrapping="Wrap" Text="Après une recherche sans résultat, appuie sur Entrée pour mémoriser le terme. BIMaestro pourra ensuite proposer de l’associer à la famille finalement ouverte."/>
                                                     <TextBlock Text="Tu peux combiner : pompe rvt:2024 doc:oui"
                                                                Foreground="{DynamicResource Text.Secondary}"
                                                                Margin="0,10,0,0"
@@ -1318,6 +1360,8 @@
                               Focusable="False">
                     <Grid x:Name="SettingsPanelRoot" Margin="12,10,8,10" Background="Transparent">
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -1611,6 +1655,34 @@
                                          IsReadOnly="True"
                                          VerticalScrollBarVisibility="Auto"/>
                             </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <TextBlock Grid.Row="9"
+                               Text="Mots-clés intelligents"
+                               Style="{StaticResource SettingSectionTitleStyle}"/>
+
+                    <Border Grid.Row="10"
+                            Style="{StaticResource SettingSectionBorderStyle}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Margin="0,0,18,0">
+                                <TextBlock Text="Enrichir toute la bibliothèque"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource PrimaryText}"/>
+                                <TextBlock Margin="0,5,0,0"
+                                           Foreground="{DynamicResource Text.Secondary}"
+                                           TextWrapping="Wrap"
+                                           Text="Affiche l’aperçu, le nom, la description et les mots-clés proposés pour chaque famille. Vous pouvez tout corriger avant l’enregistrement."/>
+                            </StackPanel>
+                            <Button Grid.Column="1"
+                                    Content="Ouvrir l’assistant…"
+                                    Width="180" Height="34"
+                                    VerticalAlignment="Center"
+                                    Click="OpenSearchMetadataReview_Click"/>
                         </Grid>
                     </Border>
                     </Grid>
