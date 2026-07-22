@@ -3,7 +3,6 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:Famille"
         xmlns:ui="clr-namespace:BIMaestro.UI"
-        xmlns:xctk="http://schemas.xceed.com/wpf/xaml/toolkit"
         Title="BIMaestro - Navigateur de Familles"
         Height="651" Width="1280"
         MinWidth="900" MinHeight="400"
@@ -1418,33 +1417,33 @@
                             </Grid.ColumnDefinitions>
 
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Couleur du haut" Style="{StaticResource SettingLabelStyle}"/>
-                            <xctk:ColorPicker Grid.Row="0" Grid.Column="1"
+                            <ui:SimpleColorPicker Grid.Row="0" Grid.Column="1"
                                               x:Name="TopColorPicker"
                                               Height="26"
                                               SelectedColor="#FFF2F2F2"/>
 
                             <TextBlock Grid.Row="0" Grid.Column="3" Text="Couleur du bas" Style="{StaticResource SettingLabelStyle}"/>
-                            <xctk:ColorPicker Grid.Row="0" Grid.Column="4"
+                            <ui:SimpleColorPicker Grid.Row="0" Grid.Column="4"
                                               x:Name="BottomColorPicker"
                                               Height="26"
                                               SelectedColor="#FFFFFFFF"/>
 
                             <TextBlock Grid.Row="1" Grid.Column="0" Text="Arrière-plan des familles" Style="{StaticResource SettingLabelStyle}" Margin="0,12,16,0"/>
-                            <xctk:ColorPicker Grid.Row="1" Grid.Column="1"
+                            <ui:SimpleColorPicker Grid.Row="1" Grid.Column="1"
                                               Margin="0,12,0,0"
                                               x:Name="PanelBackgroundPicker"
                                               Height="26"
                                               SelectedColor="#F0F0F0"/>
 
                             <TextBlock Grid.Row="1" Grid.Column="3" Text="Arrière-plan de l'arborescence" Style="{StaticResource SettingLabelStyle}" Margin="0,12,16,0"/>
-                            <xctk:ColorPicker Grid.Row="1" Grid.Column="4"
+                            <ui:SimpleColorPicker Grid.Row="1" Grid.Column="4"
                                               Margin="0,12,0,0"
                                               x:Name="TreeViewBackgroundPicker"
                                               Height="26"
                                               SelectedColor="#F0F0F0"/>
 
                             <TextBlock Grid.Row="2" Grid.Column="0" Text="Arrière-plan des panneaux" Style="{StaticResource SettingLabelStyle}" Margin="0,12,16,0"/>
-                            <xctk:ColorPicker Grid.Row="2" Grid.Column="1"
+                            <ui:SimpleColorPicker Grid.Row="2" Grid.Column="1"
                                               Margin="0,12,0,0"
                                               x:Name="ContentPanelBackgroundPicker"
                                               Height="26"
@@ -1481,13 +1480,13 @@
                             </Grid.ColumnDefinitions>
 
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="ItemsBackground" Style="{StaticResource SettingLabelStyle}"/>
-                            <xctk:ColorPicker Grid.Row="0" Grid.Column="1"
+                            <ui:SimpleColorPicker Grid.Row="0" Grid.Column="1"
                                               x:Name="ItemsBackgroundPicker"
                                               Height="26"
                                               SelectedColor="Transparent"/>
 
                             <TextBlock Grid.Row="1" Grid.Column="0" Text="Arrière-plan général" Style="{StaticResource SettingLabelStyle}" Margin="0,12,16,0"/>
-                            <xctk:ColorPicker Grid.Row="1" Grid.Column="1"
+                            <ui:SimpleColorPicker Grid.Row="1" Grid.Column="1"
                                               Margin="0,12,0,0"
                                               x:Name="TabBackgroundPicker"
                                               Height="26"

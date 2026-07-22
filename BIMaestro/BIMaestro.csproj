@@ -60,9 +60,6 @@
     <PackageReference Include="EPPlus">
       <Version>8.0.8</Version>
     </PackageReference>
-    <PackageReference Include="Extended.Wpf.Toolkit">
-      <Version>4.6.1</Version>
-    </PackageReference>
     <PackageReference Include="HelixToolkit.Wpf">
       <Version>2.27.3</Version>
     </PackageReference>
@@ -225,11 +222,11 @@
     <Reference Include="System.Xml" />
     <Reference Include="WindowsBase" />
     <Reference Include="WindowsFormsIntegration" />
-    <Reference Include="Xceed.Wpf.Toolkit, Version=4.6.0.0, Culture=neutral, PublicKeyToken=3e4669d2f30244f4, processorArchitecture=MSIL">
-      <HintPath>..\packages\Extended.Wpf.Toolkit.4.6.1\lib\net40\Xceed.Wpf.Toolkit.dll</HintPath>
-    </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Controls\SimpleColorPicker.xaml.cs">
+      <DependentUpon>SimpleColorPicker.xaml</DependentUpon>
+    </Compile>
     <Compile Include="animation touche\chargement et salto\StuntSpinner.xaml.cs">
       <DependentUpon>StuntSpinner.xaml</DependentUpon>
     </Compile>
@@ -522,6 +519,10 @@
     <Compile Include="commands\renuméroté élément\ElementRenameWindow.xaml.cs">
       <DependentUpon>ElementRenameWindow.xaml</DependentUpon>
     </Compile>
+    <Page Include="Controls\SimpleColorPicker.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
     <Page Include="animation touche\chargement et salto\StuntSpinner.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
