@@ -33,4 +33,31 @@ namespace Page
             }
         }
     }
+
+    [Transaction(TransactionMode.Manual)]
+    public class SupportCommand : BaseTrackedCommand
+    {
+        private const string SupportUrl = "https://ko-fi.com/bimaestro";
+
+        protected override string ButtonId => "SupportCommand";
+
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = SupportUrl,
+                    UseShellExecute = true
+                });
+
+                return Result.Succeeded;
+            }
+            catch (Exception ex)
+            {
+                TaskDialog.Show("BIMaestro - Soutenir", $"Impossible d'ouvrir la page Ko-fi : {ex.Message}");
+                return Result.Failed;
+            }
+        }
+    }
 }

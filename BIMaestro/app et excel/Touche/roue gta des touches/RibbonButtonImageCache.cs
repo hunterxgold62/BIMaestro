@@ -20,6 +20,12 @@ namespace BIMaestro.UI
                 var targetPath = Path.Combine(CacheFolder, resourceFileName);
                 if (File.Exists(targetPath)) return targetPath;
 
+                if (string.Equals(resourceFileName, global::RibbonIconAssets.SupportHeartFileName, StringComparison.OrdinalIgnoreCase))
+                {
+                    File.WriteAllBytes(targetPath, global::RibbonIconAssets.GetSupportHeartPngBytes());
+                    return File.Exists(targetPath) ? targetPath : null;
+                }
+
                 var asm = Assembly.GetExecutingAssembly();
                 string resourcePath = $"BIMaestro.Resources.{resourceFileName}";
                 using (var stream = asm.GetManifestResourceStream(resourcePath))

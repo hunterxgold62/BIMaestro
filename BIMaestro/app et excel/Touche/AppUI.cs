@@ -158,7 +158,19 @@ public class AppUI : IExternalApplication
                         ("ContactCommand", "Contact", "Page.ContactCommand", "Information (2).png", "Ouvre le LinkedIn de Paul Lemert pour envoyer un retour, signaler un bouton qui bloque ou proposer une idée."),
                         ("RadialMenuButtonsCommand", "Rosace\nBoutons", "BIMaestro.UI.RadialMenuButtonsCommand", "Option.png", "Rosace des 16 derniers boutons BIMaestro utilisés.")
                     })
-                ))
+                )),
+
+                new RibbonItemDefinition(
+                    "SupportCommand",
+                    "Soutenir",
+                    panel => AddPushButton(
+                        panel,
+                        "SupportCommand",
+                        "Soutenir",
+                        assemblyPath,
+                        "Page.SupportCommand",
+                        RibbonIconAssets.SupportHeartFileName,
+                        "Vous appréciez BIMaestro ? Ouvrez la page Ko-fi pour soutenir volontairement son développement autour d’un petit café."))
             })
         };
     }
@@ -583,6 +595,11 @@ public class AppUI : IExternalApplication
 
     private static BitmapImage LoadBitmapFromResource(string resourceFileName, int decodeSize)
     {
+        if (string.Equals(resourceFileName, RibbonIconAssets.SupportHeartFileName, StringComparison.OrdinalIgnoreCase))
+        {
+            return RibbonIconAssets.LoadSupportHeart(decodeSize);
+        }
+
         var asm = Assembly.GetExecutingAssembly();
         string resourcePath = $"BIMaestro.Resources.{resourceFileName}";
 
@@ -721,4 +738,33 @@ public class AppUI : IExternalApplication
         return null;
     }
 
+}
+
+internal static class RibbonIconAssets
+{
+    internal const string SupportHeartFileName = "SupportHeart.png";
+
+    private const string SupportHeartPngBase64 =
+        "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";
+
+    internal static byte[] GetSupportHeartPngBytes()
+    {
+        return Convert.FromBase64String(SupportHeartPngBase64);
+    }
+
+    internal static BitmapImage LoadSupportHeart(int decodeSize)
+    {
+        using (var stream = new MemoryStream(GetSupportHeartPngBytes()))
+        {
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.StreamSource = stream;
+            if (decodeSize > 0)
+                bitmap.DecodePixelWidth = decodeSize;
+            bitmap.EndInit();
+            bitmap.Freeze();
+            return bitmap;
+        }
+    }
 }
