@@ -24,7 +24,6 @@ namespace BIMaestro.Dashboard
         {
             try
             {
-                Environment.SetEnvironmentVariable("EPPlusLicenseContext", "NonCommercial", EnvironmentVariableTarget.Process);
                 string activePath = cdata.Application?.ActiveUIDocument?.Document?.PathName;
 
                 DateTime now = DateTime.Now;

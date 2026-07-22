@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json;
-using OfficeOpenXml;
+using NPOI.SS.UserModel;
+using NPOI.XSSF.UserModel;
 using OxyPlot;
 using OxyPlot.Axes;
 using OxyPlot.Series;
@@ -82,8 +83,6 @@ namespace BIMaestro.Dashboard
             _tgCompare.IsChecked = false;
             _tgRvt.IsChecked = true;
             _tgRfa.IsChecked = false;
-
-            Environment.SetEnvironmentVariable("EPPlusLicenseContext", "NonCommercial", EnvironmentVariableTarget.Process);
 
             _plotModel = new PlotModel { Title = "Temps passé" };
             _plotView.Model = _plotModel;
@@ -204,21 +203,29 @@ namespace BIMaestro.Dashboard
             _rows.Clear();
             if (!File.Exists(_excelPath)) return;
 
-            using var pkg = new ExcelPackage(new FileInfo(_excelPath));
-            var ws = pkg.Workbook.Worksheets["Historique_Temps_Revit"];
-            if (ws == null || ws.Dimension == null) return;
+            using var stream = new FileStream(
+                _excelPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
+            using var workbook = new XSSFWorkbook(stream);
+            var ws = workbook.GetSheet("Historique_Temps_Revit");
+            if (ws == null) return;
 
-            int r0 = ws.Dimension.Start.Row + 1, rn = ws.Dimension.End.Row;
-            for (int r = r0; r <= rn; r++)
+            var formatter = new DataFormatter();
+            for (int r = ws.FirstRowNum + 1; r <= ws.LastRowNum; r++)
             {
-                string ev = (ws.Cells[r, 1].Value ?? "").ToString();
+                var row = ws.GetRow(r);
+                if (row == null) continue;
+
+                string ev = GetCellText(row.GetCell(0), formatter);
                 if (string.IsNullOrWhiteSpace(ev)) continue;
-                string docId = NormalizeDocumentId((ws.Cells[r, 2].Value ?? "").ToString());
-                string docName = (ws.Cells[r, 3].Value ?? "").ToString();
-                string revitVer = (ws.Cells[r, 4].Value ?? "").ToString();
-                string dateStr = (ws.Cells[r, 5].Value ?? "").ToString();
-                string timeStr = (ws.Cells[r, 6].Value ?? "").ToString();
-                object durObj = ws.Cells[r, 7].Value;
+                string docId = NormalizeDocumentId(GetCellText(row.GetCell(1), formatter));
+                string docName = GetCellText(row.GetCell(2), formatter);
+                string revitVer = GetCellText(row.GetCell(3), formatter);
+                string dateStr = GetCellText(row.GetCell(4), formatter);
+                string timeStr = GetCellText(row.GetCell(5), formatter);
+                object durObj = GetCellValue(row.GetCell(6), formatter);
                 _rows.Add(new LogRow
                 {
                     Event = ev,
@@ -229,6 +236,52 @@ namespace BIMaestro.Dashboard
                     When = ParseDateTimeFlexible(dateStr, timeStr),
                     Duration = ParseDurationFlexible(durObj)
                 });
+            }
+        }
+
+        private static string GetCellText(ICell cell, DataFormatter formatter)
+        {
+            if (cell == null) return string.Empty;
+
+            try
+            {
+                return formatter.FormatCellValue(cell) ?? string.Empty;
+            }
+            catch
+            {
+                return cell.ToString() ?? string.Empty;
+            }
+        }
+
+        private static object GetCellValue(ICell cell, DataFormatter formatter)
+        {
+            if (cell == null) return null;
+
+            try
+            {
+                CellType type = cell.CellType == CellType.Formula
+                    ? cell.CachedFormulaResultType
+                    : cell.CellType;
+
+                switch (type)
+                {
+                    case CellType.Numeric:
+                        // La seule valeur lue ici est une durée Excel exprimée en jours.
+                        // La garder numérique préserve aussi les durées supérieures à 24 h.
+                        return cell.NumericCellValue;
+                    case CellType.Boolean:
+                        return cell.BooleanCellValue;
+                    case CellType.String:
+                        return cell.StringCellValue;
+                    case CellType.Blank:
+                        return null;
+                    default:
+                        return GetCellText(cell, formatter);
+                }
+            }
+            catch
+            {
+                return GetCellText(cell, formatter);
             }
         }
 

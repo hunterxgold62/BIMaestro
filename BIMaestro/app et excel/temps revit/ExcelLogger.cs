@@ -1,7 +1,8 @@
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Microsoft.Win32;
-using OfficeOpenXml;
+using NPOI.SS.UserModel;
+using NPOI.XSSF.UserModel;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -50,8 +51,6 @@ public static class ExcelLogger
         try
         {
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-            ExcelPackage.License.SetNonCommercialPersonal("OK1");
-
             WithStorageLock(() =>
             {
                 if (!Directory.Exists(LogDirectory))
@@ -324,13 +323,13 @@ public static class ExcelLogger
 
     private static void CreateExcelFileCore()
     {
-        using (var package = new ExcelPackage(new FileInfo(_excelFilePath)))
+        using (var workbook = OpenOrCreateWorkbook(_excelFilePath))
         {
-            var ws = package.Workbook.Worksheets[WorksheetName]
-                     ?? package.Workbook.Worksheets.Add(WorksheetName);
+            var ws = workbook.GetSheet(WorksheetName)
+                     ?? workbook.CreateSheet(WorksheetName);
 
-            EnsureHeader(ws);
-            package.Save();
+            EnsureHeader(ws, workbook);
+            SaveWorkbook(workbook, _excelFilePath);
         }
     }
 
@@ -339,38 +338,95 @@ public static class ExcelLogger
 
     private static void EnsureSheetExistsCore()
     {
-        using (var package = new ExcelPackage(new FileInfo(_excelFilePath)))
+        using (var workbook = OpenOrCreateWorkbook(_excelFilePath))
         {
-            var ws = package.Workbook.Worksheets[WorksheetName]
-                     ?? package.Workbook.Worksheets.Add(WorksheetName);
+            var ws = workbook.GetSheet(WorksheetName)
+                     ?? workbook.CreateSheet(WorksheetName);
 
-            EnsureHeader(ws);
-            package.Save();
+            EnsureHeader(ws, workbook);
+            SaveWorkbook(workbook, _excelFilePath);
         }
     }
 
-    private static void EnsureHeader(ExcelWorksheet ws)
+    private static void EnsureHeader(ISheet ws, IWorkbook workbook)
     {
-        ws.Cells["A1"].Value = "Event";
-        ws.Cells["B1"].Value = "Document ID";
-        ws.Cells["C1"].Value = "Document Name";
-        ws.Cells["D1"].Value = "Revit Version";
-        ws.Cells["E1"].Value = "Date";
-        ws.Cells["F1"].Value = "Time";
-        ws.Cells["G1"].Value = "Duration";
-        ws.Cells["H1"].Value = "Session ID";
-        ws.Cells["I1"].Value = "Document Kind";
-        ws.Cells["J1"].Value = "Is Workshared";
-        ws.Cells["K1"].Value = "Central Path";
-        ws.Cells["L1"].Value = "Local Path";
-        ws.Cells["M1"].Value = "Path Hash";
-        ws.Cells["N1"].Value = "Revit User";
-        ws.Cells["O1"].Value = "Windows User";
-        ws.Cells["P1"].Value = "Machine";
-        ws.Cells["Q1"].Value = "Process ID";
-        ws.Cells["R1"].Value = "Project Info JSON";
-        ws.Column(7).Style.Numberformat.Format = "[hh]:mm:ss";
+        string[] headers =
+        {
+            "Event",
+            "Document ID",
+            "Document Name",
+            "Revit Version",
+            "Date",
+            "Time",
+            "Duration",
+            "Session ID",
+            "Document Kind",
+            "Is Workshared",
+            "Central Path",
+            "Local Path",
+            "Path Hash",
+            "Revit User",
+            "Windows User",
+            "Machine",
+            "Process ID",
+            "Project Info JSON"
+        };
+
+        var row = ws.GetRow(0) ?? ws.CreateRow(0);
+        for (int column = 0; column < headers.Length; column++)
+            SetCellValue(row, column, headers[column]);
+
+        GetDurationStyle(workbook, ws);
+    }
+
+    private static XSSFWorkbook OpenOrCreateWorkbook(string path)
+    {
+        if (!File.Exists(path) || new FileInfo(path).Length == 0)
+            return new XSSFWorkbook();
+
+        using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            return new XSSFWorkbook(stream);
+    }
+
+    private static void SaveWorkbook(XSSFWorkbook workbook, string path)
+    {
+        string temporaryPath = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+
+        try
+        {
+            using (var stream = new FileStream(temporaryPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                workbook.Write(stream);
+
+            File.Copy(temporaryPath, path, true);
         }
+        finally
+        {
+            try
+            {
+                if (File.Exists(temporaryPath))
+                    File.Delete(temporaryPath);
+            }
+            catch { }
+        }
+    }
+
+    private static ICellStyle GetDurationStyle(IWorkbook workbook, ISheet sheet)
+    {
+        var existingStyle = sheet.GetColumnStyle(6);
+        if (existingStyle != null && existingStyle.DataFormat != 0)
+            return existingStyle;
+
+        var style = workbook.CreateCellStyle();
+        style.DataFormat = workbook.CreateDataFormat().GetFormat("[hh]:mm:ss");
+        sheet.SetDefaultColumnStyle(6, style);
+        return style;
+    }
+
+    private static void SetCellValue(IRow row, int column, string value)
+    {
+        var cell = row.GetCell(column) ?? row.CreateCell(column);
+        cell.SetCellValue(value ?? string.Empty);
+    }
 
     private static void LogEvent(string eventType, Document document, UIApplication uiApp, TimeSpan duration, TimeLogMetadata classification = null)
     {
@@ -473,40 +529,44 @@ public static class ExcelLogger
         var list = (entries ?? Enumerable.Empty<LogEntry>()).ToList();
         if (list.Count == 0) return;
 
-        using (var package = new ExcelPackage(new FileInfo(_excelFilePath)))
+        using (var workbook = OpenOrCreateWorkbook(_excelFilePath))
         {
-            var ws = package.Workbook.Worksheets[WorksheetName]
-                     ?? package.Workbook.Worksheets.Add(WorksheetName);
+            var ws = workbook.GetSheet(WorksheetName)
+                     ?? workbook.CreateSheet(WorksheetName);
 
-            EnsureHeader(ws);
+            EnsureHeader(ws, workbook);
+            var durationStyle = GetDurationStyle(workbook, ws);
 
-            int lastRow = ws.Dimension?.End.Row ?? 1;
+            int lastRow = Math.Max(ws.LastRowNum, 0);
             foreach (var entry in list)
             {
-                lastRow++;
+                var row = ws.CreateRow(++lastRow);
 
-                ws.Cells[lastRow, 1].Value = entry.EventType;
-                ws.Cells[lastRow, 2].Value = entry.DocumentId;
-                ws.Cells[lastRow, 3].Value = entry.DocumentName;
-                ws.Cells[lastRow, 4].Value = entry.RevitVersion;
-                ws.Cells[lastRow, 5].Value = entry.When.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-                ws.Cells[lastRow, 6].Value = entry.When.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
-                ws.Cells[lastRow, 7].Value = entry.Duration;
-                ws.Cells[lastRow, 7].Style.Numberformat.Format = "[hh]:mm:ss";
-                ws.Cells[lastRow, 8].Value = entry.Classification?.SessionId;
-                ws.Cells[lastRow, 9].Value = entry.Classification?.DocumentKind;
-                ws.Cells[lastRow, 10].Value = entry.Classification?.IsWorkshared;
-                ws.Cells[lastRow, 11].Value = entry.Classification?.CentralPath;
-                ws.Cells[lastRow, 12].Value = entry.Classification?.LocalPath;
-                ws.Cells[lastRow, 13].Value = entry.Classification?.PathHash;
-                ws.Cells[lastRow, 14].Value = entry.Classification?.RevitUser;
-                ws.Cells[lastRow, 15].Value = entry.Classification?.WindowsUser;
-                ws.Cells[lastRow, 16].Value = entry.Classification?.MachineName;
-                ws.Cells[lastRow, 17].Value = entry.Classification?.ProcessId;
-                ws.Cells[lastRow, 18].Value = entry.Classification?.ProjectInfoJson;
+                SetCellValue(row, 0, entry.EventType);
+                SetCellValue(row, 1, entry.DocumentId);
+                SetCellValue(row, 2, entry.DocumentName);
+                SetCellValue(row, 3, entry.RevitVersion);
+                SetCellValue(row, 4, entry.When.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+                SetCellValue(row, 5, entry.When.ToString("HH:mm:ss", CultureInfo.InvariantCulture));
+
+                var durationCell = row.CreateCell(6);
+                durationCell.SetCellValue(entry.Duration.TotalDays);
+                durationCell.CellStyle = durationStyle;
+
+                SetCellValue(row, 7, entry.Classification?.SessionId);
+                SetCellValue(row, 8, entry.Classification?.DocumentKind);
+                SetCellValue(row, 9, entry.Classification?.IsWorkshared);
+                SetCellValue(row, 10, entry.Classification?.CentralPath);
+                SetCellValue(row, 11, entry.Classification?.LocalPath);
+                SetCellValue(row, 12, entry.Classification?.PathHash);
+                SetCellValue(row, 13, entry.Classification?.RevitUser);
+                SetCellValue(row, 14, entry.Classification?.WindowsUser);
+                SetCellValue(row, 15, entry.Classification?.MachineName);
+                SetCellValue(row, 16, entry.Classification?.ProcessId);
+                SetCellValue(row, 17, entry.Classification?.ProjectInfoJson);
             }
 
-            package.Save();
+            SaveWorkbook(workbook, _excelFilePath);
         }
     }
 

@@ -1,5 +1,7 @@
 ﻿using Autodesk.Revit.DB;
-using OfficeOpenXml;
+using NPOI.SS.UserModel;
+using NPOI.SS.Util;
+using NPOI.XSSF.UserModel;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -306,43 +308,105 @@ namespace Analyse
 
         private static void ExportExcel(List<CollaborativeModelRecord> records)
         {
-            ExcelPackage.License.SetNonCommercialPersonal("BIMaestro");
-            using (var package = new ExcelPackage(new FileInfo(ExcelPath)))
+            using (var workbook = OpenOrCreateWorkbook(ExcelPath))
             {
-                var ws = package.Workbook.Worksheets["Suivi_Maquettes"] ?? package.Workbook.Worksheets.Add("Suivi_Maquettes");
-                ws.Cells.Clear();
+                var ws = workbook.GetSheet("Suivi_Maquettes") ?? workbook.CreateSheet("Suivi_Maquettes");
+                ClearSheet(ws);
 
-                ws.Cells[1, 1].Value = "Projet";
-                ws.Cells[1, 2].Value = "Maquette";
-                ws.Cells[1, 3].Value = "Chemin";
-                ws.Cells[1, 4].Value = "Utilisateur";
-                ws.Cells[1, 5].Value = "Créateur (1er ouvert)";
-                ws.Cells[1, 6].Value = "Dernière modification";
-                ws.Cells[1, 7].Value = "Version Revit";
-                ws.Cells[1, 8].Value = "Date";
+                var headerFont = workbook.CreateFont();
+                headerFont.IsBold = true;
+                var headerStyle = workbook.CreateCellStyle();
+                headerStyle.SetFont(headerFont);
 
-                var row = 2;
+                var dateStyle = workbook.CreateCellStyle();
+                dateStyle.DataFormat = workbook.CreateDataFormat().GetFormat("yyyy-mm-dd");
+
+                string[] headers =
+                {
+                    "Projet",
+                    "Maquette",
+                    "Chemin",
+                    "Utilisateur",
+                    "Créateur (1er ouvert)",
+                    "Dernière modification",
+                    "Version Revit",
+                    "Date"
+                };
+
+                var headerRow = ws.CreateRow(0);
+                for (int column = 0; column < headers.Length; column++)
+                {
+                    var cell = headerRow.CreateCell(column);
+                    cell.SetCellValue(headers[column]);
+                    cell.CellStyle = headerStyle;
+                }
+
+                int rowIndex = 1;
                 foreach (var item in records)
                 {
-                    ws.Cells[row, 1].Value = item.ProjectName;
-                    ws.Cells[row, 2].Value = item.ModelName;
-                    ws.Cells[row, 3].Value = item.ModelPath;
-                    ws.Cells[row, 4].Value = item.UserName;
-                    ws.Cells[row, 5].Value = item.CreatorName;
-                    ws.Cells[row, 6].Value = item.LastChangedBy;
-                    ws.Cells[row, 7].Value = item.RevitVersion;
-                    ws.Cells[row, 8].Value = item.TimestampDate;
-                    ws.Cells[row, 8].Style.Numberformat.Format = "yyyy-mm-dd";
-                    row++;
+                    var row = ws.CreateRow(rowIndex++);
+                    row.CreateCell(0).SetCellValue(item.ProjectName ?? string.Empty);
+                    row.CreateCell(1).SetCellValue(item.ModelName ?? string.Empty);
+                    row.CreateCell(2).SetCellValue(item.ModelPath ?? string.Empty);
+                    row.CreateCell(3).SetCellValue(item.UserName ?? string.Empty);
+                    row.CreateCell(4).SetCellValue(item.CreatorName ?? string.Empty);
+                    row.CreateCell(5).SetCellValue(item.LastChangedBy ?? string.Empty);
+                    row.CreateCell(6).SetCellValue(item.RevitVersion ?? string.Empty);
+
+                    var dateCell = row.CreateCell(7);
+                    dateCell.SetCellValue(item.TimestampDate);
+                    dateCell.CellStyle = dateStyle;
                 }
 
-                if (ws.Dimension != null)
+                ws.SetAutoFilter(new CellRangeAddress(0, Math.Max(0, rowIndex - 1), 0, headers.Length - 1));
+                ws.CreateFreezePane(0, 1);
+                for (int column = 0; column < headers.Length; column++)
                 {
-                    ws.Cells[ws.Dimension.Address].AutoFilter = true;
-                    ws.Cells[ws.Dimension.Address].AutoFitColumns();
+                    try { ws.AutoSizeColumn(column); } catch { }
                 }
 
-                package.Save();
+                SaveWorkbook(workbook, ExcelPath);
+            }
+        }
+
+        private static XSSFWorkbook OpenOrCreateWorkbook(string path)
+        {
+            if (!File.Exists(path) || new FileInfo(path).Length == 0)
+                return new XSSFWorkbook();
+
+            using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                return new XSSFWorkbook(stream);
+        }
+
+        private static void ClearSheet(ISheet sheet)
+        {
+            for (int rowIndex = sheet.LastRowNum; rowIndex >= sheet.FirstRowNum; rowIndex--)
+            {
+                var row = sheet.GetRow(rowIndex);
+                if (row != null)
+                    sheet.RemoveRow(row);
+            }
+        }
+
+        private static void SaveWorkbook(XSSFWorkbook workbook, string path)
+        {
+            string temporaryPath = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+
+            try
+            {
+                using (var stream = new FileStream(temporaryPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                    workbook.Write(stream);
+
+                File.Copy(temporaryPath, path, true);
+            }
+            finally
+            {
+                try
+                {
+                    if (File.Exists(temporaryPath))
+                        File.Delete(temporaryPath);
+                }
+                catch { }
             }
         }
 
