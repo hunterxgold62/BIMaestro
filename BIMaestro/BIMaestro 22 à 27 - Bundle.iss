@@ -31,6 +31,7 @@ AppPublisher=Paul Lemert
 AppPublisherURL=https://www.bimaestro.fr/
 AppSupportURL=https://www.bimaestro.fr/
 AppUpdatesURL=https://www.bimaestro.fr/telechargement
+LicenseFile=Marketplace\ConditionsUtilisation.txt
 PrivilegesRequired=lowest
 DisableProgramGroupPage=yes
 DisableDirPage=yes
@@ -45,6 +46,9 @@ ArchitecturesInstallIn64BitMode=x64compatible
 CloseApplications=yes
 RestartApplications=no
 
+[Languages]
+Name: "french"; MessagesFile: "compiler:Languages\French.isl"
+
 [Files]
 ; DLL principale et dépendances. Les symboles de débogage ne sont pas distribués.
 Source: "bin\Release\*.*"; DestDir: "{app}\Contents"; \
@@ -56,6 +60,12 @@ Source: "Resources\OLD\BIMaestro.png"; DestDir: "{app}\Contents"; \
   DestName: "BIMaestro.png"; Flags: ignoreversion
 Source: "Marketplace\BIMaestroHelp.html"; DestDir: "{app}\Contents"; \
   DestName: "BIMaestroHelp.html"; Flags: ignoreversion
+Source: "Marketplace\ConditionsUtilisation.txt"; DestDir: "{app}\Contents"; \
+  DestName: "ConditionsUtilisation.txt"; Flags: ignoreversion
+Source: "Marketplace\PolitiqueConfidentialite.html"; DestDir: "{app}\Contents"; \
+  DestName: "PolitiqueConfidentialite.html"; Flags: ignoreversion
+Source: "..\LICENSE.txt"; DestDir: "{app}\Contents"; \
+  DestName: "LICENSE.txt"; Flags: ignoreversion
 
 [Code]
 const
@@ -97,7 +107,7 @@ begin
     '  AppNameSpace="com.bimaestro.revit">' + #13#10 +
     '  <CompanyDetails Name="Paul Lemert"' + #13#10 +
     '    Url="https://www.bimaestro.fr/"' + #13#10 +
-    '    Email="lemert.paul60@gmail.com"' + #13#10 +
+    '    Email="bimaestro.plugin@gmail.com"' + #13#10 +
     '    Phone="" />' + #13#10 +
     '  <Components Description="BIMaestro pour Revit 2022 à 2027">' + #13#10 +
     '    <RuntimeRequirements OS="Win64" Platform="Revit" SeriesMin="R2022" SeriesMax="R2027" />' + #13#10 +
@@ -139,4 +149,3 @@ end;
 [UninstallDelete]
 ; L'intégralité du bundle est supprimée. Aucun fichier n'est créé ailleurs.
 Type: filesandordirs; Name: "{app}"
-

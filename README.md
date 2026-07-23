@@ -102,7 +102,7 @@ Le ruban est organisé en panneaux métier. Les noms ci-dessous correspondent au
 - **Gestion Excel** : exporte ou importe des nomenclatures au format Excel.
 - **Phases rapides** : modifie rapidement les phases de création et de démolition des objets sélectionnés.
 - **Surcharges** : applique ou réinitialise demi-teinte, transparence, masquage ou couleur dans les vues choisies.
-- **Organisateur** : renomme les éléments sélectionnés avec préfixes, suffixes et numérotation.
+- **Organisateur** : renomme les éléments sélectionnés avec préfixes, suffixes et numérotation. Sur une feuille, il peut aussi numéroter les fenêtres de vue dans l’ordre de lecture.
 - **Purge** : nettoie le projet en supprimant vues non placées, familles et nomenclatures inutilisées après validation.
 
 ### Outils IA

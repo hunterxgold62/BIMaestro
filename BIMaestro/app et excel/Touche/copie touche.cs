@@ -114,7 +114,7 @@ public class AppUI : IExternalApplication
             panelEditing, "ElementRenamerButton", "Organisateur\nd'Éléments",
             assemblyPath, typeof(Modification.RenameElementsCommand),
             "Organisateur d'éléments.png",
-            "Renomme des éléments (pré/suffixes, numérotation), tri par niveau/emplacement, réinitialisation possible."
+            "Renomme et numérote des éléments. Sur une feuille, organise aussi les fenêtres de vue selon leur position."
         );
 
         AddPushButton(

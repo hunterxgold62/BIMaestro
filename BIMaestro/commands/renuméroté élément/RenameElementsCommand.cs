@@ -4,6 +4,7 @@ using Autodesk.Revit.UI;
 using Licensing;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 
 namespace Modification
@@ -11,6 +12,10 @@ namespace Modification
     [Transaction(TransactionMode.Manual)]
     public class RenameElementsCommand : BaseTrackedCommand
     {
+        private const string ViewNameTarget = "Nom de la vue — navigateur";
+        private const string ViewTitleTarget = "Titre sur la feuille — texte affiché";
+        private const string ViewportDetailNumberTarget = "Numéro du détail — pastille sur la feuille";
+
         protected override string ButtonId => "RenameElementsCommand";
         protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
@@ -24,6 +29,26 @@ namespace Modification
             {
                 TaskDialog.Show("Sélection", "Aucun élément sélectionné. Veuillez sélectionner des éléments dans Revit.");
                 return Result.Cancelled;
+            }
+
+            var selectedElements = selectedIds
+                .Select(doc.GetElement)
+                .Where(element => element != null)
+                .ToList();
+            int viewportCount = selectedElements.Count(element => element is Viewport);
+
+            if (viewportCount > 0)
+            {
+                if (viewportCount != selectedElements.Count)
+                {
+                    TaskDialog.Show(
+                        "Sélection incompatible",
+                        "La sélection mélange des fenêtres de vue et d'autres éléments.\n\n" +
+                        "Sélectionnez uniquement les fenêtres de vue à numéroter.");
+                    return Result.Cancelled;
+                }
+
+                return RenameSelectedViewports(doc, uiDoc, selectedElements.Cast<Viewport>().ToList());
             }
 
             // Récupérer les paramètres texte modifiables du premier élément sélectionné
@@ -70,7 +95,9 @@ namespace Modification
                             int currentNumber = 1;
                             int totalElements = selectedIds.Count;
 
-                            bool isNumeric = renamerWindow.SelectedNumberFormat == "1,2,3..." || renamerWindow.SelectedNumberFormat == "001,002,003...";
+                            bool isNumeric = renamerWindow.SelectedNumberFormat == "1,2,3..."
+                                || renamerWindow.SelectedNumberFormat == "001,002,003..."
+                                || renamerWindow.SelectedNumberFormat == "0001,0002,0003...";
                             bool isAlphabetic = renamerWindow.SelectedNumberFormat == "A,B,C...";
 
                             if (isNumeric)
@@ -94,10 +121,14 @@ namespace Modification
                             }
 
                             // Conversion de la hauteur de bande avec gestion des erreurs
-                            if (!double.TryParse(renamerWindow.BandHeight, out double bandHeight))
+                            if (!TryParseUserDouble(renamerWindow.BandHeight, out double bandHeightMeters)
+                                || bandHeightMeters <= 0)
                             {
-                                bandHeight = 1.0; // Valeur par défaut si la conversion échoue
+                                bandHeightMeters = 1.0;
                             }
+                            double bandHeight = UnitUtils.ConvertToInternalUnits(
+                                bandHeightMeters,
+                                UnitTypeId.Meters);
 
                             // Obtenir les éléments avec leurs positions transformées selon la vue active
                             var elementLocations = GetElementsWithLocations(doc, selectedIds, uiDoc.ActiveView);
@@ -175,6 +206,380 @@ namespace Modification
             }
 
             return Result.Cancelled;
+        }
+
+        private Result RenameSelectedViewports(
+            Document doc,
+            UIDocument uiDoc,
+            List<Viewport> selectedViewports)
+        {
+            ViewSheet activeSheet = uiDoc.ActiveView as ViewSheet;
+            if (activeSheet == null)
+            {
+                TaskDialog.Show(
+                    "Feuille requise",
+                    "Pour numéroter des fenêtres de vue, ouvrez leur feuille puis relancez Organisateur.");
+                return Result.Cancelled;
+            }
+
+            var viewportIdsOnSheet = new HashSet<int>(
+                activeSheet.GetAllViewports().Select(id => id.IntegerValue));
+            if (selectedViewports.Any(viewport => !viewportIdsOnSheet.Contains(viewport.Id.IntegerValue)))
+            {
+                TaskDialog.Show(
+                    "Sélection incompatible",
+                    "Toutes les fenêtres de vue sélectionnées doivent appartenir à la feuille active.");
+                return Result.Cancelled;
+            }
+
+            var viewportTargets = new List<string>
+            {
+                ViewportDetailNumberTarget,
+                ViewNameTarget,
+                ViewTitleTarget
+            };
+
+            var renamerWindow = new ElementRenamerWindow(viewportTargets, isViewportMode: true);
+            if (renamerWindow.ShowDialog() != true)
+            {
+                return Result.Cancelled;
+            }
+
+            if (!TryParseUserDouble(renamerWindow.BandHeight, out double toleranceMillimeters)
+                || toleranceMillimeters <= 0)
+            {
+                toleranceMillimeters = 20.0;
+            }
+
+            double rowTolerance = UnitUtils.ConvertToInternalUnits(
+                toleranceMillimeters,
+                UnitTypeId.Millimeters);
+            List<Viewport> sortedViewports = SortViewportsByReadingOrder(
+                selectedViewports,
+                rowTolerance);
+
+            if (!TryBuildNumberedValues(
+                renamerWindow,
+                sortedViewports.Count,
+                out List<string> desiredValues,
+                out string validationError))
+            {
+                TaskDialog.Show("Erreur", validationError);
+                return Result.Failed;
+            }
+
+            using (var transaction = new Transaction(doc, "Organiser les fenêtres de vue"))
+            {
+                try
+                {
+                    transaction.Start();
+
+                    if (renamerWindow.SelectedParameter == ViewportDetailNumberTarget)
+                    {
+                        SetViewportDetailNumbers(
+                            doc,
+                            activeSheet,
+                            sortedViewports,
+                            desiredValues);
+                    }
+                    else if (renamerWindow.SelectedParameter == ViewTitleTarget)
+                    {
+                        SetViewTitles(doc, sortedViewports, desiredValues);
+                    }
+                    else
+                    {
+                        SetViewNames(doc, sortedViewports, desiredValues);
+                    }
+
+                    transaction.Commit();
+                }
+                catch (Exception ex)
+                {
+                    if (transaction.GetStatus() == TransactionStatus.Started)
+                    {
+                        transaction.RollBack();
+                    }
+
+                    TaskDialog.Show(
+                        "Organisateur",
+                        "La numérotation des fenêtres de vue n'a pas pu être appliquée.\n\n" +
+                        ex.Message);
+                    return Result.Failed;
+                }
+            }
+
+            return Result.Succeeded;
+        }
+
+        private List<Viewport> SortViewportsByReadingOrder(
+            IEnumerable<Viewport> viewports,
+            double rowTolerance)
+        {
+            var remaining = viewports
+                .Select(viewport => new ElementLocation
+                {
+                    Element = viewport,
+                    Location = GetViewportReadingPosition(viewport)
+                })
+                .OrderByDescending(item => item.Location.Y)
+                .ThenBy(item => item.Location.X)
+                .ToList();
+
+            var sorted = new List<Viewport>();
+            while (remaining.Count > 0)
+            {
+                double rowY = remaining[0].Location.Y;
+                var row = remaining
+                    .Where(item => Math.Abs(item.Location.Y - rowY) <= rowTolerance)
+                    .OrderBy(item => item.Location.X)
+                    .ToList();
+
+                sorted.AddRange(row.Select(item => (Viewport)item.Element));
+                foreach (ElementLocation item in row)
+                {
+                    remaining.Remove(item);
+                }
+            }
+
+            return sorted;
+        }
+
+        private XYZ GetViewportReadingPosition(Viewport viewport)
+        {
+            XYZ boxCenter = viewport.GetBoxCenter();
+            double rowY = boxCenter.Y;
+
+            try
+            {
+                Outline labelOutline = viewport.GetLabelOutline();
+                if (labelOutline != null && !labelOutline.IsEmpty)
+                {
+                    // Les titres sont généralement alignés sur une même ligne même lorsque
+                    // les cadrages des coupes ont des hauteurs différentes.
+                    rowY = labelOutline.MinimumPoint.Y;
+                }
+                else
+                {
+                    Outline boxOutline = viewport.GetBoxOutline();
+                    if (boxOutline != null && !boxOutline.IsEmpty)
+                    {
+                        rowY = boxOutline.MinimumPoint.Y;
+                    }
+                }
+            }
+            catch
+            {
+                // Le centre reste un repli fiable si un type de viewport n'expose pas son titre.
+            }
+
+            return new XYZ(boxCenter.X, rowY, 0);
+        }
+
+        private bool TryBuildNumberedValues(
+            ElementRenamerWindow renamerWindow,
+            int count,
+            out List<string> values,
+            out string error)
+        {
+            values = new List<string>();
+            error = null;
+
+            string format = renamerWindow.SelectedNumberFormat;
+            bool isAlphabetic = format == "A,B,C...";
+            int currentNumber;
+
+            if (isAlphabetic)
+            {
+                currentNumber = LettersToNumber((renamerWindow.StartNumber ?? string.Empty).ToUpperInvariant());
+                if (currentNumber < 1)
+                {
+                    error = "Le numéro de départ doit être une lettre ou une séquence alphabétique valide.";
+                    return false;
+                }
+            }
+            else if (!int.TryParse(renamerWindow.StartNumber, out currentNumber))
+            {
+                error = "Le numéro de départ doit être un nombre entier.";
+                return false;
+            }
+
+            string prefix = renamerWindow.Prefix ?? string.Empty;
+            string suffix = renamerWindow.Suffix ?? string.Empty;
+
+            for (int index = 0; index < count; index++)
+            {
+                string number;
+                if (isAlphabetic)
+                {
+                    number = NumberToLetters(currentNumber);
+                }
+                else if (format == "0001,0002,0003...")
+                {
+                    number = currentNumber.ToString("D4");
+                }
+                else if (format == "001,002,003...")
+                {
+                    number = currentNumber.ToString("D3");
+                }
+                else
+                {
+                    number = currentNumber.ToString(CultureInfo.InvariantCulture);
+                }
+
+                values.Add(prefix + number + suffix);
+                currentNumber++;
+            }
+
+            return true;
+        }
+
+        private void SetViewportDetailNumbers(
+            Document doc,
+            ViewSheet sheet,
+            IList<Viewport> viewports,
+            IList<string> desiredValues)
+        {
+            var selectedIds = new HashSet<int>(viewports.Select(viewport => viewport.Id.IntegerValue));
+            var numbersUsedByOtherViewports = new HashSet<string>(
+                sheet.GetAllViewports()
+                    .Where(id => !selectedIds.Contains(id.IntegerValue))
+                    .Select(id => doc.GetElement(id) as Viewport)
+                    .Where(viewport => viewport != null)
+                    .Select(GetViewportDetailNumber)
+                    .Where(value => !string.IsNullOrWhiteSpace(value)),
+                StringComparer.OrdinalIgnoreCase);
+
+            List<string> conflicts = desiredValues
+                .Where(value => numbersUsedByOtherViewports.Contains(value))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (conflicts.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    "Ces numéros sont déjà utilisés par d'autres fenêtres de la feuille : " +
+                    string.Join(", ", conflicts) + ".");
+            }
+
+            string temporaryPrefix = "BM" + Guid.NewGuid().ToString("N").Substring(0, 8);
+            for (int index = 0; index < viewports.Count; index++)
+            {
+                SetViewportDetailNumber(viewports[index], temporaryPrefix + index);
+            }
+
+            doc.Regenerate();
+
+            for (int index = 0; index < viewports.Count; index++)
+            {
+                SetViewportDetailNumber(viewports[index], desiredValues[index]);
+            }
+        }
+
+        private string GetViewportDetailNumber(Viewport viewport)
+        {
+            Parameter parameter = viewport.get_Parameter(BuiltInParameter.VIEWPORT_DETAIL_NUMBER);
+            return parameter?.AsString() ?? string.Empty;
+        }
+
+        private void SetViewportDetailNumber(Viewport viewport, string value)
+        {
+            Parameter parameter = viewport.get_Parameter(BuiltInParameter.VIEWPORT_DETAIL_NUMBER);
+            if (parameter == null || parameter.IsReadOnly || parameter.StorageType != StorageType.String)
+            {
+                throw new InvalidOperationException(
+                    "Le numéro de détail d'une fenêtre de vue sélectionnée n'est pas modifiable.");
+            }
+
+            parameter.Set(value);
+        }
+
+        private void SetViewNames(
+            Document doc,
+            IList<Viewport> viewports,
+            IList<string> desiredValues)
+        {
+            List<View> views = GetDistinctSelectedViews(doc, viewports);
+            if (views.Count != viewports.Count)
+            {
+                throw new InvalidOperationException(
+                    "Une même vue est présente plusieurs fois dans la sélection et ne peut pas recevoir plusieurs noms.");
+            }
+
+            var selectedViewIds = new HashSet<int>(views.Select(view => view.Id.IntegerValue));
+            var namesUsedByOtherViews = new HashSet<string>(
+                new FilteredElementCollector(doc)
+                    .OfClass(typeof(View))
+                    .Cast<View>()
+                    .Where(view => !selectedViewIds.Contains(view.Id.IntegerValue))
+                    .Select(view => view.Name),
+                StringComparer.OrdinalIgnoreCase);
+
+            List<string> conflicts = desiredValues
+                .Where(value => namesUsedByOtherViews.Contains(value))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (conflicts.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    "Ces noms de vue existent déjà dans le projet : " +
+                    string.Join(", ", conflicts) + ".");
+            }
+
+            string temporaryPrefix = "BIMaestro temporaire " +
+                Guid.NewGuid().ToString("N").Substring(0, 8) + " ";
+            for (int index = 0; index < views.Count; index++)
+            {
+                views[index].Name = temporaryPrefix + index;
+            }
+
+            doc.Regenerate();
+
+            for (int index = 0; index < views.Count; index++)
+            {
+                views[index].Name = desiredValues[index];
+            }
+        }
+
+        private void SetViewTitles(
+            Document doc,
+            IList<Viewport> viewports,
+            IList<string> desiredValues)
+        {
+            for (int index = 0; index < viewports.Count; index++)
+            {
+                View view = doc.GetElement(viewports[index].ViewId) as View;
+                Parameter parameter = view?.get_Parameter(BuiltInParameter.VIEW_DESCRIPTION);
+                if (parameter == null || parameter.IsReadOnly || parameter.StorageType != StorageType.String)
+                {
+                    throw new InvalidOperationException(
+                        "Le titre sur la feuille d'une vue sélectionnée n'est pas modifiable.");
+                }
+
+                parameter.Set(desiredValues[index]);
+            }
+        }
+
+        private List<View> GetDistinctSelectedViews(Document doc, IEnumerable<Viewport> viewports)
+        {
+            return viewports
+                .Select(viewport => doc.GetElement(viewport.ViewId) as View)
+                .Where(view => view != null)
+                .GroupBy(view => view.Id.IntegerValue)
+                .Select(group => group.First())
+                .ToList();
+        }
+
+        private static bool TryParseUserDouble(string value, out double result)
+        {
+            return double.TryParse(
+                       value,
+                       NumberStyles.Float,
+                       CultureInfo.CurrentCulture,
+                       out result)
+                || double.TryParse(
+                       value,
+                       NumberStyles.Float,
+                       CultureInfo.InvariantCulture,
+                       out result);
         }
 
         private List<string> GetWritableTextParameters(Element element)

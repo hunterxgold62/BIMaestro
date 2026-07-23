@@ -147,11 +147,27 @@ namespace Modification
             }
         }
 
+        public bool IsViewportMode { get; }
+        public bool CanReset => !IsViewportMode;
+        public Visibility LevelSortVisibility => IsViewportMode
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        public string WindowSubtitle => IsViewportMode
+            ? "Numérotez les pastilles ou renommez les vues selon leur position sur la feuille."
+            : "Configurez le paramètre cible, la structure de nommage et lancez le renommage en un clic.";
+        public string BandHeightLabel => IsViewportMode
+            ? "Tolérance de ligne (mm) :"
+            : "Hauteur de bande (m) :";
+        public string BandHeightToolTip => IsViewportMode
+            ? "Deux fenêtres de vue dont les centres sont proches verticalement sont considérées sur la même ligne, puis triées de gauche à droite."
+            : "Les éléments sont regroupés par bandes horizontales de cette hauteur et triés de gauche à droite.";
+
         public bool IsReset { get; private set; } // Propriété pour savoir si l'utilisateur veut réinitialiser
         public bool IsNumberingEnabled { get; internal set; }
 
-        public ElementRenamerWindow(List<string> parameters)
+        public ElementRenamerWindow(List<string> parameters, bool isViewportMode = false)
         {
+            IsViewportMode = isViewportMode;
             ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
             this.DataContext = this;
@@ -168,7 +184,7 @@ namespace Modification
             IsSortByLevelEnabled = false;
             SelectedNumberFormat = NumberFormats[0]; // "1,2,3..." par défaut
             StartNumber = "1";
-            BandHeight = "1.0"; // Valeur par défaut pour la hauteur de bande
+            BandHeight = IsViewportMode ? "20" : "1.0";
         }
 
         private void OnRenameClick(object sender, RoutedEventArgs e)

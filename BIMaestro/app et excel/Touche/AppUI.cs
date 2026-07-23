@@ -83,7 +83,7 @@ public class AppUI : IExternalApplication
                         panel,
                         assemblyPath,
                         ("Surcharges vues", "Surcharges", "Modification.OverrideColorCommand", "Couleur.png", "Applique ou réinitialise rapidement la demi-teinte, la transparence ou le masquage des éléments sélectionnés dans les vues choisies. Si une feuille est sélectionnée, BIMaestro applique l’action aux vues placées sur cette feuille."),
-                        ("ElementRenamerButton", "Organisateur", "Modification.RenameElementsCommand", "Organisateur.png", "Renomme les éléments sélectionnés avec préfixes, suffixes et numérotation.\r\nTrie les éléments par niveau/emplacement et peut réinitialiser le paramètre texte ciblé."),
+                        ("ElementRenamerButton", "Organisateur", "Modification.RenameElementsCommand", "Organisateur.png", "Renomme les éléments sélectionnés avec préfixes, suffixes et numérotation.\r\nSur une feuille, numérote les fenêtres de vue de haut en bas puis de gauche à droite.\r\nTrie aussi les éléments par niveau/emplacement et peut réinitialiser le paramètre texte ciblé."),
                         ("Purge du plan", "Purge", "Modification.CombinedCleanupCommand", "Purge.png", "Supprime les vues non placées, les familles et les nomenclatures inutilisées afin d'alléger le projet.\r\nUne fenêtre permet de choisir précisément les éléments à purger avant exécution.\r\n")
                     )),
              }),

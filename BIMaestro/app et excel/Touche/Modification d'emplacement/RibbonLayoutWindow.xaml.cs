@@ -2,7 +2,9 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Navigation;
 using BIMaestro.Welcome;
@@ -177,6 +179,44 @@ namespace BIMaestro.RibbonLayout
         {
             Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true });
             e.Handled = true;
+        }
+
+        private void OpenTerms_Click(object sender, RoutedEventArgs e)
+        {
+            OpenBundledDocument("ConditionsUtilisation.txt");
+        }
+
+        private void OpenPrivacyPolicy_Click(object sender, RoutedEventArgs e)
+        {
+            OpenBundledDocument("PolitiqueConfidentialite.html");
+        }
+
+        private void OpenBundledDocument(string fileName)
+        {
+            try
+            {
+                var assemblyDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                var documentPath = Path.Combine(assemblyDirectory ?? string.Empty, fileName);
+                if (!File.Exists(documentPath))
+                {
+                    MessageBox.Show(
+                        $"Le document est introuvable : {documentPath}",
+                        "BIMaestro",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                Process.Start(new ProcessStartInfo(documentPath) { UseShellExecute = true });
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show(
+                    $"Impossible d’ouvrir le document : {ex.Message}",
+                    "BIMaestro",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
         }
     }
 

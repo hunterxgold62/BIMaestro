@@ -1,0 +1,151 @@
+CONDITIONS D’UTILISATION DE BIMAESTRO
+
+Version du 23 juillet 2026
+
+IMPORTANT : LISEZ ATTENTIVEMENT LES PRÉSENTES CONDITIONS AVANT D’INSTALLER
+OU D’UTILISER BIMAESTRO.
+
+En sélectionnant « Je comprends et j’accepte les termes du contrat de
+licence » dans l’installateur, puis en installant ou en utilisant BIMaestro,
+vous acceptez les présentes conditions. Si vous ne les acceptez pas, vous
+devez annuler l’installation et ne pas utiliser le logiciel.
+
+
+1. ÉDITEUR ET CONTACT
+
+BIMaestro est édité par Paul Lemert.
+
+Site : https://www.bimaestro.fr/
+Contact : bimaestro.plugin@gmail.com
+
+BIMaestro est un projet indépendant. Il n’est ni édité, ni certifié, ni
+garanti par Autodesk, sauf indication éventuelle propre à sa publication sur
+la plateforme Autodesk.
+
+
+2. OBJET
+
+BIMaestro est une extension destinée à Autodesk Revit. Elle rassemble des
+outils d’aide à la production BIM, à la modification, à l’analyse, à l’export,
+à la gestion de familles et à l’utilisation de fonctions d’intelligence
+artificielle.
+
+Le logiciel est actuellement fourni gratuitement. Sa disponibilité, son
+contenu et son modèle de diffusion pourront évoluer dans les versions
+ultérieures.
+
+
+3. PRÉREQUIS ET UTILISATION
+
+Vous devez disposer d’une version compatible d’Autodesk Revit et des droits
+nécessaires pour installer et utiliser une extension.
+
+Vous restez responsable :
+
+- de vérifier les résultats produits par BIMaestro ;
+- de sauvegarder vos fichiers avant toute opération importante ;
+- de contrôler les modifications apportées à vos projets et familles Revit ;
+- de respecter les règles de votre entreprise et la confidentialité de vos
+  projets ;
+- de ne pas utiliser BIMaestro à des fins illégales ou portant atteinte aux
+  droits de tiers.
+
+
+4. CONNEXIONS INTERNET ET DONNÉES TECHNIQUES
+
+BIMaestro utilise des connexions internet pour assurer certains services,
+notamment :
+
+- la validation technique et la continuité du service ;
+- la mesure de l’utilisation des boutons et des erreurs afin d’identifier les
+  fonctions les plus utilisées et d’améliorer le logiciel ;
+- les fonctions d’intelligence artificielle demandées par l’utilisateur ;
+- la vérification des mises à jour ;
+- les classements des mini-jeux.
+
+L’utilisation du logiciel implique la transmission automatique de données
+techniques et d’usage. Selon la fonction utilisée, celles-ci peuvent inclure
+des identifiants techniques, les noms d’utilisateur Windows ou Revit, le nom
+de la machine, la version de Revit et de BIMaestro, le bouton utilisé, son
+résultat, le titre du document actif, le nom et le type de la vue active, ainsi
+que des informations d’erreur.
+
+Lorsque vous renseignez volontairement un profil, votre adresse électronique,
+votre prénom et votre nom peuvent également être transmis.
+
+Lorsque vous lancez une fonction d’intelligence artificielle, les textes,
+images, paramètres ou informations que vous choisissez de traiter sont
+transmis aux services nécessaires à l’exécution de la demande.
+
+Le détail des traitements, des destinataires et des durées de conservation
+figure dans la Politique de confidentialité fournie avec BIMaestro.
+
+
+5. INFORMATIONS CONFIDENTIELLES
+
+N’utilisez pas les fonctions en ligne ou d’intelligence artificielle avec des
+informations secrètes, sensibles, personnelles ou confidentielles si vous
+n’êtes pas autorisé à les transmettre aux prestataires concernés.
+
+BIMaestro ne remplace pas les procédures de sécurité, de validation et de
+confidentialité de votre entreprise.
+
+
+6. SERVICES TIERS
+
+Certains services sont fournis avec l’aide de prestataires tiers, notamment
+Supabase pour l’infrastructure en ligne et OpenAI pour certaines fonctions
+d’intelligence artificielle.
+
+Leur disponibilité, leurs performances et leurs propres conditions ne
+dépendent pas entièrement de l’éditeur de BIMaestro. Une interruption, une
+limitation ou une modification de ces services peut affecter certaines
+fonctions sans empêcher nécessairement l’utilisation des outils locaux.
+
+
+7. ABSENCE DE GARANTIE
+
+BIMaestro est fourni « en l’état », sans garantie expresse ou implicite,
+conformément à la licence MIT et dans les limites permises par la loi.
+
+L’éditeur ne garantit pas que le logiciel sera exempt d’erreurs, disponible en
+permanence ou adapté à tous les projets et à toutes les méthodes de travail.
+Vous devez vérifier les résultats avant de les utiliser dans un contexte de
+production.
+
+Les dispositions légales impératives dont vous bénéficiez éventuellement en
+tant que consommateur restent applicables.
+
+
+8. MISES À JOUR ET ÉVOLUTION
+
+BIMaestro peut rechercher l’existence de nouvelles versions. Les mises à jour
+peuvent modifier, ajouter ou retirer des fonctions, corriger des erreurs ou
+adapter la compatibilité avec Autodesk Revit et les services tiers.
+
+Une nouvelle version importante pourra demander l’acceptation de conditions
+mises à jour.
+
+
+9. FIN D’UTILISATION ET DEMANDES RELATIVES AUX DONNÉES
+
+Vous pouvez cesser d’utiliser BIMaestro en le désinstallant depuis les
+applications installées de Windows.
+
+Pour demander l’accès, la rectification ou la suppression des données
+associées à votre utilisation, écrivez à :
+
+bimaestro.plugin@gmail.com
+
+Indiquez uniquement les éléments nécessaires pour retrouver les données
+concernées. Une vérification raisonnable de votre identité pourra être
+demandée.
+
+
+10. DROIT APPLICABLE
+
+Les présentes conditions sont régies par le droit français, sous réserve des
+règles impératives applicables dans votre pays de résidence.
+
+Avant toute démarche contentieuse, vous êtes invité à contacter l’éditeur à
+bimaestro.plugin@gmail.com afin de rechercher une solution amiable.
