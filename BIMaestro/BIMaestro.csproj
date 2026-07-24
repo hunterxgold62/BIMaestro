@@ -485,6 +485,11 @@
     </Compile>
     <Compile Include="les couleurs\Changement auto des couleurs\Bouton de reset tabitem.cs" />
     <Compile Include="les couleurs\Changement auto des couleurs\ColoringStateManager.cs" />
+    <Compile Include="les couleurs\Personnalisation\ColorPreferencesWindow.xaml.cs">
+      <DependentUpon>ColorPreferencesWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="les couleurs\Personnalisation\CustomizeRibbonColorsCommand.cs" />
+    <Compile Include="les couleurs\Personnalisation\RibbonColorPreferences.cs" />
     <None Include="Test\dwg to revit\ImportDwgWallsCommand.cs" />
     <None Include="Test\popup\CommandStickmanAnimation.cs" />
     <None Include="Test\popup\StickmanAnimationWindow.xaml.cs">
@@ -503,6 +508,10 @@
       <DependentUpon>ElementRenameWindow.xaml</DependentUpon>
     </Compile>
     <Page Include="Controls\SimpleColorPicker.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="les couleurs\Personnalisation\ColorPreferencesWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>

@@ -207,25 +207,6 @@ namespace Couleur
         private static readonly SolidColorBrush _whiteBrush = Brushes.White;
         private static readonly SolidColorBrush _hoverBrush = new SolidColorBrush(Color.FromArgb(100, 255, 255, 255));
 
-        private static readonly Dictionary<string, SolidColorBrush> predefinedKeywordColors =
-            new Dictionary<string, SolidColorBrush>
-            {
-                { "Outils de Visualisation",   new SolidColorBrush(Color.FromRgb(255, 230, 230)) },
-                { "Modification",             new SolidColorBrush(Color.FromRgb(230, 255, 230)) },
-                { "Outils IA",                new SolidColorBrush(Color.FromRgb(230, 230, 255)) },
-                { "Couleur et information",        new SolidColorBrush(Color.FromRgb(230, 230, 230)) },
-                { "Panneaux réservés au test",new SolidColorBrush(Color.FromRgb(255, 255, 230)) },
-                { "Analyse",                  new SolidColorBrush(Color.FromRgb(230, 255, 255)) },
-                { "Spécifique aux familles",  new SolidColorBrush(Color.FromRgb(255, 230, 255)) }
-            };
-
-        private static readonly List<string> _targetKeywords = new List<string>
-        {
-            "Outils de Visualisation", "Modification", "Outils IA",
-            "Couleur et information", "Panneaux réservés au test",
-            "Spécifique aux familles", "Analyse"
-        };
-
         public static void ResetRandomColors() => _projectTabColors.Clear();
 
         public static void ApplyColorings(IntPtr mainWindowHandle)
@@ -351,6 +332,9 @@ namespace Couleur
         {
             var wnd = GetMainWindow(mainWindowHandle);
             if (wnd == null) return;
+            Dictionary<string, RibbonPanelColorScheme> panelColors =
+                RibbonColorPreferences.CreateSchemes();
+
             foreach (var border in FindChildrenByType<Border>(wnd))
             {
                 var dc = border.DataContext;
@@ -359,15 +343,15 @@ namespace Couleur
                 var val = prop?.GetValue(dc)?.ToString();
                 if (string.IsNullOrEmpty(val)) continue;
 
-                foreach (var kw in _targetKeywords)
+                foreach (var panelColor in panelColors)
                 {
-                    if (val.IndexOf(kw, StringComparison.OrdinalIgnoreCase) >= 0 &&
-                        predefinedKeywordColors.TryGetValue(kw, out var brush))
+                    if (val.IndexOf(panelColor.Key, StringComparison.OrdinalIgnoreCase) >= 0)
                     {
-                        border.Background = brush;
-                        border.BorderBrush = DarkenColor(brush.Color, 0.7);
+                        RibbonPanelColorScheme scheme = panelColor.Value;
+                        border.Background = scheme.CreateBackgroundBrush();
+                        border.BorderBrush = DarkenColor(scheme.BackgroundColor, 0.7);
                         border.BorderThickness = new Thickness(1);
-                        ColorTextBlocks(border, Brushes.Black);
+                        ColorTextBlocks(border, new SolidColorBrush(scheme.TextColor));
                         break;
                     }
                 }
@@ -484,7 +468,8 @@ namespace Couleur
         }
 
         private static SolidColorBrush DarkenColor(Color c, double f) =>
-            new SolidColorBrush(Color.FromRgb(
+            new SolidColorBrush(Color.FromArgb(
+                c.A,
                 (byte)(c.R * f),
                 (byte)(c.G * f),
                 (byte)(c.B * f)));
@@ -495,23 +480,13 @@ namespace Couleur
     // -----------------------------------------------------------------------
     public static class PartialColoringHelper
     {
-        private static readonly Dictionary<string, SolidColorBrush> partialTitles =
-            new Dictionary<string, SolidColorBrush>
-            {
-                { "Outils de Visualisation",   new SolidColorBrush(Color.FromRgb(255, 230, 230)) },
-                { "Modification",             new SolidColorBrush(Color.FromRgb(230, 255, 230)) },
-                { "Outils IA",                new SolidColorBrush(Color.FromRgb(230, 230, 255)) },
-                { "Analyse",                  new SolidColorBrush(Color.FromRgb(230, 255, 255)) },
-                { "Spécifique aux familles",  new SolidColorBrush(Color.FromRgb(255, 230, 255)) },
-                { "Panneaux réservés au test",new SolidColorBrush(Color.FromRgb(255, 255, 230)) },
-                { "Couleur et information",        new SolidColorBrush(Color.FromRgb(230, 230, 230)) }
-            };
-
         public static void ApplyPartialColoring(IntPtr mainWindowHandle)
         {
             if (!ColoringStateManager.IsColoringActive || ColoringStateManager.IsFullMode) return;
             var wnd = GetMainWindow(mainWindowHandle);
             if (wnd == null) return;
+            Dictionary<string, RibbonPanelColorScheme> panelColors =
+                RibbonColorPreferences.CreateSchemes();
 
             var panels = FindVisualByTypeName(wnd, "PanelTitleBar");
             foreach (var ptb in panels)
@@ -519,15 +494,16 @@ namespace Couleur
                 var prop = ptb.GetType().GetProperty("Title");
                 if (prop == null) continue;
                 var title = prop.GetValue(ptb)?.ToString();
-                if (title != null && partialTitles.TryGetValue(title, out var brush))
+                if (title != null &&
+                    panelColors.TryGetValue(title, out RibbonPanelColorScheme scheme))
                 {
                     var b = FindChildrenByType<Border>(ptb).FirstOrDefault() as Border ?? (ptb as Border);
                     if (b != null)
                     {
-                        b.Background = brush;
-                        b.BorderBrush = DarkenColor(brush.Color, 0.7);
+                        b.Background = scheme.CreateBackgroundBrush();
+                        b.BorderBrush = DarkenColor(scheme.BackgroundColor, 0.7);
                         b.BorderThickness = new Thickness(1);
-                        ColorTextBlocks(b, Brushes.Black);
+                        ColorTextBlocks(b, new SolidColorBrush(scheme.TextColor));
                     }
                 }
             }
@@ -543,7 +519,7 @@ namespace Couleur
                 var prop = ptb.GetType().GetProperty("Title");
                 if (prop == null) continue;
                 var title = prop.GetValue(ptb)?.ToString();
-                if (title != null && partialTitles.ContainsKey(title))
+                if (title != null && RibbonColorPreferences.IsKnownPanel(title))
                 {
                     var b = FindChildrenByType<Border>(ptb).FirstOrDefault() as Border ?? (ptb as Border);
                     if (b != null)
@@ -604,7 +580,8 @@ namespace Couleur
         }
 
         private static SolidColorBrush DarkenColor(Color c, double f) =>
-            new SolidColorBrush(Color.FromRgb(
+            new SolidColorBrush(Color.FromArgb(
+                c.A,
                 (byte)(c.R * f),
                 (byte)(c.G * f),
                 (byte)(c.B * f)));

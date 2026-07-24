@@ -78,7 +78,7 @@ public class AppUI : IExternalApplication
                 })),
                 new RibbonItemDefinition("GestionExcelCmd", "Gestion Excel", panel => AddPushButton(panel, "GestionExcelCmd", "Gestion\nExcel", assemblyPath, "ScheduleIO.ScheduleExcelIOCommand", "Gestion Excel.png", "Exporter ou importer une nomenclature au format Excel")),
                 new RibbonItemDefinition("PhaseQuickEditButton", "Phases rapides", panel => AddPushButton(panel, "PhaseQuickEditButton", "Phases\nrapides", assemblyPath, "Modification.PhaseQuickEditCommand", "paramétre.png", "Modifie rapidement la phase de creation et la phase de demolition des objets selectionnes.")),
-                new RibbonItemDefinition("SafeMoveButton", "Déplacement protégé", panel => AddPushButton(panel, "SafeMoveButton", "Déplacement\nprotégé", assemblyPath, "Modification.SafeMoveCommand", "Déplacement protégé.png", "Déplace précisément les objets entre deux points sans les dissocier ni les recréer.\r\nAnnule intégralement l'opération si Revit détecte une contrainte ou un risque pour une étiquette ou une cotation.")),
+                //new RibbonItemDefinition("SafeMoveButton", "Déplacement protégé", panel => AddPushButton(panel, "SafeMoveButton", "Déplacement\nprotégé", assemblyPath, "Modification.SafeMoveCommand", "Déplacement protégé.png", "Déplace précisément les objets entre deux points sans les dissocier ni les recréer.\r\nAnnule intégralement l'opération si Revit détecte une contrainte ou un risque pour une étiquette ou une cotation.")),
                 new RibbonItemDefinition("ModificationQuickTools", "Outils rapides", panel => AddStackedPushButtons(
                         panel,
                         assemblyPath,
@@ -139,6 +139,7 @@ public class AppUI : IExternalApplication
                     ("Couleur de projet", "Couleur\nOui/Non", "Couleur.ToggleCombinedColoringCommand", "Couleur oui non.png","Active ou désactive les couleurs du projet (simple ou double clic)"),
                     ("Couleur de maquette", "Couleur reset", "Couleur.ResetTabItemRandomColorsCommand", "reset.png","Réinitialise les couleurs appliquées"),
                     ("papa Noël", "papa\nNoël", "Couleur.PapanoelCommand", "papa noel.png","Fait apparaître des couleurs comme des guirlandes\nDouble clic pour revenir à la normale.\n\nAttention désactiver <couleur Oui/Non> avant activation."),
+                    ("Personnaliser les couleurs", "Palette", "Couleur.CustomizeRibbonColorsCommand", "Couleur.png","Choisit une couleur unie ou un dégradé, ainsi que la couleur du texte de chaque panneau du ruban BIMaestro."),
                     ("BIMaestro_Exemple", "Exemple", "Page.GuideCommand", "Exemple.png", "Page d'information sur le plugin"),
                 })),
 

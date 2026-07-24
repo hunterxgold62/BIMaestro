@@ -1,0 +1,192 @@
+<Window x:Class="Couleur.ColorPreferencesWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:BIMaestro.UI"
+        Title="Couleurs du ruban BIMaestro"
+        Width="1030"
+        Height="620"
+        MinWidth="900"
+        MinHeight="520"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        ShowInTaskbar="False"
+        Background="{DynamicResource App.Background}">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/BIMaestro;component/Themes/BIMaestroTheme.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+
+            <Style x:Key="PanelNameStyle" TargetType="TextBlock">
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="TextWrapping" Value="Wrap"/>
+            </Style>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0"
+                Margin="0,0,0,12"
+                Padding="16"
+                Background="{DynamicResource Brand}"
+                CornerRadius="14">
+            <StackPanel>
+                <TextBlock Style="{StaticResource H1}"
+                           Text="Personnaliser les couleurs"/>
+                <TextBlock Margin="0,6,0,0"
+                           Foreground="White"
+                           TextWrapping="Wrap"
+                           Text="Testez une couleur unie ou un dégradé horizontal, vertical ou diagonal. L’aperçu permet de vérifier immédiatement le fond et la lisibilité du texte."/>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="1" Style="{StaticResource Card}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="130"/>
+                        <ColumnDefinition Width="180"/>
+                        <ColumnDefinition Width="180"/>
+                        <ColumnDefinition Width="180"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource Hint}"
+                               FontWeight="SemiBold"
+                               Text="Aperçu du panneau"/>
+                    <TextBlock Grid.Column="1"
+                               Margin="12,0,0,0"
+                               Style="{StaticResource Hint}"
+                               FontWeight="SemiBold"
+                               Text="Mode"/>
+                    <TextBlock Grid.Column="2"
+                               Margin="12,0,0,0"
+                               Style="{StaticResource Hint}"
+                               FontWeight="SemiBold"
+                               Text="Couleur de départ"/>
+                    <TextBlock Grid.Column="3"
+                               Margin="12,0,0,0"
+                               Style="{StaticResource Hint}"
+                               FontWeight="SemiBold"
+                               Text="Couleur d’arrivée"/>
+                    <TextBlock Grid.Column="4"
+                               Margin="12,0,0,0"
+                               Style="{StaticResource Hint}"
+                               FontWeight="SemiBold"
+                               Text="Couleur du texte"/>
+                </Grid>
+
+                <ScrollViewer Grid.Row="1"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <ItemsControl ItemsSource="{Binding PanelColors}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Padding="0,9"
+                                        BorderBrush="{DynamicResource Divider}"
+                                        BorderThickness="0,0,0,1">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="130"/>
+                                            <ColumnDefinition Width="180"/>
+                                            <ColumnDefinition Width="180"/>
+                                            <ColumnDefinition Width="180"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <Border Margin="0,0,10,0"
+                                                Padding="10,5"
+                                                Background="{Binding BackgroundBrush}"
+                                                BorderBrush="#66000000"
+                                                BorderThickness="1"
+                                                CornerRadius="4">
+                                            <TextBlock Style="{StaticResource PanelNameStyle}"
+                                                       Foreground="{Binding TextBrush}"
+                                                       Text="{Binding PanelName}"/>
+                                        </Border>
+
+                                        <ComboBox Grid.Column="1"
+                                                  Height="30"
+                                                  Margin="12,0,0,0"
+                                                  VerticalContentAlignment="Center"
+                                                  ItemsSource="{Binding BackgroundModes}"
+                                                  SelectedItem="{Binding BackgroundMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                  ToolTip="Uni, horizontal, vertical ou diagonal"/>
+
+                                        <ui:SimpleColorPicker Grid.Column="2"
+                                                              Margin="12,0,0,0"
+                                                              MinWidth="160"
+                                                              HorizontalAlignment="Stretch"
+                                                              SelectedColor="{Binding BackgroundColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                        <ui:SimpleColorPicker Grid.Column="3"
+                                                              Margin="12,0,0,0"
+                                                              MinWidth="160"
+                                                              HorizontalAlignment="Stretch"
+                                                              IsEnabled="{Binding IsGradient}"
+                                                              ToolTip="Disponible lorsque le mode dégradé est activé"
+                                                              SelectedColor="{Binding BackgroundEndColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                        <ui:SimpleColorPicker Grid.Column="4"
+                                                              Margin="12,0,0,0"
+                                                              MinWidth="160"
+                                                              HorizontalAlignment="Stretch"
+                                                              SelectedColor="{Binding TextColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <StackPanel Grid.Row="2" Margin="0,12,0,0">
+                    <TextBlock Style="{StaticResource Hint}"
+                               Text="{Binding PreferenceFilePath}"
+                               TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding PreferenceFilePath}"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="2" Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <Button Grid.Column="0"
+                    MinWidth="150"
+                    Style="{StaticResource SecondaryButton}"
+                    Content="Valeurs par défaut"
+                    Click="ResetDefaultsButton_Click"/>
+
+            <Button Grid.Column="2"
+                    Margin="0,0,8,0"
+                    MinWidth="100"
+                    Style="{StaticResource SecondaryButton}"
+                    Content="Annuler"
+                    IsCancel="True"/>
+
+            <Button Grid.Column="3"
+                    MinWidth="150"
+                    Style="{StaticResource PrimaryButton}"
+                    Content="Enregistrer"
+                    IsDefault="True"
+                    Click="SaveButton_Click"/>
+        </Grid>
+    </Grid>
+</Window>
