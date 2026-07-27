@@ -211,44 +211,34 @@
                                     BorderBrush="{DynamicResource Border}"
                                     BorderThickness="1"
                                     CornerRadius="10"
-                                    Padding="10"
+                                    Padding="14"
                                     Margin="0,12,0,0">
                                 <StackPanel>
-                                    <TextBlock FontWeight="SemiBold" Text="Contact"/>
-                                    <TextBlock Margin="0,6,0,0">
+                                    <TextBlock FontWeight="SemiBold"
+                                               FontSize="15"
+                                               Text="Une question, un bug ou une idée ?"/>
+                                    <TextBlock Style="{StaticResource Hint}"
+                                               Margin="0,8,0,0"
+                                               TextWrapping="Wrap"
+                                               Text="BIMaestro est développé par une seule personne. Tes retours m’aident énormément à repérer ce qui ne fonctionne pas, à améliorer les outils existants et à choisir les prochaines évolutions."/>
+                                    <TextBlock Style="{StaticResource Hint}"
+                                               Margin="0,8,0,0"
+                                               TextWrapping="Wrap"
+                                               Text="Même un message rapide peut faire la différence, alors n’hésite pas à me contacter :"/>
+                                    <TextBlock Margin="0,12,0,0">
                                         <Run Text="LinkedIn : "/>
                                         <Hyperlink NavigateUri="https://www.linkedin.com/in/paul-lemert-b40921207"
                                                    RequestNavigate="OnRequestNavigate">
                                             <Run Text="Paul Lemert"/>
                                         </Hyperlink>
                                     </TextBlock>
-                                    <TextBlock Style="{StaticResource Hint}"
-                                               Margin="0,6,0,0"
-                                               Text="Bouton qui marche mal, commande pas claire, idée d'amélioration : envoie-moi un message ici."/>
-                                </StackPanel>
-                            </Border>
-
-                            <Border Background="{DynamicResource Surface.Subtle}"
-                                    BorderBrush="{DynamicResource Border}"
-                                    BorderThickness="1"
-                                    CornerRadius="10"
-                                    Padding="10"
-                                    Margin="0,12,0,0">
-                                <StackPanel>
-                                    <TextBlock FontWeight="SemiBold" Text="Informations légales et confidentialité"/>
-                                    <TextBlock Style="{StaticResource Hint}"
-                                               Margin="0,6,0,10"
-                                               TextWrapping="Wrap"
-                                               Text="Consultez les conditions d’utilisation et le détail des données techniques traitées par BIMaestro."/>
-                                    <StackPanel Orientation="Horizontal">
-                                        <Button Style="{StaticResource SecondaryButton}"
-                                                Content="Conditions d’utilisation"
-                                                Margin="0,0,8,0"
-                                                Click="OpenTerms_Click"/>
-                                        <Button Style="{StaticResource SecondaryButton}"
-                                                Content="Politique de confidentialité"
-                                                Click="OpenPrivacyPolicy_Click"/>
-                                    </StackPanel>
+                                    <TextBlock Margin="0,6,0,0">
+                                        <Run Text="E-mail : "/>
+                                        <Hyperlink NavigateUri="mailto:bimaestro.plugin@gmail.com"
+                                                   RequestNavigate="OnRequestNavigate">
+                                            <Run Text="bimaestro.plugin@gmail.com"/>
+                                        </Hyperlink>
+                                    </TextBlock>
                                 </StackPanel>
                             </Border>
                         </StackPanel>

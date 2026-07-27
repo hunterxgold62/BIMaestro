@@ -139,7 +139,7 @@ public class AppUI : IExternalApplication
                     ("Couleur de projet", "Couleur\nOui/Non", "Couleur.ToggleCombinedColoringCommand", "Couleur oui non.png","Active ou désactive les couleurs du projet (simple ou double clic)"),
                     ("Couleur de maquette", "Couleur reset", "Couleur.ResetTabItemRandomColorsCommand", "reset.png","Réinitialise les couleurs appliquées"),
                     ("papa Noël", "papa\nNoël", "Couleur.PapanoelCommand", "papa noel.png","Fait apparaître des couleurs comme des guirlandes\nDouble clic pour revenir à la normale.\n\nAttention désactiver <couleur Oui/Non> avant activation."),
-                    ("Personnaliser les couleurs", "Palette", "Couleur.CustomizeRibbonColorsCommand", "Couleur.png","Choisit une couleur unie ou un dégradé, ainsi que la couleur du texte de chaque panneau du ruban BIMaestro."),
+                    ("Personnaliser les couleurs", "Palette", "Couleur.CustomizeRibbonColorsCommand", "Couleur.png","Choisit une couleur unie, un dégradé ou un thème prédéfini, ainsi que la couleur du texte de chaque panneau du ruban BIMaestro."),
                     ("BIMaestro_Exemple", "Exemple", "Page.GuideCommand", "Exemple.png", "Page d'information sur le plugin"),
                 })),
 

@@ -289,6 +289,11 @@ namespace Modification
                    || source == ReservationAutoV3Window.PipeSource.LienRVT;
         }
 
+        private static bool CanCreateReservationWithoutHost(FamilySymbol symbol)
+        {
+            return symbol?.Family?.FamilyPlacementType == FamilyPlacementType.OneLevelBased;
+        }
+
         private void RunManual(UIDocument uiDoc, Document doc,
             ReservationAutoV3Window win,
             ReservationAutoV3Config cfg,
@@ -324,6 +329,16 @@ namespace Modification
 
                 if (useLinkedHost)
                 {
+                    if (!CanCreateReservationWithoutHost(reservationSymbol))
+                    {
+                        TaskDialog.Show(
+                            "Famille sans hôte requise",
+                            $"Le {(isWall ? "mur" : "sol")} sera sélectionné dans une maquette liée.\n\n" +
+                            $"La famille « {reservationSymbol.Family.Name} » est une famille avec hôte et ne peut pas être créée dans ce cas.\n\n" +
+                            "Relance la commande et choisis une famille sans hôte.");
+                        break;
+                    }
+
                     var linkedHost = PickLinkedHostCandidate(
                         uiDoc,
                         doc,

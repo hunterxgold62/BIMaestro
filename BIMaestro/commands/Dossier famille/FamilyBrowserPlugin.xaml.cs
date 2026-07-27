@@ -2278,9 +2278,11 @@ namespace Famille
                 }
             }
 
-            if (fam.DocumentationLinks.Count == 1)
+            // Le badge ouvre directement l'unique document. Le menu contextuel
+            // reste une vraie fenêtre de gestion, même lorsqu'il n'y en a qu'un.
+            if (fam.DocumentationLinks.Count == 1 && !allowPrompt)
             {
-                OpenDocument(fam.DocumentationLinks[0]);
+                OpenDocument(fam, fam.DocumentationLinks[0]);
                 return;
             }
 
@@ -2458,11 +2460,6 @@ namespace Famille
 
             var snapshot = fam.DocumentationLinks.Select(l => l.Clone()).ToList();
 
-            lock (_documentationLock)
-            {
-                _documentationCache[fam.Path] = snapshot.Select(l => l.Clone()).ToList();
-            }
-
             var docFile = GetDocumentationFilePath(fam.Path);
             if (string.IsNullOrWhiteSpace(docFile))
                 return false;
@@ -2479,6 +2476,11 @@ namespace Famille
                     var payload = new FamilyDocumentationPayload { Documents = snapshot };
                     var json = JsonConvert.SerializeObject(payload, Formatting.Indented);
                     File.WriteAllText(docFile, json, Encoding.UTF8);
+                }
+
+                lock (_documentationLock)
+                {
+                    _documentationCache[fam.Path] = snapshot.Select(l => l.Clone()).ToList();
                 }
 
                 return true;
@@ -2614,7 +2616,65 @@ namespace Famille
                 }
             };
 
+            var changePathButton = new Button
+            {
+                Content = "Modifier le chemin...",
+                MinWidth = 140,
+                Margin = new Thickness(8, 0, 0, 0),
+                IsEnabled = false
+            };
+            changePathButton.Click += (_, __) =>
+            {
+                if (listBox.SelectedItems.Count != 1)
+                    return;
+
+                var selected = (FamilyDocumentLink)listBox.SelectedItem;
+                if (RelocateDocument(fam, selected, dialog))
+                {
+                    listBox.Items.Refresh();
+                    listBox.SelectedItem = selected;
+                }
+            };
+
+            var removeButton = new Button
+            {
+                Content = "Supprimer le lien",
+                MinWidth = 125,
+                Margin = new Thickness(8, 0, 0, 0),
+                IsEnabled = false
+            };
+            removeButton.Click += (_, __) =>
+            {
+                var linksToRemove = listBox.SelectedItems.Cast<FamilyDocumentLink>().ToList();
+                if (linksToRemove.Count == 0)
+                    return;
+
+                string subject = linksToRemove.Count == 1
+                    ? $"le lien vers « {linksToRemove[0].DisplayName} »"
+                    : $"ces {linksToRemove.Count} liens";
+
+                var answer = MessageBox.Show(dialog,
+                    $"Voulez-vous supprimer {subject} ?\n\nLes fichiers eux-mêmes ne seront pas supprimés.",
+                    "Documentation",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (answer == MessageBoxResult.Yes &&
+                    RemoveDocumentationLinks(fam, linksToRemove))
+                {
+                    listBox.Items.Refresh();
+                }
+            };
+
+            listBox.SelectionChanged += (_, __) =>
+            {
+                changePathButton.IsEnabled = listBox.SelectedItems.Count == 1;
+                removeButton.IsEnabled = listBox.SelectedItems.Count > 0;
+            };
+
             buttonsPanel.Children.Add(addButton);
+            buttonsPanel.Children.Add(changePathButton);
+            buttonsPanel.Children.Add(removeButton);
             buttonsPanel.Children.Add(openAllButton);
             buttonsPanel.Children.Add(openSelectedButton);
             buttonsPanel.Children.Add(closeButton);
@@ -2625,22 +2685,192 @@ namespace Famille
             {
                 if (openAll)
                 {
-                    foreach (var link in fam.DocumentationLinks)
+                    // Une action "Supprimer le lien" peut modifier la collection
+                    // pendant l'ouverture d'un document introuvable.
+                    foreach (var link in fam.DocumentationLinks.ToList())
                     {
-                        OpenDocument(link);
+                        OpenDocument(fam, link);
                     }
                 }
                 else if (selectedLinks != null)
                 {
                     foreach (var link in selectedLinks)
                     {
-                        OpenDocument(link);
+                        OpenDocument(fam, link);
                     }
                 }
             }
         }
 
-        private void OpenDocument(FamilyDocumentLink link)
+        private bool RelocateDocument(FamilyItem fam, FamilyDocumentLink link, Window owner)
+        {
+            if (fam == null || link == null)
+                return false;
+
+            string oldPath = link.FilePath;
+            string oldLabel = link.Label;
+            string oldType = link.Type;
+
+            var dialog = new OpenFileDialog
+            {
+                Title = $"Rechercher « {link.DisplayName} »",
+                Filter = "Tous les fichiers|*.*",
+                Multiselect = false,
+                CheckFileExists = true,
+                CheckPathExists = true,
+                FileName = link.DisplayName
+            };
+
+            try
+            {
+                var oldDirectory = System.IO.Path.GetDirectoryName(oldPath);
+                var familyDirectory = System.IO.Path.GetDirectoryName(fam.Path);
+                if (!string.IsNullOrWhiteSpace(oldDirectory) && Directory.Exists(oldDirectory))
+                    dialog.InitialDirectory = oldDirectory;
+                else if (!string.IsNullOrWhiteSpace(familyDirectory) && Directory.Exists(familyDirectory))
+                    dialog.InitialDirectory = familyDirectory;
+            }
+            catch
+            {
+                // Le sélecteur s'ouvrira dans son dossier par défaut.
+            }
+
+            if (dialog.ShowDialog(owner ?? this) != true || string.IsNullOrWhiteSpace(dialog.FileName))
+                return false;
+
+            string newPath = dialog.FileName.Trim();
+            link.FilePath = newPath;
+            link.Label = System.IO.Path.GetFileName(newPath);
+            link.Type = System.IO.Path.GetExtension(newPath)?.TrimStart('.')?.ToUpperInvariant();
+            SortDocumentationLinks(fam);
+
+            if (PersistDocumentation(fam))
+                return true;
+
+            link.FilePath = oldPath;
+            link.Label = oldLabel;
+            link.Type = oldType;
+            SortDocumentationLinks(fam);
+            return false;
+        }
+
+        private bool RemoveDocumentationLinks(FamilyItem fam, IEnumerable<FamilyDocumentLink> links)
+        {
+            if (fam?.DocumentationLinks == null || links == null)
+                return false;
+
+            var previous = fam.DocumentationLinks.Select(l => l.Clone()).ToList();
+            var targets = new HashSet<FamilyDocumentLink>(links);
+            bool removed = false;
+
+            foreach (var link in fam.DocumentationLinks.ToList())
+            {
+                if (targets.Contains(link))
+                {
+                    fam.DocumentationLinks.Remove(link);
+                    removed = true;
+                }
+            }
+
+            if (!removed)
+                return false;
+
+            if (PersistDocumentation(fam))
+                return true;
+
+            fam.DocumentationLinks.Clear();
+            foreach (var link in previous)
+                fam.DocumentationLinks.Add(link);
+            return false;
+        }
+
+        private enum MissingDocumentAction
+        {
+            Cancel,
+            Relocate,
+            Remove,
+            Manage
+        }
+
+        private MissingDocumentAction ShowMissingDocumentDialog(FamilyDocumentLink link, string expandedPath)
+        {
+            var dialog = new Window
+            {
+                Title = "Document introuvable",
+                Owner = this,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                ResizeMode = ResizeMode.NoResize,
+                SizeToContent = SizeToContent.WidthAndHeight,
+                MaxWidth = 720,
+                ShowInTaskbar = false
+            };
+
+            var root = new StackPanel { Margin = new Thickness(18), MaxWidth = 680 };
+            root.Children.Add(new TextBlock
+            {
+                Text = $"Le document « {link.DisplayName} » est introuvable.",
+                FontWeight = FontWeights.SemiBold,
+                FontSize = 14,
+                TextWrapping = TextWrapping.Wrap
+            });
+            root.Children.Add(new TextBlock
+            {
+                Text = expandedPath,
+                Margin = new Thickness(0, 10, 0, 0),
+                Foreground = Brushes.DimGray,
+                TextWrapping = TextWrapping.Wrap
+            });
+            root.Children.Add(new TextBlock
+            {
+                Text = "Voulez-vous rechercher son nouvel emplacement, supprimer le lien ou gérer les documents associés ?",
+                Margin = new Thickness(0, 14, 0, 0),
+                TextWrapping = TextWrapping.Wrap
+            });
+
+            var buttons = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 18, 0, 0)
+            };
+
+            MissingDocumentAction action = MissingDocumentAction.Cancel;
+            void AddActionButton(string label, MissingDocumentAction buttonAction, bool isDefault = false)
+            {
+                var button = new Button
+                {
+                    Content = label,
+                    MinWidth = 105,
+                    Margin = new Thickness(8, 0, 0, 0),
+                    IsDefault = isDefault
+                };
+                button.Click += (_, __) =>
+                {
+                    action = buttonAction;
+                    dialog.DialogResult = true;
+                };
+                buttons.Children.Add(button);
+            }
+
+            AddActionButton("Rechercher...", MissingDocumentAction.Relocate, isDefault: true);
+            AddActionButton("Supprimer le lien", MissingDocumentAction.Remove);
+            AddActionButton("Gérer les documents", MissingDocumentAction.Manage);
+
+            var cancelButton = new Button
+            {
+                Content = "Annuler",
+                MinWidth = 90,
+                Margin = new Thickness(8, 0, 0, 0),
+                IsCancel = true
+            };
+            buttons.Children.Add(cancelButton);
+            root.Children.Add(buttons);
+            dialog.Content = root;
+            dialog.ShowDialog();
+            return action;
+        }
+
+        private void OpenDocument(FamilyItem fam, FamilyDocumentLink link)
         {
             if (link == null)
                 return;
@@ -2671,11 +2901,20 @@ namespace Famille
 
             if (!isUrl && !File.Exists(expanded) && !Directory.Exists(expanded))
             {
-                MessageBox.Show(this,
-                    $"Le document \"{link.DisplayName}\" est introuvable :\n{expanded}",
-                    "Documentation",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                var action = ShowMissingDocumentDialog(link, expanded);
+                if (action == MissingDocumentAction.Relocate)
+                {
+                    if (RelocateDocument(fam, link, this))
+                        OpenDocument(fam, link);
+                }
+                else if (action == MissingDocumentAction.Remove)
+                {
+                    RemoveDocumentationLinks(fam, new[] { link });
+                }
+                else if (action == MissingDocumentAction.Manage)
+                {
+                    ShowDocumentationPicker(fam);
+                }
                 return;
             }
 

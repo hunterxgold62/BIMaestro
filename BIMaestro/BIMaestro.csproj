@@ -489,6 +489,11 @@
       <DependentUpon>ColorPreferencesWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="les couleurs\Personnalisation\CustomizeRibbonColorsCommand.cs" />
+    <Compile Include="les couleurs\Personnalisation\RevitColorPreferencesWindow.xaml.cs">
+      <DependentUpon>RevitColorPreferencesWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="les couleurs\Personnalisation\RevitRibbonCustomization.cs" />
+    <Compile Include="les couleurs\Personnalisation\RibbonColorPresetCatalog.cs" />
     <Compile Include="les couleurs\Personnalisation\RibbonColorPreferences.cs" />
     <None Include="Test\dwg to revit\ImportDwgWallsCommand.cs" />
     <None Include="Test\popup\CommandStickmanAnimation.cs" />
@@ -512,6 +517,10 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Include="les couleurs\Personnalisation\ColorPreferencesWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="les couleurs\Personnalisation\RevitColorPreferencesWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>

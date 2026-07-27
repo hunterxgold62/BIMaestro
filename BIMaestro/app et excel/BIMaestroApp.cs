@@ -24,6 +24,14 @@ public class BIMaestroApp : IExternalApplication
     private UIApplication _uiApp;
     private bool _hasResetWhenOff = false;
     private bool _hasShownTimeTrackingError = false;
+    private string _lastRibbonTabTitle;
+    private DateTime _nextRibbonInspectionUtc = DateTime.MinValue;
+    private DateTime _lastRibbonApplyUtc = DateTime.MinValue;
+
+    private static readonly TimeSpan RibbonInspectionInterval =
+        TimeSpan.FromMilliseconds(250);
+    private static readonly TimeSpan RibbonSafetyRefreshInterval =
+        TimeSpan.FromSeconds(30);
 
     private static readonly string LogDirectory =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs");
@@ -177,16 +185,14 @@ public class BIMaestroApp : IExternalApplication
                     Couleur.CombinedColoringApplication.ResetColorings(_uiApp.MainWindowHandle);
                     Couleur.PartialColoringHelper.ResetPartialColoring(_uiApp.MainWindowHandle);
                     _hasResetWhenOff = true;
+                    _lastRibbonTabTitle = null;
+                    _lastRibbonApplyUtc = DateTime.MinValue;
                 }
             }
             else
             {
                 _hasResetWhenOff = false;
-                Couleur.CombinedColoringApplication.ApplyTabItemColoring(_uiApp.MainWindowHandle);
-                if (Couleur.ColoringStateManager.IsFullMode)
-                    Couleur.CombinedColoringApplication.ApplyPapanoelColoring(_uiApp.MainWindowHandle);
-                else
-                    Couleur.PartialColoringHelper.ApplyPartialColoring(_uiApp.MainWindowHandle);
+                RefreshRibbonColorsWhenNeeded();
             }
 
             ExcelLogger.OnIdling(_uiApp);
@@ -196,6 +202,43 @@ public class BIMaestroApp : IExternalApplication
         {
             AppendLog($"OnIdling : {ex.Message}\n{ex.StackTrace}");
         }
+    }
+
+    private void RefreshRibbonColorsWhenNeeded()
+    {
+        DateTime now = DateTime.UtcNow;
+        if (now < _nextRibbonInspectionUtc)
+            return;
+
+        _nextRibbonInspectionUtc = now + RibbonInspectionInterval;
+        string activeTabTitle =
+            Couleur.RevitRibbonCatalog.GetActiveTabTitle() ?? string.Empty;
+        bool tabChanged = !string.Equals(
+            activeTabTitle,
+            _lastRibbonTabTitle,
+            StringComparison.OrdinalIgnoreCase);
+        bool safetyRefreshDue =
+            now - _lastRibbonApplyUtc >= RibbonSafetyRefreshInterval;
+
+        if (!tabChanged && !safetyRefreshDue)
+            return;
+
+        Couleur.CombinedColoringApplication.ApplyTabItemColoring(
+            _uiApp.MainWindowHandle);
+        if (Couleur.ColoringStateManager.IsFullMode)
+        {
+            Couleur.CombinedColoringApplication.ApplyPapanoelColoring(
+                _uiApp.MainWindowHandle);
+        }
+        else
+        {
+            Couleur.PartialColoringHelper.ApplyPartialColoring(
+                _uiApp.MainWindowHandle);
+        }
+
+        Couleur.RevitRibbonGlobalColoring.Apply(_uiApp.MainWindowHandle);
+        _lastRibbonTabTitle = activeTabTitle;
+        _lastRibbonApplyUtc = now;
     }
 
     private void OnViewActivatedSafe(object sender, ViewActivatedEventArgs args)

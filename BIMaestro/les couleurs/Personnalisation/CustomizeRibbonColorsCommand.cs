@@ -21,7 +21,8 @@ namespace Couleur
             {
                 ColoringStateManager.LoadState();
 
-                var window = new ColorPreferencesWindow();
+                var window = new ColorPreferencesWindow(
+                    data.Application.MainWindowHandle);
                 new WindowInteropHelper(window)
                 {
                     Owner = data.Application.MainWindowHandle
@@ -53,6 +54,8 @@ namespace Couleur
                 CombinedColoringApplication.ApplyPapanoelColoring(mainWindowHandle);
             else
                 PartialColoringHelper.ApplyPartialColoring(mainWindowHandle);
+
+            RevitRibbonGlobalColoring.Apply(mainWindowHandle);
         }
     }
 }

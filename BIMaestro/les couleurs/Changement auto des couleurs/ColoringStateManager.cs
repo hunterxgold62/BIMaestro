@@ -218,6 +218,7 @@ namespace Couleur
 
         public static void ResetColorings(IntPtr mainWindowHandle)
         {
+            RevitRibbonGlobalColoring.Reset();
             ResetTabItemColoring(mainWindowHandle);
             ResetPapanoelColoring(mainWindowHandle);
             ResetBIMaestroTab();  // stop watcher + clear
@@ -335,6 +336,7 @@ namespace Couleur
             Dictionary<string, RibbonPanelColorScheme> panelColors =
                 RibbonColorPreferences.CreateSchemes();
 
+            var targets = new List<(Border Border, RibbonPanelColorScheme Scheme)>();
             foreach (var border in FindChildrenByType<Border>(wnd))
             {
                 var dc = border.DataContext;
@@ -347,13 +349,65 @@ namespace Couleur
                 {
                     if (val.IndexOf(panelColor.Key, StringComparison.OrdinalIgnoreCase) >= 0)
                     {
-                        RibbonPanelColorScheme scheme = panelColor.Value;
-                        border.Background = scheme.CreateBackgroundBrush();
-                        border.BorderBrush = DarkenColor(scheme.BackgroundColor, 0.7);
-                        border.BorderThickness = new Thickness(1);
-                        ColorTextBlocks(border, new SolidColorBrush(scheme.TextColor));
+                        targets.Add((border, panelColor.Value));
                         break;
                     }
+                }
+            }
+
+            double ribbonLeft = double.MaxValue;
+            double ribbonRight = double.MinValue;
+            foreach (var target in targets)
+            {
+                if (target.Scheme.BackgroundPattern !=
+                    RibbonBackgroundPattern.FrenchFlagContinuous)
+                {
+                    continue;
+                }
+
+                if (TryGetHorizontalRange(target.Border, wnd, out double left, out double right))
+                {
+                    ribbonLeft = Math.Min(ribbonLeft, left);
+                    ribbonRight = Math.Max(ribbonRight, right);
+                }
+            }
+
+            bool hasContinuousRange =
+                ribbonLeft < ribbonRight && ribbonLeft != double.MaxValue;
+
+            foreach (var target in targets)
+            {
+                Brush background = target.Scheme.CreateBackgroundBrush();
+                if (hasContinuousRange &&
+                    target.Scheme.BackgroundPattern ==
+                    RibbonBackgroundPattern.FrenchFlagContinuous &&
+                    TryGetHorizontalRange(target.Border, wnd, out double left, out double right))
+                {
+                    double totalWidth = ribbonRight - ribbonLeft;
+                    background = target.Scheme.CreateBackgroundBrush(
+                        (left - ribbonLeft) / totalWidth,
+                        (right - ribbonLeft) / totalWidth);
+                }
+
+                target.Border.Background = background;
+                target.Border.BorderBrush =
+                    DarkenBackgroundBrush(background, target.Scheme.BackgroundColor);
+                target.Border.BorderThickness = new Thickness(1);
+                if (hasContinuousRange &&
+                    target.Scheme.BackgroundPattern ==
+                    RibbonBackgroundPattern.FrenchFlagContinuous)
+                {
+                    ColorContinuousFlagTextBlocks(
+                        target.Border,
+                        wnd,
+                        ribbonLeft,
+                        ribbonRight);
+                }
+                else
+                {
+                    ColorTextBlocks(
+                        target.Border,
+                        new SolidColorBrush(target.Scheme.TextColor));
                 }
             }
         }
@@ -455,10 +509,58 @@ namespace Couleur
             return res;
         }
 
+        private static bool TryGetHorizontalRange(
+            FrameworkElement element,
+            Visual ancestor,
+            out double left,
+            out double right)
+        {
+            left = 0;
+            right = 0;
+
+            try
+            {
+                if (element == null || ancestor == null || element.ActualWidth <= 0)
+                    return false;
+
+                var transform = element.TransformToAncestor(ancestor);
+                left = transform.Transform(new System.Windows.Point(0, 0)).X;
+                right = left + element.ActualWidth;
+                return right > left;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private static void ColorTextBlocks(DependencyObject parent, Brush color)
         {
             foreach (var tb in FindChildrenByType<TextBlock>(parent))
                 tb.Foreground = color;
+        }
+
+        private static void ColorContinuousFlagTextBlocks(
+            DependencyObject parent,
+            Visual ancestor,
+            double ribbonLeft,
+            double ribbonRight)
+        {
+            double totalWidth = ribbonRight - ribbonLeft;
+            if (totalWidth <= 0)
+                return;
+
+            foreach (var textBlock in FindChildrenByType<TextBlock>(parent))
+            {
+                if (!TryGetHorizontalRange(textBlock, ancestor, out double left, out double right))
+                    continue;
+
+                double center = ((left + right) / 2 - ribbonLeft) / totalWidth;
+                textBlock.Foreground =
+                    center < 1.0 / 3.0 || center >= 2.0 / 3.0
+                        ? Brushes.White
+                        : Brushes.Black;
+            }
         }
 
         private static void ClearTextBlocks(DependencyObject parent)
@@ -473,6 +575,25 @@ namespace Couleur
                 (byte)(c.R * f),
                 (byte)(c.G * f),
                 (byte)(c.B * f)));
+
+        private static SolidColorBrush DarkenBackgroundBrush(Brush brush, Color fallback)
+        {
+            Color color = fallback;
+            if (brush is SolidColorBrush solid)
+            {
+                color = solid.Color;
+            }
+            else if (brush is LinearGradientBrush gradient &&
+                     gradient.GradientStops.Count > 0)
+            {
+                color = gradient.GradientStops
+                    .OrderBy(stop => Math.Abs(stop.Offset - 0.5))
+                    .First()
+                    .Color;
+            }
+
+            return DarkenColor(color, 0.7);
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -489,6 +610,8 @@ namespace Couleur
                 RibbonColorPreferences.CreateSchemes();
 
             var panels = FindVisualByTypeName(wnd, "PanelTitleBar");
+            var targets =
+                new List<(FrameworkElement Panel, Border Border, RibbonPanelColorScheme Scheme)>();
             foreach (var ptb in panels)
             {
                 var prop = ptb.GetType().GetProperty("Title");
@@ -499,12 +622,63 @@ namespace Couleur
                 {
                     var b = FindChildrenByType<Border>(ptb).FirstOrDefault() as Border ?? (ptb as Border);
                     if (b != null)
-                    {
-                        b.Background = scheme.CreateBackgroundBrush();
-                        b.BorderBrush = DarkenColor(scheme.BackgroundColor, 0.7);
-                        b.BorderThickness = new Thickness(1);
-                        ColorTextBlocks(b, new SolidColorBrush(scheme.TextColor));
-                    }
+                        targets.Add((ptb, b, scheme));
+                }
+            }
+
+            double ribbonLeft = double.MaxValue;
+            double ribbonRight = double.MinValue;
+            foreach (var target in targets)
+            {
+                if (target.Scheme.BackgroundPattern !=
+                    RibbonBackgroundPattern.FrenchFlagContinuous)
+                {
+                    continue;
+                }
+
+                if (TryGetHorizontalRange(target.Panel, wnd, out double left, out double right))
+                {
+                    ribbonLeft = Math.Min(ribbonLeft, left);
+                    ribbonRight = Math.Max(ribbonRight, right);
+                }
+            }
+
+            bool hasContinuousRange =
+                ribbonLeft < ribbonRight && ribbonLeft != double.MaxValue;
+
+            foreach (var target in targets)
+            {
+                Brush background = target.Scheme.CreateBackgroundBrush();
+                if (hasContinuousRange &&
+                    target.Scheme.BackgroundPattern ==
+                    RibbonBackgroundPattern.FrenchFlagContinuous &&
+                    TryGetHorizontalRange(target.Panel, wnd, out double left, out double right))
+                {
+                    double totalWidth = ribbonRight - ribbonLeft;
+                    background = target.Scheme.CreateBackgroundBrush(
+                        (left - ribbonLeft) / totalWidth,
+                        (right - ribbonLeft) / totalWidth);
+                }
+
+                target.Border.Background = background;
+                target.Border.BorderBrush =
+                    DarkenBackgroundBrush(background, target.Scheme.BackgroundColor);
+                target.Border.BorderThickness = new Thickness(1);
+                if (hasContinuousRange &&
+                    target.Scheme.BackgroundPattern ==
+                    RibbonBackgroundPattern.FrenchFlagContinuous)
+                {
+                    ColorContinuousFlagTextBlocks(
+                        target.Border,
+                        wnd,
+                        ribbonLeft,
+                        ribbonRight);
+                }
+                else
+                {
+                    ColorTextBlocks(
+                        target.Border,
+                        new SolidColorBrush(target.Scheme.TextColor));
                 }
             }
         }
@@ -567,10 +741,58 @@ namespace Couleur
             return list;
         }
 
+        private static bool TryGetHorizontalRange(
+            FrameworkElement element,
+            Visual ancestor,
+            out double left,
+            out double right)
+        {
+            left = 0;
+            right = 0;
+
+            try
+            {
+                if (element == null || ancestor == null || element.ActualWidth <= 0)
+                    return false;
+
+                var transform = element.TransformToAncestor(ancestor);
+                left = transform.Transform(new System.Windows.Point(0, 0)).X;
+                right = left + element.ActualWidth;
+                return right > left;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private static void ColorTextBlocks(DependencyObject p, Brush color)
         {
             foreach (var tb in FindChildrenByType<TextBlock>(p))
                 tb.Foreground = color;
+        }
+
+        private static void ColorContinuousFlagTextBlocks(
+            DependencyObject parent,
+            Visual ancestor,
+            double ribbonLeft,
+            double ribbonRight)
+        {
+            double totalWidth = ribbonRight - ribbonLeft;
+            if (totalWidth <= 0)
+                return;
+
+            foreach (var textBlock in FindChildrenByType<TextBlock>(parent))
+            {
+                if (!TryGetHorizontalRange(textBlock, ancestor, out double left, out double right))
+                    continue;
+
+                double center = ((left + right) / 2 - ribbonLeft) / totalWidth;
+                textBlock.Foreground =
+                    center < 1.0 / 3.0 || center >= 2.0 / 3.0
+                        ? Brushes.White
+                        : Brushes.Black;
+            }
         }
 
         private static void ClearTextBlocks(DependencyObject p)
@@ -585,5 +807,24 @@ namespace Couleur
                 (byte)(c.R * f),
                 (byte)(c.G * f),
                 (byte)(c.B * f)));
+
+        private static SolidColorBrush DarkenBackgroundBrush(Brush brush, Color fallback)
+        {
+            Color color = fallback;
+            if (brush is SolidColorBrush solid)
+            {
+                color = solid.Color;
+            }
+            else if (brush is LinearGradientBrush gradient &&
+                     gradient.GradientStops.Count > 0)
+            {
+                color = gradient.GradientStops
+                    .OrderBy(stop => Math.Abs(stop.Offset - 0.5))
+                    .First()
+                    .Color;
+            }
+
+            return DarkenColor(color, 0.7);
+        }
     }
 }

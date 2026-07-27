@@ -10,20 +10,46 @@ namespace Couleur
 {
     public partial class ColorPreferencesWindow : Window
     {
-        public ColorPreferencesWindow()
+        private readonly System.IntPtr _mainWindowHandle;
+        private string _selectedPresetName;
+
+        public ColorPreferencesWindow(System.IntPtr mainWindowHandle)
         {
             ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
 
+            _mainWindowHandle = mainWindowHandle;
             PanelColors = CreateItems(RibbonColorPreferences.Load());
             PreferenceFilePath =
                 $"Sauvegarde : {RibbonColorPreferences.PreferenceFilePath}";
+            _selectedPresetName = RibbonColorPresetCatalog.PresetNames.FirstOrDefault();
             DataContext = this;
         }
 
         public ObservableCollection<PanelColorItem> PanelColors { get; }
 
         public string PreferenceFilePath { get; }
+
+        public IReadOnlyList<string> PresetNames =>
+            RibbonColorPresetCatalog.PresetNames;
+
+        public string SelectedPresetName
+        {
+            get => _selectedPresetName;
+            set => _selectedPresetName = value;
+        }
+
+        private void ApplyPresetButton_Click(object sender, RoutedEventArgs e)
+        {
+            Dictionary<string, RibbonPanelColorScheme> preset =
+                RibbonColorPresetCatalog.Create(SelectedPresetName);
+
+            foreach (PanelColorItem item in PanelColors)
+            {
+                if (preset.TryGetValue(item.PanelName, out RibbonPanelColorScheme scheme))
+                    item.ApplyScheme(scheme);
+            }
+        }
 
         private void ResetDefaultsButton_Click(object sender, RoutedEventArgs e)
         {
@@ -37,25 +63,50 @@ namespace Couleur
             }
         }
 
-        private void SaveButton_Click(object sender, RoutedEventArgs e)
+        private void OpenRevitColorsButton_Click(
+            object sender,
+            RoutedEventArgs e)
         {
             try
             {
-                var colors = PanelColors.ToDictionary(
-                    item => item.PanelName,
-                    item => item.CreateScheme());
-
-                RibbonColorPreferences.Save(colors);
+                SaveCurrentColors();
+                RevitColorPreferencesWindow.ShowModeless(_mainWindowHandle);
                 DialogResult = true;
             }
             catch (System.Exception ex)
             {
-                MessageBox.Show(
-                    $"Impossible d’enregistrer les couleurs.\n\n{ex.Message}",
-                    "BIMaestro",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                ShowSaveError(ex);
             }
+        }
+
+        private void SaveButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                SaveCurrentColors();
+                DialogResult = true;
+            }
+            catch (System.Exception ex)
+            {
+                ShowSaveError(ex);
+            }
+        }
+
+        private void SaveCurrentColors()
+        {
+            var colors = PanelColors.ToDictionary(
+                item => item.PanelName,
+                item => item.CreateScheme());
+            RibbonColorPreferences.Save(colors);
+        }
+
+        private static void ShowSaveError(System.Exception ex)
+        {
+            MessageBox.Show(
+                $"Impossible d’enregistrer les couleurs.\n\n{ex.Message}",
+                "BIMaestro",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
         }
 
         private static ObservableCollection<PanelColorItem> CreateItems(
@@ -80,12 +131,19 @@ namespace Couleur
     public sealed class PanelColorItem : INotifyPropertyChanged
     {
         private static readonly IReadOnlyList<string> AvailableBackgroundModes =
-            new[] { "Uni", "Horizontal", "Vertical", "Diagonal" };
+            new[]
+            {
+                "Uni", "Horizontal", "Vertical", "Diagonal",
+                "France", "France continue", "Noël festif", "Confettis",
+                "Pokéball douce"
+            };
 
         private Color? _backgroundColor;
         private Color? _backgroundEndColor;
         private Color? _textColor;
         private string _backgroundMode;
+        private double _patternStart;
+        private double _patternEnd;
 
         public PanelColorItem(string panelName, RibbonPanelColorScheme scheme)
         {
@@ -161,12 +219,17 @@ namespace Couleur
                 _backgroundMode = normalized;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(IsGradient));
+                OnPropertyChanged(nameof(CanEditEndColor));
                 OnPropertyChanged(nameof(BackgroundBrush));
             }
         }
 
         public bool IsGradient =>
-            !string.Equals(BackgroundMode, "Uni", System.StringComparison.OrdinalIgnoreCase);
+            string.Equals(BackgroundMode, "Horizontal", System.StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(BackgroundMode, "Vertical", System.StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(BackgroundMode, "Diagonal", System.StringComparison.OrdinalIgnoreCase);
+
+        public bool CanEditEndColor => IsGradient;
 
         public Brush BackgroundBrush => CreateScheme().CreateBackgroundBrush();
 
@@ -180,7 +243,10 @@ namespace Couleur
                 BackgroundEndColor ?? BackgroundColor ?? Colors.Transparent,
                 TextColor ?? Colors.Transparent,
                 IsGradient,
-                GetGradientDirection(BackgroundMode));
+                GetGradientDirection(BackgroundMode),
+                GetBackgroundPattern(BackgroundMode),
+                _patternStart,
+                _patternEnd);
         }
 
         public void ApplyScheme(RibbonPanelColorScheme scheme)
@@ -194,6 +260,8 @@ namespace Couleur
             _backgroundEndColor = scheme.BackgroundEndColor;
             _textColor = scheme.TextColor;
             _backgroundMode = GetBackgroundMode(scheme);
+            _patternStart = scheme.PatternStart;
+            _patternEnd = scheme.PatternEnd;
 
             if (!notify)
                 return;
@@ -203,15 +271,51 @@ namespace Couleur
             OnPropertyChanged(nameof(TextColor));
             OnPropertyChanged(nameof(BackgroundMode));
             OnPropertyChanged(nameof(IsGradient));
+            OnPropertyChanged(nameof(CanEditEndColor));
             OnPropertyChanged(nameof(BackgroundBrush));
             OnPropertyChanged(nameof(TextBrush));
         }
 
         private static string GetBackgroundMode(RibbonPanelColorScheme scheme)
         {
+            if (scheme.BackgroundPattern == RibbonBackgroundPattern.FrenchFlag)
+                return "France";
+
+            if (scheme.BackgroundPattern == RibbonBackgroundPattern.FrenchFlagContinuous)
+                return "France continue";
+
+            if (scheme.BackgroundPattern == RibbonBackgroundPattern.ChristmasFestive)
+                return "Noël festif";
+
+            if (scheme.BackgroundPattern == RibbonBackgroundPattern.Confetti)
+                return "Confettis";
+
+            if (scheme.BackgroundPattern == RibbonBackgroundPattern.PokeBallPixel)
+                return "Pokéball douce";
+
             return scheme.IsGradient
                 ? scheme.GradientDirection.ToString()
                 : "Uni";
+        }
+
+        private static RibbonBackgroundPattern GetBackgroundPattern(string mode)
+        {
+            if (string.Equals(mode, "France", System.StringComparison.OrdinalIgnoreCase))
+                return RibbonBackgroundPattern.FrenchFlag;
+
+            if (string.Equals(mode, "France continue", System.StringComparison.OrdinalIgnoreCase))
+                return RibbonBackgroundPattern.FrenchFlagContinuous;
+
+            if (string.Equals(mode, "Noël festif", System.StringComparison.OrdinalIgnoreCase))
+                return RibbonBackgroundPattern.ChristmasFestive;
+
+            if (string.Equals(mode, "Confettis", System.StringComparison.OrdinalIgnoreCase))
+                return RibbonBackgroundPattern.Confetti;
+
+            if (string.Equals(mode, "Pokéball douce", System.StringComparison.OrdinalIgnoreCase))
+                return RibbonBackgroundPattern.PokeBallPixel;
+
+            return RibbonBackgroundPattern.Standard;
         }
 
         private static RibbonGradientDirection GetGradientDirection(string mode)

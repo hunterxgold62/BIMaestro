@@ -462,6 +462,35 @@ namespace Modification
                           string.Equals(s.Family.Name, profile.FamilyName, StringComparison.OrdinalIgnoreCase));
         }
 
+        private FamilySymbol FindProfileSymbol(ProfileConfig profile)
+        {
+            if (profile == null || string.IsNullOrWhiteSpace(profile.FamilyName))
+                return null;
+
+            var symbols = new FilteredElementCollector(_doc)
+                .OfClass(typeof(FamilySymbol))
+                .Cast<FamilySymbol>()
+                .Where(s => s?.Family?.Name != null &&
+                            string.Equals(s.Family.Name, profile.FamilyName, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            if (!string.IsNullOrWhiteSpace(profile.TypeName))
+            {
+                var exact = symbols.FirstOrDefault(s =>
+                    string.Equals(s.Name, profile.TypeName, StringComparison.OrdinalIgnoreCase));
+                if (exact != null)
+                    return exact;
+            }
+
+            return symbols.FirstOrDefault();
+        }
+
+        private bool IsSelectedProfileUnhosted()
+        {
+            FamilySymbol symbol = FindProfileSymbol(SelectedExecutionProfile);
+            return symbol?.Family?.FamilyPlacementType == FamilyPlacementType.OneLevelBased;
+        }
+
         private ProfileConfig FindBuiltInProfile(HostTarget host, ShapeTarget shape, bool isV2)
         {
             string[] candidates;
@@ -1603,6 +1632,44 @@ namespace Modification
             MultiEnabled = chkMulti.IsChecked == true;
             NormeEnabled = chkNorme.IsChecked == true;
             DynamoAutoEnabled = chkDynamo.IsChecked == true;
+
+            bool selectedProfileIsUnhosted = IsSelectedProfileUnhosted();
+            if (DoubleLinkEnabled && !selectedProfileIsUnhosted)
+            {
+                MessageBox.Show(
+                    "Le mode Double lien nécessite une famille sans hôte.\n\n" +
+                    "Le mur ou le sol appartient à une maquette liée et ne peut pas héberger une famille créée dans votre projet.\n\n" +
+                    "Choisissez une option « Ma famille sans hôte » ou « BIMaestro sans hôte » dans la liste Forme.",
+                    "Famille sans hôte requise",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            bool usesModelLink = SelectedPipeSource == PipeSource.LienIFC
+                                 || SelectedPipeSource == PipeSource.LienRVT;
+            if (usesModelLink && !DoubleLinkEnabled)
+            {
+                string selectedMode = selectedProfileIsUnhosted ? "SANS HÔTE" : "AVEC HÔTE";
+                string suitableDirection = selectedProfileIsUnhosted
+                    ? "réseau de votre maquette → mur ou sol lié"
+                    : "réseau lié → mur ou sol de votre maquette";
+                string otherDirection = selectedProfileIsUnhosted
+                    ? "Pour un réseau lié vers un support de votre maquette, choisissez une famille avec hôte."
+                    : "Pour un réseau de votre maquette vers un support lié, choisissez une famille sans hôte.";
+
+                var answer = MessageBox.Show(
+                    $"La famille sélectionnée est {selectedMode}.\n\n" +
+                    $"Elle convient au cas :\n{suitableDirection}.\n\n" +
+                    $"{otherDirection}\n\nContinuer avec cette famille ?",
+                    "Vérification du lien",
+                    MessageBoxButton.OKCancel,
+                    MessageBoxImage.Information,
+                    MessageBoxResult.Cancel);
+
+                if (answer != MessageBoxResult.OK)
+                    return;
+            }
 
             Config.DefaultNormeEnabled = NormeEnabled;
             Config.DefaultDynamoAutoEnabled = DynamoAutoEnabled;

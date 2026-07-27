@@ -14,8 +14,6 @@ namespace Famille
     public class ConvertSharedToFamilyParametersCommand : BaseTrackedCommand
     {
         protected override string ButtonId => "ConvertSharedToFamilyParameters";
-        private const int ConversionBatchSize = 5;
-
         protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
             var doc = data.Application.ActiveUIDocument?.Document;
@@ -45,9 +43,8 @@ namespace Famille
 
             int converted = 0;
             var failed = new List<string>();
-
             bool tempTypeCreated = false;
-            bool tempTypeInitialized = false;
+            bool fatalFailure = false;
 
             using (var group = new TransactionGroup(doc, "BIMaestro - Conversion sécurisée des paramètres"))
             {
@@ -55,60 +52,73 @@ namespace Famille
 
                 try
                 {
-                    foreach (var batch in Batch(sharedParameters, ConversionBatchSize))
+                    if (familyManager.CurrentType == null)
                     {
                         var failureGuard = new RollBackOnAnyFailure();
-                        bool batchFailed = false;
-
-                        using (var tx = new Transaction(doc, "Convertir paramètres partagés en paramètres de famille"))
+                        using (var typeTx = new Transaction(doc, "Créer un type temporaire BIMaestro"))
                         {
-                            tx.Start();
-                            ConfigureStrictFailureHandling(tx, failureGuard);
+                            typeTx.Start();
+                            ConfigureStrictFailureHandling(typeTx, failureGuard);
+                            EnsureCurrentTypeExists(familyManager, out tempTypeCreated);
+                            doc.Regenerate();
 
-                            if (!tempTypeInitialized)
+                            if (typeTx.Commit() != TransactionStatus.Committed)
                             {
-                                EnsureCurrentTypeExists(familyManager, out tempTypeCreated);
-                                tempTypeInitialized = true;
+                                failed.Add(string.IsNullOrWhiteSpace(failureGuard.Message)
+                                    ? "Revit n'a pas pu créer le type temporaire nécessaire à la conversion."
+                                    : failureGuard.Message);
+                                fatalFailure = true;
                             }
+                        }
+                    }
 
-                            foreach (var parameter in batch)
+                    if (!fatalFailure)
+                    {
+                        foreach (var parameter in sharedParameters)
+                        {
+                            string parameterName = ParameterDisplayName(parameter);
+                            var failureGuard = new RollBackOnAnyFailure();
+                            bool parameterFailed = false;
+
+                            using (var tx = new Transaction(doc, $"Convertir le paramètre {parameterName}"))
                             {
-                                string error;
-                                if (TryReplaceSharedParameter(doc, familyManager, parameter, out error))
+                                tx.Start();
+                                ConfigureStrictFailureHandling(tx, failureGuard);
+
+                                string conversionError;
+                                if (!TryReplaceSharedParameter(doc, familyManager, parameter, out conversionError))
                                 {
-                                    converted++;
+                                    failed.Add(string.IsNullOrWhiteSpace(conversionError)
+                                        ? parameterName
+                                        : $"{parameterName} — {conversionError}");
+                                    parameterFailed = true;
+                                    tx.RollBack();
                                 }
                                 else
                                 {
-                                    string name = ParameterDisplayName(parameter);
-                                    failed.Add(string.IsNullOrWhiteSpace(error) ? name : $"{name} — {error}");
-                                    batchFailed = true;
-                                    break;
+                                    doc.Regenerate();
+                                    if (IsSharedParameterStillPresent(familyManager, parameterName))
+                                    {
+                                        failed.Add($"{parameterName} — Revit n'a pas remplacé le paramètre partagé.");
+                                        parameterFailed = true;
+                                        tx.RollBack();
+                                    }
+                                    else if (tx.Commit() != TransactionStatus.Committed)
+                                    {
+                                        failed.Add(string.IsNullOrWhiteSpace(failureGuard.Message)
+                                            ? $"{parameterName} — Revit a refusé la conversion lors de la validation."
+                                            : $"{parameterName} — {failureGuard.Message}");
+                                        parameterFailed = true;
+                                    }
                                 }
-                            }
 
-                            if (batchFailed)
-                            {
-                                tx.RollBack();
-                            }
-                            else
-                            {
-                                doc.Regenerate();
-                                if (tx.Commit() != TransactionStatus.Committed)
-                                {
-                                    failed.Add(string.IsNullOrWhiteSpace(failureGuard.Message)
-                                        ? "Revit a refusé la conversion lors de la validation."
-                                        : failureGuard.Message);
-                                    batchFailed = true;
-                                }
+                                if (!parameterFailed)
+                                    converted++;
                             }
                         }
-
-                        if (batchFailed)
-                            break;
                     }
 
-                    if (failed.Count == 0 && tempTypeCreated)
+                    if (!fatalFailure && tempTypeCreated)
                     {
                         var cleanupGuard = new RollBackOnAnyFailure();
                         using (var cleanupTx = new Transaction(doc, "Nettoyage type temporaire BIMaestro"))
@@ -123,21 +133,28 @@ namespace Famille
                                 failed.Add(string.IsNullOrWhiteSpace(cleanupGuard.Message)
                                     ? "Revit a refusé le nettoyage du type temporaire."
                                     : cleanupGuard.Message);
+                                fatalFailure = true;
                             }
                         }
                     }
 
-                    if (failed.Count > 0)
+                    if (fatalFailure)
                     {
                         if (group.GetStatus() == TransactionStatus.Started)
                             group.RollBack();
                         converted = 0;
+                    }
+                    else if (converted == 0)
+                    {
+                        if (group.GetStatus() == TransactionStatus.Started)
+                            group.RollBack();
                     }
                     else if (group.Assimilate() != TransactionStatus.Committed)
                     {
                         if (group.GetStatus() == TransactionStatus.Started)
                             group.RollBack();
                         failed.Add("Revit n'a pas pu finaliser la conversion.");
+                        fatalFailure = true;
                         converted = 0;
                     }
                 }
@@ -148,21 +165,33 @@ namespace Famille
 
                     converted = 0;
                     failed.Add(FormatException(ex));
+                    fatalFailure = true;
                 }
             }
 
-            bool rolledBack = failed.Count > 0;
+            int notConverted = sharedParameters.Count - converted;
             string report = $"Paramètres partagés détectés : {sharedParameters.Count}\n" +
                             $"Convertis en paramètres de famille : {converted}\n" +
-                            $"Échecs : {failed.Count}";
+                            $"Non convertis : {notConverted}";
 
-            if (rolledBack)
+            if (fatalFailure)
             {
                 report += "\n\nSÉCURITÉ : aucune modification n'a été conservée ; la famille est restée dans son état initial.";
                 report += "\n\nDétails :\n- " + string.Join("\n- ", failed.Distinct());
             }
+            else if (failed.Count > 0)
+            {
+                report += "\n\nLes paramètres ci-dessous ont été ignorés. Chaque tentative concernée a été annulée sans affecter la famille.";
+                report += "\n\nDétails :\n- " + string.Join("\n- ", failed.Distinct());
+            }
 
-            TaskDialog.Show(rolledBack ? "Conversion annulée sans modification" : "Conversion terminée", report);
+            string title = fatalFailure
+                ? "Conversion annulée sans modification"
+                : failed.Count > 0
+                    ? "Conversion partielle sécurisée"
+                    : "Conversion terminée";
+
+            TaskDialog.Show(title, report);
             return Result.Succeeded;
         }
 
@@ -193,15 +222,6 @@ namespace Famille
 
                 return FailureProcessingResult.ProceedWithRollBack;
             }
-        }
-
-        private static IEnumerable<List<FamilyParameter>> Batch(List<FamilyParameter> parameters, int size)
-        {
-            if (parameters == null || parameters.Count == 0 || size <= 0)
-                yield break;
-
-            for (int i = 0; i < parameters.Count; i += size)
-                yield return parameters.Skip(i).Take(size).ToList();
         }
 
         private static string ParameterDisplayName(FamilyParameter parameter)
@@ -261,12 +281,6 @@ namespace Famille
                 return false;
             }
 
-            if (parameter.IsReadOnly)
-            {
-                error = "Paramètre en lecture seule";
-                return false;
-            }
-
             var definition = parameter.Definition;
             if (definition == null)
             {
@@ -283,6 +297,28 @@ namespace Famille
             error = invocationErrors.Count == 0
                 ? "ReplaceParameter n'a pas abouti ; la recréation destructive a été volontairement désactivée"
                 : string.Join(" | ", invocationErrors.Distinct().Take(3));
+
+            return false;
+        }
+
+        private static bool IsSharedParameterStillPresent(FamilyManager familyManager, string parameterName)
+        {
+            foreach (var candidate in familyManager.GetParameters())
+            {
+                try
+                {
+                    if (candidate != null
+                        && candidate.IsShared
+                        && string.Equals(candidate.Definition?.Name, parameterName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+                }
+                catch
+                {
+                    // Un objet remplacé peut devenir invalide pendant la transaction.
+                }
+            }
 
             return false;
         }
