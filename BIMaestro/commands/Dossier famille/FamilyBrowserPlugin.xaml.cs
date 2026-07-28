@@ -46,7 +46,10 @@ namespace Famille
         private readonly string pathsFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "SauvegardePréférence", "CheminsFamille.json");
         private readonly string workFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "FamilleRevit");
         private static readonly TimeSpan NewFamilyAge = TimeSpan.FromDays(14);
-        private static readonly TimeSpan UpdatedFamilyAge = TimeSpan.FromDays(30);
+        private static readonly TimeSpan UpdatedFamilyAge = TimeSpan.FromDays(14);
+        private List<string> _newFamilyPaths = new();
+        private List<string> _updatedFamilyPaths = new();
+        private FreshnessFolderKind _activeFreshnessFolder;
 
         // Cache de vignettes (disque)
         private readonly string thumbCacheFolder =
@@ -210,6 +213,13 @@ namespace Famille
         private CancellationTokenSource _previewCts;
         private bool _isGeneratingPreviews;
 
+        private enum FreshnessFolderKind
+        {
+            None,
+            New,
+            Updated
+        }
+
         // ===== Collections =====
         private ObservableCollection<Collection> _collections = new();
         private Collection _selectedCollection;
@@ -305,6 +315,7 @@ namespace Famille
 
         private void LoadFolderTree()
         {
+            _activeFreshnessFolder = FreshnessFolderKind.None;
             currentFolderPath = rootFolderPath;
             FolderTreeView.Items.Clear();
 
@@ -349,6 +360,7 @@ namespace Famille
 
             ClearSearchForFolderNavigation();
 
+            _activeFreshnessFolder = FreshnessFolderKind.None;
             currentFolderPath = tv.Tag.ToString();
             RefreshCurrentFolder();
         }
@@ -385,6 +397,18 @@ namespace Famille
                 if (!string.IsNullOrWhiteSpace(parentPath))
                     allFamilies.Add(CreateBackFolderItem(parentPath));
 
+                if (string.Equals(path, rootFolderPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    RefreshFreshnessFamilyPaths();
+
+                    // Toujours en tête : NEW, puis MAJ. Un dossier virtuel vide
+                    // n'est pas affiché.
+                    if (_newFamilyPaths.Count > 0)
+                        allFamilies.Add(CreateFreshnessFolderItem(FreshnessFolderKind.New, _newFamilyPaths.Count));
+                    if (_updatedFamilyPaths.Count > 0)
+                        allFamilies.Add(CreateFreshnessFolderItem(FreshnessFolderKind.Updated, _updatedFamilyPaths.Count));
+                }
+
                 foreach (var dir in SafeEnumerateDirectories(path).OrderBy(d => d, NaturalSort.Directories))
                     allFamilies.Add(CreateFolderItemFromDirectory(dir));
             }
@@ -407,13 +431,18 @@ namespace Famille
 
             if (!recursive)
             {
+                var freshnessItems = allFamilies
+                    .Where(f => f.IsFreshnessFolder)
+                    .OrderBy(f => f.IsUpdatedFolder)
+                    .ToList();
+
                 var folderItems = allFamilies
-                    .Where(f => f.IsFolder && !f.IsBackNavigation)
+                    .Where(f => f.IsFolder && !f.IsBackNavigation && !f.IsFreshnessFolder)
                     .OrderBy(f => f.Name, NaturalSort.Strings)
                     .ToList();
 
                 var backItems = allFamilies.Where(f => f.IsBackNavigation).ToList();
-                allFamilies = backItems.Concat(folderItems).Concat(familyItems).ToList();
+                allFamilies = backItems.Concat(freshnessItems).Concat(folderItems).Concat(familyItems).ToList();
             }
             else
             {
@@ -426,12 +455,92 @@ namespace Famille
 
         private void RefreshCurrentFolder()
         {
-            LoadFamilies(currentFolderPath, recursive: false);
+            if (_activeFreshnessFolder == FreshnessFolderKind.None)
+                LoadFamilies(currentFolderPath, recursive: false);
+            else
+                LoadFreshnessFolder(_activeFreshnessFolder);
+
             UpdateFolderHeader();
             BeginPaging(ApplyInteractiveSorting(new List<FamilyItem>(allFamilies)));
 
             TopFamiliesView.Visibility = Visibility.Collapsed;
             TopSeparator.Visibility = Visibility.Collapsed;
+        }
+
+        private void LoadFreshnessFolder(FreshnessFolderKind kind)
+        {
+            ResetInteractiveFilters();
+            RefreshFreshnessFamilyPaths();
+            allFamilies.Clear();
+            allFamilies.Add(CreateBackFolderItem(rootFolderPath));
+
+            var paths = kind == FreshnessFolderKind.New
+                ? _newFamilyPaths
+                : _updatedFamilyPaths;
+
+            allFamilies.AddRange(paths
+                .Where(File.Exists)
+                .Select(CreateFamilyItemFromPath)
+                .OrderByDescending(f => kind == FreshnessFolderKind.New
+                    ? f.CreatedUtc
+                    : f.LastModifiedUtc)
+                .ThenBy(f => f.Name, NaturalSort.Strings));
+
+            TopFamiliesView.Visibility = Visibility.Collapsed;
+            TopSeparator.Visibility = Visibility.Collapsed;
+        }
+
+        private void RefreshFreshnessFamilyPaths()
+        {
+            var newFamilies = new List<(string Path, DateTime Date)>();
+            var updatedFamilies = new List<(string Path, DateTime Date)>();
+
+            if (!Directory.Exists(rootFolderPath))
+            {
+                _newFamilyPaths = new List<string>();
+                _updatedFamilyPaths = new List<string>();
+                return;
+            }
+
+            IEnumerable<string> paths;
+            try
+            {
+                paths = Directory.EnumerateFiles(rootFolderPath, "*.rfa", SearchOption.AllDirectories).ToList();
+            }
+            catch
+            {
+                paths = Enumerable.Empty<string>();
+            }
+
+            foreach (var path in paths)
+            {
+                try
+                {
+                    var info = new FileInfo(path);
+                    if (!info.Exists)
+                        continue;
+
+                    var createdUtc = info.CreationTimeUtc;
+                    var modifiedUtc = info.LastWriteTimeUtc;
+                    if (IsNewFamily(createdUtc))
+                        newFamilies.Add((path, createdUtc));
+                    else if (IsUpdatedFamily(createdUtc, modifiedUtc))
+                        updatedFamilies.Add((path, modifiedUtc));
+                }
+                catch
+                {
+                    // Un fichier inaccessible ne doit pas bloquer l'ouverture.
+                }
+            }
+
+            _newFamilyPaths = newFamilies
+                .OrderByDescending(f => f.Date)
+                .Select(f => f.Path)
+                .ToList();
+            _updatedFamilyPaths = updatedFamilies
+                .OrderByDescending(f => f.Date)
+                .Select(f => f.Path)
+                .ToList();
         }
 
         private string GetNavigableParentPath(string path)
@@ -484,6 +593,17 @@ namespace Famille
                 Path = rootFolderPath,
                 SeparatorVisibility = Visibility.Collapsed
             });
+
+            if (_activeFreshnessFolder != FreshnessFolderKind.None)
+            {
+                BreadcrumbItems.Add(new FolderBreadcrumb
+                {
+                    Name = _activeFreshnessFolder == FreshnessFolderKind.New ? "NEW" : "MAJ",
+                    Path = null,
+                    SeparatorVisibility = Visibility.Visible
+                });
+                return;
+            }
 
             try
             {
@@ -3000,6 +3120,20 @@ namespace Famille
                 return;
             }
 
+            if (fam.IsNewFolder)
+            {
+                NavigateToFreshnessFolder(FreshnessFolderKind.New);
+                e.Handled = true;
+                return;
+            }
+
+            if (fam.IsUpdatedFolder)
+            {
+                NavigateToFreshnessFolder(FreshnessFolderKind.Updated);
+                e.Handled = true;
+                return;
+            }
+
             if (fam.IsFolder)
             {
                 NavigateToFolder(fam.Path);
@@ -3025,7 +3159,14 @@ namespace Famille
 
         private void OpenFolderItem_Click(object sender, RoutedEventArgs e)
         {
-            if ((sender as MenuItem)?.DataContext is FamilyItem fam && fam.IsFolder)
+            if ((sender as MenuItem)?.DataContext is not FamilyItem fam || !fam.IsFolder)
+                return;
+
+            if (fam.IsNewFolder)
+                NavigateToFreshnessFolder(FreshnessFolderKind.New);
+            else if (fam.IsUpdatedFolder)
+                NavigateToFreshnessFolder(FreshnessFolderKind.Updated);
+            else
                 NavigateToFolder(fam.Path);
         }
 
@@ -3041,6 +3182,7 @@ namespace Famille
                 return;
 
             ClearSearchForFolderNavigation();
+            _activeFreshnessFolder = FreshnessFolderKind.None;
             currentFolderPath = folderPath;
 
             try
@@ -3053,6 +3195,17 @@ namespace Famille
                 _suppressFolderSelectionChanged = false;
             }
 
+            RefreshCurrentFolder();
+        }
+
+        private void NavigateToFreshnessFolder(FreshnessFolderKind kind)
+        {
+            if (kind == FreshnessFolderKind.None)
+                return;
+
+            ClearSearchForFolderNavigation();
+            _activeFreshnessFolder = kind;
+            currentFolderPath = rootFolderPath;
             RefreshCurrentFolder();
         }
 
@@ -3488,7 +3641,7 @@ namespace Famille
                 try
                 {
                     var icons = new List<ImageSource>();
-                    foreach (var familyPath in GetFolderPreviewFamilyPaths(folder.Path, 4))
+                    foreach (var familyPath in GetFolderPreviewFamilyPaths(folder, 4))
                     {
                         icons.Add(LoadPreviewImageForFamilyPath(familyPath, 320));
                     }
@@ -3550,9 +3703,18 @@ namespace Famille
             return null;
         }
 
-        private IEnumerable<string> GetFolderPreviewFamilyPaths(string folderPath, int max)
+        private IEnumerable<string> GetFolderPreviewFamilyPaths(FamilyItem folder, int max)
         {
             var result = new List<string>();
+            if (folder == null || max <= 0)
+                return result;
+
+            if (folder.IsNewFolder)
+                return _newFamilyPaths.Where(File.Exists).Take(max).ToList();
+            if (folder.IsUpdatedFolder)
+                return _updatedFamilyPaths.Where(File.Exists).Take(max).ToList();
+
+            string folderPath = folder.Path;
             if (string.IsNullOrWhiteSpace(folderPath) || max <= 0 || !Directory.Exists(folderPath))
                 return result;
 
@@ -4958,6 +5120,23 @@ namespace Famille
             };
         }
 
+        private FamilyItem CreateFreshnessFolderItem(FreshnessFolderKind kind, int familyCount)
+        {
+            bool isNew = kind == FreshnessFolderKind.New;
+            return new FamilyItem
+            {
+                Name = isNew ? "NEW" : "MAJ",
+                Path = rootFolderPath,
+                IsFolder = true,
+                IsNewFolder = isNew,
+                IsUpdatedFolder = !isNew,
+                NormalizedName = isNew ? "new" : "maj",
+                Category = "Nouveautés",
+                FolderFamilyCount = familyCount,
+                DocumentationAvailable = false
+            };
+        }
+
         private static int CountFamiliesInFolder(string folderPath)
         {
             if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
@@ -5174,6 +5353,34 @@ namespace Famille
         public Visibility FamilyControlVisibility => IsFolder ? Visibility.Collapsed : Visibility.Visible;
         public Visibility FolderControlVisibility => IsFolder ? Visibility.Visible : Visibility.Collapsed;
 
+        private bool _isNewFolder;
+        public bool IsNewFolder
+        {
+            get => _isNewFolder;
+            set
+            {
+                if (_isNewFolder == value) return;
+                _isNewFolder = value;
+                OnPropertyChanged(nameof(IsNewFolder));
+                OnPropertyChanged(nameof(IsFreshnessFolder));
+            }
+        }
+
+        private bool _isUpdatedFolder;
+        public bool IsUpdatedFolder
+        {
+            get => _isUpdatedFolder;
+            set
+            {
+                if (_isUpdatedFolder == value) return;
+                _isUpdatedFolder = value;
+                OnPropertyChanged(nameof(IsUpdatedFolder));
+                OnPropertyChanged(nameof(IsFreshnessFolder));
+            }
+        }
+
+        public bool IsFreshnessFolder => IsNewFolder || IsUpdatedFolder;
+
         private bool _isBackNavigation;
         public bool IsBackNavigation
         {
@@ -5371,7 +5578,7 @@ namespace Famille
         }
 
         private static readonly TimeSpan NewBadgeAge = TimeSpan.FromDays(14);
-        private static readonly TimeSpan UpdatedBadgeAge = TimeSpan.FromDays(30);
+        private static readonly TimeSpan UpdatedBadgeAge = TimeSpan.FromDays(14);
 
         private DateTime? _createdUtc;
         public DateTime? CreatedUtc

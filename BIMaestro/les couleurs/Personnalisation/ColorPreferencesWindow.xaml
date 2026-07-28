@@ -4,9 +4,9 @@
         xmlns:ui="clr-namespace:BIMaestro.UI"
         Title="Couleurs du ruban BIMaestro"
         Width="1030"
-        Height="620"
+        Height="760"
         MinWidth="900"
-        MinHeight="520"
+        MinHeight="620"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
         ShowInTaskbar="False"
@@ -47,8 +47,10 @@
             </StackPanel>
         </Border>
 
-        <Border Grid.Row="1" Style="{StaticResource Card}">
-            <Grid>
+        <TabControl Grid.Row="1">
+            <TabItem Header="Ruban BIMaestro">
+                <Border Style="{StaticResource Card}">
+                    <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
@@ -80,8 +82,58 @@
                                   Height="34"
                                   Margin="14,0,8,0"
                                   VerticalContentAlignment="Center"
-                                  ItemsSource="{Binding PresetNames}"
-                                  SelectedItem="{Binding SelectedPresetName, Mode=TwoWay}"/>
+                                  ItemsSource="{Binding PresetEntries}"
+                                  SelectedValuePath="Name"
+                                  SelectedValue="{Binding SelectedPresetName, Mode=TwoWay}">
+                            <ComboBox.ItemContainerStyle>
+                                <Style TargetType="ComboBoxItem">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsHeader}" Value="True">
+                                            <Setter Property="IsEnabled" Value="False"/>
+                                            <Setter Property="Focusable" Value="False"/>
+                                            <Setter Property="IsHitTestVisible" Value="False"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ComboBox.ItemContainerStyle>
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid MinWidth="180">
+                                        <TextBlock x:Name="PresetName"
+                                                   VerticalAlignment="Center"
+                                                   Text="{Binding Name}"/>
+                                        <Grid x:Name="SectionHeader"
+                                              Margin="0,5"
+                                              Visibility="Collapsed">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Separator VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="1"
+                                                       Margin="8,0"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource Text.Secondary}"
+                                                       Text="{Binding Name}"/>
+                                            <Separator Grid.Column="2"
+                                                       VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Grid>
+                                    <DataTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding IsHeader}" Value="True">
+                                            <Setter TargetName="PresetName"
+                                                    Property="Visibility"
+                                                    Value="Collapsed"/>
+                                            <Setter TargetName="SectionHeader"
+                                                    Property="Visibility"
+                                                    Value="Visible"/>
+                                        </DataTrigger>
+                                    </DataTemplate.Triggers>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
 
                         <Button Grid.Column="2"
                                 Height="34"
@@ -201,7 +253,168 @@
                                ToolTip="{Binding PreferenceFilePath}"/>
                 </StackPanel>
             </Grid>
-        </Border>
+                </Border>
+            </TabItem>
+
+            <TabItem Header="Arborescence du projet">
+                <Border Style="{StaticResource Card}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource H2}"
+                                           Text="Personnalisation de l’arborescence"/>
+                                <TextBlock Margin="0,5,0,0"
+                                           Style="{StaticResource Hint}"
+                                           TextWrapping="Wrap"
+                                           Text="Réglez séparément son apparence et son comportement. Disponible dans Revit 2024 et les versions suivantes."/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1"
+                                        Margin="18,0,0,0"
+                                        VerticalAlignment="Center"
+                                        Orientation="Horizontal">
+                                <CheckBox Margin="0,0,16,0"
+                                          VerticalAlignment="Center"
+                                          FontWeight="SemiBold"
+                                          Content="Activer"
+                                          IsChecked="{Binding BrowserPreferences.IsEnabled, Mode=TwoWay}"/>
+                                <Button MinWidth="150"
+                                        Style="{StaticResource SecondaryButton}"
+                                        Content="Restaurer Revit"
+                                        ToolTip="Désactive toute personnalisation et restaure l’apparence native de l’arborescence."
+                                        Click="ResetBrowserDefaultsButton_Click"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Border Grid.Row="1"
+                                Margin="0,18,0,0"
+                                Padding="16"
+                                Background="{DynamicResource Surface.Subtle}"
+                                BorderBrush="{DynamicResource Border}"
+                                BorderThickness="1"
+                                CornerRadius="10">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock FontWeight="SemiBold"
+                                           Foreground="{DynamicResource Text.Primary}"
+                                           Text="Apparence"/>
+
+                                <Grid Grid.Row="1" Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="170"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Margin="0,0,16,0">
+                                        <TextBlock Margin="0,0,0,6"
+                                                   Style="{StaticResource Hint}"
+                                                   FontWeight="SemiBold"
+                                                   Text="Style du fond"/>
+                                        <ComboBox Height="32"
+                                                  ItemsSource="{Binding BrowserBackgroundModes}"
+                                                  SelectedItem="{Binding BrowserPreferences.BackgroundMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="1"
+                                                Margin="0,0,16,0">
+                                        <TextBlock Margin="0,0,0,6"
+                                                   Style="{StaticResource Hint}"
+                                                   FontWeight="SemiBold"
+                                                   Text="Fond principal"/>
+                                        <ui:SimpleColorPicker MinWidth="170"
+                                                              HorizontalAlignment="Stretch"
+                                                              SelectedColor="{Binding BrowserPreferences.BackgroundColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="2"
+                                                Margin="0,0,16,0">
+                                        <TextBlock Margin="0,0,0,6"
+                                                   Style="{StaticResource Hint}"
+                                                   FontWeight="SemiBold"
+                                                   Text="Texte"/>
+                                        <ui:SimpleColorPicker MinWidth="170"
+                                                              HorizontalAlignment="Stretch"
+                                                              SelectedColor="{Binding BrowserPreferences.TextColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="3">
+                                        <TextBlock Margin="0,0,0,6"
+                                                   Style="{StaticResource Hint}"
+                                                   FontWeight="SemiBold"
+                                                   Text="Accent et recherche"/>
+                                        <ui:SimpleColorPicker MinWidth="170"
+                                                              HorizontalAlignment="Stretch"
+                                                              SelectedColor="{Binding BrowserPreferences.AccentColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Grid>
+                        </Border>
+
+                        <Border Grid.Row="2"
+                                Margin="0,14,0,0"
+                                Padding="16"
+                                Background="{DynamicResource Surface.Subtle}"
+                                BorderBrush="{DynamicResource Border}"
+                                BorderThickness="1"
+                                CornerRadius="10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel>
+                                    <TextBlock FontWeight="SemiBold"
+                                               Foreground="{DynamicResource Text.Primary}"
+                                               Text="Navigation depuis une feuille"/>
+                                    <TextBlock Margin="0,5,24,0"
+                                               Style="{StaticResource Hint}"
+                                               TextWrapping="Wrap"
+                                               Text="Lorsqu’un viewport ou une nomenclature est sélectionné sur une feuille, BIMaestro recherche sa vue et l’encadre avec la couleur d’accent."/>
+                                </StackPanel>
+
+                                <CheckBox Grid.Column="1"
+                                          VerticalAlignment="Center"
+                                          FontWeight="SemiBold"
+                                          Content="Recherche automatique"
+                                          ToolTip="Activée par défaut. La recherche reste visible 300 ms pendant le clic dans l’arborescence."
+                                          IsChecked="{Binding BrowserPreferences.IsSheetViewSearchEnabled, Mode=TwoWay}"/>
+                            </Grid>
+                        </Border>
+
+                        <StackPanel Grid.Row="3"
+                                    Margin="0,18,0,0"
+                                    VerticalAlignment="Bottom">
+                            <TextBlock Style="{StaticResource Hint}"
+                                       Text="Les changements sont appliqués après Enregistrer. Revit 2023 conserve son arborescence native."/>
+                            <TextBlock Margin="0,4,0,0"
+                                       Style="{StaticResource Hint}"
+                                       Text="{Binding PreferenceFilePath}"
+                                       TextTrimming="CharacterEllipsis"
+                                       ToolTip="{Binding PreferenceFilePath}"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </TabItem>
+        </TabControl>
 
         <Grid Grid.Row="2" Margin="0,12,0,0">
             <Grid.ColumnDefinitions>

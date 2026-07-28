@@ -24,7 +24,13 @@ namespace Couleur
         FrenchFlagContinuous,
         ChristmasFestive,
         Confetti,
-        PokeBallPixel
+        PokeBallPixel,
+        AnimatedPokemonPixelContinuous,
+        AnimatedRainbowContinuous,
+        AnimatedPastelBubblesContinuous,
+        AnimatedPastelWavesContinuous,
+        AnimatedPastelStarsContinuous,
+        AnimatedSoftCloudsContinuous
     }
 
     public sealed class RibbonPanelColorScheme
@@ -65,6 +71,16 @@ namespace Couleur
 
         public double PatternEnd { get; }
 
+        public bool IsContinuousAcrossRibbon =>
+            BackgroundPattern == RibbonBackgroundPattern.FrenchFlagContinuous ||
+            BackgroundPattern == RibbonBackgroundPattern.PokeBallPixel ||
+            BackgroundPattern == RibbonBackgroundPattern.AnimatedPokemonPixelContinuous ||
+            BackgroundPattern == RibbonBackgroundPattern.AnimatedRainbowContinuous ||
+            BackgroundPattern == RibbonBackgroundPattern.AnimatedPastelBubblesContinuous ||
+            BackgroundPattern == RibbonBackgroundPattern.AnimatedPastelWavesContinuous ||
+            BackgroundPattern == RibbonBackgroundPattern.AnimatedPastelStarsContinuous ||
+            BackgroundPattern == RibbonBackgroundPattern.AnimatedSoftCloudsContinuous;
+
         public Brush CreateBackgroundBrush()
         {
             if (BackgroundPattern == RibbonBackgroundPattern.FrenchFlag)
@@ -81,6 +97,39 @@ namespace Couleur
 
             if (BackgroundPattern == RibbonBackgroundPattern.PokeBallPixel)
                 return CreatePokeBallSoftBrush();
+
+            if (BackgroundPattern ==
+                RibbonBackgroundPattern.AnimatedPokemonPixelContinuous)
+            {
+                return CreateAnimatedPokemonPixelBrush(0);
+            }
+
+            if (BackgroundPattern == RibbonBackgroundPattern.AnimatedRainbowContinuous)
+                return CreateAnimatedRainbowBrush(0, 420);
+
+            if (BackgroundPattern ==
+                RibbonBackgroundPattern.AnimatedPastelBubblesContinuous)
+            {
+                return CreateAnimatedPastelBubblesBrush(0);
+            }
+
+            if (BackgroundPattern ==
+                RibbonBackgroundPattern.AnimatedPastelWavesContinuous)
+            {
+                return CreateAnimatedPastelWavesBrush(0);
+            }
+
+            if (BackgroundPattern ==
+                RibbonBackgroundPattern.AnimatedPastelStarsContinuous)
+            {
+                return CreateAnimatedPastelStarsBrush(0);
+            }
+
+            if (BackgroundPattern ==
+                RibbonBackgroundPattern.AnimatedSoftCloudsContinuous)
+            {
+                return CreateAnimatedSoftCloudsBrush(0);
+            }
 
             if (!IsGradient)
                 return new SolidColorBrush(BackgroundColor);
@@ -110,6 +159,59 @@ namespace Couleur
             return BackgroundPattern == RibbonBackgroundPattern.FrenchFlagContinuous
                 ? CreateFrenchFlagBrush(actualStart, actualEnd)
                 : CreateBackgroundBrush();
+        }
+
+        public Brush CreateBackgroundBrush(
+            double physicalStart,
+            double physicalEnd,
+            double physicalTotalWidth)
+        {
+            double totalWidth = Math.Max(1, physicalTotalWidth);
+
+            if (BackgroundPattern == RibbonBackgroundPattern.FrenchFlagContinuous)
+            {
+                return CreateFrenchFlagBrush(
+                    physicalStart / totalWidth,
+                    physicalEnd / totalWidth);
+            }
+
+            if (BackgroundPattern == RibbonBackgroundPattern.AnimatedRainbowContinuous)
+                return CreateAnimatedRainbowBrush(physicalStart, totalWidth);
+
+            if (BackgroundPattern == RibbonBackgroundPattern.PokeBallPixel)
+                return CreatePokeBallSoftBrush(physicalStart);
+
+            if (BackgroundPattern ==
+                RibbonBackgroundPattern.AnimatedPokemonPixelContinuous)
+            {
+                return CreateAnimatedPokemonPixelBrush(physicalStart);
+            }
+
+            if (BackgroundPattern ==
+                RibbonBackgroundPattern.AnimatedPastelBubblesContinuous)
+            {
+                return CreateAnimatedPastelBubblesBrush(physicalStart);
+            }
+
+            if (BackgroundPattern ==
+                RibbonBackgroundPattern.AnimatedPastelWavesContinuous)
+            {
+                return CreateAnimatedPastelWavesBrush(physicalStart);
+            }
+
+            if (BackgroundPattern ==
+                RibbonBackgroundPattern.AnimatedPastelStarsContinuous)
+            {
+                return CreateAnimatedPastelStarsBrush(physicalStart);
+            }
+
+            if (BackgroundPattern ==
+                RibbonBackgroundPattern.AnimatedSoftCloudsContinuous)
+            {
+                return CreateAnimatedSoftCloudsBrush(physicalStart);
+            }
+
+            return CreateBackgroundBrush();
         }
 
         private static Brush CreateFrenchFlagBrush(double segmentStart, double segmentEnd)
@@ -268,7 +370,645 @@ namespace Couleur
                     geometry));
         }
 
-        private Brush CreatePokeBallSoftBrush()
+        private static Brush CreateAnimatedRainbowBrush(
+            double segmentStart,
+            double totalWidth)
+        {
+            double width = Math.Max(1, totalWidth);
+            var brush = new LinearGradientBrush
+            {
+                MappingMode = BrushMappingMode.Absolute,
+                StartPoint = new System.Windows.Point(-segmentStart, 0),
+                EndPoint = new System.Windows.Point(width - segmentStart, 0),
+                SpreadMethod = GradientSpreadMethod.Repeat,
+                Transform = RibbonPatternAnimation.GetRainbowTransform(width)
+            };
+
+            brush.GradientStops.Add(new GradientStop(Color.FromRgb(255, 107, 120), 0));
+            brush.GradientStops.Add(new GradientStop(Color.FromRgb(255, 174, 105), 0.14));
+            brush.GradientStops.Add(new GradientStop(Color.FromRgb(255, 230, 109), 0.28));
+            brush.GradientStops.Add(new GradientStop(Color.FromRgb(111, 227, 161), 0.42));
+            brush.GradientStops.Add(new GradientStop(Color.FromRgb(101, 214, 232), 0.56));
+            brush.GradientStops.Add(new GradientStop(Color.FromRgb(108, 140, 255), 0.70));
+            brush.GradientStops.Add(new GradientStop(Color.FromRgb(183, 133, 244), 0.84));
+            brush.GradientStops.Add(new GradientStop(Color.FromRgb(255, 107, 120), 1));
+            return brush;
+        }
+
+        private Brush CreateAnimatedPokemonPixelBrush(double segmentStart)
+        {
+            const double width = 720;
+            const double height = 20;
+            const double pixelSize = 0.75;
+
+            var drawing = new DrawingGroup();
+            drawing.Children.Add(
+                new GeometryDrawing(
+                    new SolidColorBrush(BackgroundColor),
+                    null,
+                    new RectangleGeometry(
+                        new System.Windows.Rect(0, 0, width, height))));
+
+            var sprites = new DrawingGroup
+            {
+                Opacity = 0.80
+            };
+            AddPixelSprite(
+                sprites,
+                CharmanderPixels,
+                new Dictionary<char, Color>
+                {
+                    ['K'] = Color.FromRgb(0, 0, 0),
+                    ['O'] = Color.FromRgb(255, 102, 34),
+                    ['Y'] = Color.FromRgb(247, 194, 54),
+                    ['R'] = Color.FromRgb(252, 55, 33)
+                },
+                52.125,
+                3.25,
+                pixelSize);
+            AddPixelSprite(
+                sprites,
+                BulbasaurPixels,
+                new Dictionary<char, Color>
+                {
+                    ['K'] = Color.FromRgb(19, 27, 30),
+                    ['T'] = Color.FromRgb(30, 188, 178),
+                    ['R'] = Color.FromRgb(227, 19, 23),
+                    ['G'] = Color.FromRgb(19, 139, 20),
+                    ['D'] = Color.FromRgb(1, 136, 104)
+                },
+                171.375,
+                1.75,
+                pixelSize);
+            AddPixelSprite(
+                sprites,
+                PikachuPixels,
+                new Dictionary<char, Color>
+                {
+                    ['K'] = Color.FromRgb(23, 24, 22),
+                    ['Y'] = Color.FromRgb(253, 213, 30),
+                    ['B'] = Color.FromRgb(154, 93, 51),
+                    ['R'] = Color.FromRgb(227, 64, 63)
+                },
+                291.375,
+                1,
+                pixelSize);
+            AddPixelSprite(
+                sprites,
+                SquirtlePixels,
+                new Dictionary<char, Color>
+                {
+                    ['K'] = Color.FromRgb(21, 24, 24),
+                    ['N'] = Color.FromRgb(173, 118, 50),
+                    ['B'] = Color.FromRgb(141, 217, 237),
+                    ['C'] = Color.FromRgb(249, 231, 190)
+                },
+                412.875,
+                2.5,
+                pixelSize);
+            AddPixelSprite(
+                sprites,
+                SnorlaxPixels,
+                new Dictionary<char, Color>
+                {
+                    ['K'] = Color.FromRgb(24, 23, 21),
+                    ['T'] = Color.FromRgb(38, 79, 77),
+                    ['S'] = Color.FromRgb(201, 174, 128),
+                    ['C'] = Color.FromRgb(229, 212, 164)
+                },
+                533.25,
+                3.25,
+                pixelSize);
+            AddPixelSprite(
+                sprites,
+                AshPixels,
+                new Dictionary<char, Color>
+                {
+                    ['K'] = Color.FromRgb(18, 18, 18),
+                    ['R'] = Color.FromRgb(234, 73, 58),
+                    ['L'] = Color.FromRgb(61, 178, 76),
+                    ['S'] = Color.FromRgb(250, 196, 141),
+                    ['G'] = Color.FromRgb(23, 127, 44)
+                },
+                653.25,
+                4,
+                pixelSize);
+            drawing.Children.Add(sprites);
+
+            return new DrawingBrush(drawing)
+            {
+                TileMode = TileMode.Tile,
+                Viewport = new System.Windows.Rect(
+                    -segmentStart,
+                    0,
+                    width,
+                    height),
+                ViewportUnits = BrushMappingMode.Absolute,
+                Viewbox = new System.Windows.Rect(0, 0, width, height),
+                ViewboxUnits = BrushMappingMode.Absolute,
+                Stretch = Stretch.Fill,
+                Transform = RibbonPatternAnimation.GetPokemonTransform()
+            };
+        }
+
+        private static void AddPixelSprite(
+            DrawingGroup drawing,
+            IReadOnlyList<string> pixels,
+            IReadOnlyDictionary<char, Color> palette,
+            double originX,
+            double originY,
+            double pixelSize)
+        {
+            for (int row = 0; row < pixels.Count; row++)
+            {
+                string line = pixels[row];
+                for (int column = 0; column < line.Length; column++)
+                {
+                    char key = line[column];
+                    if (!palette.TryGetValue(key, out Color color))
+                        continue;
+
+                    drawing.Children.Add(
+                        new GeometryDrawing(
+                            new SolidColorBrush(color),
+                            null,
+                            new RectangleGeometry(
+                                new System.Windows.Rect(
+                                    originX + column * pixelSize,
+                                    originY + row * pixelSize,
+                                    pixelSize,
+                                    pixelSize))));
+                }
+            }
+        }
+
+        private static readonly string[] PikachuPixels =
+        {
+            ".KK...............KK...",
+            ".KKKK............KKK...",
+            ".KKYYK..........KYKK...",
+            "..KYYYK........KYYK....",
+            "..KYYYYKKKKKK.KYYYK..K.",
+            "...KYYYYYYYYYKYYYYK.KYK",
+            "....KYYYYYYYYYYYYK.KYYK",
+            "....KYYYYYYYYYYYK.KYYYK",
+            "...KYYK.YYYYYK.YKKYYYYK",
+            "...KYYKKYYYYYKKYYKYYYYK",
+            "...KYYYYYYKYYYYYYKYYYK.",
+            ".KKKRRRYKYYYKYRRRKYYK..",
+            "KYYKRRRYYKKKYYRRKYKY...",
+            "KYYYKKYYYYYYYYYK.YYKK..",
+            ".KYYYYYYYYYYYYYYKYYYKK.",
+            "..KYYYYYYYYYYYYYYKYKK..",
+            "...KKYYYYYYYYYYKYKBBK..",
+            "...KYYYYYYYYYKYKYKBK...",
+            "...KYYYYYYYYYKYKYKK....",
+            "...KYYYYYYYYYYKYYK.....",
+            "...KYYYYYYYYYYYYYK.....",
+            "....KYYYYYYYYYYYK......",
+            "...KYYYKKKKKKKYYYK.....",
+            "...KKKK.......KKKK....."
+        };
+
+        private static readonly string[] CharmanderPixels =
+        {
+            "....KKKK.........K...",
+            "...KOOOOK.......KRK..",
+            "..KOOOOOOK......KRRK.",
+            "..KOOOOOOK......KRRK.",
+            ".KOOOOOOOOK....KRRRRK",
+            "KOOOO.KOOOK....KRRYRK",
+            "KOOOOKKOOOOK...KRYYRK",
+            "KOOOOKKOOOOK....KYKK.",
+            ".KOOOOOOOOOOK...KOK..",
+            "..KKOOOOOOOOOK.KOOK..",
+            "....KKKOOKOOOKKOOK...",
+            ".....KYYKOOOOOKOOK...",
+            ".....KYYYKKOOOKOK....",
+            "....K.KYYYOOOOKK.....",
+            ".....KKKYYOOOKK......",
+            "........KKKOKK.......",
+            ".........K.O.K.......",
+            "..........KKKK......."
+        };
+
+        private static readonly string[] BulbasaurPixels =
+        {
+            "...............KKK.....",
+            "..............KGGGK....",
+            "...........KKKGGGGK....",
+            "...KK....KGGGGGGGGGK...",
+            "..KTTKKKKKKGGKKKGGGGK..",
+            "..KTTTTTTTTKKTTKGGGGGK.",
+            "..KTTTTDDDTTTTTKGGGGGGK",
+            ".KTTTTDDDTTTTTTKGGGGGGK",
+            ".KTTDTTDTTTTTTTTKGGGGGK",
+            ".K.KTTTTTDTKKTTTKGGGGGK",
+            ".K.RTTTTTTKR.KTTDKGGGGK",
+            "KT.KTTTTTK.R.KTTTTKGGK.",
+            "KTTRTTTTTKRR.KTTTTTKK..",
+            "KKTTKTKTTTTTTTTTTTTTDK.",
+            ".KKTTTTTTTTTKKTTDTTDTK.",
+            "..KKKKKKKKKKTTTTTTDDDTK",
+            "...KDDDTTTTTTKTTKTDDDTK",
+            "..KDKDDDDDDDKTTTKTTDTTK",
+            "..KTTDKKDDDKTTDTKKTTTTK",
+            "..KTDTTKKKKKTDTTKK.KTK.",
+            "..K.K.KK...K.K.K.KKKK..",
+            "...KKKK.....KKK........"
+        };
+
+        private static readonly string[] SquirtlePixels =
+        {
+            "....KKKKKK.........",
+            "...KBBBBBBK........",
+            "..KBBBBBBBBK.......",
+            ".KBBBBBBBBBBK......",
+            ".K.BBBB.KBBBK......",
+            ".KKBBBBKKBBBK......",
+            ".KKBBBBKKBBBK......",
+            "KBBBBBBBBBBBKK.....",
+            ".KBKBBBBBKBKNNK....",
+            "..KBKKKKKBKKKNNK...",
+            ".KKKCCCCCKBBKNNK...",
+            "KBBKKKKKKBBBKNKKKK.",
+            "KBBKCCKCKBBBKNKBBBK",
+            ".KKCCCKCCKKKNNKBBBK",
+            "..KKCCKCCCCKNKBBKBK",
+            "..KBKKKKCKKKKBBKBBK",
+            "..KBKCCCKBBBKBBKKK.",
+            "..KBBKKKKBBBKKKK...",
+            ".KBBBK...KBBK......",
+            ".KKKK....KKKK......"
+        };
+
+        private static readonly string[] SnorlaxPixels =
+        {
+            "....KK......KK....",
+            "...KTTKKKKKKTTK...",
+            "...KTTTTTTTTTTK...",
+            "...KTTCCTTCCTTK...",
+            "...KTCCCCCCCCTK...",
+            "...KTCKKCCKKCTK...",
+            "...KTCCCCCCCCTK...",
+            "..KKKCCKKKKCCKKK..",
+            ".KTTTKCCCCCCKTTTK.",
+            "KTTTTTCCCCCCTTTTTK",
+            "KTTTKKCCCCCCCKTTTK",
+            ".KKKTCCCCCCCCCKKK.",
+            ".KTKKCCCCCCCCKKTK.",
+            ".KKCCKCCCCCCKCCKK.",
+            ".KCCCCKCCCCKCCCCK.",
+            ".KCSSCKTTTTKCSSCK.",
+            "..KSSCKKKKKKCSSK..",
+            "...KKK......KKK..."
+        };
+
+        private static readonly string[] AshPixels =
+        {
+            ".....KKKKKKKK.....",
+            "....KRRRRRRRRK....",
+            "...KRRR..L.RRRK...",
+            "...KRR..G...RRK...",
+            "...KRR.GGGG.RRK...",
+            "...KRKKKKKKKKRK...",
+            "..KKKRRRRRRRRKKK..",
+            ".KKKSKKKKKKKKSKKK.",
+            "KKSKS.KSKKSK.SKSKK",
+            "KKSKS.KSKSSK.SKSKK",
+            ".KKSS.KSSSSK.SSKK.",
+            "..KKSSSSSSSSSSKK..",
+            "...KSSSKKKSSSSK...",
+            "....KSSSSSSSSK....",
+            ".....KKSSSSKK.....",
+            ".......KKKK......."
+        };
+
+        private Brush CreateAnimatedPastelBubblesBrush(double segmentStart)
+        {
+            const double width = 120;
+            const double height = 48;
+            var drawing = new DrawingGroup();
+            drawing.Children.Add(
+                new GeometryDrawing(
+                    new SolidColorBrush(BackgroundColor),
+                    null,
+                    new RectangleGeometry(
+                        new System.Windows.Rect(0, 0, width, height))));
+
+            AddPastelBubble(
+                drawing,
+                Color.FromArgb(115, 92, 184, 255),
+                18,
+                14,
+                8);
+            AddPastelBubble(
+                drawing,
+                Color.FromArgb(100, 165, 121, 255),
+                61,
+                36,
+                11);
+            AddPastelBubble(
+                drawing,
+                Color.FromArgb(105, 83, 214, 198),
+                102,
+                11,
+                6.5);
+            AddPastelBubble(
+                drawing,
+                Color.FromArgb(90, 255, 151, 196),
+                110,
+                42,
+                4.5);
+
+            return new DrawingBrush(drawing)
+            {
+                TileMode = TileMode.Tile,
+                Viewport = new System.Windows.Rect(
+                    -segmentStart,
+                    0,
+                    width,
+                    height),
+                ViewportUnits = BrushMappingMode.Absolute,
+                Viewbox = new System.Windows.Rect(0, 0, width, height),
+                ViewboxUnits = BrushMappingMode.Absolute,
+                Stretch = Stretch.Fill,
+                Transform = RibbonPatternAnimation.GetBubblesTransform()
+            };
+        }
+
+        private static void AddPastelBubble(
+            DrawingGroup drawing,
+            Color color,
+            double centerX,
+            double centerY,
+            double radius)
+        {
+            var fill = new SolidColorBrush(
+                Color.FromArgb(
+                    (byte)Math.Min(255, color.A / 2 + 30),
+                    color.R,
+                    color.G,
+                    color.B));
+            var outline = new Pen(new SolidColorBrush(color), 1.35);
+            drawing.Children.Add(
+                new GeometryDrawing(
+                    fill,
+                    outline,
+                    new EllipseGeometry(
+                        new System.Windows.Point(centerX, centerY),
+                        radius,
+                        radius)));
+
+            drawing.Children.Add(
+                new GeometryDrawing(
+                    new SolidColorBrush(Color.FromArgb(150, 255, 255, 255)),
+                    null,
+                    new EllipseGeometry(
+                        new System.Windows.Point(
+                            centerX - radius * 0.32,
+                            centerY - radius * 0.32),
+                        Math.Max(1.1, radius * 0.19),
+                        Math.Max(1.1, radius * 0.19))));
+        }
+
+        private Brush CreateAnimatedPastelWavesBrush(double segmentStart)
+        {
+            const double width = 180;
+            const double height = 48;
+            var drawing = new DrawingGroup();
+            drawing.Children.Add(
+                new GeometryDrawing(
+                    new SolidColorBrush(BackgroundColor),
+                    null,
+                    new RectangleGeometry(
+                        new System.Windows.Rect(0, 0, width, height))));
+
+            AddPastelWave(
+                drawing,
+                Color.FromArgb(105, 84, 190, 225),
+                12,
+                4.5);
+            AddPastelWave(
+                drawing,
+                Color.FromArgb(95, 103, 133, 238),
+                26,
+                5.5);
+            AddPastelWave(
+                drawing,
+                Color.FromArgb(90, 151, 113, 229),
+                40,
+                4);
+
+            return new DrawingBrush(drawing)
+            {
+                TileMode = TileMode.Tile,
+                Viewport = new System.Windows.Rect(
+                    -segmentStart,
+                    0,
+                    width,
+                    height),
+                ViewportUnits = BrushMappingMode.Absolute,
+                Viewbox = new System.Windows.Rect(0, 0, width, height),
+                ViewboxUnits = BrushMappingMode.Absolute,
+                Stretch = Stretch.Fill,
+                Transform = RibbonPatternAnimation.GetWavesTransform()
+            };
+        }
+
+        private static void AddPastelWave(
+            DrawingGroup drawing,
+            Color color,
+            double centerY,
+            double amplitude)
+        {
+            const double width = 180;
+            var figure = new PathFigure
+            {
+                StartPoint = new System.Windows.Point(0, centerY),
+                IsClosed = false,
+                IsFilled = false
+            };
+            figure.Segments.Add(
+                new BezierSegment(
+                    new System.Windows.Point(30, centerY - amplitude),
+                    new System.Windows.Point(60, centerY - amplitude),
+                    new System.Windows.Point(90, centerY),
+                    true));
+            figure.Segments.Add(
+                new BezierSegment(
+                    new System.Windows.Point(120, centerY + amplitude),
+                    new System.Windows.Point(150, centerY + amplitude),
+                    new System.Windows.Point(width, centerY),
+                    true));
+
+            var geometry = new PathGeometry();
+            geometry.Figures.Add(figure);
+            drawing.Children.Add(
+                new GeometryDrawing(
+                    null,
+                    new Pen(new SolidColorBrush(color), 2.4)
+                    {
+                        StartLineCap = PenLineCap.Round,
+                        EndLineCap = PenLineCap.Round
+                    },
+                    geometry));
+        }
+
+        private Brush CreateAnimatedPastelStarsBrush(double segmentStart)
+        {
+            const double width = 160;
+            const double height = 20;
+            var background = new LinearGradientBrush(
+                BackgroundColor,
+                BackgroundEndColor,
+                0);
+            var drawing = new DrawingGroup();
+            drawing.Children.Add(
+                new GeometryDrawing(
+                    background,
+                    null,
+                    new RectangleGeometry(
+                        new System.Windows.Rect(0, 0, width, height))));
+
+            AddPastelStar(drawing, 14, 6, 3.5, Color.FromRgb(255, 255, 255));
+            AddPastelStar(drawing, 39, 15, 2.4, Color.FromRgb(255, 215, 128));
+            AddPastelStar(drawing, 65, 7, 2.8, Color.FromRgb(255, 177, 211));
+            AddPastelStar(drawing, 91, 13, 3.8, Color.FromRgb(255, 255, 255));
+            AddPastelStar(drawing, 119, 5, 2.2, Color.FromRgb(255, 225, 145));
+            AddPastelStar(drawing, 143, 14, 3, Color.FromRgb(204, 184, 255));
+
+            return new DrawingBrush(drawing)
+            {
+                TileMode = TileMode.Tile,
+                Viewport = new System.Windows.Rect(
+                    -segmentStart,
+                    0,
+                    width,
+                    height),
+                ViewportUnits = BrushMappingMode.Absolute,
+                Viewbox = new System.Windows.Rect(0, 0, width, height),
+                ViewboxUnits = BrushMappingMode.Absolute,
+                Stretch = Stretch.Fill,
+                Transform = RibbonPatternAnimation.GetStarsTransform()
+            };
+        }
+
+        private static void AddPastelStar(
+            DrawingGroup drawing,
+            double centerX,
+            double centerY,
+            double radius,
+            Color color)
+        {
+            var geometry = new StreamGeometry();
+            using (StreamGeometryContext context = geometry.Open())
+            {
+                for (int pointIndex = 0; pointIndex < 10; pointIndex++)
+                {
+                    double angle = -Math.PI / 2 + pointIndex * Math.PI / 5;
+                    double pointRadius =
+                        pointIndex % 2 == 0 ? radius : radius * 0.42;
+                    var point = new System.Windows.Point(
+                        centerX + Math.Cos(angle) * pointRadius,
+                        centerY + Math.Sin(angle) * pointRadius);
+
+                    if (pointIndex == 0)
+                        context.BeginFigure(point, true, true);
+                    else
+                        context.LineTo(point, true, false);
+                }
+            }
+
+            drawing.Children.Add(
+                new GeometryDrawing(
+                    new SolidColorBrush(Color.FromArgb(205, color.R, color.G, color.B)),
+                    new Pen(
+                        new SolidColorBrush(
+                            Color.FromArgb(115, color.R, color.G, color.B)),
+                        0.65),
+                    geometry));
+        }
+
+        private Brush CreateAnimatedSoftCloudsBrush(double segmentStart)
+        {
+            const double width = 220;
+            const double height = 20;
+            var background = new LinearGradientBrush(
+                BackgroundColor,
+                BackgroundEndColor,
+                90);
+            var drawing = new DrawingGroup();
+            drawing.Children.Add(
+                new GeometryDrawing(
+                    background,
+                    null,
+                    new RectangleGeometry(
+                        new System.Windows.Rect(0, 0, width, height))));
+
+            AddSoftCloud(drawing, 28, 11, 0.72);
+            AddSoftCloud(drawing, 104, 7, 0.52);
+            AddSoftCloud(drawing, 180, 13, 0.66);
+
+            return new DrawingBrush(drawing)
+            {
+                TileMode = TileMode.Tile,
+                Viewport = new System.Windows.Rect(
+                    -segmentStart,
+                    0,
+                    width,
+                    height),
+                ViewportUnits = BrushMappingMode.Absolute,
+                Viewbox = new System.Windows.Rect(0, 0, width, height),
+                ViewboxUnits = BrushMappingMode.Absolute,
+                Stretch = Stretch.Fill,
+                Transform = RibbonPatternAnimation.GetCloudsTransform()
+            };
+        }
+
+        private static void AddSoftCloud(
+            DrawingGroup drawing,
+            double centerX,
+            double centerY,
+            double scale)
+        {
+            var cloud = new GeometryGroup();
+            cloud.Children.Add(
+                new EllipseGeometry(
+                    new System.Windows.Point(centerX - 7 * scale, centerY),
+                    7 * scale,
+                    4.5 * scale));
+            cloud.Children.Add(
+                new EllipseGeometry(
+                    new System.Windows.Point(centerX, centerY - 3 * scale),
+                    8 * scale,
+                    6.5 * scale));
+            cloud.Children.Add(
+                new EllipseGeometry(
+                    new System.Windows.Point(centerX + 8 * scale, centerY),
+                    7 * scale,
+                    4.5 * scale));
+            cloud.Children.Add(
+                new RectangleGeometry(
+                    new System.Windows.Rect(
+                        centerX - 13 * scale,
+                        centerY,
+                        26 * scale,
+                        4.5 * scale),
+                    2.2 * scale,
+                    2.2 * scale));
+
+            drawing.Children.Add(
+                new GeometryDrawing(
+                    new SolidColorBrush(Color.FromArgb(195, 255, 255, 255)),
+                    new Pen(
+                        new SolidColorBrush(
+                            Color.FromArgb(75, 113, 158, 195)),
+                        0.7),
+                    cloud));
+        }
+
+        private Brush CreatePokeBallSoftBrush(double segmentStart = 0)
         {
             const double width = 72;
             const double height = 34;
@@ -290,7 +1030,11 @@ namespace Couleur
             return new DrawingBrush(drawing)
             {
                 TileMode = TileMode.Tile,
-                Viewport = new System.Windows.Rect(0, 0, width, height),
+                Viewport = new System.Windows.Rect(
+                    -segmentStart,
+                    0,
+                    width,
+                    height),
                 ViewportUnits = BrushMappingMode.Absolute,
                 Viewbox = new System.Windows.Rect(0, 0, width, height),
                 ViewboxUnits = BrushMappingMode.Absolute,
@@ -369,9 +1113,27 @@ namespace Couleur
     internal static class RibbonPatternAnimation
     {
         private const double PokeBallTileWidth = 72;
+        private const double RainbowPixelsPerSecond = 40;
         private static readonly TranslateTransform PokeBallTransform =
             new TranslateTransform();
+        private static readonly TranslateTransform PokemonTransform =
+            new TranslateTransform();
+        private static readonly TranslateTransform BubblesTransform =
+            new TranslateTransform();
+        private static readonly TranslateTransform WavesTransform =
+            new TranslateTransform();
+        private static readonly TranslateTransform StarsTransform =
+            new TranslateTransform();
+        private static readonly TranslateTransform CloudsTransform =
+            new TranslateTransform();
+        private static readonly Dictionary<int, TranslateTransform> RainbowTransforms =
+            new Dictionary<int, TranslateTransform>();
         private static bool _isStarted;
+        private static bool _isPokemonStarted;
+        private static bool _areBubblesStarted;
+        private static bool _areWavesStarted;
+        private static bool _areStarsStarted;
+        private static bool _areCloudsStarted;
 
         public static Transform GetPokeBallTransform()
         {
@@ -400,6 +1162,157 @@ namespace Couleur
                 animation,
                 HandoffBehavior.SnapshotAndReplace);
             _isStarted = true;
+        }
+
+        public static Transform GetRainbowTransform(double totalWidth)
+        {
+            int animationWidth = Math.Max(1, (int)Math.Round(totalWidth));
+            if (RainbowTransforms.TryGetValue(
+                    animationWidth,
+                    out TranslateTransform existing))
+            {
+                return existing;
+            }
+
+            var transform = new TranslateTransform();
+            var animation = new DoubleAnimation
+            {
+                From = 0,
+                To = animationWidth,
+                Duration = TimeSpan.FromSeconds(
+                    Math.Max(8, animationWidth / RainbowPixelsPerSecond)),
+                RepeatBehavior = RepeatBehavior.Forever
+            };
+
+            Timeline.SetDesiredFrameRate(animation, 15);
+            transform.BeginAnimation(
+                TranslateTransform.XProperty,
+                animation,
+                HandoffBehavior.SnapshotAndReplace);
+            RainbowTransforms[animationWidth] = transform;
+            return transform;
+        }
+
+        public static Transform GetPokemonTransform()
+        {
+            if (_isPokemonStarted)
+                return PokemonTransform;
+
+            var animation = new DoubleAnimation
+            {
+                From = 0,
+                To = 720,
+                Duration = TimeSpan.FromSeconds(45),
+                RepeatBehavior = RepeatBehavior.Forever
+            };
+
+            Timeline.SetDesiredFrameRate(animation, 15);
+            PokemonTransform.BeginAnimation(
+                TranslateTransform.XProperty,
+                animation,
+                HandoffBehavior.SnapshotAndReplace);
+            _isPokemonStarted = true;
+            return PokemonTransform;
+        }
+
+        public static Transform GetBubblesTransform()
+        {
+            if (_areBubblesStarted)
+                return BubblesTransform;
+
+            var xAnimation = new DoubleAnimation
+            {
+                From = 0,
+                To = 120,
+                Duration = TimeSpan.FromSeconds(10),
+                RepeatBehavior = RepeatBehavior.Forever
+            };
+            var yAnimation = new DoubleAnimation
+            {
+                From = 0,
+                To = -48,
+                Duration = TimeSpan.FromSeconds(10),
+                RepeatBehavior = RepeatBehavior.Forever
+            };
+
+            Timeline.SetDesiredFrameRate(xAnimation, 15);
+            Timeline.SetDesiredFrameRate(yAnimation, 15);
+            BubblesTransform.BeginAnimation(
+                TranslateTransform.XProperty,
+                xAnimation,
+                HandoffBehavior.SnapshotAndReplace);
+            BubblesTransform.BeginAnimation(
+                TranslateTransform.YProperty,
+                yAnimation,
+                HandoffBehavior.SnapshotAndReplace);
+            _areBubblesStarted = true;
+            return BubblesTransform;
+        }
+
+        public static Transform GetWavesTransform()
+        {
+            if (_areWavesStarted)
+                return WavesTransform;
+
+            var animation = new DoubleAnimation
+            {
+                From = 0,
+                To = 180,
+                Duration = TimeSpan.FromSeconds(10),
+                RepeatBehavior = RepeatBehavior.Forever
+            };
+
+            Timeline.SetDesiredFrameRate(animation, 15);
+            WavesTransform.BeginAnimation(
+                TranslateTransform.XProperty,
+                animation,
+                HandoffBehavior.SnapshotAndReplace);
+            _areWavesStarted = true;
+            return WavesTransform;
+        }
+
+        public static Transform GetStarsTransform()
+        {
+            if (_areStarsStarted)
+                return StarsTransform;
+
+            var animation = new DoubleAnimation
+            {
+                From = 0,
+                To = 160,
+                Duration = TimeSpan.FromSeconds(14),
+                RepeatBehavior = RepeatBehavior.Forever
+            };
+
+            Timeline.SetDesiredFrameRate(animation, 15);
+            StarsTransform.BeginAnimation(
+                TranslateTransform.XProperty,
+                animation,
+                HandoffBehavior.SnapshotAndReplace);
+            _areStarsStarted = true;
+            return StarsTransform;
+        }
+
+        public static Transform GetCloudsTransform()
+        {
+            if (_areCloudsStarted)
+                return CloudsTransform;
+
+            var animation = new DoubleAnimation
+            {
+                From = 0,
+                To = 220,
+                Duration = TimeSpan.FromSeconds(24),
+                RepeatBehavior = RepeatBehavior.Forever
+            };
+
+            Timeline.SetDesiredFrameRate(animation, 15);
+            CloudsTransform.BeginAnimation(
+                TranslateTransform.XProperty,
+                animation,
+                HandoffBehavior.SnapshotAndReplace);
+            _areCloudsStarted = true;
+            return CloudsTransform;
         }
     }
 
@@ -736,6 +1649,182 @@ namespace Couleur
             public double DebutMotif { get; set; }
 
             public double FinMotif { get; set; }
+        }
+    }
+
+    public sealed class ProjectBrowserColorSettings
+    {
+        public bool IsEnabled { get; set; }
+
+        public string BackgroundMode { get; set; }
+
+        public Color BackgroundColor { get; set; }
+
+        public Color TextColor { get; set; }
+
+        public Color AccentColor { get; set; }
+
+        public bool IsSheetViewSearchEnabled { get; set; }
+    }
+
+    public static class ProjectBrowserColorPreferences
+    {
+        private static ProjectBrowserColorSettings _cached;
+
+        public static ProjectBrowserColorSettings GetDefaults()
+        {
+            return new ProjectBrowserColorSettings
+            {
+                IsEnabled = true,
+                BackgroundMode = "Bulles pastel",
+                BackgroundColor = Color.FromRgb(255, 249, 252),
+                TextColor = Color.FromRgb(58, 61, 72),
+                AccentColor = Color.FromRgb(219, 87, 142),
+                IsSheetViewSearchEnabled = true
+            };
+        }
+
+        public static ProjectBrowserColorSettings Load()
+        {
+            lock (RibbonColorPreferences.PreferenceSyncRoot)
+            {
+                if (_cached != null)
+                    return Clone(_cached);
+
+                ProjectBrowserColorSettings settings = GetDefaults();
+                try
+                {
+                    JObject root =
+                        RibbonColorPreferences.LoadPreferenceRoot();
+                    if (root["Arborescence"] is JObject saved)
+                    {
+                        settings.IsEnabled =
+                            saved.Value<bool?>("Activer") ??
+                            settings.IsEnabled;
+                        settings.BackgroundMode = NormalizeMode(
+                            saved.Value<string>("ModeFond"));
+                        settings.IsSheetViewSearchEnabled =
+                            saved.Value<bool?>("RechercheVueFeuille") ??
+                            settings.IsSheetViewSearchEnabled;
+
+                        if (TryParseColor(
+                                saved.Value<string>("Fond"),
+                                out Color background))
+                        {
+                            settings.BackgroundColor = background;
+                        }
+
+                        if (TryParseColor(
+                                saved.Value<string>("Texte"),
+                                out Color text))
+                        {
+                            settings.TextColor = text;
+                        }
+
+                        if (TryParseColor(
+                                saved.Value<string>("Accent"),
+                                out Color accent))
+                        {
+                            settings.AccentColor = accent;
+                        }
+                    }
+                }
+                catch
+                {
+                    settings = GetDefaults();
+                }
+
+                _cached = settings;
+                return Clone(_cached);
+            }
+        }
+
+        public static void Save(ProjectBrowserColorSettings settings)
+        {
+            if (settings == null)
+                throw new ArgumentNullException(nameof(settings));
+
+            lock (RibbonColorPreferences.PreferenceSyncRoot)
+            {
+                ProjectBrowserColorSettings normalized = Clone(settings);
+                normalized.BackgroundMode =
+                    NormalizeMode(normalized.BackgroundMode);
+
+                JObject root =
+                    RibbonColorPreferences.LoadPreferenceRoot();
+                root["Arborescence"] = new JObject
+                {
+                    ["Activer"] = normalized.IsEnabled,
+                    ["ModeFond"] = normalized.BackgroundMode,
+                    ["Fond"] = ToHex(normalized.BackgroundColor),
+                    ["Texte"] = ToHex(normalized.TextColor),
+                    ["Accent"] = ToHex(normalized.AccentColor),
+                    ["RechercheVueFeuille"] =
+                        normalized.IsSheetViewSearchEnabled
+                };
+                RibbonColorPreferences.SavePreferenceRoot(root);
+                _cached = normalized;
+            }
+        }
+
+        private static ProjectBrowserColorSettings Clone(
+            ProjectBrowserColorSettings source)
+        {
+            return new ProjectBrowserColorSettings
+            {
+                IsEnabled = source.IsEnabled,
+                BackgroundMode = NormalizeMode(source.BackgroundMode),
+                BackgroundColor = source.BackgroundColor,
+                TextColor = source.TextColor,
+                AccentColor = source.AccentColor,
+                IsSheetViewSearchEnabled =
+                    source.IsSheetViewSearchEnabled
+            };
+        }
+
+        private static string NormalizeMode(string value)
+        {
+            string[] supportedModes =
+            {
+                "Uni",
+                "Bulles pastel",
+                "Vagues pastel",
+                "Lucioles pastel",
+                "Aurore pastel"
+            };
+            return supportedModes.FirstOrDefault(mode =>
+                       string.Equals(
+                           mode,
+                           value,
+                           StringComparison.OrdinalIgnoreCase)) ??
+                   "Bulles pastel";
+        }
+
+        private static bool TryParseColor(
+            string value,
+            out Color color)
+        {
+            color = Colors.Transparent;
+            try
+            {
+                object converted = ColorConverter.ConvertFromString(value);
+                if (converted is Color parsed)
+                {
+                    color = parsed;
+                    return true;
+                }
+            }
+            catch
+            {
+                // Une couleur invalide restaure simplement la valeur par défaut.
+            }
+
+            return false;
+        }
+
+        private static string ToHex(Color color)
+        {
+            return $"#{color.A:X2}{color.R:X2}{color.G:X2}{color.B:X2}";
         }
     }
 }

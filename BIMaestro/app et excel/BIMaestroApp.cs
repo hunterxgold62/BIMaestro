@@ -52,6 +52,8 @@ public class BIMaestroApp : IExternalApplication
 
             // --- Infos Revit ---
             var revitVersion = application.ControlledApplication.VersionNumber;
+            Couleur.ProjectBrowserColoring.ConfigureRevitVersion(
+                revitVersion);
 
             // Username Revit (fallback Windows)
             string revitUser = TryReadRevitUsernameFromIni(revitVersion)
@@ -248,6 +250,8 @@ public class BIMaestroApp : IExternalApplication
             _uiApp ??= new UIApplication(args.Document.Application);
             Analyse.ElementHistoryTracker.ScheduleDeferredPrime(args.Document);
             ExcelLogger.OnViewActivated(args.Document, _uiApp);
+            Couleur.ProjectBrowserColoring
+                .CompleteAutomaticFocusNavigation();
         }
         catch (Autodesk.Revit.Exceptions.InvalidObjectException ex)
         {
@@ -279,6 +283,9 @@ public class BIMaestroApp : IExternalApplication
             var doc = args.GetDocument();
             var selectedIds = args.GetSelectedElements();
             Analyse.ElementHistoryTracker.CaptureSelectedElementDetails(doc, selectedIds);
+            Couleur.ProjectBrowserColoring.FocusSelectedSheetContent(
+                doc,
+                selectedIds);
         }
         catch (Exception ex)
         {

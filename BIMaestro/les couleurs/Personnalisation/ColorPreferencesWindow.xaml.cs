@@ -8,10 +8,13 @@ using System.Windows.Media;
 
 namespace Couleur
 {
-    public partial class ColorPreferencesWindow : Window
+    public partial class ColorPreferencesWindow :
+        Window,
+        INotifyPropertyChanged
     {
         private readonly System.IntPtr _mainWindowHandle;
         private string _selectedPresetName;
+        private ProjectBrowserColorSettings _browserPreferences;
 
         public ColorPreferencesWindow(System.IntPtr mainWindowHandle)
         {
@@ -20,9 +23,20 @@ namespace Couleur
 
             _mainWindowHandle = mainWindowHandle;
             PanelColors = CreateItems(RibbonColorPreferences.Load());
+            _browserPreferences =
+                ProjectBrowserColorPreferences.Load();
             PreferenceFilePath =
                 $"Sauvegarde : {RibbonColorPreferences.PreferenceFilePath}";
-            _selectedPresetName = RibbonColorPresetCatalog.PresetNames.FirstOrDefault();
+            PresetEntries = RibbonColorPresetCatalog.StandardPresetNames
+                .Select(name => new PresetMenuEntry(name, false))
+                .Concat(new[] { new PresetMenuEntry("Animé", true) })
+                .Concat(
+                    RibbonColorPresetCatalog.AnimatedPresetNames
+                        .Select(name => new PresetMenuEntry(name, false)))
+                .ToList()
+                .AsReadOnly();
+            _selectedPresetName =
+                RibbonColorPresetCatalog.StandardPresetNames.FirstOrDefault();
             DataContext = this;
         }
 
@@ -30,8 +44,27 @@ namespace Couleur
 
         public string PreferenceFilePath { get; }
 
-        public IReadOnlyList<string> PresetNames =>
-            RibbonColorPresetCatalog.PresetNames;
+        public IReadOnlyList<PresetMenuEntry> PresetEntries { get; }
+
+        public IReadOnlyList<string> BrowserBackgroundModes { get; } =
+            new[]
+            {
+                "Uni",
+                "Bulles pastel",
+                "Vagues pastel",
+                "Lucioles pastel",
+                "Aurore pastel"
+            };
+
+        public ProjectBrowserColorSettings BrowserPreferences
+        {
+            get => _browserPreferences;
+            private set
+            {
+                _browserPreferences = value;
+                OnPropertyChanged();
+            }
+        }
 
         public string SelectedPresetName
         {
@@ -61,6 +94,20 @@ namespace Couleur
                 if (defaults.TryGetValue(item.PanelName, out RibbonPanelColorScheme scheme))
                     item.ApplyScheme(scheme);
             }
+
+            BrowserPreferences =
+                ProjectBrowserColorPreferences.GetDefaults();
+        }
+
+        private void ResetBrowserDefaultsButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            ProjectBrowserColorSettings reset =
+                ProjectBrowserColorPreferences.GetDefaults();
+            reset.IsEnabled = false;
+            reset.BackgroundMode = "Uni";
+            BrowserPreferences = reset;
         }
 
         private void OpenRevitColorsButton_Click(
@@ -98,6 +145,8 @@ namespace Couleur
                 item => item.PanelName,
                 item => item.CreateScheme());
             RibbonColorPreferences.Save(colors);
+            ProjectBrowserColorPreferences.Save(
+                BrowserPreferences);
         }
 
         private static void ShowSaveError(System.Exception ex)
@@ -126,6 +175,29 @@ namespace Couleur
                     return new PanelColorItem(panelName, scheme);
                 }));
         }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        private void OnPropertyChanged(
+            [CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(
+                this,
+                new PropertyChangedEventArgs(propertyName));
+        }
+    }
+
+    public sealed class PresetMenuEntry
+    {
+        public PresetMenuEntry(string name, bool isHeader)
+        {
+            Name = name;
+            IsHeader = isHeader;
+        }
+
+        public string Name { get; }
+
+        public bool IsHeader { get; }
     }
 
     public sealed class PanelColorItem : INotifyPropertyChanged
@@ -135,7 +207,9 @@ namespace Couleur
             {
                 "Uni", "Horizontal", "Vertical", "Diagonal",
                 "France", "France continue", "Noël festif", "Confettis",
-                "Pokéball douce"
+                "Pokéball douce", "Pokémon pixel", "Arc-en-ciel animé",
+                "Bulles pastel", "Vagues pastel", "Étoiles pastel",
+                "Nuages doux"
             };
 
         private Color? _backgroundColor;
@@ -293,6 +367,42 @@ namespace Couleur
             if (scheme.BackgroundPattern == RibbonBackgroundPattern.PokeBallPixel)
                 return "Pokéball douce";
 
+            if (scheme.BackgroundPattern ==
+                RibbonBackgroundPattern.AnimatedPokemonPixelContinuous)
+            {
+                return "Pokémon pixel";
+            }
+
+            if (scheme.BackgroundPattern ==
+                RibbonBackgroundPattern.AnimatedRainbowContinuous)
+            {
+                return "Arc-en-ciel animé";
+            }
+
+            if (scheme.BackgroundPattern ==
+                RibbonBackgroundPattern.AnimatedPastelBubblesContinuous)
+            {
+                return "Bulles pastel";
+            }
+
+            if (scheme.BackgroundPattern ==
+                RibbonBackgroundPattern.AnimatedPastelWavesContinuous)
+            {
+                return "Vagues pastel";
+            }
+
+            if (scheme.BackgroundPattern ==
+                RibbonBackgroundPattern.AnimatedPastelStarsContinuous)
+            {
+                return "Étoiles pastel";
+            }
+
+            if (scheme.BackgroundPattern ==
+                RibbonBackgroundPattern.AnimatedSoftCloudsContinuous)
+            {
+                return "Nuages doux";
+            }
+
             return scheme.IsGradient
                 ? scheme.GradientDirection.ToString()
                 : "Uni";
@@ -314,6 +424,54 @@ namespace Couleur
 
             if (string.Equals(mode, "Pokéball douce", System.StringComparison.OrdinalIgnoreCase))
                 return RibbonBackgroundPattern.PokeBallPixel;
+
+            if (string.Equals(
+                    mode,
+                    "Pokémon pixel",
+                    System.StringComparison.OrdinalIgnoreCase))
+            {
+                return RibbonBackgroundPattern.AnimatedPokemonPixelContinuous;
+            }
+
+            if (string.Equals(
+                    mode,
+                    "Arc-en-ciel animé",
+                    System.StringComparison.OrdinalIgnoreCase))
+            {
+                return RibbonBackgroundPattern.AnimatedRainbowContinuous;
+            }
+
+            if (string.Equals(
+                    mode,
+                    "Bulles pastel",
+                    System.StringComparison.OrdinalIgnoreCase))
+            {
+                return RibbonBackgroundPattern.AnimatedPastelBubblesContinuous;
+            }
+
+            if (string.Equals(
+                    mode,
+                    "Vagues pastel",
+                    System.StringComparison.OrdinalIgnoreCase))
+            {
+                return RibbonBackgroundPattern.AnimatedPastelWavesContinuous;
+            }
+
+            if (string.Equals(
+                    mode,
+                    "Étoiles pastel",
+                    System.StringComparison.OrdinalIgnoreCase))
+            {
+                return RibbonBackgroundPattern.AnimatedPastelStarsContinuous;
+            }
+
+            if (string.Equals(
+                    mode,
+                    "Nuages doux",
+                    System.StringComparison.OrdinalIgnoreCase))
+            {
+                return RibbonBackgroundPattern.AnimatedSoftCloudsContinuous;
+            }
 
             return RibbonBackgroundPattern.Standard;
         }

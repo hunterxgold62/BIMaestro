@@ -26,7 +26,12 @@ namespace Couleur
             new[]
             {
                 "Pokéball douce",
-                "Arc-en-ciel animé"
+                "Pokémon pixel",
+                "Arc-en-ciel animé",
+                "Bulles pastel",
+                "Vagues pastel",
+                "Étoiles pastel",
+                "Nuages doux"
             };
 
         public static IReadOnlyList<string> PresetNames { get; } =
@@ -53,8 +58,18 @@ namespace Couleur
                     return CreateConfetti();
                 case "Pokéball douce":
                     return CreatePokeBallSoft();
+                case "Pokémon pixel":
+                    return CreateAnimatedPokemonPixel();
                 case "Arc-en-ciel animé":
                     return CreateAnimatedRainbow();
+                case "Bulles pastel":
+                    return CreateAnimatedPastelBubbles();
+                case "Vagues pastel":
+                    return CreateAnimatedPastelWaves();
+                case "Étoiles pastel":
+                    return CreateAnimatedPastelStars();
+                case "Nuages doux":
+                    return CreateAnimatedSoftClouds();
                 case "Noël":
                     return CreateChristmas();
                 case "France":
@@ -174,6 +189,18 @@ namespace Couleur
                     RibbonBackgroundPattern.PokeBallPixel));
         }
 
+        private static Dictionary<string, RibbonPanelColorScheme> CreateAnimatedPokemonPixel()
+        {
+            return Build((_, __) =>
+                new RibbonPanelColorScheme(
+                    FromHex("#FFF2AD"),
+                    FromHex("#B9DFFF"),
+                    FromHex("#26384A"),
+                    false,
+                    RibbonGradientDirection.Horizontal,
+                    RibbonBackgroundPattern.AnimatedPokemonPixelContinuous));
+        }
+
         private static Dictionary<string, RibbonPanelColorScheme> CreateAnimatedRainbow()
         {
             return Build((_, __) =>
@@ -184,6 +211,54 @@ namespace Couleur
                     false,
                     RibbonGradientDirection.Horizontal,
                     RibbonBackgroundPattern.AnimatedRainbowContinuous));
+        }
+
+        private static Dictionary<string, RibbonPanelColorScheme> CreateAnimatedPastelBubbles()
+        {
+            return Build((_, __) =>
+                new RibbonPanelColorScheme(
+                    FromHex("#F2F8FF"),
+                    FromHex("#A9D9FF"),
+                    FromHex("#29445F"),
+                    false,
+                    RibbonGradientDirection.Diagonal,
+                    RibbonBackgroundPattern.AnimatedPastelBubblesContinuous));
+        }
+
+        private static Dictionary<string, RibbonPanelColorScheme> CreateAnimatedPastelWaves()
+        {
+            return Build((_, __) =>
+                new RibbonPanelColorScheme(
+                    FromHex("#F4FBFF"),
+                    FromHex("#93DDE8"),
+                    FromHex("#24445A"),
+                    false,
+                    RibbonGradientDirection.Horizontal,
+                    RibbonBackgroundPattern.AnimatedPastelWavesContinuous));
+        }
+
+        private static Dictionary<string, RibbonPanelColorScheme> CreateAnimatedPastelStars()
+        {
+            return Build((_, __) =>
+                new RibbonPanelColorScheme(
+                    FromHex("#FFF4FB"),
+                    FromHex("#E9E4FF"),
+                    FromHex("#493B62"),
+                    false,
+                    RibbonGradientDirection.Horizontal,
+                    RibbonBackgroundPattern.AnimatedPastelStarsContinuous));
+        }
+
+        private static Dictionary<string, RibbonPanelColorScheme> CreateAnimatedSoftClouds()
+        {
+            return Build((_, __) =>
+                new RibbonPanelColorScheme(
+                    FromHex("#EAF8FF"),
+                    FromHex("#BBDFF7"),
+                    FromHex("#294B66"),
+                    false,
+                    RibbonGradientDirection.Vertical,
+                    RibbonBackgroundPattern.AnimatedSoftCloudsContinuous));
         }
 
         private static Dictionary<string, RibbonPanelColorScheme> CreateChristmas()
