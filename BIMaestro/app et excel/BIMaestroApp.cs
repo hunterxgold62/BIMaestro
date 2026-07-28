@@ -27,6 +27,9 @@ public class BIMaestroApp : IExternalApplication
     private string _lastRibbonTabTitle;
     private DateTime _nextRibbonInspectionUtc = DateTime.MinValue;
     private DateTime _lastRibbonApplyUtc = DateTime.MinValue;
+    private int _pendingProjectBrowserViewRefreshes;
+    private DateTime _nextProjectBrowserViewRefreshUtc =
+        DateTime.MinValue;
 
     private static readonly TimeSpan RibbonInspectionInterval =
         TimeSpan.FromMilliseconds(250);
@@ -179,6 +182,7 @@ public class BIMaestroApp : IExternalApplication
 
             Page.SecretGifShortcutManager.PollKeyboardState();
             Analyse.ElementHistoryTracker.ProcessDeferredPrime(_uiApp.ActiveUIDocument?.Document);
+            RefreshProjectBrowserActiveViewWhenNeeded();
 
             if (!Couleur.ColoringStateManager.IsColoringActive)
             {
@@ -252,6 +256,12 @@ public class BIMaestroApp : IExternalApplication
             ExcelLogger.OnViewActivated(args.Document, _uiApp);
             Couleur.ProjectBrowserColoring
                 .CompleteAutomaticFocusNavigation();
+            Couleur.ProjectBrowserColoring.TrackActiveView(
+                args.Document,
+                args.CurrentActiveView);
+            _pendingProjectBrowserViewRefreshes = 3;
+            _nextProjectBrowserViewRefreshUtc =
+                DateTime.UtcNow.AddMilliseconds(80);
         }
         catch (Autodesk.Revit.Exceptions.InvalidObjectException ex)
         {
@@ -274,6 +284,32 @@ public class BIMaestroApp : IExternalApplication
         {
             AppendLog($"OnViewActivated : {ex.Message}\n{ex.StackTrace}");
         }
+    }
+
+    private void RefreshProjectBrowserActiveViewWhenNeeded()
+    {
+        if (_pendingProjectBrowserViewRefreshes <= 0 ||
+            DateTime.UtcNow < _nextProjectBrowserViewRefreshUtc)
+        {
+            return;
+        }
+
+        UIDocument uiDocument = _uiApp?.ActiveUIDocument;
+        Document document = uiDocument?.Document;
+        View activeView = uiDocument?.ActiveView;
+        if (document != null && activeView != null)
+        {
+            Couleur.ProjectBrowserColoring.TrackActiveView(
+                document,
+                activeView);
+        }
+
+        _pendingProjectBrowserViewRefreshes--;
+        _nextProjectBrowserViewRefreshUtc =
+            DateTime.UtcNow.AddMilliseconds(
+                _pendingProjectBrowserViewRefreshes == 2
+                    ? 140
+                    : 260);
     }
 
     private void OnSelectionChangedSafe(object sender, SelectionChangedEventArgs args)

@@ -53,7 +53,7 @@ namespace Couleur
                 "Bulles pastel",
                 "Vagues pastel",
                 "Lucioles pastel",
-                "Aurore pastel"
+                "Dégradé pastel animé"
             };
 
         public ProjectBrowserColorSettings BrowserPreferences
@@ -106,8 +106,12 @@ namespace Couleur
             ProjectBrowserColorSettings reset =
                 ProjectBrowserColorPreferences.GetDefaults();
             reset.IsEnabled = false;
+            reset.IsActiveViewParentHighlightEnabled = false;
             reset.BackgroundMode = "Uni";
             BrowserPreferences = reset;
+            ProjectBrowserColorPreferences.Save(reset);
+            ProjectBrowserColoring.Reset();
+            ProjectBrowserColoring.Apply(_mainWindowHandle);
         }
 
         private void OpenRevitColorsButton_Click(
@@ -147,6 +151,8 @@ namespace Couleur
             RibbonColorPreferences.Save(colors);
             ProjectBrowserColorPreferences.Save(
                 BrowserPreferences);
+            ProjectBrowserColoring.Reset();
+            ProjectBrowserColoring.Apply(_mainWindowHandle);
         }
 
         private static void ShowSaveError(System.Exception ex)

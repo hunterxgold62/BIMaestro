@@ -3,6 +3,7 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -91,6 +92,38 @@ namespace Couleur
             }
 
             return GetTextProperty(activeTab, "Title", "Text", "Name");
+        }
+
+        internal static IReadOnlyList<object> GetPanelsForTab(
+            string tabTitle)
+        {
+            if (string.IsNullOrWhiteSpace(tabTitle))
+                return Array.Empty<object>();
+
+            object ribbon = GetRibbon();
+            if (ribbon == null)
+                return Array.Empty<object>();
+
+            object tab = GetEnumerableProperty(ribbon, "Tabs")
+                .FirstOrDefault(candidate =>
+                    string.Equals(
+                        GetTextProperty(
+                            candidate,
+                            "Title",
+                            "Text",
+                            "Name"),
+                        tabTitle,
+                        StringComparison.OrdinalIgnoreCase));
+            return tab == null
+                ? Array.Empty<object>()
+                : GetEnumerableProperty(tab, "Panels").ToList();
+        }
+
+        internal static string GetPanelTitle(object panel)
+        {
+            object source = GetProperty(panel, "Source");
+            return GetTextProperty(source, "Title", "Text", "Name") ??
+                   GetTextProperty(panel, "Title", "Text", "Name");
         }
 
         private static object GetRibbon()
@@ -551,6 +584,9 @@ namespace Couleur
     {
         private static readonly List<Border> ColoredBorders = new List<Border>();
         private static readonly List<TextBlock> ColoredTexts = new List<TextBlock>();
+        private static readonly Dictionary<object, NativePanelBrushState>
+            NativePanelBrushes =
+                new Dictionary<object, NativePanelBrushState>();
 
         public static void Apply(IntPtr mainWindowHandle)
         {
@@ -576,6 +612,8 @@ namespace Couleur
                     activeTabTitle);
             if (preferences.Count == 0)
                 return;
+
+            ApplyNativePanelBackgrounds(activeTabTitle, preferences);
 
             Window window = HwndSource
                 .FromHwnd(mainWindowHandle)
@@ -630,6 +668,30 @@ namespace Couleur
 
         public static void Reset()
         {
+            foreach (KeyValuePair<object, NativePanelBrushState> entry in
+                     NativePanelBrushes.ToList())
+            {
+                if (entry.Value.Notifier != null &&
+                    entry.Value.PropertyChangedHandler != null)
+                {
+                    entry.Value.Notifier.PropertyChanged -=
+                        entry.Value.PropertyChangedHandler;
+                }
+
+                SetPropertyValue(
+                    entry.Key,
+                    "CustomPanelTitleBarBackground",
+                    entry.Value.TitleBarBackground);
+                SetPropertyValue(
+                    entry.Key,
+                    "CustomPanelBackground",
+                    entry.Value.PanelBackground);
+                SetPropertyValue(
+                    entry.Key,
+                    "CustomSlideOutPanelBackground",
+                    entry.Value.SlideOutBackground);
+            }
+
             foreach (Border border in ColoredBorders.Distinct().ToList())
             {
                 border.ClearValue(Border.BackgroundProperty);
@@ -640,8 +702,146 @@ namespace Couleur
             foreach (TextBlock textBlock in ColoredTexts.Distinct().ToList())
                 textBlock.ClearValue(TextBlock.ForegroundProperty);
 
+            NativePanelBrushes.Clear();
             ColoredBorders.Clear();
             ColoredTexts.Clear();
+        }
+
+        private static void ApplyNativePanelBackgrounds(
+            string activeTabTitle,
+            Dictionary<string, RevitRibbonPanelPreference> preferences)
+        {
+            foreach (object panel in
+                     RevitRibbonCatalog.GetPanelsForTab(activeTabTitle))
+            {
+                string panelTitle =
+                    RevitRibbonCatalog.GetPanelTitle(panel);
+                if (string.IsNullOrWhiteSpace(panelTitle) ||
+                    !preferences.TryGetValue(
+                        panelTitle,
+                        out RevitRibbonPanelPreference preference))
+                {
+                    continue;
+                }
+
+                if (!NativePanelBrushes.TryGetValue(
+                        panel,
+                        out NativePanelBrushState originalState))
+                {
+                    originalState = new NativePanelBrushState(
+                            GetPropertyValue(
+                                panel,
+                                "CustomPanelTitleBarBackground"),
+                            GetPropertyValue(
+                                panel,
+                                "CustomPanelBackground"),
+                            GetPropertyValue(
+                                panel,
+                                "CustomSlideOutPanelBackground"));
+                    NativePanelBrushes[panel] = originalState;
+                }
+
+                Brush background =
+                    preference.Scheme.CreateBackgroundBrush();
+                ApplyNativePanelState(
+                    panel,
+                    preference,
+                    background,
+                    originalState);
+
+                if (panel is INotifyPropertyChanged notifier &&
+                    originalState.PropertyChangedHandler == null)
+                {
+                    PropertyChangedEventHandler handler = (_, args) =>
+                    {
+                        if (string.IsNullOrWhiteSpace(args.PropertyName) ||
+                            string.Equals(
+                                args.PropertyName,
+                                "IsCollapsed",
+                                StringComparison.Ordinal))
+                        {
+                            ApplyNativePanelState(
+                                panel,
+                                preference,
+                                background,
+                                originalState);
+                        }
+                    };
+                    originalState.Notifier = notifier;
+                    originalState.PropertyChangedHandler = handler;
+                    notifier.PropertyChanged += handler;
+                }
+            }
+        }
+
+        private static void ApplyNativePanelState(
+            object panel,
+            RevitRibbonPanelPreference preference,
+            Brush background,
+            NativePanelBrushState originalState)
+        {
+            SetPropertyValue(
+                panel,
+                "CustomPanelTitleBarBackground",
+                background);
+
+            bool isCollapsed =
+                GetPropertyValue(panel, "IsCollapsed") is bool collapsed &&
+                collapsed;
+            SetPropertyValue(
+                panel,
+                "CustomPanelBackground",
+                preference.IsFullPanel || isCollapsed
+                    ? background
+                    : originalState.PanelBackground);
+            SetPropertyValue(
+                panel,
+                "CustomSlideOutPanelBackground",
+                preference.IsFullPanel
+                    ? background
+                    : originalState.SlideOutBackground);
+        }
+
+        private static object GetPropertyValue(
+            object source,
+            string propertyName)
+        {
+            try
+            {
+                return source?.GetType()
+                    .GetProperty(
+                        propertyName,
+                        BindingFlags.Instance |
+                        BindingFlags.Public |
+                        BindingFlags.NonPublic)
+                    ?.GetValue(source);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static void SetPropertyValue(
+            object source,
+            string propertyName,
+            object value)
+        {
+            try
+            {
+                PropertyInfo property = source?.GetType()
+                    .GetProperty(
+                        propertyName,
+                        BindingFlags.Instance |
+                        BindingFlags.Public |
+                        BindingFlags.NonPublic);
+                if (property?.CanWrite == true)
+                    property.SetValue(source, value);
+            }
+            catch
+            {
+                // Les propriétés Autodesk peuvent varier selon la version.
+            }
         }
 
         private static List<Border> GetPanelBackgroundBorders(
@@ -778,6 +978,33 @@ namespace Couleur
             }
 
             return result;
+        }
+
+        private sealed class NativePanelBrushState
+        {
+            public NativePanelBrushState(
+                object titleBarBackground,
+                object panelBackground,
+                object slideOutBackground)
+            {
+                TitleBarBackground = titleBarBackground;
+                PanelBackground = panelBackground;
+                SlideOutBackground = slideOutBackground;
+            }
+
+            public object TitleBarBackground { get; }
+
+            public object PanelBackground { get; }
+
+            public object SlideOutBackground { get; }
+
+            public INotifyPropertyChanged Notifier { get; set; }
+
+            public PropertyChangedEventHandler PropertyChangedHandler
+            {
+                get;
+                set;
+            }
         }
 
         private static SolidColorBrush CreateBorderBrush(

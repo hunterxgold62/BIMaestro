@@ -848,15 +848,17 @@ namespace Couleur
         private static bool _legacyNativeProjectBrowser;
         private static ProjectBrowserColorSettings _settings =
             ProjectBrowserColorPreferences.GetDefaults();
+        private static string _activeViewName = string.Empty;
+        private static string _activeViewElementId = string.Empty;
+        private static long _activeViewGeneration;
+        private static IReadOnlyList<string> _activeViewFolderPath =
+            Array.Empty<string>();
 
         private static SolidColorBrush BackgroundBrush =>
             new SolidColorBrush(_settings.BackgroundColor);
 
         private static SolidColorBrush TextBrush =>
             new SolidColorBrush(_settings.TextColor);
-
-        private static SolidColorBrush AccentBrush =>
-            new SolidColorBrush(_settings.AccentColor);
 
         public static string DiagnosticFilePath =>
             Path.Combine(
@@ -882,10 +884,7 @@ namespace Couleur
         {
             _settings = ProjectBrowserColorPreferences.Load();
             if (!_settings.IsEnabled)
-            {
                 Reset();
-                return;
-            }
 
             Window window = HwndSource
                 .FromHwnd(mainWindowHandle)
@@ -917,20 +916,26 @@ namespace Couleur
                     _chromiumBrowser,
                     "if(window.__bimaestroProjectBrowserTheme){" +
                     "const t=window.__bimaestroProjectBrowserTheme;" +
-                    "if(t.clearFocus)t.clearFocus();" +
+                    "if(t.dispose)t.dispose();" +
+                    "else{" +
                     "if(t.observer)t.observer.disconnect();" +
+                    "if(t.clearFocus)t.clearFocus();}" +
                     "document.querySelectorAll('[data-bimaestro-badge]')" +
                     ".forEach(el=>el.remove());" +
                     "document.querySelectorAll(" +
                     "'[data-bimaestro-arc-star]," +
                     "[data-bimaestro-arc-lock]," +
                     "[data-bimaestro-arc-group]," +
+                    "[data-bimaestro-active-parent]," +
                     "[data-bimaestro-focus-overlay]," +
+                    "[data-bimaestro-focus-target]," +
                     "[data-bimaestro-bubble-surface]')" +
                     ".forEach(el=>{" +
                     "el.removeAttribute('data-bimaestro-arc-star');" +
                     "el.removeAttribute('data-bimaestro-arc-lock');" +
                     "el.removeAttribute('data-bimaestro-arc-group');" +
+                    "el.removeAttribute('data-bimaestro-active-parent');" +
+                    "el.removeAttribute('data-bimaestro-focus-target');" +
                     "if(el.hasAttribute('data-bimaestro-focus-overlay'))" +
                     "{el.remove();return;}" +
                     "el.removeAttribute(" +
@@ -1031,16 +1036,164 @@ namespace Couleur
             string viewNameJson =
                 Newtonsoft.Json.JsonConvert.SerializeObject(
                     targetView.Name);
+            string viewIdJson =
+                Newtonsoft.Json.JsonConvert.SerializeObject(
+                    GetElementIdText(targetView.Id));
             ExecuteBrowserScript(
                 _chromiumBrowser,
                 "if(window.__bimaestroProjectBrowserTheme)" +
                 "window.__bimaestroProjectBrowserTheme" +
-                $".focusView({viewNameJson});");
+                $".focusView({viewNameJson},{viewIdJson});");
+        }
+
+        public static void TrackActiveView(
+            Document document,
+            View activeView)
+        {
+            _activeViewGeneration++;
+            _activeViewName = activeView?.Name ?? string.Empty;
+            _activeViewElementId = activeView == null
+                ? string.Empty
+                : GetElementIdText(activeView.Id);
+            _activeViewFolderPath = GetActiveViewFolderPath(
+                document,
+                activeView);
+            PushActiveViewMarker();
         }
 
         public static void CompleteAutomaticFocusNavigation()
         {
             ClearAutomaticFocus();
+        }
+
+        private static IReadOnlyList<string> GetActiveViewFolderPath(
+            Document document,
+            View activeView)
+        {
+            if (document == null ||
+                activeView == null ||
+                activeView is ViewSheet ||
+                activeView.IsTemplate)
+            {
+                return Array.Empty<string>();
+            }
+
+            List<FolderItemInfo> folderItems = null;
+            try
+            {
+                BrowserOrganization organization =
+                    BrowserOrganization
+                        .GetCurrentBrowserOrganizationForViews(document);
+                if (organization == null ||
+                    !organization.AreFiltersSatisfied(activeView.Id))
+                {
+                    return Array.Empty<string>();
+                }
+
+                folderItems = organization
+                    .GetFolderItems(activeView.Id)
+                    ?.Where(item => item != null)
+                    .ToList();
+                if (folderItems == null)
+                    return Array.Empty<string>();
+
+                return folderItems
+                    .Select(item => item.Name?.Trim())
+                    .Where(name => !string.IsNullOrWhiteSpace(name))
+                    .ToList()
+                    .AsReadOnly();
+            }
+            catch
+            {
+                return Array.Empty<string>();
+            }
+            finally
+            {
+                if (folderItems != null)
+                {
+                    foreach (FolderItemInfo item in folderItems)
+                    {
+                        try
+                        {
+                            item.Dispose();
+                        }
+                        catch
+                        {
+                            // L'information peut déjà avoir été libérée
+                            // par une autre version de l'API Revit.
+                        }
+                    }
+                }
+            }
+        }
+
+        private static string GetElementIdText(ElementId elementId)
+        {
+            if (elementId == null)
+                return string.Empty;
+
+            try
+            {
+                System.Reflection.PropertyInfo valueProperty =
+                    elementId.GetType().GetProperty("Value");
+                if (valueProperty != null)
+                {
+                    object value =
+                        valueProperty.GetValue(elementId);
+                    if (value != null)
+                    {
+                        return Convert.ToString(
+                            value,
+                            System.Globalization
+                                .CultureInfo.InvariantCulture);
+                    }
+                }
+            }
+            catch
+            {
+                // Revit 2023 n'expose pas encore la valeur 64 bits.
+            }
+
+            return elementId.IntegerValue.ToString(
+                System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        private static void PushActiveViewMarker()
+        {
+            if (_chromiumBrowser == null)
+                return;
+
+            ProjectBrowserColorSettings settings =
+                ProjectBrowserColorPreferences.Load();
+            if (!settings.IsActiveViewParentHighlightEnabled)
+            {
+                ExecuteBrowserScript(
+                    _chromiumBrowser,
+                    "if(window.__bimaestroProjectBrowserTheme)" +
+                    "window.__bimaestroProjectBrowserTheme" +
+                    ".clearActiveView();");
+                return;
+            }
+
+            string viewNameJson =
+                Newtonsoft.Json.JsonConvert.SerializeObject(
+                    _activeViewName);
+            string pathJson =
+                Newtonsoft.Json.JsonConvert.SerializeObject(
+                    _activeViewFolderPath);
+            string viewIdJson =
+                Newtonsoft.Json.JsonConvert.SerializeObject(
+                    _activeViewElementId);
+            string generationJson =
+                Newtonsoft.Json.JsonConvert.SerializeObject(
+                    _activeViewGeneration);
+            ExecuteBrowserScript(
+                _chromiumBrowser,
+                "if(window.__bimaestroProjectBrowserTheme)" +
+                "window.__bimaestroProjectBrowserTheme" +
+                $".setActiveView(" +
+                $"{viewNameJson},{pathJson},{viewIdJson}," +
+                $"{generationJson});");
         }
 
         private static void ScheduleAutomaticFocusClear()
@@ -1108,8 +1261,12 @@ namespace Couleur
 
                 _chromiumBrowser = browser;
                 _browserInjectionSucceeded = true;
+                PushActiveViewMarker();
                 break;
             }
+
+            if (!_settings.IsEnabled)
+                return;
 
             _legacyNativeProjectBrowser =
                 _revitVersion == "2023" &&
@@ -1142,13 +1299,10 @@ namespace Couleur
 
                 if (element is TextBlock textBlock)
                 {
-                    Brush foreground = IsArcLabel(textBlock.Text)
-                        ? AccentBrush
-                        : TextBrush;
                     SetTrackedValue(
                         textBlock,
                         TextBlock.ForegroundProperty,
-                        foreground);
+                        TextBrush);
                 }
                 else if (element is HeaderedItemsControl itemsControl &&
                          itemsControl.Header is string header)
@@ -1156,7 +1310,7 @@ namespace Couleur
                     SetTrackedValue(
                         itemsControl,
                         System.Windows.Controls.Control.ForegroundProperty,
-                        IsArcLabel(header) ? AccentBrush : TextBrush);
+                        TextBrush);
                 }
                 else if (element is ContentControl contentControl &&
                          contentControl.Content is string content)
@@ -1164,7 +1318,7 @@ namespace Couleur
                     SetTrackedValue(
                         contentControl,
                         System.Windows.Controls.Control.ForegroundProperty,
-                        IsArcLabel(content) ? AccentBrush : TextBrush);
+                        TextBrush);
                 }
             }
         }
@@ -1175,23 +1329,31 @@ namespace Couleur
             string script = @"
 (()=>{
   const key='__bimaestroProjectBrowserTheme';
-  const version=5;
+  const version=16;
   const theme={
+    appearanceEnabled:__BIMAESTRO_BROWSER_APPEARANCE_ENABLED__,
+    activeParentEnabled:__BIMAESTRO_ACTIVE_PARENT_ENABLED__,
     background:'__BIMAESTRO_BROWSER_BACKGROUND__',
     text:'__BIMAESTRO_BROWSER_TEXT__',
     accent:'__BIMAESTRO_BROWSER_ACCENT__',
+    activeParent:'__BIMAESTRO_ACTIVE_PARENT_COLOR__',
     focusBackground:'__BIMAESTRO_BROWSER_FOCUS__',
     mode:'__BIMAESTRO_BROWSER_MODE__'
   };
   if(window[key]&&window[key].version!==version){
     const previous=window[key];
-    if(previous.observer)previous.observer.disconnect();
-    if(previous.clearFocus)previous.clearFocus();
+    if(previous.dispose)previous.dispose();
+    else{
+      if(previous.observer)previous.observer.disconnect();
+      if(previous.clearFocus)previous.clearFocus();
+    }
     document.querySelectorAll(
       '[data-bimaestro-arc-star],'+
       '[data-bimaestro-arc-lock],'+
       '[data-bimaestro-arc-group],'+
+      '[data-bimaestro-active-parent],'+
       '[data-bimaestro-focus-overlay],'+
+      '[data-bimaestro-focus-target],'+
       '[data-bimaestro-bubble-surface]')
       .forEach(el=>{
         if(el.hasAttribute('data-bimaestro-focus-overlay')){
@@ -1201,6 +1363,8 @@ namespace Couleur
         el.removeAttribute('data-bimaestro-arc-star');
         el.removeAttribute('data-bimaestro-arc-lock');
         el.removeAttribute('data-bimaestro-arc-group');
+        el.removeAttribute('data-bimaestro-active-parent');
+        el.removeAttribute('data-bimaestro-focus-target');
         el.removeAttribute('data-bimaestro-bubble-surface');
       });
     if(previous.originals)
@@ -1216,6 +1380,7 @@ namespace Couleur
   }
   if(!window[key]){
     const originals=new Map();
+    const state={disposed:false};
     const remember=el=>{
       if(!originals.has(el))
         originals.set(
@@ -1252,9 +1417,8 @@ namespace Couleur
           }
         }
         @keyframes bimaestroWaveDrift{
-          0%{background-position:0% 25%,100% 75%,20% 100%;}
-          50%{background-position:100% 55%,0% 35%,80% 0%;}
-          100%{background-position:0% 25%,100% 75%,20% 100%;}
+          0%{background-position:0 0,40px 20px;}
+          100%{background-position:80px 0,120px 20px;}
         }
         @keyframes bimaestroFireflyDrift{
           0%{
@@ -1315,20 +1479,18 @@ namespace Couleur
         [data-bimaestro-bubble-surface='waves']{
           background-image:
             radial-gradient(
-              ellipse at 15% 115%,
-              rgba(255,188,211,.42) 0 24%,
-              transparent 25%),
+              ellipse at 50% 100%,
+              transparent 0 17px,
+              rgba(166,211,241,.42) 18px 20px,
+              transparent 21px),
             radial-gradient(
-              ellipse at 85% -15%,
-              rgba(177,220,255,.40) 0 27%,
-              transparent 28%),
-            radial-gradient(
-              ellipse at 50% 120%,
-              rgba(191,237,211,.32) 0 20%,
-              transparent 21%);
-          background-size:190% 145%,210% 155%,230% 170%;
+              ellipse at 50% 0%,
+              transparent 0 17px,
+              rgba(244,177,205,.34) 18px 20px,
+              transparent 21px);
+          background-size:80px 40px,80px 40px;
           background-repeat:repeat;
-          animation:bimaestroWaveDrift 20s ease-in-out infinite;
+          animation:bimaestroWaveDrift 9s linear infinite;
         }
         [data-bimaestro-bubble-surface='fireflies']{
           background-image:
@@ -1368,6 +1530,18 @@ namespace Couleur
           background-repeat:repeat;
           animation:bimaestroAuroraDrift 16s ease-in-out infinite;
         }
+        [data-bimaestro-active-parent]{
+          color:${theme.activeParent} !important;
+          font-weight:700 !important;
+        }
+        [data-bimaestro-active-parent]::after{
+          content:' ★';
+          color:${theme.activeParent};
+          font-size:.82em;
+          font-weight:700;
+          margin-left:4px;
+          text-shadow:0 0 1px rgba(255,255,255,.9);
+        }
         @media (prefers-reduced-motion:reduce){
           [data-bimaestro-bubble-surface='bubbles'],
           [data-bimaestro-bubble-surface='waves'],
@@ -1387,71 +1561,11 @@ namespace Couleur
         return r.width>0&&r.height>0&&r.bottom>=0&&
           r.top<=window.innerHeight;
       });
-    const meaningfulLabels=()=>visibleLabels().filter(label=>{
-      const value=(label.textContent||'').trim();
-      const style=getComputedStyle(label);
-      const rect=label.getBoundingClientRect();
-      return value.length>1&&
-        !/^[+\-–—…]+$/.test(value)&&
-        style.display!=='none'&&
-        style.visibility!=='hidden'&&
-        Number(style.opacity)!==0&&
-        rect.height<=32;
-    });
-    const markArcGroups=()=>{
-      document.querySelectorAll(
-        '[data-bimaestro-arc-group]')
-        .forEach(label=>{
-          label.removeAttribute('data-bimaestro-arc-group');
-        });
-      const labels=meaningfulLabels().sort((a,b)=>{
-        const ar=a.getBoundingClientRect();
-        const br=b.getBoundingClientRect();
-        return ar.top-br.top||ar.left-br.left;
-      });
-      const arcLabels=labels.filter(
-        label=>(label.textContent||'').trim().toUpperCase()==='ARC');
-      arcLabels.forEach(arc=>{
-        const arcRect=arc.getBoundingClientRect();
-        const descendants=[];
-        const arcIndex=labels.indexOf(arc);
-        for(let index=arcIndex+1;index<labels.length;index++){
-          const label=labels[index];
-          const rect=label.getBoundingClientRect();
-          if(rect.top<=arcRect.top+2)continue;
-          if(rect.left<=arcRect.left+3)break;
-          if(rect.left>arcRect.left+6)descendants.push(label);
-        }
-        const uniqueDescendants=Array.from(new Set(descendants))
-          .filter(label=>{
-            if(label===arc)return false;
-            const rect=label.getBoundingClientRect();
-            return rect.top>=arcRect.bottom-2&&
-              rect.left>arcRect.left+6;
-          });
-        if(uniqueDescendants.length===0)return;
-        arc.setAttribute('data-bimaestro-arc-group','1');
-      });
-    };
     const paint=()=>{
-      [document.documentElement,document.body].forEach(el=>{
-        if(!el)return;
-        remember(el);
-        el.setAttribute(
-          'data-bimaestro-bubble-surface',
-          theme.mode);
-        el.style.setProperty(
-          'background-color',
-          theme.background,
-          'important');
-        el.style.setProperty('color',theme.text,'important');
-      });
-      markArcGroups();
-      document.querySelectorAll('*').forEach(el=>{
-        if(el.closest('[data-bimaestro-badge]'))return;
-        const r=el.getBoundingClientRect();
-        if(r.width>=window.innerWidth*.60&&
-           r.height>=window.innerHeight*.25){
+      if(state.disposed)return;
+      if(theme.appearanceEnabled){
+        [document.documentElement,document.body].forEach(el=>{
+          if(!el)return;
           remember(el);
           el.setAttribute(
             'data-bimaestro-bubble-surface',
@@ -1460,17 +1574,34 @@ namespace Couleur
             'background-color',
             theme.background,
             'important');
-        }
-        const value=(el.textContent||'').trim();
-        if(value&&el.children.length===0){
-          remember(el);
-          el.style.setProperty(
-            'color',
-            el.hasAttribute('data-bimaestro-arc-group')?
-              theme.accent:theme.text,
-            'important');
-        }
-      });
+          el.style.setProperty('color',theme.text,'important');
+        });
+        document.querySelectorAll('*').forEach(el=>{
+          if(el.closest('[data-bimaestro-badge]'))return;
+          const r=el.getBoundingClientRect();
+          if(r.width>=window.innerWidth*.60&&
+             r.height>=window.innerHeight*.25){
+            remember(el);
+            el.setAttribute(
+              'data-bimaestro-bubble-surface',
+              theme.mode);
+            el.style.setProperty(
+              'background-color',
+              theme.background,
+              'important');
+          }
+          const value=(el.textContent||'').trim();
+          if(value&&el.children.length===0){
+            remember(el);
+            el.style.setProperty(
+              'color',
+              theme.text,
+              'important');
+          }
+        });
+      }
+      refreshActiveHighlight();
+      renderActiveParent();
     };
     const setInputValue=(input,value)=>{
       const descriptor=Object.getOwnPropertyDescriptor(
@@ -1486,6 +1617,23 @@ namespace Couleur
     let focusSequence=0;
     let automaticSearchValue=null;
     let clearFocusTimer=null;
+    const restoreHighlight=highlight=>{
+      if(!highlight)return;
+      if(highlight.overlay)
+        highlight.overlay.remove();
+      if(!highlight.host)return;
+      highlight.host.removeAttribute(
+        'data-bimaestro-focus-target');
+      if(highlight.label&&highlight.label!==highlight.host)
+        highlight.label.removeAttribute(
+          'data-bimaestro-focus-target');
+    };
+    const removeActiveHighlight=()=>{
+      if(!activeHighlight)return;
+      const previousHighlight=activeHighlight;
+      activeHighlight=null;
+      restoreHighlight(previousHighlight);
+    };
     const findSearchInput=()=>Array.from(
       document.querySelectorAll('input')).find(input=>{
         const placeholder=(input.placeholder||'').toLowerCase();
@@ -1500,17 +1648,13 @@ namespace Couleur
     const clearFocus=()=>{
       cancelScheduledClear();
       focusSequence++;
-      if(activeHighlight){
-        const previousHighlight=activeHighlight;
-        activeHighlight=null;
-        previousHighlight.remove();
-      }
+      removeActiveHighlight();
       const search=findSearchInput();
       if(search&&automaticSearchValue!==null&&
          search.value===automaticSearchValue)
         setInputValue(search,'');
       automaticSearchValue=null;
-      paint();
+      if(!state.disposed)paint();
     };
     const scheduleClearFocus=delay=>{
       cancelScheduledClear();
@@ -1520,14 +1664,36 @@ namespace Couleur
         clearFocus();
       },safeDelay);
     };
-    const highlightLabel=label=>{
-      if(!label)return false;
-      if(activeHighlight){
-        const previousHighlight=activeHighlight;
-        activeHighlight=null;
-        previousHighlight.remove();
+    const positionHighlight=highlight=>{
+      if(!highlight||!highlight.overlay)return false;
+      if(!highlight.host||
+         !highlight.host.isConnected){
+        highlight.overlay.style.display='none';
+        return false;
       }
-      label.scrollIntoView({
+      const rect=highlight.host.getBoundingClientRect();
+      if(rect.width<=0||
+         rect.height<=0||
+         rect.bottom<=0||
+         rect.top>=window.innerHeight){
+        highlight.overlay.style.display='none';
+        return false;
+      }
+      const overlay=highlight.overlay;
+      overlay.style.display='block';
+      overlay.style.left='2px';
+      overlay.style.width='calc(100vw - 18px)';
+      overlay.style.top=`${Math.max(0,rect.top-2)}px`;
+      overlay.style.height=
+        `${Math.max(22,rect.height+4)}px`;
+      return true;
+    };
+    const highlightLabel=row=>{
+      if(!row)return false;
+      removeActiveHighlight();
+      const label=row.label||row.element||row;
+      let host=row.host||label;
+      host.scrollIntoView({
         behavior:'auto',
         block:'center',
         inline:'nearest'
@@ -1539,10 +1705,6 @@ namespace Couleur
         'data-bimaestro-focus-overlay',
         '1');
       overlay.style.position='fixed';
-      overlay.style.left='2px';
-      overlay.style.width='calc(100vw - 18px)';
-      overlay.style.top=`${Math.max(0,rect.top-3)}px`;
-      overlay.style.height=`${Math.max(22,rect.height+6)}px`;
       overlay.style.boxSizing='border-box';
       overlay.style.border=`2px solid ${theme.accent}`;
       overlay.style.borderRadius='4px';
@@ -1551,42 +1713,484 @@ namespace Couleur
       overlay.style.zIndex='2147483646';
       (document.body||document.documentElement)
         .appendChild(overlay);
-      activeHighlight=overlay;
+      const currentHighlight={
+        overlay,
+        host,
+        label,
+        elementId:row.id||''
+      };
+      activeHighlight=currentHighlight;
+      positionHighlight(currentHighlight);
       setTimeout(()=>{
-        if(activeHighlight!==overlay)return;
+        if(activeHighlight!==currentHighlight)return;
         activeHighlight=null;
-        overlay.remove();
-      },2600);
+        restoreHighlight(currentHighlight);
+      },6000);
       return true;
     };
-    const findLabel=name=>visibleLabels().find(
-      label=>(label.textContent||'').trim()===name);
-    const focusView=name=>{
+    const normalizeLabel=value=>(value||'')
+      .replace(/[\u200B-\u200D\uFEFF]/g,'')
+      .replace(/\s+/g,' ')
+      .trim()
+      .toLocaleLowerCase();
+    const getProjectBrowserRows=()=>{
+      const wraps=Array.from(document.querySelectorAll(
+        '[class*=""vTree_treeItemWrap""]'));
+      const rows=wraps
+        .map(wrap=>{
+          const host=wrap.parentElement||wrap;
+          const treeItem=wrap.querySelector(
+            '[role=""treeitem""]');
+          const input=wrap.querySelector('input');
+          const rawName=input?input.value:wrap.textContent;
+          const name=normalizeLabel(rawName);
+          if(!name)return null;
+          const style=getComputedStyle(wrap);
+          const rect=wrap.getBoundingClientRect();
+          const hostRect=host.getBoundingClientRect();
+          if(style.display==='none'||
+             style.visibility==='hidden'||
+             Number(style.opacity)===0||
+             rect.width<=0||
+             rect.height<=0)
+            return null;
+          const labelCandidates=Array.from(
+            wrap.querySelectorAll('*'))
+            .filter(element=>
+              element.children.length===0&&
+              normalizeLabel(element.textContent)===name)
+            .sort((a,b)=>{
+              const ar=a.getBoundingClientRect();
+              const br=b.getBoundingClientRect();
+              return ar.width*ar.height-br.width*br.height;
+            });
+          return {
+            wrap,
+            host,
+            label:labelCandidates[0]||input||wrap,
+            id:treeItem&&treeItem.id
+              ?String(treeItem.id)
+              :'',
+            name,
+            top:hostRect.top,
+            left:rect.left,
+            branch:null,
+            ancestors:[]
+          };
+        })
+        .filter(Boolean)
+        .sort((a,b)=>a.top-b.top||a.left-b.left);
+      if(!rows.length)return rows;
+      const rootLeft=Math.min(...rows.map(row=>row.left));
+      let currentBranch=null;
+      const stack=[];
+      rows.forEach(row=>{
+        if(row.left<=rootLeft+3){
+          if(/^(vues|views)(\s*\([^)]*\))?$/.test(row.name))
+            currentBranch='views';
+          else if(
+            /^(feuilles|sheets)(\s*\([^)]*\))?$/.test(
+              row.name))
+            currentBranch='sheets';
+          else currentBranch=null;
+        }
+        row.branch=currentBranch;
+        while(stack.length&&
+              row.left<=stack[stack.length-1].left+3)
+          stack.pop();
+        row.ancestors=stack.slice();
+        stack.push(row);
+      });
+      return rows;
+    };
+    const findTreeScroller=rows=>{
+      const seed=rows&&rows.length
+        ?rows[0].host
+        :document.querySelector(
+           '[class*=""vTree_treeItemWrap""]');
+      let candidate=seed?seed.parentElement:null;
+      while(candidate&&candidate!==document.body){
+        const style=getComputedStyle(candidate);
+        const canScroll=
+          candidate.scrollHeight>
+            candidate.clientHeight+4&&
+          /(auto|scroll)/i.test(
+            style.overflowY||style.overflow);
+        if(canScroll)return candidate;
+        candidate=candidate.parentElement;
+      }
+      return null;
+    };
+    const findLabel=(name,elementId)=>{
+      const target=normalizeLabel(name);
+      const id=String(elementId||'');
+      const rows=getProjectBrowserRows();
+      if(id){
+        const exactId=rows.find(
+          row=>row.id===id&&row.branch==='views');
+        if(exactId)return exactId;
+      }
+      if(!target)return null;
+      const matchesName=row=>
+        row.name===target||
+        row.name.endsWith(`: ${target}`)||
+        row.name.endsWith(`:${target}`);
+      return rows.find(
+        row=>row.branch==='views'&&matchesName(row))||
+        rows.find(
+          row=>row.branch!=='sheets'&&matchesName(row))||
+        null;
+    };
+    const refreshActiveHighlight=()=>{
+      if(!activeHighlight||
+         !activeHighlight.elementId)
+        return;
+      const row=getProjectBrowserRows().find(
+        candidate=>
+          candidate.id===activeHighlight.elementId);
+      if(!row){
+        activeHighlight.host=null;
+        activeHighlight.label=null;
+        if(activeHighlight.overlay)
+          activeHighlight.overlay.style.display='none';
+        return;
+      }
+      activeHighlight.host=row.host;
+      activeHighlight.label=row.label;
+      positionHighlight(activeHighlight);
+    };
+    const highlightWhenReady=(
+      name,
+      elementId,
+      sequence,
+      attempt)=>{
+      if(sequence!==focusSequence)return;
+      refreshActiveHighlight();
+      const label=findLabel(name,elementId);
+      const needsRefresh=
+        label&&(
+          !activeHighlight||
+          activeHighlight.elementId!==label.id||
+          activeHighlight.host!==label.host||
+          !activeHighlight.host||
+          !activeHighlight.host.isConnected);
+      if(needsRefresh)highlightLabel(label);
+      if(label){
+        if(attempt>=12)return;
+        setTimeout(
+          ()=>highlightWhenReady(
+            name,
+            elementId,
+            sequence,
+            attempt+1),
+          100);
+        return;
+      }
+      if(attempt>=80)return;
+      const rows=getProjectBrowserRows();
+      const scroller=findTreeScroller(rows);
+      if(scroller){
+        const page=Math.max(80,scroller.clientHeight-28);
+        if(attempt===0)
+          scroller.scrollTop=0;
+        else if(
+          scroller.scrollTop+scroller.clientHeight<
+            scroller.scrollHeight-2)
+          scroller.scrollTop=Math.min(
+            scroller.scrollHeight-scroller.clientHeight,
+            scroller.scrollTop+page);
+        else if(attempt>8)return;
+      }
+      setTimeout(
+        ()=>highlightWhenReady(
+          name,
+          elementId,
+          sequence,
+          attempt+1),
+        60);
+    };
+    const focusView=(name,elementId)=>{
       if(!name)return;
       cancelScheduledClear();
       const sequence=++focusSequence;
-      if(highlightLabel(findLabel(name)))return;
+      if(highlightLabel(findLabel(name,elementId))){
+        setTimeout(
+          ()=>highlightWhenReady(
+            name,
+            elementId,
+            sequence,
+            0),
+          100);
+        return;
+      }
       const search=findSearchInput();
       if(!search)return;
       automaticSearchValue=name;
       setInputValue(search,name);
-      setTimeout(()=>{
-        if(sequence!==focusSequence)return;
-        highlightLabel(findLabel(name));
-      },300);
+      setTimeout(
+        ()=>highlightWhenReady(
+          name,
+          elementId,
+          sequence,
+          0),
+        100);
     };
+    let activeViewName='';
+    let activeViewElementId='';
+    let activeViewGeneration=0;
+    let activeViewPath=[];
+    let activeParentNodeId='';
+    let activeParentMarker=null;
+    let activeParentClickTimer=null;
+    let activeParentScrollTimer=null;
+    let activeParentRetryTimers=[];
+    const restoreStyleProperty=(element,name,snapshot)=>{
+      if(!element||!snapshot)return;
+      if(snapshot.value)
+        element.style.setProperty(
+          name,
+          snapshot.value,
+          snapshot.priority);
+      else element.style.removeProperty(name);
+    };
+    const clearActiveParentMarker=()=>{
+      if(!activeParentMarker)return;
+      const marker=activeParentMarker;
+      activeParentMarker=null;
+      if(!marker.element)return;
+      marker.element.removeAttribute(
+        'data-bimaestro-active-parent');
+      restoreStyleProperty(
+        marker.element,
+        'color',
+        marker.color);
+      restoreStyleProperty(
+        marker.element,
+        'font-weight',
+        marker.fontWeight);
+    };
+    const markActiveParent=element=>{
+      if(!element){
+        clearActiveParentMarker();
+        return;
+      }
+      if(activeParentMarker&&
+         activeParentMarker.element===element){
+        element.setAttribute(
+          'data-bimaestro-active-parent',
+          '1');
+        element.style.setProperty(
+          'color',
+          theme.activeParent,
+          'important');
+        element.style.setProperty(
+          'font-weight',
+          '700',
+          'important');
+        return;
+      }
+      clearActiveParentMarker();
+      activeParentMarker={
+        element,
+        color:{
+          value:element.style.getPropertyValue('color'),
+          priority:element.style.getPropertyPriority('color')
+        },
+        fontWeight:{
+          value:element.style.getPropertyValue('font-weight'),
+          priority:element.style.getPropertyPriority('font-weight')
+        }
+      };
+      element.setAttribute(
+        'data-bimaestro-active-parent',
+        '1');
+      element.style.setProperty(
+        'color',
+        theme.activeParent,
+        'important');
+      element.style.setProperty(
+        'font-weight',
+        '700',
+        'important');
+    };
+    const getVisibleViewRows=()=>getProjectBrowserRows()
+      .filter(row=>row.branch!=='sheets');
+    const findVisibleActiveParent=()=>{
+      if(!activeViewPath.length)return null;
+      const rows=getVisibleViewRows();
+      if(activeParentNodeId){
+        const cachedParent=rows.find(
+          row=>row.id===activeParentNodeId);
+        if(cachedParent)return cachedParent;
+        activeParentNodeId='';
+      }
+      const normalizedPath=activeViewPath.map(normalizeLabel);
+      const normalizedPathSet=new Set(normalizedPath);
+      if(activeViewElementId){
+        const activeRow=rows.find(
+          row=>row.id===activeViewElementId);
+        if(activeRow){
+          const exactAncestors=activeRow.ancestors
+            .filter(row=>
+              normalizedPathSet.has(row.name)&&
+              row.branch!=='sheets');
+          if(exactAncestors.length)
+            return exactAncestors[
+              exactAncestors.length-1];
+        }
+      }
+      let best=null;
+      for(let level=0;level<normalizedPath.length;level++){
+        const target=normalizedPath[level];
+        if(!target)continue;
+        rows
+          .filter(row=>row.name===target)
+          .forEach(row=>{
+            let expectedLevel=level-1;
+            let matchedAncestors=0;
+            for(let index=row.ancestors.length-1;
+                index>=0&&expectedLevel>=0;
+                index--){
+              if(row.ancestors[index].name===
+                 normalizedPath[expectedLevel]){
+                matchedAncestors++;
+                expectedLevel--;
+              }
+            }
+            const isVerifiedRoot=
+              level===0&&row.branch==='views';
+            if(!isVerifiedRoot&&matchedAncestors===0)
+              return;
+            const score=
+              matchedAncestors*10000+
+              level*1000+
+              Math.min(99,row.left);
+            if(!best||score>best.score)
+              best={row,score};
+          });
+      }
+      return best?best.row:null;
+    };
+    const renderActiveParent=()=>{
+      if(state.disposed||
+         !theme.activeParentEnabled||
+         !activeViewPath.length){
+        clearActiveParentMarker();
+        return;
+      }
+      const parentRow=findVisibleActiveParent();
+      if(parentRow){
+        activeParentNodeId=parentRow.id||'';
+        markActiveParent(parentRow.label);
+      }else{
+        markActiveParent(null);
+      }
+    };
+    const clearActiveView=()=>{
+      activeViewName='';
+      activeViewElementId='';
+      activeViewGeneration=0;
+      activeViewPath=[];
+      activeParentNodeId='';
+      activeParentRetryTimers.forEach(clearTimeout);
+      activeParentRetryTimers=[];
+      clearActiveParentMarker();
+    };
+    const scheduleActiveParentRetries=delays=>{
+      activeParentRetryTimers.forEach(clearTimeout);
+      activeParentRetryTimers=(delays||[]).map(delay=>
+        setTimeout(
+          ()=>renderActiveParent(),
+          Math.max(0,Number(delay)||0)));
+    };
+    const setActiveView=(
+      name,
+      path,
+      elementId,
+      generation)=>{
+      const incomingGeneration=
+        Math.max(0,Number(generation)||0);
+      if(incomingGeneration<activeViewGeneration)
+        return;
+      activeViewGeneration=incomingGeneration;
+      activeViewName=name||'';
+      activeViewElementId=String(elementId||'');
+      activeParentNodeId='';
+      clearActiveParentMarker();
+      activeViewPath=Array.isArray(path)
+        ?path.filter(value=>
+           typeof value==='string'&&value.trim())
+        :[];
+      renderActiveParent();
+      scheduleActiveParentRetries([70,220,550]);
+    };
+    const onBrowserClick=()=>{
+      if(activeParentClickTimer!==null)
+        clearTimeout(activeParentClickTimer);
+      activeParentClickTimer=setTimeout(()=>{
+        activeParentClickTimer=null;
+        renderActiveParent();
+      },90);
+      scheduleActiveParentRetries([180,450]);
+    };
+    const onBrowserScroll=()=>{
+      if(activeParentScrollTimer!==null)return;
+      activeParentScrollTimer=requestAnimationFrame(()=>{
+        activeParentScrollTimer=null;
+        refreshActiveHighlight();
+        renderActiveParent();
+      });
+    };
+    document.addEventListener('click',onBrowserClick,true);
+    document.addEventListener('scroll',onBrowserScroll,true);
     let paintScheduled=false;
     const observer=new MutationObserver(()=>{
-      if(paintScheduled)return;
+      if(state.disposed||paintScheduled)return;
       paintScheduled=true;
       requestAnimationFrame(()=>{
         paintScheduled=false;
+        if(state.disposed)return;
         paint();
       });
     });
     observer.observe(
       document.documentElement,
-      {childList:true,subtree:true});
+      {
+        childList:true,
+        characterData:true,
+        subtree:true
+      });
+    const dispose=()=>{
+      state.disposed=true;
+      observer.disconnect();
+      cancelScheduledClear();
+      if(activeParentClickTimer!==null){
+        clearTimeout(activeParentClickTimer);
+        activeParentClickTimer=null;
+      }
+      if(activeParentScrollTimer!==null){
+        cancelAnimationFrame(activeParentScrollTimer);
+        activeParentScrollTimer=null;
+      }
+      activeParentRetryTimers.forEach(clearTimeout);
+      activeParentRetryTimers=[];
+      document.removeEventListener(
+        'click',
+        onBrowserClick,
+        true);
+      document.removeEventListener(
+        'scroll',
+        onBrowserScroll,
+        true);
+      clearActiveParentMarker();
+      focusSequence++;
+      removeActiveHighlight();
+      const search=findSearchInput();
+      if(search&&automaticSearchValue!==null&&
+         search.value===automaticSearchValue)
+        setInputValue(search,'');
+      automaticSearchValue=null;
+    };
     window[key]={
       version,
       originals,
@@ -1594,12 +2198,23 @@ namespace Couleur
       paint,
       focusView,
       clearFocus,
-      scheduleClearFocus
+      scheduleClearFocus,
+      setActiveView,
+      clearActiveView,
+      dispose
     };
   }
   window[key].paint();
 })()";
             return script
+                .Replace(
+                    "__BIMAESTRO_BROWSER_APPEARANCE_ENABLED__",
+                    settings.IsEnabled ? "true" : "false")
+                .Replace(
+                    "__BIMAESTRO_ACTIVE_PARENT_ENABLED__",
+                    settings.IsActiveViewParentHighlightEnabled
+                        ? "true"
+                        : "false")
                 .Replace(
                     "__BIMAESTRO_BROWSER_BACKGROUND__",
                     ToCssColor(settings.BackgroundColor))
@@ -1609,6 +2224,9 @@ namespace Couleur
                 .Replace(
                     "__BIMAESTRO_BROWSER_ACCENT__",
                     ToCssColor(settings.AccentColor))
+                .Replace(
+                    "__BIMAESTRO_ACTIVE_PARENT_COLOR__",
+                    ToCssColor(settings.ActiveViewParentColor))
                 .Replace(
                     "__BIMAESTRO_BROWSER_FOCUS__",
                     ToCssFocusBackground(settings.AccentColor))
@@ -1655,6 +2273,10 @@ namespace Couleur
             }
 
             if (string.Equals(
+                    mode,
+                    "Dégradé pastel animé",
+                    StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(
                     mode,
                     "Aurore pastel",
                     StringComparison.OrdinalIgnoreCase))

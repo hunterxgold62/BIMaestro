@@ -1665,6 +1665,10 @@ namespace Couleur
         public Color AccentColor { get; set; }
 
         public bool IsSheetViewSearchEnabled { get; set; }
+
+        public bool IsActiveViewParentHighlightEnabled { get; set; }
+
+        public Color ActiveViewParentColor { get; set; }
     }
 
     public static class ProjectBrowserColorPreferences
@@ -1680,7 +1684,9 @@ namespace Couleur
                 BackgroundColor = Color.FromRgb(255, 249, 252),
                 TextColor = Color.FromRgb(58, 61, 72),
                 AccentColor = Color.FromRgb(219, 87, 142),
-                IsSheetViewSearchEnabled = true
+                IsSheetViewSearchEnabled = true,
+                IsActiveViewParentHighlightEnabled = true,
+                ActiveViewParentColor = Color.FromRgb(220, 54, 69)
             };
         }
 
@@ -1706,6 +1712,9 @@ namespace Couleur
                         settings.IsSheetViewSearchEnabled =
                             saved.Value<bool?>("RechercheVueFeuille") ??
                             settings.IsSheetViewSearchEnabled;
+                        settings.IsActiveViewParentHighlightEnabled =
+                            saved.Value<bool?>("RepererParentVueActive") ??
+                            settings.IsActiveViewParentHighlightEnabled;
 
                         if (TryParseColor(
                                 saved.Value<string>("Fond"),
@@ -1726,6 +1735,15 @@ namespace Couleur
                                 out Color accent))
                         {
                             settings.AccentColor = accent;
+                        }
+
+                        if (TryParseColor(
+                                saved.Value<string>(
+                                    "CouleurParentVueActive"),
+                                out Color activeViewParent))
+                        {
+                            settings.ActiveViewParentColor =
+                                activeViewParent;
                         }
                     }
                 }
@@ -1760,7 +1778,11 @@ namespace Couleur
                     ["Texte"] = ToHex(normalized.TextColor),
                     ["Accent"] = ToHex(normalized.AccentColor),
                     ["RechercheVueFeuille"] =
-                        normalized.IsSheetViewSearchEnabled
+                        normalized.IsSheetViewSearchEnabled,
+                    ["RepererParentVueActive"] =
+                        normalized.IsActiveViewParentHighlightEnabled,
+                    ["CouleurParentVueActive"] =
+                        ToHex(normalized.ActiveViewParentColor)
                 };
                 RibbonColorPreferences.SavePreferenceRoot(root);
                 _cached = normalized;
@@ -1778,7 +1800,11 @@ namespace Couleur
                 TextColor = source.TextColor,
                 AccentColor = source.AccentColor,
                 IsSheetViewSearchEnabled =
-                    source.IsSheetViewSearchEnabled
+                    source.IsSheetViewSearchEnabled,
+                IsActiveViewParentHighlightEnabled =
+                    source.IsActiveViewParentHighlightEnabled,
+                ActiveViewParentColor =
+                    source.ActiveViewParentColor
             };
         }
 
@@ -1790,8 +1816,16 @@ namespace Couleur
                 "Bulles pastel",
                 "Vagues pastel",
                 "Lucioles pastel",
-                "Aurore pastel"
+                "Dégradé pastel animé"
             };
+            if (string.Equals(
+                    value,
+                    "Aurore pastel",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return "Dégradé pastel animé";
+            }
+
             return supportedModes.FirstOrDefault(mode =>
                        string.Equals(
                            mode,
