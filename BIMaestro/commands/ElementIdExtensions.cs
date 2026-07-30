@@ -46,5 +46,43 @@ namespace Autodesk.Revit.DB
 
             return -1;
         }
+
+        public static long GetIdLongValue(this ElementId id)
+        {
+            if (id == null)
+            {
+                return -1L;
+            }
+
+            if (ValueProperty != null)
+            {
+                var value = ValueProperty.GetValue(id);
+                if (value is long longValue)
+                {
+                    return longValue;
+                }
+
+                if (value is int intValue)
+                {
+                    return intValue;
+                }
+            }
+
+            if (IntegerValueProperty != null)
+            {
+                var value = IntegerValueProperty.GetValue(id);
+                if (value is long longValue)
+                {
+                    return longValue;
+                }
+
+                if (value is int intValue)
+                {
+                    return intValue;
+                }
+            }
+
+            return -1L;
+        }
     }
 }

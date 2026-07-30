@@ -55,6 +55,29 @@ public class AppUI : IExternalApplication
 
             }),
 
+            new RibbonPanelDefinition("Panneaux réservés au test", new List<RibbonItemDefinition>
+            {
+                new RibbonItemDefinition(
+                    "RevitGameCommand",
+                    "Maquette jouable",
+                    panel => AddPushButton(
+                        panel,
+                        "RevitGameCommand",
+                        "Maquette\njouable",
+                        assemblyPath,
+                        "BIMaestro.VideoGames.RevitGameCommand",
+                        "3D.jpg",
+                        "Transforme en un clic la vue 3D Revit active en terrain de jeu navigable.\r\n\r\n" +
+                        "Fonctionnalités :\r\n" +
+                        "- conserve les éléments visibles, la boîte de coupe et les couleurs de la vue,\r\n" +
+                        "- déplacement à la première personne en ZQSD/WASD,\r\n" +
+                        "- collisions avec les murs et équipements,\r\n" +
+                        "- ouverture et fermeture des portes proches avec E,\r\n" +
+                        "- montée automatique des escaliers et rampes,\r\n" +
+                        "- saut, course, gravité et mode vol libre.\r\n\r\n" +
+                        "Conseil : préparez une vue 3D en Couleurs uniformes, puis cliquez sur ce bouton."))
+            }),
+
              new RibbonPanelDefinition("Modification", new List<RibbonItemDefinition>
             {
                 

@@ -100,8 +100,7 @@ namespace ScanTextRevit
             }
 
             // 5) Affichage de la fenêtre de résultat
-            CorrectionResultWindow resultWindow = new CorrectionResultWindow();
-            resultWindow.UiDoc = uiApp.ActiveUIDocument;
+            CorrectionResultWindow resultWindow = new CorrectionResultWindow(uiApp.ActiveUIDocument);
             var helper2 = new System.Windows.Interop.WindowInteropHelper(resultWindow);
             helper2.Owner = System.Diagnostics.Process.GetCurrentProcess().MainWindowHandle;
             resultWindow.Show();

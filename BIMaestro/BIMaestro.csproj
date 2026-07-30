@@ -51,6 +51,9 @@
     <PackageReference Include="HelixToolkit.Wpf">
       <Version>2.27.3</Version>
     </PackageReference>
+    <PackageReference Include="HelixToolkit.Wpf.SharpDX">
+      <Version>2.27.3</Version>
+    </PackageReference>
     <PackageReference Include="Markdown.Xaml">
       <Version>1.0.0</Version>
     </PackageReference>
@@ -248,6 +251,14 @@
     </Compile>
     <Compile Include="commands\Jeux\snake\SnakeWindow.xaml.cs">
       <DependentUpon>SnakeWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameCollisionWorld.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameGpuSceneBuilder.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameSceneData.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\RevitGameCommand.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\RevitGameExportContext.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\RevitGameWindow.xaml.cs">
+      <DependentUpon>RevitGameWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="commands\page de mise à jour en direct\UpdateNotificationManager.cs" />
     <Compile Include="commands\page de mise à jour en direct\ButtonUpdateNote.cs" />
@@ -632,6 +643,10 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <Page Include="commands\Jeux vidéos\Maquette jouable\RevitGameWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
     <Page Include="commands\menu contextuel\CommandSelectionWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -929,6 +944,7 @@
     <EmbeddedResource Include="Resources\paramétre.png" />
     <EmbeddedResource Include="Resources\Purge famille.png" />
     <EmbeddedResource Include="Resources\Déplacement protégé.png" />
+    <EmbeddedResource Include="Resources\3D.jpg" />
     <Content Include="Themes\BIMaestro_Charte_Graphique.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

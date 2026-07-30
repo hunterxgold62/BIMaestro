@@ -1,0 +1,310 @@
+<Window x:Class="BIMaestro.VideoGames.RevitGameWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:h="http://helix-toolkit.org/wpf/SharpDX"
+        xmlns:h2="clr-namespace:HelixToolkit.Wpf.SharpDX.Elements2D;assembly=HelixToolkit.Wpf.SharpDX"
+        Title="BIMaestro — Maquette jouable"
+        Width="1280"
+        Height="800"
+        MinWidth="900"
+        MinHeight="600"
+        WindowStartupLocation="CenterOwner"
+        WindowState="Maximized"
+        ShowInTaskbar="False"
+        Background="#10151D">
+    <Window.Resources>
+        <Style x:Key="HudCaption" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#AFC0D5"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+        <Style x:Key="HudValue" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontFamily" Value="Segoe UI Semibold"/>
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+        <Style x:Key="GlassButton" TargetType="Button">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="#66151D28"/>
+            <Setter Property="BorderBrush" Value="#557F97B4"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="#AA2A3B50"/>
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#FF78C9FF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid x:Name="RootGrid" Background="#10151D">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <h:Viewport3DX x:Name="GameViewport"
+                       Grid.Row="1"
+                       BackgroundColor="#FFB8CBD6"
+                       UseDefaultGestures="False"
+                       EnableMouseButtonHitTest="False"
+                       EnableAutoOctreeUpdate="False"
+                       MinimumUpdateCount="1"
+                       ShowCameraInfo="False"
+                       ShowCoordinateSystem="False"
+                       ShowFrameRate="False"
+                       ShowViewCube="False"
+                       EnableRenderFrustum="True"
+                       EnableDeferredRendering="True"
+                       EnableSwapChainRendering="True"
+                       EnableD2DRendering="True"
+                       IncreaseSwapchainFPS="True"
+                       IsShadowMappingEnabled="False"
+                       MSAA="Four"
+                       FXAALevel="None"
+                       OITRenderMode="SinglePassWeighted"
+                       ClipToBounds="True">
+            <h:Viewport3DX.Content2D>
+                <h2:RelativePositionCanvas2D IsHitTestVisible="False">
+                    <h2:TextModel2D Text="+"
+                                    Width="28"
+                                    Height="28"
+                                    FontFamily="Segoe UI Semibold"
+                                    FontSize="22"
+                                    Foreground="White"
+                                    Background="#00000000"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    TextAlignment="Center"
+                                    IsHitTestVisible="False"/>
+                </h2:RelativePositionCanvas2D>
+            </h:Viewport3DX.Content2D>
+            <h:AmbientLight3D x:Name="AmbientLight" Color="#FF5C6878"/>
+            <h:DirectionalLight3D x:Name="SunLight"
+                                  Color="#FFFFF4DE"
+                                  Direction="-0.42,-0.58,-1"/>
+            <h:DirectionalLight3D x:Name="FillLight"
+                                  Color="#FF7499BE"
+                                  Direction="0.52,0.34,0.72"/>
+            <h:DirectionalLight3D x:Name="HeadLight"
+                                  Color="#66FFFFFF"
+                                  Direction="1,0,-0.1"/>
+        </h:Viewport3DX>
+
+        <!-- En-tête -->
+        <Border Grid.Row="0"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Top"
+                Margin="8"
+                Padding="14,10"
+                CornerRadius="9"
+                Background="#B317202B"
+                BorderBrush="#557B91AA"
+                BorderThickness="1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="18"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Width="42" Height="42" CornerRadius="8" Background="#FF19A7CE">
+                    <Grid>
+                        <TextBlock Text="B" FontFamily="Segoe UI Black" FontSize="25"
+                                   Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Border Width="8" Height="8" CornerRadius="4" Background="#FFFFC857"
+                                HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,5,5,0"/>
+                    </Grid>
+                </Border>
+
+                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                    <TextBlock Text="MAQUETTE JOUABLE" Foreground="White" FontFamily="Segoe UI Semibold"
+                               FontSize="15"/>
+                    <TextBlock x:Name="ViewNameText" Style="{StaticResource HudCaption}" Margin="0,2,0,0"/>
+                    <TextBlock x:Name="SceneStatsText" Style="{StaticResource HudCaption}" Margin="0,2,0,0"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                    <StackPanel Margin="0,0,22,0">
+                        <TextBlock Text="MODE" Style="{StaticResource HudCaption}"/>
+                        <TextBlock x:Name="ModeText" Text="MARCHE" Style="{StaticResource HudValue}"/>
+                    </StackPanel>
+                    <StackPanel Margin="0,0,22,0">
+                        <TextBlock Text="VITESSE" Style="{StaticResource HudCaption}"/>
+                        <TextBlock x:Name="SpeedText" Text="0,0 m/s" Style="{StaticResource HudValue}"/>
+                    </StackPanel>
+                    <StackPanel Margin="0,0,22,0">
+                        <TextBlock Text="PERFORMANCE" Style="{StaticResource HudCaption}"/>
+                        <TextBlock x:Name="FpsText" Text="— FPS" Style="{StaticResource HudValue}"/>
+                    </StackPanel>
+                    <Button Style="{StaticResource GlassButton}" Content="Quitter  ×" Click="ExitButton_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Aide de prise en main -->
+        <Border x:Name="MouseGuide"
+                Grid.Row="2"
+                Panel.ZIndex="20"
+                Visibility="Collapsed"
+                IsHitTestVisible="False"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Margin="8"
+                Padding="20,11"
+                CornerRadius="8"
+                Background="#D91A2430"
+                BorderBrush="#9978C9FF"
+                BorderThickness="1">
+            <StackPanel>
+                <TextBlock Text="MAINTENEZ LE CLIC ET GLISSEZ POUR REGARDER"
+                           Foreground="White"
+                           FontFamily="Segoe UI Semibold"
+                           FontSize="13"
+                           HorizontalAlignment="Center"/>
+                <TextBlock Text="Clic gauche ou droit • Relâchez pour libérer la caméra"
+                           Style="{StaticResource HudCaption}"
+                           Margin="0,4,0,0"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Commandes -->
+        <Border x:Name="ControlsHud"
+                Grid.Row="2"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Margin="8"
+                Padding="14,9"
+                CornerRadius="9"
+                Background="#B317202B"
+                BorderBrush="#557B91AA"
+                BorderThickness="1"
+                IsHitTestVisible="False">
+            <Border.CacheMode>
+                <BitmapCache RenderAtScale="1"/>
+            </Border.CacheMode>
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="ZQSD / WASD" Style="{StaticResource HudValue}"/>
+                <TextBlock Text="  se déplacer   •   " Style="{StaticResource HudCaption}"/>
+                <TextBlock Text="CLIC + GLISSER" Style="{StaticResource HudValue}"/>
+                <TextBlock Text="  regarder   •   " Style="{StaticResource HudCaption}"/>
+                <TextBlock Text="ESPACE" Style="{StaticResource HudValue}"/>
+                <TextBlock Text="  sauter   •   " Style="{StaticResource HudCaption}"/>
+                <TextBlock Text="MAJ" Style="{StaticResource HudValue}"/>
+                <TextBlock Text="  courir   •   " Style="{StaticResource HudCaption}"/>
+                <TextBlock Text="F" Style="{StaticResource HudValue}"/>
+                <TextBlock Text="  voler   •   " Style="{StaticResource HudCaption}"/>
+                <TextBlock Text="E" Style="{StaticResource HudValue}"/>
+                <TextBlock Text="  ouvrir / fermer une porte   •   " Style="{StaticResource HudCaption}"/>
+                <TextBlock Text="R" Style="{StaticResource HudValue}"/>
+                <TextBlock Text="  réapparaître" Style="{StaticResource HudCaption}"/>
+            </StackPanel>
+        </Border>
+
+        <Border x:Name="ToastBorder"
+                Grid.Row="0"
+                Panel.ZIndex="30"
+                Visibility="Collapsed"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Top"
+                Margin="0,18,0,0"
+                Padding="16,8"
+                CornerRadius="7"
+                Background="#DF15202C"
+                BorderBrush="#8878C9FF"
+                BorderThickness="1"
+                IsHitTestVisible="False">
+            <TextBlock x:Name="ToastText" Foreground="White" FontFamily="Segoe UI Semibold" FontSize="12"/>
+        </Border>
+
+        <!--
+          Sas bloquant : il reste au-dessus de la scène jusqu'à ce que l'index
+          physique, les maillages DirectX et les buffers graphiques soient prêts.
+        -->
+        <Border x:Name="LoadingGate"
+                Grid.Row="0"
+                Panel.ZIndex="100"
+                Background="#F2131922">
+            <Grid>
+                <StackPanel Width="460"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center">
+                    <Border Width="64" Height="64" CornerRadius="14"
+                            Background="#FF19A7CE"
+                            HorizontalAlignment="Center">
+                        <TextBlock Text="B"
+                                   Foreground="White"
+                                   FontFamily="Segoe UI Black"
+                                   FontSize="38"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                    </Border>
+
+                    <TextBlock x:Name="LoadingTitleText"
+                               Text="PRÉPARATION DE LA MAQUETTE JOUABLE"
+                               Foreground="White"
+                               FontFamily="Segoe UI Semibold"
+                               FontSize="17"
+                               TextAlignment="Center"
+                               Margin="0,22,0,0"/>
+
+                    <TextBlock x:Name="LoadingStatusText"
+                               Text="Initialisation du moteur 3D…"
+                               Foreground="#BFD0E3"
+                               FontFamily="Segoe UI"
+                               FontSize="13"
+                               TextAlignment="Center"
+                               TextWrapping="Wrap"
+                               Margin="0,10,0,0"/>
+
+                    <ProgressBar x:Name="LoadingProgress"
+                                 IsIndeterminate="True"
+                                 Height="5"
+                                 Margin="44,20"
+                                 Foreground="#FF19A7CE"
+                                 Background="#FF2A3442"
+                                 BorderThickness="0"/>
+
+                    <TextBlock x:Name="LoadingMetricsText"
+                               Foreground="#7F95AE"
+                               FontFamily="Segoe UI"
+                               FontSize="11"
+                               TextAlignment="Center"/>
+
+                    <TextBlock Text="Le déplacement restera verrouillé jusqu’au chargement complet."
+                               Foreground="#7F95AE"
+                               FontFamily="Segoe UI"
+                               FontSize="11"
+                               TextAlignment="Center"
+                               Margin="0,7,0,18"/>
+
+                    <Button x:Name="LoadingCloseButton"
+                            Style="{StaticResource GlassButton}"
+                            Content="Annuler"
+                            Click="ExitButton_Click"
+                            Width="110"
+                            HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

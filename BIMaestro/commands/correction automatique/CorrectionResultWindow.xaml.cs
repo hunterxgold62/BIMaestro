@@ -18,7 +18,9 @@ namespace ScanTextRevit
     public partial class CorrectionResultWindow : Window
     {
         private const string HelpUrl = "https://www.bimaestro.fr/ia?outil=audit-texte-ia";
-        public UIDocument UiDoc { get; set; }
+        public UIDocument UiDoc { get; private set; }
+        private readonly ShowCorrectionElementHandler _showElementHandler;
+        private readonly ExternalEvent _showElementEvent;
 
         // Stocke les corrections regroupées par clé (ex. "Feuille : …" ou "Vue : …")
         private Dictionary<string, List<CorrectionItem>> _allResults = new Dictionary<string, List<CorrectionItem>>();
@@ -45,10 +47,27 @@ namespace ScanTextRevit
         }
 
         public CorrectionResultWindow()
+            : this(null)
+        {
+        }
+
+        public CorrectionResultWindow(UIDocument uiDoc)
         {
             ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
+            UiDoc = uiDoc;
+            if (uiDoc != null)
+            {
+                _showElementHandler = new ShowCorrectionElementHandler(uiDoc.Document);
+                _showElementEvent = ExternalEvent.Create(_showElementHandler);
+            }
+            Closed += CorrectionResultWindow_Closed;
             LoadPreferences();
+        }
+
+        private void CorrectionResultWindow_Closed(object sender, EventArgs e)
+        {
+            try { _showElementEvent?.Dispose(); } catch { }
         }
 
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -354,7 +373,8 @@ namespace ScanTextRevit
                 {
                     MenuItem mi = new MenuItem { Header = kvp.Key };
                     var corr = kvp.Value;
-                    mi.Click += (s, e) => ShowElementInView(corr);
+                    mi.IsEnabled = TryGetElementId(corr, out _);
+                    mi.Click += (s, e) => QueueShowElement(corr);
                     menu.Items.Add(mi);
                 }
                 showButton.Click += (s, e) =>
@@ -364,9 +384,9 @@ namespace ScanTextRevit
                 };
                 showButton.IsEnabled = true;
             }
-            else if (int.TryParse(item.ElementId?.Trim(), out int dummy))
+            else if (TryGetElementId(item, out _))
             {
-                showButton.Click += (s, e) => ShowElement(item.ElementId);
+                showButton.Click += (s, e) => QueueShowElement(item);
                 showButton.IsEnabled = true;
             }
             else
@@ -401,70 +421,155 @@ namespace ScanTextRevit
         }
 
 
-        private void ShowElement(string elementIdStr)
-        { 
-            try
+        private static bool TryGetElementId(CorrectionItem item, out long elementId)
+        {
+            elementId = -1;
+            return item != null &&
+                   long.TryParse(item.ElementId?.Trim(), out elementId) &&
+                   elementId > 0;
+        }
+
+        private void QueueShowElement(CorrectionItem item)
+        {
+            if (!TryGetElementId(item, out long elementId) ||
+                _showElementHandler == null ||
+                _showElementEvent == null)
             {
-                if (UiDoc != null && int.TryParse(elementIdStr?.Trim(), out int idValue))
+                MessageBox.Show(
+                    "L'élément ne peut pas être affiché.",
+                    "BIMaestro",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            long? viewId = null;
+            if (long.TryParse(item.ViewId?.Trim(), out long parsedViewId) && parsedViewId > 0)
+                viewId = parsedViewId;
+
+            _showElementHandler.SetRequest(elementId, viewId);
+            ExternalEventRequest result = _showElementEvent.Raise();
+            if (result == ExternalEventRequest.Denied)
+            {
+                MessageBox.Show(
+                    "Revit ne peut pas traiter cette demande pour le moment.",
+                    "BIMaestro",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+        }
+
+        private sealed class ShowCorrectionElementHandler : IExternalEventHandler
+        {
+            private readonly Document _document;
+            private readonly object _requestLock = new object();
+            private long? _elementId;
+            private long? _viewId;
+
+            public ShowCorrectionElementHandler(Document document)
+            {
+                _document = document;
+            }
+
+            public void SetRequest(long elementId, long? viewId)
+            {
+                lock (_requestLock)
                 {
-                    var elemId = new ElementId(idValue);
-                    var element = UiDoc.Document.GetElement(elemId);
-                    if (element == null)
+                    _elementId = elementId;
+                    _viewId = viewId;
+                }
+            }
+
+            public void Execute(UIApplication app)
+            {
+                long? elementId;
+                long? requestedViewId;
+                lock (_requestLock)
+                {
+                    elementId = _elementId;
+                    requestedViewId = _viewId;
+                    _elementId = null;
+                    _viewId = null;
+                }
+
+                if (!elementId.HasValue)
+                    return;
+
+                try
+                {
+                    UIDocument uiDoc = app.ActiveUIDocument;
+                    if (uiDoc == null || _document == null || !_document.IsValidObject ||
+                        !ReferenceEquals(uiDoc.Document, _document))
                     {
-                        MessageBox.Show("L'élément n'a pas pu être trouvé dans le document.", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+                        TaskDialog.Show(
+                            "BIMaestro",
+                            "Le document analysé n'est plus le document actif. Revenez dans ce document puis réessayez.");
                         return;
                     }
 
-                    if (element is ViewSheet sheet)
+                    Element element = _document.GetElement(CreateElementId(elementId.Value));
+                    if (element == null)
                     {
-                        UiDoc.RequestViewChange(sheet);
-                    }
-                    else
-                    {
-                        ElementId ownerViewId = element.OwnerViewId;
-                        if (ownerViewId != null &&
-                            ownerViewId != ElementId.InvalidElementId &&
-                            !ownerViewId.Equals(UiDoc.ActiveView.Id))
-                        {
-                            View ownerView = UiDoc.Document.GetElement(ownerViewId) as View;
-                            if (ownerView != null)
-                            {
-                                UiDoc.RequestViewChange(ownerView);
-                            }
-                        }
+                        TaskDialog.Show("BIMaestro", "L'élément n'existe plus dans le document.");
+                        return;
                     }
 
-                    // Afficher et sélectionner l'élément
-                    UiDoc.ShowElements(new List<ElementId> { elemId });
-                    UiDoc.Selection.SetElementIds(new List<ElementId> { elemId });
-                }
-                else
-                {
-                    MessageBox.Show("L'identifiant de l'élément n'est pas valide.", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Erreur lors de l'affichage de l'élément : " + ex.Message, "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-        private void ShowElementInView(CorrectionItem item)
-        {
-            try
-            {
-                if (!string.IsNullOrEmpty(item.ViewId) && int.TryParse(item.ViewId, out int vId))
-                {
-                    View view = UiDoc.Document.GetElement(new ElementId(vId)) as View;
-                    if (view != null && !view.Id.Equals(UiDoc.ActiveView.Id))
+                    View targetView = null;
+                    if (requestedViewId.HasValue)
+                        targetView = _document.GetElement(CreateElementId(requestedViewId.Value)) as View;
+
+                    if (targetView == null && element is View elementView)
+                        targetView = elementView;
+
+                    if (targetView == null &&
+                        element.OwnerViewId != null &&
+                        element.OwnerViewId != ElementId.InvalidElementId)
                     {
-                        UiDoc.RequestViewChange(view);
+                        targetView = _document.GetElement(element.OwnerViewId) as View;
                     }
+
+                    if (targetView != null &&
+                        !targetView.IsTemplate &&
+                        !targetView.Id.Equals(uiDoc.ActiveView.Id))
+                    {
+                        // Changement synchrone dans le contexte ExternalEvent :
+                        // le zoom n'est lancé qu'une fois la vue réellement active.
+                        uiDoc.ActiveView = targetView;
+                    }
+
+                    // Les textes de paramètres de feuilles/nomenclatures sont rattachés
+                    // à la vue elle-même : l'activer suffit, ShowElements(View) est évité.
+                    if (element is View)
+                        return;
+
+                    var ids = new List<ElementId> { element.Id };
+                    uiDoc.Selection.SetElementIds(ids);
+                    uiDoc.ShowElements(ids);
                 }
-                ShowElement(item.ElementId);
+                catch (Exception ex)
+                {
+                    TaskDialog.Show(
+                        "BIMaestro",
+                        "Impossible d'afficher cet élément sans risque pour Revit.\n\n" + ex.Message);
+                }
             }
-            catch (Exception ex)
+
+            public string GetName()
             {
-                MessageBox.Show("Erreur lors de l'affichage de l'élément : " + ex.Message, "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+                return "BIMaestro - Afficher une correction de texte";
+            }
+
+            private static ElementId CreateElementId(long value)
+            {
+                var longConstructor = typeof(ElementId).GetConstructor(new[] { typeof(long) });
+                if (longConstructor != null)
+                    return (ElementId)longConstructor.Invoke(new object[] { value });
+
+                if (value > int.MaxValue)
+                    throw new InvalidOperationException(
+                        "Cet identifiant 64 bits nécessite Revit 2024 ou une version plus récente.");
+
+                return new ElementId((int)value);
             }
         }
 

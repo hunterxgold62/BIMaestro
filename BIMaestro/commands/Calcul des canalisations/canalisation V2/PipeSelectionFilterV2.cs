@@ -37,6 +37,71 @@ namespace Analyse
                 new Dictionary<double, (double, double)>();
         }
 
+        private sealed class NetworkSelectionHandler : IExternalEventHandler
+        {
+            private readonly Document _document;
+            private readonly object _requestLock = new object();
+            private List<ElementId> _pendingIds = new List<ElementId>();
+
+            public NetworkSelectionHandler(Document document)
+            {
+                _document = document;
+            }
+
+            public void SetRequest(IEnumerable<ElementId> ids)
+            {
+                lock (_requestLock)
+                {
+                    _pendingIds = ids?.Where(id => id != null).Distinct().ToList()
+                                  ?? new List<ElementId>();
+                }
+            }
+
+            public void Execute(UIApplication app)
+            {
+                List<ElementId> ids;
+                lock (_requestLock)
+                {
+                    ids = _pendingIds;
+                    _pendingIds = new List<ElementId>();
+                }
+
+                if (ids.Count == 0)
+                    return;
+
+                try
+                {
+                    UIDocument uiDoc = app.ActiveUIDocument;
+                    if (uiDoc == null || _document == null || !_document.IsValidObject ||
+                        !ReferenceEquals(uiDoc.Document, _document))
+                    {
+                        TaskDialog.Show(
+                            "BIMaestro",
+                            "Le document du calcul n'est plus le document actif.");
+                        return;
+                    }
+
+                    var validIds = ids.Where(id => _document.GetElement(id) != null).ToList();
+                    if (validIds.Count == 0)
+                        return;
+
+                    uiDoc.Selection.SetElementIds(validIds);
+                    uiDoc.ShowElements(validIds);
+                }
+                catch (Exception ex)
+                {
+                    TaskDialog.Show(
+                        "BIMaestro",
+                        "Impossible d'afficher ce réseau sans risque pour Revit.\n\n" + ex.Message);
+                }
+            }
+
+            public string GetName()
+            {
+                return "BIMaestro - Afficher un réseau";
+            }
+        }
+
         protected override string ButtonId => "PipeLengthByDiameterCommandV2";
 
 
@@ -705,7 +770,25 @@ namespace Analyse
             if (items.Count == 0)
                 return;
 
-            var interactionWindow = new PipeNetworkInteractionWindow(items, ids => SelectNetworkElements(uidoc, ids));
+            var selectionHandler = new NetworkSelectionHandler(uidoc.Document);
+            var selectionEvent = ExternalEvent.Create(selectionHandler);
+            var interactionWindow = new PipeNetworkInteractionWindow(items, ids =>
+            {
+                selectionHandler.SetRequest(ids);
+                ExternalEventRequest request = selectionEvent.Raise();
+                if (request == ExternalEventRequest.Denied)
+                {
+                    MessageBox.Show(
+                        "Revit ne peut pas traiter cette demande pour le moment.",
+                        "BIMaestro",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                }
+            });
+            interactionWindow.Closed += (sender, args) =>
+            {
+                try { selectionEvent.Dispose(); } catch { }
+            };
             var helper = new WindowInteropHelper(interactionWindow)
             {
                 Owner = mainWindowHandle
@@ -719,15 +802,6 @@ namespace Analyse
             var brush = new SolidColorBrush(mediaColor);
             brush.Freeze();
             return brush;
-        }
-
-        private void SelectNetworkElements(UIDocument uidoc, HashSet<ElementId> ids)
-        {
-            if (ids == null || ids.Count == 0)
-                return;
-
-            uidoc.Selection.SetElementIds(ids);
-            uidoc.ShowElements(ids);
         }
 
         // Méthode d'export vers Excel (retourne le chemin complet du fichier généré)

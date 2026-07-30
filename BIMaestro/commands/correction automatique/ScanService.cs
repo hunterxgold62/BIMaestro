@@ -20,7 +20,7 @@ namespace ScanTextRevit
                     var textsInView = ScanSingleView(doc, view);
 
                     string prefix = GetViewTypeLabel(view);
-                    string key = $"{prefix} : {view.Name} (Id {view.Id.GetIdValue()})";
+                    string key = $"{prefix} : {view.Name} (Id {view.Id.GetIdLongValue()})";
 
                     // (A) Filtrer et dédupliquer avant de stocker
                     var filtered = FilterAndDeduplicate(textsInView);
@@ -43,7 +43,7 @@ namespace ScanTextRevit
                             textsDirectlyOnSheet.Add(new ScannedTextItem
                             {
                                 Text = tn.Text,
-                                ElementId = tn.Id.GetIdValue().ToString()
+                                ElementId = tn.Id.GetIdLongValue().ToString()
                             });
                         }
                     }
@@ -62,7 +62,7 @@ namespace ScanTextRevit
                             textsDirectlyOnSheet.Add(new ScannedTextItem
                             {
                                 Text = tagText,
-                                ElementId = tag.Id.GetIdValue().ToString()
+                                ElementId = tag.Id.GetIdLongValue().ToString()
                             });
                         }
                     }
@@ -81,7 +81,7 @@ namespace ScanTextRevit
                             textsDirectlyOnSheet.Add(new ScannedTextItem
                             {
                                 Text = text,
-                                ElementId = fs.Id.GetIdValue().ToString()
+                                ElementId = fs.Id.GetIdLongValue().ToString()
                             });
                         }
                     }
@@ -93,7 +93,7 @@ namespace ScanTextRevit
                         textsDirectlyOnSheet.Add(new ScannedTextItem
                         {
                             Text = text,
-                            ElementId = sheet.Id.GetIdValue().ToString()
+                            ElementId = sheet.Id.GetIdLongValue().ToString()
                         });
                     }
 
@@ -106,7 +106,7 @@ namespace ScanTextRevit
                             textsDirectlyOnSheet.Add(new ScannedTextItem
                             {
                                 Text = text,
-                                ElementId = sheet.Id.GetIdValue().ToString()
+                                ElementId = sheet.Id.GetIdLongValue().ToString()
                             });
                         }
                     }
@@ -124,13 +124,13 @@ namespace ScanTextRevit
                             textsDirectlyOnSheet.Add(new ScannedTextItem
                             {
                                 Text = text,
-                                ElementId = tb.Id.GetIdValue().ToString()
+                                ElementId = tb.Id.GetIdLongValue().ToString()
                             });
                         }
                     }
 
                     // Ajout final
-                    string sheetKey = $"Feuille : {sheet.SheetNumber} - {sheet.Name} (Id {sheet.Id.GetIdValue()})";
+                    string sheetKey = $"Feuille : {sheet.SheetNumber} - {sheet.Name} (Id {sheet.Id.GetIdLongValue()})";
                     allTextsByViewSheet[sheetKey] = FilterAndDeduplicate(textsDirectlyOnSheet);
 
                     // (7) Vues placées (Viewport)
@@ -146,7 +146,7 @@ namespace ScanTextRevit
                             var textsInPlacedView = ScanSingleView(doc, placedView);
 
                             string prefix = GetViewTypeLabel(placedView);
-                            string key = $"{prefix} : {placedView.Name} (Id {placedView.Id.GetIdValue()})";
+                            string key = $"{prefix} : {placedView.Name} (Id {placedView.Id.GetIdLongValue()})";
                             allTextsByViewSheet[key] = FilterAndDeduplicate(textsInPlacedView);
                         }
                     }
@@ -162,7 +162,7 @@ namespace ScanTextRevit
                         if (vsched != null)
                         {
                             var textsInSchedule = ScanSingleView(doc, vsched);
-                            string key = $"Nomenclature : {vsched.Name} (Id {vsched.Id.GetIdValue()})";
+                            string key = $"Nomenclature : {vsched.Name} (Id {vsched.Id.GetIdLongValue()})";
                             allTextsByViewSheet[key] = FilterAndDeduplicate(textsInSchedule);
                         }
                     }
@@ -185,7 +185,7 @@ namespace ScanTextRevit
                 var scheduleTexts = ScanSchedule(doc, schedule);
                 foreach (var text in scheduleTexts)
                 {
-                    result.Add(new ScannedTextItem { Text = text, ElementId = view.Id.GetIdValue().ToString() });
+                    result.Add(new ScannedTextItem { Text = text, ElementId = view.Id.GetIdLongValue().ToString() });
                 }
                 return result;
             }
@@ -200,7 +200,7 @@ namespace ScanTextRevit
             {
                 if (!string.IsNullOrEmpty(tn.Text))
                 {
-                    result.Add(new ScannedTextItem { Text = tn.Text, ElementId = tn.Id.GetIdValue().ToString() });
+                    result.Add(new ScannedTextItem { Text = tn.Text, ElementId = tn.Id.GetIdLongValue().ToString() });
                 }
             }
 
@@ -215,7 +215,7 @@ namespace ScanTextRevit
                 string tagText = tag.TagText;
                 if (!string.IsNullOrEmpty(tagText))
                 {
-                    result.Add(new ScannedTextItem { Text = tagText, ElementId = tag.Id.GetIdValue().ToString() });
+                    result.Add(new ScannedTextItem { Text = tagText, ElementId = tag.Id.GetIdLongValue().ToString() });
                 }
             }
 
@@ -230,7 +230,7 @@ namespace ScanTextRevit
                 var paramTexts = GetAllStringParameters(fs, doc);
                 foreach (var text in paramTexts)
                 {
-                    result.Add(new ScannedTextItem { Text = text, ElementId = fs.Id.GetIdValue().ToString() });
+                    result.Add(new ScannedTextItem { Text = text, ElementId = fs.Id.GetIdLongValue().ToString() });
                 }
             }
 
