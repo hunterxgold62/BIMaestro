@@ -4,6 +4,7 @@
         Title="BIMaestro — Bienvenue"
         Width="880" Height="620"
         MinWidth="760" MinHeight="540"
+        WindowState="Maximized"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
         Background="{DynamicResource App.Background}"

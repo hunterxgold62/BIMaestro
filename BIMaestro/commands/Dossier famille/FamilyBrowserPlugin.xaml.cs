@@ -183,7 +183,7 @@ namespace Famille
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
         // Pagination & recherche
-        private const int PageSize = 200;
+        private const int PageSize = 60;
         private const int ScrollTopActionThreshold = 16;
         private const int FolderSearchUiBatchSize = 6;
         private const int FolderSearchUiPauseMs = 15;
@@ -192,7 +192,9 @@ namespace Famille
         private int _groupedVisualLoadVersion;
         private int _folderSearchVersion;
         private ObservableCollection<FamilySearchGroup> _activeSearchGroups;
-        private readonly DispatcherTimer _searchDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
+        private readonly DispatcherTimer _searchDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(350) };
+        private CancellationTokenSource _searchCts = new CancellationTokenSource();
+        private int _searchRequestVersion;
 
         // Index global (auto)
         private FamilyIndexService _index;
@@ -249,10 +251,12 @@ namespace Famille
             SetPreviewFolders(familiesFolder, imagesFolder);
 
 
-            _searchDebounce.Tick += (s, e) =>
+            _searchDebounce.Tick += async (s, e) =>
             {
                 _searchDebounce.Stop();
-                ApplyFilters();
+                int version = _searchRequestVersion;
+                var token = _searchCts.Token;
+                await ApplyFiltersAsync(version, token);
             };
 
             if (!Directory.Exists(familiesFolder) || !Directory.Exists(imagesFolder))
@@ -272,6 +276,14 @@ namespace Famille
         protected override void OnClosed(EventArgs e)
         {
             FamilyPreviewBridge.PreviewVisibilityChanged -= OnPreviewVisibilityChanged;
+            _searchDebounce.Stop();
+            _searchRequestVersion++;
+            try { _searchCts?.Cancel(); _searchCts?.Dispose(); } catch { }
+            if (_index != null)
+            {
+                _index.IndexUpdated -= OnIndexUpdated;
+                _index.Dispose();
+            }
             try { _previewCts?.Cancel(); _previewCts?.Dispose(); } catch { }
             base.OnClosed(e);
         }
@@ -304,11 +316,11 @@ namespace Famille
 
         private void OnIndexUpdated()
         {
-            Dispatcher.Invoke(() =>
+            Dispatcher.BeginInvoke(new Action(() =>
             {
                 if (_globalSearchMode || !string.IsNullOrWhiteSpace(SearchBox?.Text))
-                    ApplyFilters();
-            });
+                    QueueSearch();
+            }), DispatcherPriority.Background);
         }
 
         #region Arbo & chargement dossier
@@ -1026,8 +1038,8 @@ namespace Famille
 
         private void SearchBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
         {
-            _searchDebounce.Stop();
-            _searchDebounce.Start();
+            // Le simple fait de placer le curseur ne doit pas relancer une
+            // recherche potentiellement coûteuse.
         }
 
         private void SearchBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
@@ -1043,18 +1055,21 @@ namespace Famille
             ResetInteractiveFilters();
             PlaceholderText.Visibility = string.IsNullOrEmpty(SearchBox.Text)
                 ? Visibility.Visible : Visibility.Collapsed;
-            _searchDebounce.Stop();
-            _searchDebounce.Start();
+            QueueSearch();
         }
 
-        private void SearchBox_KeyDown(object sender, KeyEventArgs e)
+        private async void SearchBox_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key != Key.Enter)
                 return;
 
             _searchDebounce.Stop();
-            ApplyFilters();
             e.Handled = true;
+            int requestVersion = _searchRequestVersion;
+            await ApplyFiltersAsync(requestVersion, _searchCts.Token);
+
+            if (requestVersion != _searchRequestVersion)
+                return;
 
             if (_index == null || !_index.IsReady || (_currentResult?.Count ?? 0) > 0)
                 return;
@@ -1066,6 +1081,23 @@ namespace Famille
                 PagingStatusText.Visibility = Visibility.Visible;
                 PagingStatusText.Text = $"Aucun résultat. Recherche « {string.Join(" ", query.Terms)} » mémorisée : ouvre maintenant la famille correspondante.";
             }
+        }
+
+        private void QueueSearch()
+        {
+            _searchRequestVersion++;
+
+            try { _searchCts.Cancel(); } catch { }
+            _searchCts.Dispose();
+            _searchCts = new CancellationTokenSource();
+
+            // Arrête aussi l'ajout progressif des cartes et le chargement des
+            // aperçus issus de la requête précédente.
+            _folderSearchVersion++;
+            _groupedVisualLoadVersion++;
+
+            _searchDebounce.Stop();
+            _searchDebounce.Start();
         }
 
         private void SearchScopeButton_Click(object sender, RoutedEventArgs e)
@@ -1111,7 +1143,7 @@ namespace Famille
             }
 
             if (refresh)
-                ApplyFilters();
+                QueueSearch();
         }
 
         private FamilyItem CreateSearchResultItem(
@@ -1234,23 +1266,45 @@ namespace Famille
             return sorted;
         }
 
-        private List<FamilyItem> BuildGlobalSearchItems(FamilySearchQuery query, bool showLocation, int max = 8000)
+        private List<FamilyItem> BuildGlobalSearchItems(
+            FamilySearchQuery query,
+            bool showLocation,
+            int max = 8000,
+            CancellationToken cancellationToken = default)
         {
             if (_index == null)
                 return new List<FamilyItem>();
 
             var entries = _index.GetAll(max: 0).ToList();
-            var matchingEntries = entries.Where(e => MatchesGlobalSearch(e, query)).ToList();
+            var matchingEntries = new List<FamilyIndexService.Entry>();
+            foreach (var entry in entries)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (MatchesGlobalSearch(entry, query))
+                    matchingEntries.Add(entry);
+            }
+
             bool approximate = false;
             if (matchingEntries.Count == 0 && query.Terms.Any(CanUseApproximateSearch))
             {
-                matchingEntries = entries.Where(e => MatchesApproximateSearch(e, query)).ToList();
+                matchingEntries.Clear();
+                foreach (var entry in entries)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (MatchesApproximateSearch(entry, query))
+                        matchingEntries.Add(entry);
+                }
                 approximate = matchingEntries.Count > 0;
             }
 
-            var items = matchingEntries
-                .Select(e => CreateSearchResultItem(e, showLocation, query, approximate))
-                .ToList();
+            var items = new List<FamilyItem>(matchingEntries.Count);
+            foreach (var entry in matchingEntries)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                items.Add(CreateSearchResultItem(entry, showLocation, query, approximate));
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
             items = ApplyGlobalSearchSorting(items);
             return max > 0 ? items.Take(max).ToList() : items;
         }
@@ -1593,6 +1647,186 @@ namespace Famille
                     LoadVisualsForItem(item);
 
                 await Task.Delay(10);
+            }
+        }
+
+        private async Task ApplyFiltersAsync(int requestVersion, CancellationToken cancellationToken)
+        {
+            string rawText = SearchBox?.Text ?? string.Empty;
+            string normalizedText = StripDiacritics(rawText).ToLowerInvariant();
+            bool globalMode = _globalSearchMode;
+
+            // Sans texte, le dossier courant est déjà en mémoire et sa remise
+            // en place est très rapide. La bibliothèque globale, elle, reste
+            // calculée en arrière-plan.
+            if (!globalMode && string.IsNullOrWhiteSpace(normalizedText))
+            {
+                if (requestVersion == _searchRequestVersion && !cancellationToken.IsCancellationRequested)
+                    ApplyFilters();
+                return;
+            }
+
+            var query = FamilySearchQuery.Parse(normalizedText);
+            PagingStatusText.Visibility = Visibility.Visible;
+            PagingStatusText.Text = "Recherche…";
+
+            List<FamilyItem> items;
+            try
+            {
+                items = await Task.Run(
+                    () => BuildGlobalSearchItems(
+                        query,
+                        showLocation: !globalMode,
+                        max: 8000,
+                        cancellationToken: cancellationToken),
+                    cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch (Exception ex)
+            {
+                if (requestVersion != _searchRequestVersion || cancellationToken.IsCancellationRequested)
+                    return;
+
+                PagingStatusText.Visibility = Visibility.Visible;
+                PagingStatusText.Text = "Recherche impossible : " + ex.Message;
+                return;
+            }
+
+            if (requestVersion != _searchRequestVersion ||
+                cancellationToken.IsCancellationRequested ||
+                !string.Equals(rawText, SearchBox?.Text ?? string.Empty, StringComparison.Ordinal) ||
+                globalMode != _globalSearchMode)
+            {
+                return;
+            }
+
+            if (globalMode)
+            {
+                BeginPaging(ApplyInteractiveSorting(items));
+                if (_index != null && !_index.IsReady)
+                {
+                    PagingStatusText.Visibility = Visibility.Visible;
+                    PagingStatusText.Text = items.Count == 0
+                        ? "Recherche en cours…"
+                        : $"Familles affichées : {items.Count}. Les détails se complètent.";
+                }
+                return;
+            }
+
+            _ = ShowGroupedFolderSearchResultsProgressivelyAsync(items, requestVersion, cancellationToken);
+        }
+
+        private async Task ShowGroupedFolderSearchResultsProgressivelyAsync(
+            List<FamilyItem> items,
+            int requestVersion,
+            CancellationToken cancellationToken)
+        {
+            items ??= new List<FamilyItem>();
+
+            _groupedVisualLoadVersion++;
+            int viewVersion = ++_folderSearchVersion;
+            ClearSelectedFamilies();
+            _lastSelectedFamily = null;
+
+            var definitions = new List<(string Title, List<FamilyItem> Items)>();
+            var localItems = items.Where(i => i?.IsInCurrentFolder == true).ToList();
+            foreach (var item in localItems)
+            {
+                item.SearchLocationLabel = "Dans ce dossier";
+                item.SearchLocationVisibility = Visibility.Visible;
+            }
+
+            if (localItems.Count > 0)
+                definitions.Add(("Dans ce dossier", localItems));
+
+            definitions.AddRange(items
+                .Where(i => i != null && !i.IsInCurrentFolder)
+                .GroupBy(i => string.IsNullOrWhiteSpace(i.SearchFolderPath) ? "Autre dossier" : i.SearchFolderPath)
+                .OrderBy(g => g.Key, StringComparer.CurrentCultureIgnoreCase)
+                .Select(g => (g.Key, g.ToList())));
+
+            _activeSearchGroups = new ObservableCollection<FamilySearchGroup>(
+                definitions.Select(d => new FamilySearchGroup
+                {
+                    Title = d.Title,
+                    CountText = d.Items.Count == 1 ? "1 famille" : $"{d.Items.Count} familles",
+                    Families = new ObservableCollection<FamilyItem>()
+                }));
+
+            _currentResult = items;
+            _nextIndex = items.Count;
+            displayedFamilies = new List<FamilyItem>();
+
+            FamilyListView.Visibility = Visibility.Collapsed;
+            GroupedFamilyListView.Visibility = Visibility.Visible;
+            GroupedFamilyListView.ItemsSource = _activeSearchGroups;
+            UpdateCount(items.Count);
+
+            if (items.Count == 0)
+            {
+                PagingStatusText.Visibility = Visibility.Visible;
+                PagingStatusText.Text = "Aucun résultat.";
+                return;
+            }
+
+            const int BatchSize = 12;
+            int displayedCount = 0;
+            int otherCount = items.Count - localItems.Count;
+
+            for (int groupIndex = 0; groupIndex < definitions.Count; groupIndex++)
+            {
+                var definition = definitions[groupIndex];
+                var targetGroup = _activeSearchGroups[groupIndex];
+
+                for (int start = 0; start < definition.Items.Count; start += BatchSize)
+                {
+                    if (requestVersion != _searchRequestVersion ||
+                        viewVersion != _folderSearchVersion ||
+                        cancellationToken.IsCancellationRequested)
+                    {
+                        return;
+                    }
+
+                    var batch = definition.Items.Skip(start).Take(BatchSize).ToList();
+                    MarkFavoritesInView(batch);
+                    foreach (var item in batch)
+                    {
+                        targetGroup.Families.Add(item);
+                        displayedFamilies.Add(item);
+                    }
+
+                    displayedCount += batch.Count;
+                    PagingStatusText.Visibility = Visibility.Visible;
+                    PagingStatusText.Text = displayedCount >= items.Count
+                        ? $"Dans ce dossier : {localItems.Count}. Autres dossiers : {otherCount}."
+                        : $"Affichage : {displayedCount}/{items.Count}…";
+
+                    // Rend les nouvelles cartes puis redonne immédiatement la
+                    // priorité à la frappe avant de préparer le lot suivant.
+                    await Dispatcher.Yield(DispatcherPriority.Background);
+
+                    if (requestVersion != _searchRequestVersion ||
+                        viewVersion != _folderSearchVersion ||
+                        cancellationToken.IsCancellationRequested)
+                    {
+                        return;
+                    }
+
+                    foreach (var item in batch)
+                        LoadVisualsForItem(item);
+
+                    try
+                    {
+                        await Task.Delay(12, cancellationToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        return;
+                    }
+                }
             }
         }
 
@@ -4159,7 +4393,11 @@ namespace Famille
             ImageResolver.ClearCaches();
             _bitmapCache.Clear();
 
-            _index?.Dispose();
+            if (_index != null)
+            {
+                _index.IndexUpdated -= OnIndexUpdated;
+                _index.Dispose();
+            }
             _index = new FamilyIndexService(familiesFolder, imagesFolder);
             _index.IndexUpdated += OnIndexUpdated;
             _ = _index.StartAsync();
