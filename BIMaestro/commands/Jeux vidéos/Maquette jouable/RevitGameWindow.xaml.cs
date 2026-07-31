@@ -1,6 +1,8 @@
 using System;
+using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime;
 using System.Windows;
 using System.Windows.Input;
@@ -8,9 +10,14 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Media3D;
 using System.Windows.Threading;
+using System.Threading.Tasks;
 using HelixToolkit.Wpf.SharpDX;
+using HelixToolkit.Wpf.SharpDX.Elements2D;
 using HelixToolkit.Wpf.SharpDX.Utilities;
 using SharpDX.Direct3D11;
+using Drawing = System.Drawing;
+using Drawing2D = System.Drawing.Drawing2D;
+using DrawingImaging = System.Drawing.Imaging;
 using HxMeshGeometry3D = HelixToolkit.Wpf.SharpDX.MeshGeometry3D;
 using HxPerspectiveCamera = HelixToolkit.Wpf.SharpDX.PerspectiveCamera;
 
@@ -23,6 +30,10 @@ namespace BIMaestro.VideoGames
         private const double PlayerRadius = 0.76;       // 23 cm
         private const double PlayerHeight = 5.80;       // 1,77 m
         private const double EyeHeight = 5.28;          // 1,61 m
+        private const double CrouchPlayerHeight = 3.35; // 1,02 m
+        private const double CrouchEyeHeight = 2.72;    // 0,83 m
+        private const double CrouchSpeed = 4.2;         // 1,28 m/s
+        private const double CrouchTransitionSpeed = 10.0;
         private const double MaximumStepHeight = 0.86;  // 26 cm
         private const double WalkSpeed = 7.2;           // 2,19 m/s
         private const double SprintSpeed = 18.0;        // 5,49 m/s
@@ -32,6 +43,10 @@ namespace BIMaestro.VideoGames
         private const double GroundOffset = 0.04;
         private const double DoorInteractionDistance = 8.0; // 2,44 m
         private const double DoorAnimationSpeed = 2.8;
+        private const int MiniMapImageSize = 208;
+        private const double MiniMapLevelChangeHeight = 8.0; // 2,44 m
+        private const double MiniMapRebuildCooldownSeconds = 0.28;
+        private const double ForwardDoubleTapSeconds = 0.34;
 
         private readonly GameSceneData _scene;
         private GameCollisionWorld _world = null!;
@@ -40,9 +55,13 @@ namespace BIMaestro.VideoGames
         private readonly HxPerspectiveCamera _camera;
         private readonly DefaultEffectsManager _effectsManager;
         private readonly HashSet<Key> _pressedKeys = new HashSet<Key>();
+        private readonly ObservableCollection<GameSelectedElementItem>
+            _selectedElementHistory =
+                new ObservableCollection<GameSelectedElementItem>();
         private readonly Stopwatch _frameClock = Stopwatch.StartNew();
         private readonly Stopwatch _fpsClock = Stopwatch.StartNew();
         private readonly DispatcherTimer _toastTimer;
+        private MemoryStream? _miniMapImageStream;
 
         private Point3D _footPosition;
         private Point3D _previousFootPosition;
@@ -50,7 +69,7 @@ namespace BIMaestro.VideoGames
         private double _yaw;
         private double _pitch;
         private double _verticalVelocity;
-        private double _walkCycle;
+        private double _currentEyeHeight = EyeHeight;
         private double _lastFrameSeconds;
         private double _simulationAccumulator;
         private double _lastSpeed;
@@ -62,10 +81,12 @@ namespace BIMaestro.VideoGames
         private int _frameSpikes;
         private bool _grounded;
         private bool _flyMode;
+        private bool _isCrouching;
         private bool _mouseLookActive;
         private MouseButton? _lookButton;
         private Point _lastMousePosition;
-        private bool _hasUsedMouseLook;
+        private Point _rightMouseDownPosition;
+        private bool _rightGestureMoved;
         private bool _realisticLight = true;
         private bool _isClosing;
         private bool _scenePrepared;
@@ -73,12 +94,28 @@ namespace BIMaestro.VideoGames
         private bool _loadingFailed;
         private bool _loadingGateDismissed;
         private int _renderWarmupFrames;
+        private double _miniMapSliceZ;
+        private double _miniMapWorldMinimumX;
+        private double _miniMapWorldMaximumY;
+        private double _miniMapWorldScale;
+        private double _miniMapPixelOffsetX;
+        private double _miniMapPixelOffsetY;
+        private double _lastMiniMapBuildSeconds = double.MinValue;
+        private bool _miniMapBuildInProgress;
+        private bool _miniMapRebuildQueued;
+        private bool _miniMapReady;
+        private double _lastForwardTapSeconds = double.MinValue;
+        private Key _lastForwardTapKey = Key.None;
+        private Key _doubleTapSprintKey = Key.None;
+        private bool _doubleTapSprintActive;
 
         internal RevitGameWindow(GameSceneData scene)
         {
             _scene = scene ?? throw new ArgumentNullException(nameof(scene));
 
             InitializeComponent();
+            SelectedElementsList.ItemsSource = _selectedElementHistory;
+            UpdateSelectionHistoryUi();
 
             _effectsManager = CreateBestEffectsManager();
             GameViewport.EffectsManager = _effectsManager;
@@ -110,6 +147,7 @@ namespace BIMaestro.VideoGames
             Deactivated += (s, e) =>
             {
                 _pressedKeys.Clear();
+                ClearDoubleTapSprint();
                 ReleaseMouseLook();
             };
             PreviewKeyDown += RevitGameWindow_PreviewKeyDown;
@@ -206,6 +244,7 @@ namespace BIMaestro.VideoGames
         private void RevitGameWindow_Closed(object sender, EventArgs e)
         {
             _isClosing = true;
+            _miniMapRebuildQueued = false;
             CompositionTarget.Rendering -= CompositionTarget_Rendering;
             GameViewport.OnRendered -= GameViewport_OnRendered;
             GameViewport.RenderExceptionOccurred -= GameViewport_RenderExceptionOccurred;
@@ -213,6 +252,8 @@ namespace BIMaestro.VideoGames
             _pressedKeys.Clear();
             try { GameViewport.Dispose(); } catch { }
             try { _effectsManager.Dispose(); } catch { }
+            try { _miniMapImageStream?.Dispose(); } catch { }
+            _miniMapImageStream = null;
         }
 
         private void PrepareScene()
@@ -283,8 +324,7 @@ namespace BIMaestro.VideoGames
             _readyToPlay = true;
             _lastFrameSeconds = _frameClock.Elapsed.TotalSeconds;
             _simulationAccumulator = 0.0;
-            MouseGuide.Visibility = Visibility.Visible;
-            ControlsHud.Visibility = Visibility.Collapsed;
+            ControlsHud.Visibility = Visibility.Visible;
             Keyboard.Focus(GameViewport);
             ShowToast("Maquette entièrement chargée — vous pouvez entrer");
         }
@@ -406,6 +446,9 @@ namespace BIMaestro.VideoGames
             _pitch = 0.0;
             _verticalVelocity = 0.0;
             _flyMode = false;
+            _isCrouching = false;
+            _currentEyeHeight = EyeHeight;
+            ClearDoubleTapSprint();
             _grounded = _world.TryFindGround(
                 _footPosition.X,
                 _footPosition.Y,
@@ -420,6 +463,7 @@ namespace BIMaestro.VideoGames
             _renderFootPosition = _footPosition;
             ModeText.Text = "MARCHE";
             UpdateCamera(_renderFootPosition);
+            RebuildMiniMap(true);
             if (announce)
                 ShowToast("Retour au point de départ");
         }
@@ -474,7 +518,9 @@ namespace BIMaestro.VideoGames
                 _footPosition,
                 interpolation);
             UpdateDoorAnimations(elapsed);
+            UpdateCrouchCamera(elapsed);
             UpdateCamera(_renderFootPosition);
+            UpdateMiniMap();
             UpdatePerformanceHud();
         }
 
@@ -495,8 +541,16 @@ namespace BIMaestro.VideoGames
             if (movement.LengthSquared > 1.0)
                 movement.Normalize();
 
-            bool sprint = IsDown(Key.LeftShift) || IsDown(Key.RightShift);
-            double speed = sprint ? SprintSpeed : WalkSpeed;
+            if (!_flyMode)
+                UpdateCrouchState();
+
+            bool sprint =
+                IsDown(Key.LeftShift) ||
+                IsDown(Key.RightShift) ||
+                (_doubleTapSprintActive && IsDown(_doubleTapSprintKey));
+            double speed = _isCrouching
+                ? CrouchSpeed
+                : (sprint ? SprintSpeed : WalkSpeed);
             _lastSpeed = movement.Length * speed;
 
             if (_flyMode)
@@ -513,10 +567,13 @@ namespace BIMaestro.VideoGames
             if (movement.LengthSquared > 1e-8)
             {
                 Vector3D displacement = movement * speed * deltaTime;
-                TryMoveHorizontal(displacement.X, 0.0);
-                TryMoveHorizontal(0.0, displacement.Y);
-                if (_grounded)
-                    _walkCycle += deltaTime * (sprint ? 12.5 : 9.0);
+                // Sur terrain libre, une seule requête remplace les deux requêtes
+                // X/Y. Le repli séparé conserve le glissement le long des murs.
+                if (!TryMoveHorizontal(displacement.X, displacement.Y))
+                {
+                    TryMoveHorizontal(displacement.X, 0.0);
+                    TryMoveHorizontal(0.0, displacement.Y);
+                }
             }
 
             if (_grounded)
@@ -526,9 +583,13 @@ namespace BIMaestro.VideoGames
                     _footPosition.Y,
                     _footPosition.Z + MaximumStepHeight,
                     _footPosition.Z - 2.4,
-                    out double ground))
+                    out double ground,
+                    out double groundNormalZ))
                 {
-                    _footPosition.Z = ground + GroundOffset;
+                    _footPosition.Z = ResolveGroundHeight(
+                        ground,
+                        groundNormalZ,
+                        _footPosition.Z);
                     _verticalVelocity = 0.0;
                 }
                 else
@@ -544,8 +605,9 @@ namespace BIMaestro.VideoGames
 
                 if (_verticalVelocity > 0.0)
                 {
-                    double currentHead = _footPosition.Z + PlayerHeight;
-                    double nextHead = nextZ + PlayerHeight;
+                    double activeHeight = ActivePlayerHeight;
+                    double currentHead = _footPosition.Z + activeHeight;
+                    double nextHead = nextZ + activeHeight;
                     if (_world.TryFindCeiling(
                         _footPosition.X,
                         _footPosition.Y,
@@ -553,7 +615,7 @@ namespace BIMaestro.VideoGames
                         nextHead + 0.1,
                         out double ceiling))
                     {
-                        nextZ = Math.Min(nextZ, ceiling - PlayerHeight - 0.06);
+                        nextZ = Math.Min(nextZ, ceiling - activeHeight - 0.06);
                         _verticalVelocity = 0.0;
                     }
                 }
@@ -577,10 +639,10 @@ namespace BIMaestro.VideoGames
                 ResetPlayer(true);
         }
 
-        private void TryMoveHorizontal(double deltaX, double deltaY)
+        private bool TryMoveHorizontal(double deltaX, double deltaY)
         {
             if (Math.Abs(deltaX) < 1e-10 && Math.Abs(deltaY) < 1e-10)
-                return;
+                return true;
 
             var candidate = new Point3D(
                 _footPosition.X + deltaX,
@@ -593,22 +655,30 @@ namespace BIMaestro.VideoGames
                     candidate.Y,
                     _footPosition.Z + MaximumStepHeight,
                     _footPosition.Z - 2.4,
-                    out double candidateGround) &&
+                    out double candidateGround,
+                    out double candidateGroundNormalZ) &&
                 candidateGround <= _footPosition.Z + MaximumStepHeight)
             {
-                candidate.Z = candidateGround + GroundOffset;
+                candidate.Z = ResolveGroundHeight(
+                    candidateGround,
+                    candidateGroundNormalZ,
+                    _footPosition.Z);
             }
 
-            if (!_world.IsBodyBlocked(candidate, PlayerRadius, PlayerHeight, MaximumStepHeight))
+            if (!_world.IsBodyBlocked(
+                candidate,
+                PlayerRadius,
+                ActivePlayerHeight,
+                MaximumStepHeight))
+            {
                 _footPosition = candidate;
+                return true;
+            }
+            return false;
         }
 
         private void UpdateCamera(Point3D cameraFootPosition)
         {
-            double headBob = 0.0;
-            if (_grounded && _lastSpeed > 0.1 && !_flyMode)
-                headBob = Math.Sin(_walkCycle) * 0.035;
-
             double cosPitch = Math.Cos(_pitch);
             var look = new Vector3D(
                 Math.Cos(_yaw) * cosPitch,
@@ -619,12 +689,78 @@ namespace BIMaestro.VideoGames
             _camera.Position = new Point3D(
                 cameraFootPosition.X,
                 cameraFootPosition.Y,
-                cameraFootPosition.Z + EyeHeight + headBob);
+                cameraFootPosition.Z + _currentEyeHeight);
             _camera.LookDirection = look * 10.0;
             _camera.UpDirection = new Vector3D(0, 0, 1);
 
             if (_realisticLight)
                 HeadLight.Direction = look;
+        }
+
+        private double ActivePlayerHeight =>
+            _isCrouching ? CrouchPlayerHeight : PlayerHeight;
+
+        private void UpdateCrouchState()
+        {
+            bool crouchRequested =
+                IsDown(Key.LeftCtrl) || IsDown(Key.RightCtrl);
+            if (crouchRequested)
+            {
+                if (!_isCrouching)
+                {
+                    _isCrouching = true;
+                    ModeText.Text = "ACCROUPI";
+                }
+                return;
+            }
+
+            if (!_isCrouching)
+                return;
+
+            double crouchedHead = _footPosition.Z + CrouchPlayerHeight;
+            double standingHead = _footPosition.Z + PlayerHeight + 0.08;
+            bool ceilingBlocksStanding =
+                _world.TryFindCeiling(
+                    _footPosition.X,
+                    _footPosition.Y,
+                    crouchedHead,
+                    standingHead,
+                    out double ceiling) &&
+                ceiling <= standingHead;
+            if (ceilingBlocksStanding)
+                return;
+
+            _isCrouching = false;
+            ModeText.Text = "MARCHE";
+        }
+
+        private void UpdateCrouchCamera(double elapsed)
+        {
+            double targetEyeHeight =
+                _isCrouching ? CrouchEyeHeight : EyeHeight;
+            _currentEyeHeight = MoveTowards(
+                _currentEyeHeight,
+                targetEyeHeight,
+                CrouchTransitionSpeed * elapsed);
+        }
+
+        private static double ResolveGroundHeight(
+            double ground,
+            double groundNormalZ,
+            double currentFootZ)
+        {
+            double targetFootZ = ground + GroundOffset;
+            // Les raccords entre facettes coplanaires peuvent différer de quelques
+            // centimètres (dalles superposées, finitions ou maillages liés).
+            // Sur une surface réellement horizontale, ces raccords ne doivent
+            // jamais faire osciller la caméra. Les vraies marches restent très
+            // au-dessus de ce seuil.
+            if (groundNormalZ >= 0.99998 &&
+                Math.Abs(targetFootZ - currentFootZ) <= 0.10)
+            {
+                return currentFootZ;
+            }
+            return targetFootZ;
         }
 
         private void UpdatePerformanceHud()
@@ -679,7 +815,9 @@ namespace BIMaestro.VideoGames
         {
             if (e.Key == Key.Escape)
             {
-                if (_mouseLookActive)
+                if (ObjectInfoPanel.Visibility == Visibility.Visible)
+                    CloseSelectionPanel();
+                else if (_mouseLookActive)
                     ReleaseMouseLook();
                 else
                     Close();
@@ -697,6 +835,8 @@ namespace BIMaestro.VideoGames
             if (!firstPress)
                 return;
 
+            RegisterForwardDoubleTap(e.Key);
+
             if (e.Key == Key.Space && !_flyMode && _grounded)
             {
                 _verticalVelocity = JumpSpeed;
@@ -708,9 +848,26 @@ namespace BIMaestro.VideoGames
                 ToggleNearestDoor();
                 e.Handled = true;
             }
+            else if (e.Key == Key.M)
+            {
+                MiniMapOverlay2D.Visibility =
+                    MiniMapOverlay2D.Visibility == Visibility.Visible
+                        ? Visibility.Collapsed
+                        : Visibility.Visible;
+                if (MiniMapOverlay2D.Visibility == Visibility.Visible)
+                {
+                    if (_miniMapReady)
+                        UpdateMiniMap();
+                    else
+                        RebuildMiniMap(true);
+                }
+                e.Handled = true;
+            }
             else if (e.Key == Key.F)
             {
                 _flyMode = !_flyMode;
+                _isCrouching = false;
+                ClearDoubleTapSprint();
                 _grounded = false;
                 _verticalVelocity = 0.0;
                 ModeText.Text = _flyMode ? "VOL LIBRE" : "MARCHE";
@@ -734,7 +891,7 @@ namespace BIMaestro.VideoGames
             var playerEye = new Point3D(
                 _footPosition.X,
                 _footPosition.Y,
-                _footPosition.Z + EyeHeight);
+                _footPosition.Z + _currentEyeHeight);
 
             foreach (GameGpuDoorAnimation door in _doors)
             {
@@ -873,6 +1030,41 @@ namespace BIMaestro.VideoGames
                 return;
 
             _pressedKeys.Remove(e.Key);
+            if (_doubleTapSprintActive && e.Key == _doubleTapSprintKey)
+            {
+                _doubleTapSprintActive = false;
+                _doubleTapSprintKey = Key.None;
+            }
+        }
+
+        private void RegisterForwardDoubleTap(Key key)
+        {
+            if (key != Key.Z && key != Key.W && key != Key.Up)
+                return;
+
+            double now = _frameClock.Elapsed.TotalSeconds;
+            bool isDoubleTap =
+                key == _lastForwardTapKey &&
+                now - _lastForwardTapSeconds <= ForwardDoubleTapSeconds;
+            if (isDoubleTap)
+            {
+                _doubleTapSprintActive = true;
+                _doubleTapSprintKey = key;
+                _lastForwardTapSeconds = double.MinValue;
+                _lastForwardTapKey = Key.None;
+                return;
+            }
+
+            _lastForwardTapSeconds = now;
+            _lastForwardTapKey = key;
+        }
+
+        private void ClearDoubleTapSprint()
+        {
+            _doubleTapSprintActive = false;
+            _doubleTapSprintKey = Key.None;
+            _lastForwardTapSeconds = double.MinValue;
+            _lastForwardTapKey = Key.None;
         }
 
         private void GameViewport_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -895,7 +1087,13 @@ namespace BIMaestro.VideoGames
 
         private void GameViewport_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
         {
+            bool inspect =
+                _mouseLookActive &&
+                _lookButton == MouseButton.Right &&
+                !_rightGestureMoved;
             EndMouseLook(MouseButton.Right);
+            if (inspect)
+                SelectObjectAtScreenPoint(_rightMouseDownPosition);
             e.Handled = true;
         }
 
@@ -907,8 +1105,11 @@ namespace BIMaestro.VideoGames
             _mouseLookActive = true;
             _lookButton = button;
             _lastMousePosition = e.GetPosition(GameViewport);
-            _hasUsedMouseLook = true;
-            MouseGuide.Visibility = Visibility.Collapsed;
+            if (button == MouseButton.Right)
+            {
+                _rightMouseDownPosition = _lastMousePosition;
+                _rightGestureMoved = false;
+            }
             ControlsHud.Visibility = Visibility.Visible;
             GameViewport.Cursor = Cursors.ScrollAll;
             Mouse.Capture(GameViewport, CaptureMode.Element);
@@ -932,8 +1133,6 @@ namespace BIMaestro.VideoGames
             _lookButton = null;
             Mouse.Capture(null);
             GameViewport.Cursor = Cursors.Arrow;
-            if (!_isClosing && _readyToPlay && !_hasUsedMouseLook)
-                MouseGuide.Visibility = Visibility.Visible;
         }
 
         private void GameViewport_MouseMove(object sender, MouseEventArgs e)
@@ -942,6 +1141,11 @@ namespace BIMaestro.VideoGames
                 return;
 
             Point position = e.GetPosition(GameViewport);
+            if (_lookButton == MouseButton.Right &&
+                (position - _rightMouseDownPosition).Length > 9.0)
+            {
+                _rightGestureMoved = true;
+            }
             double deltaX = position.X - _lastMousePosition.X;
             double deltaY = position.Y - _lastMousePosition.Y;
             _lastMousePosition = position;
@@ -962,6 +1166,639 @@ namespace BIMaestro.VideoGames
             // Visée non inversée dans la caméra DirectX.
             _pitch = Clamp(_pitch + deltaY * 0.00225, -1.48, 1.48);
             e.Handled = true;
+        }
+
+        private void SelectObjectAtScreenPoint(Point screenPoint)
+        {
+            Point3D origin = _camera.Position;
+            Vector3D forward = _camera.LookDirection;
+            if (forward.LengthSquared < 1e-10 ||
+                GameViewport.ActualWidth < 10.0 ||
+                GameViewport.ActualHeight < 10.0)
+            {
+                return;
+            }
+            forward.Normalize();
+
+            Vector3D right = Vector3D.CrossProduct(
+                forward,
+                _camera.UpDirection);
+            if (right.LengthSquared < 1e-10)
+                return;
+            right.Normalize();
+            Vector3D screenUp = Vector3D.CrossProduct(right, forward);
+            screenUp.Normalize();
+
+            double normalizedX =
+                screenPoint.X / GameViewport.ActualWidth * 2.0 - 1.0;
+            double normalizedY =
+                1.0 - screenPoint.Y / GameViewport.ActualHeight * 2.0;
+            double horizontalScale =
+                Math.Tan(_camera.FieldOfView * Math.PI / 360.0);
+            double verticalScale =
+                horizontalScale *
+                GameViewport.ActualHeight /
+                GameViewport.ActualWidth;
+            Vector3D direction =
+                forward +
+                right * (normalizedX * horizontalScale) +
+                screenUp * (normalizedY * verticalScale);
+            direction.Normalize();
+
+            GameElementData? selected = null;
+            double nearestDistance = 300.0;
+            foreach (GameElementData element in _scene.Elements)
+            {
+                Rect3D bounds = element.Bounds;
+                if (bounds.IsEmpty ||
+                    !TryIntersectRayBounds(origin, direction, bounds, out double distance) ||
+                    distance >= nearestDistance)
+                {
+                    continue;
+                }
+
+                nearestDistance = distance;
+                selected = element;
+            }
+
+            if (selected == null)
+            {
+                ShowToast("Aucun objet identifié dans le viseur");
+                return;
+            }
+
+            AddSelectedElement(selected);
+            ObjectInfoPanel.Visibility = Visibility.Visible;
+        }
+
+        private void AddSelectedElement(GameElementData element)
+        {
+            var item = new GameSelectedElementItem(element);
+            for (int index = _selectedElementHistory.Count - 1;
+                index >= 0;
+                index--)
+            {
+                if (_selectedElementHistory[index].UniqueKey == item.UniqueKey)
+                    _selectedElementHistory.RemoveAt(index);
+            }
+
+            // La dernière inspection reste immédiatement visible en haut.
+            _selectedElementHistory.Insert(0, item);
+            const int maximumHistoryCount = 100;
+            while (_selectedElementHistory.Count > maximumHistoryCount)
+                _selectedElementHistory.RemoveAt(_selectedElementHistory.Count - 1);
+
+            UpdateSelectionHistoryUi();
+            SelectedElementsList.ScrollIntoView(item);
+        }
+
+        private void UpdateSelectionHistoryUi()
+        {
+            int count = _selectedElementHistory.Count;
+            SelectedElementCountText.Text = count == 1
+                ? "1 élément inspecté"
+                : count + " éléments inspectés";
+            EmptySelectionHistoryText.Visibility = count == 0
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            SelectedElementsList.Visibility = count == 0
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+            ClearSelectionHistoryButton.IsEnabled = count > 0;
+        }
+
+        private void CloseSelectionPanelButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            CloseSelectionPanel();
+        }
+
+        private void CloseSelectionPanel()
+        {
+            ObjectInfoPanel.Visibility = Visibility.Collapsed;
+            _pressedKeys.Clear();
+            ClearDoubleTapSprint();
+            GameViewport.Focus();
+        }
+
+        private void ClearSelectionHistoryButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            _selectedElementHistory.Clear();
+            UpdateSelectionHistoryUi();
+            ShowToast("Historique des sélections effacé");
+        }
+
+        private static bool TryIntersectRayBounds(
+            Point3D origin,
+            Vector3D direction,
+            Rect3D bounds,
+            out double distance)
+        {
+            if (origin.X >= bounds.X && origin.X <= bounds.X + bounds.SizeX &&
+                origin.Y >= bounds.Y && origin.Y <= bounds.Y + bounds.SizeY &&
+                origin.Z >= bounds.Z && origin.Z <= bounds.Z + bounds.SizeZ)
+            {
+                distance = 0.0;
+                return false;
+            }
+
+            double minimum = 0.03;
+            double maximum = 300.0;
+            if (!UpdateRayInterval(
+                    origin.X,
+                    direction.X,
+                    bounds.X,
+                    bounds.X + bounds.SizeX,
+                    ref minimum,
+                    ref maximum) ||
+                !UpdateRayInterval(
+                    origin.Y,
+                    direction.Y,
+                    bounds.Y,
+                    bounds.Y + bounds.SizeY,
+                    ref minimum,
+                    ref maximum) ||
+                !UpdateRayInterval(
+                    origin.Z,
+                    direction.Z,
+                    bounds.Z,
+                    bounds.Z + bounds.SizeZ,
+                    ref minimum,
+                    ref maximum))
+            {
+                distance = 0.0;
+                return false;
+            }
+
+            distance = minimum;
+            return minimum >= 0.03 && minimum <= maximum;
+        }
+
+        private static bool UpdateRayInterval(
+            double origin,
+            double direction,
+            double minimumBound,
+            double maximumBound,
+            ref double minimum,
+            ref double maximum)
+        {
+            if (Math.Abs(direction) < 1e-10)
+                return origin >= minimumBound && origin <= maximumBound;
+
+            double first = (minimumBound - origin) / direction;
+            double second = (maximumBound - origin) / direction;
+            if (first > second)
+            {
+                double swap = first;
+                first = second;
+                second = swap;
+            }
+
+            minimum = Math.Max(minimum, first);
+            maximum = Math.Min(maximum, second);
+            return minimum <= maximum;
+        }
+
+        private static string ValueOrFallback(string value, string fallback)
+        {
+            return string.IsNullOrWhiteSpace(value) ? fallback : value;
+        }
+
+        private void UpdateMiniMap()
+        {
+            if (MiniMapOverlay2D.Visibility != Visibility.Visible)
+                return;
+
+            Vector3D look = _camera.LookDirection;
+            double horizontalLengthSquared =
+                look.X * look.X + look.Y * look.Y;
+            if (horizontalLengthSquared > 1e-8)
+            {
+                double heading = Math.Atan2(look.Y, look.X);
+                MiniMapPlayerRotation2D.Angle =
+                    -heading * 180.0 / Math.PI;
+            }
+
+            if (!_miniMapReady)
+                return;
+
+            double now = _frameClock.Elapsed.TotalSeconds;
+            bool changedLevel =
+                Math.Abs(_footPosition.Z - _miniMapSliceZ) >
+                    MiniMapLevelChangeHeight;
+            if (changedLevel &&
+                now - _lastMiniMapBuildSeconds >= MiniMapRebuildCooldownSeconds)
+            {
+                RebuildMiniMap(false);
+            }
+
+            // Le plan complet du niveau reste fixe. Seule la flèche se déplace
+            // dans sa projection, avec la position interpolée de la caméra.
+            double playerPixelX = Clamp(
+                _miniMapPixelOffsetX +
+                    (_renderFootPosition.X - _miniMapWorldMinimumX) *
+                    _miniMapWorldScale,
+                6.0,
+                MiniMapImageSize - 6.0);
+            double playerPixelY = Clamp(
+                _miniMapPixelOffsetY +
+                    (_miniMapWorldMaximumY - _renderFootPosition.Y) *
+                    _miniMapWorldScale,
+                6.0,
+                MiniMapImageSize - 6.0);
+            Canvas2D.SetLeft(
+                MiniMapPlayer2D,
+                21.0 + playerPixelX - 10.0);
+            Canvas2D.SetTop(
+                MiniMapPlayer2D,
+                45.0 + playerPixelY - 10.0);
+        }
+
+        private async void RebuildMiniMap(bool force)
+        {
+            if (_world == null ||
+                MiniMapOverlay2D.Visibility != Visibility.Visible)
+            {
+                return;
+            }
+
+            if (_miniMapBuildInProgress)
+            {
+                _miniMapRebuildQueued |= force;
+                return;
+            }
+
+            double now = _frameClock.Elapsed.TotalSeconds;
+            if (!force &&
+                now - _lastMiniMapBuildSeconds <
+                    MiniMapRebuildCooldownSeconds)
+            {
+                return;
+            }
+
+            double footZ = _footPosition.Z;
+            double planSliceZ =
+                footZ + Clamp(_currentEyeHeight * 0.62, 1.5, 4.0);
+            Rect3D sceneBounds = _scene.Bounds;
+            double planCenterX = sceneBounds.IsEmpty
+                ? _footPosition.X
+                : sceneBounds.X + sceneBounds.SizeX * 0.5;
+            double planCenterY = sceneBounds.IsEmpty
+                ? _footPosition.Y
+                : sceneBounds.Y + sceneBounds.SizeY * 0.5;
+            double planRadius = sceneBounds.IsEmpty
+                ? 45.0
+                : Math.Max(sceneBounds.SizeX, sceneBounds.SizeY) * 0.5 + 2.0;
+            var doorSegments = new List<GameMapSegment>();
+            foreach (GameDoorData door in _scene.Doors)
+            {
+                if (Math.Abs(door.Center.Z - planSliceZ) >
+                        _currentEyeHeight + 2.0)
+                {
+                    continue;
+                }
+
+                doorSegments.Add(new GameMapSegment(
+                    door.Hinge.X,
+                    door.Hinge.Y,
+                    door.SecondHinge.X,
+                    door.SecondHinge.Y));
+            }
+
+            _miniMapBuildInProgress = true;
+            _lastMiniMapBuildSeconds = now;
+            try
+            {
+                MiniMapBuildResult result = await Task.Run(() =>
+                {
+                    IList<GameMapSegment> wallSegments =
+                        _world.GetMiniMapSegments(
+                            planCenterX,
+                            planCenterY,
+                            planSliceZ,
+                            planRadius,
+                            12000);
+                    MiniMapProjection projection =
+                        CreateMiniMapProjection(
+                            wallSegments,
+                            doorSegments,
+                            sceneBounds);
+                    MemoryStream imageStream = CreateMiniMapImage(
+                        projection,
+                        wallSegments,
+                        doorSegments,
+                        footZ);
+                    return new MiniMapBuildResult(
+                        footZ,
+                        imageStream,
+                        projection);
+                });
+
+                if (_isClosing)
+                {
+                    result.ImageStream.Dispose();
+                    return;
+                }
+
+                _miniMapSliceZ = result.SliceZ;
+                _miniMapWorldMinimumX = result.Projection.MinimumX;
+                _miniMapWorldMaximumY = result.Projection.MaximumY;
+                _miniMapWorldScale = result.Projection.Scale;
+                _miniMapPixelOffsetX = result.Projection.PixelOffsetX;
+                _miniMapPixelOffsetY = result.Projection.PixelOffsetY;
+                _miniMapReady = true;
+                MemoryStream? previousStream = _miniMapImageStream;
+                _miniMapImageStream = result.ImageStream;
+                MiniMapImage2D.ImageStream = result.ImageStream;
+                try { previousStream?.Dispose(); } catch { }
+                UpdateMiniMap();
+            }
+            catch (Exception exception)
+            {
+                Debug.WriteLine(
+                    "Mini-carte non reconstruite : " + exception.Message);
+            }
+            finally
+            {
+                _miniMapBuildInProgress = false;
+                if (!_isClosing && _miniMapRebuildQueued)
+                {
+                    _miniMapRebuildQueued = false;
+                    RebuildMiniMap(true);
+                }
+            }
+        }
+
+        private static MiniMapProjection CreateMiniMapProjection(
+            IEnumerable<GameMapSegment> wallSegments,
+            IEnumerable<GameMapSegment> doorSegments,
+            Rect3D fallbackBounds)
+        {
+            double minimumX = double.MaxValue;
+            double minimumY = double.MaxValue;
+            double maximumX = double.MinValue;
+            double maximumY = double.MinValue;
+
+            foreach (GameMapSegment segment in wallSegments)
+            {
+                minimumX = Math.Min(minimumX, Math.Min(segment.X1, segment.X2));
+                minimumY = Math.Min(minimumY, Math.Min(segment.Y1, segment.Y2));
+                maximumX = Math.Max(maximumX, Math.Max(segment.X1, segment.X2));
+                maximumY = Math.Max(maximumY, Math.Max(segment.Y1, segment.Y2));
+            }
+
+            foreach (GameMapSegment segment in doorSegments)
+            {
+                minimumX = Math.Min(minimumX, Math.Min(segment.X1, segment.X2));
+                minimumY = Math.Min(minimumY, Math.Min(segment.Y1, segment.Y2));
+                maximumX = Math.Max(maximumX, Math.Max(segment.X1, segment.X2));
+                maximumY = Math.Max(maximumY, Math.Max(segment.Y1, segment.Y2));
+            }
+
+            if (minimumX == double.MaxValue)
+            {
+                if (fallbackBounds.IsEmpty)
+                {
+                    minimumX = -45.0;
+                    minimumY = -45.0;
+                    maximumX = 45.0;
+                    maximumY = 45.0;
+                }
+                else
+                {
+                    minimumX = fallbackBounds.X;
+                    minimumY = fallbackBounds.Y;
+                    maximumX = fallbackBounds.X + fallbackBounds.SizeX;
+                    maximumY = fallbackBounds.Y + fallbackBounds.SizeY;
+                }
+            }
+
+            double width = Math.Max(0.5, maximumX - minimumX);
+            double height = Math.Max(0.5, maximumY - minimumY);
+            double margin = Math.Max(0.5, Math.Max(width, height) * 0.035);
+            minimumX -= margin;
+            minimumY -= margin;
+            maximumX += margin;
+            maximumY += margin;
+            width = maximumX - minimumX;
+            height = maximumY - minimumY;
+
+            const double imagePadding = 8.0;
+            double drawableSize = MiniMapImageSize - imagePadding * 2.0;
+            double scale = Math.Min(drawableSize / width, drawableSize / height);
+            double pixelOffsetX =
+                (MiniMapImageSize - width * scale) * 0.5;
+            double pixelOffsetY =
+                (MiniMapImageSize - height * scale) * 0.5;
+            return new MiniMapProjection(
+                minimumX,
+                minimumY,
+                maximumX,
+                maximumY,
+                scale,
+                pixelOffsetX,
+                pixelOffsetY);
+        }
+
+        private static MemoryStream CreateMiniMapImage(
+            MiniMapProjection projection,
+            IEnumerable<GameMapSegment> wallSegments,
+            IEnumerable<GameMapSegment> doorSegments,
+            double footZ)
+        {
+            const int textureWidth = 238;
+            const int textureHeight = 262;
+            const float cardLeft = 12f;
+            const float cardTop = 12f;
+            const float cardWidth = 226f;
+            const float cardHeight = 250f;
+            const float mapLeft = 21f;
+            const float mapTop = 45f;
+            const float mapSize = MiniMapImageSize;
+            double gridSpacing = 10.0; // 3,05 m au minimum
+            while (gridSpacing * projection.Scale < 18.0)
+                gridSpacing *= 2.0;
+
+            var bitmap = new Drawing.Bitmap(
+                textureWidth,
+                textureHeight,
+                DrawingImaging.PixelFormat.Format32bppPArgb);
+            using (bitmap)
+            using (Drawing.Graphics graphics = Drawing.Graphics.FromImage(bitmap))
+            using (var cardBrush =
+                new Drawing.SolidBrush(Drawing.Color.FromArgb(239, 23, 32, 43)))
+            using (var mapBrush =
+                new Drawing.SolidBrush(Drawing.Color.FromArgb(245, 14, 20, 28)))
+            using (var titleBrush =
+                new Drawing.SolidBrush(Drawing.Color.FromArgb(255, 244, 248, 252)))
+            using (var captionBrush =
+                new Drawing.SolidBrush(Drawing.Color.FromArgb(235, 208, 218, 230)))
+            using (var gridPen =
+                new Drawing.Pen(Drawing.Color.FromArgb(34, 151, 174, 197), 1f))
+            using (var majorGridPen =
+                new Drawing.Pen(Drawing.Color.FromArgb(58, 151, 174, 197), 1f))
+            using (var borderPen =
+                new Drawing.Pen(Drawing.Color.FromArgb(160, 123, 145, 170), 1f))
+            using (var wallPen =
+                new Drawing.Pen(Drawing.Color.FromArgb(245, 195, 213, 229), 1.2f))
+            using (var doorPen =
+                new Drawing.Pen(Drawing.Color.FromArgb(255, 72, 218, 241), 1.9f))
+            using (var titleFont = new Drawing.Font(
+                "Segoe UI",
+                8.5f,
+                Drawing.FontStyle.Bold,
+                Drawing.GraphicsUnit.Point))
+            using (var captionFont = new Drawing.Font(
+                "Segoe UI",
+                8f,
+                Drawing.FontStyle.Regular,
+                Drawing.GraphicsUnit.Point))
+            {
+                graphics.SmoothingMode = Drawing2D.SmoothingMode.AntiAlias;
+                graphics.PixelOffsetMode = Drawing2D.PixelOffsetMode.HighQuality;
+                graphics.Clear(Drawing.Color.Transparent);
+                graphics.FillRectangle(
+                    cardBrush,
+                    cardLeft,
+                    cardTop,
+                    cardWidth,
+                    cardHeight);
+                graphics.DrawRectangle(
+                    borderPen,
+                    cardLeft + 0.5f,
+                    cardTop + 0.5f,
+                    cardWidth - 1f,
+                    cardHeight - 1f);
+                graphics.DrawString(
+                    "PLAN DU NIVEAU",
+                    titleFont,
+                    titleBrush,
+                    cardLeft + 10f,
+                    cardTop + 8f);
+                string elevation =
+                    "Z " + (footZ * 0.3048).ToString("0.0") + " m";
+                Drawing.SizeF elevationSize =
+                    graphics.MeasureString(elevation, captionFont);
+                graphics.DrawString(
+                    elevation,
+                    captionFont,
+                    captionBrush,
+                    cardLeft + cardWidth - elevationSize.Width - 10f,
+                    cardTop + 8f);
+                graphics.FillRectangle(
+                    mapBrush,
+                    mapLeft,
+                    mapTop,
+                    mapSize,
+                    mapSize);
+                graphics.SetClip(new Drawing.RectangleF(
+                    mapLeft,
+                    mapTop,
+                    mapSize,
+                    mapSize));
+
+                double firstGridX = Math.Ceiling(
+                    projection.MinimumX / gridSpacing) *
+                    gridSpacing;
+                for (double worldX = firstGridX;
+                    worldX <= projection.MaximumX;
+                    worldX += gridSpacing)
+                {
+                    float x = mapLeft + (float)(
+                        projection.PixelOffsetX +
+                        (worldX - projection.MinimumX) * projection.Scale);
+                    bool major = IsMajorMiniMapGridLine(worldX, gridSpacing);
+                    graphics.DrawLine(
+                        major ? majorGridPen : gridPen,
+                        x,
+                        mapTop,
+                        x,
+                        mapTop + mapSize);
+                }
+
+                double firstGridY = Math.Ceiling(
+                    projection.MinimumY / gridSpacing) *
+                    gridSpacing;
+                for (double worldY = firstGridY;
+                    worldY <= projection.MaximumY;
+                    worldY += gridSpacing)
+                {
+                    float y = mapTop + (float)(
+                        projection.PixelOffsetY +
+                        (projection.MaximumY - worldY) * projection.Scale);
+                    bool major = IsMajorMiniMapGridLine(worldY, gridSpacing);
+                    graphics.DrawLine(
+                        major ? majorGridPen : gridPen,
+                        mapLeft,
+                        y,
+                        mapLeft + mapSize,
+                        y);
+                }
+
+                wallPen.StartCap = Drawing2D.LineCap.Round;
+                wallPen.EndCap = Drawing2D.LineCap.Round;
+                doorPen.StartCap = Drawing2D.LineCap.Round;
+                doorPen.EndCap = Drawing2D.LineCap.Round;
+
+                foreach (GameMapSegment segment in wallSegments)
+                {
+                    float x1 = mapLeft + (float)(projection.PixelOffsetX +
+                        (segment.X1 - projection.MinimumX) * projection.Scale);
+                    float y1 = mapTop + (float)(projection.PixelOffsetY +
+                        (projection.MaximumY - segment.Y1) * projection.Scale);
+                    float x2 = mapLeft + (float)(projection.PixelOffsetX +
+                        (segment.X2 - projection.MinimumX) * projection.Scale);
+                    float y2 = mapTop + (float)(projection.PixelOffsetY +
+                        (projection.MaximumY - segment.Y2) * projection.Scale);
+                    graphics.DrawLine(wallPen, x1, y1, x2, y2);
+                }
+
+                foreach (GameMapSegment segment in doorSegments)
+                {
+                    float x1 = mapLeft + (float)(projection.PixelOffsetX +
+                        (segment.X1 - projection.MinimumX) * projection.Scale);
+                    float y1 = mapTop + (float)(projection.PixelOffsetY +
+                        (projection.MaximumY - segment.Y1) * projection.Scale);
+                    float x2 = mapLeft + (float)(projection.PixelOffsetX +
+                        (segment.X2 - projection.MinimumX) * projection.Scale);
+                    float y2 = mapTop + (float)(projection.PixelOffsetY +
+                        (projection.MaximumY - segment.Y2) * projection.Scale);
+                    graphics.DrawLine(doorPen, x1, y1, x2, y2);
+                }
+                graphics.ResetClip();
+                graphics.DrawRectangle(
+                    borderPen,
+                    mapLeft + 0.5f,
+                    mapTop + 0.5f,
+                    mapSize - 1f,
+                    mapSize - 1f);
+                Drawing.SizeF northSize =
+                    graphics.MeasureString("N", titleFont);
+                graphics.DrawString(
+                    "N",
+                    titleFont,
+                    titleBrush,
+                    mapLeft + (mapSize - northSize.Width) * 0.5f,
+                    mapTop + 2f);
+
+                var stream = new MemoryStream(32 * 1024);
+                bitmap.Save(stream, DrawingImaging.ImageFormat.Png);
+                stream.Position = 0;
+                return stream;
+            }
+        }
+
+        private static bool IsMajorMiniMapGridLine(
+            double coordinate,
+            double gridSpacing)
+        {
+            double majorSpacing = gridSpacing * 5.0;
+            return Math.Abs(
+                coordinate / majorSpacing -
+                Math.Round(coordinate / majorSpacing)) < 1e-6;
         }
 
         private void ShowToast(string message)
@@ -1009,6 +1846,84 @@ namespace BIMaestro.VideoGames
         private static double Clamp(double value, double minimum, double maximum)
         {
             return Math.Max(minimum, Math.Min(maximum, value));
+        }
+
+        private sealed class GameSelectedElementItem
+        {
+            public GameSelectedElementItem(GameElementData element)
+            {
+                UniqueKey = string.IsNullOrWhiteSpace(element.Key)
+                    ? element.DocumentTitle + "|" + element.ElementId
+                    : element.Key;
+                Name = ValueOrFallback(element.Name, "Élément sans nom");
+                IdText = "#" + element.ElementId;
+                CategoryText =
+                    "Catégorie : " +
+                    ValueOrFallback(element.Category, "Non renseignée");
+                TypeText =
+                    "Type : " +
+                    ValueOrFallback(element.TypeName, "Non renseigné");
+                LevelText =
+                    "Niveau : " +
+                    ValueOrFallback(element.LevelName, "Non renseigné");
+                ModelText =
+                    "Maquette : " +
+                    ValueOrFallback(element.DocumentTitle, "Document actif");
+            }
+
+            public string UniqueKey { get; }
+            public string Name { get; }
+            public string IdText { get; }
+            public string CategoryText { get; }
+            public string TypeText { get; }
+            public string LevelText { get; }
+            public string ModelText { get; }
+        }
+
+        private sealed class MiniMapBuildResult
+        {
+            public MiniMapBuildResult(
+                double sliceZ,
+                MemoryStream imageStream,
+                MiniMapProjection projection)
+            {
+                SliceZ = sliceZ;
+                ImageStream = imageStream;
+                Projection = projection;
+            }
+
+            public double SliceZ { get; }
+            public MemoryStream ImageStream { get; }
+            public MiniMapProjection Projection { get; }
+        }
+
+        private sealed class MiniMapProjection
+        {
+            public MiniMapProjection(
+                double minimumX,
+                double minimumY,
+                double maximumX,
+                double maximumY,
+                double scale,
+                double pixelOffsetX,
+                double pixelOffsetY)
+            {
+                MinimumX = minimumX;
+                MinimumY = minimumY;
+                MaximumX = maximumX;
+                MaximumY = maximumY;
+                Scale = scale;
+                PixelOffsetX = pixelOffsetX;
+                PixelOffsetY = pixelOffsetY;
+            }
+
+            public double MinimumX { get; }
+            public double MinimumY { get; }
+            public double MaximumX { get; }
+            public double MaximumY { get; }
+            public double Scale { get; }
+            public double PixelOffsetX { get; }
+            public double PixelOffsetY { get; }
         }
 
     }

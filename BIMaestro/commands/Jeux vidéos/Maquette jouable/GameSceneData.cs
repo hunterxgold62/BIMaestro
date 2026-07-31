@@ -5,6 +5,77 @@ using System.Windows.Media.Media3D;
 
 namespace BIMaestro.VideoGames
 {
+    internal sealed class GameElementData
+    {
+        private double _minX = double.MaxValue;
+        private double _minY = double.MaxValue;
+        private double _minZ = double.MaxValue;
+        private double _maxX = double.MinValue;
+        private double _maxY = double.MinValue;
+        private double _maxZ = double.MinValue;
+
+        public string Key { get; set; } = string.Empty;
+        public int ElementId { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public string TypeName { get; set; } = string.Empty;
+        public string LevelName { get; set; } = string.Empty;
+        public string DocumentTitle { get; set; } = string.Empty;
+        public bool HasBounds { get; private set; }
+
+        public Rect3D Bounds => HasBounds
+            ? new Rect3D(
+                _minX,
+                _minY,
+                _minZ,
+                Math.Max(0.001, _maxX - _minX),
+                Math.Max(0.001, _maxY - _minY),
+                Math.Max(0.001, _maxZ - _minZ))
+            : Rect3D.Empty;
+
+        public void Include(IEnumerable<Point3D> points)
+        {
+            foreach (Point3D point in points)
+            {
+                _minX = Math.Min(_minX, point.X);
+                _minY = Math.Min(_minY, point.Y);
+                _minZ = Math.Min(_minZ, point.Z);
+                _maxX = Math.Max(_maxX, point.X);
+                _maxY = Math.Max(_maxY, point.Y);
+                _maxZ = Math.Max(_maxZ, point.Z);
+                HasBounds = true;
+            }
+        }
+
+        public void Translate(Vector3D delta)
+        {
+            if (!HasBounds)
+                return;
+            _minX += delta.X;
+            _maxX += delta.X;
+            _minY += delta.Y;
+            _maxY += delta.Y;
+            _minZ += delta.Z;
+            _maxZ += delta.Z;
+        }
+    }
+
+    internal readonly struct GameMapSegment
+    {
+        public GameMapSegment(double x1, double y1, double x2, double y2)
+        {
+            X1 = x1;
+            Y1 = y1;
+            X2 = x2;
+            Y2 = y2;
+        }
+
+        public double X1 { get; }
+        public double Y1 { get; }
+        public double X2 { get; }
+        public double Y2 { get; }
+    }
+
     internal sealed class GameMeshData
     {
         public Point3DCollection Positions { get; } = new Point3DCollection();
@@ -35,6 +106,7 @@ namespace BIMaestro.VideoGames
             new GameMeshData { IsTransparent = true };
         public Point3D Center { get; private set; }
         public Point3D Hinge { get; private set; }
+        public Point3D SecondHinge { get; private set; }
 
         public bool HasGeometry =>
             OpaqueMesh.Positions.Count > 0 ||
@@ -113,7 +185,6 @@ namespace BIMaestro.VideoGames
             double meanPerpendicular = perpendicularTotal / pointCount;
             double middleAlongAxis = (minAlongAxis + maxAlongAxis) * 0.5;
             double middleZ = (minZ + maxZ) * 0.5;
-
             Center = new Point3D(
                 axisX * middleAlongAxis + perpendicularX * meanPerpendicular,
                 axisY * middleAlongAxis + perpendicularY * meanPerpendicular,
@@ -121,6 +192,10 @@ namespace BIMaestro.VideoGames
             Hinge = new Point3D(
                 axisX * minAlongAxis + perpendicularX * meanPerpendicular,
                 axisY * minAlongAxis + perpendicularY * meanPerpendicular,
+                minZ);
+            SecondHinge = new Point3D(
+                axisX * maxAlongAxis + perpendicularX * meanPerpendicular,
+                axisY * maxAlongAxis + perpendicularY * meanPerpendicular,
                 minZ);
             return true;
         }
@@ -131,6 +206,7 @@ namespace BIMaestro.VideoGames
             TranslateMesh(TransparentMesh, delta);
             Center += delta;
             Hinge += delta;
+            SecondHinge += delta;
         }
 
         public void ReleaseSourceGeometry()
@@ -267,6 +343,7 @@ namespace BIMaestro.VideoGames
     {
         public IList<GameMeshData> Meshes { get; } = new List<GameMeshData>();
         public IList<GameDoorData> Doors { get; } = new List<GameDoorData>();
+        public IList<GameElementData> Elements { get; } = new List<GameElementData>();
         public IList<GameTriangle> Triangles { get; } = new List<GameTriangle>();
 
         public string ViewName { get; set; } = string.Empty;
@@ -324,6 +401,9 @@ namespace BIMaestro.VideoGames
 
             foreach (GameDoorData door in Doors)
                 door.Translate(offset);
+
+            foreach (GameElementData element in Elements)
+                element.Translate(offset);
 
             foreach (GameTriangle triangle in Triangles)
                 triangle.Translate(offset);

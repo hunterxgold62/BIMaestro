@@ -60,8 +60,14 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
         <h:Viewport3DX x:Name="GameViewport"
-                       Grid.Row="1"
+                       Grid.Column="0"
                        BackgroundColor="#FFB8CBD6"
                        UseDefaultGestures="False"
                        EnableMouseButtonHitTest="False"
@@ -83,6 +89,41 @@
                        ClipToBounds="True">
             <h:Viewport3DX.Content2D>
                 <h2:RelativePositionCanvas2D IsHitTestVisible="False">
+                    <h2:Canvas2D x:Name="MiniMapOverlay2D"
+                                 Width="238"
+                                 Height="262"
+                                 HorizontalAlignment="Left"
+                                 VerticalAlignment="Top"
+                                 h2:RelativePositionCanvas2D.RelativeX="-1"
+                                 h2:RelativePositionCanvas2D.RelativeY="1"
+                                 IsHitTestVisible="False">
+                        <h2:ImageModel2D x:Name="MiniMapImage2D"
+                                         Width="238"
+                                         Height="262"
+                                         h2:Canvas2D.Left="0"
+                                         h2:Canvas2D.Top="0"
+                                         IsHitTestVisible="False"/>
+                        <h2:TextModel2D x:Name="MiniMapPlayer2D"
+                                        Text="&#x27A4;"
+                                        Width="20"
+                                        Height="20"
+                                        FontFamily="Segoe UI Symbol"
+                                        FontSize="18"
+                                        FontWeight="Bold"
+                                        Foreground="#FFFFC857"
+                                        Background="#00000000"
+                                        TextAlignment="Center"
+                                        RenderTransformOrigin="0.5,0.5"
+                                        h2:Canvas2D.Left="115"
+                                        h2:Canvas2D.Top="139"
+                                        IsHitTestVisible="False">
+                            <h2:TextModel2D.Transform>
+                                <RotateTransform x:Name="MiniMapPlayerRotation2D"
+                                                 CenterX="10"
+                                                 CenterY="10"/>
+                            </h2:TextModel2D.Transform>
+                        </h2:TextModel2D>
+                    </h2:Canvas2D>
                     <h2:TextModel2D Text="+"
                                     Width="28"
                                     Height="28"
@@ -107,6 +148,165 @@
                                   Color="#66FFFFFF"
                                   Direction="1,0,-0.1"/>
         </h:Viewport3DX>
+
+        <!-- Historique des objets visés par des clics droits courts. -->
+        <Border x:Name="ObjectInfoPanel"
+                Grid.Column="1"
+                Visibility="Collapsed"
+                Width="330"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Stretch"
+                Margin="12"
+                Padding="14"
+                CornerRadius="9"
+                Background="#F117202B"
+                BorderBrush="#8878C9FF"
+                BorderThickness="1"
+                IsHitTestVisible="True">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="SÉLECTIONS REVIT"
+                                   Foreground="#FF78C9FF"
+                                   FontFamily="Segoe UI Semibold"
+                                   FontSize="11"/>
+                        <TextBlock x:Name="SelectedElementCountText"
+                                   Text="0 élément"
+                                   Style="{StaticResource HudCaption}"
+                                   Margin="0,3,0,0"/>
+                    </StackPanel>
+                    <Button Grid.Column="1"
+                            Style="{StaticResource GlassButton}"
+                            Content="←  Retour au jeu"
+                            Padding="10,6"
+                            Click="CloseSelectionPanelButton_Click"/>
+                </Grid>
+
+                <Border Grid.Row="1"
+                        Height="1"
+                        Margin="0,12,0,10"
+                        Background="#557B91AA"/>
+
+                <Grid Grid.Row="2">
+                    <TextBlock x:Name="EmptySelectionHistoryText"
+                               Text="Les éléments inspectés apparaîtront ici."
+                               Style="{StaticResource HudCaption}"
+                               TextWrapping="Wrap"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Margin="20"
+                               Visibility="Collapsed"/>
+                    <ListBox x:Name="SelectedElementsList"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             Padding="0"
+                             Focusable="False"
+                             HorizontalContentAlignment="Stretch"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.CanContentScroll="True"
+                             VirtualizingPanel.IsVirtualizing="True"
+                             VirtualizingPanel.VirtualizationMode="Recycling">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Focusable" Value="False"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                <Setter Property="Padding" Value="0"/>
+                                <Setter Property="Margin" Value="0,0,0,8"/>
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <ContentPresenter/>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Padding="11,10"
+                                        CornerRadius="7"
+                                        Background="#B5101720"
+                                        BorderBrush="#557B91AA"
+                                        BorderThickness="1">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Name}"
+                                                       Foreground="White"
+                                                       FontFamily="Segoe UI Semibold"
+                                                       FontSize="14"
+                                                       TextWrapping="Wrap"
+                                                       Margin="0,0,8,0"/>
+                                            <Border Grid.Column="1"
+                                                    Padding="6,2"
+                                                    VerticalAlignment="Top"
+                                                    CornerRadius="4"
+                                                    Background="#3325BEEA">
+                                                <TextBlock Text="{Binding IdText}"
+                                                           Foreground="#FF8EDFFF"
+                                                           FontFamily="Consolas"
+                                                           FontSize="10"/>
+                                            </Border>
+                                        </Grid>
+                                        <TextBlock Text="{Binding CategoryText}"
+                                                   Style="{StaticResource HudCaption}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,7,0,0"/>
+                                        <TextBlock Text="{Binding TypeText}"
+                                                   Style="{StaticResource HudCaption}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,3,0,0"/>
+                                        <TextBlock Text="{Binding LevelText}"
+                                                   Style="{StaticResource HudCaption}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,3,0,0"/>
+                                        <TextBlock Text="{Binding ModelText}"
+                                                   Foreground="#7F95AE"
+                                                   FontFamily="Segoe UI"
+                                                   FontSize="10"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,6,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+
+                <Grid Grid.Row="3" Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Clic droit court pour ajouter"
+                               Style="{StaticResource HudCaption}"
+                               VerticalAlignment="Center"/>
+                    <Button x:Name="ClearSelectionHistoryButton"
+                            Grid.Column="1"
+                            Style="{StaticResource GlassButton}"
+                            Content="Effacer"
+                            Padding="10,5"
+                            Click="ClearSelectionHistoryButton_Click"/>
+                </Grid>
+            </Grid>
+        </Border>
+        </Grid>
 
         <!-- En-tête -->
         <Border Grid.Row="0"
@@ -160,33 +360,6 @@
             </Grid>
         </Border>
 
-        <!-- Aide de prise en main -->
-        <Border x:Name="MouseGuide"
-                Grid.Row="2"
-                Panel.ZIndex="20"
-                Visibility="Collapsed"
-                IsHitTestVisible="False"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Center"
-                Margin="8"
-                Padding="20,11"
-                CornerRadius="8"
-                Background="#D91A2430"
-                BorderBrush="#9978C9FF"
-                BorderThickness="1">
-            <StackPanel>
-                <TextBlock Text="MAINTENEZ LE CLIC ET GLISSEZ POUR REGARDER"
-                           Foreground="White"
-                           FontFamily="Segoe UI Semibold"
-                           FontSize="13"
-                           HorizontalAlignment="Center"/>
-                <TextBlock Text="Clic gauche ou droit • Relâchez pour libérer la caméra"
-                           Style="{StaticResource HudCaption}"
-                           Margin="0,4,0,0"
-                           HorizontalAlignment="Center"/>
-            </StackPanel>
-        </Border>
-
         <!-- Commandes -->
         <Border x:Name="ControlsHud"
                 Grid.Row="2"
@@ -205,16 +378,18 @@
             <StackPanel Orientation="Horizontal">
                 <TextBlock Text="ZQSD / WASD" Style="{StaticResource HudValue}"/>
                 <TextBlock Text="  se déplacer   •   " Style="{StaticResource HudCaption}"/>
-                <TextBlock Text="CLIC + GLISSER" Style="{StaticResource HudValue}"/>
-                <TextBlock Text="  regarder   •   " Style="{StaticResource HudCaption}"/>
                 <TextBlock Text="ESPACE" Style="{StaticResource HudValue}"/>
                 <TextBlock Text="  sauter   •   " Style="{StaticResource HudCaption}"/>
                 <TextBlock Text="MAJ" Style="{StaticResource HudValue}"/>
                 <TextBlock Text="  courir   •   " Style="{StaticResource HudCaption}"/>
+                <TextBlock Text="CTRL" Style="{StaticResource HudValue}"/>
+                <TextBlock Text="  s’accroupir   •   " Style="{StaticResource HudCaption}"/>
                 <TextBlock Text="F" Style="{StaticResource HudValue}"/>
                 <TextBlock Text="  voler   •   " Style="{StaticResource HudCaption}"/>
                 <TextBlock Text="E" Style="{StaticResource HudValue}"/>
                 <TextBlock Text="  ouvrir / fermer une porte   •   " Style="{StaticResource HudCaption}"/>
+                <TextBlock Text="M" Style="{StaticResource HudValue}"/>
+                <TextBlock Text="  mini-carte   •   " Style="{StaticResource HudCaption}"/>
                 <TextBlock Text="R" Style="{StaticResource HudValue}"/>
                 <TextBlock Text="  réapparaître" Style="{StaticResource HudCaption}"/>
             </StackPanel>

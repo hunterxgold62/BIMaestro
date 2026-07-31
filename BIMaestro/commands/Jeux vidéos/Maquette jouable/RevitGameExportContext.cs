@@ -26,6 +26,8 @@ namespace BIMaestro.VideoGames
         private readonly Stack<bool> _preferredWalkable = new Stack<bool>();
         private readonly Stack<bool> _collidable = new Stack<bool>();
         private readonly Stack<GameDoorData?> _doors = new Stack<GameDoorData?>();
+        private readonly Stack<GameElementData?> _elements =
+            new Stack<GameElementData?>();
         private readonly HashSet<string> _visibleElements = new HashSet<string>(StringComparer.Ordinal);
 
         private Color _currentColor = Color.FromRgb(190, 195, 202);
@@ -45,6 +47,7 @@ namespace BIMaestro.VideoGames
             _preferredWalkable.Clear();
             _collidable.Clear();
             _doors.Clear();
+            _elements.Clear();
             _visibleElements.Clear();
             _transforms.Push(Transform.Identity);
             _documents.Push(_rootDocument);
@@ -82,21 +85,24 @@ namespace BIMaestro.VideoGames
             bool preferred = false;
             bool collidable = true;
             GameDoorData? door = null;
+            GameElementData? elementData = null;
             Document document = _documents.Count > 0 ? _documents.Peek() : _rootDocument;
 
             try
             {
                 Element element = document.GetElement(elementId);
+                string elementKey = CreateElementKey(document, elementId);
+                elementData = CreateElementData(document, element, elementKey);
                 if (element?.Category != null)
                 {
                     int categoryId = element.Category.Id.IntegerValue;
                     preferred = IsPreferredWalkableCategory(categoryId);
                     collidable = categoryId != (int)BuiltInCategory.OST_Doors;
                     if (!collidable)
-                        door = new GameDoorData(CreateElementKey(document, elementId));
+                        door = new GameDoorData(elementKey);
                 }
 
-                _visibleElements.Add(CreateElementKey(document, elementId));
+                _visibleElements.Add(elementKey);
             }
             catch
             {
@@ -106,6 +112,7 @@ namespace BIMaestro.VideoGames
             _preferredWalkable.Push(preferred);
             _collidable.Push(collidable);
             _doors.Push(door);
+            _elements.Push(elementData);
             return RenderNodeAction.Proceed;
         }
 
@@ -120,6 +127,12 @@ namespace BIMaestro.VideoGames
                 GameDoorData? door = _doors.Pop();
                 if (door != null && door.FinalizeGeometry())
                     _scene.Doors.Add(door);
+            }
+            if (_elements.Count > 0)
+            {
+                GameElementData? element = _elements.Pop();
+                if (element != null && element.HasBounds)
+                    _scene.Elements.Add(element);
             }
         }
 
@@ -203,6 +216,8 @@ namespace BIMaestro.VideoGames
             bool preferred = _preferredWalkable.Count > 0 && _preferredWalkable.Peek();
             bool collidable = _collidable.Count == 0 || _collidable.Peek();
             GameDoorData? door = _doors.Count > 0 ? _doors.Peek() : null;
+            GameElementData? elementData =
+                _elements.Count > 0 ? _elements.Peek() : null;
 
             // Un polymesh Revit partage ses sommets entre plusieurs facettes.
             // Les ajouter une fois au lieu de trois fois par triangle réduit
@@ -228,6 +243,7 @@ namespace BIMaestro.VideoGames
 
             if (transformedPoints.Length == 0)
                 return;
+            elementData?.Include(transformedPoints);
 
             int chunkX = ToRenderChunk((minX + maxX) * 0.5);
             int chunkY = ToRenderChunk((minY + maxY) * 0.5);
@@ -359,6 +375,60 @@ namespace BIMaestro.VideoGames
             if (string.IsNullOrWhiteSpace(documentKey))
                 documentKey = document.Title;
             return documentKey + "|" + elementId.IntegerValue;
+        }
+
+        private static GameElementData CreateElementData(
+            Document document,
+            Element? element,
+            string key)
+        {
+            var data = new GameElementData
+            {
+                Key = key,
+                ElementId = element?.Id.IntegerValue ?? 0,
+                Name = SafeText(() => element?.Name),
+                Category = SafeText(() => element?.Category?.Name),
+                DocumentTitle = document.Title ?? string.Empty
+            };
+
+            if (element == null)
+                return data;
+
+            try
+            {
+                ElementId typeId = element.GetTypeId();
+                if (typeId != ElementId.InvalidElementId)
+                    data.TypeName = document.GetElement(typeId)?.Name ?? string.Empty;
+            }
+            catch { }
+
+            try
+            {
+                ElementId levelId = element.LevelId;
+                if (levelId != ElementId.InvalidElementId)
+                    data.LevelName = document.GetElement(levelId)?.Name ?? string.Empty;
+            }
+            catch { }
+
+            if (string.IsNullOrWhiteSpace(data.LevelName))
+            {
+                try
+                {
+                    Parameter levelParameter =
+                        element.get_Parameter(BuiltInParameter.FAMILY_LEVEL_PARAM) ??
+                        element.get_Parameter(BuiltInParameter.INSTANCE_REFERENCE_LEVEL_PARAM);
+                    data.LevelName = levelParameter?.AsValueString() ?? string.Empty;
+                }
+                catch { }
+            }
+
+            return data;
+        }
+
+        private static string SafeText(Func<string?> getter)
+        {
+            try { return getter() ?? string.Empty; }
+            catch { return string.Empty; }
         }
 
         private static bool IsPreferredWalkableCategory(int categoryId)
