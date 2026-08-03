@@ -15,7 +15,7 @@ namespace BIMaestro.VideoGames
         private double _maxZ = double.MinValue;
 
         public string Key { get; set; } = string.Empty;
-        public int ElementId { get; set; }
+        public long ElementId { get; set; }
         public string Name { get; set; } = string.Empty;
         public string Category { get; set; } = string.Empty;
         public string TypeName { get; set; } = string.Empty;
@@ -345,6 +345,7 @@ namespace BIMaestro.VideoGames
         public IList<GameDoorData> Doors { get; } = new List<GameDoorData>();
         public IList<GameElementData> Elements { get; } = new List<GameElementData>();
         public IList<GameTriangle> Triangles { get; } = new List<GameTriangle>();
+        public GameMepGraphData MepGraph { get; set; } = new GameMepGraphData();
 
         public string ViewName { get; set; } = string.Empty;
         public int VisibleElementCount { get; set; }
@@ -407,6 +408,8 @@ namespace BIMaestro.VideoGames
 
             foreach (GameTriangle triangle in Triangles)
                 triangle.Translate(offset);
+
+            MepGraph.Translate(offset);
 
             ViewEye = viewEye + offset;
             ViewForward = viewForward;

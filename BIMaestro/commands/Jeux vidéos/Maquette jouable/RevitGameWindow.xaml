@@ -88,15 +88,44 @@
                        OITRenderMode="SinglePassWeighted"
                        ClipToBounds="True">
             <h:Viewport3DX.Content2D>
-                <h2:RelativePositionCanvas2D IsHitTestVisible="False">
+                <h2:Canvas2D x:Name="GameHudCanvas2D"
+                             Width="1280"
+                             Height="720"
+                             IsHitTestVisible="False">
                     <h2:Canvas2D x:Name="MiniMapOverlay2D"
                                  Width="238"
                                  Height="262"
-                                 HorizontalAlignment="Left"
-                                 VerticalAlignment="Top"
-                                 h2:RelativePositionCanvas2D.RelativeX="-1"
-                                 h2:RelativePositionCanvas2D.RelativeY="1"
+                                 h2:Canvas2D.Left="12"
+                                 h2:Canvas2D.Top="12"
                                  IsHitTestVisible="False">
+                        <!-- Fond Direct2D permanent : la carte reste lisible
+                             pendant le chargement ou si le PNG doit etre regenere. -->
+                        <h2:RectangleModel2D Width="226"
+                                             Height="250"
+                                             Fill="#EF17202B"
+                                             Stroke="#A07B91AA"
+                                             StrokeThickness="1"
+                                             h2:Canvas2D.Left="12"
+                                             h2:Canvas2D.Top="12"
+                                             IsHitTestVisible="False"/>
+                        <h2:RectangleModel2D Width="208"
+                                             Height="208"
+                                             Fill="#F50E141C"
+                                             Stroke="#A07B91AA"
+                                             StrokeThickness="1"
+                                             h2:Canvas2D.Left="21"
+                                             h2:Canvas2D.Top="45"
+                                             IsHitTestVisible="False"/>
+                        <h2:TextModel2D Text="PLAN DU NIVEAU"
+                                        Width="130"
+                                        Height="20"
+                                        FontFamily="Segoe UI Semibold"
+                                        FontSize="11"
+                                        Foreground="#FFF4F8FC"
+                                        Background="#00000000"
+                                        h2:Canvas2D.Left="22"
+                                        h2:Canvas2D.Top="20"
+                                        IsHitTestVisible="False"/>
                         <h2:ImageModel2D x:Name="MiniMapImage2D"
                                          Width="238"
                                          Height="262"
@@ -114,17 +143,23 @@
                                         Background="#00000000"
                                         TextAlignment="Center"
                                         RenderTransformOrigin="0.5,0.5"
-                                        h2:Canvas2D.Left="115"
-                                        h2:Canvas2D.Top="139"
+                                        h2:Canvas2D.Left="11"
+                                        h2:Canvas2D.Top="35"
                                         IsHitTestVisible="False">
                             <h2:TextModel2D.Transform>
-                                <RotateTransform x:Name="MiniMapPlayerRotation2D"
-                                                 CenterX="10"
-                                                 CenterY="10"/>
+                                <TransformGroup>
+                                    <RotateTransform x:Name="MiniMapPlayerRotation2D"
+                                                     CenterX="10"
+                                                     CenterY="10"/>
+                                    <TranslateTransform x:Name="MiniMapPlayerTranslation2D"
+                                                        X="104"
+                                                        Y="104"/>
+                                </TransformGroup>
                             </h2:TextModel2D.Transform>
                         </h2:TextModel2D>
                     </h2:Canvas2D>
-                    <h2:TextModel2D Text="+"
+                    <h2:TextModel2D x:Name="Crosshair2D"
+                                    Text="+"
                                     Width="28"
                                     Height="28"
                                     FontFamily="Segoe UI Semibold"
@@ -135,7 +170,7 @@
                                     VerticalAlignment="Center"
                                     TextAlignment="Center"
                                     IsHitTestVisible="False"/>
-                </h2:RelativePositionCanvas2D>
+                </h2:Canvas2D>
             </h:Viewport3DX.Content2D>
             <h:AmbientLight3D x:Name="AmbientLight" Color="#FF5C6878"/>
             <h:DirectionalLight3D x:Name="SunLight"
@@ -148,6 +183,210 @@
                                   Color="#66FFFFFF"
                                   Direction="1,0,-0.1"/>
         </h:Viewport3DX>
+
+        <!-- Panneau fonctionnel MEP placé à côté du swap-chain DirectX.
+             Une superposition WPF sur ce viewport est instable selon la version de Revit. -->
+        <Border x:Name="MepPanel"
+                Grid.Column="1"
+                Panel.ZIndex="20"
+                Visibility="Collapsed"
+                Width="360"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Stretch"
+                Margin="12"
+                Padding="14"
+                CornerRadius="9"
+                Background="#F117202B"
+                BorderBrush="#AA2CCFD6"
+                BorderThickness="1"
+                IsHitTestVisible="True">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="FLUIDES MEP"
+                                   Foreground="#FF46D7DC"
+                                   FontFamily="Segoe UI Semibold"
+                                   FontSize="12"/>
+                        <TextBlock x:Name="MepStatsText"
+                                   Text="Analyse des canalisations"
+                                   Style="{StaticResource HudCaption}"
+                                   Margin="0,3,0,0"/>
+                    </StackPanel>
+                    <Button Grid.Column="1"
+                            Style="{StaticResource GlassButton}"
+                            Content="×"
+                            Padding="9,5"
+                            Click="MepCloseButton_Click"/>
+                </Grid>
+
+                <StackPanel Grid.Row="1" Margin="0,12,0,10">
+                    <Button x:Name="MepFlowToggleButton"
+                            Style="{StaticResource GlassButton}"
+                            Content="Activer les flux"
+                            HorizontalAlignment="Stretch"
+                            Click="MepFlowToggleButton_Click"/>
+                    <TextBlock x:Name="MepStatusText"
+                               Text="Les flux sont désactivés."
+                               Foreground="#FFBFD0E3"
+                               FontFamily="Segoe UI Semibold"
+                               FontSize="11"
+                               TextWrapping="Wrap"
+                               Margin="0,9,0,0"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="2">
+                        <TextBlock Text="SYSTÈMES AFFICHÉS"
+                                   Foreground="#FF7F95AE"
+                                   FontFamily="Segoe UI Semibold"
+                                   FontSize="10"
+                                   Margin="0,3,0,6"/>
+                        <ListBox x:Name="MepSystemsList"
+                                 MaxHeight="145"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                 ScrollViewer.CanContentScroll="True"
+                                 VirtualizingPanel.IsVirtualizing="True"
+                                 VirtualizingPanel.VirtualizationMode="Recycling">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="Focusable" Value="False"/>
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListBoxItem">
+                                                <ContentPresenter/>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <CheckBox IsChecked="{Binding IsEnabled, Mode=TwoWay}"
+                                              Foreground="White"
+                                              Margin="0,3"
+                                              Click="MepSystemFilter_Changed">
+                                        <Grid Margin="4,0,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="10"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Width="7" Height="24"
+                                                    CornerRadius="3"
+                                                    Background="{Binding ColorBrush}"
+                                                    VerticalAlignment="Center"/>
+                                            <StackPanel Grid.Column="1" Margin="7,0,0,0">
+                                                <TextBlock Text="{Binding Name}"
+                                                           Foreground="White"
+                                                           FontSize="11"
+                                                           TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding Detail}"
+                                                           Style="{StaticResource HudCaption}"
+                                                           FontSize="9"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </CheckBox>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <Border Height="1" Background="#557B91AA" Margin="0,10"/>
+                        <TextBlock Text="SOURCES DE FLUIDE"
+                                   Foreground="#FF7F95AE"
+                                   FontFamily="Segoe UI Semibold"
+                                   FontSize="10"
+                                   Margin="0,0,0,6"/>
+                        <TextBlock x:Name="MepNoSourceText"
+                                   Text="Aucune source fiable détectée. Sélectionne une canalisation d'arrivée ou un équipement pour définir la source."
+                                   Style="{StaticResource HudCaption}"
+                                   TextWrapping="Wrap"
+                                   Visibility="Collapsed"
+                                   Margin="0,2,0,5"/>
+                        <ListBox x:Name="MepSourcesList"
+                                 MaxHeight="165"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                 ScrollViewer.CanContentScroll="True"
+                                 VirtualizingPanel.IsVirtualizing="True"
+                                 VirtualizingPanel.VirtualizationMode="Recycling">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="Focusable" Value="False"/>
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListBoxItem">
+                                                <ContentPresenter/>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <CheckBox IsChecked="{Binding IsActive, Mode=TwoWay}"
+                                              Foreground="White"
+                                              Margin="0,3"
+                                              Click="MepSource_Changed">
+                                        <StackPanel Margin="4,0,0,0">
+                                            <TextBlock Text="{Binding Name}"
+                                                       Foreground="White"
+                                                       FontSize="11"
+                                                       TextWrapping="Wrap"/>
+                                            <TextBlock Style="{StaticResource HudCaption}"
+                                                       FontSize="9">
+                                                <Run Text="{Binding SystemName, Mode=OneWay}"/>
+                                                <Run Text="  •  "/>
+                                                <Run Text="{Binding ConfidenceText, Mode=OneWay}"/>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </CheckBox>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <Border Height="1" Background="#557B91AA" Margin="0,10"/>
+                        <TextBlock Text="LÉGENDE"
+                                   Foreground="#FF7F95AE"
+                                   FontFamily="Segoe UI Semibold"
+                                   FontSize="10"/>
+                        <TextBlock Text="Flux lumineux : alimenté  •  Gris : isolé  •  Ambre : indéterminé  •  Rouge : vanne fermée"
+                                   Style="{StaticResource HudCaption}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,5,0,0"/>
+                </StackPanel>
+
+                <Grid Grid.Row="3" Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="MepDiagnosticsText"
+                               Style="{StaticResource HudCaption}"
+                               TextWrapping="Wrap"
+                               VerticalAlignment="Center"
+                               Margin="0,0,8,0"/>
+                    <Button Grid.Column="1"
+                            Style="{StaticResource GlassButton}"
+                            Content="Réinitialiser"
+                            Padding="9,5"
+                            Click="MepResetButton_Click"/>
+                </Grid>
+            </Grid>
+        </Border>
 
         <!-- Historique des objets visés par des clics droits courts. -->
         <Border x:Name="ObjectInfoPanel"
@@ -282,6 +521,54 @@
                                                    FontSize="10"
                                                    TextWrapping="Wrap"
                                                    Margin="0,6,0,0"/>
+                                        <StackPanel Visibility="{Binding MepVisibility}"
+                                                    Margin="0,8,0,0">
+                                            <Border Height="1" Background="#445E748D" Margin="0,0,0,7"/>
+                                            <TextBlock Text="{Binding SystemText}"
+                                                       Foreground="#FF71DCE0"
+                                                       FontFamily="Segoe UI Semibold"
+                                                       FontSize="10"
+                                                       TextWrapping="Wrap"/>
+                                            <TextBlock Text="{Binding FlowText}"
+                                                       Style="{StaticResource HudCaption}"
+                                                       TextWrapping="Wrap"
+                                                       Margin="0,3,0,0"/>
+                                            <TextBlock Text="{Binding ValveText}"
+                                                       Style="{StaticResource HudCaption}"
+                                                       TextWrapping="Wrap"
+                                                       Margin="0,3,0,0"
+                                                       Visibility="{Binding ValveOverrideVisibility}"/>
+                                            <Button Content="{Binding ValveActionText}"
+                                                    Tag="{Binding UniqueKey}"
+                                                    Style="{StaticResource GlassButton}"
+                                                    Margin="0,8,0,0"
+                                                    Visibility="{Binding ValveActionVisibility}"
+                                                    Click="ValveActionButton_Click"/>
+                                            <Button Content="{Binding ValveOverrideActionText}"
+                                                    Tag="{Binding UniqueKey}"
+                                                    Style="{StaticResource GlassButton}"
+                                                    Margin="0,5,0,0"
+                                                    Visibility="{Binding ValveOverrideVisibility}"
+                                                    Click="ValveOverrideButton_Click"/>
+                                            <Button Content="{Binding SourceActionText}"
+                                                    Tag="{Binding UniqueKey}"
+                                                    Style="{StaticResource GlassButton}"
+                                                    Margin="0,5,0,0"
+                                                    Visibility="{Binding SourceActionVisibility}"
+                                                    Click="SourceOverrideButton_Click"/>
+                                            <Button Content="{Binding SourceForwardActionText}"
+                                                    Tag="{Binding UniqueKey}"
+                                                    Style="{StaticResource GlassButton}"
+                                                    Margin="0,5,0,0"
+                                                    Visibility="{Binding SourceDirectionVisibility}"
+                                                    Click="SourceForwardButton_Click"/>
+                                            <Button Content="{Binding SourceReverseActionText}"
+                                                    Tag="{Binding UniqueKey}"
+                                                    Style="{StaticResource GlassButton}"
+                                                    Margin="0,5,0,0"
+                                                    Visibility="{Binding SourceDirectionVisibility}"
+                                                    Click="SourceReverseButton_Click"/>
+                                        </StackPanel>
                                     </StackPanel>
                                 </Border>
                             </DataTemplate>
@@ -343,6 +630,11 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="MepPanelButton"
+                            Style="{StaticResource GlassButton}"
+                            Content="Fluides MEP"
+                            Margin="0,0,18,0"
+                            Click="MepPanelButton_Click"/>
                     <StackPanel Margin="0,0,22,0">
                         <TextBlock Text="MODE" Style="{StaticResource HudCaption}"/>
                         <TextBlock x:Name="ModeText" Text="MARCHE" Style="{StaticResource HudValue}"/>
@@ -390,6 +682,8 @@
                 <TextBlock Text="  ouvrir / fermer une porte   •   " Style="{StaticResource HudCaption}"/>
                 <TextBlock Text="M" Style="{StaticResource HudValue}"/>
                 <TextBlock Text="  mini-carte   •   " Style="{StaticResource HudCaption}"/>
+                <TextBlock Text="P" Style="{StaticResource HudValue}"/>
+                <TextBlock Text="  fluides MEP   •   " Style="{StaticResource HudCaption}"/>
                 <TextBlock Text="R" Style="{StaticResource HudValue}"/>
                 <TextBlock Text="  réapparaître" Style="{StaticResource HudCaption}"/>
             </StackPanel>

@@ -2099,7 +2099,9 @@ namespace Analyse
                 if (_doc.IsFamilyDocument)
                     RestoreFamilyTypeParameters(ev, changes, result);
 
-                var element = ev.ElementId > 0 ? _doc.GetElement(new ElementId(ev.ElementId)) : null;
+                var element = ev.ElementId > 0
+                    ? _doc.GetElement(ElementIdExtensions.CreateElementId(ev.ElementId))
+                    : null;
                 if (element != null)
                     RestoreElementOrTypeParameters(element, changes, result);
 
@@ -2266,7 +2268,7 @@ namespace Analyse
                         return false;
                     case StorageType.ElementId:
                         if (int.TryParse(oldValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var idValue))
-                            return parameter.Set(new ElementId(idValue));
+                            return parameter.Set(ElementIdExtensions.CreateElementId(idValue));
                         return false;
                     default:
                         return false;
@@ -2303,7 +2305,7 @@ namespace Analyse
                         return true;
                     case StorageType.ElementId:
                         if (!int.TryParse(oldValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var idValue)) return false;
-                        manager.Set(parameter, new ElementId(idValue));
+                        manager.Set(parameter, ElementIdExtensions.CreateElementId(idValue));
                         return true;
                     default:
                         return false;
@@ -2403,7 +2405,7 @@ namespace Analyse
 
             var ids = focusElementIds
                 .Distinct()
-                .Select(x => new ElementId(x))
+                .Select(x => ElementIdExtensions.CreateElementId(x))
                 .Where(id => _doc.GetElement(id) != null)
                 .ToList();
 

@@ -2249,7 +2249,7 @@ namespace Analyse
 
             try
             {
-                var type = doc.GetElement(new ElementId(typeId)) as ElementType;
+                var type = doc.GetElement(ElementIdExtensions.CreateElementId(typeId)) as ElementType;
                 if (type == null)
                 {
                     ThumbnailPathCache[key] = string.Empty;

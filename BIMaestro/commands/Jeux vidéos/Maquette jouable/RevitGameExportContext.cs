@@ -95,7 +95,7 @@ namespace BIMaestro.VideoGames
                 elementData = CreateElementData(document, element, elementKey);
                 if (element?.Category != null)
                 {
-                    int categoryId = element.Category.Id.IntegerValue;
+                    int categoryId = element.Category.Id.GetIdValue();
                     preferred = IsPreferredWalkableCategory(categoryId);
                     collidable = categoryId != (int)BuiltInCategory.OST_Doors;
                     if (!collidable)
@@ -106,7 +106,7 @@ namespace BIMaestro.VideoGames
             }
             catch
             {
-                _visibleElements.Add(document.GetHashCode() + "|" + elementId.IntegerValue);
+                _visibleElements.Add(document.GetHashCode() + "|" + elementId.GetIdLongValue());
             }
 
             _preferredWalkable.Push(preferred);
@@ -374,7 +374,7 @@ namespace BIMaestro.VideoGames
             string documentKey = document.PathName;
             if (string.IsNullOrWhiteSpace(documentKey))
                 documentKey = document.Title;
-            return documentKey + "|" + elementId.IntegerValue;
+            return documentKey + "|" + elementId.GetIdLongValue();
         }
 
         private static GameElementData CreateElementData(
@@ -385,7 +385,7 @@ namespace BIMaestro.VideoGames
             var data = new GameElementData
             {
                 Key = key,
-                ElementId = element?.Id.IntegerValue ?? 0,
+                ElementId = element?.Id.GetIdLongValue() ?? 0L,
                 Name = SafeText(() => element?.Name),
                 Category = SafeText(() => element?.Category?.Name),
                 DocumentTitle = document.Title ?? string.Empty
@@ -462,6 +462,24 @@ namespace BIMaestro.VideoGames
 
             GameSceneData scene = context.Scene;
             scene.ViewName = view.Name;
+
+            // Les connecteurs Revit doivent être lus tant que la commande est
+            // encore sur le thread Revit. La fenêtre WPF ne recevra ensuite que
+            // le graphe immuable et les états de simulation temporaires.
+            try
+            {
+                scene.MepGraph = RevitGameMepExtractor.Extract(document, scene);
+            }
+            catch (Exception exception)
+            {
+                // Le mode MEP enrichit la maquette jouable, mais une famille
+                // incompatible avec une version de Revit ne doit jamais bloquer
+                // l'ouverture de la scène principale.
+                scene.MepGraph = new GameMepGraphData
+                {
+                    ExtractionError = exception.Message
+                };
+            }
 
             ViewOrientation3D orientation = view.GetOrientation();
             XYZ eye = orientation.EyePosition;

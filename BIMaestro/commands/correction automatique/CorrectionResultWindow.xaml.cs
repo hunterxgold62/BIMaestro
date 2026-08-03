@@ -561,15 +561,7 @@ namespace ScanTextRevit
 
             private static ElementId CreateElementId(long value)
             {
-                var longConstructor = typeof(ElementId).GetConstructor(new[] { typeof(long) });
-                if (longConstructor != null)
-                    return (ElementId)longConstructor.Invoke(new object[] { value });
-
-                if (value > int.MaxValue)
-                    throw new InvalidOperationException(
-                        "Cet identifiant 64 bits nécessite Revit 2024 ou une version plus récente.");
-
-                return new ElementId((int)value);
+                return ElementIdExtensions.CreateElementId(value);
             }
         }
 

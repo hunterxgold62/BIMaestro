@@ -843,7 +843,6 @@ namespace Couleur
         private static object _chromiumBrowser;
         private static bool _browserInjectionSucceeded;
         private static DispatcherTimer _refreshTimer;
-        private static int _diagnosticState;
         private static string _revitVersion = "inconnue";
         private static bool _legacyNativeProjectBrowser;
         private static ProjectBrowserColorSettings _settings =
@@ -860,14 +859,6 @@ namespace Couleur
         private static SolidColorBrush TextBrush =>
             new SolidColorBrush(_settings.TextColor);
 
-        public static string DiagnosticFilePath =>
-            Path.Combine(
-                Environment.GetFolderPath(
-                    Environment.SpecialFolder.MyDocuments),
-                "RevitLogs",
-                "SauvegardePréférence",
-                $"diagnostic-arborescence-{_revitVersion}.txt");
-
         public static void ConfigureRevitVersion(string version)
         {
             string safeVersion = new string(
@@ -877,7 +868,6 @@ namespace Couleur
             _revitVersion = string.IsNullOrWhiteSpace(safeVersion)
                 ? "inconnue"
                 : safeVersion;
-            _diagnosticState = 0;
         }
 
         public static void Apply(IntPtr mainWindowHandle)
@@ -894,14 +884,10 @@ namespace Couleur
 
             FrameworkElement root = FindProjectBrowserRoot(window);
             if (root == null)
-            {
-                WriteDiagnostic(window, null);
                 return;
-            }
 
             _projectBrowserRoot = root;
             ApplyColors(root);
-            WriteDiagnostic(window, root);
             if (_legacyNativeProjectBrowser)
                 return;
 
@@ -982,7 +968,6 @@ namespace Couleur
             _projectBrowserRoot = null;
             _chromiumBrowser = null;
             _browserInjectionSucceeded = false;
-            _diagnosticState = 0;
             _legacyNativeProjectBrowser = false;
         }
 
@@ -2690,109 +2675,6 @@ namespace Couleur
             catch
             {
                 return false;
-            }
-        }
-
-        private static void WriteDiagnostic(
-            Window mainWindow,
-            FrameworkElement result)
-        {
-            int newState = result == null ? 1 : 2;
-            if (_diagnosticState >= newState)
-                return;
-
-            try
-            {
-                var lines = new List<string>
-                {
-                    $"Date UTC : {DateTime.UtcNow:O}",
-                    $"Version Revit : {_revitVersion}",
-                    $"Résultat : {(result == null ? "introuvable" : "trouvé")}"
-                };
-
-                int sourceIndex = 0;
-                foreach (PresentationSource source in
-                         PresentationSource.CurrentSources)
-                {
-                    sourceIndex++;
-                    if (!(source?.RootVisual is FrameworkElement root))
-                    {
-                        lines.Add($"Source {sourceIndex} : sans racine WPF");
-                        continue;
-                    }
-
-                    List<FrameworkElement> descendants =
-                        FindChildrenByType<FrameworkElement>(root);
-                    string interestingTypes = string.Join(
-                        ", ",
-                        descendants
-                            .Select(element => element.GetType().Name)
-                            .Where(name =>
-                                name.IndexOf(
-                                    "Browser",
-                                    StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                name.IndexOf(
-                                    "Tree",
-                                    StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                name.IndexOf(
-                                    "Dock",
-                                    StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                name.IndexOf(
-                                    "Pane",
-                                    StringComparison.OrdinalIgnoreCase) >= 0)
-                            .Distinct()
-                            .Take(20));
-
-                    lines.Add(
-                        $"Source {sourceIndex} : {root.GetType().Name}, " +
-                        $"{root.ActualWidth:0} x {root.ActualHeight:0}, " +
-                        $"{descendants.Count} éléments");
-                    if (!string.IsNullOrWhiteSpace(interestingTypes))
-                        lines.Add($"  Types utiles : {interestingTypes}");
-                }
-
-                if (result != null)
-                {
-                    List<TextBlock> texts =
-                        FindChildrenByType<TextBlock>(result);
-                    lines.Add(
-                        $"Contrôle : {result.GetType().FullName}, " +
-                        $"{result.ActualWidth:0} x {result.ActualHeight:0}");
-                    lines.Add($"TextBlock visibles : {texts.Count}");
-                    lines.Add(
-                        $"Libellés ARC visibles : " +
-                        $"{texts.Count(text => IsArcLabel(text.Text))}");
-                    lines.Add(
-                        $"Chromium trouvé : " +
-                        $"{(_chromiumBrowser == null ? "non" : "oui")}");
-                    string activeBrowserType =
-                        _chromiumBrowser?.GetType().FullName ?? "aucun";
-                    lines.Add(
-                        $"Moteur utilisé : {activeBrowserType}");
-                    string browserCandidateTypes = string.Join(
-                        ", ",
-                        FindChildrenByType<FrameworkElement>(result)
-                            .Where(IsBrowserCandidate)
-                            .Select(element =>
-                                element.GetType().FullName)
-                            .Distinct());
-                    lines.Add(
-                        $"Moteurs candidats : {browserCandidateTypes}");
-                    lines.Add(
-                        $"Injection CSS demandée : " +
-                        $"{(_browserInjectionSucceeded ? "oui" : "non")}");
-                }
-
-                string directory = Path.GetDirectoryName(DiagnosticFilePath);
-                if (!Directory.Exists(directory))
-                    Directory.CreateDirectory(directory);
-
-                File.WriteAllLines(DiagnosticFilePath, lines);
-                _diagnosticState = newState;
-            }
-            catch
-            {
-                // Le diagnostic ne doit jamais affecter le démarrage de Revit.
             }
         }
 
