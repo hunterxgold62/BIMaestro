@@ -31,8 +31,8 @@ namespace Analyse
             public Dictionary<string, double> DuctLengths = new Dictionary<string, double>();
             public Dictionary<string, double> DuctFittingLengths = new Dictionary<string, double>();
             public Dictionary<double, double> PipeVolumes = new Dictionary<double, double>();
-            public Dictionary<double, int> ElbowCounts = new Dictionary<double, int>();
-            public Dictionary<double, int> TeeCounts = new Dictionary<double, int>();
+            public Dictionary<string, int> ElbowCounts = new Dictionary<string, int>();
+            public Dictionary<string, int> TeeCounts = new Dictionary<string, int>();
             public Dictionary<double, (double DiametreInterieur, double DiametreExterieur)> DnToDiameters =
                 new Dictionary<double, (double, double)>();
         }
@@ -147,8 +147,8 @@ namespace Analyse
                 Dictionary<double, double> pipeFittingLengths = new Dictionary<double, double>();
                 Dictionary<string, double> ductLengths = new Dictionary<string, double>();
                 Dictionary<string, double> ductFittingLengths = new Dictionary<string, double>();
-                Dictionary<double, int> elbowCounts = new Dictionary<double, int>();
-                Dictionary<double, int> teeCounts = new Dictionary<double, int>();
+                Dictionary<string, int> elbowCounts = new Dictionary<string, int>();
+                Dictionary<string, int> teeCounts = new Dictionary<string, int>();
                 Dictionary<double, (double DiametreInterieur, double DiametreExterieur)> dnToDiameters =
                     new Dictionary<double, (double, double)>();
                 Dictionary<double, double> pipeVolumes = new Dictionary<double, double>();
@@ -259,16 +259,20 @@ namespace Analyse
                         diametre = UnitUtils.ConvertFromInternalUnits(diametre, UnitTypeId.Millimeters);
 
                         double diametreInterieur = pipe.get_Parameter(BuiltInParameter.RBS_PIPE_INNER_DIAM_PARAM)?.AsDouble() ?? 0;
-                        if (diametreInterieur == 0) continue;
-                        double diametreInterieur_mm = UnitUtils.ConvertFromInternalUnits(diametreInterieur, UnitTypeId.Millimeters);
+                        double diametreInterieur_mm = diametreInterieur > 0
+                            ? UnitUtils.ConvertFromInternalUnits(diametreInterieur, UnitTypeId.Millimeters)
+                            : 0;
 
                         double diametreExterieur = pipe.get_Parameter(BuiltInParameter.RBS_PIPE_OUTER_DIAMETER)?.AsDouble() ?? 0;
-                        if (diametreExterieur == 0) continue;
-                        double diametreExterieur_mm = UnitUtils.ConvertFromInternalUnits(diametreExterieur, UnitTypeId.Millimeters);
+                        double diametreExterieur_mm = diametreExterieur > 0
+                            ? UnitUtils.ConvertFromInternalUnits(diametreExterieur, UnitTypeId.Millimeters)
+                            : 0;
 
-                        if (!dnToDiameters.ContainsKey(diametre))
+                        if (diametreInterieur_mm > 0 && diametreExterieur_mm > 0 &&
+                            !dnToDiameters.ContainsKey(diametre))
                             dnToDiameters[diametre] = (diametreInterieur_mm, diametreExterieur_mm);
-                        if (netAgg != null && !netAgg.DnToDiameters.ContainsKey(diametre))
+                        if (netAgg != null && diametreInterieur_mm > 0 && diametreExterieur_mm > 0 &&
+                            !netAgg.DnToDiameters.ContainsKey(diametre))
                             netAgg.DnToDiameters[diametre] = (diametreInterieur_mm, diametreExterieur_mm);
 
                         double longueur = pipe.get_Parameter(BuiltInParameter.CURVE_ELEM_LENGTH).AsDouble();
@@ -286,18 +290,21 @@ namespace Analyse
                                 netAgg.PipeLengths[diametre] = longueur;
                         }
 
-                        double diametreInterieur_m = UnitUtils.ConvertFromInternalUnits(diametreInterieur, UnitTypeId.Meters);
-                        double volume = Math.PI * Math.Pow(diametreInterieur_m / 2, 2) * longueur;
-                        if (pipeVolumes.ContainsKey(diametreInterieur_mm))
-                            pipeVolumes[diametreInterieur_mm] += volume;
-                        else
-                            pipeVolumes[diametreInterieur_mm] = volume;
-                        if (netAgg != null)
+                        if (diametreInterieur > 0)
                         {
-                            if (netAgg.PipeVolumes.ContainsKey(diametreInterieur_mm))
-                                netAgg.PipeVolumes[diametreInterieur_mm] += volume;
+                            double diametreInterieur_m = UnitUtils.ConvertFromInternalUnits(diametreInterieur, UnitTypeId.Meters);
+                            double volume = Math.PI * Math.Pow(diametreInterieur_m / 2, 2) * longueur;
+                            if (pipeVolumes.ContainsKey(diametreInterieur_mm))
+                                pipeVolumes[diametreInterieur_mm] += volume;
                             else
-                                netAgg.PipeVolumes[diametreInterieur_mm] = volume;
+                                pipeVolumes[diametreInterieur_mm] = volume;
+                            if (netAgg != null)
+                            {
+                                if (netAgg.PipeVolumes.ContainsKey(diametreInterieur_mm))
+                                    netAgg.PipeVolumes[diametreInterieur_mm] += volume;
+                                else
+                                    netAgg.PipeVolumes[diametreInterieur_mm] = volume;
+                            }
                         }
                     }
                     // --- Traitement pour les gaines ---
@@ -368,38 +375,36 @@ namespace Analyse
                                 else
                                     netAgg.PipeFittingLengths[maxDiametre] = longueur;
                             }
-                            string familyName = fi.Symbol.Family.Name.ToLower();
-                            string typeName = fi.Name.ToLower();
-                            bool isElbow = familyName.Contains("coude") || familyName.Contains("elbow") ||
-                                            typeName.Contains("coude") || typeName.Contains("elbow");
-                            bool isTee = familyName.Contains("té") || familyName.Contains("tee") ||
-                                         typeName.Contains("té") || typeName.Contains("tee");
+                            FittingKind fittingKind = GetFittingKind(fi);
+                            string fittingSize = GetFittingSize(fi, fittingKind);
+                            bool isElbow = fittingKind == FittingKind.Elbow;
+                            bool isTee = fittingKind == FittingKind.Tee;
                             if (isElbow)
                             {
-                                if (elbowCounts.ContainsKey(maxDiametre))
-                                    elbowCounts[maxDiametre]++;
+                                if (elbowCounts.ContainsKey(fittingSize))
+                                    elbowCounts[fittingSize]++;
                                 else
-                                    elbowCounts[maxDiametre] = 1;
+                                    elbowCounts[fittingSize] = 1;
                                 if (netAgg != null)
                                 {
-                                    if (netAgg.ElbowCounts.ContainsKey(maxDiametre))
-                                        netAgg.ElbowCounts[maxDiametre]++;
+                                    if (netAgg.ElbowCounts.ContainsKey(fittingSize))
+                                        netAgg.ElbowCounts[fittingSize]++;
                                     else
-                                        netAgg.ElbowCounts[maxDiametre] = 1;
+                                        netAgg.ElbowCounts[fittingSize] = 1;
                                 }
                             }
                             else if (isTee)
                             {
-                                if (teeCounts.ContainsKey(maxDiametre))
-                                    teeCounts[maxDiametre]++;
+                                if (teeCounts.ContainsKey(fittingSize))
+                                    teeCounts[fittingSize]++;
                                 else
-                                    teeCounts[maxDiametre] = 1;
+                                    teeCounts[fittingSize] = 1;
                                 if (netAgg != null)
                                 {
-                                    if (netAgg.TeeCounts.ContainsKey(maxDiametre))
-                                        netAgg.TeeCounts[maxDiametre]++;
+                                    if (netAgg.TeeCounts.ContainsKey(fittingSize))
+                                        netAgg.TeeCounts[fittingSize]++;
                                     else
-                                        netAgg.TeeCounts[maxDiametre] = 1;
+                                        netAgg.TeeCounts[fittingSize] = 1;
                                 }
                             }
                         }
@@ -516,14 +521,14 @@ namespace Analyse
                 {
                     sb.AppendLine("Nombre de coudes par diamètre :");
                     foreach (var item in elbowCounts.OrderBy(kvp => kvp.Key))
-                        sb.AppendLine($"{item.Key:N0} mm : {item.Value}");
+                        sb.AppendLine($"{item.Key} : {item.Value}");
                     sb.AppendLine();
                 }
                 if (teeCounts.Count > 0)
                 {
                     sb.AppendLine("Nombre de tés par diamètre :");
                     foreach (var item in teeCounts.OrderBy(kvp => kvp.Key))
-                        sb.AppendLine($"{item.Key:N0} mm : {item.Value}");
+                        sb.AppendLine($"{item.Key} : {item.Value}");
                     sb.AppendLine();
                 }
                 if (includeDucts && ductLengths.Count > 0)
@@ -681,27 +686,233 @@ namespace Analyse
             return null;
         }
 
-        // --- NOUVELLE IMPLEMENTATION ---
-        // Estimation de la longueur d'un accessoire par interpolation linéaire
+        private enum FittingKind
+        {
+            Other,
+            Elbow,
+            Tee
+        }
+
+        private sealed class FittingConnectorInfo
+        {
+            public XYZ Origin { get; set; }
+            public XYZ Direction { get; set; }
+            public double DiameterMm { get; set; }
+        }
+
+        private FittingKind GetFittingKind(FamilyInstance fitting)
+        {
+            var mechanicalFitting = fitting.MEPModel as MechanicalFitting;
+            if (mechanicalFitting != null)
+            {
+                switch (mechanicalFitting.PartType)
+                {
+                    case PartType.Elbow:
+                        return FittingKind.Elbow;
+                    case PartType.Tee:
+                    case PartType.LateralTee:
+                        return FittingKind.Tee;
+                }
+            }
+
+            // Secours pour les anciennes familles dont le type de pièce n'est pas renseigné.
+            string familyName = fitting.Symbol?.Family?.Name?.ToLowerInvariant() ?? string.Empty;
+            string typeName = fitting.Name?.ToLowerInvariant() ?? string.Empty;
+            if (familyName.Contains("coude") || familyName.Contains("elbow") ||
+                typeName.Contains("coude") || typeName.Contains("elbow"))
+                return FittingKind.Elbow;
+            if (familyName.Contains("té") || familyName.Contains("tee") ||
+                typeName.Contains("té") || typeName.Contains("tee"))
+                return FittingKind.Tee;
+            return FittingKind.Other;
+        }
+
+        private string GetFittingSize(FamilyInstance fitting, FittingKind kind)
+        {
+            List<FittingConnectorInfo> connectors = GetPipeConnectors(fitting);
+            if (connectors.Count == 0)
+                return "Dimension inconnue";
+
+            if (kind == FittingKind.Tee && connectors.Count >= 3)
+            {
+                // Les deux directions les plus opposées constituent le passage principal.
+                int mainA = 0;
+                int mainB = 1;
+                double smallestDot = double.MaxValue;
+                for (int i = 0; i < connectors.Count - 1; i++)
+                {
+                    for (int j = i + 1; j < connectors.Count; j++)
+                    {
+                        double dot = connectors[i].Direction.DotProduct(connectors[j].Direction);
+                        if (dot < smallestDot)
+                        {
+                            smallestDot = dot;
+                            mainA = i;
+                            mainB = j;
+                        }
+                    }
+                }
+
+                var ordered = new List<double>
+                {
+                    connectors[mainA].DiameterMm,
+                    connectors[mainB].DiameterMm
+                };
+                ordered.AddRange(connectors
+                    .Where((connector, index) => index != mainA && index != mainB)
+                    .Select(connector => connector.DiameterMm)
+                    .OrderByDescending(value => value));
+                return FormatDiameterSignature(ordered);
+            }
+
+            return FormatDiameterSignature(connectors
+                .Select(connector => connector.DiameterMm)
+                .OrderByDescending(value => value));
+        }
+
+        private string FormatDiameterSignature(IEnumerable<double> diameters)
+        {
+            var rounded = diameters
+                .Where(value => value > 0)
+                .Select(value => Math.Round(value, 1))
+                .ToList();
+            if (rounded.Count == 0)
+                return "Dimension inconnue";
+
+            if (rounded.All(value => Math.Abs(value - rounded[0]) < 0.2))
+                return $"DN {rounded[0]:0.#}";
+            return "DN " + string.Join(" × ", rounded.Select(value => value.ToString("0.#")));
+        }
+
+        // Longueur développée d'après la géométrie des connecteurs. La table
+        // historique n'est utilisée que si la famille ne fournit pas assez d'informations.
         private double EstimateFittingLength(FamilyInstance fitting)
         {
-            double maxDiameter = 0;
-            var connectors = fitting.MEPModel?.ConnectorManager?.Connectors;
-            if (connectors != null)
-            {
-                List<double> diametres = new List<double>();
-                foreach (Connector connector in connectors)
-                {
-                    double diam = connector.Radius * 2;
-                    diam = UnitUtils.ConvertFromInternalUnits(diam, UnitTypeId.Millimeters);
-                    diametres.Add(diam);
-                }
-                if (diametres.Count > 0)
-                    maxDiameter = diametres.Max();
-            }
-            if (maxDiameter <= 0)
+            List<FittingConnectorInfo> connectors = GetPipeConnectors(fitting);
+            if (connectors.Count == 0)
                 return 0;
-            return InterpolateFittingLength(maxDiameter);
+
+            double lengthInternal = 0;
+            FittingKind kind = GetFittingKind(fitting);
+            if (kind == FittingKind.Elbow && connectors.Count == 2)
+                lengthInternal = EstimateElbowLength(connectors[0], connectors[1]);
+            else if (kind == FittingKind.Tee && connectors.Count >= 3)
+                lengthInternal = EstimateJunctionLength(connectors);
+            else if (connectors.Count == 2)
+                lengthInternal = connectors[0].Origin.DistanceTo(connectors[1].Origin);
+            else if (connectors.Count >= 3)
+                lengthInternal = EstimateJunctionLength(connectors);
+
+            if (lengthInternal > 1e-6)
+                return UnitUtils.ConvertFromInternalUnits(lengthInternal, UnitTypeId.Meters);
+
+            return InterpolateFittingLength(connectors.Max(connector => connector.DiameterMm));
+        }
+
+        private List<FittingConnectorInfo> GetPipeConnectors(FamilyInstance fitting)
+        {
+            var result = new List<FittingConnectorInfo>();
+            ConnectorSet connectors = fitting.MEPModel?.ConnectorManager?.Connectors;
+            if (connectors == null)
+                return result;
+
+            foreach (Connector connector in connectors)
+            {
+                try
+                {
+                    if (connector.Domain != Domain.DomainPiping ||
+                        connector.ConnectorType == ConnectorType.Logical ||
+                        connector.Shape != ConnectorProfileType.Round)
+                        continue;
+
+                    XYZ direction = connector.CoordinateSystem?.BasisZ;
+                    if (direction == null || direction.GetLength() < 1e-9)
+                        continue;
+
+                    result.Add(new FittingConnectorInfo
+                    {
+                        Origin = connector.Origin,
+                        Direction = direction.Normalize(),
+                        DiameterMm = UnitUtils.ConvertFromInternalUnits(
+                            connector.Radius * 2,
+                            UnitTypeId.Millimeters)
+                    });
+                }
+                catch
+                {
+                    // Certains connecteurs de familles anciennes sont partiellement définis.
+                }
+            }
+            return result;
+        }
+
+        private double EstimateElbowLength(FittingConnectorInfo first, FittingConnectorInfo second)
+        {
+            if (!TryGetClosestLineMidpoint(first, second, out XYZ corner))
+                return 0;
+
+            double directionAngle = Math.Acos(Clamp(
+                first.Direction.DotProduct(second.Direction), -1.0, 1.0));
+            double bendAngle = Math.PI - directionAngle;
+            if (bendAngle < Math.PI / 180.0 || bendAngle >= Math.PI - 1e-6)
+                return 0;
+
+            double tangent = Math.Tan(bendAngle / 2.0);
+            if (Math.Abs(tangent) < 1e-9)
+                return 0;
+
+            double firstRadius = first.Origin.DistanceTo(corner) / tangent;
+            double secondRadius = second.Origin.DistanceTo(corner) / tangent;
+            double centerlineRadius = (firstRadius + secondRadius) / 2.0;
+            return centerlineRadius > 0 ? centerlineRadius * bendAngle : 0;
+        }
+
+        private double EstimateJunctionLength(IList<FittingConnectorInfo> connectors)
+        {
+            var centers = new List<XYZ>();
+            for (int i = 0; i < connectors.Count - 1; i++)
+            {
+                for (int j = i + 1; j < connectors.Count; j++)
+                {
+                    if (TryGetClosestLineMidpoint(connectors[i], connectors[j], out XYZ center))
+                        centers.Add(center);
+                }
+            }
+            if (centers.Count == 0)
+                return 0;
+
+            XYZ junction = new XYZ(
+                centers.Average(point => point.X),
+                centers.Average(point => point.Y),
+                centers.Average(point => point.Z));
+            return connectors.Sum(connector => connector.Origin.DistanceTo(junction));
+        }
+
+        private bool TryGetClosestLineMidpoint(
+            FittingConnectorInfo first,
+            FittingConnectorInfo second,
+            out XYZ midpoint)
+        {
+            midpoint = null;
+            XYZ delta = first.Origin - second.Origin;
+            double dot = first.Direction.DotProduct(second.Direction);
+            double denominator = 1.0 - dot * dot;
+            if (denominator < 1e-8)
+                return false;
+
+            double firstProjection = first.Direction.DotProduct(delta);
+            double secondProjection = second.Direction.DotProduct(delta);
+            double firstParameter = (dot * secondProjection - firstProjection) / denominator;
+            double secondParameter = (secondProjection - dot * firstProjection) / denominator;
+            XYZ firstPoint = first.Origin + first.Direction * firstParameter;
+            XYZ secondPoint = second.Origin + second.Direction * secondParameter;
+            midpoint = (firstPoint + secondPoint) * 0.5;
+            return true;
+        }
+
+        private double Clamp(double value, double minimum, double maximum)
+        {
+            return Math.Max(minimum, Math.Min(maximum, value));
         }
 
         private double InterpolateFittingLength(double diameterMm)
@@ -739,7 +950,6 @@ namespace Analyse
             }
             return knownPoints[0].Length;
         }
-        // --- FIN NOUVELLE IMPLEMENTATION ---
         private void ShowNetworkInteractionWindow(
            UIDocument uidoc,
            IntPtr mainWindowHandle,
@@ -812,8 +1022,8 @@ namespace Analyse
             Dictionary<string, double> ductData,
             Dictionary<string, double> ductFittingData,
             bool includeDucts,
-            Dictionary<double, int> elbowCounts,
-            Dictionary<double, int> teeCounts,
+            Dictionary<string, int> elbowCounts,
+            Dictionary<string, int> teeCounts,
             Dictionary<double, (double DiametreInterieur, double DiametreExterieur)> dnToDiameters,
             Dictionary<double, double> pipeVolumes,
             string singleSystemType,

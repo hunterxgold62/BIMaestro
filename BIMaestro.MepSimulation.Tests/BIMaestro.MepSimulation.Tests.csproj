@@ -32,9 +32,20 @@
     <Reference Include="WindowsBase" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json">
+      <Version>13.0.3</Version>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameMepData.cs">
       <Link>GameMepData.cs</Link>
+    </Compile>
+    <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameMepScenarioStore.cs">
+      <Link>GameMepScenarioStore.cs</Link>
+    </Compile>
+    <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameRuntimeDiagnostics.cs">
+      <Link>GameRuntimeDiagnostics.cs</Link>
     </Compile>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

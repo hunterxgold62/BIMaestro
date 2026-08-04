@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Windows.Media;
@@ -44,6 +46,21 @@ namespace BIMaestro.VideoGames
             {
                 DocumentTitle = document.Title ?? string.Empty
             };
+            try
+            {
+                ConfigureScenarioIdentity(document, graph);
+            }
+            catch (Exception exception)
+            {
+                // L'identité sert uniquement à la sauvegarde locale. Elle ne
+                // doit jamais empêcher l'extraction fonctionnelle du réseau.
+                graph.ScenarioCanPersist = false;
+                graph.ScenarioModelKey = string.Empty;
+                graph.ScenarioPersistenceError = exception.Message;
+                GameRuntimeDiagnostics.Write(
+                    "Identité persistante MEP indisponible, extraction poursuivie",
+                    exception);
+            }
             var visibleElementKeys = new HashSet<string>(
                 scene.Elements.Select(element => element.Key),
                 StringComparer.Ordinal);
@@ -61,6 +78,7 @@ namespace BIMaestro.VideoGames
                 var elementData = new GameMepElementData
                 {
                     Key = elementKey,
+                    PersistentId = SafeText(() => element.UniqueId),
                     ElementId = element.Id.GetIdLongValue(),
                     Name = SafeText(() => element.Name),
                     Category = SafeText(() => element.Category?.Name),
@@ -87,6 +105,12 @@ namespace BIMaestro.VideoGames
                     {
                         Index = connectorIndex,
                         Key = connectorKey,
+                        PersistentKey = SafeGet(
+                            () => CreatePersistentConnectorKey(
+                                element,
+                                connector,
+                                origin),
+                            string.Empty),
                         ElementKey = elementKey,
                         SystemKey = systemKey,
                         Position = origin,
@@ -470,9 +494,15 @@ namespace BIMaestro.VideoGames
             string searchable = (data.Name + " " + data.TypeName + " " +
                 SafeText(() => (element as FamilyInstance)?.Symbol?.FamilyName))
                 .ToLowerInvariant();
+            // Une pompe met le fluide en mouvement mais ne crée pas la
+            // matière qui entre dans le périmètre de la maquette. Elle reste
+            // donc un élément traversant et n'est jamais proposée comme
+            // source fonctionnelle automatique.
+            if (ContainsAny(searchable, "pompe", "pump", "circulateur"))
+                return null;
             if (ContainsAny(
                 searchable,
-                "pompe", "pump", "circulateur", "chaudi", "boiler", "chiller",
+                "chaudi", "boiler", "chiller",
                 "groupe froid", "heat pump", "pac ", "échangeur", "echangeur"))
             {
                 score += 4;
@@ -510,14 +540,11 @@ namespace BIMaestro.VideoGames
             foreach (IGrouping<string, SourceScore> group in scores
                 .GroupBy(score => score.Element.SystemKey ?? string.Empty))
             {
-                int bestScore = group.Max(score => score.Score);
                 foreach (SourceScore candidate in group
                     .OrderByDescending(score => score.Score)
                     .ThenBy(score => score.Element.ElementId)
                     .Take(12))
                 {
-                    bool active = candidate.Score == bestScore &&
-                        (candidate.IsBaseEquipment || bestScore >= 4);
                     graph.Sources.Add(new GameMepSourceData
                     {
                         ElementKey = candidate.Element.Key,
@@ -530,8 +557,11 @@ namespace BIMaestro.VideoGames
                             : candidate.Score >= 4
                                 ? GameMepConfidence.Medium
                                 : GameMepConfidence.Low,
-                        IsActive = active,
-                        InitiallyActive = active
+                        // Les propositions restent volontairement décochées.
+                        // La frontière physique du projet ne peut pas être
+                        // devinée de façon fiable depuis les seules familles.
+                        IsActive = false,
+                        InitiallyActive = false
                     });
                 }
             }
@@ -815,6 +845,133 @@ namespace BIMaestro.VideoGames
             if (string.IsNullOrWhiteSpace(documentKey))
                 documentKey = document.Title;
             return documentKey + "|" + elementId.GetIdLongValue();
+        }
+
+        private static void ConfigureScenarioIdentity(
+            Document document,
+            GameMepGraphData graph)
+        {
+            string stableIdentity = string.Empty;
+            try
+            {
+                if (document.IsModelInCloud)
+                {
+                    ModelPath cloudPath = document.GetCloudModelPath();
+                    string projectGuid = ReadModelPathGuid(cloudPath, "GetProjectGUID");
+                    string modelGuid = ReadModelPathGuid(cloudPath, "GetModelGUID");
+                    if (!string.IsNullOrWhiteSpace(projectGuid) &&
+                        !string.IsNullOrWhiteSpace(modelGuid))
+                    {
+                        stableIdentity = "cloud|" + projectGuid + "|" + modelGuid;
+                    }
+                    else
+                    {
+                        string cloudPathText = SafeGet(
+                            () => ModelPathUtils.ConvertModelPathToUserVisiblePath(cloudPath),
+                            string.Empty);
+                        if (!string.IsNullOrWhiteSpace(cloudPathText))
+                            stableIdentity = "cloud|" + cloudPathText;
+                    }
+                }
+            }
+            catch
+            {
+                stableIdentity = string.Empty;
+            }
+
+            if (string.IsNullOrWhiteSpace(stableIdentity))
+            {
+                try
+                {
+                    if (document.IsWorkshared)
+                    {
+                        ModelPath centralPath = document.GetWorksharingCentralModelPath();
+                        if (centralPath != null)
+                        {
+                            string central =
+                                ModelPathUtils.ConvertModelPathToUserVisiblePath(centralPath);
+                            if (!string.IsNullOrWhiteSpace(central))
+                                stableIdentity = "central|" + central;
+                        }
+                    }
+                }
+                catch
+                {
+                    stableIdentity = string.Empty;
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(stableIdentity))
+            {
+                string documentPath = SafeGet(() => document.PathName, string.Empty);
+                if (!string.IsNullOrWhiteSpace(documentPath))
+                {
+                    try { documentPath = Path.GetFullPath(documentPath); }
+                    catch { }
+                    stableIdentity = "file|" + documentPath;
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(stableIdentity))
+            {
+                graph.ScenarioModelKey = NormalizeScenarioIdentity(stableIdentity);
+                graph.ScenarioCanPersist = true;
+                return;
+            }
+
+            // Une maquette non enregistrée ne reçoit jamais de fichier disque.
+            // Cette clé permet seulement de conserver son scénario si la
+            // fenêtre jouable est relancée dans la même session Revit.
+            graph.ScenarioModelKey = "session|" +
+                document.GetHashCode().ToString(CultureInfo.InvariantCulture) + "|" +
+                (document.Title ?? "Projet sans nom");
+            graph.ScenarioCanPersist = false;
+        }
+
+        private static string NormalizeScenarioIdentity(string identity)
+        {
+            return (identity ?? string.Empty)
+                .Trim()
+                .Replace('\\', '/')
+                .ToUpperInvariant();
+        }
+
+        private static string ReadModelPathGuid(ModelPath modelPath, string methodName)
+        {
+            if (modelPath == null)
+                return string.Empty;
+            try
+            {
+                object value = modelPath.GetType()
+                    .GetMethod(methodName, Type.EmptyTypes)
+                    ?.Invoke(modelPath, null);
+                return value is Guid guid && guid != Guid.Empty
+                    ? guid.ToString("N", CultureInfo.InvariantCulture)
+                    : string.Empty;
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        private static string CreatePersistentConnectorKey(
+            Element owner,
+            Connector connector,
+            Point3D origin)
+        {
+            string ownerId = SafeText(() => owner.UniqueId);
+            int connectorId = SafeGet(() => connector.Id, -1);
+            if (connectorId >= 0)
+            {
+                return ownerId + "|connector|" +
+                    connectorId.ToString(CultureInfo.InvariantCulture);
+            }
+
+            return ownerId + "|position|" +
+                origin.X.ToString("R", CultureInfo.InvariantCulture) + "|" +
+                origin.Y.ToString("R", CultureInfo.InvariantCulture) + "|" +
+                origin.Z.ToString("R", CultureInfo.InvariantCulture);
         }
 
         private static string CreateConnectorKey(

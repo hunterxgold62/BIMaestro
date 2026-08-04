@@ -59,8 +59,8 @@ namespace Analyse
             Dictionary<string, double> ductData,
             Dictionary<string, double> ductFittingData,
             bool includeDucts,
-            Dictionary<double, int> elbowCounts,
-            Dictionary<double, int> teeCounts,
+            Dictionary<string, int> elbowCounts,
+            Dictionary<string, int> teeCounts,
             Dictionary<double, (double DiametreInterieur, double DiametreExterieur)> dnToDiameters,
             Dictionary<double, double> pipeVolumes,
             string singleSystemType,
@@ -134,8 +134,8 @@ namespace Analyse
             Dictionary<string, double> ductData,
             Dictionary<string, double> ductFittingData,
             bool includeDucts,
-            Dictionary<double, int> elbowCounts,
-            Dictionary<double, int> teeCounts,
+            Dictionary<string, int> elbowCounts,
+            Dictionary<string, int> teeCounts,
             Dictionary<double, (double DiametreInterieur, double DiametreExterieur)> dnToDiameters,
             Dictionary<double, double> pipeVolumes,
             string singleSystemType)
@@ -199,9 +199,9 @@ namespace Analyse
                 WriteCountSection(
                     sheet, ref row, styles,
                     "Nombre de coudes par diamètre",
-                    "Diamètre (mm)", "Nombre",
+                    "Dimensions", "Nombre",
                     elbowCounts.OrderBy(item => item.Key),
-                    key => key.ToString("N0"));
+                    key => key);
             }
 
             if (teeCounts.Count > 0)
@@ -209,9 +209,9 @@ namespace Analyse
                 WriteCountSection(
                     sheet, ref row, styles,
                     "Nombre de tés par diamètre",
-                    "Diamètre (mm)", "Nombre",
+                    "Dimensions", "Nombre",
                     teeCounts.OrderBy(item => item.Key),
-                    key => key.ToString("N0"));
+                    key => key);
             }
 
             if (includeDucts && ductData.Count > 0)
@@ -297,18 +297,18 @@ namespace Analyse
                 {
                     WriteCountSection(
                         sheet, ref row, styles,
-                        "Nombre de coudes", "Diamètre (mm)", "Nombre",
+                        "Nombre de coudes", "Dimensions", "Nombre",
                         values.ElbowCounts.OrderBy(item => item.Key),
-                        key => key.ToString("N0"));
+                        key => key);
                 }
 
                 if (values.TeeCounts.Count > 0)
                 {
                     WriteCountSection(
                         sheet, ref row, styles,
-                        "Nombre de tés", "Diamètre (mm)", "Nombre",
+                        "Nombre de tés", "Dimensions", "Nombre",
                         values.TeeCounts.OrderBy(item => item.Key),
-                        key => key.ToString("N0"));
+                        key => key);
                 }
 
                 if (includeDucts && values.DuctLengths.Count > 0)
@@ -338,7 +338,7 @@ namespace Analyse
             XSSFWorkbook workbook,
             PipeExcelStyles styles,
             Dictionary<double, double> pipeData,
-            Dictionary<double, int> elbowCounts)
+            Dictionary<string, int> elbowCounts)
         {
             if (pipeData.Count == 0 && elbowCounts.Count == 0)
                 return;
@@ -371,10 +371,10 @@ namespace Analyse
                 int dataStartRow = headerRow + 1;
                 int currentRow = dataStartRow;
 
-                WriteHeaderRow(sheet, headerRow, styles.Header, "DN (mm)", "Nombre de coudes");
+                WriteHeaderRow(sheet, headerRow, styles.Header, "Dimensions", "Nombre de coudes");
                 foreach (var item in elbowCounts.OrderBy(item => item.Key))
                 {
-                    SetNumber(sheet, currentRow, 0, item.Key);
+                    SetText(sheet, currentRow, 0, item.Key);
                     SetNumber(sheet, currentRow, 1, item.Value);
                     currentRow++;
                 }
@@ -383,7 +383,7 @@ namespace Analyse
                     sheet,
                     dataStartRow,
                     currentRow - 1,
-                    "Répartition des coudes par DN",
+                    "Répartition des coudes par dimensions",
                     6, headerRow, 16, headerRow + 20);
             }
 
@@ -462,8 +462,8 @@ namespace Analyse
             var chart = (XSSFChart)drawing.CreateChart(anchor);
             chart.SetTitle(title);
 
-            var chartData = chart.ChartDataFactory.CreatePieChartData<double, double>();
-            var categories = DataSources.FromNumericCellRange(
+            var chartData = chart.ChartDataFactory.CreatePieChartData<string, double>();
+            var categories = DataSources.FromStringCellRange(
                 sheet, new CellRangeAddress(firstDataRow, lastDataRow, 0, 0));
             var values = DataSources.FromNumericCellRange(
                 sheet, new CellRangeAddress(firstDataRow, lastDataRow, 1, 1));

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
 using HelixToolkit.Wpf.SharpDX;
@@ -19,7 +18,10 @@ namespace BIMaestro.VideoGames
         private const double ParticleUpdateInterval = 1.0 / 30.0;
         private const double MaximumRenderDistance = 420.0;
         private const double ParticleSpacing = 18.0;
-        private const double FlowSpeed = 8.0;
+        private const double FlowSpeed = 2.4;
+        private const double ArrowLength = 0.90;
+        private const double ArrowHeadLength = 0.30;
+        private const double ArrowHeadWidth = 0.22;
         private const int MinimumParticleBudget = 350;
         private const int MaximumParticleBudget = 4000;
         private const int MaximumLineSegmentCount = 150000;
@@ -35,12 +37,12 @@ namespace BIMaestro.VideoGames
         private readonly GameMepGraphData _graph;
         private readonly Viewport3DX _viewport;
         private readonly LineGeometryModel3D _lineModel;
-        private readonly PointGeometryModel3D _pointModel;
+        private readonly LineGeometryModel3D _arrowModel;
         private readonly IList<Particle> _particles = new List<Particle>();
         private LineGeometry3D _lineGeometry = new LineGeometry3D();
-        private PointGeometry3D _pointGeometry = new PointGeometry3D();
+        private LineGeometry3D _arrowGeometry = new LineGeometry3D();
         private bool _lineModelAttached;
-        private bool _pointModelAttached;
+        private bool _arrowModelAttached;
         private int _particleBudget = 2000;
         private double _lastParticleUpdateSeconds = double.MinValue;
         private Point3D _lastParticleCameraPosition;
@@ -67,12 +69,12 @@ namespace BIMaestro.VideoGames
                 IsHitTestVisible = false,
                 IsRendering = false
             };
-            _pointModel = new PointGeometryModel3D
+            _arrowModel = new LineGeometryModel3D
             {
                 Color = Colors.White,
-                Size = new Size(9.0, 9.0),
-                Figure = PointFigure.Ellipse,
-                FigureRatio = 1.0,
+                Thickness = 3.2,
+                Smoothness = 1.0,
+                FixedSize = true,
                 DepthBias = -34000,
                 SlopeScaledDepthBias = -3.5,
                 RenderOrder = 2001,
@@ -98,7 +100,7 @@ namespace BIMaestro.VideoGames
             if (!Enabled)
             {
                 _lineModel.IsRendering = false;
-                _pointModel.IsRendering = false;
+                _arrowModel.IsRendering = false;
                 return;
             }
 
@@ -113,7 +115,7 @@ namespace BIMaestro.VideoGames
             if (!_graph.HasData)
             {
                 _lineModel.IsRendering = false;
-                _pointModel.IsRendering = false;
+                _arrowModel.IsRendering = false;
                 return;
             }
             RebuildLines(cameraPosition);
@@ -144,10 +146,9 @@ namespace BIMaestro.VideoGames
             for (int index = 0; index < _particles.Count; index++)
             {
                 Particle particle = _particles[index];
-                Point3D position;
                 if (particle.Path == null)
                 {
-                    position = particle.FixedPosition;
+                    WriteFixedMarker(index, particle.FixedPosition);
                 }
                 else
                 {
@@ -159,17 +160,14 @@ namespace BIMaestro.VideoGames
                     double progress = particle.Phase +
                         totalSeconds * normalizedSpeed * direction;
                     progress -= Math.Floor(progress);
-                    position = path.Sample(progress);
+                    WriteMovingArrow(index, path, progress, cameraPosition);
                 }
-
-                if (IsFinite(position))
-                    _pointGeometry.Positions[index] = ToVector(position);
             }
 
             if (_particles.Count > 0)
             {
-                _pointGeometry.UpdateVertices();
-                _pointGeometry.UpdateBounds();
+                _arrowGeometry.UpdateVertices();
+                _arrowGeometry.UpdateBounds();
             }
             LastAnimationMilliseconds =
                 (Stopwatch.GetTimestamp() - startTimestamp) * 1000.0 /
@@ -198,10 +196,10 @@ namespace BIMaestro.VideoGames
                 try { _viewport.Items.Remove(_lineModel); } catch { }
                 _lineModelAttached = false;
             }
-            if (_pointModelAttached)
+            if (_arrowModelAttached)
             {
-                try { _viewport.Items.Remove(_pointModel); } catch { }
-                _pointModelAttached = false;
+                try { _viewport.Items.Remove(_arrowModel); } catch { }
+                _arrowModelAttached = false;
             }
         }
 
@@ -212,10 +210,10 @@ namespace BIMaestro.VideoGames
                 _viewport.Items.Add(_lineModel);
                 _lineModelAttached = true;
             }
-            if (!_pointModelAttached && _pointModel.Geometry != null)
+            if (!_arrowModelAttached && _arrowModel.Geometry != null)
             {
-                _viewport.Items.Add(_pointModel);
-                _pointModelAttached = true;
+                _viewport.Items.Add(_arrowModel);
+                _arrowModelAttached = true;
             }
         }
 
@@ -295,6 +293,7 @@ namespace BIMaestro.VideoGames
                 .Where(path =>
                     path.IsVisible &&
                     path.FlowState == GameMepFlowState.Supplied &&
+                    path.DirectionState == GameMepDirectionState.Resolved &&
                     path.Length > 0.02 &&
                     !double.IsNaN(path.Length) &&
                     !double.IsInfinity(path.Length) &&
@@ -355,29 +354,38 @@ namespace BIMaestro.VideoGames
                 });
             }
 
-            var positions = new Vector3Collection(_particles.Count);
-            var indices = new IntCollection(_particles.Count);
-            var colors = new Color4Collection(_particles.Count);
+            if (_particles.Count == 0)
+            {
+                _arrowModel.IsRendering = false;
+                _lastParticleCameraPosition = cameraPosition;
+                _particleDefinitionsDirty = false;
+                return;
+            }
+
+            var positions = new Vector3Collection(_particles.Count * 6);
+            var indices = new IntCollection(_particles.Count * 6);
+            var colors = new Color4Collection(_particles.Count * 6);
             for (int index = 0; index < _particles.Count; index++)
             {
                 Particle particle = _particles[index];
                 Point3D initial = particle.Path == null
                     ? particle.FixedPosition
                     : particle.Path.Sample(particle.Phase);
-                positions.Add(ToVector(initial));
-                indices.Add(index);
-                colors.Add(particle.Color);
+                int first = positions.Count;
+                for (int vertex = 0; vertex < 6; vertex++)
+                {
+                    positions.Add(ToVector(initial));
+                    colors.Add(particle.Color);
+                }
+                indices.Add(first);
+                indices.Add(first + 1);
+                indices.Add(first + 2);
+                indices.Add(first + 3);
+                indices.Add(first + 4);
+                indices.Add(first + 5);
             }
 
-            if (_particles.Count == 0)
-            {
-                _pointModel.IsRendering = false;
-                _lastParticleCameraPosition = cameraPosition;
-                _particleDefinitionsDirty = false;
-                return;
-            }
-
-            _pointGeometry = new PointGeometry3D
+            _arrowGeometry = new LineGeometry3D
             {
                 Positions = positions,
                 Indices = indices,
@@ -386,17 +394,110 @@ namespace BIMaestro.VideoGames
                 PreDefinedVertexCount = positions.Count,
                 PreDefinedIndexCount = indices.Count
             };
-            _pointGeometry.UpdateBounds();
-            _pointModel.Geometry = _pointGeometry;
-            _pointModel.IsRendering = Enabled;
+            for (int index = 0; index < _particles.Count; index++)
+            {
+                Particle particle = _particles[index];
+                if (particle.Path == null)
+                    WriteFixedMarker(index, particle.FixedPosition);
+                else
+                    WriteMovingArrow(index, particle.Path, particle.Phase, cameraPosition);
+            }
+            _arrowGeometry.UpdateBounds();
+            _arrowModel.Geometry = _arrowGeometry;
+            _arrowModel.IsRendering = Enabled;
             _lastParticleCameraPosition = cameraPosition;
             _particleDefinitionsDirty = false;
+        }
+
+        private void WriteMovingArrow(
+            int particleIndex,
+            GameMepPathData path,
+            double progress,
+            Point3D cameraPosition)
+        {
+            if (path.Length <= 1e-6)
+                return;
+
+            double normalizedLength = Math.Min(0.45, ArrowLength / path.Length);
+            double tipProgress = progress;
+            double tailProgress = path.FlowForward
+                ? Math.Max(0.0, progress - normalizedLength)
+                : Math.Min(1.0, progress + normalizedLength);
+            if (Math.Abs(tipProgress - tailProgress) < normalizedLength * 0.25)
+            {
+                if (path.FlowForward)
+                {
+                    tailProgress = progress;
+                    tipProgress = Math.Min(1.0, progress + normalizedLength);
+                }
+                else
+                {
+                    tailProgress = progress;
+                    tipProgress = Math.Max(0.0, progress - normalizedLength);
+                }
+            }
+
+            Point3D tail = path.Sample(tailProgress);
+            Point3D tip = path.Sample(tipProgress);
+            Vector3D direction = tip - tail;
+            double visibleLength = direction.Length;
+            if (!IsFinite(tail) || !IsFinite(tip) || visibleLength < 1e-5)
+                return;
+            direction.Normalize();
+
+            // La tête reste dans un plan lisible depuis la caméra, y
+            // compris sur les tronçons verticaux ou vus presque de face.
+            Vector3D view = cameraPosition - tip;
+            Vector3D side = Vector3D.CrossProduct(direction, view);
+            if (side.LengthSquared < 1e-8)
+                side = Vector3D.CrossProduct(direction, new Vector3D(0, 0, 1));
+            if (side.LengthSquared < 1e-8)
+                side = Vector3D.CrossProduct(direction, new Vector3D(0, 1, 0));
+            side.Normalize();
+
+            double headLength = Math.Min(ArrowHeadLength, visibleLength * 0.48);
+            double headWidth = Math.Min(ArrowHeadWidth, headLength * 0.90);
+            Point3D headBase = tip - direction * headLength;
+            Point3D headA = headBase + side * headWidth;
+            Point3D headB = headBase - side * headWidth;
+            int first = particleIndex * 6;
+            _arrowGeometry.Positions[first] = ToVector(tail);
+            _arrowGeometry.Positions[first + 1] = ToVector(tip);
+            _arrowGeometry.Positions[first + 2] = ToVector(tip);
+            _arrowGeometry.Positions[first + 3] = ToVector(headA);
+            _arrowGeometry.Positions[first + 4] = ToVector(tip);
+            _arrowGeometry.Positions[first + 5] = ToVector(headB);
+        }
+
+        private void WriteFixedMarker(int particleIndex, Point3D position)
+        {
+            if (!IsFinite(position))
+                return;
+            const double radius = 0.24;
+            int first = particleIndex * 6;
+            _arrowGeometry.Positions[first] = ToVector(
+                position + new Vector3D(-radius, 0, 0));
+            _arrowGeometry.Positions[first + 1] = ToVector(
+                position + new Vector3D(radius, 0, 0));
+            _arrowGeometry.Positions[first + 2] = ToVector(
+                position + new Vector3D(0, -radius, 0));
+            _arrowGeometry.Positions[first + 3] = ToVector(
+                position + new Vector3D(0, radius, 0));
+            _arrowGeometry.Positions[first + 4] = ToVector(
+                position + new Vector3D(0, 0, -radius));
+            _arrowGeometry.Positions[first + 5] = ToVector(
+                position + new Vector3D(0, 0, radius));
         }
 
         private SharpDX.Color4 GetPathColor(
             GameMepPathData path,
             GameMepSystemData? system)
         {
+            if (path.FlowState == GameMepFlowState.Supplied &&
+                path.DirectionState != GameMepDirectionState.Resolved)
+            {
+                return new SharpDX.Color4(1.0f, 0.66f, 0.18f, 0.90f);
+            }
             switch (path.FlowState)
             {
                 case GameMepFlowState.Supplied:

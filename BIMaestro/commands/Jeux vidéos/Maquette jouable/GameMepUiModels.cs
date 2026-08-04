@@ -63,9 +63,11 @@ namespace BIMaestro.VideoGames
         }
 
         public GameMepSourceData Data { get; }
-        public string Name => string.IsNullOrWhiteSpace(Data.Name)
-            ? "Source sans nom"
-            : Data.Name;
+        public string Name =>
+            (Data.BoundaryKind == GameMepBoundaryKind.Inlet
+                ? "Arrivée — "
+                : "Retour — ") +
+            (string.IsNullOrWhiteSpace(Data.Name) ? "sans nom" : Data.Name);
         public string SystemName { get; }
         public string ConfidenceText => Data.HasExplicitDirection
             ? "sens manuel"

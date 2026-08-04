@@ -309,7 +309,7 @@
                                    FontSize="10"
                                    Margin="0,0,0,6"/>
                         <TextBlock x:Name="MepNoSourceText"
-                                   Text="Aucune source fiable détectée. Sélectionne une canalisation d'arrivée ou un équipement pour définir la source."
+                                   Text="Aucune source active. Sélectionne la canalisation d'arrivée principale et indique son sens."
                                    Style="{StaticResource HudCaption}"
                                    TextWrapping="Wrap"
                                    Visibility="Collapsed"
@@ -568,6 +568,30 @@
                                                     Margin="0,5,0,0"
                                                     Visibility="{Binding SourceDirectionVisibility}"
                                                     Click="SourceReverseButton_Click"/>
+                                            <Button Content="{Binding ReturnForwardActionText}"
+                                                    Tag="{Binding UniqueKey}"
+                                                    Style="{StaticResource GlassButton}"
+                                                    Margin="0,8,0,0"
+                                                    Visibility="{Binding ReturnDirectionVisibility}"
+                                                    Click="ReturnForwardButton_Click"/>
+                                            <Button Content="{Binding ReturnReverseActionText}"
+                                                    Tag="{Binding UniqueKey}"
+                                                    Style="{StaticResource GlassButton}"
+                                                    Margin="0,5,0,0"
+                                                    Visibility="{Binding ReturnDirectionVisibility}"
+                                                    Click="ReturnReverseButton_Click"/>
+                                            <Button Content="{Binding ConstraintForwardActionText}"
+                                                    Tag="{Binding UniqueKey}"
+                                                    Style="{StaticResource GlassButton}"
+                                                    Margin="0,8,0,0"
+                                                    Visibility="{Binding ConstraintDirectionVisibility}"
+                                                    Click="ConstraintForwardButton_Click"/>
+                                            <Button Content="{Binding ConstraintReverseActionText}"
+                                                    Tag="{Binding UniqueKey}"
+                                                    Style="{StaticResource GlassButton}"
+                                                    Margin="0,5,0,0"
+                                                    Visibility="{Binding ConstraintDirectionVisibility}"
+                                                    Click="ConstraintReverseButton_Click"/>
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>

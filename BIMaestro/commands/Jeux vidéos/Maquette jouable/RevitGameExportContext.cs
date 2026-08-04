@@ -16,6 +16,7 @@ namespace BIMaestro.VideoGames
     internal sealed class RevitGameExportContext : IExportContext
     {
         private const double RenderChunkSize = 60.0; // pieds, environ 18 mètres
+        private const double InsulationOpacity = 0.60; // 40 % transparent
 
         private readonly Document _rootDocument;
         private readonly GameSceneData _scene = new GameSceneData();
@@ -248,7 +249,12 @@ namespace BIMaestro.VideoGames
             int chunkX = ToRenderChunk((minX + maxX) * 0.5);
             int chunkY = ToRenderChunk((minY + maxY) * 0.5);
             int chunkZ = ToRenderChunk((minZ + maxZ) * 0.5);
-            bool transparent = _currentOpacity < 0.995;
+            double effectiveOpacity =
+                elementData != null &&
+                !string.IsNullOrWhiteSpace(elementData.SelectionTargetKey)
+                    ? Math.Min(_currentOpacity, InsulationOpacity)
+                    : _currentOpacity;
+            bool transparent = effectiveOpacity < 0.995;
             GameMeshData mesh = door != null
                 ? door.GetMesh(transparent)
                 : GetCurrentMesh(chunkX, chunkY, chunkZ, transparent);
@@ -268,7 +274,7 @@ namespace BIMaestro.VideoGames
                 hasPointNormals = false;
             }
 
-            byte alpha = (byte)Math.Round(_currentOpacity * 255.0);
+            byte alpha = (byte)Math.Round(effectiveOpacity * 255.0);
             Color vertexColor = Color.FromArgb(
                 alpha,
                 _currentColor.R,
@@ -327,8 +333,16 @@ namespace BIMaestro.VideoGames
                 // Les portes restent intégralement visibles, mais leurs vantaux
                 // et cadres ne ferment pas artificiellement les circulations.
                 // L'ouverture découpée dans le mur reste donc franchissable.
+                var selectionTriangle =
+                    new GameTriangle(a, b, c, faceNormal, preferred)
+                {
+                    IsCollisionGeometry = collidable
+                };
+                elementData?.SelectionTriangles.Add(selectionTriangle);
                 if (collidable)
-                    _scene.Triangles.Add(new GameTriangle(a, b, c, faceNormal, preferred));
+                {
+                    _scene.Triangles.Add(selectionTriangle);
+                }
             }
         }
 
@@ -393,6 +407,20 @@ namespace BIMaestro.VideoGames
 
             if (element == null)
                 return data;
+
+            // Le calorifuge reste affiché, mais il n'a aucune utilité dans
+            // la fiche fonctionnelle. Un clic sur son volume doit donc viser
+            // directement la canalisation ou l'accessoire qu'il enveloppe.
+            if (element is InsulationLiningBase insulation)
+            {
+                try
+                {
+                    ElementId hostId = insulation.HostElementId;
+                    if (hostId != null && hostId != ElementId.InvalidElementId)
+                        data.SelectionTargetKey = CreateElementKey(document, hostId);
+                }
+                catch { }
+            }
 
             try
             {
@@ -468,17 +496,49 @@ namespace BIMaestro.VideoGames
             // le graphe immuable et les états de simulation temporaires.
             try
             {
+                GameRuntimeDiagnostics.Write("Extraction MEP - début");
                 scene.MepGraph = RevitGameMepExtractor.Extract(document, scene);
+                GameRuntimeDiagnostics.Write(
+                    "Extraction MEP terminée : " +
+                    scene.MepGraph.Elements.Count + " élément(s), " +
+                    scene.MepGraph.Connectors.Count + " connecteur(s), " +
+                    scene.MepGraph.Connections.Count + " liaison(s)");
             }
             catch (Exception exception)
             {
                 // Le mode MEP enrichit la maquette jouable, mais une famille
                 // incompatible avec une version de Revit ne doit jamais bloquer
                 // l'ouverture de la scène principale.
+                GameRuntimeDiagnostics.Write("Extraction MEP interrompue", exception);
                 scene.MepGraph = new GameMepGraphData
                 {
-                    ExtractionError = exception.Message
+                    ExtractionError = exception.Message,
+                    DocumentTitle = SafeDocumentTitle(document)
                 };
+            }
+
+            // La persistance est une fonction annexe. Une incompatibilité de
+            // stockage ne doit surtout pas remplacer un graphe MEP valide par
+            // un graphe vide, notamment lors du passage de Revit 2023 à 2024.
+            if (scene.MepGraph.HasData)
+            {
+                try
+                {
+                    GameMepScenarioRestoreResult restore =
+                        GameMepScenarioStore.Restore(scene.MepGraph);
+                    GameRuntimeDiagnostics.Write(
+                        "Scénario MEP restauré : " +
+                        restore.RestoredSources + " source(s), " +
+                        restore.RestoredValves + " vanne(s), " +
+                        restore.SkippedEntries + " entrée(s) ignorée(s)");
+                }
+                catch (Exception exception)
+                {
+                    scene.MepGraph.ScenarioPersistenceError = exception.Message;
+                    GameRuntimeDiagnostics.Write(
+                        "Restauration MEP ignorée, graphe conservé",
+                        exception);
+                }
             }
 
             ViewOrientation3D orientation = view.GetOrientation();
@@ -489,6 +549,12 @@ namespace BIMaestro.VideoGames
                 new Vector3D(forward.X, forward.Y, forward.Z));
 
             return scene;
+        }
+
+        private static string SafeDocumentTitle(Document document)
+        {
+            try { return document.Title ?? string.Empty; }
+            catch { return string.Empty; }
         }
     }
 }

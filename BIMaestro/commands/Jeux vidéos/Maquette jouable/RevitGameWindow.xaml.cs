@@ -39,6 +39,7 @@ namespace BIMaestro.VideoGames
         private const double WalkSpeed = 7.2;           // 2,19 m/s
         private const double SprintSpeed = 18.0;        // 5,49 m/s
         private const double FlySpeed = 15.0;
+        private const double FlySprintSpeed = 26.24672; // 8,00 m/s
         private const double JumpSpeed = 11.2;
         private const double Gravity = 28.0;
         private const double GroundOffset = 0.04;
@@ -260,6 +261,9 @@ namespace BIMaestro.VideoGames
         private void RevitGameWindow_Closed(object sender, EventArgs e)
         {
             _isClosing = true;
+            // Garantit que la toute dernière action est écrite même si Revit
+            // est fermé avant la fin d'une sauvegarde asynchrone précédente.
+            GameMepScenarioStore.SaveNow(_scene.MepGraph);
             _miniMapRebuildQueued = false;
             _mepRecalculationQueued = false;
             CompositionTarget.Rendering -= CompositionTarget_Rendering;
@@ -683,9 +687,16 @@ namespace BIMaestro.VideoGames
             if (_flyMode)
             {
                 double verticalInput = Axis(IsDown(Key.Space), IsDown(Key.LeftCtrl) || IsDown(Key.C));
-                Vector3D flyMovement = movement * FlySpeed;
-                flyMovement.Z = verticalInput * FlySpeed;
-                _footPosition += flyMovement * deltaTime;
+                var flyDirection = new Vector3D(
+                    movement.X,
+                    movement.Y,
+                    verticalInput);
+                if (flyDirection.LengthSquared > 1.0)
+                    flyDirection.Normalize();
+
+                double effectiveFlySpeed = sprint ? FlySprintSpeed : FlySpeed;
+                _lastSpeed = flyDirection.Length * effectiveFlySpeed;
+                _footPosition += flyDirection * effectiveFlySpeed * deltaTime;
                 _grounded = false;
                 _verticalVelocity = 0.0;
                 return;
@@ -1328,19 +1339,69 @@ namespace BIMaestro.VideoGames
 
             GameElementData? selected = null;
             double nearestDistance = 300.0;
+            GameElementData? boundsFallback = null;
+            double nearestFallbackDistance = 300.0;
+            var selectableByKey = new Dictionary<string, GameElementData>(
+                StringComparer.Ordinal);
+            foreach (GameElementData element in _scene.Elements)
+            {
+                if (!string.IsNullOrWhiteSpace(element.Key))
+                    selectableByKey[element.Key] = element;
+            }
             foreach (GameElementData element in _scene.Elements)
             {
                 Rect3D bounds = element.Bounds;
                 if (bounds.IsEmpty ||
-                    !TryIntersectRayBounds(origin, direction, bounds, out double distance) ||
-                    distance >= nearestDistance)
+                    !TryIntersectRayBounds(origin, direction, bounds, out double boundsDistance) ||
+                    boundsDistance >= nearestDistance)
                 {
                     continue;
                 }
 
-                nearestDistance = distance;
-                selected = element;
+                GameElementData candidate = element;
+                if (!string.IsNullOrWhiteSpace(element.SelectionTargetKey))
+                {
+                    if (!selectableByKey.TryGetValue(
+                        element.SelectionTargetKey,
+                        out candidate))
+                    {
+                        // L'enveloppe ne doit jamais masquer un autre objet si
+                        // son porteur n'est pas présent dans la vue exportée.
+                        continue;
+                    }
+                }
+
+                if (element.SelectionTriangles.Count == 0)
+                {
+                    // Quelques objets volontairement non collisionnels (par
+                    // exemple les portes) n'ont pas de triangles indexés.
+                    // Ils restent sélectionnables en repli, sans pouvoir
+                    // masquer une surface réellement touchée.
+                    if (boundsDistance < nearestFallbackDistance)
+                    {
+                        nearestFallbackDistance = boundsDistance;
+                        boundsFallback = candidate;
+                    }
+                    continue;
+                }
+
+                foreach (GameTriangle triangle in element.SelectionTriangles)
+                {
+                    if (TryIntersectRayTriangle(
+                            origin,
+                            direction,
+                            triangle,
+                            out double triangleDistance) &&
+                        triangleDistance < nearestDistance)
+                    {
+                        nearestDistance = triangleDistance;
+                        selected = candidate;
+                    }
+                }
             }
+
+            if (selected == null)
+                selected = boundsFallback;
 
             if (selected == null)
             {
@@ -1427,7 +1488,12 @@ namespace BIMaestro.VideoGames
                     ? "Analyse MEP indisponible pour cette maquette"
                     : "Aucun réseau de canalisation détecté";
 
-            int activeSources = graph.Sources.Count(source => source.IsActive);
+            int activeSources = graph.Sources.Count(source =>
+                source.IsActive &&
+                source.BoundaryKind == GameMepBoundaryKind.Inlet);
+            int activeReturns = graph.Sources.Count(source =>
+                source.IsActive &&
+                source.BoundaryKind == GameMepBoundaryKind.Outlet);
             if (!string.IsNullOrWhiteSpace(_mepRuntimeError))
                 MepStatusText.Text = "Affichage des fluides désactivé sans fermer le jeu : " +
                     _mepRuntimeError;
@@ -1437,22 +1503,44 @@ namespace BIMaestro.VideoGames
             else if (!graph.HasData)
                 MepStatusText.Text = "Le document actif ne contient aucun connecteur de canalisation exploitable.";
             else if (activeSources == 0)
-                MepStatusText.Text = "Source à définir : les lignes restent indéterminées et aucune impulsion ne circule.";
+                MepStatusText.Text = "Source principale à définir : fais un clic droit sur la canalisation d'arrivée puis choisis son sens.";
             else if (_mepRecalculationRunning)
                 MepStatusText.Text = "Recalcul de la continuité du réseau…";
             else
                 MepStatusText.Text = activeSources +
-                    (activeSources == 1 ? " source active" : " sources actives") +
+                    (activeSources == 1 ? " arrivée active" : " arrivées actives") +
+                    "  •  " + activeReturns +
+                    (activeReturns == 1 ? " retour" : " retours") +
+                    "  •  " + graph.DirectionConflictCount + " conflit(s) de sens" +
                     "  •  calcul " + graph.LastCalculationMilliseconds.ToString("0.0") + " ms";
 
-            MepNoSourceText.Visibility = graph.Sources.Count == 0
+            MepNoSourceText.Visibility = activeSources == 0
                 ? Visibility.Visible
                 : Visibility.Collapsed;
-            MepDiagnosticsText.Text = !string.IsNullOrWhiteSpace(graph.ExtractionError)
+            string diagnostics = !string.IsNullOrWhiteSpace(graph.ExtractionError)
                 ? "Extraction MEP interrompue sans fermer la scène."
                 : graph.OpenConnectorCount.ToString("N0") + " connecteurs ouverts  •  " +
                     graph.UncertainValveCount.ToString("N0") + " vannes à valider  •  " +
                     "analyse " + graph.ExtractionMilliseconds.ToString("0") + " ms";
+            if (graph.RestoredSourceCount > 0 || graph.RestoredValveCount > 0)
+            {
+                diagnostics += "  •  restauré : " +
+                    graph.RestoredSourceCount + " source(s), " +
+                    graph.RestoredValveCount + " vanne(s)";
+            }
+            if (graph.RestoredDirectionConstraintCount > 0)
+            {
+                diagnostics += "  •  " + graph.RestoredDirectionConstraintCount +
+                    " sens de pompe restauré(s)";
+            }
+            if (graph.SkippedScenarioEntryCount > 0)
+            {
+                diagnostics += "  •  " + graph.SkippedScenarioEntryCount +
+                    " ancien(s) réglage(s) ignoré(s)";
+            }
+            if (!string.IsNullOrWhiteSpace(graph.ScenarioPersistenceError))
+                diagnostics += "  •  sauvegarde locale indisponible";
+            MepDiagnosticsText.Text = diagnostics;
 
             foreach (GameMepSystemItem item in _mepSystemItems)
                 item.Refresh();
@@ -1510,8 +1598,21 @@ namespace BIMaestro.VideoGames
 
         private void MepFlowToggleButton_Click(object sender, RoutedEventArgs e)
         {
+            GameRuntimeDiagnostics.Write(
+                "Commande Fluides MEP : " +
+                _scene.MepGraph.Elements.Count + " élément(s), " +
+                _scene.MepGraph.Elements.Sum(element => element.Paths.Count) +
+                " chemin(s), " +
+                _scene.MepGraph.Sources.Count(source => source.IsActive) +
+                " source(s) active(s)");
             if (!_scene.MepGraph.HasData)
             {
+                if (!string.IsNullOrWhiteSpace(_scene.MepGraph.ExtractionError))
+                {
+                    GameRuntimeDiagnostics.Write(
+                        "Fluides MEP indisponibles : " +
+                        _scene.MepGraph.ExtractionError);
+                }
                 ShowToast("Aucun réseau MEP exploitable dans le document actif");
                 return;
             }
@@ -1531,9 +1632,16 @@ namespace BIMaestro.VideoGames
                 _mepRenderer.SetEnabled(enable, _camera.Position);
                 _mepFlowEnabled = enable;
                 _mepRuntimeError = string.Empty;
+                GameRuntimeDiagnostics.Write(
+                    enable
+                        ? "Rendu des flux MEP activé"
+                        : "Rendu des flux MEP désactivé");
             }
             catch (Exception exception)
             {
+                GameRuntimeDiagnostics.Write(
+                    "Activation du rendu des flux MEP impossible",
+                    exception);
                 DisableMepRenderingAfterError(exception);
                 ShowToast("Flux MEP désactivés : " + exception.Message);
                 return;
@@ -1568,6 +1676,7 @@ namespace BIMaestro.VideoGames
         {
             if (_mepSimulation == null || !_scenePrepared)
                 return;
+            SaveMepScenario();
             RecalculateMepAsync("Sources de fluide mises à jour");
         }
 
@@ -1602,9 +1711,11 @@ namespace BIMaestro.VideoGames
             {
                 _mepSourceItems.Remove(item);
             }
+            _scene.MepGraph.DirectionConstraints.Clear();
             foreach (GameMepSystemData system in _scene.MepGraph.Systems)
                 system.IsVisible = true;
 
+            SaveMepScenario();
             RecalculateMepAsync("Scénario MEP réinitialisé");
         }
 
@@ -1616,6 +1727,8 @@ namespace BIMaestro.VideoGames
                 return;
 
             valve.IsClosed = !valve.IsClosed;
+            valve.WasManuallyOverridden = true;
+            SaveMepScenario();
             RecalculateMepAsync(valve.IsClosed
                 ? "Vanne fermée : calcul des zones isolées"
                 : "Vanne ouverte : continuité restaurée");
@@ -1632,6 +1745,7 @@ namespace BIMaestro.VideoGames
             valve.WasManuallyOverridden = true;
             if (!valve.IsEnabledAsValve)
                 valve.IsClosed = false;
+            SaveMepScenario();
             RecalculateMepAsync(valve.IsEnabledAsValve
                 ? "L'accessoire est maintenant traité comme une vanne"
                 : "L'accessoire n'est plus traité comme une vanne");
@@ -1653,7 +1767,8 @@ namespace BIMaestro.VideoGames
                 candidate => string.Equals(
                     candidate.ElementKey,
                     key,
-                    StringComparison.Ordinal));
+                    StringComparison.Ordinal) &&
+                    candidate.BoundaryKind == GameMepBoundaryKind.Inlet);
             if (source == null)
             {
                 source = new GameMepSourceData
@@ -1667,7 +1782,8 @@ namespace BIMaestro.VideoGames
                     IsActive = true,
                     InitiallyActive = false,
                     WasManuallyOverridden = true,
-                    IsUserCreated = true
+                    IsUserCreated = true,
+                    BoundaryKind = GameMepBoundaryKind.Inlet
                 };
                 _scene.MepGraph.Sources.Add(source);
                 _mepSourceItems.Add(new GameMepSourceItem(
@@ -1680,6 +1796,7 @@ namespace BIMaestro.VideoGames
                 source.WasManuallyOverridden = true;
             }
 
+            SaveMepScenario();
             RecalculateMepAsync(source.IsActive
                 ? "Source de fluide activée"
                 : "Source de fluide désactivée");
@@ -1687,17 +1804,40 @@ namespace BIMaestro.VideoGames
 
         private void SourceForwardButton_Click(object sender, RoutedEventArgs e)
         {
-            SetDirectionalPipeSource(sender as FrameworkElement, true);
+            SetDirectionalPipeBoundary(
+                sender as FrameworkElement,
+                true,
+                GameMepBoundaryKind.Inlet);
         }
 
         private void SourceReverseButton_Click(object sender, RoutedEventArgs e)
         {
-            SetDirectionalPipeSource(sender as FrameworkElement, false);
+            SetDirectionalPipeBoundary(
+                sender as FrameworkElement,
+                false,
+                GameMepBoundaryKind.Inlet);
         }
 
-        private void SetDirectionalPipeSource(
+        private void ReturnForwardButton_Click(object sender, RoutedEventArgs e)
+        {
+            SetDirectionalPipeBoundary(
+                sender as FrameworkElement,
+                true,
+                GameMepBoundaryKind.Outlet);
+        }
+
+        private void ReturnReverseButton_Click(object sender, RoutedEventArgs e)
+        {
+            SetDirectionalPipeBoundary(
+                sender as FrameworkElement,
+                false,
+                GameMepBoundaryKind.Outlet);
+        }
+
+        private void SetDirectionalPipeBoundary(
             FrameworkElement? sender,
-            bool forward)
+            bool forward,
+            GameMepBoundaryKind boundaryKind)
         {
             if (_mepRecalculationRunning)
             {
@@ -1723,7 +1863,8 @@ namespace BIMaestro.VideoGames
                 candidate => string.Equals(
                     candidate.ElementKey,
                     key,
-                    StringComparison.Ordinal));
+                    StringComparison.Ordinal) &&
+                    candidate.BoundaryKind == boundaryKind);
             if (source == null)
             {
                 source = new GameMepSourceData
@@ -1731,13 +1872,14 @@ namespace BIMaestro.VideoGames
                     ElementKey = element.Key,
                     SystemKey = element.SystemKey,
                     Name = string.IsNullOrWhiteSpace(element.Name)
-                        ? "Arrivée canalisation #" + element.ElementId
-                        : "Arrivée — " + element.Name,
+                        ? "Canalisation #" + element.ElementId
+                        : element.Name,
                     Confidence = GameMepConfidence.High,
                     IsActive = true,
                     InitiallyActive = false,
                     WasManuallyOverridden = true,
-                    IsUserCreated = true
+                    IsUserCreated = true,
+                    BoundaryKind = boundaryKind
                 };
                 _scene.MepGraph.Sources.Add(source);
                 _mepSourceItems.Add(new GameMepSourceItem(
@@ -1749,9 +1891,73 @@ namespace BIMaestro.VideoGames
             source.ExitConnectorIndex = exit;
             source.IsActive = true;
             source.WasManuallyOverridden = true;
+            SaveMepScenario();
             RecalculateMepAsync(forward
-                ? "Source définie : début vers fin"
-                : "Source définie : fin vers début");
+                ? (boundaryKind == GameMepBoundaryKind.Inlet
+                    ? "Arrivée définie : début vers fin"
+                    : "Retour défini : début vers fin")
+                : (boundaryKind == GameMepBoundaryKind.Inlet
+                    ? "Arrivée définie : fin vers début"
+                    : "Retour défini : fin vers début"));
+        }
+
+        private void ConstraintForwardButton_Click(object sender, RoutedEventArgs e)
+        {
+            SetDirectionConstraint(sender as FrameworkElement, true);
+        }
+
+        private void ConstraintReverseButton_Click(object sender, RoutedEventArgs e)
+        {
+            SetDirectionConstraint(sender as FrameworkElement, false);
+        }
+
+        private void SetDirectionConstraint(FrameworkElement? sender, bool forward)
+        {
+            if (_mepRecalculationRunning)
+                return;
+            string key = sender?.Tag as string ?? string.Empty;
+            GameMepElementData? element = _scene.MepGraph.FindElement(key);
+            GameMepPathData? path = element?.Paths.FirstOrDefault(candidate =>
+                candidate.StartConnector >= 0 &&
+                candidate.EndConnector >= 0 &&
+                candidate.StartConnector != candidate.EndConnector);
+            if (element == null || path == null)
+                return;
+
+            int entry = forward ? path.StartConnector : path.EndConnector;
+            int exit = forward ? path.EndConnector : path.StartConnector;
+            GameMepDirectionConstraintData? constraint =
+                _scene.MepGraph.DirectionConstraints.FirstOrDefault(candidate =>
+                    string.Equals(candidate.ElementKey, key, StringComparison.Ordinal));
+            if (constraint != null && constraint.EntryConnectorIndex == entry &&
+                constraint.ExitConnectorIndex == exit)
+            {
+                _scene.MepGraph.DirectionConstraints.Remove(constraint);
+                SaveMepScenario();
+                RecalculateMepAsync("Sens imposé retiré");
+                return;
+            }
+            if (constraint == null)
+            {
+                constraint = new GameMepDirectionConstraintData
+                {
+                    ElementKey = key
+                };
+                _scene.MepGraph.DirectionConstraints.Add(constraint);
+            }
+            constraint.EntryConnectorIndex = entry;
+            constraint.ExitConnectorIndex = exit;
+            constraint.IsActive = true;
+            constraint.WasManuallyOverridden = true;
+            SaveMepScenario();
+            RecalculateMepAsync(forward
+                ? "Sens de pompe imposé : début vers fin"
+                : "Sens de pompe imposé : fin vers début");
+        }
+
+        private void SaveMepScenario()
+        {
+            GameMepScenarioStore.QueueSave(_scene.MepGraph);
         }
 
         private async void RecalculateMepAsync(string completionMessage)
@@ -1894,6 +2100,48 @@ namespace BIMaestro.VideoGames
 
             distance = minimum;
             return minimum >= 0.03 && minimum <= maximum;
+        }
+
+        private static bool TryIntersectRayTriangle(
+            Point3D origin,
+            Vector3D direction,
+            GameTriangle triangle,
+            out double distance)
+        {
+            // Möller-Trumbore, double face : la sélection doit fonctionner
+            // quelle que soit l'orientation des normales exportées par Revit.
+            Vector3D edge1 = triangle.B - triangle.A;
+            Vector3D edge2 = triangle.C - triangle.A;
+            Vector3D perpendicular = Vector3D.CrossProduct(direction, edge2);
+            double determinant = Vector3D.DotProduct(edge1, perpendicular);
+            if (Math.Abs(determinant) < 1e-10)
+            {
+                distance = 0.0;
+                return false;
+            }
+
+            double inverseDeterminant = 1.0 / determinant;
+            Vector3D fromA = origin - triangle.A;
+            double barycentricU =
+                Vector3D.DotProduct(fromA, perpendicular) * inverseDeterminant;
+            if (barycentricU < -1e-8 || barycentricU > 1.0 + 1e-8)
+            {
+                distance = 0.0;
+                return false;
+            }
+
+            Vector3D cross = Vector3D.CrossProduct(fromA, edge1);
+            double barycentricV =
+                Vector3D.DotProduct(direction, cross) * inverseDeterminant;
+            if (barycentricV < -1e-8 ||
+                barycentricU + barycentricV > 1.0 + 1e-8)
+            {
+                distance = 0.0;
+                return false;
+            }
+
+            distance = Vector3D.DotProduct(edge2, cross) * inverseDeterminant;
+            return distance >= 0.03 && distance <= 300.0;
         }
 
         private static bool UpdateRayInterval(
@@ -2516,6 +2764,8 @@ namespace BIMaestro.VideoGames
                     ValveOverrideVisibility = Visibility.Collapsed;
                     SourceActionVisibility = Visibility.Collapsed;
                     SourceDirectionVisibility = Visibility.Collapsed;
+                    ReturnDirectionVisibility = Visibility.Collapsed;
+                    ConstraintDirectionVisibility = Visibility.Collapsed;
                     return;
                 }
 
@@ -2525,13 +2775,30 @@ namespace BIMaestro.VideoGames
                     (string.IsNullOrWhiteSpace(mepElement.Classification)
                         ? string.Empty
                         : "  •  " + mepElement.Classification);
-                FlowText = "État : " + ToFrenchFlowState(mepElement.FlowState);
+                GameMepPathData? representativePath = mepElement.Paths.FirstOrDefault();
+                FlowText = "État : " + ToFrenchFlowState(mepElement.FlowState) +
+                    (representativePath == null
+                        ? string.Empty
+                        : "\nSens : " + ToFrenchDirection(representativePath));
 
                 GameMepSourceData? source = mepGraph.Sources.FirstOrDefault(
                     candidate => string.Equals(
                         candidate.ElementKey,
                         UniqueKey,
-                        StringComparison.Ordinal));
+                        StringComparison.Ordinal) &&
+                        candidate.BoundaryKind == GameMepBoundaryKind.Inlet);
+                GameMepSourceData? outlet = mepGraph.Sources.FirstOrDefault(
+                    candidate => string.Equals(
+                        candidate.ElementKey,
+                        UniqueKey,
+                        StringComparison.Ordinal) &&
+                        candidate.BoundaryKind == GameMepBoundaryKind.Outlet);
+                GameMepDirectionConstraintData? constraint =
+                    mepGraph.DirectionConstraints.FirstOrDefault(candidate =>
+                        string.Equals(
+                            candidate.ElementKey,
+                            UniqueKey,
+                            StringComparison.Ordinal));
                 GameMepPathData? directionalPath = mepElement.Paths.FirstOrDefault(path =>
                     path.StartConnector >= 0 &&
                     path.EndConnector >= 0 &&
@@ -2541,6 +2808,16 @@ namespace BIMaestro.VideoGames
                     mepElement.ConnectorIndices.Count == 2 &&
                     directionalPath != null;
                 SourceDirectionVisibility = supportsDirection
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+                ReturnDirectionVisibility = supportsDirection
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+                bool supportsConstraint =
+                    !mepElement.IsPipeCurve &&
+                    mepElement.ConnectorIndices.Count == 2 &&
+                    directionalPath != null;
+                ConstraintDirectionVisibility = supportsConstraint
                     ? Visibility.Visible
                     : Visibility.Collapsed;
                 SourceActionVisibility = source != null || !supportsDirection
@@ -2563,6 +2840,26 @@ namespace BIMaestro.VideoGames
                     source.EntryConnectorIndex == directionalPath.EndConnector
                         ? "✓ Sens fin → début"
                         : "Choisir le sens fin → début";
+                ReturnForwardActionText = outlet != null &&
+                    directionalPath != null && outlet.IsActive &&
+                    outlet.EntryConnectorIndex == directionalPath.StartConnector
+                        ? "✓ Retour début → fin"
+                        : "Définir retour début → fin";
+                ReturnReverseActionText = outlet != null &&
+                    directionalPath != null && outlet.IsActive &&
+                    outlet.EntryConnectorIndex == directionalPath.EndConnector
+                        ? "✓ Retour fin → début"
+                        : "Définir retour fin → début";
+                ConstraintForwardActionText = constraint != null &&
+                    directionalPath != null && constraint.IsActive &&
+                    constraint.EntryConnectorIndex == directionalPath.StartConnector
+                        ? "✓ Pompe début → fin (retirer)"
+                        : "Imposer pompe début → fin";
+                ConstraintReverseActionText = constraint != null &&
+                    directionalPath != null && constraint.IsActive &&
+                    constraint.EntryConnectorIndex == directionalPath.EndConnector
+                        ? "✓ Pompe fin → début (retirer)"
+                        : "Imposer pompe fin → début";
 
                 GameMepValveData? valve = mepGraph.FindValve(UniqueKey);
                 if (valve == null)
@@ -2613,6 +2910,25 @@ namespace BIMaestro.VideoGames
             public string SourceForwardActionText { get; } = string.Empty;
             public string SourceReverseActionText { get; } = string.Empty;
             public Visibility SourceDirectionVisibility { get; } = Visibility.Collapsed;
+            public string ReturnForwardActionText { get; } = string.Empty;
+            public string ReturnReverseActionText { get; } = string.Empty;
+            public Visibility ReturnDirectionVisibility { get; } = Visibility.Collapsed;
+            public string ConstraintForwardActionText { get; } = string.Empty;
+            public string ConstraintReverseActionText { get; } = string.Empty;
+            public Visibility ConstraintDirectionVisibility { get; } = Visibility.Collapsed;
+
+            private static string ToFrenchDirection(GameMepPathData path)
+            {
+                switch (path.DirectionState)
+                {
+                    case GameMepDirectionState.Resolved:
+                        return path.DirectionReason;
+                    case GameMepDirectionState.Conflict:
+                        return "conflit — flèches arrêtées";
+                    default:
+                        return "indéterminé";
+                }
+            }
 
             private static string ToFrenchFlowState(GameMepFlowState state)
             {

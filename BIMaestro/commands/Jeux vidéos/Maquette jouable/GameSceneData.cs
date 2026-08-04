@@ -21,6 +21,18 @@ namespace BIMaestro.VideoGames
         public string TypeName { get; set; } = string.Empty;
         public string LevelName { get; set; } = string.Empty;
         public string DocumentTitle { get; set; } = string.Empty;
+        /// <summary>
+        /// Lorsqu'un objet n'est qu'une enveloppe (calorifuge), le clic est
+        /// redirigé vers son élément Revit porteur.
+        /// </summary>
+        public string SelectionTargetKey { get; set; } = string.Empty;
+        /// <summary>
+        /// Triangles de collision appartenant réellement à cet élément. La
+        /// sélection les réutilise directement : aucune seconde copie de la
+        /// géométrie n'est conservée en mémoire.
+        /// </summary>
+        public IList<GameTriangle> SelectionTriangles { get; } =
+            new List<GameTriangle>();
         public bool HasBounds { get; private set; }
 
         public Rect3D Bounds => HasBounds
@@ -57,6 +69,15 @@ namespace BIMaestro.VideoGames
             _maxY += delta.Y;
             _minZ += delta.Z;
             _maxZ += delta.Z;
+
+            // Les triangles collisionnels sont recentrés par GameSceneData.
+            // Seuls les triangles de sélection des objets non collisionnels
+            // (portes, notamment) doivent être déplacés ici.
+            foreach (GameTriangle triangle in SelectionTriangles)
+            {
+                if (!triangle.IsCollisionGeometry)
+                    triangle.Translate(delta);
+            }
         }
     }
 
@@ -296,6 +317,7 @@ namespace BIMaestro.VideoGames
         public Point3D C { get; private set; }
         public Vector3D Normal { get; }
         public bool PreferredWalkable { get; }
+        public bool IsCollisionGeometry { get; set; }
 
         public double MinX { get; private set; }
         public double MaxX { get; private set; }
