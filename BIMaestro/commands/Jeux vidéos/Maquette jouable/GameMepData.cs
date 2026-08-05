@@ -34,6 +34,42 @@ namespace BIMaestro.VideoGames
         Conflict
     }
 
+    internal enum GameMepDirectionReliability
+    {
+        Reliable,
+        Inferred,
+        Ambiguous,
+        Manual
+    }
+
+    internal sealed class GameMepDirectionExplanationData
+    {
+        public GameMepDirectionReliability Reliability { get; set; } =
+            GameMepDirectionReliability.Ambiguous;
+        public string PrimarySourceElementKey { get; set; } = string.Empty;
+        public string PrimarySourceName { get; set; } = string.Empty;
+        public IList<string> AlternativeSourceNames { get; } = new List<string>();
+        public string InfluencingReturnName { get; set; } = string.Empty;
+        public IList<string> UpstreamElementKeys { get; } = new List<string>();
+        public IList<string> UpstreamElementNames { get; } = new List<string>();
+        public IList<string> LimitingControls { get; } = new List<string>();
+        public string Rule { get; set; } = string.Empty;
+        public bool HasAlternativeRoute { get; set; }
+        public bool IsManual { get; set; }
+    }
+
+    internal enum GameMepDirectionConstraintScope
+    {
+        LocalOverride,
+        EquipmentPressureRise
+    }
+
+    internal enum GameMepFlowControlKind
+    {
+        IsolationValve,
+        CheckValve
+    }
+
     internal sealed class GameMepConnectorData
     {
         public int Index { get; set; }
@@ -73,9 +109,17 @@ namespace BIMaestro.VideoGames
         public IList<double> CumulativeLengths { get; } = new List<double>();
         public double Length { get; private set; }
         public GameMepFlowState FlowState { get; set; }
+        /// <summary>
+        /// Indique qu'un trajet participe réellement à une circulation entre
+        /// une arrivée et un retour. Une portion atteignable depuis une arrivée
+        /// peut rester alimentée tout en étant stagnante devant une vanne fermée.
+        /// </summary>
+        public bool HasCirculation { get; set; } = true;
         public bool FlowForward { get; set; } = true;
         public GameMepDirectionState DirectionState { get; set; }
         public string DirectionReason { get; set; } = string.Empty;
+        public GameMepDirectionExplanationData DirectionExplanation { get; set; } =
+            new GameMepDirectionExplanationData();
 
         public Point3D MidPoint => Sample(0.5);
 
@@ -150,14 +194,25 @@ namespace BIMaestro.VideoGames
     internal sealed class GameMepValveData
     {
         public string ElementKey { get; set; } = string.Empty;
+        public GameMepFlowControlKind Kind { get; set; } =
+            GameMepFlowControlKind.IsolationValve;
         public GameMepConfidence Confidence { get; set; }
         public string DetectionReason { get; set; } = string.Empty;
         public bool IsEnabledAsValve { get; set; }
         public bool InitiallyEnabledAsValve { get; set; }
         public bool IsClosed { get; set; }
         public bool WasManuallyOverridden { get; set; }
+        public int EntryConnectorIndex { get; set; } = -1;
+        public int ExitConnectorIndex { get; set; } = -1;
+        public int InitiallyEntryConnectorIndex { get; set; } = -1;
+        public int InitiallyExitConnectorIndex { get; set; } = -1;
         public GameMepFlowState UpstreamState { get; set; }
         public GameMepFlowState DownstreamState { get; set; }
+
+        public bool HasExplicitDirection =>
+            EntryConnectorIndex >= 0 &&
+            ExitConnectorIndex >= 0 &&
+            EntryConnectorIndex != ExitConnectorIndex;
     }
 
     internal sealed class GameMepSourceData
@@ -189,6 +244,8 @@ namespace BIMaestro.VideoGames
     internal sealed class GameMepDirectionConstraintData
     {
         public string ElementKey { get; set; } = string.Empty;
+        public GameMepDirectionConstraintScope Scope { get; set; } =
+            GameMepDirectionConstraintScope.LocalOverride;
         public int EntryConnectorIndex { get; set; } = -1;
         public int ExitConnectorIndex { get; set; } = -1;
         public bool IsActive { get; set; } = true;
@@ -231,6 +288,8 @@ namespace BIMaestro.VideoGames
             new List<GameMepSourceData>();
         public IList<GameMepDirectionConstraintData> DirectionConstraints { get; } =
             new List<GameMepDirectionConstraintData>();
+        public IList<GameMepDiagnosticData> Diagnostics { get; } =
+            new List<GameMepDiagnosticData>();
         public IList<GameMepSystemData> Systems { get; } =
             new List<GameMepSystemData>();
 
@@ -245,6 +304,7 @@ namespace BIMaestro.VideoGames
         public int SkippedScenarioEntryCount { get; set; }
         public string ScenarioPersistenceError { get; set; } = string.Empty;
         public double LastCalculationMilliseconds { get; set; }
+        public double LastDiagnosticMilliseconds { get; set; }
         public int OpenConnectorCount { get; set; }
         public int UncertainValveCount => Valves.Count(v =>
             v.Confidence == GameMepConfidence.Low && !v.WasManuallyOverridden);
@@ -371,7 +431,8 @@ namespace BIMaestro.VideoGames
             int[] supplyDistance = ComputeDistances(
                 inletSeeds,
                 inletExternalStops,
-                new Dictionary<int, string>());
+                new Dictionary<int, string>(),
+                false);
 
             // Une pompe ne crée pas de fluide. Sa contrainte ajoute uniquement
             // un couple bas/haut au calcul visuel du sens.
@@ -381,7 +442,9 @@ namespace BIMaestro.VideoGames
             var lowInternalStops = new Dictionary<int, string>();
             foreach (GameMepDirectionConstraintData constraint in
                 _graph.DirectionConstraints.Where(item =>
-                    item.IsActive && item.HasExplicitDirection))
+                    item.IsActive && item.HasExplicitDirection &&
+                    item.Scope ==
+                        GameMepDirectionConstraintScope.EquipmentPressureRise))
             {
                 if (constraint.ExitConnectorIndex >= 0 &&
                     constraint.ExitConnectorIndex < count)
@@ -402,11 +465,13 @@ namespace BIMaestro.VideoGames
             int[] highDistance = ComputeDistances(
                 highSeeds,
                 inletExternalStops,
-                highInternalStops);
+                highInternalStops,
+                false);
             int[] lowDistance = ComputeDistances(
                 lowSeeds,
                 outletExternalStops,
-                lowInternalStops);
+                lowInternalStops,
+                true);
 
             bool hasAnyInlet = activeSourceSystems.Count > 0;
             foreach (GameMepElementData element in _graph.Elements)
@@ -460,7 +525,15 @@ namespace BIMaestro.VideoGames
                 }
             }
 
+            ApplyCirculationPotential(
+                inletSeeds,
+                outletSeeds,
+                new HashSet<int>(inletExternalStops.Concat(outletExternalStops)),
+                highDistance,
+                lowDistance);
             UpdateValveStates(activeSourceSystems, supplyDistance);
+            GameMepDirectionExplanationBuilder.Refresh(_graph);
+            GameMepDiagnosticAnalyzer.Refresh(_graph);
             stopwatch.Stop();
             _graph.LastCalculationMilliseconds = stopwatch.Elapsed.TotalMilliseconds;
         }
@@ -486,7 +559,8 @@ namespace BIMaestro.VideoGames
         private int[] ComputeDistances(
             IEnumerable<int> seeds,
             ISet<int> externalStops,
-            IDictionary<int, string> internalStops)
+            IDictionary<int, string> internalStops,
+            bool reverseCheckValveDirection)
         {
             int count = _graph.Connectors.Count;
             var distance = Enumerable.Repeat(-1, count).ToArray();
@@ -505,7 +579,14 @@ namespace BIMaestro.VideoGames
                 foreach (int edgeIndex in _adjacentEdges![current])
                 {
                     GameMepConnectionData edge = _graph.Connections[edgeIndex];
-                    if (IsBlockedByValve(edge) ||
+                    int next = edge.ConnectorA == current
+                        ? edge.ConnectorB
+                        : edge.ConnectorA;
+                    if (IsBlockedByFlowControl(
+                            edge,
+                            current,
+                            next,
+                            reverseCheckValveDirection) ||
                         (externalStops.Contains(current) && !edge.IsInternal) ||
                         (internalStops.TryGetValue(current, out string elementKey) &&
                          edge.IsInternal &&
@@ -513,9 +594,6 @@ namespace BIMaestro.VideoGames
                     {
                         continue;
                     }
-                    int next = edge.ConnectorA == current
-                        ? edge.ConnectorB
-                        : edge.ConnectorA;
                     if (next < 0 || next >= count || distance[next] >= 0)
                         continue;
                     distance[next] = distance[current] + 1;
@@ -530,6 +608,33 @@ namespace BIMaestro.VideoGames
             out bool forward,
             out string reason)
         {
+            GameMepValveData? checkValve = _graph.FindValve(path.ElementKey);
+            if (checkValve != null &&
+                checkValve.IsEnabledAsValve &&
+                checkValve.Kind == GameMepFlowControlKind.CheckValve &&
+                checkValve.HasExplicitDirection &&
+                TryMatchDirection(
+                    path,
+                    checkValve.EntryConnectorIndex,
+                    checkValve.ExitConnectorIndex,
+                    out forward))
+            {
+                reason = "Sens imposé par le clapet anti-retour";
+                return true;
+            }
+            foreach (GameMepDirectionConstraintData constraint in
+                _graph.DirectionConstraints.Where(item =>
+                    item.IsActive && item.HasExplicitDirection &&
+                    item.Scope == GameMepDirectionConstraintScope.LocalOverride &&
+                    string.Equals(item.ElementKey, path.ElementKey, StringComparison.Ordinal)))
+            {
+                if (TryMatchDirection(path, constraint.EntryConnectorIndex,
+                        constraint.ExitConnectorIndex, out forward))
+                {
+                    reason = "Correction locale manuelle, sans effet sur le reste du reseau";
+                    return true;
+                }
+            }
             foreach (GameMepSourceData boundary in _graph.Sources.Where(item =>
                 item.IsActive && item.HasExplicitDirection &&
                 string.Equals(item.ElementKey, path.ElementKey, StringComparison.Ordinal)))
@@ -546,6 +651,8 @@ namespace BIMaestro.VideoGames
             foreach (GameMepDirectionConstraintData constraint in
                 _graph.DirectionConstraints.Where(item =>
                     item.IsActive && item.HasExplicitDirection &&
+                    item.Scope ==
+                        GameMepDirectionConstraintScope.EquipmentPressureRise &&
                     string.Equals(item.ElementKey, path.ElementKey, StringComparison.Ordinal)))
             {
                 if (TryMatchDirection(path, constraint.EntryConnectorIndex,
@@ -659,6 +766,363 @@ namespace BIMaestro.VideoGames
             return false;
         }
 
+        /// <summary>
+        /// Sépare une portion réellement traversée d'une portion simplement
+        /// atteignable depuis une arrivée. Le calcul travaille sur le réseau
+        /// ouvert et considère les extrémités libres comme des sorties implicites.
+        /// Une branche terminée par une vanne fermée n'est pas une sortie : elle
+        /// reste alimentée, mais aucune flèche ne s'y déplace.
+        /// </summary>
+        private void ApplyCirculationPotential(
+            IEnumerable<int> inletSeedValues,
+            IEnumerable<int> outletSeedValues,
+            ISet<int> externalStops,
+            int[] highDistance,
+            int[] lowDistance)
+        {
+            int connectorCount = _graph.Connectors.Count;
+            var inletSeeds = new HashSet<int>(inletSeedValues.Where(index =>
+                index >= 0 && index < connectorCount));
+            var outletSeeds = new HashSet<int>(outletSeedValues.Where(index =>
+                index >= 0 && index < connectorCount));
+
+            // Une extrémité topologique non renseignée représente une sortie
+            // implicite. Les connecteurs d'une vanne d'isolement fermée sont
+            // volontairement exclus : seule cette coupure interne doit rendre
+            // la branche amont stagnante.
+            var closedValveConnectors = new HashSet<int>(_graph.Valves
+                .Where(valve => valve.IsEnabledAsValve && valve.IsClosed &&
+                    valve.Kind == GameMepFlowControlKind.IsolationValve)
+                .SelectMany(valve =>
+                {
+                    GameMepElementData? element =
+                        _graph.FindElement(valve.ElementKey);
+                    return element != null
+                        ? element.ConnectorIndices
+                        : Enumerable.Empty<int>();
+                }));
+            var topologyDegree = new int[connectorCount];
+            foreach (GameMepConnectionData edge in _graph.Connections)
+            {
+                if (edge.ConnectorA < 0 || edge.ConnectorA >= connectorCount ||
+                    edge.ConnectorB < 0 || edge.ConnectorB >= connectorCount)
+                {
+                    continue;
+                }
+                topologyDegree[edge.ConnectorA]++;
+                topologyDegree[edge.ConnectorB]++;
+            }
+            for (int index = 0; index < connectorCount; index++)
+            {
+                if (!inletSeeds.Contains(index) && topologyDegree[index] <= 1 &&
+                    !closedValveConnectors.Contains(index))
+                {
+                    outletSeeds.Add(index);
+                }
+            }
+
+            // Sans couple arrivée/retour, conserver le comportement historique :
+            // le moteur ne doit pas faire disparaître tous les flux d'un ancien
+            // scénario qui ne possède encore que des arrivées.
+            if (inletSeeds.Count == 0 || outletSeeds.Count == 0)
+            {
+                foreach (GameMepPathData path in _graph.Elements.SelectMany(item => item.Paths))
+                {
+                    path.HasCirculation =
+                        path.FlowState == GameMepFlowState.Supplied &&
+                        path.DirectionState == GameMepDirectionState.Resolved;
+                }
+                return;
+            }
+
+            int edgeCount = _graph.Connections.Count;
+            var allowed = new bool[edgeCount];
+            for (int edgeIndex = 0; edgeIndex < edgeCount; edgeIndex++)
+            {
+                GameMepConnectionData edge = _graph.Connections[edgeIndex];
+                bool valid = edge.ConnectorA >= 0 && edge.ConnectorA < connectorCount &&
+                    edge.ConnectorB >= 0 && edge.ConnectorB < connectorCount;
+                allowed[edgeIndex] = valid && !IsBlockedByValve(edge) &&
+                    !(!edge.IsInternal &&
+                      (externalStops.Contains(edge.ConnectorA) ||
+                       externalStops.Contains(edge.ConnectorB)));
+            }
+
+            var component = Enumerable.Repeat(-1, connectorCount).ToArray();
+            var componentHasInlet = new List<bool>();
+            var componentHasOutlet = new List<bool>();
+            int componentIndex = 0;
+            for (int seed = 0; seed < connectorCount; seed++)
+            {
+                if (component[seed] >= 0)
+                    continue;
+                bool hasInlet = false;
+                bool hasOutlet = false;
+                var queue = new Queue<int>();
+                component[seed] = componentIndex;
+                queue.Enqueue(seed);
+                while (queue.Count > 0)
+                {
+                    int current = queue.Dequeue();
+                    hasInlet |= inletSeeds.Contains(current);
+                    hasOutlet |= outletSeeds.Contains(current);
+                    foreach (int edgeIndex in _adjacentEdges![current])
+                    {
+                        if (!allowed[edgeIndex])
+                            continue;
+                        GameMepConnectionData edge = _graph.Connections[edgeIndex];
+                        int next = edge.ConnectorA == current
+                            ? edge.ConnectorB
+                            : edge.ConnectorA;
+                        if (component[next] >= 0)
+                            continue;
+                        component[next] = componentIndex;
+                        queue.Enqueue(next);
+                    }
+                }
+                componentHasInlet.Add(hasInlet);
+                componentHasOutlet.Add(hasOutlet);
+                componentIndex++;
+            }
+
+            bool IsRelevantConnector(int index)
+            {
+                if (index < 0 || index >= connectorCount)
+                    return false;
+                int id = component[index];
+                return id >= 0 && componentHasInlet[id] && componentHasOutlet[id];
+            }
+
+            // Élagage du graphe : toute feuille qui n'est ni une arrivée ni un
+            // retour ne peut appartenir à un trajet de circulation. L'opération
+            // est répétée jusqu'au té ou à la boucle utile la plus proche.
+            var retained = (bool[])allowed.Clone();
+            var degree = new int[connectorCount];
+            for (int edgeIndex = 0; edgeIndex < edgeCount; edgeIndex++)
+            {
+                if (!retained[edgeIndex])
+                    continue;
+                GameMepConnectionData edge = _graph.Connections[edgeIndex];
+                if (!IsRelevantConnector(edge.ConnectorA))
+                {
+                    retained[edgeIndex] = false;
+                    continue;
+                }
+                degree[edge.ConnectorA]++;
+                degree[edge.ConnectorB]++;
+            }
+            var pruneQueue = new Queue<int>();
+            var removed = new bool[connectorCount];
+            for (int index = 0; index < connectorCount; index++)
+            {
+                if (IsRelevantConnector(index) &&
+                    !inletSeeds.Contains(index) && !outletSeeds.Contains(index) &&
+                    degree[index] <= 1)
+                {
+                    pruneQueue.Enqueue(index);
+                }
+            }
+            while (pruneQueue.Count > 0)
+            {
+                int current = pruneQueue.Dequeue();
+                if (removed[current] || inletSeeds.Contains(current) ||
+                    outletSeeds.Contains(current) || degree[current] > 1)
+                {
+                    continue;
+                }
+                removed[current] = true;
+                foreach (int edgeIndex in _adjacentEdges![current])
+                {
+                    if (!retained[edgeIndex])
+                        continue;
+                    retained[edgeIndex] = false;
+                    GameMepConnectionData edge = _graph.Connections[edgeIndex];
+                    int next = edge.ConnectorA == current
+                        ? edge.ConnectorB
+                        : edge.ConnectorA;
+                    degree[current]--;
+                    degree[next]--;
+                    if (!removed[next] && !inletSeeds.Contains(next) &&
+                        !outletSeeds.Contains(next) && degree[next] <= 1)
+                    {
+                        pruneQueue.Enqueue(next);
+                    }
+                }
+            }
+
+            var potential = new double[connectorCount];
+            var fixedPotential = new bool[connectorCount];
+            for (int index = 0; index < connectorCount; index++)
+            {
+                bool inlet = inletSeeds.Contains(index);
+                bool outlet = outletSeeds.Contains(index);
+                fixedPotential[index] = inlet || outlet;
+                if (inlet && outlet)
+                    potential[index] = 0.5;
+                else if (inlet)
+                    potential[index] = 1.0;
+                else if (outlet)
+                    potential[index] = 0.0;
+                else if (index < highDistance.Length && index < lowDistance.Length &&
+                    highDistance[index] >= 0 && lowDistance[index] >= 0)
+                {
+                    potential[index] = (double)lowDistance[index] /
+                        Math.Max(1, highDistance[index] + lowDistance[index]);
+                }
+                else
+                {
+                    potential[index] = 0.5;
+                }
+            }
+
+            // Le potentiel par distance fournit une excellente initialisation.
+            // Quelques passes de relaxation suffisent ensuite à rendre les
+            // boucles et les dérivations indépendantes de l'ordre des objets.
+            const int maximumIterations = 320;
+            const double relaxation = 1.35;
+            for (int iteration = 0; iteration < maximumIterations; iteration++)
+            {
+                double maximumChange = 0.0;
+                for (int index = 0; index < connectorCount; index++)
+                {
+                    if (!IsRelevantConnector(index) || removed[index] ||
+                        fixedPotential[index])
+                    {
+                        continue;
+                    }
+                    double total = 0.0;
+                    int neighborCount = 0;
+                    foreach (int edgeIndex in _adjacentEdges![index])
+                    {
+                        if (!retained[edgeIndex])
+                            continue;
+                        GameMepConnectionData edge = _graph.Connections[edgeIndex];
+                        int next = edge.ConnectorA == index
+                            ? edge.ConnectorB
+                            : edge.ConnectorA;
+                        total += potential[next];
+                        neighborCount++;
+                    }
+                    if (neighborCount == 0)
+                        continue;
+                    double average = total / neighborCount;
+                    double nextValue = potential[index] +
+                        relaxation * (average - potential[index]);
+                    nextValue = Math.Max(0.0, Math.Min(1.0, nextValue));
+                    maximumChange = Math.Max(maximumChange,
+                        Math.Abs(nextValue - potential[index]));
+                    potential[index] = nextValue;
+                }
+                if (maximumChange < 1e-7)
+                    break;
+            }
+
+            var retainedExternalConnector = new bool[connectorCount];
+            for (int edgeIndex = 0; edgeIndex < edgeCount; edgeIndex++)
+            {
+                if (!retained[edgeIndex])
+                    continue;
+                GameMepConnectionData edge = _graph.Connections[edgeIndex];
+                if (!edge.IsInternal)
+                {
+                    retainedExternalConnector[edge.ConnectorA] = true;
+                    retainedExternalConnector[edge.ConnectorB] = true;
+                }
+            }
+
+            foreach (GameMepElementData element in _graph.Elements)
+            {
+                foreach (GameMepPathData path in element.Paths)
+                {
+                    if (path.FlowState != GameMepFlowState.Supplied ||
+                        !IsRelevantConnector(path.StartConnector) ||
+                        !TryGetPathPotentialDifference(
+                            element,
+                            path,
+                            retained,
+                            retainedExternalConnector,
+                            potential,
+                            out double difference))
+                    {
+                        path.HasCirculation = false;
+                        if (path.FlowState == GameMepFlowState.Supplied)
+                            path.DirectionReason =
+                                "Sous pression, stagnation devant une vanne fermée";
+                        continue;
+                    }
+
+                    path.HasCirculation = Math.Abs(difference) > 1e-5;
+                    if (!path.HasCirculation)
+                    {
+                        path.DirectionReason =
+                            "Potentiel équilibré : fluide stagnant";
+                        continue;
+                    }
+
+                    if (!TryGetImposedDirection(path, out _, out _))
+                    {
+                        path.FlowForward = difference > 0.0;
+                        path.DirectionState = GameMepDirectionState.Resolved;
+                        path.DirectionReason =
+                            "Déduit du potentiel entre arrivée et retour";
+                    }
+                }
+            }
+
+            bool TryGetPathPotentialDifference(
+                GameMepElementData element,
+                GameMepPathData path,
+                bool[] retainedEdges,
+                bool[] retainedExternal,
+                double[] values,
+                out double difference)
+            {
+                difference = 0.0;
+                int start = path.StartConnector;
+                int end = path.EndConnector;
+                if (start < 0 || start >= connectorCount || removed[start])
+                    return false;
+
+                if (end >= 0 && end < connectorCount)
+                {
+                    bool retainedPathEdge = _adjacentEdges![start].Any(edgeIndex =>
+                    {
+                        if (!retainedEdges[edgeIndex])
+                            return false;
+                        GameMepConnectionData edge = _graph.Connections[edgeIndex];
+                        int next = edge.ConnectorA == start
+                            ? edge.ConnectorB
+                            : edge.ConnectorA;
+                        return next == end && edge.IsInternal &&
+                            string.Equals(edge.ElementKey, path.ElementKey,
+                                StringComparison.Ordinal);
+                    });
+                    if (!retainedPathEdge || removed[end])
+                        return false;
+                    difference = values[start] - values[end];
+                    return true;
+                }
+
+                // Les tés et certains accessoires utilisent un chemin depuis
+                // chaque connecteur vers un centre géométrique virtuel.
+                if (!retainedExternal[start] && !inletSeeds.Contains(start) &&
+                    !outletSeeds.Contains(start))
+                {
+                    return false;
+                }
+                List<int> useful = element.ConnectorIndices.Where(index =>
+                    index >= 0 && index < connectorCount && !removed[index] &&
+                    IsRelevantConnector(index) &&
+                    (retainedExternal[index] || inletSeeds.Contains(index) ||
+                     outletSeeds.Contains(index))).ToList();
+                if (useful.Count < 2)
+                    return false;
+                double center = useful.Average(index => values[index]);
+                difference = values[start] - center;
+                return true;
+            }
+        }
+
         private void UpdateValveStates(
             ISet<string> activeSourceSystems,
             int[] supplyDistance)
@@ -746,16 +1210,16 @@ namespace BIMaestro.VideoGames
                 foreach (int edgeIndex in _adjacentEdges![current])
                 {
                     GameMepConnectionData edge = _graph.Connections[edgeIndex];
-                    if (IsBlockedByValve(edge))
+                    int next = edge.ConnectorA == current
+                        ? edge.ConnectorB
+                        : edge.ConnectorA;
+                    if (IsBlockedByFlowControl(edge, current, next, false))
                         continue;
                     // Le connecteur d'entrée représente la limite de la
                     // maquette. On entre dans le tuyau par sa liaison interne,
                     // sans repartir artificiellement vers le réseau amont.
                     if (directedSourceEntries.Contains(current) && !edge.IsInternal)
                         continue;
-                    int next = edge.ConnectorA == current
-                        ? edge.ConnectorB
-                        : edge.ConnectorA;
                     if (next < 0 || next >= count || reached[next])
                         continue;
                     reached[next] = true;
@@ -874,6 +1338,31 @@ namespace BIMaestro.VideoGames
                 return false;
             GameMepValveData? valve = _graph.FindValve(edge.ElementKey);
             return valve != null && valve.IsEnabledAsValve && valve.IsClosed;
+        }
+
+        private bool IsBlockedByFlowControl(
+            GameMepConnectionData edge,
+            int current,
+            int next,
+            bool reverseCheckValveDirection)
+        {
+            if (!edge.IsInternal || !edge.IsValveGateCandidate)
+                return false;
+            GameMepValveData? valve = _graph.FindValve(edge.ElementKey);
+            if (valve == null || !valve.IsEnabledAsValve)
+                return false;
+            if (valve.Kind == GameMepFlowControlKind.IsolationValve)
+                return valve.IsClosed;
+            if (!valve.HasExplicitDirection)
+                return false;
+
+            int allowedStart = reverseCheckValveDirection
+                ? valve.ExitConnectorIndex
+                : valve.EntryConnectorIndex;
+            int allowedEnd = reverseCheckValveDirection
+                ? valve.EntryConnectorIndex
+                : valve.ExitConnectorIndex;
+            return current != allowedStart || next != allowedEnd;
         }
     }
 }

@@ -50,8 +50,12 @@ namespace BIMaestro.VideoGames
     internal sealed class GameMepScenarioValveState
     {
         public string ElementPersistentId { get; set; } = string.Empty;
+        public GameMepFlowControlKind Kind { get; set; } =
+            GameMepFlowControlKind.IsolationValve;
         public bool IsEnabledAsValve { get; set; }
         public bool IsClosed { get; set; }
+        public string EntryConnectorPersistentKey { get; set; } = string.Empty;
+        public string ExitConnectorPersistentKey { get; set; } = string.Empty;
     }
 
     internal sealed class GameMepScenarioSourceState
@@ -69,6 +73,8 @@ namespace BIMaestro.VideoGames
     internal sealed class GameMepScenarioDirectionConstraintState
     {
         public string ElementPersistentId { get; set; } = string.Empty;
+        public GameMepDirectionConstraintScope Scope { get; set; } =
+            GameMepDirectionConstraintScope.LocalOverride;
         public bool IsActive { get; set; }
         public string EntryConnectorPersistentKey { get; set; } = string.Empty;
         public string ExitConnectorPersistentKey { get; set; } = string.Empty;
@@ -76,7 +82,7 @@ namespace BIMaestro.VideoGames
 
     internal static class GameMepScenarioStore
     {
-        private const int CurrentSchemaVersion = 2;
+        private const int CurrentSchemaVersion = 4;
         private static readonly object StorageLock = new object();
         private static readonly Dictionary<string, GameMepScenarioSnapshot>
             SessionScenarios =
@@ -236,8 +242,16 @@ namespace BIMaestro.VideoGames
                 snapshot.Valves.Add(new GameMepScenarioValveState
                 {
                     ElementPersistentId = element.PersistentId,
+                    Kind = valve.Kind,
                     IsEnabledAsValve = valve.IsEnabledAsValve,
-                    IsClosed = valve.IsEnabledAsValve && valve.IsClosed
+                    IsClosed = valve.Kind == GameMepFlowControlKind.IsolationValve &&
+                        valve.IsEnabledAsValve && valve.IsClosed,
+                    EntryConnectorPersistentKey = GetConnectorPersistentKey(
+                        graph,
+                        valve.EntryConnectorIndex),
+                    ExitConnectorPersistentKey = GetConnectorPersistentKey(
+                        graph,
+                        valve.ExitConnectorIndex)
                 });
             }
 
@@ -292,6 +306,7 @@ namespace BIMaestro.VideoGames
                     new GameMepScenarioDirectionConstraintState
                     {
                         ElementPersistentId = element.PersistentId,
+                        Scope = constraint.Scope,
                         IsActive = constraint.IsActive,
                         EntryConnectorPersistentKey = GetConnectorPersistentKey(
                             graph,
@@ -350,7 +365,25 @@ namespace BIMaestro.VideoGames
                 }
 
                 valve.IsEnabledAsValve = state.IsEnabledAsValve;
-                valve.IsClosed = state.IsEnabledAsValve && state.IsClosed;
+                if (snapshot.SchemaVersion >= 4)
+                {
+                    valve.Kind = state.Kind;
+                    int entryIndex = FindConnectorIndex(
+                        graph,
+                        element.Key,
+                        state.EntryConnectorPersistentKey);
+                    int exitIndex = FindConnectorIndex(
+                        graph,
+                        element.Key,
+                        state.ExitConnectorPersistentKey);
+                    if (entryIndex >= 0 && exitIndex >= 0 && entryIndex != exitIndex)
+                    {
+                        valve.EntryConnectorIndex = entryIndex;
+                        valve.ExitConnectorIndex = exitIndex;
+                    }
+                }
+                valve.IsClosed = valve.Kind == GameMepFlowControlKind.IsolationValve &&
+                    state.IsEnabledAsValve && state.IsClosed;
                 valve.WasManuallyOverridden = true;
                 result.RestoredValves++;
             }
@@ -445,6 +478,11 @@ namespace BIMaestro.VideoGames
                     new GameMepDirectionConstraintData
                     {
                         ElementKey = element.Key,
+                        Scope = snapshot.SchemaVersion >= 3
+                            ? state.Scope
+                            : (element.IsPipeCurve
+                                ? GameMepDirectionConstraintScope.LocalOverride
+                                : GameMepDirectionConstraintScope.EquipmentPressureRise),
                         EntryConnectorIndex = entryIndex,
                         ExitConnectorIndex = exitIndex,
                         IsActive = state.IsActive,

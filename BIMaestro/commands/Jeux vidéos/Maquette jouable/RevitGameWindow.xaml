@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:h="http://helix-toolkit.org/wpf/SharpDX"
         xmlns:h2="clr-namespace:HelixToolkit.Wpf.SharpDX.Elements2D;assembly=HelixToolkit.Wpf.SharpDX"
-        Title="BIMaestro — Maquette jouable"
+        Title="BIMaestro — Maquette BIM"
         Width="1280"
         Height="800"
         MinWidth="900"
@@ -11,24 +11,39 @@
         WindowStartupLocation="CenterOwner"
         WindowState="Maximized"
         ShowInTaskbar="False"
-        Background="#10151D">
+        Background="#0B1310"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True">
     <Window.Resources>
+        <!-- Palette sombre dérivée de la charte BIMaestro. -->
+        <SolidColorBrush x:Key="GameBrand" Color="#188F69"/>
+        <SolidColorBrush x:Key="GameBrandDark" Color="#0F5132"/>
+        <SolidColorBrush x:Key="GameBrandSoft" Color="#2639A77D"/>
+        <SolidColorBrush x:Key="GameAccent" Color="#F59E0B"/>
+        <SolidColorBrush x:Key="GameSurface" Color="#F20F1B17"/>
+        <SolidColorBrush x:Key="GameSurfaceRaised" Color="#F51A2923"/>
+        <SolidColorBrush x:Key="GameBorder" Color="#665D7D70"/>
+        <SolidColorBrush x:Key="GameText" Color="#FFF7FAF8"/>
+        <SolidColorBrush x:Key="GameTextMuted" Color="#FFABC0B7"/>
+
         <Style x:Key="HudCaption" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="#AFC0D5"/>
+            <Setter Property="Foreground" Value="{StaticResource GameTextMuted}"/>
             <Setter Property="FontFamily" Value="Segoe UI"/>
             <Setter Property="FontSize" Value="11"/>
         </Style>
         <Style x:Key="HudValue" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Foreground" Value="{StaticResource GameText}"/>
             <Setter Property="FontFamily" Value="Segoe UI Semibold"/>
             <Setter Property="FontSize" Value="13"/>
         </Style>
         <Style x:Key="GlassButton" TargetType="Button">
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Background" Value="#66151D28"/>
-            <Setter Property="BorderBrush" Value="#557F97B4"/>
+            <Setter Property="Foreground" Value="{StaticResource GameText}"/>
+            <Setter Property="Background" Value="#9917231E"/>
+            <Setter Property="BorderBrush" Value="{StaticResource GameBorder}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="Padding" Value="12,7"/>
+            <Setter Property="FontFamily" Value="Segoe UI Semibold"/>
+            <Setter Property="FontSize" Value="11"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -37,23 +52,46 @@
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="6"
+                                CornerRadius="8"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ButtonBorder" Property="Background" Value="#AA2A3B50"/>
-                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#FF78C9FF"/>
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="#CC234034"/>
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#FF7CC8A3"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="#FF0F5132"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.45"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style x:Key="PrimaryGameButton" TargetType="Button" BasedOn="{StaticResource GlassButton}">
+            <Setter Property="Background" Value="{StaticResource GameBrandDark}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource GameBrand}"/>
+            <Setter Property="Padding" Value="14,10"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+        <Style x:Key="SectionLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#FF8CA99D"/>
+            <Setter Property="FontFamily" Value="Segoe UI Semibold"/>
+            <Setter Property="FontSize" Value="10"/>
+        </Style>
+        <Style x:Key="CompactExpander" TargetType="Expander">
+            <Setter Property="Foreground" Value="{StaticResource GameText}"/>
+            <Setter Property="FontFamily" Value="Segoe UI Semibold"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Margin" Value="0,6,0,0"/>
+        </Style>
     </Window.Resources>
 
-    <Grid x:Name="RootGrid" Background="#10151D">
+    <Grid x:Name="RootGrid" Background="#0B1310">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -92,72 +130,6 @@
                              Width="1280"
                              Height="720"
                              IsHitTestVisible="False">
-                    <h2:Canvas2D x:Name="MiniMapOverlay2D"
-                                 Width="238"
-                                 Height="262"
-                                 h2:Canvas2D.Left="12"
-                                 h2:Canvas2D.Top="12"
-                                 IsHitTestVisible="False">
-                        <!-- Fond Direct2D permanent : la carte reste lisible
-                             pendant le chargement ou si le PNG doit etre regenere. -->
-                        <h2:RectangleModel2D Width="226"
-                                             Height="250"
-                                             Fill="#EF17202B"
-                                             Stroke="#A07B91AA"
-                                             StrokeThickness="1"
-                                             h2:Canvas2D.Left="12"
-                                             h2:Canvas2D.Top="12"
-                                             IsHitTestVisible="False"/>
-                        <h2:RectangleModel2D Width="208"
-                                             Height="208"
-                                             Fill="#F50E141C"
-                                             Stroke="#A07B91AA"
-                                             StrokeThickness="1"
-                                             h2:Canvas2D.Left="21"
-                                             h2:Canvas2D.Top="45"
-                                             IsHitTestVisible="False"/>
-                        <h2:TextModel2D Text="PLAN DU NIVEAU"
-                                        Width="130"
-                                        Height="20"
-                                        FontFamily="Segoe UI Semibold"
-                                        FontSize="11"
-                                        Foreground="#FFF4F8FC"
-                                        Background="#00000000"
-                                        h2:Canvas2D.Left="22"
-                                        h2:Canvas2D.Top="20"
-                                        IsHitTestVisible="False"/>
-                        <h2:ImageModel2D x:Name="MiniMapImage2D"
-                                         Width="238"
-                                         Height="262"
-                                         h2:Canvas2D.Left="0"
-                                         h2:Canvas2D.Top="0"
-                                         IsHitTestVisible="False"/>
-                        <h2:TextModel2D x:Name="MiniMapPlayer2D"
-                                        Text="&#x27A4;"
-                                        Width="20"
-                                        Height="20"
-                                        FontFamily="Segoe UI Symbol"
-                                        FontSize="18"
-                                        FontWeight="Bold"
-                                        Foreground="#FFFFC857"
-                                        Background="#00000000"
-                                        TextAlignment="Center"
-                                        RenderTransformOrigin="0.5,0.5"
-                                        h2:Canvas2D.Left="11"
-                                        h2:Canvas2D.Top="35"
-                                        IsHitTestVisible="False">
-                            <h2:TextModel2D.Transform>
-                                <TransformGroup>
-                                    <RotateTransform x:Name="MiniMapPlayerRotation2D"
-                                                     CenterX="10"
-                                                     CenterY="10"/>
-                                    <TranslateTransform x:Name="MiniMapPlayerTranslation2D"
-                                                        X="104"
-                                                        Y="104"/>
-                                </TransformGroup>
-                            </h2:TextModel2D.Transform>
-                        </h2:TextModel2D>
-                    </h2:Canvas2D>
                     <h2:TextModel2D x:Name="Crosshair2D"
                                     Text="+"
                                     Width="28"
@@ -169,6 +141,17 @@
                                     HorizontalAlignment="Center"
                                     VerticalAlignment="Center"
                                     TextAlignment="Center"
+                                    IsHitTestVisible="False"/>
+                    <h2:TextModel2D x:Name="HoverLabel2D"
+                                    Text=""
+                                    Width="280"
+                                    Height="38"
+                                    FontFamily="Segoe UI Semibold"
+                                    FontSize="12"
+                                    Foreground="White"
+                                    Background="#E60F1B17"
+                                    TextAlignment="Center"
+                                    Visibility="Collapsed"
                                     IsHitTestVisible="False"/>
                 </h2:Canvas2D>
             </h:Viewport3DX.Content2D>
@@ -190,14 +173,14 @@
                 Grid.Column="1"
                 Panel.ZIndex="20"
                 Visibility="Collapsed"
-                Width="360"
+                Width="318"
                 HorizontalAlignment="Right"
-                VerticalAlignment="Stretch"
-                Margin="12"
-                Padding="14"
-                CornerRadius="9"
-                Background="#F117202B"
-                BorderBrush="#AA2CCFD6"
+                VerticalAlignment="Top"
+                Margin="8"
+                Padding="12"
+                CornerRadius="14"
+                Background="{StaticResource GameSurface}"
+                BorderBrush="{StaticResource GameBrand}"
                 BorderThickness="1"
                 IsHitTestVisible="True">
             <Grid>
@@ -215,9 +198,9 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel>
                         <TextBlock Text="FLUIDES MEP"
-                                   Foreground="#FF46D7DC"
+                                   Foreground="#FF7CC8A3"
                                    FontFamily="Segoe UI Semibold"
-                                   FontSize="12"/>
+                                   FontSize="13"/>
                         <TextBlock x:Name="MepStatsText"
                                    Text="Analyse des canalisations"
                                    Style="{StaticResource HudCaption}"
@@ -231,25 +214,88 @@
                 </Grid>
 
                 <StackPanel Grid.Row="1" Margin="0,12,0,10">
-                    <Button x:Name="MepFlowToggleButton"
-                            Style="{StaticResource GlassButton}"
-                            Content="Activer les flux"
-                            HorizontalAlignment="Stretch"
-                            Click="MepFlowToggleButton_Click"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Button x:Name="MepFlowToggleButton"
+                                Style="{StaticResource PrimaryGameButton}"
+                                Content="Flux"
+                                Margin="0,0,3,0"
+                                Click="MepFlowToggleButton_Click"/>
+                        <Button x:Name="MepValveMarkersToggleButton"
+                                Grid.Column="1"
+                                Style="{StaticResource GlassButton}"
+                                Content="Vannes"
+                                Margin="3,0,0,0"
+                                Click="MepValveMarkersToggleButton_Click"/>
+                    </Grid>
+
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Margin="0,0,3,0" Padding="10,8" CornerRadius="9"
+                                Background="#9917241E" BorderBrush="#554C8F73" BorderThickness="1">
+                            <StackPanel>
+                                <TextBlock Text="ARRIVÉES" Style="{StaticResource SectionLabel}"/>
+                                <TextBlock x:Name="MepArrivalSummaryText" Text="0 active"
+                                           Foreground="#FF71D9AE" FontFamily="Segoe UI Semibold"
+                                           FontSize="13" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="1" Margin="3,0,0,0" Padding="10,8" CornerRadius="9"
+                                Background="#99151E24" BorderBrush="#555D7D86" BorderThickness="1">
+                            <StackPanel>
+                                <TextBlock Text="RETOURS" Style="{StaticResource SectionLabel}"/>
+                                <TextBlock x:Name="MepReturnSummaryText" Text="0 actif"
+                                           Foreground="#FF83C7DE" FontFamily="Segoe UI Semibold"
+                                           FontSize="13" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
                     <TextBlock x:Name="MepStatusText"
                                Text="Les flux sont désactivés."
-                               Foreground="#FFBFD0E3"
+                               Foreground="{StaticResource GameTextMuted}"
                                FontFamily="Segoe UI Semibold"
                                FontSize="11"
                                TextWrapping="Wrap"
                                Margin="0,9,0,0"/>
+
+                    <Button x:Name="MepAdvancedToggleButton"
+                            Style="{StaticResource GlassButton}"
+                            Content="Réglages et analyses  +"
+                            HorizontalAlignment="Stretch"
+                            Margin="0,10,0,0"
+                            Click="MepAdvancedToggleButton_Click"/>
+                    <Grid x:Name="MepAdvancedTabs"
+                          Visibility="Collapsed"
+                          Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Button x:Name="MepNetworkTabButton"
+                                Style="{StaticResource GlassButton}"
+                                Content="Réseau"
+                                Margin="0,0,3,0"
+                                Click="MepNetworkTabButton_Click"/>
+                        <Button x:Name="MepDiagnosticsTabButton"
+                                Grid.Column="1"
+                                Style="{StaticResource GlassButton}"
+                                Content="Diagnostics"
+                                Margin="3,0,0,0"
+                                Click="MepDiagnosticsTabButton_Click"/>
+                    </Grid>
                 </StackPanel>
 
-                <StackPanel Grid.Row="2">
+                <StackPanel x:Name="MepNetworkContentPanel"
+                            Grid.Row="2"
+                            Visibility="Collapsed">
                         <TextBlock Text="SYSTÈMES AFFICHÉS"
-                                   Foreground="#FF7F95AE"
-                                   FontFamily="Segoe UI Semibold"
-                                   FontSize="10"
+                                   Style="{StaticResource SectionLabel}"
                                    Margin="0,3,0,6"/>
                         <ListBox x:Name="MepSystemsList"
                                  MaxHeight="145"
@@ -303,10 +349,8 @@
                         </ListBox>
 
                         <Border Height="1" Background="#557B91AA" Margin="0,10"/>
-                        <TextBlock Text="SOURCES DE FLUIDE"
-                                   Foreground="#FF7F95AE"
-                                   FontFamily="Segoe UI Semibold"
-                                   FontSize="10"
+                        <TextBlock Text="ARRIVÉES ET RETOURS"
+                                   Style="{StaticResource SectionLabel}"
                                    Margin="0,0,0,6"/>
                         <TextBlock x:Name="MepNoSourceText"
                                    Text="Aucune source active. Sélectionne la canalisation d'arrivée principale et indique son sens."
@@ -337,7 +381,7 @@
                             </ListBox.ItemContainerStyle>
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <CheckBox IsChecked="{Binding IsActive, Mode=TwoWay}"
+                                    <CheckBox IsChecked="{Binding IsActive, Mode=OneWay}"
                                               Foreground="White"
                                               Margin="0,3"
                                               Click="MepSource_Changed">
@@ -360,30 +404,170 @@
 
                         <Border Height="1" Background="#557B91AA" Margin="0,10"/>
                         <TextBlock Text="LÉGENDE"
-                                   Foreground="#FF7F95AE"
-                                   FontFamily="Segoe UI Semibold"
-                                   FontSize="10"/>
-                        <TextBlock Text="Flux lumineux : alimenté  •  Gris : isolé  •  Ambre : indéterminé  •  Rouge : vanne fermée"
+                                   Style="{StaticResource SectionLabel}"/>
+                        <TextBlock Text="Flux lumineux : alimenté  •  Gris : isolé  •  Ambre : indéterminé&#x0a;Vannes : anneau vert ouverte  •  croix rouge fermée  •  ambre incertaine  •  blanc sélectionnée"
                                    Style="{StaticResource HudCaption}"
                                    TextWrapping="Wrap"
                                    Margin="0,5,0,0"/>
                 </StackPanel>
 
-                <Grid Grid.Row="3" Margin="0,12,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
+                <Grid x:Name="MepDiagnosticsContentPanel"
+                      Grid.Row="2"
+                      Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock x:Name="MepDiagnosticSummaryText"
+                               Foreground="#FFFFC56D"
+                               FontFamily="Segoe UI Semibold"
+                               FontSize="11"
+                               TextWrapping="Wrap"
+                               Margin="0,2,0,8"/>
+                    <StackPanel Grid.Row="1" Margin="0,0,0,8">
+                        <ComboBox x:Name="MepDiagnosticSeverityFilter"
+                                  Height="28"
+                                  SelectionChanged="MepDiagnosticFilter_Changed"/>
+                        <ComboBox x:Name="MepDiagnosticTypeFilter"
+                                  Height="28"
+                                  Margin="0,5,0,0"
+                                  SelectionChanged="MepDiagnosticFilter_Changed"/>
+                        <ComboBox x:Name="MepDiagnosticSystemFilter"
+                                  Height="28"
+                                  Margin="0,5,0,0"
+                                  SelectionChanged="MepDiagnosticFilter_Changed"/>
+                        <CheckBox x:Name="MepDiagnosticShowAllCheckBox"
+                                  Foreground="#FFBFD0E3"
+                                  FontSize="10"
+                                  Margin="2,7,0,0"
+                                  Click="MepDiagnosticFilter_Changed">
+                            <TextBlock Text="Tout afficher, y compris les extrémités probablement légitimes"
+                                       TextWrapping="Wrap"/>
+                        </CheckBox>
+                    </StackPanel>
+                    <Grid Grid.Row="2">
+                        <TextBlock x:Name="MepDiagnosticEmptyText"
+                                   Text="Aucune anomalie ne correspond aux filtres."
+                                   Style="{StaticResource HudCaption}"
+                                   TextWrapping="Wrap"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Margin="15"/>
+                        <ListBox x:Name="MepDiagnosticsList"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 HorizontalContentAlignment="Stretch"
+                                 SelectionChanged="MepDiagnosticsList_SelectionChanged"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                 ScrollViewer.CanContentScroll="True"
+                                 VirtualizingPanel.IsVirtualizing="True"
+                                 VirtualizingPanel.VirtualizationMode="Recycling">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                    <Setter Property="Padding" Value="0"/>
+                                    <Setter Property="Margin" Value="0,0,0,7"/>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Padding="9,8"
+                                            CornerRadius="6"
+                                            Background="#B5101720"
+                                            BorderBrush="{Binding SeverityBrush}"
+                                            BorderThickness="1">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Title}"
+                                                       Foreground="White"
+                                                       FontFamily="Segoe UI Semibold"
+                                                       FontSize="11"
+                                                       TextWrapping="Wrap"/>
+                                            <TextBlock Text="{Binding Detail}"
+                                                       Style="{StaticResource HudCaption}"
+                                                       FontSize="9"
+                                                       TextWrapping="Wrap"
+                                                       Margin="0,3,0,0"/>
+                                            <TextBlock Text="{Binding ReferenceText}"
+                                                       Foreground="#FFFF76E8"
+                                                       FontFamily="Segoe UI Semibold"
+                                                       FontSize="10"
+                                                       TextWrapping="Wrap"
+                                                       Margin="0,5,0,0"
+                                                       Visibility="{Binding ReferenceVisibility}"/>
+                                            <TextBlock Text="{Binding SystemText}"
+                                                       Foreground="#FF71DCE0"
+                                                       FontSize="9"
+                                                       TextWrapping="Wrap"
+                                                       Margin="0,3,0,0"/>
+                                            <Button Content="Rejoindre"
+                                                    Tag="{Binding Key}"
+                                                    Style="{StaticResource GlassButton}"
+                                                    HorizontalAlignment="Left"
+                                                    Padding="9,4"
+                                                    Margin="0,6,0,0"
+                                                    IsEnabled="{Binding CanNavigate}"
+                                                    Click="MepDiagnosticNavigateButton_Click"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
+                </Grid>
+
+                <Grid x:Name="MepAdvancedFooter"
+                      Grid.Row="3"
+                      Visibility="Collapsed"
+                      Margin="0,12,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
                     <TextBlock x:Name="MepDiagnosticsText"
                                Style="{StaticResource HudCaption}"
                                TextWrapping="Wrap"
                                VerticalAlignment="Center"
-                               Margin="0,0,8,0"/>
-                    <Button Grid.Column="1"
-                            Style="{StaticResource GlassButton}"
-                            Content="Réinitialiser"
-                            Padding="9,5"
-                            Click="MepResetButton_Click"/>
+                               Margin="0,0,0,7"/>
+                    <StackPanel Grid.Row="1"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Right">
+                        <Button x:Name="MepUndoButton"
+                                Style="{StaticResource GlassButton}"
+                                Content="Annuler"
+                                Padding="8,5"
+                                Margin="0,0,5,0"
+                                Click="MepUndoButton_Click"/>
+                        <Button x:Name="MepRedoButton"
+                                Style="{StaticResource GlassButton}"
+                                Content="Rétablir"
+                                Padding="8,5"
+                                Margin="0,0,5,0"
+                                Click="MepRedoButton_Click"/>
+                    </StackPanel>
+                    <WrapPanel Grid.Row="2"
+                               HorizontalAlignment="Right"
+                               Margin="0,6,0,0">
+                        <TextBlock Text="Réinitialiser :"
+                                   Style="{StaticResource HudCaption}"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,6,0"/>
+                        <Button Style="{StaticResource GlassButton}"
+                                Content="Vannes"
+                                Padding="8,5"
+                                Margin="0,0,5,0"
+                                Click="MepResetValvesButton_Click"/>
+                        <Button Style="{StaticResource GlassButton}"
+                                Content="Sources / sens"
+                                Padding="8,5"
+                                Margin="0,0,5,0"
+                                Click="MepResetSourcesButton_Click"/>
+                        <Button Style="{StaticResource GlassButton}"
+                                Content="Tout"
+                                Padding="8,5"
+                                Click="MepResetButton_Click"/>
+                    </WrapPanel>
                 </Grid>
             </Grid>
         </Border>
@@ -392,14 +576,14 @@
         <Border x:Name="ObjectInfoPanel"
                 Grid.Column="1"
                 Visibility="Collapsed"
-                Width="330"
+                Width="318"
                 HorizontalAlignment="Right"
                 VerticalAlignment="Stretch"
-                Margin="12"
-                Padding="14"
-                CornerRadius="9"
-                Background="#F117202B"
-                BorderBrush="#8878C9FF"
+                Margin="8"
+                Padding="12"
+                CornerRadius="14"
+                Background="{StaticResource GameSurface}"
+                BorderBrush="{StaticResource GameBrand}"
                 BorderThickness="1"
                 IsHitTestVisible="True">
             <Grid>
@@ -416,10 +600,10 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="SÉLECTIONS REVIT"
-                                   Foreground="#FF78C9FF"
+                        <TextBlock Text="ÉLÉMENTS INSPECTÉS"
+                                   Foreground="#FF7CC8A3"
                                    FontFamily="Segoe UI Semibold"
-                                   FontSize="11"/>
+                                   FontSize="12"/>
                         <TextBlock x:Name="SelectedElementCountText"
                                    Text="0 élément"
                                    Style="{StaticResource HudCaption}"
@@ -427,7 +611,7 @@
                     </StackPanel>
                     <Button Grid.Column="1"
                             Style="{StaticResource GlassButton}"
-                            Content="←  Retour au jeu"
+                            Content="Retour"
                             Padding="10,6"
                             Click="CloseSelectionPanelButton_Click"/>
                 </Grid>
@@ -438,8 +622,12 @@
                         Background="#557B91AA"/>
 
                 <Grid Grid.Row="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
                     <TextBlock x:Name="EmptySelectionHistoryText"
-                               Text="Les éléments inspectés apparaîtront ici."
+                               Text="Pointe un objet puis effectue un clic gauche."
                                Style="{StaticResource HudCaption}"
                                TextWrapping="Wrap"
                                HorizontalAlignment="Center"
@@ -447,6 +635,7 @@
                                Margin="20"
                                Visibility="Collapsed"/>
                     <ListBox x:Name="SelectedElementsList"
+                             Grid.Row="0"
                              Background="Transparent"
                              BorderThickness="0"
                              Padding="0"
@@ -476,9 +665,9 @@
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Border Padding="11,10"
-                                        CornerRadius="7"
-                                        Background="#B5101720"
-                                        BorderBrush="#557B91AA"
+                                        CornerRadius="10"
+                                        Background="#CC14211C"
+                                        BorderBrush="{StaticResource GameBorder}"
                                         BorderThickness="1">
                                     <StackPanel>
                                         <Grid>
@@ -492,40 +681,43 @@
                                                        FontSize="14"
                                                        TextWrapping="Wrap"
                                                        Margin="0,0,8,0"/>
-                                            <Border Grid.Column="1"
-                                                    Padding="6,2"
-                                                    VerticalAlignment="Top"
-                                                    CornerRadius="4"
-                                                    Background="#3325BEEA">
-                                                <TextBlock Text="{Binding IdText}"
-                                                           Foreground="#FF8EDFFF"
+                                             <Border Grid.Column="1"
+                                                     Padding="6,2"
+                                                     VerticalAlignment="Top"
+                                                     CornerRadius="5"
+                                                     Background="{StaticResource GameBrandSoft}">
+                                                 <TextBlock Text="{Binding IdText}"
+                                                            Foreground="#FF9EE0C3"
                                                            FontFamily="Consolas"
                                                            FontSize="10"/>
                                             </Border>
                                         </Grid>
-                                        <TextBlock Text="{Binding CategoryText}"
-                                                   Style="{StaticResource HudCaption}"
-                                                   TextWrapping="Wrap"
-                                                   Margin="0,7,0,0"/>
-                                        <TextBlock Text="{Binding TypeText}"
-                                                   Style="{StaticResource HudCaption}"
-                                                   TextWrapping="Wrap"
-                                                   Margin="0,3,0,0"/>
-                                        <TextBlock Text="{Binding LevelText}"
-                                                   Style="{StaticResource HudCaption}"
-                                                   TextWrapping="Wrap"
-                                                   Margin="0,3,0,0"/>
-                                        <TextBlock Text="{Binding ModelText}"
-                                                   Foreground="#7F95AE"
-                                                   FontFamily="Segoe UI"
-                                                   FontSize="10"
-                                                   TextWrapping="Wrap"
-                                                   Margin="0,6,0,0"/>
+                                        <Expander Header="Informations Revit"
+                                                  Style="{StaticResource CompactExpander}">
+                                            <StackPanel Margin="4,4,0,2">
+                                                <TextBlock Text="{Binding CategoryText}"
+                                                           Style="{StaticResource HudCaption}"
+                                                           TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding TypeText}"
+                                                           Style="{StaticResource HudCaption}"
+                                                           TextWrapping="Wrap"
+                                                           Margin="0,3,0,0"/>
+                                                <TextBlock Text="{Binding LevelText}"
+                                                           Style="{StaticResource HudCaption}"
+                                                           TextWrapping="Wrap"
+                                                           Margin="0,3,0,0"/>
+                                                <TextBlock Text="{Binding ModelText}"
+                                                           Style="{StaticResource HudCaption}"
+                                                           FontSize="10"
+                                                           TextWrapping="Wrap"
+                                                           Margin="0,3,0,0"/>
+                                            </StackPanel>
+                                        </Expander>
                                         <StackPanel Visibility="{Binding MepVisibility}"
                                                     Margin="0,8,0,0">
                                             <Border Height="1" Background="#445E748D" Margin="0,0,0,7"/>
-                                            <TextBlock Text="{Binding SystemText}"
-                                                       Foreground="#FF71DCE0"
+                                             <TextBlock Text="{Binding SystemText}"
+                                                        Foreground="#FF7CC8A3"
                                                        FontFamily="Segoe UI Semibold"
                                                        FontSize="10"
                                                        TextWrapping="Wrap"/>
@@ -533,71 +725,269 @@
                                                        Style="{StaticResource HudCaption}"
                                                        TextWrapping="Wrap"
                                                        Margin="0,3,0,0"/>
+                                            <Button Content="{Binding ValveActionText}"
+                                                    Tag="{Binding UniqueKey}"
+                                                    Style="{StaticResource PrimaryGameButton}"
+                                                    Margin="0,9,0,1"
+                                                    Visibility="{Binding ValveActionVisibility}"
+                                                    Click="ValveActionButton_Click"/>
+                                            <Expander Header="Comprendre et suivre le réseau"
+                                                      Style="{StaticResource CompactExpander}">
+                                                <StackPanel Margin="0,2,0,3">
+                                            <Border Background="#71101824"
+                                                    BorderBrush="{Binding DirectionQualityBrush}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="5"
+                                                    Padding="8,7"
+                                                    Margin="0,7,0,0"
+                                                    Visibility="{Binding DirectionExplanationVisibility}">
+                                                <StackPanel>
+                                                    <TextBlock Text="Pourquoi ce sens ?"
+                                                               Foreground="White"
+                                                               FontFamily="Segoe UI Semibold"
+                                                               FontSize="11"/>
+                                                    <TextBlock Text="{Binding DirectionQualityText}"
+                                                               Foreground="{Binding DirectionQualityBrush}"
+                                                               FontFamily="Segoe UI Semibold"
+                                                               FontSize="10"
+                                                               Margin="0,3,0,0"/>
+                                                    <TextBlock Text="{Binding DirectionExplanationText}"
+                                                               Style="{StaticResource HudCaption}"
+                                                               TextWrapping="Wrap"
+                                                               Margin="0,5,0,0"/>
+                                                </StackPanel>
+                                            </Border>
+                                            <Border Background="#61101824"
+                                                    BorderBrush="#5578C9FF"
+                                                    BorderThickness="1"
+                                                    CornerRadius="5"
+                                                    Padding="8,7"
+                                                    Margin="0,7,0,0"
+                                                    Visibility="{Binding NetworkTraceVisibility}">
+                                                <StackPanel>
+                                                    <TextBlock Text="SUIVRE LE RÉSEAU"
+                                                               Foreground="#FF78C9FF"
+                                                               FontFamily="Segoe UI Semibold"
+                                                               FontSize="10"/>
+                                                    <TextBlock Text="{Binding NetworkTraceStatusText}"
+                                                               Style="{StaticResource HudCaption}"
+                                                               TextWrapping="Wrap"
+                                                               Margin="0,4,0,0"
+                                                               Visibility="{Binding NetworkTraceStatusVisibility}"/>
+                                                    <Button Content="Suivre vers la source"
+                                                            Tag="{Binding UniqueKey}"
+                                                            Style="{StaticResource GlassButton}"
+                                                            Margin="0,6,0,0"
+                                                            Click="TraceUpstreamButton_Click"/>
+                                                    <Button Content="Suivre vers l’aval"
+                                                            Tag="{Binding UniqueKey}"
+                                                            Style="{StaticResource GlassButton}"
+                                                            Margin="0,5,0,0"
+                                                            Click="TraceDownstreamButton_Click"/>
+                                                    <Button Content="Afficher la branche complète"
+                                                            Tag="{Binding UniqueKey}"
+                                                            Style="{StaticResource GlassButton}"
+                                                            Margin="0,5,0,0"
+                                                            Click="TraceFullBranchButton_Click"/>
+                                                    <StackPanel Margin="0,7,0,0"
+                                                                Visibility="{Binding NetworkTraceBranchesVisibility}">
+                                                        <TextBlock Text="Choisir une branche aval :"
+                                                                   Style="{StaticResource HudCaption}"
+                                                                   Margin="0,0,0,3"/>
+                                                        <ItemsControl ItemsSource="{Binding NetworkTraceBranches}">
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <Button Content="{Binding ActionText}"
+                                                                            Tag="{Binding}"
+                                                                            Style="{StaticResource GlassButton}"
+                                                                            Margin="0,3,0,0"
+                                                                            Click="TraceBranchButton_Click"/>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </StackPanel>
+                                                    <Button Content="Quitter le suivi"
+                                                            Style="{StaticResource GlassButton}"
+                                                            Margin="0,7,0,0"
+                                                            Visibility="{Binding NetworkTraceExitVisibility}"
+                                                            Click="ExitNetworkTraceButton_Click"/>
+                                                </StackPanel>
+                                            </Border>
+                                            <Button Content="{Binding ReverseDirectionActionText}"
+                                                    Tag="{Binding UniqueKey}"
+                                                    Style="{StaticResource GlassButton}"
+                                                    Margin="0,7,0,0"
+                                                    Visibility="{Binding ReverseDirectionVisibility}"
+                                                    Click="ReverseElementDirectionButton_Click"/>
+                                            <Button Content="{Binding SystemIsolationActionText}"
+                                                    Tag="{Binding UniqueKey}"
+                                                    Style="{StaticResource GlassButton}"
+                                                    Margin="0,5,0,0"
+                                                    Visibility="{Binding SystemIsolationVisibility}"
+                                                    Click="IsolateElementSystemButton_Click"/>
+                                            <Button Content="Réinitialiser ce système"
+                                                    Tag="{Binding UniqueKey}"
+                                                    Style="{StaticResource GlassButton}"
+                                                    Margin="0,5,0,0"
+                                                    Visibility="{Binding SystemIsolationVisibility}"
+                                                    Click="ResetElementSystemButton_Click"/>
+                                                </StackPanel>
+                                            </Expander>
+                                            <TextBlock Text="ACTIONS RAPIDES"
+                                                       Style="{StaticResource SectionLabel}"
+                                                       Margin="0,8,0,2"/>
                                             <TextBlock Text="{Binding ValveText}"
                                                        Style="{StaticResource HudCaption}"
                                                        TextWrapping="Wrap"
                                                        Margin="0,3,0,0"
                                                        Visibility="{Binding ValveOverrideVisibility}"/>
-                                            <Button Content="{Binding ValveActionText}"
-                                                    Tag="{Binding UniqueKey}"
-                                                    Style="{StaticResource GlassButton}"
-                                                    Margin="0,8,0,0"
-                                                    Visibility="{Binding ValveActionVisibility}"
-                                                    Click="ValveActionButton_Click"/>
-                                            <Button Content="{Binding ValveOverrideActionText}"
+                                            <Button Content="{Binding CheckValveDirectionActionText}"
                                                     Tag="{Binding UniqueKey}"
                                                     Style="{StaticResource GlassButton}"
                                                     Margin="0,5,0,0"
-                                                    Visibility="{Binding ValveOverrideVisibility}"
-                                                    Click="ValveOverrideButton_Click"/>
+                                                    Visibility="{Binding CheckValveDirectionVisibility}"
+                                                    Click="CheckValveDirectionButton_Click"/>
                                             <Button Content="{Binding SourceActionText}"
                                                     Tag="{Binding UniqueKey}"
                                                     Style="{StaticResource GlassButton}"
                                                     Margin="0,5,0,0"
                                                     Visibility="{Binding SourceActionVisibility}"
                                                     Click="SourceOverrideButton_Click"/>
-                                            <Button Content="{Binding SourceForwardActionText}"
+                                            <Button Content="Retirer cette arrivée"
                                                     Tag="{Binding UniqueKey}"
                                                     Style="{StaticResource GlassButton}"
                                                     Margin="0,5,0,0"
-                                                    Visibility="{Binding SourceDirectionVisibility}"
-                                                    Click="SourceForwardButton_Click"/>
-                                            <Button Content="{Binding SourceReverseActionText}"
+                                                    Visibility="{Binding SourceRemoveVisibility}"
+                                                    Click="RemoveSourceButton_Click"/>
+                                            <Button Content="{Binding SourcePickerActionText}"
                                                     Tag="{Binding UniqueKey}"
-                                                    Style="{StaticResource GlassButton}"
-                                                    Margin="0,5,0,0"
+                                                    Style="{StaticResource PrimaryGameButton}"
+                                                    Margin="0,8,0,0"
                                                     Visibility="{Binding SourceDirectionVisibility}"
-                                                    Click="SourceReverseButton_Click"/>
-                                            <Button Content="{Binding ReturnForwardActionText}"
+                                                    Click="BeginSourceDirectionPicker_Click"/>
+                                            <Button Content="{Binding ReturnPickerActionText}"
                                                     Tag="{Binding UniqueKey}"
-                                                    Style="{StaticResource GlassButton}"
+                                                    Style="{StaticResource PrimaryGameButton}"
                                                     Margin="0,8,0,0"
                                                     Visibility="{Binding ReturnDirectionVisibility}"
-                                                    Click="ReturnForwardButton_Click"/>
-                                            <Button Content="{Binding ReturnReverseActionText}"
+                                                    Click="BeginReturnDirectionPicker_Click"/>
+                                            <Button Content="Retirer ce retour"
                                                     Tag="{Binding UniqueKey}"
                                                     Style="{StaticResource GlassButton}"
                                                     Margin="0,5,0,0"
-                                                    Visibility="{Binding ReturnDirectionVisibility}"
-                                                    Click="ReturnReverseButton_Click"/>
-                                            <Button Content="{Binding ConstraintForwardActionText}"
-                                                    Tag="{Binding UniqueKey}"
-                                                    Style="{StaticResource GlassButton}"
-                                                    Margin="0,8,0,0"
-                                                    Visibility="{Binding ConstraintDirectionVisibility}"
-                                                    Click="ConstraintForwardButton_Click"/>
-                                            <Button Content="{Binding ConstraintReverseActionText}"
-                                                    Tag="{Binding UniqueKey}"
-                                                    Style="{StaticResource GlassButton}"
-                                                    Margin="0,5,0,0"
-                                                    Visibility="{Binding ConstraintDirectionVisibility}"
-                                                    Click="ConstraintReverseButton_Click"/>
+                                                    Visibility="{Binding ReturnRemoveVisibility}"
+                                                    Click="RemoveReturnButton_Click"/>
+                                            <Expander Header="Outils avancés"
+                                                      Style="{StaticResource CompactExpander}">
+                                                <StackPanel Margin="0,3,0,2">
+                                                    <Button Content="{Binding ValveOverrideActionText}"
+                                                            Tag="{Binding UniqueKey}"
+                                                            Style="{StaticResource GlassButton}"
+                                                            Visibility="{Binding ValveOverrideVisibility}"
+                                                            Click="ValveOverrideButton_Click"/>
+                                                    <Button Content="{Binding ConstraintForwardActionText}"
+                                                            Tag="{Binding UniqueKey}"
+                                                            Style="{StaticResource GlassButton}"
+                                                            Margin="0,5,0,0"
+                                                            Visibility="{Binding ConstraintDirectionVisibility}"
+                                                            Click="ConstraintForwardButton_Click"/>
+                                                    <Button Content="{Binding ConstraintReverseActionText}"
+                                                            Tag="{Binding UniqueKey}"
+                                                            Style="{StaticResource GlassButton}"
+                                                            Margin="0,5,0,0"
+                                                            Visibility="{Binding ConstraintDirectionVisibility}"
+                                                            Click="ConstraintReverseButton_Click"/>
+                                                </StackPanel>
+                                            </Expander>
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
+
+                    <Border x:Name="DirectionPickerPanel"
+                            Grid.Row="0"
+                            Visibility="Collapsed"
+                            Padding="14"
+                            CornerRadius="11"
+                            Background="#F517261F"
+                            BorderBrush="{StaticResource GameBrand}"
+                            BorderThickness="1">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock x:Name="DirectionPickerTitleText"
+                                       Text="Choisir le sens"
+                                       Foreground="White"
+                                       FontFamily="Segoe UI Semibold"
+                                       FontSize="15"/>
+                            <TextBlock Text="Les repères colorés sont affichés directement sur la canalisation. Survole un choix pour prévisualiser la flèche."
+                                       Style="{StaticResource HudCaption}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,7,0,12"/>
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Margin="0,0,3,0" Padding="9,7" CornerRadius="8"
+                                        Background="#3326D98C">
+                                    <TextBlock Text="A  •  VERT" Foreground="#FF71F0AE"
+                                               FontFamily="Segoe UI Semibold" HorizontalAlignment="Center"/>
+                                </Border>
+                                <Border Grid.Column="1" Margin="3,0,0,0" Padding="9,7" CornerRadius="8"
+                                        Background="#3333BEEA">
+                                    <TextBlock Text="B  •  BLEU" Foreground="#FF7DD8F7"
+                                               FontFamily="Segoe UI Semibold" HorizontalAlignment="Center"/>
+                                </Border>
+                            </Grid>
+                            <Button Content="A  →  B"
+                                    Style="{StaticResource PrimaryGameButton}"
+                                    MouseEnter="DirectionForwardButton_MouseEnter"
+                                    MouseLeave="DirectionChoiceButton_MouseLeave"
+                                    Click="DirectionForwardButton_Click"/>
+                            <Button Content="B  →  A"
+                                    Style="{StaticResource PrimaryGameButton}"
+                                    Margin="0,7,0,0"
+                                    MouseEnter="DirectionReverseButton_MouseEnter"
+                                    MouseLeave="DirectionChoiceButton_MouseLeave"
+                                    Click="DirectionReverseButton_Click"/>
+                            <Button Content="Annuler"
+                                    Style="{StaticResource GlassButton}"
+                                    Margin="0,12,0,0"
+                                    Click="CancelDirectionPickerButton_Click"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Expander x:Name="SelectedElementHistoryExpander"
+                              Grid.Row="1"
+                              Header="Historique (0)"
+                              Style="{StaticResource CompactExpander}"
+                              Margin="0,8,0,0">
+                        <ListBox x:Name="SelectedElementHistoryList"
+                                 MaxHeight="180"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 HorizontalContentAlignment="Stretch"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Tag="{Binding}"
+                                            Style="{StaticResource GlassButton}"
+                                            HorizontalContentAlignment="Stretch"
+                                            Margin="0,3,0,0"
+                                            Click="RestoreSelectionHistoryButton_Click">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Name}" Foreground="White"
+                                                       FontFamily="Segoe UI Semibold" TextWrapping="Wrap"/>
+                                            <TextBlock Text="{Binding CategoryText}"
+                                                       Style="{StaticResource HudCaption}"
+                                                       FontSize="9" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </Button>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Expander>
                 </Grid>
 
                 <Grid Grid.Row="3" Margin="0,10,0,0">
@@ -605,7 +995,7 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="Clic droit court pour ajouter"
+                    <TextBlock Text="Clic gauche : sélectionner / regarder  •  Clic droit : action vanne"
                                Style="{StaticResource HudCaption}"
                                VerticalAlignment="Center"/>
                     <Button x:Name="ClearSelectionHistoryButton"
@@ -623,54 +1013,59 @@
         <Border Grid.Row="0"
                 HorizontalAlignment="Stretch"
                 VerticalAlignment="Top"
-                Margin="8"
-                Padding="14,10"
-                CornerRadius="9"
-                Background="#B317202B"
-                BorderBrush="#557B91AA"
+                Margin="6"
+                Padding="9,7"
+                CornerRadius="12"
+                Background="{StaticResource GameSurface}"
+                BorderBrush="{StaticResource GameBorder}"
                 BorderThickness="1">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="18"/>
+                    <ColumnDefinition Width="12"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <Border Width="42" Height="42" CornerRadius="8" Background="#FF19A7CE">
+                <Border Width="34" Height="34" CornerRadius="9" Background="{StaticResource GameBrand}">
                     <Grid>
-                        <TextBlock Text="B" FontFamily="Segoe UI Black" FontSize="25"
+                        <TextBlock Text="B" FontFamily="Segoe UI Black" FontSize="20"
                                    Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        <Border Width="8" Height="8" CornerRadius="4" Background="#FFFFC857"
-                                HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,5,5,0"/>
+                        <Border Width="7" Height="7" CornerRadius="4" Background="{StaticResource GameAccent}"
+                                HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,4,4,0"/>
                     </Grid>
                 </Border>
 
                 <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                    <TextBlock Text="MAQUETTE JOUABLE" Foreground="White" FontFamily="Segoe UI Semibold"
-                               FontSize="15"/>
-                    <TextBlock x:Name="ViewNameText" Style="{StaticResource HudCaption}" Margin="0,2,0,0"/>
-                    <TextBlock x:Name="SceneStatsText" Style="{StaticResource HudCaption}" Margin="0,2,0,0"/>
+                    <TextBlock Text="MAQUETTE BIM" Foreground="White" FontFamily="Segoe UI Semibold"
+                               FontSize="13"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,1,0,0">
+                        <TextBlock x:Name="ViewNameText" Style="{StaticResource HudCaption}"/>
+                        <TextBlock x:Name="SceneStatsText" Style="{StaticResource HudCaption}" Margin="12,0,0,0"/>
+                    </StackPanel>
                 </StackPanel>
 
                 <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button x:Name="MepPanelButton"
-                            Style="{StaticResource GlassButton}"
-                            Content="Fluides MEP"
-                            Margin="0,0,18,0"
+                            Style="{StaticResource PrimaryGameButton}"
+                            Content="Fluides"
+                            Padding="14,7"
+                            Margin="0,0,6,0"
                             Click="MepPanelButton_Click"/>
-                    <StackPanel Margin="0,0,22,0">
-                        <TextBlock Text="MODE" Style="{StaticResource HudCaption}"/>
-                        <TextBlock x:Name="ModeText" Text="MARCHE" Style="{StaticResource HudValue}"/>
-                    </StackPanel>
-                    <StackPanel Margin="0,0,22,0">
-                        <TextBlock Text="VITESSE" Style="{StaticResource HudCaption}"/>
-                        <TextBlock x:Name="SpeedText" Text="0,0 m/s" Style="{StaticResource HudValue}"/>
-                    </StackPanel>
-                    <StackPanel Margin="0,0,22,0">
-                        <TextBlock Text="PERFORMANCE" Style="{StaticResource HudCaption}"/>
-                        <TextBlock x:Name="FpsText" Text="— FPS" Style="{StaticResource HudValue}"/>
-                    </StackPanel>
+                    <Button Style="{StaticResource GlassButton}"
+                            Content="Commandes"
+                            Margin="0,0,8,0"
+                            Click="ControlsHelpButton_Click"/>
+                    <Border Background="#9917241E" BorderBrush="{StaticResource GameBorder}"
+                            BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="0,0,8,0">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock x:Name="ModeText" Text="MARCHE" Style="{StaticResource HudValue}"/>
+                            <TextBlock Text="  •  " Style="{StaticResource HudCaption}"/>
+                            <TextBlock x:Name="SpeedText" Text="0,0 m/s" Style="{StaticResource HudValue}"/>
+                            <TextBlock Text="  •  " Style="{StaticResource HudCaption}"/>
+                            <TextBlock x:Name="FpsText" Text="— FPS" Style="{StaticResource HudValue}"/>
+                        </StackPanel>
+                    </Border>
                     <Button Style="{StaticResource GlassButton}" Content="Quitter  ×" Click="ExitButton_Click"/>
                 </StackPanel>
             </Grid>
@@ -679,38 +1074,37 @@
         <!-- Commandes -->
         <Border x:Name="ControlsHud"
                 Grid.Row="2"
+                Visibility="Collapsed"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
                 Margin="8"
                 Padding="14,9"
-                CornerRadius="9"
-                Background="#B317202B"
-                BorderBrush="#557B91AA"
+                CornerRadius="12"
+                Background="{StaticResource GameSurface}"
+                BorderBrush="{StaticResource GameBorder}"
                 BorderThickness="1"
                 IsHitTestVisible="False">
             <Border.CacheMode>
                 <BitmapCache RenderAtScale="1"/>
             </Border.CacheMode>
-            <StackPanel Orientation="Horizontal">
+            <WrapPanel HorizontalAlignment="Center">
                 <TextBlock Text="ZQSD / WASD" Style="{StaticResource HudValue}"/>
                 <TextBlock Text="  se déplacer   •   " Style="{StaticResource HudCaption}"/>
                 <TextBlock Text="ESPACE" Style="{StaticResource HudValue}"/>
                 <TextBlock Text="  sauter   •   " Style="{StaticResource HudCaption}"/>
                 <TextBlock Text="MAJ" Style="{StaticResource HudValue}"/>
-                <TextBlock Text="  courir   •   " Style="{StaticResource HudCaption}"/>
+                <TextBlock Text="  courir / descendre en vol   •   " Style="{StaticResource HudCaption}"/>
                 <TextBlock Text="CTRL" Style="{StaticResource HudValue}"/>
                 <TextBlock Text="  s’accroupir   •   " Style="{StaticResource HudCaption}"/>
                 <TextBlock Text="F" Style="{StaticResource HudValue}"/>
                 <TextBlock Text="  voler   •   " Style="{StaticResource HudCaption}"/>
                 <TextBlock Text="E" Style="{StaticResource HudValue}"/>
                 <TextBlock Text="  ouvrir / fermer une porte   •   " Style="{StaticResource HudCaption}"/>
-                <TextBlock Text="M" Style="{StaticResource HudValue}"/>
-                <TextBlock Text="  mini-carte   •   " Style="{StaticResource HudCaption}"/>
                 <TextBlock Text="P" Style="{StaticResource HudValue}"/>
                 <TextBlock Text="  fluides MEP   •   " Style="{StaticResource HudCaption}"/>
                 <TextBlock Text="R" Style="{StaticResource HudValue}"/>
                 <TextBlock Text="  réapparaître" Style="{StaticResource HudCaption}"/>
-            </StackPanel>
+            </WrapPanel>
         </Border>
 
         <Border x:Name="ToastBorder"
@@ -722,8 +1116,8 @@
                 Margin="0,18,0,0"
                 Padding="16,8"
                 CornerRadius="7"
-                Background="#DF15202C"
-                BorderBrush="#8878C9FF"
+                Background="{StaticResource GameSurfaceRaised}"
+                BorderBrush="{StaticResource GameBrand}"
                 BorderThickness="1"
                 IsHitTestVisible="False">
             <TextBlock x:Name="ToastText" Foreground="White" FontFamily="Segoe UI Semibold" FontSize="12"/>
@@ -736,13 +1130,13 @@
         <Border x:Name="LoadingGate"
                 Grid.Row="0"
                 Panel.ZIndex="100"
-                Background="#F2131922">
+                Background="#FA0B1310">
             <Grid>
                 <StackPanel Width="460"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center">
                     <Border Width="64" Height="64" CornerRadius="14"
-                            Background="#FF19A7CE"
+                            Background="{StaticResource GameBrand}"
                             HorizontalAlignment="Center">
                         <TextBlock Text="B"
                                    Foreground="White"
@@ -753,7 +1147,7 @@
                     </Border>
 
                     <TextBlock x:Name="LoadingTitleText"
-                               Text="PRÉPARATION DE LA MAQUETTE JOUABLE"
+                               Text="PRÉPARATION DE LA MAQUETTE BIM"
                                Foreground="White"
                                FontFamily="Segoe UI Semibold"
                                FontSize="17"
@@ -773,8 +1167,8 @@
                                  IsIndeterminate="True"
                                  Height="5"
                                  Margin="44,20"
-                                 Foreground="#FF19A7CE"
-                                 Background="#FF2A3442"
+                                 Foreground="{StaticResource GameBrand}"
+                                 Background="#FF23312B"
                                  BorderThickness="0"/>
 
                     <TextBlock x:Name="LoadingMetricsText"

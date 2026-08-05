@@ -41,8 +41,26 @@
     <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameMepData.cs">
       <Link>GameMepData.cs</Link>
     </Compile>
+    <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameMepDirectionExplanation.cs">
+      <Link>GameMepDirectionExplanation.cs</Link>
+    </Compile>
+    <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameMepNetworkTrace.cs">
+      <Link>GameMepNetworkTrace.cs</Link>
+    </Compile>
+    <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameMepDiagnostics.cs">
+      <Link>GameMepDiagnostics.cs</Link>
+    </Compile>
     <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameMepScenarioStore.cs">
       <Link>GameMepScenarioStore.cs</Link>
+    </Compile>
+    <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameMepScenarioHistory.cs">
+      <Link>GameMepScenarioHistory.cs</Link>
+    </Compile>
+    <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameSceneData.cs">
+      <Link>GameSceneData.cs</Link>
+    </Compile>
+    <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameSelectionIndex.cs">
+      <Link>GameSelectionIndex.cs</Link>
     </Compile>
     <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameRuntimeDiagnostics.cs">
       <Link>GameRuntimeDiagnostics.cs</Link>

@@ -26,14 +26,14 @@ namespace BIMaestro.VideoGames
 
             if (document == null)
             {
-                TaskDialog.Show("Maquette jouable", "Ouvrez d'abord une maquette Revit.");
+                TaskDialog.Show("Maquette BIM", "Ouvrez d'abord une maquette Revit.");
                 return Result.Cancelled;
             }
 
             if (!(document.ActiveView is View3D view3D) || view3D.IsTemplate)
             {
                 TaskDialog.Show(
-                    "Maquette jouable",
+                    "Maquette BIM",
                     "Affichez la vue 3D que vous voulez explorer, puis relancez le bouton.\n\n" +
                     "BIMaestro reprend exactement la visibilité, la boîte de coupe et les couleurs de cette vue.");
                 return Result.Cancelled;
@@ -46,7 +46,7 @@ namespace BIMaestro.VideoGames
                 if (scene.TriangleCount == 0)
                 {
                     TaskDialog.Show(
-                        "Maquette jouable",
+                        "Maquette BIM",
                         "Aucune géométrie 3D visible n'a été trouvée dans la vue active.");
                     return Result.Cancelled;
                 }
@@ -58,7 +58,7 @@ namespace BIMaestro.VideoGames
             {
                 message = exception.Message;
                 TaskDialog.Show(
-                    "Maquette jouable",
+                    "Maquette BIM",
                     "La conversion de la vue 3D n'a pas pu être terminée.\n\n" + exception.Message);
                 return Result.Failed;
             }

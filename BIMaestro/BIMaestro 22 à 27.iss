@@ -19,15 +19,10 @@ Compression=lzma
 SolidCompression=yes
 
 [Files]
-; Les binaires sont isolés par génération d'API Revit. Les dépendances sont
-; également dupliquées afin que le chargeur .NET ne mélange jamais les deux
-; contextes d'assembly.
+; Version de test : le module de base compilé avec l'API Revit 2023 est utilisé
+; pour toutes les versions de Revit ciblées.
 Source: "bin\Release\*.*"; \
-  DestDir: "{localappdata}\BIMaestro\Bin\2023"; \
-  Flags: ignoreversion recursesubdirs createallsubdirs; \
-  Excludes: "*.pdb"
-Source: "bin\Release2024\*.*"; \
-  DestDir: "{localappdata}\BIMaestro\Bin\2024"; \
+  DestDir: "{localappdata}\BIMaestro\Bin"; \
   Flags: ignoreversion recursesubdirs createallsubdirs; \
   Excludes: "*.pdb"
 
@@ -57,7 +52,7 @@ end;
 // -----------------------------------------------------------------
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  AddinsRoot, BinFolder, VersionBinFolder, Xml: String;
+  AddinsRoot, BinFolder, Xml: String;
   Versions: array[1..6] of String;
   i: Integer;
   ManifestPath: String;
@@ -78,12 +73,7 @@ begin
 
     for i := Low(Versions) to High(Versions) do
     begin
-      if (Versions[i] = '2022') or (Versions[i] = '2023') then
-        VersionBinFolder := BinFolder + '\2023'
-      else
-        VersionBinFolder := BinFolder + '\2024';
-
-      Xml := BuildXml(VersionBinFolder);
+      Xml := BuildXml(BinFolder);
       ForceDirectories(AddinsRoot + '\' + Versions[i]);
       ManifestPath := AddinsRoot + '\' + Versions[i] + '\BIMaestro.addin';
       SaveStringToFile(ManifestPath, Xml, False);

@@ -155,7 +155,11 @@ namespace BIMaestro.VideoGames
                     primarySystem.ElementCount++;
                 }
 
-                GameMepValveData? valve = DetectValve(element, elementData, connectors.Count);
+                GameMepValveData? valve = DetectValve(
+                    element,
+                    elementData,
+                    connectors.Count,
+                    graph);
                 if (valve != null)
                     graph.Valves.Add(valve);
 
@@ -391,7 +395,8 @@ namespace BIMaestro.VideoGames
         private static GameMepValveData? DetectValve(
             Element element,
             GameMepElementData data,
-            int connectorCount)
+            int connectorCount,
+            GameMepGraphData graph)
         {
             int score = 0;
             var reasons = new List<string>();
@@ -418,10 +423,51 @@ namespace BIMaestro.VideoGames
             string searchable = (data.Name + " " + data.TypeName + " " +
                 SafeText(() => (element as FamilyInstance)?.Symbol?.FamilyName))
                 .ToLowerInvariant();
+            bool checkValve = connectorCount == 2 && ContainsAny(
+                searchable + " " + partType.ToLowerInvariant(),
+                "clapet", "anti-retour", "anti retour", "check valve",
+                "non-return", "non return", "nonreturn", " nrv");
+            if (checkValve)
+            {
+                int entry = data.ConnectorIndices.Where(index =>
+                        index >= 0 && index < graph.Connectors.Count &&
+                        string.Equals(
+                            graph.Connectors[index].FlowDirection,
+                            "In",
+                            StringComparison.OrdinalIgnoreCase))
+                    .DefaultIfEmpty(-1)
+                    .First();
+                int exit = data.ConnectorIndices.Where(index =>
+                        index >= 0 && index < graph.Connectors.Count &&
+                        string.Equals(
+                            graph.Connectors[index].FlowDirection,
+                            "Out",
+                            StringComparison.OrdinalIgnoreCase))
+                    .DefaultIfEmpty(-1)
+                    .First();
+                bool hasDirection = entry >= 0 && exit >= 0 && entry != exit;
+                return new GameMepValveData
+                {
+                    ElementKey = data.Key,
+                    Kind = GameMepFlowControlKind.CheckValve,
+                    Confidence = hasDirection
+                        ? GameMepConfidence.High
+                        : GameMepConfidence.Medium,
+                    DetectionReason = hasDirection
+                        ? "clapet anti-retour, sens lu dans les connecteurs Revit"
+                        : "clapet anti-retour, sens à confirmer",
+                    IsEnabledAsValve = true,
+                    InitiallyEnabledAsValve = true,
+                    EntryConnectorIndex = entry,
+                    ExitConnectorIndex = exit,
+                    InitiallyEntryConnectorIndex = entry,
+                    InitiallyExitConnectorIndex = exit
+                };
+            }
             if (ContainsAny(
                 searchable,
                 "vanne", "valve", "robinet", "papillon", "opercule",
-                "soupape", "clapet", "ball valve", "gate valve", "butterfly"))
+                "soupape", "ball valve", "gate valve", "butterfly"))
             {
                 score += 4;
                 reasons.Add("nom de famille/type");
@@ -439,6 +485,7 @@ namespace BIMaestro.VideoGames
             return new GameMepValveData
             {
                 ElementKey = data.Key,
+                Kind = GameMepFlowControlKind.IsolationValve,
                 Confidence = confidence,
                 DetectionReason = string.Join(", ", reasons),
                 IsEnabledAsValve = enabledAsValve,

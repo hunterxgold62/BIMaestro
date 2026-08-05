@@ -59,22 +59,22 @@ public class AppUI : IExternalApplication
             {
                 new RibbonItemDefinition(
                     "RevitGameCommand",
-                    "Maquette jouable",
+                    "Maquette BIM",
                     panel => AddPushButton(
                         panel,
                         "RevitGameCommand",
-                        "Maquette\njouable",
+                        "Maquette\nBIM",
                         assemblyPath,
                         "BIMaestro.VideoGames.RevitGameCommand",
                         "3D.jpg",
-                        "Transforme en un clic la vue 3D Revit active en terrain de jeu navigable.\r\n\r\n" +
+                        "Transforme en un clic la vue 3D Revit active en maquette BIM interactive.\r\n\r\n" +
                         "Fonctionnalités :\r\n" +
                         "- conserve les éléments visibles, la boîte de coupe et les couleurs de la vue,\r\n" +
                         "- déplacement à la première personne en ZQSD/WASD,\r\n" +
                         "- collisions avec les murs et équipements,\r\n" +
                         "- ouverture et fermeture des portes proches avec E,\r\n" +
-                        "- mini-carte locale en plan avec M,\r\n" +
-                        "- informations Revit par clic droit court sur un objet,\r\n" +
+                        "- informations Revit par clic gauche court sur un objet,\r\n" +
+                        "- ouverture ou fermeture contextuelle des vannes par clic droit,\r\n" +
                         "- accroupissement avec Ctrl pour inspecter les zones basses,\r\n" +
                         "- montée automatique des escaliers et rampes,\r\n" +
                         "- saut, course, gravité et mode vol libre.\r\n\r\n" +
