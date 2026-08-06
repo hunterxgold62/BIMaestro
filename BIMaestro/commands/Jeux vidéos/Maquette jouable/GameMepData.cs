@@ -850,7 +850,8 @@ namespace BIMaestro.VideoGames
             // Sans couple arrivée/retour, conserver le comportement historique :
             // le moteur ne doit pas faire disparaître tous les flux d'un ancien
             // scénario qui ne possède encore que des arrivées.
-            if (inletSeeds.Count == 0 || outletSeeds.Count == 0)
+            if ((inletSeeds.Count == 0 && explicitOutletSeeds.Count == 0) ||
+                outletSeeds.Count == 0)
             {
                 foreach (GameMepPathData path in _graph.Elements.SelectMany(item => item.Paths))
                 {
@@ -880,6 +881,7 @@ namespace BIMaestro.VideoGames
             var componentHasInlet = new List<bool>();
             var componentHasOutlet = new List<bool>();
             var componentHasExplicitOutlet = new List<bool>();
+            var componentIsReturnOnly = new List<bool>();
             int componentIndex = 0;
             for (int seed = 0; seed < connectorCount; seed++)
             {
@@ -914,7 +916,26 @@ namespace BIMaestro.VideoGames
                 componentHasInlet.Add(hasInlet);
                 componentHasOutlet.Add(hasOutlet);
                 componentHasExplicitOutlet.Add(hasExplicitOutlet);
+                componentIsReturnOnly.Add(hasExplicitOutlet && !hasInlet);
                 componentIndex++;
+            }
+
+            // Dans un système Revit de retour distinct, les extrémités
+            // ouvertes jouent le rôle des points d'entrée implicites et le
+            // retour choisi reste la sortie. On obtient ainsi un vrai trajet
+            // complet au lieu d'animer arbitrairement tout le composant.
+            for (int index = 0; index < connectorCount; index++)
+            {
+                int id = component[index];
+                if (id < 0 || !componentIsReturnOnly[id] ||
+                    explicitOutletSeeds.Contains(index) ||
+                    !outletSeeds.Contains(index))
+                {
+                    continue;
+                }
+                outletSeeds.Remove(index);
+                inletSeeds.Add(index);
+                componentHasInlet[id] = true;
             }
 
             bool IsRelevantConnector(int index)
@@ -925,15 +946,6 @@ namespace BIMaestro.VideoGames
                 return id >= 0 &&
                     ((componentHasInlet[id] && componentHasOutlet[id]) ||
                      componentHasExplicitOutlet[id]);
-            }
-
-            bool IsReturnOnlyConnector(int index)
-            {
-                if (index < 0 || index >= connectorCount)
-                    return false;
-                int id = component[index];
-                return id >= 0 && componentHasExplicitOutlet[id] &&
-                    !componentHasInlet[id];
             }
 
             // Élagage du graphe : toute feuille qui n'est ni une arrivée ni un
@@ -959,7 +971,6 @@ namespace BIMaestro.VideoGames
             for (int index = 0; index < connectorCount; index++)
             {
                 if (IsRelevantConnector(index) &&
-                    !IsReturnOnlyConnector(index) &&
                     !inletSeeds.Contains(index) && !outletSeeds.Contains(index) &&
                     degree[index] <= 1)
                 {
@@ -1121,21 +1132,21 @@ namespace BIMaestro.VideoGames
             {
                 foreach (GameMepPathData path in element.Paths)
                 {
+                    // Invariant de rendu : le corps d'une vanne d'isolement
+                    // fermée ne transporte jamais de particule, quel que soit
+                    // le type de condition aux limites autour d'elle.
+                    if (IsClosedIsolationValve(path.ElementKey))
+                    {
+                        path.HasCirculation = false;
+                        path.DirectionReason =
+                            "Vanne fermée : fluide stagnant";
+                        continue;
+                    }
+
                     if (path.FlowState != GameMepFlowState.Supplied ||
                         !IsRelevantConnector(path.StartConnector))
                     {
                         path.HasCirculation = false;
-                        continue;
-                    }
-
-                    // Sur un système de retour distinct, la sortie déclarée
-                    // par l'utilisateur est l'unique condition aux limites. Le
-                    // gradient aller/retour n'existe donc pas dans ce composant :
-                    // la portée vers le retour et le sens résolu suffisent.
-                    if (IsReturnOnlyConnector(path.StartConnector))
-                    {
-                        path.HasCirculation =
-                            path.DirectionState == GameMepDirectionState.Resolved;
                         continue;
                     }
 
@@ -1272,6 +1283,14 @@ namespace BIMaestro.VideoGames
             GameMepValveData? valve = _graph.FindValve(elementKey);
             return valve != null && valve.IsEnabledAsValve &&
                 !valve.IsClosed &&
+                valve.Kind == GameMepFlowControlKind.IsolationValve;
+        }
+
+        private bool IsClosedIsolationValve(string elementKey)
+        {
+            GameMepValveData? valve = _graph.FindValve(elementKey);
+            return valve != null && valve.IsEnabledAsValve &&
+                valve.IsClosed &&
                 valve.Kind == GameMepFlowControlKind.IsolationValve;
         }
 

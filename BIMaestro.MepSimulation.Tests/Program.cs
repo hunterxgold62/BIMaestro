@@ -402,8 +402,9 @@ namespace BIMaestro.VideoGames
             AssertState(fixture, "far-return", GameMepFlowState.Isolated);
             AssertState(fixture, "near-return", GameMepFlowState.Supplied);
             Assert(!fixture.Path("far-return").HasCirculation &&
-                fixture.Path("near-return").HasCirculation,
-                "A closed valve must isolate only the return branch located before it.");
+                !fixture.Path("return-valve").HasCirculation &&
+                !fixture.Path("near-return").HasCirculation,
+                "A closed valve must make both sides stagnant when it cuts the only return path.");
         }
 
         private static void ClosedValveDeadEndStaysPressurizedWithoutCirculation()
