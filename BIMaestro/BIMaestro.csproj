@@ -278,6 +278,7 @@
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameSceneData.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameSelectionIndex.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\RevitGameCommand.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\RevitGameCompatibility.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\RevitGameExportContext.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\RevitGameMepExtractor.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\RevitGameWindow.xaml.cs">

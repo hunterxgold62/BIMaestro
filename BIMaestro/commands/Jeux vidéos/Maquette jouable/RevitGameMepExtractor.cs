@@ -195,20 +195,31 @@ namespace BIMaestro.VideoGames
                 byId[element.Id.GetIdLongValue()] = element;
             }
 
-            BuiltInCategory[] categories =
+            // Ne pas créer ici un tableau BuiltInCategory à partir de constantes.
+            // Revit 2023 expose cette énumération sur 32 bits, tandis que Revit
+            // 2024+ la charge sur 64 bits. Un tableau préinitialisé dans une DLL
+            // compilée en 2023 provoque alors RuntimeHelpers.InitializeArray :
+            // « La valeur n'est pas comprise dans la plage attendue ».
+            // La résolution par nom construit chaque valeur avec le type exact
+            // fourni par la version de Revit qui héberge la DLL.
+            string[] categoryNames =
             {
-                BuiltInCategory.OST_PipeCurves,
-                BuiltInCategory.OST_FlexPipeCurves,
-                BuiltInCategory.OST_PipeFitting,
-                BuiltInCategory.OST_PipeAccessory,
-                BuiltInCategory.OST_MechanicalEquipment,
-                BuiltInCategory.OST_PlumbingFixtures,
-                BuiltInCategory.OST_Sprinklers
+                "OST_PipeCurves",
+                "OST_FlexPipeCurves",
+                "OST_PipeFitting",
+                "OST_PipeAccessory",
+                "OST_MechanicalEquipment",
+                "OST_PlumbingFixtures",
+                "OST_Sprinklers"
             };
-            foreach (BuiltInCategory category in categories)
+            foreach (string categoryName in categoryNames)
             {
                 try
                 {
+                    var category = (BuiltInCategory)Enum.Parse(
+                        typeof(BuiltInCategory),
+                        categoryName,
+                        false);
                     foreach (Element element in new FilteredElementCollector(document)
                         .OfCategory(category)
                         .WhereElementIsNotElementType())

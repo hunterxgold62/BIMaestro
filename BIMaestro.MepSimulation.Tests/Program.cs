@@ -27,6 +27,10 @@ namespace BIMaestro.VideoGames
                 MissingDirectionsDoNotBreakReachability();
                 DirectedPipeSourceSuppliesOnlyChosenSide();
                 ArrivalAndReturnStabilizeDirection();
+                OpenIsolationValveIsDirectionallyTransparent();
+                SourceOnlyNetworkKeepsDirectionAcrossOpenValve();
+                DifferentRevitSystemsDoNotExchangeDirection();
+                ReturnOnlySystemFlowsTowardDeclaredOutlet();
                 ClosedValveDeadEndStaysPressurizedWithoutCirculation();
                 UnmarkedOpenEndKeepsCirculation();
                 EqualOpposingArrivalsStayAmbiguous();
@@ -284,6 +288,122 @@ namespace BIMaestro.VideoGames
                 "The flow must travel from the arrival-side connector to the return-side connector.");
             Assert(path.DirectionReason.IndexOf("retour", StringComparison.OrdinalIgnoreCase) >= 0,
                 "The diagnostic must explain that the return helped resolve the direction.");
+        }
+
+        private static void OpenIsolationValveIsDirectionallyTransparent()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("arrival", 1, source: true);
+            fixture.AddElement("before", 2);
+            fixture.AddElement("open-valve", 2, valve: true);
+            fixture.AddElement("after", 2);
+            fixture.AddElement("return", 1);
+            fixture.Connect("arrival", 0, "before", 0);
+            fixture.Connect("before", 1, "open-valve", 0);
+            fixture.Connect("open-valve", 1, "after", 0);
+            fixture.Connect("after", 1, "return", 0);
+            fixture.AddBoundary("return", GameMepBoundaryKind.Outlet);
+
+            fixture.Calculate();
+
+            Assert(fixture.Path("before").FlowForward &&
+                fixture.Path("open-valve").FlowForward &&
+                fixture.Path("after").FlowForward,
+                "An open isolation valve must preserve the direction of its surrounding pipes.");
+            Assert(fixture.Path("open-valve").HasCirculation,
+                "An open isolation valve must display continuous circulation.");
+
+            bool directionBeforeSecondCalculation =
+                fixture.Path("open-valve").FlowForward;
+            fixture.Calculate();
+            Assert(fixture.Path("open-valve").FlowForward ==
+                directionBeforeSecondCalculation,
+                "Recalculation must never flip an open isolation valve.");
+        }
+
+        private static void SourceOnlyNetworkKeepsDirectionAcrossOpenValve()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("arrival", 1, source: true);
+            fixture.AddElement("before", 2);
+            fixture.AddElement("open-valve", 2, valve: true);
+            fixture.AddElement("after", 2);
+            fixture.Connect("arrival", 0, "before", 0);
+            fixture.Connect("before", 1, "open-valve", 0);
+            fixture.Connect("open-valve", 1, "after", 0);
+
+            fixture.Calculate();
+
+            Assert(fixture.Path("before").FlowForward &&
+                fixture.Path("open-valve").FlowForward &&
+                fixture.Path("after").FlowForward,
+                "Implicit open ends must not turn a source-only network back towards its arrival.");
+            Assert(new[] { "before", "open-valve", "after" }.All(key =>
+                    fixture.Path(key).DirectionReason.IndexOf(
+                        "potentiel entre", StringComparison.OrdinalIgnoreCase) < 0),
+                "An implicit outlet must never replace the direction propagated from the source.");
+        }
+
+        private static void DifferentRevitSystemsDoNotExchangeDirection()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("arrival-a", 1, source: true);
+            fixture.AddElement("pipe-a", 2);
+            fixture.AddElement("multi-system-equipment", 2);
+            fixture.AddElement("pipe-b", 2);
+            fixture.Connect("arrival-a", 0, "pipe-a", 0);
+            fixture.Connect("pipe-a", 1, "multi-system-equipment", 0);
+            fixture.Connect("multi-system-equipment", 1, "pipe-b", 0);
+            fixture.SetElementSystem("arrival-a", "system-a");
+            fixture.SetElementSystem("pipe-a", "system-a");
+            fixture.SetConnectorSystem("multi-system-equipment", 0, "system-a");
+            fixture.SetConnectorSystem("multi-system-equipment", 1, "system-b");
+            fixture.SetElementSystem("pipe-b", "system-b");
+
+            fixture.Calculate();
+
+            AssertState(fixture, "pipe-a", GameMepFlowState.Supplied);
+            AssertState(fixture, "pipe-b", GameMepFlowState.Unknown);
+            Assert(fixture.Path("pipe-a").FlowForward,
+                "System A must keep the direction propagated by its own source.");
+        }
+
+        private static void ReturnOnlySystemFlowsTowardDeclaredOutlet()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("far-return", 2);
+            fixture.AddElement("return-valve", 2, valve: true);
+            fixture.AddElement("near-return", 2);
+            fixture.AddElement("declared-return", 1);
+            fixture.Connect("far-return", 1, "return-valve", 0);
+            fixture.Connect("return-valve", 1, "near-return", 0);
+            fixture.Connect("near-return", 1, "declared-return", 0);
+            foreach (string key in new[]
+                { "far-return", "return-valve", "near-return", "declared-return" })
+            {
+                fixture.SetElementSystem(key, "return-system");
+            }
+            fixture.AddBoundary("declared-return", GameMepBoundaryKind.Outlet);
+
+            fixture.Calculate();
+
+            AssertState(fixture, "far-return", GameMepFlowState.Supplied);
+            Assert(fixture.Path("far-return").FlowForward &&
+                fixture.Path("return-valve").FlowForward &&
+                fixture.Path("near-return").FlowForward,
+                "A return-only system must point continuously toward its declared outlet.");
+            Assert(fixture.Path("far-return").HasCirculation &&
+                fixture.Path("near-return").HasCirculation,
+                "A declared return must animate its own Revit system without an inlet.");
+
+            fixture.CloseValve("return-valve");
+            fixture.Calculate();
+
+            AssertState(fixture, "far-return", GameMepFlowState.Isolated);
+            AssertState(fixture, "near-return", GameMepFlowState.Supplied);
+            Assert(!fixture.Path("far-return").HasCirculation &&
+                fixture.Path("near-return").HasCirculation,
+                "A closed valve must isolate only the return branch located before it.");
         }
 
         private static void ClosedValveDeadEndStaysPressurizedWithoutCirculation()
@@ -1792,6 +1912,21 @@ namespace BIMaestro.VideoGames
             {
                 GameMepElementData element = _elements[key];
                 Graph.Connectors[element.ConnectorIndices[port]].SystemKey = systemKey;
+            }
+
+            public void SetElementSystem(string key, string systemKey)
+            {
+                GameMepElementData element = _elements[key];
+                element.SystemKey = systemKey;
+                foreach (int connector in element.ConnectorIndices)
+                    Graph.Connectors[connector].SystemKey = systemKey;
+                foreach (GameMepPathData path in element.Paths)
+                    path.SystemKey = systemKey;
+                foreach (GameMepSourceData source in Graph.Sources.Where(item =>
+                    string.Equals(item.ElementKey, key, StringComparison.Ordinal)))
+                {
+                    source.SystemKey = systemKey;
+                }
             }
 
             public void SetDirectedSource(

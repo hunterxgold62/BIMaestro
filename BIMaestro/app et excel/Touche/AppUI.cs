@@ -64,9 +64,9 @@ public class AppUI : IExternalApplication
                         panel,
                         "RevitGameCommand",
                         "Maquette\nBIM",
-                        assemblyPath,
+                       assemblyPath,
                         "BIMaestro.VideoGames.RevitGameCommand",
-                        "3D.jpg",
+                       "3D.jpg",
                         "Transforme en un clic la vue 3D Revit active en maquette BIM interactive.\r\n\r\n" +
                         "Fonctionnalités :\r\n" +
                         "- conserve les éléments visibles, la boîte de coupe et les couleurs de la vue,\r\n" +

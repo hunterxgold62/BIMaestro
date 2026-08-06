@@ -42,6 +42,10 @@ namespace BIMaestro.VideoGames
             try
             {
                 Mouse.OverrideCursor = Cursors.Wait;
+                // Une seule DLL, compilée avec l'API Revit 2023, est utilisée.
+                // Cette détection initialise les adaptations et le diagnostic
+                // propres à Maquette BIM sans modifier les autres commandes.
+                RevitGameCompatibility.Detect(application);
                 GameSceneData scene = RevitGameSceneExporter.Export(document, view3D);
                 if (scene.TriangleCount == 0)
                 {

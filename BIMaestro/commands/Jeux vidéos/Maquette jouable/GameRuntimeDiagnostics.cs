@@ -9,6 +9,13 @@ namespace BIMaestro.VideoGames
     internal static class GameRuntimeDiagnostics
     {
         private static readonly object SyncRoot = new object();
+        private static int _revitMajorVersion = 2023;
+
+        public static void ConfigureRevitVersion(int majorVersion)
+        {
+            if (majorVersion >= 2000 && majorVersion <= 9999)
+                _revitMajorVersion = majorVersion;
+        }
 
         public static void Write(string phase, Exception exception = null)
         {
@@ -19,7 +26,9 @@ namespace BIMaestro.VideoGames
                     "BIMaestro",
                     "Logs");
                 Directory.CreateDirectory(directory);
-                string path = Path.Combine(directory, "MaquetteJouable-Revit2023.log");
+                string path = Path.Combine(
+                    directory,
+                    "MaquetteBIM-Revit" + _revitMajorVersion + ".log");
                 var line = new StringBuilder()
                     .Append(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff"))
                     .Append(" | PID ")
