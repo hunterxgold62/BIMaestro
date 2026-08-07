@@ -2914,7 +2914,6 @@ namespace Analyse
             ElementHistoryEvent historyEvent)
         {
             if (historyEvent == null) return;
-            LatestElementHistoryIndex.Observe(historyEvent);
             Queue.Enqueue(historyEvent);
         }
 
