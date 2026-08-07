@@ -2,6 +2,8 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -10,6 +12,51 @@ using System.Windows.Media.Animation;
 
 namespace Couleur
 {
+    public sealed class ProjectBrowserCategoryColorRule :
+        INotifyPropertyChanged
+    {
+        private string _categoryName = string.Empty;
+        private Color _color = Color.FromRgb(209, 250, 229);
+
+        public string CategoryName
+        {
+            get => _categoryName;
+            set
+            {
+                string safeValue = value ?? string.Empty;
+                if (_categoryName == safeValue) return;
+                _categoryName = safeValue;
+                PropertyChanged?.Invoke(
+                    this,
+                    new PropertyChangedEventArgs(nameof(CategoryName)));
+            }
+        }
+
+        public Color Color
+        {
+            get => _color;
+            set
+            {
+                if (_color == value) return;
+                _color = value;
+                PropertyChanged?.Invoke(
+                    this,
+                    new PropertyChangedEventArgs(nameof(Color)));
+            }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        public ProjectBrowserCategoryColorRule Clone()
+        {
+            return new ProjectBrowserCategoryColorRule
+            {
+                CategoryName = CategoryName,
+                Color = Color
+            };
+        }
+    }
+
     public enum RibbonGradientDirection
     {
         Horizontal,
@@ -1672,6 +1719,16 @@ namespace Couleur
         private bool _isSheetViewSearchEnabled;
         private bool _isActiveViewParentHighlightEnabled;
         private Color _activeViewParentColor;
+        private bool _isViewTypeColoringEnabled;
+        private bool _isViewTypeParentColoringEnabled;
+        private bool _isCategoryColoringEnabled;
+        private string _viewColorTarget;
+        private Color _planViewColor;
+        private Color _sectionViewColor;
+        private Color _threeDViewColor;
+        private Color _elevationViewColor;
+        private Color _scheduleViewColor;
+        private Color _otherViewColor;
 
         public bool IsEnabled
         {
@@ -1721,6 +1778,77 @@ namespace Couleur
             set => SetField(ref _activeViewParentColor, value);
         }
 
+        public bool IsViewTypeColoringEnabled
+        {
+            get => _isViewTypeColoringEnabled;
+            set => SetField(ref _isViewTypeColoringEnabled, value);
+        }
+
+        public bool IsViewTypeParentColoringEnabled
+        {
+            get => _isViewTypeParentColoringEnabled;
+            set => SetField(ref _isViewTypeParentColoringEnabled, value);
+        }
+
+        public bool IsCategoryColoringEnabled
+        {
+            get => _isCategoryColoringEnabled;
+            set => SetField(ref _isCategoryColoringEnabled, value);
+        }
+
+        public string ViewColorTarget
+        {
+            get => _viewColorTarget;
+            set => SetField(
+                ref _viewColorTarget,
+                string.Equals(
+                    value,
+                    "Texte",
+                    StringComparison.OrdinalIgnoreCase)
+                    ? "Texte"
+                    : "Fond");
+        }
+
+        public ObservableCollection<ProjectBrowserCategoryColorRule>
+            CategoryColorRules { get; set; } =
+                new ObservableCollection<ProjectBrowserCategoryColorRule>();
+
+        public Color PlanViewColor
+        {
+            get => _planViewColor;
+            set => SetField(ref _planViewColor, value);
+        }
+
+        public Color SectionViewColor
+        {
+            get => _sectionViewColor;
+            set => SetField(ref _sectionViewColor, value);
+        }
+
+        public Color ThreeDViewColor
+        {
+            get => _threeDViewColor;
+            set => SetField(ref _threeDViewColor, value);
+        }
+
+        public Color ElevationViewColor
+        {
+            get => _elevationViewColor;
+            set => SetField(ref _elevationViewColor, value);
+        }
+
+        public Color ScheduleViewColor
+        {
+            get => _scheduleViewColor;
+            set => SetField(ref _scheduleViewColor, value);
+        }
+
+        public Color OtherViewColor
+        {
+            get => _otherViewColor;
+            set => SetField(ref _otherViewColor, value);
+        }
+
         public event System.ComponentModel.PropertyChangedEventHandler
             PropertyChanged;
 
@@ -1756,7 +1884,17 @@ namespace Couleur
                 AccentColor = Color.FromRgb(219, 87, 142),
                 IsSheetViewSearchEnabled = true,
                 IsActiveViewParentHighlightEnabled = true,
-                ActiveViewParentColor = Color.FromRgb(220, 54, 69)
+                ActiveViewParentColor = Color.FromRgb(220, 54, 69),
+                IsViewTypeColoringEnabled = false,
+                IsViewTypeParentColoringEnabled = true,
+                IsCategoryColoringEnabled = false,
+                ViewColorTarget = "Fond",
+                PlanViewColor = Color.FromRgb(219, 234, 254),
+                SectionViewColor = Color.FromRgb(252, 221, 235),
+                ThreeDViewColor = Color.FromRgb(254, 215, 215),
+                ElevationViewColor = Color.FromRgb(254, 229, 195),
+                ScheduleViewColor = Color.FromRgb(209, 250, 229),
+                OtherViewColor = Color.FromRgb(237, 233, 254)
             };
         }
 
@@ -1785,6 +1923,17 @@ namespace Couleur
                         settings.IsActiveViewParentHighlightEnabled =
                             saved.Value<bool?>("RepererParentVueActive") ??
                             settings.IsActiveViewParentHighlightEnabled;
+                        settings.IsViewTypeColoringEnabled =
+                            saved.Value<bool?>("ColorerTypesVues") ??
+                            settings.IsViewTypeColoringEnabled;
+                        settings.IsViewTypeParentColoringEnabled =
+                            saved.Value<bool?>("ColorerParentsVues") ??
+                            settings.IsViewTypeParentColoringEnabled;
+                        settings.IsCategoryColoringEnabled =
+                            saved.Value<bool?>("ColorerCategories") ??
+                            settings.IsCategoryColoringEnabled;
+                        settings.ViewColorTarget =
+                            saved.Value<string>("CibleCouleursVues");
 
                         if (TryParseColor(
                                 saved.Value<string>("Fond"),
@@ -1814,6 +1963,43 @@ namespace Couleur
                         {
                             settings.ActiveViewParentColor =
                                 activeViewParent;
+                        }
+
+                        LoadColor(saved, "CouleurPlans", color =>
+                            settings.PlanViewColor = color);
+                        LoadColor(saved, "CouleurCoupes", color =>
+                            settings.SectionViewColor = color);
+                        LoadColor(saved, "Couleur3D", color =>
+                            settings.ThreeDViewColor = color);
+                        LoadColor(saved, "CouleurElevations", color =>
+                            settings.ElevationViewColor = color);
+                        LoadColor(saved, "CouleurNomenclatures", color =>
+                            settings.ScheduleViewColor = color);
+                        LoadColor(saved, "CouleurAutresVues", color =>
+                            settings.OtherViewColor = color);
+
+                        if (saved["ReglesCategories"] is JArray rules)
+                        {
+                            settings.CategoryColorRules.Clear();
+                            foreach (JObject rule in rules.OfType<JObject>())
+                            {
+                                string name =
+                                    rule.Value<string>("Nom")?.Trim();
+                                if (string.IsNullOrWhiteSpace(name) ||
+                                    !TryParseColor(
+                                        rule.Value<string>("Couleur"),
+                                        out Color ruleColor))
+                                {
+                                    continue;
+                                }
+
+                                settings.CategoryColorRules.Add(
+                                    new ProjectBrowserCategoryColorRule
+                                    {
+                                        CategoryName = name,
+                                        Color = ruleColor
+                                    });
+                            }
                         }
                     }
                 }
@@ -1852,14 +2038,41 @@ namespace Couleur
                     ["RepererParentVueActive"] =
                         normalized.IsActiveViewParentHighlightEnabled,
                     ["CouleurParentVueActive"] =
-                        ToHex(normalized.ActiveViewParentColor)
+                        ToHex(normalized.ActiveViewParentColor),
+                    ["ColorerTypesVues"] =
+                        normalized.IsViewTypeColoringEnabled,
+                    ["ColorerParentsVues"] =
+                        normalized.IsViewTypeParentColoringEnabled,
+                    ["ColorerCategories"] =
+                        normalized.IsCategoryColoringEnabled,
+                    ["CibleCouleursVues"] =
+                        normalized.ViewColorTarget,
+                    ["CouleurPlans"] = ToHex(normalized.PlanViewColor),
+                    ["CouleurCoupes"] = ToHex(normalized.SectionViewColor),
+                    ["Couleur3D"] = ToHex(normalized.ThreeDViewColor),
+                    ["CouleurElevations"] =
+                        ToHex(normalized.ElevationViewColor),
+                    ["CouleurNomenclatures"] =
+                        ToHex(normalized.ScheduleViewColor),
+                    ["CouleurAutresVues"] =
+                        ToHex(normalized.OtherViewColor),
+                    ["ReglesCategories"] = new JArray(
+                        normalized.CategoryColorRules
+                            .Where(rule =>
+                                !string.IsNullOrWhiteSpace(
+                                    rule.CategoryName))
+                            .Select(rule => new JObject
+                            {
+                                ["Nom"] = rule.CategoryName.Trim(),
+                                ["Couleur"] = ToHex(rule.Color)
+                            }))
                 };
                 RibbonColorPreferences.SavePreferenceRoot(root);
                 _cached = normalized;
             }
         }
 
-        private static ProjectBrowserColorSettings Clone(
+        internal static ProjectBrowserColorSettings Clone(
             ProjectBrowserColorSettings source)
         {
             return new ProjectBrowserColorSettings
@@ -1874,8 +2087,38 @@ namespace Couleur
                 IsActiveViewParentHighlightEnabled =
                     source.IsActiveViewParentHighlightEnabled,
                 ActiveViewParentColor =
-                    source.ActiveViewParentColor
+                    source.ActiveViewParentColor,
+                IsViewTypeColoringEnabled =
+                    source.IsViewTypeColoringEnabled,
+                IsViewTypeParentColoringEnabled =
+                    source.IsViewTypeParentColoringEnabled,
+                IsCategoryColoringEnabled =
+                    source.IsCategoryColoringEnabled,
+                ViewColorTarget = source.ViewColorTarget,
+                PlanViewColor = source.PlanViewColor,
+                SectionViewColor = source.SectionViewColor,
+                ThreeDViewColor = source.ThreeDViewColor,
+                ElevationViewColor = source.ElevationViewColor,
+                ScheduleViewColor = source.ScheduleViewColor,
+                OtherViewColor = source.OtherViewColor,
+                CategoryColorRules = new ObservableCollection<
+                    ProjectBrowserCategoryColorRule>(
+                    source.CategoryColorRules
+                        .Select(rule => rule.Clone()))
             };
+        }
+
+        private static void LoadColor(
+            JObject saved,
+            string propertyName,
+            Action<Color> apply)
+        {
+            if (TryParseColor(
+                    saved.Value<string>(propertyName),
+                    out Color color))
+            {
+                apply(color);
+            }
         }
 
         private static string NormalizeMode(string value)
@@ -1904,7 +2147,7 @@ namespace Couleur
                    "Bulles pastel";
         }
 
-        private static bool TryParseColor(
+        internal static bool TryParseColor(
             string value,
             out Color color)
         {
@@ -1926,9 +2169,246 @@ namespace Couleur
             return false;
         }
 
-        private static string ToHex(Color color)
+        internal static string ToHex(Color color)
         {
             return $"#{color.A:X2}{color.R:X2}{color.G:X2}{color.B:X2}";
+        }
+    }
+
+    public sealed class ProjectBrowserColorProfile
+    {
+        public string Name { get; set; }
+
+        public ProjectBrowserColorSettings Settings { get; set; }
+
+        public override string ToString() => Name ?? string.Empty;
+    }
+
+    public static class ProjectBrowserColorProfilePreferences
+    {
+        private const string RootPropertyName = "ProfilsArborescence";
+
+        public static IReadOnlyList<ProjectBrowserColorProfile> Load()
+        {
+            lock (RibbonColorPreferences.PreferenceSyncRoot)
+            {
+                var profiles = new List<ProjectBrowserColorProfile>();
+                try
+                {
+                    JObject root =
+                        RibbonColorPreferences.LoadPreferenceRoot();
+                    if (!(root[RootPropertyName] is JArray savedProfiles))
+                        return profiles.AsReadOnly();
+
+                    foreach (JObject saved in
+                             savedProfiles.OfType<JObject>())
+                    {
+                        string name = saved.Value<string>("Nom")?.Trim();
+                        if (string.IsNullOrWhiteSpace(name) ||
+                            !(saved["Configuration"] is JObject configuration))
+                        {
+                            continue;
+                        }
+
+                        profiles.Add(new ProjectBrowserColorProfile
+                        {
+                            Name = name,
+                            Settings = Deserialize(configuration)
+                        });
+                    }
+                }
+                catch
+                {
+                    profiles.Clear();
+                }
+
+                return profiles
+                    .OrderBy(profile => profile.Name)
+                    .ToList()
+                    .AsReadOnly();
+            }
+        }
+
+        public static void Save(
+            string name,
+            ProjectBrowserColorSettings settings)
+        {
+            string safeName = name?.Trim();
+            if (string.IsNullOrWhiteSpace(safeName))
+                throw new ArgumentException(
+                    "Saisissez un nom pour le profil.",
+                    nameof(name));
+            if (settings == null)
+                throw new ArgumentNullException(nameof(settings));
+
+            lock (RibbonColorPreferences.PreferenceSyncRoot)
+            {
+                JObject root =
+                    RibbonColorPreferences.LoadPreferenceRoot();
+                JArray profiles =
+                    root[RootPropertyName] as JArray ?? new JArray();
+                JObject existing = profiles
+                    .OfType<JObject>()
+                    .FirstOrDefault(item => string.Equals(
+                        item.Value<string>("Nom"),
+                        safeName,
+                        StringComparison.OrdinalIgnoreCase));
+                existing?.Remove();
+                profiles.Add(new JObject
+                {
+                    ["Nom"] = safeName,
+                    ["Configuration"] = Serialize(settings)
+                });
+                root[RootPropertyName] = profiles;
+                RibbonColorPreferences.SavePreferenceRoot(root);
+            }
+        }
+
+        public static void Delete(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return;
+            lock (RibbonColorPreferences.PreferenceSyncRoot)
+            {
+                JObject root =
+                    RibbonColorPreferences.LoadPreferenceRoot();
+                if (!(root[RootPropertyName] is JArray profiles)) return;
+                foreach (JObject profile in profiles
+                             .OfType<JObject>()
+                             .Where(item => string.Equals(
+                                 item.Value<string>("Nom"),
+                                 name,
+                                 StringComparison.OrdinalIgnoreCase))
+                             .ToList())
+                {
+                    profile.Remove();
+                }
+                RibbonColorPreferences.SavePreferenceRoot(root);
+            }
+        }
+
+        private static JObject Serialize(
+            ProjectBrowserColorSettings source)
+        {
+            ProjectBrowserColorSettings settings =
+                ProjectBrowserColorPreferences.Clone(source);
+            return new JObject
+            {
+                ["Activer"] = settings.IsEnabled,
+                ["ModeFond"] = settings.BackgroundMode,
+                ["Fond"] = ProjectBrowserColorPreferences.ToHex(
+                    settings.BackgroundColor),
+                ["Texte"] = ProjectBrowserColorPreferences.ToHex(
+                    settings.TextColor),
+                ["Accent"] = ProjectBrowserColorPreferences.ToHex(
+                    settings.AccentColor),
+                ["ColorerTypesVues"] =
+                    settings.IsViewTypeColoringEnabled,
+                ["ColorerParentsVues"] =
+                    settings.IsViewTypeParentColoringEnabled,
+                ["ColorerCategories"] =
+                    settings.IsCategoryColoringEnabled,
+                ["CibleCouleursVues"] = settings.ViewColorTarget,
+                ["CouleurPlans"] = ProjectBrowserColorPreferences.ToHex(
+                    settings.PlanViewColor),
+                ["CouleurCoupes"] = ProjectBrowserColorPreferences.ToHex(
+                    settings.SectionViewColor),
+                ["Couleur3D"] = ProjectBrowserColorPreferences.ToHex(
+                    settings.ThreeDViewColor),
+                ["CouleurElevations"] =
+                    ProjectBrowserColorPreferences.ToHex(
+                        settings.ElevationViewColor),
+                ["CouleurNomenclatures"] =
+                    ProjectBrowserColorPreferences.ToHex(
+                        settings.ScheduleViewColor),
+                ["CouleurAutresVues"] =
+                    ProjectBrowserColorPreferences.ToHex(
+                        settings.OtherViewColor),
+                ["ReglesCategories"] = new JArray(
+                    settings.CategoryColorRules
+                        .Where(rule =>
+                            !string.IsNullOrWhiteSpace(rule.CategoryName))
+                        .Select(rule => new JObject
+                        {
+                            ["Nom"] = rule.CategoryName.Trim(),
+                            ["Couleur"] =
+                                ProjectBrowserColorPreferences.ToHex(
+                                    rule.Color)
+                        }))
+            };
+        }
+
+        private static ProjectBrowserColorSettings Deserialize(
+            JObject saved)
+        {
+            ProjectBrowserColorSettings settings =
+                ProjectBrowserColorPreferences.GetDefaults();
+            settings.IsEnabled =
+                saved.Value<bool?>("Activer") ?? settings.IsEnabled;
+            settings.BackgroundMode =
+                saved.Value<string>("ModeFond") ?? settings.BackgroundMode;
+            settings.IsViewTypeColoringEnabled =
+                saved.Value<bool?>("ColorerTypesVues") ?? false;
+            settings.IsViewTypeParentColoringEnabled =
+                saved.Value<bool?>("ColorerParentsVues") ?? true;
+            settings.IsCategoryColoringEnabled =
+                saved.Value<bool?>("ColorerCategories") ?? false;
+            settings.ViewColorTarget =
+                saved.Value<string>("CibleCouleursVues");
+
+            LoadColor(saved, "Fond", color =>
+                settings.BackgroundColor = color);
+            LoadColor(saved, "Texte", color =>
+                settings.TextColor = color);
+            LoadColor(saved, "Accent", color =>
+                settings.AccentColor = color);
+            LoadColor(saved, "CouleurPlans", color =>
+                settings.PlanViewColor = color);
+            LoadColor(saved, "CouleurCoupes", color =>
+                settings.SectionViewColor = color);
+            LoadColor(saved, "Couleur3D", color =>
+                settings.ThreeDViewColor = color);
+            LoadColor(saved, "CouleurElevations", color =>
+                settings.ElevationViewColor = color);
+            LoadColor(saved, "CouleurNomenclatures", color =>
+                settings.ScheduleViewColor = color);
+            LoadColor(saved, "CouleurAutresVues", color =>
+                settings.OtherViewColor = color);
+
+            settings.CategoryColorRules.Clear();
+            if (saved["ReglesCategories"] is JArray rules)
+            {
+                foreach (JObject rule in rules.OfType<JObject>())
+                {
+                    string ruleName = rule.Value<string>("Nom")?.Trim();
+                    if (string.IsNullOrWhiteSpace(ruleName) ||
+                        !ProjectBrowserColorPreferences.TryParseColor(
+                            rule.Value<string>("Couleur"),
+                            out Color ruleColor))
+                    {
+                        continue;
+                    }
+                    settings.CategoryColorRules.Add(
+                        new ProjectBrowserCategoryColorRule
+                        {
+                            CategoryName = ruleName,
+                            Color = ruleColor
+                        });
+                }
+            }
+            return settings;
+        }
+
+        private static void LoadColor(
+            JObject saved,
+            string propertyName,
+            Action<Color> apply)
+        {
+            if (ProjectBrowserColorPreferences.TryParseColor(
+                    saved.Value<string>(propertyName),
+                    out Color color))
+            {
+                apply(color);
+            }
         }
     }
 }

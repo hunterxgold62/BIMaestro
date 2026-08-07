@@ -22,7 +22,8 @@ namespace Couleur
                 ColoringStateManager.LoadState();
 
                 var window = new ColorPreferencesWindow(
-                    data.Application.MainWindowHandle);
+                    data.Application.MainWindowHandle,
+                    data.Application.ActiveUIDocument?.Document);
                 new WindowInteropHelper(window)
                 {
                     Owner = data.Application.MainWindowHandle

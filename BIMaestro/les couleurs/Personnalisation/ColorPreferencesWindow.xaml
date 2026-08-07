@@ -266,6 +266,9 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
@@ -393,12 +396,22 @@
                                                 <StackPanel Grid.Row="1" Margin="3,9,3,0">
                                                     <TextBlock Margin="0,0,0,6" FontSize="11" FontWeight="SemiBold"
                                                                Foreground="{Binding BrowserPreviewTextBrush}" Text="▾  Vues (tout)"/>
-                                                    <TextBlock Margin="18,0,0,6" FontSize="11"
-                                                               Foreground="{Binding BrowserPreviewTextBrush}" Text="▾  Plans d’étage"/>
-                                                    <TextBlock Margin="35,0,0,5" FontSize="11"
-                                                               Foreground="{Binding BrowserPreviewTextBrush}"
-                                                               Text="{Binding BrowserPreviewSecondaryViewName}"
-                                                               TextTrimming="CharacterEllipsis"/>
+                                                    <Border Margin="14,0,0,6" Padding="5,2"
+                                                            Background="{Binding BrowserPreviewPlanParentBrush}"
+                                                            CornerRadius="2">
+                                                        <TextBlock FontSize="11" FontWeight="SemiBold"
+                                                                   Foreground="{Binding BrowserPreviewPlanParentTextBrush}"
+                                                                   Text="▾  Plans d’étage"/>
+                                                    </Border>
+                                                    <Border Margin="31,0,0,5" Padding="5,2"
+                                                            Background="{Binding BrowserPreviewPlanBrush}"
+                                                            BorderBrush="#FF60A5FA" BorderThickness="3,0,0,0"
+                                                            CornerRadius="2">
+                                                        <TextBlock FontSize="11"
+                                                                   Foreground="{Binding BrowserPreviewPlanTextBrush}"
+                                                                   Text="{Binding BrowserPreviewSecondaryViewName}"
+                                                                   TextTrimming="CharacterEllipsis"/>
+                                                    </Border>
                                                     <Border Margin="31,0,0,5" Padding="5,3"
                                                             Background="{Binding BrowserPreviewAccentBrush}" CornerRadius="3"
                                                             Visibility="{Binding BrowserSearchVisibility}">
@@ -406,14 +419,26 @@
                                                                    Text="{Binding BrowserPreviewPrimaryViewName}"
                                                                    TextTrimming="CharacterEllipsis"/>
                                                     </Border>
-                                                    <StackPanel Margin="18,1,0,0" Orientation="Horizontal">
-                                                        <TextBlock FontSize="11" Foreground="{Binding BrowserPreviewTextBrush}"
-                                                                   Text="{Binding BrowserPreviewSectionName}"
-                                                                   TextTrimming="CharacterEllipsis"/>
-                                                        <TextBlock Margin="6,0,0,0" FontSize="11" FontWeight="Bold"
-                                                                   Foreground="{Binding BrowserPreviewActiveParentBrush}"
-                                                                   Text="★ Vue active" Visibility="{Binding BrowserActiveParentVisibility}"/>
-                                                    </StackPanel>
+                                                    <Border Margin="14,0,0,4" Padding="5,2"
+                                                            Background="{Binding BrowserPreviewSectionBrush}"
+                                                            BorderBrush="#FFF472B6" BorderThickness="3,0,0,0"
+                                                            CornerRadius="2">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <TextBlock FontSize="11" Foreground="{Binding BrowserPreviewSectionTextBrush}"
+                                                                       Text="{Binding BrowserPreviewSectionName}"
+                                                                       TextTrimming="CharacterEllipsis"/>
+                                                            <TextBlock Margin="6,0,0,0" FontSize="11" FontWeight="Bold"
+                                                                       Foreground="{Binding BrowserPreviewActiveParentBrush}"
+                                                                       Text="★ Vue active" Visibility="{Binding BrowserActiveParentVisibility}"/>
+                                                        </StackPanel>
+                                                    </Border>
+                                                    <Border Margin="14,0,0,0" Padding="5,2"
+                                                            Background="{Binding BrowserPreviewThreeDBrush}"
+                                                            BorderBrush="#FFEF4444" BorderThickness="3,0,0,0"
+                                                            CornerRadius="2">
+                                                        <TextBlock FontSize="11" Foreground="{Binding BrowserPreviewThreeDTextBrush}"
+                                                                   Text="Vue 3D · Coordination"/>
+                                                    </Border>
                                                 </StackPanel>
                                             </Grid>
 
@@ -491,33 +516,101 @@
                         <Border Grid.Row="2"
                                 Margin="0,14,0,0"
                                 Padding="16"
-                                Background="{DynamicResource Surface.Subtle}"
-                                BorderBrush="{DynamicResource Border}"
+                                Background="{DynamicResource Surface}"
+                                BorderBrush="{DynamicResource Brand}"
                                 BorderThickness="1"
-                                CornerRadius="10">
+                                CornerRadius="10"
+                                IsEnabled="{Binding BrowserPreferences.IsEnabled}">
+                            <StackPanel>
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="320"/>
                                 </Grid.ColumnDefinitions>
-
                                 <StackPanel>
-                                    <TextBlock FontWeight="SemiBold"
+                                    <TextBlock FontSize="14" FontWeight="SemiBold"
                                                Foreground="{DynamicResource Text.Primary}"
-                                               Text="Navigation depuis une feuille"/>
+                                               Text="02  Mode de coloration"/>
                                     <TextBlock Margin="0,5,24,0"
                                                Style="{StaticResource Hint}"
                                                TextWrapping="Wrap"
-                                               Text="Lorsqu’un viewport ou une nomenclature est sélectionné sur une feuille, BIMaestro recherche sa vue et l’encadre avec la couleur d’accent."/>
+                                               Text="Choisissez une seule logique de travail. En mode combiné, les catégories personnelles sont prioritaires sur les types de vues."/>
                                 </StackPanel>
-
-                                <CheckBox Grid.Column="1"
-                                          VerticalAlignment="Center"
-                                          FontWeight="SemiBold"
-                                          Content="Recherche automatique"
-                                          ToolTip="Activée par défaut. La recherche reste visible 300 ms pendant le clic dans l’arborescence."
-                                          IsChecked="{Binding BrowserPreferences.IsSheetViewSearchEnabled, Mode=TwoWay}"/>
+                                <StackPanel Grid.Column="1" Margin="20,0,0,0">
+                                    <TextBlock Margin="0,0,0,6"
+                                               Style="{StaticResource Hint}"
+                                               FontWeight="SemiBold"
+                                               Text="Coloration des lignes"/>
+                                    <ComboBox Height="34"
+                                              ItemsSource="{Binding BrowserColoringModes}"
+                                              SelectedItem="{Binding BrowserColoringMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                    <TextBlock Margin="0,6,0,0" FontSize="10"
+                                               Foreground="{DynamicResource Text.Secondary}"
+                                               Text="Priorité : catégorie personnelle → type de vue → fond général"/>
+                                    <Grid Margin="0,10,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="150"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock VerticalAlignment="Center"
+                                                   Style="{StaticResource Hint}"
+                                                   FontWeight="SemiBold"
+                                                   Text="Appliquer la couleur au"/>
+                                        <ComboBox Grid.Column="1" Height="32"
+                                                  ItemsSource="{Binding BrowserViewColorTargets}"
+                                                  SelectedItem="{Binding BrowserPreferences.ViewColorTarget, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </Grid>
+                                </StackPanel>
                             </Grid>
+                            <Border Margin="0,14,0,0" Padding="12"
+                                    Background="{DynamicResource Surface.Subtle}"
+                                    BorderBrush="{DynamicResource Border}"
+                                    BorderThickness="1" CornerRadius="8">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="150"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock VerticalAlignment="Center"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource Text.Primary}"
+                                               Text="Profils enregistrés"/>
+                                    <ComboBox Grid.Column="1" Height="32" Margin="12,0,8,0"
+                                              ItemsSource="{Binding BrowserColorProfiles}"
+                                              SelectedItem="{Binding SelectedBrowserColorProfile, Mode=TwoWay}"/>
+                                    <Button Grid.Column="2" MinWidth="84" Height="32"
+                                            Style="{StaticResource SecondaryButton}"
+                                            Content="Appliquer"
+                                            Click="ApplyBrowserProfileButton_Click"/>
+                                    <Button Grid.Column="3" Width="34" Height="32" Margin="8,0,0,0"
+                                            Style="{StaticResource SecondaryButton}"
+                                            Content="×" ToolTip="Supprimer le profil sélectionné"
+                                            Click="DeleteBrowserProfileButton_Click"/>
+
+                                    <TextBlock Grid.Row="1" Margin="0,12,0,0"
+                                               VerticalAlignment="Center"
+                                               Style="{StaticResource Hint}"
+                                               FontWeight="SemiBold"
+                                               Text="Nouveau profil"/>
+                                    <TextBox Grid.Row="1" Grid.Column="1"
+                                             Height="32" Margin="12,12,8,0" Padding="9,0"
+                                             VerticalContentAlignment="Center"
+                                             Text="{Binding NewBrowserColorProfileName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             ToolTip="Exemple : Phases projet ou Standard agence"/>
+                                    <Button Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="2"
+                                            Height="32" Margin="0,12,0,0" MinWidth="126"
+                                            Style="{StaticResource PrimaryButton}"
+                                            Content="Enregistrer le profil"
+                                            Click="SaveBrowserProfileButton_Click"/>
+                                </Grid>
+                            </Border>
+                            </StackPanel>
                         </Border>
 
                         <Border Grid.Row="3"
@@ -526,44 +619,278 @@
                                 Background="{DynamicResource Surface.Subtle}"
                                 BorderBrush="{DynamicResource Border}"
                                 BorderThickness="1"
-                                CornerRadius="10">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="190"/>
-                                </Grid.ColumnDefinitions>
+                                CornerRadius="10"
+                                IsEnabled="{Binding BrowserPreferences.IsEnabled}"
+                                Visibility="{Binding BrowserTypeColoringVisibility}">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource Text.Primary}"
+                                                   Text="Couleurs selon le type de vue"/>
+                                        <TextBlock Margin="0,5,24,0"
+                                                   Style="{StaticResource Hint}"
+                                                   TextWrapping="Wrap"
+                                                   Text="Ajoute un fond pastel et un repère coloré aux vues visibles. Les dossiers et les feuilles gardent leur apparence normale."/>
+                                    </StackPanel>
+                                    <CheckBox Grid.Column="1"
+                                              Margin="18,0,0,0"
+                                              VerticalAlignment="Center"
+                                              FontWeight="SemiBold"
+                                              Content="Colorer aussi les parents"
+                                              IsChecked="{Binding BrowserPreferences.IsViewTypeParentColoringEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                </Grid>
 
-                                <StackPanel>
-                                    <TextBlock FontWeight="SemiBold"
-                                               Foreground="{DynamicResource Text.Primary}"
-                                               Text="Repère de la vue active"/>
-                                    <TextBlock Margin="0,5,24,0"
-                                               Style="{StaticResource Hint}"
-                                               TextWrapping="Wrap"
-                                               Text="Colore et marque d’une étoile le parent visible le plus proche de la vue active. Le repère descend automatiquement lorsque vous dépliez la branche."/>
-                                </StackPanel>
-
-                                <CheckBox Grid.Column="1"
-                                          Margin="18,0"
-                                          VerticalAlignment="Center"
-                                          FontWeight="SemiBold"
-                                          Content="Afficher le repère"
-                                          IsChecked="{Binding BrowserPreferences.IsActiveViewParentHighlightEnabled, Mode=TwoWay}"/>
-
-                                <StackPanel Grid.Column="2"
-                                            VerticalAlignment="Center">
-                                    <TextBlock Margin="0,0,0,6"
-                                               Style="{StaticResource Hint}"
-                                               FontWeight="SemiBold"
-                                               Text="Couleur du parent"/>
-                                    <ui:SimpleColorPicker HorizontalAlignment="Stretch"
-                                                          SelectedColor="{Binding BrowserPreferences.ActiveViewParentColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                                </StackPanel>
-                            </Grid>
+                                <WrapPanel Margin="0,14,0,0"
+                                           IsEnabled="{Binding BrowserPreferences.IsViewTypeColoringEnabled}">
+                                    <StackPanel Width="285" Margin="0,0,16,12">
+                                        <TextBlock Margin="0,0,0,5" Style="{StaticResource Hint}" FontWeight="SemiBold" Text="Plans"/>
+                                        <ui:SimpleColorPicker HorizontalAlignment="Stretch"
+                                                              SelectedColor="{Binding BrowserPreferences.PlanViewColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Width="285" Margin="0,0,16,12">
+                                        <TextBlock Margin="0,0,0,5" Style="{StaticResource Hint}" FontWeight="SemiBold" Text="Coupes"/>
+                                        <ui:SimpleColorPicker HorizontalAlignment="Stretch"
+                                                              SelectedColor="{Binding BrowserPreferences.SectionViewColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Width="285" Margin="0,0,0,12">
+                                        <TextBlock Margin="0,0,0,5" Style="{StaticResource Hint}" FontWeight="SemiBold" Text="Vues 3D"/>
+                                        <ui:SimpleColorPicker HorizontalAlignment="Stretch"
+                                                              SelectedColor="{Binding BrowserPreferences.ThreeDViewColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Width="285" Margin="0,0,16,0">
+                                        <TextBlock Margin="0,0,0,5" Style="{StaticResource Hint}" FontWeight="SemiBold" Text="Élévations"/>
+                                        <ui:SimpleColorPicker HorizontalAlignment="Stretch"
+                                                              SelectedColor="{Binding BrowserPreferences.ElevationViewColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Width="285" Margin="0,0,16,0">
+                                        <TextBlock Margin="0,0,0,5" Style="{StaticResource Hint}" FontWeight="SemiBold" Text="Nomenclatures"/>
+                                        <ui:SimpleColorPicker HorizontalAlignment="Stretch"
+                                                              SelectedColor="{Binding BrowserPreferences.ScheduleViewColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Width="285">
+                                        <TextBlock Margin="0,0,0,5" Style="{StaticResource Hint}" FontWeight="SemiBold" Text="Autres vues"/>
+                                        <ui:SimpleColorPicker HorizontalAlignment="Stretch"
+                                                              SelectedColor="{Binding BrowserPreferences.OtherViewColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                </WrapPanel>
+                            </StackPanel>
                         </Border>
 
-                        <StackPanel Grid.Row="4"
+                        <Border Grid.Row="4"
+                                Margin="0,14,0,0"
+                                Padding="16"
+                                Background="{DynamicResource Surface.Subtle}"
+                                BorderBrush="{DynamicResource Border}"
+                                BorderThickness="1"
+                                CornerRadius="10"
+                                IsEnabled="{Binding BrowserPreferences.IsEnabled}"
+                                Visibility="{Binding BrowserCategoryColoringVisibility}">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource Text.Primary}"
+                                                   Text="Couleurs selon mes catégories"/>
+                                        <TextBlock Margin="0,5,24,0"
+                                                   Style="{StaticResource Hint}"
+                                                   TextWrapping="Wrap"
+                                                   Text="Associez librement un nom de rangement comme APD, PC ou PRO à une couleur. La règle s’applique au dossier et à toutes les vues placées dessous."/>
+                                    </StackPanel>
+                                    <Button Grid.Column="2"
+                                            Width="38" Height="34"
+                                            VerticalAlignment="Center"
+                                            Style="{StaticResource PrimaryButton}"
+                                            Content="＋"
+                                            FontSize="18"
+                                            ToolTip="Ajouter une règle de catégorie"
+                                            Click="AddBrowserCategoryRuleButton_Click"/>
+                                </Grid>
+
+                                <Border Margin="0,14,0,2" Padding="12"
+                                        Background="{DynamicResource Surface}"
+                                        BorderBrush="{DynamicResource Border}"
+                                        BorderThickness="1" CornerRadius="8">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource Text.Primary}"
+                                                           Text="{Binding BrowserCategorySuggestionTitle}"/>
+                                                <TextBlock Margin="0,3,18,0"
+                                                           Style="{StaticResource Hint}"
+                                                           Text="Détection automatique dans l’organisation actuelle des vues Revit."/>
+                                            </StackPanel>
+                                            <Button Grid.Column="1" Height="30" MinWidth="92"
+                                                    VerticalAlignment="Center"
+                                                    Style="{StaticResource SecondaryButton}"
+                                                    Content="↻ Actualiser"
+                                                    Click="RefreshBrowserCategoriesButton_Click"/>
+                                        </Grid>
+                                        <ItemsControl Margin="0,10,0,0"
+                                                      ItemsSource="{Binding BrowserCategorySuggestions}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,0,0,6">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="90"/>
+                                                            <ColumnDefinition Width="82"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock VerticalAlignment="Center"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="{DynamicResource Text.Primary}"
+                                                                   Text="{Binding Name}"/>
+                                                        <TextBlock Grid.Column="1" VerticalAlignment="Center"
+                                                                   Style="{StaticResource Hint}"
+                                                                   Text="{Binding CountLabel}"/>
+                                                        <Button Grid.Column="2" Height="28"
+                                                                Style="{StaticResource SecondaryButton}"
+                                                                Content="＋ Ajouter"
+                                                                Click="AddDetectedBrowserCategoryButton_Click"/>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+
+                                <Grid Margin="0,14,0,6"
+                                      IsEnabled="{Binding BrowserPreferences.IsCategoryColoringEnabled}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="18"/>
+                                        <ColumnDefinition Width="260"/>
+                                        <ColumnDefinition Width="44"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Style="{StaticResource Hint}" FontWeight="SemiBold" Text="Nom exact de la catégorie"/>
+                                    <TextBlock Grid.Column="2" Style="{StaticResource Hint}" FontWeight="SemiBold" Text="Couleur"/>
+                                </Grid>
+
+                                <ItemsControl ItemsSource="{Binding BrowserPreferences.CategoryColorRules}"
+                                              IsEnabled="{Binding BrowserPreferences.IsCategoryColoringEnabled}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,0,0,8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="18"/>
+                                                    <ColumnDefinition Width="260"/>
+                                                    <ColumnDefinition Width="44"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBox Height="32"
+                                                         Padding="9,0"
+                                                         VerticalContentAlignment="Center"
+                                                         Text="{Binding CategoryName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                         ToolTip="Exemple : PC, PRO, APD ou Exécution"/>
+                                                <ui:SimpleColorPicker Grid.Column="2"
+                                                                      HorizontalAlignment="Stretch"
+                                                                      SelectedColor="{Binding Color, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                                <Button Grid.Column="3"
+                                                        Width="32" Height="32"
+                                                        HorizontalAlignment="Right"
+                                                        Style="{StaticResource SecondaryButton}"
+                                                        Content="×"
+                                                        FontSize="16"
+                                                        ToolTip="Supprimer cette règle"
+                                                        Click="RemoveBrowserCategoryRuleButton_Click"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Row="5"
+                                Margin="0,14,0,0"
+                                Padding="16"
+                                Background="{DynamicResource Surface.Subtle}"
+                                BorderBrush="{DynamicResource Border}"
+                                BorderThickness="1"
+                                CornerRadius="10">
+                            <Expander IsExpanded="False">
+                                <Expander.Header>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource Text.Primary}"
+                                                   Text="Sélection et navigation"/>
+                                        <TextBlock Margin="8,0,0,0"
+                                                   Style="{StaticResource Hint}"
+                                                   Text="Options avancées"/>
+                                    </StackPanel>
+                                </Expander.Header>
+                                <StackPanel Margin="0,14,0,0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource Text.Primary}"
+                                                       Text="Navigation depuis une feuille"/>
+                                            <TextBlock Margin="0,5,24,0"
+                                                       Style="{StaticResource Hint}"
+                                                       TextWrapping="Wrap"
+                                                       Text="Recherche la vue d’un viewport ou d’une nomenclature sélectionnée sur une feuille."/>
+                                        </StackPanel>
+                                        <CheckBox Grid.Column="1"
+                                                  VerticalAlignment="Center"
+                                                  FontWeight="SemiBold"
+                                                  Content="Recherche automatique"
+                                                  IsChecked="{Binding BrowserPreferences.IsSheetViewSearchEnabled, Mode=TwoWay}"/>
+                                    </Grid>
+
+                                    <Separator Margin="0,14"/>
+
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="190"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource Text.Primary}"
+                                                       Text="Repère de la vue active"/>
+                                            <TextBlock Margin="0,5,24,0"
+                                                       Style="{StaticResource Hint}"
+                                                       TextWrapping="Wrap"
+                                                       Text="Marque d’une étoile le parent visible le plus proche de la vue active."/>
+                                        </StackPanel>
+                                        <CheckBox Grid.Column="1"
+                                                  Margin="18,0"
+                                                  VerticalAlignment="Center"
+                                                  FontWeight="SemiBold"
+                                                  Content="Afficher le repère"
+                                                  IsChecked="{Binding BrowserPreferences.IsActiveViewParentHighlightEnabled, Mode=TwoWay}"/>
+                                        <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                            <TextBlock Margin="0,0,0,6"
+                                                       Style="{StaticResource Hint}"
+                                                       FontWeight="SemiBold"
+                                                       Text="Couleur du parent"/>
+                                            <ui:SimpleColorPicker HorizontalAlignment="Stretch"
+                                                                  SelectedColor="{Binding BrowserPreferences.ActiveViewParentColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Expander>
+                        </Border>
+
+                        <StackPanel Grid.Row="7"
                                     Margin="0,18,0,0"
                                     VerticalAlignment="Bottom">
                             <TextBlock Style="{StaticResource Hint}"

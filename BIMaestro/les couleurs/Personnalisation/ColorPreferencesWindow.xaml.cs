@@ -5,6 +5,11 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Media;
+using BrowserOrganization = Autodesk.Revit.DB.BrowserOrganization;
+using Document = Autodesk.Revit.DB.Document;
+using FilteredElementCollector = Autodesk.Revit.DB.FilteredElementCollector;
+using FolderItemInfo = Autodesk.Revit.DB.FolderItemInfo;
+using ViewSheet = Autodesk.Revit.DB.ViewSheet;
 
 namespace Couleur
 {
@@ -13,22 +18,30 @@ namespace Couleur
         INotifyPropertyChanged
     {
         private readonly System.IntPtr _mainWindowHandle;
+        private readonly Document _document;
         private string _selectedPresetName;
         private ProjectBrowserColorSettings _browserPreferences;
         private readonly System.Random _previewRandom = new System.Random();
         private string _browserPreviewPrimaryViewName;
         private string _browserPreviewSecondaryViewName;
         private string _browserPreviewSectionName;
+        private bool _isUpdatingBrowserColoringMode;
+        private ProjectBrowserColorProfile _selectedBrowserColorProfile;
+        private string _newBrowserColorProfileName = string.Empty;
 
-        public ColorPreferencesWindow(System.IntPtr mainWindowHandle)
+        public ColorPreferencesWindow(
+            System.IntPtr mainWindowHandle,
+            Document document = null)
         {
             ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
 
             _mainWindowHandle = mainWindowHandle;
+            _document = document;
             PanelColors = CreateItems(RibbonColorPreferences.Load());
             BrowserPreferences =
                 ProjectBrowserColorPreferences.Load();
+            RefreshBrowserProfiles();
             PreferenceFilePath =
                 $"Sauvegarde : {RibbonColorPreferences.PreferenceFilePath}";
             PresetEntries = RibbonColorPresetCatalog.StandardPresetNames
@@ -42,10 +55,44 @@ namespace Couleur
             _selectedPresetName =
                 RibbonColorPresetCatalog.StandardPresetNames.FirstOrDefault();
             GenerateBrowserPreviewNames();
+            DetectBrowserCategories();
             DataContext = this;
         }
 
         public ObservableCollection<PanelColorItem> PanelColors { get; }
+
+        public ObservableCollection<BrowserCategorySuggestion>
+            BrowserCategorySuggestions { get; } =
+                new ObservableCollection<BrowserCategorySuggestion>();
+
+        public ObservableCollection<ProjectBrowserColorProfile>
+            BrowserColorProfiles { get; } =
+                new ObservableCollection<ProjectBrowserColorProfile>();
+
+        public ProjectBrowserColorProfile SelectedBrowserColorProfile
+        {
+            get => _selectedBrowserColorProfile;
+            set
+            {
+                _selectedBrowserColorProfile = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string NewBrowserColorProfileName
+        {
+            get => _newBrowserColorProfileName;
+            set
+            {
+                _newBrowserColorProfileName = value ?? string.Empty;
+                OnPropertyChanged();
+            }
+        }
+
+        public string BrowserCategorySuggestionTitle =>
+            BrowserCategorySuggestions.Count == 0
+                ? "Aucune nouvelle catégorie détectée"
+                : $"{BrowserCategorySuggestions.Count} catégories détectées";
 
         public string PreferenceFilePath { get; }
 
@@ -60,6 +107,64 @@ namespace Couleur
                 "Lucioles pastel",
                 "Dégradé pastel animé"
             };
+
+        public IReadOnlyList<string> BrowserColoringModes { get; } =
+            new[]
+            {
+                "Aucune coloration",
+                "Par type de vue",
+                "Par catégories personnelles",
+                "Combiner les deux"
+            };
+
+        public IReadOnlyList<string> BrowserViewColorTargets { get; } =
+            new[] { "Fond", "Texte" };
+
+        public string BrowserColoringMode
+        {
+            get
+            {
+                bool types =
+                    BrowserPreferences?.IsViewTypeColoringEnabled == true;
+                bool categories =
+                    BrowserPreferences?.IsCategoryColoringEnabled == true;
+                if (types && categories) return "Combiner les deux";
+                if (types) return "Par type de vue";
+                if (categories) return "Par catégories personnelles";
+                return "Aucune coloration";
+            }
+            set
+            {
+                if (BrowserPreferences == null) return;
+                _isUpdatingBrowserColoringMode = true;
+                try
+                {
+                    BrowserPreferences.IsViewTypeColoringEnabled =
+                        value == "Par type de vue" ||
+                        value == "Combiner les deux";
+                    BrowserPreferences.IsCategoryColoringEnabled =
+                        value == "Par catégories personnelles" ||
+                        value == "Combiner les deux";
+                }
+                finally
+                {
+                    _isUpdatingBrowserColoringMode = false;
+                }
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(BrowserTypeColoringVisibility));
+                OnPropertyChanged(nameof(BrowserCategoryColoringVisibility));
+            }
+        }
+
+        public Visibility BrowserTypeColoringVisibility =>
+            BrowserPreferences?.IsViewTypeColoringEnabled == true
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+        public Visibility BrowserCategoryColoringVisibility =>
+            BrowserPreferences?.IsCategoryColoringEnabled == true
+                ? Visibility.Visible
+                : Visibility.Collapsed;
 
         public ProjectBrowserColorSettings BrowserPreferences
         {
@@ -80,6 +185,9 @@ namespace Couleur
                 }
 
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(BrowserColoringMode));
+                OnPropertyChanged(nameof(BrowserTypeColoringVisibility));
+                OnPropertyChanged(nameof(BrowserCategoryColoringVisibility));
                 NotifyBrowserPreviewChanged();
             }
         }
@@ -99,6 +207,44 @@ namespace Couleur
         public Brush BrowserPreviewActiveParentBrush =>
             new SolidColorBrush(
                 BrowserPreferences?.ActiveViewParentColor ?? Colors.Red);
+
+        public Brush BrowserPreviewPlanBrush =>
+            CreateViewTypePreviewBrush(
+                BrowserPreferences?.PlanViewColor ?? Colors.Transparent);
+
+        public Brush BrowserPreviewSectionBrush =>
+            CreateViewTypePreviewBrush(
+                BrowserPreferences?.SectionViewColor ?? Colors.Transparent);
+
+        public Brush BrowserPreviewThreeDBrush =>
+            CreateViewTypePreviewBrush(
+                BrowserPreferences?.ThreeDViewColor ?? Colors.Transparent);
+
+        public Brush BrowserPreviewPlanParentBrush =>
+            BrowserPreferences?.IsViewTypeColoringEnabled == true &&
+            BrowserPreferences?.IsViewTypeParentColoringEnabled == true &&
+            BrowserPreferences?.ViewColorTarget == "Fond"
+                ? new SolidColorBrush(BrowserPreferences.PlanViewColor)
+                : Brushes.Transparent;
+
+        public Brush BrowserPreviewPlanTextBrush =>
+            CreateViewTypePreviewTextBrush(
+                BrowserPreferences?.PlanViewColor ?? Colors.Transparent);
+
+        public Brush BrowserPreviewPlanParentTextBrush =>
+            BrowserPreferences?.IsViewTypeColoringEnabled == true &&
+            BrowserPreferences?.IsViewTypeParentColoringEnabled == true &&
+            BrowserPreferences?.ViewColorTarget == "Texte"
+                ? new SolidColorBrush(BrowserPreferences.PlanViewColor)
+                : BrowserPreviewTextBrush;
+
+        public Brush BrowserPreviewSectionTextBrush =>
+            CreateViewTypePreviewTextBrush(
+                BrowserPreferences?.SectionViewColor ?? Colors.Transparent);
+
+        public Brush BrowserPreviewThreeDTextBrush =>
+            CreateViewTypePreviewTextBrush(
+                BrowserPreferences?.ThreeDViewColor ?? Colors.Transparent);
 
         public Visibility BrowserBubblesVisibility =>
             BrowserModeVisibility("Bulles pastel");
@@ -183,6 +329,12 @@ namespace Couleur
             object sender,
             PropertyChangedEventArgs e)
         {
+            if (!_isUpdatingBrowserColoringMode)
+            {
+                OnPropertyChanged(nameof(BrowserColoringMode));
+                OnPropertyChanged(nameof(BrowserTypeColoringVisibility));
+                OnPropertyChanged(nameof(BrowserCategoryColoringVisibility));
+            }
             NotifyBrowserPreviewChanged();
         }
 
@@ -191,6 +343,234 @@ namespace Couleur
             RoutedEventArgs e)
         {
             GenerateBrowserPreviewNames();
+        }
+
+        private void AddBrowserCategoryRuleButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            Color[] colors =
+            {
+                Color.FromRgb(209, 250, 229),
+                Color.FromRgb(219, 234, 254),
+                Color.FromRgb(252, 221, 235),
+                Color.FromRgb(254, 229, 195),
+                Color.FromRgb(237, 233, 254)
+            };
+            int index = BrowserPreferences.CategoryColorRules.Count;
+            BrowserPreferences.CategoryColorRules.Add(
+                new ProjectBrowserCategoryColorRule
+                {
+                    CategoryName = string.Empty,
+                    Color = colors[index % colors.Length]
+                });
+            BrowserPreferences.IsCategoryColoringEnabled = true;
+        }
+
+        private void RemoveBrowserCategoryRuleButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement element &&
+                element.DataContext is ProjectBrowserCategoryColorRule rule)
+            {
+                BrowserPreferences.CategoryColorRules.Remove(rule);
+            }
+        }
+
+        private void RefreshBrowserCategoriesButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            DetectBrowserCategories();
+        }
+
+        private void AddDetectedBrowserCategoryButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            if (!(sender is FrameworkElement element) ||
+                !(element.DataContext is BrowserCategorySuggestion suggestion))
+            {
+                return;
+            }
+
+            bool alreadyExists = BrowserPreferences.CategoryColorRules.Any(
+                rule => string.Equals(
+                    rule.CategoryName?.Trim(),
+                    suggestion.Name,
+                    System.StringComparison.OrdinalIgnoreCase));
+            if (!alreadyExists)
+            {
+                BrowserPreferences.CategoryColorRules.Add(
+                    new ProjectBrowserCategoryColorRule
+                    {
+                        CategoryName = suggestion.Name,
+                        Color = suggestion.SuggestedColor
+                    });
+            }
+
+            BrowserPreferences.IsCategoryColoringEnabled = true;
+            BrowserCategorySuggestions.Remove(suggestion);
+            OnPropertyChanged(nameof(BrowserCategorySuggestionTitle));
+        }
+
+        private void SaveBrowserProfileButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            try
+            {
+                ProjectBrowserColorProfilePreferences.Save(
+                    NewBrowserColorProfileName,
+                    BrowserPreferences);
+                string savedName = NewBrowserColorProfileName.Trim();
+                RefreshBrowserProfiles(savedName);
+                NewBrowserColorProfileName = string.Empty;
+            }
+            catch (System.Exception ex)
+            {
+                ShowSaveError(ex);
+            }
+        }
+
+        private void ApplyBrowserProfileButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            if (SelectedBrowserColorProfile?.Settings == null) return;
+            BrowserPreferences = ProjectBrowserColorPreferences.Clone(
+                SelectedBrowserColorProfile.Settings);
+            DetectBrowserCategories();
+        }
+
+        private void DeleteBrowserProfileButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            if (SelectedBrowserColorProfile == null) return;
+            ProjectBrowserColorProfilePreferences.Delete(
+                SelectedBrowserColorProfile.Name);
+            RefreshBrowserProfiles();
+        }
+
+        private void RefreshBrowserProfiles(string selectedName = null)
+        {
+            BrowserColorProfiles.Clear();
+            foreach (ProjectBrowserColorProfile profile in
+                     ProjectBrowserColorProfilePreferences.Load())
+            {
+                BrowserColorProfiles.Add(profile);
+            }
+            SelectedBrowserColorProfile = BrowserColorProfiles
+                .FirstOrDefault(profile => string.Equals(
+                    profile.Name,
+                    selectedName,
+                    System.StringComparison.OrdinalIgnoreCase)) ??
+                BrowserColorProfiles.FirstOrDefault();
+        }
+
+        private void DetectBrowserCategories()
+        {
+            BrowserCategorySuggestions.Clear();
+            if (_document == null)
+            {
+                OnPropertyChanged(nameof(BrowserCategorySuggestionTitle));
+                return;
+            }
+
+            var counts = new Dictionary<string, int>(
+                System.StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                BrowserOrganization organization =
+                    BrowserOrganization
+                        .GetCurrentBrowserOrganizationForViews(_document);
+                foreach (Autodesk.Revit.DB.View view in
+                         new FilteredElementCollector(_document)
+                             .OfClass(typeof(Autodesk.Revit.DB.View))
+                             .Cast<Autodesk.Revit.DB.View>())
+                {
+                    if (view == null ||
+                        view.IsTemplate ||
+                        view is ViewSheet ||
+                        organization == null ||
+                        !organization.AreFiltersSatisfied(view.Id))
+                    {
+                        continue;
+                    }
+
+                    IList<FolderItemInfo> folderItems = null;
+                    try
+                    {
+                        folderItems = organization
+                            .GetFolderItems(view.Id)
+                            ?.Where(item => item != null)
+                            .ToList();
+                        if (folderItems == null) continue;
+
+                        foreach (string name in folderItems
+                                     .Select(item => item.Name?.Trim())
+                                     .Where(name =>
+                                         !string.IsNullOrWhiteSpace(name))
+                                     .Distinct(
+                                         System.StringComparer
+                                             .OrdinalIgnoreCase))
+                        {
+                            counts[name] = counts.TryGetValue(
+                                name,
+                                out int count)
+                                ? count + 1
+                                : 1;
+                        }
+                    }
+                    finally
+                    {
+                        if (folderItems != null)
+                        {
+                            foreach (FolderItemInfo item in folderItems)
+                            {
+                                try { item.Dispose(); }
+                                catch { }
+                            }
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Une organisation en cours de modification sera relue avec
+                // le bouton Actualiser lorsque Revit sera de nouveau disponible.
+            }
+
+            var existingNames = new HashSet<string>(
+                BrowserPreferences.CategoryColorRules
+                    .Select(rule => rule.CategoryName?.Trim())
+                    .Where(name => !string.IsNullOrWhiteSpace(name)),
+                System.StringComparer.OrdinalIgnoreCase);
+            Color[] palette =
+            {
+                Color.FromRgb(209, 250, 229),
+                Color.FromRgb(219, 234, 254),
+                Color.FromRgb(252, 221, 235),
+                Color.FromRgb(254, 229, 195),
+                Color.FromRgb(237, 233, 254),
+                Color.FromRgb(254, 240, 138)
+            };
+            int colorIndex = 0;
+            foreach (KeyValuePair<string, int> item in counts
+                         .Where(item => !existingNames.Contains(item.Key))
+                         .OrderByDescending(item => item.Value)
+                         .ThenBy(item => item.Key))
+            {
+                BrowserCategorySuggestions.Add(
+                    new BrowserCategorySuggestion(
+                        item.Key,
+                        item.Value,
+                        palette[colorIndex++ % palette.Length]));
+            }
+
+            OnPropertyChanged(nameof(BrowserCategorySuggestionTitle));
         }
 
         private void GenerateBrowserPreviewNames()
@@ -243,6 +623,14 @@ namespace Couleur
             OnPropertyChanged(nameof(BrowserPreviewTextBrush));
             OnPropertyChanged(nameof(BrowserPreviewAccentBrush));
             OnPropertyChanged(nameof(BrowserPreviewActiveParentBrush));
+            OnPropertyChanged(nameof(BrowserPreviewPlanBrush));
+            OnPropertyChanged(nameof(BrowserPreviewSectionBrush));
+            OnPropertyChanged(nameof(BrowserPreviewThreeDBrush));
+            OnPropertyChanged(nameof(BrowserPreviewPlanParentBrush));
+            OnPropertyChanged(nameof(BrowserPreviewPlanTextBrush));
+            OnPropertyChanged(nameof(BrowserPreviewPlanParentTextBrush));
+            OnPropertyChanged(nameof(BrowserPreviewSectionTextBrush));
+            OnPropertyChanged(nameof(BrowserPreviewThreeDTextBrush));
             OnPropertyChanged(nameof(BrowserBubblesVisibility));
             OnPropertyChanged(nameof(BrowserWavesVisibility));
             OnPropertyChanged(nameof(BrowserFirefliesVisibility));
@@ -250,6 +638,22 @@ namespace Couleur
             OnPropertyChanged(nameof(BrowserSearchVisibility));
             OnPropertyChanged(nameof(BrowserActiveParentVisibility));
             OnPropertyChanged(nameof(BrowserDisabledVisibility));
+        }
+
+        private Brush CreateViewTypePreviewBrush(Color color)
+        {
+            return BrowserPreferences?.IsViewTypeColoringEnabled == true &&
+                   BrowserPreferences?.ViewColorTarget == "Fond"
+                ? new SolidColorBrush(color)
+                : Brushes.Transparent;
+        }
+
+        private Brush CreateViewTypePreviewTextBrush(Color color)
+        {
+            return BrowserPreferences?.IsViewTypeColoringEnabled == true &&
+                   BrowserPreferences?.ViewColorTarget == "Texte"
+                ? new SolidColorBrush(color)
+                : BrowserPreviewTextBrush;
         }
 
         private void ResetDefaultsButton_Click(object sender, RoutedEventArgs e)
@@ -666,5 +1070,27 @@ namespace Couleur
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
+    }
+
+    public sealed class BrowserCategorySuggestion
+    {
+        public BrowserCategorySuggestion(
+            string name,
+            int viewCount,
+            Color suggestedColor)
+        {
+            Name = name;
+            ViewCount = viewCount;
+            SuggestedColor = suggestedColor;
+        }
+
+        public string Name { get; }
+
+        public int ViewCount { get; }
+
+        public Color SuggestedColor { get; }
+
+        public string CountLabel =>
+            ViewCount == 1 ? "1 vue" : $"{ViewCount} vues";
     }
 }

@@ -944,6 +944,21 @@ namespace Couleur
         private static long _activeViewGeneration;
         private static IReadOnlyList<string> _activeViewFolderPath =
             Array.Empty<string>();
+        private static Document _viewTypeMapDocument;
+        private static string _viewTypeMapActiveViewId = string.Empty;
+        private static string _viewTypeMapJson = "[]";
+        private sealed class BrowserViewTypeInfo
+        {
+            [Newtonsoft.Json.JsonProperty("id")]
+            public string Id { get; set; }
+
+            [Newtonsoft.Json.JsonProperty("name")]
+            public string Name { get; set; }
+
+            [Newtonsoft.Json.JsonProperty("kind")]
+            public string Kind { get; set; }
+        }
+
         private sealed class ViewHoverPreviewInfo
         {
             public string ViewId { get; set; }
@@ -1015,6 +1030,8 @@ namespace Couleur
                     "[data-bimaestro-arc-lock]," +
                     "[data-bimaestro-arc-group]," +
                     "[data-bimaestro-active-parent]," +
+                    "[data-bimaestro-view-kind]," +
+                    "[data-bimaestro-view-text]," +
                     "[data-bimaestro-focus-overlay]," +
                     "[data-bimaestro-focus-target]," +
                     "[data-bimaestro-bubble-surface]')" +
@@ -1023,6 +1040,14 @@ namespace Couleur
                     "el.removeAttribute('data-bimaestro-arc-lock');" +
                     "el.removeAttribute('data-bimaestro-arc-group');" +
                     "el.removeAttribute('data-bimaestro-active-parent');" +
+                    "el.removeAttribute('data-bimaestro-view-kind');" +
+                    "el.removeAttribute('data-bimaestro-view-parent');" +
+                    "el.removeAttribute('data-bimaestro-selected');" +
+                    "el.removeAttribute('data-bimaestro-color-target');" +
+                    "if(el.hasAttribute('data-bimaestro-view-text'))" +
+                    "el.style.removeProperty('color');" +
+                    "el.removeAttribute('data-bimaestro-view-text');" +
+                    "el.style.removeProperty('--bimaestro-view-color');" +
                     "el.removeAttribute('data-bimaestro-focus-target');" +
                     "if(el.hasAttribute('data-bimaestro-focus-overlay'))" +
                     "{el.remove();return;}" +
@@ -1187,7 +1212,103 @@ namespace Couleur
             _activeViewFolderPath = GetActiveViewFolderPath(
                 document,
                 activeView);
+            RefreshViewTypeMap(document, activeView);
             PushActiveViewMarker();
+            PushViewTypeMap();
+        }
+
+        private static void RefreshViewTypeMap(
+            Document document,
+            View activeView)
+        {
+            string activeViewId = activeView == null
+                ? string.Empty
+                : GetElementIdText(activeView.Id);
+            if (ReferenceEquals(_viewTypeMapDocument, document) &&
+                string.Equals(
+                    _viewTypeMapActiveViewId,
+                    activeViewId,
+                    StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            var viewTypes = new List<BrowserViewTypeInfo>();
+            if (document != null)
+            {
+                try
+                {
+                    foreach (View view in new FilteredElementCollector(document)
+                                 .OfClass(typeof(View))
+                                 .Cast<View>())
+                    {
+                        string kind = GetBrowserViewKind(view);
+                        if (string.IsNullOrEmpty(kind))
+                            continue;
+
+                        string id = GetElementIdText(view.Id);
+                        if (!string.IsNullOrEmpty(id) ||
+                            !string.IsNullOrWhiteSpace(view.Name))
+                        {
+                            viewTypes.Add(new BrowserViewTypeInfo
+                            {
+                                Id = id,
+                                Name = view.Name ?? string.Empty,
+                                Kind = kind
+                            });
+                        }
+                    }
+                }
+                catch
+                {
+                    // Le document peut être en cours de fermeture. La dernière
+                    // table valide reste alors affichée jusqu'à la vue suivante.
+                    return;
+                }
+            }
+
+            _viewTypeMapDocument = document;
+            _viewTypeMapActiveViewId = activeViewId;
+            _viewTypeMapJson =
+                Newtonsoft.Json.JsonConvert.SerializeObject(viewTypes);
+        }
+
+        private static string GetBrowserViewKind(View view)
+        {
+            if (view == null || view is ViewSheet)
+                return string.Empty;
+
+            string viewType = view.ViewType.ToString();
+            switch (viewType)
+            {
+                case "FloorPlan":
+                case "CeilingPlan":
+                case "EngineeringPlan":
+                case "AreaPlan":
+                    return "plan";
+                case "Section":
+                case "Detail":
+                    return "section";
+                case "ThreeD":
+                case "Walkthrough":
+                case "Rendering":
+                    return "three-d";
+                case "Elevation":
+                    return "elevation";
+                case "Schedule":
+                case "ColumnSchedule":
+                case "PanelSchedule":
+                case "Report":
+                    return "schedule";
+                case "ProjectBrowser":
+                case "SystemBrowser":
+                case "Internal":
+                case "DrawingSheet":
+                case "Undefined":
+                    return string.Empty;
+                default:
+                    return "other";
+            }
         }
 
         public static void CompleteAutomaticFocusNavigation()
@@ -1327,6 +1448,18 @@ namespace Couleur
                 $"{generationJson});");
         }
 
+        private static void PushViewTypeMap()
+        {
+            if (_chromiumBrowser == null)
+                return;
+
+            ExecuteBrowserScript(
+                _chromiumBrowser,
+                "if(window.__bimaestroProjectBrowserTheme)" +
+                "window.__bimaestroProjectBrowserTheme" +
+                $".setViewTypes({_viewTypeMapJson});");
+        }
+
         private static void ScheduleAutomaticFocusClear()
         {
             ExecuteBrowserScript(
@@ -1420,6 +1553,7 @@ namespace Couleur
                     PushViewHoverPreviews(browser);
                 }
                 PushActiveViewMarker();
+                PushViewTypeMap();
                 break;
             }
 
@@ -1484,19 +1618,42 @@ namespace Couleur
         private static string CreateBrowserThemeScript(
             ProjectBrowserColorSettings settings)
         {
+            string categoryRulesJson =
+                Newtonsoft.Json.JsonConvert.SerializeObject(
+                    settings.CategoryColorRules
+                        .Where(rule =>
+                            !string.IsNullOrWhiteSpace(rule.CategoryName))
+                        .Select(rule => new
+                        {
+                            name = rule.CategoryName.Trim(),
+                            color = ToCssColor(rule.Color)
+                        }));
             string script = @"
 (()=>{
   const key='__bimaestroProjectBrowserTheme';
-  const version=16;
+  const version=22;
   const theme={
     appearanceEnabled:__BIMAESTRO_BROWSER_APPEARANCE_ENABLED__,
     activeParentEnabled:__BIMAESTRO_ACTIVE_PARENT_ENABLED__,
+    viewTypeEnabled:__BIMAESTRO_VIEW_TYPE_ENABLED__,
+    viewParentEnabled:__BIMAESTRO_VIEW_PARENT_ENABLED__,
+    categoryEnabled:__BIMAESTRO_CATEGORY_ENABLED__,
+    categoryRules:__BIMAESTRO_CATEGORY_RULES__,
+    viewColorTarget:'__BIMAESTRO_VIEW_COLOR_TARGET__',
     background:'__BIMAESTRO_BROWSER_BACKGROUND__',
     text:'__BIMAESTRO_BROWSER_TEXT__',
     accent:'__BIMAESTRO_BROWSER_ACCENT__',
     activeParent:'__BIMAESTRO_ACTIVE_PARENT_COLOR__',
     focusBackground:'__BIMAESTRO_BROWSER_FOCUS__',
-    mode:'__BIMAESTRO_BROWSER_MODE__'
+    mode:'__BIMAESTRO_BROWSER_MODE__',
+    viewColors:{
+      plan:'__BIMAESTRO_PLAN_VIEW_COLOR__',
+      section:'__BIMAESTRO_SECTION_VIEW_COLOR__',
+      'three-d':'__BIMAESTRO_3D_VIEW_COLOR__',
+      elevation:'__BIMAESTRO_ELEVATION_VIEW_COLOR__',
+      schedule:'__BIMAESTRO_SCHEDULE_VIEW_COLOR__',
+      other:'__BIMAESTRO_OTHER_VIEW_COLOR__'
+    }
   };
   if(window[key]&&window[key].version!==version){
     const previous=window[key];
@@ -1510,6 +1667,8 @@ namespace Couleur
       '[data-bimaestro-arc-lock],'+
       '[data-bimaestro-arc-group],'+
       '[data-bimaestro-active-parent],'+
+      '[data-bimaestro-view-kind],'+
+      '[data-bimaestro-view-text],'+
       '[data-bimaestro-focus-overlay],'+
       '[data-bimaestro-focus-target],'+
       '[data-bimaestro-bubble-surface]')
@@ -1522,6 +1681,14 @@ namespace Couleur
         el.removeAttribute('data-bimaestro-arc-lock');
         el.removeAttribute('data-bimaestro-arc-group');
         el.removeAttribute('data-bimaestro-active-parent');
+        el.removeAttribute('data-bimaestro-view-kind');
+        el.removeAttribute('data-bimaestro-view-parent');
+        el.removeAttribute('data-bimaestro-selected');
+        el.removeAttribute('data-bimaestro-color-target');
+        if(el.hasAttribute('data-bimaestro-view-text'))
+          el.style.removeProperty('color');
+        el.removeAttribute('data-bimaestro-view-text');
+        el.style.removeProperty('--bimaestro-view-color');
         el.removeAttribute('data-bimaestro-focus-target');
         el.removeAttribute('data-bimaestro-bubble-surface');
       });
@@ -1700,6 +1867,29 @@ namespace Couleur
           margin-left:4px;
           text-shadow:0 0 1px rgba(255,255,255,.9);
         }
+        [data-bimaestro-view-kind][data-bimaestro-color-target='background']{
+          background-color:var(--bimaestro-view-color);
+          box-shadow:inset 3px 0 0 rgba(20,30,45,.20);
+          border-radius:3px;
+          box-sizing:border-box;
+        }
+        [data-bimaestro-view-kind][data-bimaestro-color-target='text']{
+          color:var(--bimaestro-view-color) !important;
+          font-weight:600;
+        }
+        [data-bimaestro-view-parent]{
+          font-weight:600;
+        }
+        [data-bimaestro-view-kind][data-bimaestro-selected]{
+          color:${theme.text} !important;
+          background-color:rgba(25,174,232,.78) !important;
+          background-image:linear-gradient(
+            rgba(25,174,232,.78),
+            rgba(25,174,232,.78)) !important;
+          box-shadow:
+            inset 4px 0 0 rgba(0,89,170,.92),
+            inset 0 0 0 1px rgba(0,122,204,1) !important;
+        }
         @media (prefers-reduced-motion:reduce){
           [data-bimaestro-bubble-surface='bubbles'],
           [data-bimaestro-bubble-surface='waves'],
@@ -1719,6 +1909,10 @@ namespace Couleur
         return r.width>0&&r.height>0&&r.bottom>=0&&
           r.top<=window.innerHeight;
       });
+    let viewTypesById=new Map();
+    let viewTypesByName=new Map();
+    let clickedRowId='';
+    let clickedRowName='';
     const paint=()=>{
       if(state.disposed)return;
       if(theme.appearanceEnabled){
@@ -1758,6 +1952,7 @@ namespace Couleur
           }
         });
       }
+      paintViewTypes();
       refreshActiveHighlight();
       renderActiveParent();
     };
@@ -1891,6 +2086,18 @@ namespace Couleur
       .replace(/\s+/g,' ')
       .trim()
       .toLocaleLowerCase();
+    const isSelectedElement=element=>{
+      if(!element)return false;
+      if(element.getAttribute&&(
+         element.getAttribute('aria-selected')==='true'||
+         element.getAttribute('aria-current')==='true'))
+        return true;
+      const className=typeof element.className==='string'
+        ?element.className
+        :(element.className&&element.className.baseVal)||'';
+      return /selected/i.test(className)&&
+             !/selectable/i.test(className);
+    };
     const getProjectBrowserRows=()=>{
       const wraps=Array.from(document.querySelectorAll(
         '[class*=""vTree_treeItemWrap""]'));
@@ -1922,6 +2129,9 @@ namespace Couleur
               const br=b.getBoundingClientRect();
               return ar.width*ar.height-br.width*br.height;
             });
+          const selected=[host,wrap,treeItem]
+            .concat(Array.from(wrap.querySelectorAll('*')))
+            .some(isSelectedElement);
           return {
             wrap,
             host,
@@ -1932,6 +2142,7 @@ namespace Couleur
             name,
             top:hostRect.top,
             left:rect.left,
+            selected,
             branch:null,
             ancestors:[]
           };
@@ -1960,6 +2171,133 @@ namespace Couleur
         stack.push(row);
       });
       return rows;
+    };
+    const clearViewTypeMarkers=()=>{
+      document.querySelectorAll('[data-bimaestro-view-text]')
+        .forEach(element=>{
+          element.removeAttribute('data-bimaestro-view-text');
+          if(theme.appearanceEnabled)
+            element.style.setProperty('color',theme.text,'important');
+          else
+            element.style.removeProperty('color');
+        });
+      document.querySelectorAll('[data-bimaestro-view-kind]')
+        .forEach(element=>{
+          element.removeAttribute('data-bimaestro-view-kind');
+          element.removeAttribute('data-bimaestro-view-parent');
+          element.removeAttribute('data-bimaestro-selected');
+          element.removeAttribute('data-bimaestro-color-target');
+          element.style.removeProperty('--bimaestro-view-color');
+        });
+    };
+    const resolveViewKind=row=>{
+      if(!row)return null;
+      let kind=row.id?viewTypesById.get(row.id):null;
+      if(!kind)kind=viewTypesByName.get(row.name);
+      if(!kind){
+        for(const [name,candidateKind] of viewTypesByName){
+          if(row.name.endsWith(`: ${name}`)||
+             row.name.endsWith(`:${name}`)){
+            kind=candidateKind;
+            break;
+          }
+        }
+      }
+      return kind||null;
+    };
+    const markViewTypeRow=(row,kind,isParent,customColor)=>{
+      const color=customColor||
+        (kind?theme.viewColors[kind]:null);
+      if(!row||!kind||!color)return;
+      row.wrap.setAttribute('data-bimaestro-view-kind',kind);
+      row.wrap.setAttribute(
+        'data-bimaestro-color-target',
+        theme.viewColorTarget);
+      if(isParent)
+        row.wrap.setAttribute('data-bimaestro-view-parent','1');
+      if(row.selected||
+         (clickedRowId&&row.id===clickedRowId)||
+         (clickedRowName&&row.name===clickedRowName))
+        row.wrap.setAttribute('data-bimaestro-selected','1');
+      row.wrap.style.setProperty('--bimaestro-view-color',color);
+      if(theme.viewColorTarget==='text'&&row.label){
+        row.label.setAttribute('data-bimaestro-view-text','1');
+        const selected=row.wrap.hasAttribute('data-bimaestro-selected');
+        row.label.style.setProperty(
+          'color',
+          selected?theme.text:color,
+          'important');
+      }
+    };
+    const getCategoryRule=row=>{
+      if(!theme.categoryEnabled||
+         !Array.isArray(theme.categoryRules))return null;
+      const candidates=[row]
+        .concat((row.ancestors||[]).slice().reverse());
+      for(const candidate of candidates){
+        const rule=theme.categoryRules.find(item=>
+          item&&normalizeLabel(item.name)===candidate.name);
+        if(rule&&rule.color)return rule;
+      }
+      return null;
+    };
+    const paintViewTypes=()=>{
+      clearViewTypeMarkers();
+      const hasViewTypes=theme.viewTypeEnabled&&
+        (viewTypesById.size||viewTypesByName.size);
+      const hasCategories=theme.categoryEnabled&&
+        Array.isArray(theme.categoryRules)&&
+        theme.categoryRules.length;
+      if(!hasViewTypes&&!hasCategories)return;
+      const rows=getProjectBrowserRows();
+      const coloredRows=[];
+      rows.filter(row=>row.branch!=='sheets')
+        .forEach(row=>{
+          const categoryRule=getCategoryRule(row);
+          if(categoryRule){
+            markViewTypeRow(
+              row,
+              'category',
+              false,
+              categoryRule.color);
+            return;
+          }
+          if(!hasViewTypes)return;
+          const kind=resolveViewKind(row);
+          if(!kind||!theme.viewColors[kind])return;
+          coloredRows.push({row,kind});
+          markViewTypeRow(row,kind,false);
+        });
+      if(!hasViewTypes||!theme.viewParentEnabled)return;
+      const parentKinds=new Map();
+      coloredRows.forEach(item=>{
+        const ancestors=item.row.ancestors||[];
+        const parent=ancestors.length
+          ?ancestors[ancestors.length-1]
+          :null;
+        if(!parent||parent.branch==='sheets')return;
+        if(!parentKinds.has(parent))parentKinds.set(parent,new Set());
+        parentKinds.get(parent).add(item.kind);
+      });
+      parentKinds.forEach((kinds,parent)=>{
+        if(kinds.size===1)
+          markViewTypeRow(parent,Array.from(kinds)[0],true);
+      });
+    };
+    const setViewTypes=entries=>{
+      viewTypesById=new Map();
+      viewTypesByName=new Map();
+      if(Array.isArray(entries))
+        entries.forEach(entry=>{
+          if(!entry||typeof entry!=='object')return;
+          const id=String(entry.id||'');
+          const name=normalizeLabel(entry.name);
+          const kind=String(entry.kind||'');
+          if(!theme.viewColors[kind])return;
+          if(id)viewTypesById.set(id,kind);
+          if(name)viewTypesByName.set(name,kind);
+        });
+      paintViewTypes();
     };
     const findTreeScroller=rows=>{
       const seed=rows&&rows.length
@@ -2282,12 +2620,21 @@ namespace Couleur
       renderActiveParent();
       scheduleActiveParentRetries([70,220,550]);
     };
-    const onBrowserClick=()=>{
+    const onBrowserClick=event=>{
+      const target=event&&event.target;
+      const clickedWrap=target&&target.closest
+        ?target.closest('[class*=""vTree_treeItemWrap""]')
+        :null;
+      const clickedRow=clickedWrap
+        ?getProjectBrowserRows().find(row=>row.wrap===clickedWrap)
+        :null;
+      clickedRowId=clickedRow?clickedRow.id:'';
+      clickedRowName=clickedRow?clickedRow.name:'';
       if(activeParentClickTimer!==null)
         clearTimeout(activeParentClickTimer);
       activeParentClickTimer=setTimeout(()=>{
         activeParentClickTimer=null;
-        renderActiveParent();
+        paint();
       },90);
       scheduleActiveParentRetries([180,450]);
     };
@@ -2316,6 +2663,12 @@ namespace Couleur
       {
         childList:true,
         characterData:true,
+        attributes:true,
+        attributeFilter:[
+          'aria-selected',
+          'aria-current',
+          'class'
+        ],
         subtree:true
       });
     const dispose=()=>{
@@ -2332,6 +2685,7 @@ namespace Couleur
       }
       activeParentRetryTimers.forEach(clearTimeout);
       activeParentRetryTimers=[];
+      clearViewTypeMarkers();
       document.removeEventListener(
         'click',
         onBrowserClick,
@@ -2359,6 +2713,7 @@ namespace Couleur
       scheduleClearFocus,
       setActiveView,
       clearActiveView,
+      setViewTypes,
       dispose
     };
   }
@@ -2373,6 +2728,32 @@ namespace Couleur
                     settings.IsActiveViewParentHighlightEnabled
                         ? "true"
                         : "false")
+                .Replace(
+                    "__BIMAESTRO_VIEW_TYPE_ENABLED__",
+                    settings.IsViewTypeColoringEnabled
+                        ? "true"
+                        : "false")
+                .Replace(
+                    "__BIMAESTRO_VIEW_PARENT_ENABLED__",
+                    settings.IsViewTypeParentColoringEnabled
+                        ? "true"
+                        : "false")
+                .Replace(
+                    "__BIMAESTRO_CATEGORY_ENABLED__",
+                    settings.IsCategoryColoringEnabled
+                        ? "true"
+                        : "false")
+                .Replace(
+                    "__BIMAESTRO_CATEGORY_RULES__",
+                    categoryRulesJson)
+                .Replace(
+                    "__BIMAESTRO_VIEW_COLOR_TARGET__",
+                    string.Equals(
+                        settings.ViewColorTarget,
+                        "Texte",
+                        StringComparison.OrdinalIgnoreCase)
+                        ? "text"
+                        : "background")
                 .Replace(
                     "__BIMAESTRO_BROWSER_BACKGROUND__",
                     ToCssColor(settings.BackgroundColor))
@@ -2391,7 +2772,25 @@ namespace Couleur
                 .Replace(
                     "__BIMAESTRO_BROWSER_MODE__",
                     GetBrowserBackgroundMode(
-                        settings.BackgroundMode));
+                        settings.BackgroundMode))
+                .Replace(
+                    "__BIMAESTRO_PLAN_VIEW_COLOR__",
+                    ToCssColor(settings.PlanViewColor))
+                .Replace(
+                    "__BIMAESTRO_SECTION_VIEW_COLOR__",
+                    ToCssColor(settings.SectionViewColor))
+                .Replace(
+                    "__BIMAESTRO_3D_VIEW_COLOR__",
+                    ToCssColor(settings.ThreeDViewColor))
+                .Replace(
+                    "__BIMAESTRO_ELEVATION_VIEW_COLOR__",
+                    ToCssColor(settings.ElevationViewColor))
+                .Replace(
+                    "__BIMAESTRO_SCHEDULE_VIEW_COLOR__",
+                    ToCssColor(settings.ScheduleViewColor))
+                .Replace(
+                    "__BIMAESTRO_OTHER_VIEW_COLOR__",
+                    ToCssColor(settings.OtherViewColor));
         }
 
         private static string ToCssColor(Color color)
