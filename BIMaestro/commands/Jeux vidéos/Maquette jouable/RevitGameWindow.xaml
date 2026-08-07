@@ -294,9 +294,43 @@
                 <StackPanel x:Name="MepNetworkContentPanel"
                             Grid.Row="2"
                             Visibility="Collapsed">
-                        <TextBlock Text="SYSTÈMES AFFICHÉS"
+                        <TextBlock Text="SCÉNARIOS"
                                    Style="{StaticResource SectionLabel}"
                                    Margin="0,3,0,6"/>
+                        <ComboBox x:Name="MepScenarioCombo"
+                                  IsEditable="True"
+                                  DisplayMemberPath="Name"
+                                  Height="30"
+                                  ToolTip="Choisis un scénario ou saisis un nouveau nom"/>
+                        <Grid Margin="0,6,0,3">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Button Style="{StaticResource PrimaryGameButton}"
+                                    Content="Enregistrer"
+                                    Padding="7,5"
+                                    Margin="0,0,2,0"
+                                    Click="MepSaveNamedScenarioButton_Click"/>
+                            <Button Grid.Column="1"
+                                    Style="{StaticResource GlassButton}"
+                                    Content="Charger"
+                                    Padding="7,5"
+                                    Margin="2,0"
+                                    Click="MepLoadNamedScenarioButton_Click"/>
+                            <Button Grid.Column="2"
+                                    Style="{StaticResource GlassButton}"
+                                    Content="Supprimer"
+                                    Padding="7,5"
+                                    Margin="2,0,0,0"
+                                    Click="MepDeleteNamedScenarioButton_Click"/>
+                        </Grid>
+
+                        <Border Height="1" Background="#557B91AA" Margin="0,10"/>
+                        <TextBlock Text="SYSTÈMES AFFICHÉS"
+                                   Style="{StaticResource SectionLabel}"
+                                   Margin="0,0,0,6"/>
                         <ListBox x:Name="MepSystemsList"
                                  MaxHeight="145"
                                  Background="Transparent"

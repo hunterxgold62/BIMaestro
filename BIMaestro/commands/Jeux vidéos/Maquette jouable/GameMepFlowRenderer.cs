@@ -175,7 +175,6 @@ namespace BIMaestro.VideoGames
         public bool Paused { get; set; }
         public int ParticleCount => _particles.Count;
         public double LastAnimationMilliseconds { get; private set; }
-
         public void SetEnabled(bool enabled, Point3D cameraPosition)
         {
             Enabled = enabled && _graph.HasData;

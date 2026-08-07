@@ -13,6 +13,11 @@ namespace BIMaestro.VideoGames
     {
         private const double WalkableNormalZ = 0.54; // pente maximale proche de 57°
         private const int MaximumCellsPerTriangle = 512;
+        private const double SpawnRadius = 0.76;
+        private const double SpawnHeight = 5.80;
+        private const double SpawnStepHeight = 0.86;
+        private const double SpawnGroundOffset = 0.04;
+        private const double SpawnSafetyMargin = 0.12;
 
         private readonly IList<GameTriangle> _triangles;
         private readonly Dictionary<long, List<int>> _grid = new Dictionary<long, List<int>>();
@@ -33,7 +38,7 @@ namespace BIMaestro.VideoGames
                 scene.Bounds.SizeY * scene.Bounds.SizeY);
             _cellSize = Math.Max(5.0, Math.Min(20.0, horizontalDiagonal / 80.0));
             BuildIndex();
-            scene.SpawnFootPosition = FindSpawn(scene);
+            scene.SpawnFootPosition = FindSafeSpawn(scene);
         }
 
         public bool TryFindGround(double x, double y, double maximumZ, double minimumZ, out double groundZ)
@@ -131,6 +136,18 @@ namespace BIMaestro.VideoGames
             return false;
         }
 
+        public Point3D FindSafeSpawn(GameSceneData scene)
+        {
+            if (scene == null) throw new ArgumentNullException(nameof(scene));
+            return FindSpawn(scene);
+        }
+
+        public bool IsSafeSpawn(Point3D foot)
+        {
+            double groundZ = foot.Z - SpawnGroundOffset;
+            return IsSpawnVolumeClear(foot) && HasStableGroundSupport(foot.X, foot.Y, groundZ);
+        }
+
        private void BuildIndex()
         {
             for (int index = 0; index < _triangles.Count; index++)
@@ -173,19 +190,6 @@ namespace BIMaestro.VideoGames
                 eye.Y >= bounds.Y - 5 && eye.Y <= bounds.Y + bounds.SizeY + 5 &&
                 eye.Z >= bounds.Z && eye.Z <= bounds.Z + bounds.SizeZ + 15;
 
-            if (eyeNearModel &&
-                TryFindGroundDetailed(
-                    eye.X,
-                    eye.Y,
-                    eye.Z + 1.0,
-                    bounds.Z - 2.0,
-                    true,
-                    out double eyeGround,
-                    out _))
-            {
-                return new Point3D(eye.X, eye.Y, eyeGround + 0.04);
-            }
-
             double targetX = bounds.X + bounds.SizeX * 0.5;
             double targetY = bounds.Y + bounds.SizeY * 0.5;
             Vector3D forward = scene.ViewForward;
@@ -210,6 +214,18 @@ namespace BIMaestro.VideoGames
             if (candidates.Count == 0)
                 return new Point3D(targetX, targetY, bounds.Z + bounds.SizeZ + 3.0);
 
+            if (eyeNearModel &&
+                TryCreateSafeSpawn(
+                    eye.X,
+                    eye.Y,
+                    eye.Z + 1.0,
+                    bounds.Z - 2.0,
+                    true,
+                    out Point3D eyeSpawn))
+            {
+                return eyeSpawn;
+            }
+
             // Favorise un niveau bas (entrée/RDC) tout en restant proche du centre
             // visé par la caméra Revit. Cela évite de faire apparaître le joueur
             // automatiquement sur une toiture.
@@ -217,27 +233,140 @@ namespace BIMaestro.VideoGames
             double lowLevel = elevations[Math.Min(elevations.Length - 1, elevations.Length / 5)];
             double acceptedTop = lowLevel + 6.0;
 
-            GameTriangle selected = candidates
+            List<GameTriangle> ordered = candidates
                 .Where(t => t.Centroid.Z <= acceptedTop)
                 .OrderBy(t => SquaredDistance2D(t.Centroid.X, t.Centroid.Y, targetX, targetY))
                 .ThenByDescending(t => t.HorizontalArea)
-                .FirstOrDefault()
-                ?? candidates.OrderBy(t => SquaredDistance2D(t.Centroid.X, t.Centroid.Y, targetX, targetY)).First();
+                .ToList();
+            if (ordered.Count == 0)
+                ordered = candidates
+                    .OrderBy(t => SquaredDistance2D(t.Centroid.X, t.Centroid.Y, targetX, targetY))
+                    .ThenByDescending(t => t.HorizontalArea)
+                    .ToList();
 
-            Point3D centroid = selected.Centroid;
-            if (TryFindGroundDetailed(
-                centroid.X,
-                centroid.Y,
-                selected.MaxZ + 1.0,
-                selected.MinZ - 2.0,
-                selected.PreferredWalkable,
-                out double spawnZ,
-                out _))
+            double[] searchRadii = { 0.0, 2.0, 3.5, 5.5, 8.0, 12.0 };
+            int anchorCount = Math.Min(ordered.Count, 192);
+            for (int anchorIndex = 0; anchorIndex < anchorCount; anchorIndex++)
             {
-                return new Point3D(centroid.X, centroid.Y, spawnZ + 0.04);
+                GameTriangle floor = ordered[anchorIndex];
+                Point3D anchor = floor.Centroid;
+                for (int radiusIndex = 0; radiusIndex < searchRadii.Length; radiusIndex++)
+                {
+                    double radius = searchRadii[radiusIndex];
+                    int samples = radius < 0.01 ? 1 : 12;
+                    for (int sample = 0; sample < samples; sample++)
+                    {
+                        double angle = samples == 1 ? 0.0 : Math.PI * 2.0 * sample / samples;
+                        double x = anchor.X + Math.Cos(angle) * radius;
+                        double y = anchor.Y + Math.Sin(angle) * radius;
+                        if (TryCreateSafeSpawn(
+                            x,
+                            y,
+                            floor.MaxZ + SpawnStepHeight + 0.25,
+                            floor.MinZ - 1.5,
+                            floor.PreferredWalkable,
+                            out Point3D spawn))
+                        {
+                            return spawn;
+                        }
+                    }
+                }
             }
 
-            return new Point3D(centroid.X, centroid.Y, centroid.Z + 0.04);
+            foreach (GameTriangle floor in candidates
+                .OrderByDescending(t => t.HorizontalArea)
+                .Take(512))
+            {
+                Point3D centroid = floor.Centroid;
+                if (TryCreateSafeSpawn(
+                    centroid.X,
+                    centroid.Y,
+                    floor.MaxZ + SpawnStepHeight + 0.25,
+                    floor.MinZ - 1.5,
+                    false,
+                    out Point3D spawn))
+                {
+                    return spawn;
+                }
+            }
+
+            return new Point3D(
+                targetX,
+                targetY,
+                bounds.Z + bounds.SizeZ + SpawnHeight + 3.0);
+        }
+
+        private bool TryCreateSafeSpawn(
+            double x,
+            double y,
+            double maximumZ,
+            double minimumZ,
+            bool preferredOnly,
+            out Point3D spawn)
+        {
+            spawn = new Point3D();
+            if (!TryFindGroundDetailed(
+                x,
+                y,
+                maximumZ,
+                minimumZ,
+                preferredOnly,
+                out double groundZ,
+                out double normalZ) ||
+                normalZ < WalkableNormalZ)
+            {
+                return false;
+            }
+
+            var candidate = new Point3D(x, y, groundZ + SpawnGroundOffset);
+            if (!IsSpawnVolumeClear(candidate) || !HasStableGroundSupport(x, y, groundZ))
+                return false;
+
+            spawn = candidate;
+            return true;
+        }
+
+        private bool IsSpawnVolumeClear(Point3D foot)
+        {
+            if (IsBodyBlocked(
+                foot,
+                SpawnRadius + SpawnSafetyMargin,
+                SpawnHeight,
+                SpawnStepHeight))
+            {
+                return false;
+            }
+
+            double minimumHeadZ = foot.Z + SpawnStepHeight + 0.05;
+            double maximumHeadZ = foot.Z + SpawnHeight + SpawnSafetyMargin;
+            return !TryFindCeiling(foot.X, foot.Y, minimumHeadZ, maximumHeadZ, out _);
+        }
+
+        private bool HasStableGroundSupport(double x, double y, double centerGroundZ)
+        {
+            const int samples = 8;
+            double supportRadius = SpawnRadius * 0.68;
+            for (int sample = 0; sample < samples; sample++)
+            {
+                double angle = Math.PI * 2.0 * sample / samples;
+                double sampleX = x + Math.Cos(angle) * supportRadius;
+                double sampleY = y + Math.Sin(angle) * supportRadius;
+                if (!TryFindGroundDetailed(
+                    sampleX,
+                    sampleY,
+                    centerGroundZ + SpawnStepHeight,
+                    centerGroundZ - SpawnStepHeight,
+                    false,
+                    out double sampleGroundZ,
+                    out double normalZ) ||
+                    normalZ < WalkableNormalZ ||
+                    Math.Abs(sampleGroundZ - centerGroundZ) > SpawnStepHeight)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private bool TryFindGroundDetailed(

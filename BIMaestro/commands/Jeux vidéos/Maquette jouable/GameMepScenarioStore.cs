@@ -26,6 +26,7 @@ namespace BIMaestro.VideoGames
         public string ModelKeyHash { get; set; } = string.Empty;
         public string DocumentTitle { get; set; } = string.Empty;
         public DateTime SavedUtc { get; set; }
+        public string ScenarioName { get; set; } = string.Empty;
         public IList<GameMepScenarioValveState> Valves { get; set; } =
             new List<GameMepScenarioValveState>();
         public IList<GameMepScenarioSourceState> Sources { get; set; } =
@@ -45,6 +46,12 @@ namespace BIMaestro.VideoGames
         [JsonIgnore]
         public bool HasUserState =>
             Valves.Count > 0 || Sources.Count > 0 || DirectionConstraints.Count > 0;
+    }
+
+    internal sealed class GameMepNamedScenarioInfo
+    {
+        public string Name { get; set; } = string.Empty;
+        public DateTime SavedUtc { get; set; }
     }
 
     internal sealed class GameMepScenarioValveState
@@ -86,6 +93,9 @@ namespace BIMaestro.VideoGames
         private static readonly object StorageLock = new object();
         private static readonly Dictionary<string, GameMepScenarioSnapshot>
             SessionScenarios =
+                new Dictionary<string, GameMepScenarioSnapshot>(StringComparer.Ordinal);
+        private static readonly Dictionary<string, GameMepScenarioSnapshot>
+            SessionNamedScenarios =
                 new Dictionary<string, GameMepScenarioSnapshot>(StringComparer.Ordinal);
         private static readonly Dictionary<string, long> LatestRevisionByModel =
             new Dictionary<string, long>(StringComparer.Ordinal);
@@ -200,6 +210,143 @@ namespace BIMaestro.VideoGames
                     exception);
                 return false;
             }
+        }
+
+        public static IList<GameMepNamedScenarioInfo> ListNamed(
+            GameMepGraphData graph,
+            string? storageDirectoryOverride = null)
+        {
+            if (graph == null || string.IsNullOrWhiteSpace(graph.ScenarioModelKey))
+                return new List<GameMepNamedScenarioInfo>();
+            if (!graph.ScenarioCanPersist)
+            {
+                string prefix = graph.ScenarioModelKey + "\n";
+                lock (StorageLock)
+                {
+                    return SessionNamedScenarios
+                        .Where(pair => pair.Key.StartsWith(prefix, StringComparison.Ordinal))
+                        .Select(pair => new GameMepNamedScenarioInfo
+                        {
+                            Name = pair.Value.ScenarioName,
+                            SavedUtc = pair.Value.SavedUtc
+                        })
+                        .OrderBy(item => item.Name,
+                            StringComparer.CurrentCultureIgnoreCase)
+                        .ToList();
+                }
+            }
+
+            string directory = ResolveStorageDirectory(storageDirectoryOverride);
+            if (!Directory.Exists(directory))
+                return new List<GameMepNamedScenarioInfo>();
+            string pattern = ComputeModelKeyHash(graph.ScenarioModelKey) +
+                ".named.*.json";
+            var items = new List<GameMepNamedScenarioInfo>();
+            foreach (string path in Directory.GetFiles(directory, pattern))
+            {
+                try
+                {
+                    GameMepScenarioSnapshot snapshot = Deserialize(
+                        File.ReadAllText(path, Encoding.UTF8));
+                    if (!string.IsNullOrWhiteSpace(snapshot.ScenarioName) &&
+                        string.Equals(snapshot.ModelKeyHash,
+                            ComputeModelKeyHash(graph.ScenarioModelKey),
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        items.Add(new GameMepNamedScenarioInfo
+                        {
+                            Name = snapshot.ScenarioName,
+                            SavedUtc = snapshot.SavedUtc
+                        });
+                    }
+                }
+                catch (Exception exception)
+                {
+                    GameRuntimeDiagnostics.Write(
+                        "Scénario MEP nommé illisible ignoré : " + path,
+                        exception);
+                }
+            }
+            return items.OrderBy(item => item.Name,
+                StringComparer.CurrentCultureIgnoreCase).ToList();
+        }
+
+        public static void SaveNamed(
+            GameMepGraphData graph,
+            string name,
+            string? storageDirectoryOverride = null)
+        {
+            string normalizedName = NormalizeScenarioName(name);
+            GameMepScenarioSnapshot snapshot = Capture(graph);
+            snapshot.ScenarioName = normalizedName;
+            if (!snapshot.CanPersist)
+            {
+                lock (StorageLock)
+                {
+                    SessionNamedScenarios[GetSessionNamedKey(
+                        graph.ScenarioModelKey, normalizedName)] = snapshot;
+                }
+                return;
+            }
+            WriteNamedSnapshot(snapshot, storageDirectoryOverride);
+        }
+
+        public static GameMepScenarioRestoreResult RestoreNamed(
+            GameMepGraphData graph,
+            string name,
+            string? storageDirectoryOverride = null)
+        {
+            string normalizedName = NormalizeScenarioName(name);
+            GameMepScenarioSnapshot? snapshot;
+            if (graph.ScenarioCanPersist)
+            {
+                string path = GetNamedScenarioFilePath(
+                    graph, normalizedName, storageDirectoryOverride);
+                if (!File.Exists(path))
+                    throw new FileNotFoundException("Scénario MEP introuvable.", path);
+                snapshot = Deserialize(File.ReadAllText(path, Encoding.UTF8));
+            }
+            else
+            {
+                lock (StorageLock)
+                {
+                    SessionNamedScenarios.TryGetValue(
+                        GetSessionNamedKey(graph.ScenarioModelKey, normalizedName),
+                        out snapshot);
+                }
+                if (snapshot == null)
+                    throw new InvalidOperationException("Scénario MEP introuvable.");
+            }
+
+            GameMepScenarioReset.ResetValvesToInitial(graph.Valves);
+            GameMepScenarioReset.ResetSourcesAndDirections(graph, _ => true);
+            var result = new GameMepScenarioRestoreResult();
+            ApplySnapshot(graph, snapshot, result);
+            graph.RebuildIndexes();
+            return result;
+        }
+
+        public static bool DeleteNamed(
+            GameMepGraphData graph,
+            string name,
+            string? storageDirectoryOverride = null)
+        {
+            string normalizedName = NormalizeScenarioName(name);
+            if (!graph.ScenarioCanPersist)
+            {
+                lock (StorageLock)
+                {
+                    return SessionNamedScenarios.Remove(
+                        GetSessionNamedKey(graph.ScenarioModelKey, normalizedName));
+                }
+            }
+            string path = GetNamedScenarioFilePath(
+                graph, normalizedName, storageDirectoryOverride);
+            if (!File.Exists(path))
+                return false;
+            File.Delete(path);
+            TryDelete(path + ".bak");
+            return true;
         }
 
         internal static GameMepScenarioSnapshot Capture(GameMepGraphData graph)
@@ -603,6 +750,63 @@ namespace BIMaestro.VideoGames
             {
                 TryDelete(temporaryPath);
             }
+        }
+
+        private static void WriteNamedSnapshot(
+            GameMepScenarioSnapshot snapshot,
+            string? storageDirectoryOverride)
+        {
+            string directory = ResolveStorageDirectory(storageDirectoryOverride);
+            Directory.CreateDirectory(directory);
+            string path = Path.Combine(directory,
+                snapshot.ModelKeyHash + ".named." +
+                ComputeScenarioNameHash(snapshot.ScenarioName) + ".json");
+            string temporaryPath = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            string backupPath = path + ".bak";
+            try
+            {
+                string json = JsonConvert.SerializeObject(snapshot, Formatting.Indented);
+                File.WriteAllText(temporaryPath, json, new UTF8Encoding(false));
+                if (File.Exists(path))
+                {
+                    TryDelete(backupPath);
+                    File.Replace(temporaryPath, path, backupPath, true);
+                }
+                else
+                    File.Move(temporaryPath, path);
+            }
+            finally
+            {
+                TryDelete(temporaryPath);
+            }
+        }
+
+        private static string GetNamedScenarioFilePath(
+            GameMepGraphData graph,
+            string name,
+            string? storageDirectoryOverride)
+        {
+            return Path.Combine(
+                ResolveStorageDirectory(storageDirectoryOverride),
+                ComputeModelKeyHash(graph.ScenarioModelKey) + ".named." +
+                ComputeScenarioNameHash(name) + ".json");
+        }
+
+        private static string GetSessionNamedKey(string modelKey, string name) =>
+            (modelKey ?? string.Empty) + "\n" + name.ToLowerInvariant();
+
+        private static string ComputeScenarioNameHash(string name) =>
+            ComputeModelKeyHash((name ?? string.Empty).ToLowerInvariant())
+                .Substring(0, 24);
+
+        private static string NormalizeScenarioName(string name)
+        {
+            string normalized = (name ?? string.Empty).Trim();
+            if (normalized.Length == 0)
+                throw new ArgumentException("Donne un nom au scénario.", nameof(name));
+            if (normalized.Length > 80)
+                normalized = normalized.Substring(0, 80).Trim();
+            return normalized;
         }
 
         internal static string GetScenarioFilePath(

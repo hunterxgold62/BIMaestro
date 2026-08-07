@@ -72,6 +72,7 @@ namespace BIMaestro.VideoGames
                 NetworkWithoutSourceStaysUnknown();
                 EmptyGraphDoesNotFail();
                 ScenarioRoundTripRestoresSourcesAndValves();
+                NamedScenariosCanBeSavedLoadedAndDeleted();
                 ResetRemovesPersistedScenario();
                 ChangedNetworkSkipsInvalidDirection();
                 ScenarioFilesAreIsolatedByModel();
@@ -1528,6 +1529,49 @@ namespace BIMaestro.VideoGames
             }
         }
 
+        private static void NamedScenariosCanBeSavedLoadedAndDeleted()
+        {
+            string directory = CreateTestDirectory();
+            try
+            {
+                var fixture = new PersistenceFixture("FILE|C:/NAMED-SCENARIOS.RVT");
+                fixture.AddElement("valve", "uid-named-valve", "n0", "n1");
+                fixture.AddValve("valve", true, false, initiallyEnabled: true);
+
+                GameMepScenarioStore.SaveNamed(
+                    fixture.Graph, "Fonctionnement normal", directory);
+                fixture.Graph.FindValve("valve")!.IsClosed = true;
+                fixture.Graph.FindValve("valve")!.WasManuallyOverridden = true;
+                GameMepScenarioStore.SaveNamed(
+                    fixture.Graph, "Maintenance", directory);
+
+                IList<GameMepNamedScenarioInfo> scenarios =
+                    GameMepScenarioStore.ListNamed(fixture.Graph, directory);
+                Assert(scenarios.Count == 2 &&
+                    scenarios.Any(item => item.Name == "Fonctionnement normal") &&
+                    scenarios.Any(item => item.Name == "Maintenance"),
+                    "Named scenarios must be listed independently for the model.");
+
+                GameMepScenarioStore.RestoreNamed(
+                    fixture.Graph, "Fonctionnement normal", directory);
+                Assert(!fixture.Graph.FindValve("valve")!.IsClosed,
+                    "Loading the normal scenario must reopen the valve.");
+                GameMepScenarioStore.RestoreNamed(
+                    fixture.Graph, "Maintenance", directory);
+                Assert(fixture.Graph.FindValve("valve")!.IsClosed,
+                    "Loading the maintenance scenario must restore the closed valve.");
+
+                Assert(GameMepScenarioStore.DeleteNamed(
+                        fixture.Graph, "Maintenance", directory) &&
+                    GameMepScenarioStore.ListNamed(fixture.Graph, directory).Count == 1,
+                    "Deleting one named scenario must preserve the other one.");
+            }
+            finally
+            {
+                DeleteTestDirectory(directory);
+            }
+        }
+
         private static void ResetRemovesPersistedScenario()
         {
             string directory = CreateTestDirectory();
@@ -1928,6 +1972,15 @@ namespace BIMaestro.VideoGames
                 {
                     source.SystemKey = systemKey;
                 }
+            }
+
+            public void SetPathLength(string key, double length)
+            {
+                GameMepPathData path = Path(key);
+                path.Points.Clear();
+                path.Points.Add(new Point3D(0.0, 0.0, 0.0));
+                path.Points.Add(new Point3D(length, 0.0, 0.0));
+                path.FinalizePath();
             }
 
             public void SetDirectedSource(

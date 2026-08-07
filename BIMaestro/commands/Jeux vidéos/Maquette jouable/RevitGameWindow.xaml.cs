@@ -57,6 +57,9 @@ namespace BIMaestro.VideoGames
             new ObservableCollection<GameMepSystemItem>();
         private readonly ObservableCollection<GameMepSourceItem> _mepSourceItems =
             new ObservableCollection<GameMepSourceItem>();
+        private readonly ObservableCollection<GameMepNamedScenarioInfo>
+            _mepNamedScenarios =
+                new ObservableCollection<GameMepNamedScenarioInfo>();
         private readonly ObservableCollection<GameMepDiagnosticItem>
             _mepDiagnosticItems =
                 new ObservableCollection<GameMepDiagnosticItem>();
@@ -87,6 +90,7 @@ namespace BIMaestro.VideoGames
         private double _lastFrameSeconds;
         private double _simulationAccumulator;
         private double _lastSpeed;
+        private double _wheelMoveRemaining;
         private int _frameSamples;
         private bool _grounded;
         private bool _flyMode;
@@ -131,6 +135,7 @@ namespace BIMaestro.VideoGames
             SelectedElementHistoryList.ItemsSource = _selectedElementHistory;
             MepSystemsList.ItemsSource = _mepSystemItems;
             MepSourcesList.ItemsSource = _mepSourceItems;
+            MepScenarioCombo.ItemsSource = _mepNamedScenarios;
             MepDiagnosticsList.ItemsSource = _mepDiagnosticItems;
             InitializeMepDiagnosticFilters();
             InitializeMepItems();
@@ -203,6 +208,10 @@ namespace BIMaestro.VideoGames
             GameViewport.MouseRightButtonDown += GameViewport_MouseRightButtonDown;
             GameViewport.MouseRightButtonUp += GameViewport_MouseRightButtonUp;
             GameViewport.MouseMove += GameViewport_MouseMove;
+            AddHandler(
+                Mouse.PreviewMouseWheelEvent,
+                new MouseWheelEventHandler(GameViewport_MouseWheel),
+                true);
             GameViewport.MouseLeave += GameViewport_MouseLeave;
             GameViewport.SizeChanged += GameViewport_SizeChanged;
             GameViewport.OnRendered += GameViewport_OnRendered;
@@ -303,6 +312,9 @@ namespace BIMaestro.VideoGames
             CompositionTarget.Rendering -= CompositionTarget_Rendering;
             GameViewport.SizeChanged -= GameViewport_SizeChanged;
             GameViewport.MouseLeave -= GameViewport_MouseLeave;
+            RemoveHandler(
+                Mouse.PreviewMouseWheelEvent,
+                new MouseWheelEventHandler(GameViewport_MouseWheel));
             GameViewport.OnRendered -= GameViewport_OnRendered;
             GameViewport.RenderExceptionOccurred -= GameViewport_RenderExceptionOccurred;
             Dispatcher.UnhandledException -= GameDispatcher_UnhandledException;
@@ -624,6 +636,9 @@ namespace BIMaestro.VideoGames
 
         private void ResetPlayer(bool announce)
         {
+            if (!_world.IsSafeSpawn(_scene.SpawnFootPosition))
+                _scene.SpawnFootPosition = _world.FindSafeSpawn(_scene);
+
             _footPosition = _scene.SpawnFootPosition;
             _yaw = _scene.InitialYawRadians;
             _pitch = 0.0;
@@ -641,10 +656,12 @@ namespace BIMaestro.VideoGames
 
             if (_grounded)
                 _footPosition.Z = ground + GroundOffset;
+            else
+                _flyMode = true;
 
             _previousFootPosition = _footPosition;
             _renderFootPosition = _footPosition;
-            ModeText.Text = "MARCHE";
+            ModeText.Text = _flyMode ? "VOL LIBRE" : "MARCHE";
             UpdateCamera(_renderFootPosition);
             if (announce)
                 ShowToast("Retour au point de départ");
@@ -715,6 +732,19 @@ namespace BIMaestro.VideoGames
             double forwardInput = Axis(
                 IsDown(Key.Z) || IsDown(Key.W) || IsDown(Key.Up),
                 IsDown(Key.S) || IsDown(Key.Down));
+            if (Math.Abs(_wheelMoveRemaining) > 1e-6)
+            {
+                double maximumWheelStep = WalkSpeed * deltaTime;
+                double wheelStep = Clamp(
+                    _wheelMoveRemaining,
+                    -maximumWheelStep,
+                    maximumWheelStep);
+                forwardInput = Clamp(
+                    forwardInput + wheelStep / Math.Max(1e-9, maximumWheelStep),
+                    -1.0,
+                    1.0);
+                _wheelMoveRemaining -= wheelStep;
+            }
             double rightInput = Axis(
                 IsDown(Key.D) || IsDown(Key.Right),
                 IsDown(Key.Q) || IsDown(Key.A) || IsDown(Key.Left));
@@ -1271,6 +1301,23 @@ namespace BIMaestro.VideoGames
             e.Handled = true;
         }
 
+        private void GameViewport_MouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (!_readyToPlay || !_scenePrepared || !GameViewport.IsMouseOver ||
+                MepPanel.IsMouseOver || ObjectInfoPanel.IsMouseOver)
+            {
+                return;
+            }
+            // Un cran correspond à environ un mètre. Le déplacement est
+            // consommé progressivement par la physique afin de conserver les
+            // collisions, les marches et la fluidité de la caméra.
+            _wheelMoveRemaining = Clamp(
+                _wheelMoveRemaining + (e.Delta / 120.0) * 3.2,
+                -12.0,
+                12.0);
+            e.Handled = true;
+        }
+
         private void GameViewport_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
             Point releasedPosition = e.GetPosition(GameViewport);
@@ -1811,7 +1858,122 @@ namespace BIMaestro.VideoGames
             }
 
             RebuildMepSourceItems();
+            RefreshNamedScenarios();
             UpdateMepUi();
+        }
+
+        private void RefreshNamedScenarios(string selectedName = "")
+        {
+            _mepNamedScenarios.Clear();
+            try
+            {
+                foreach (GameMepNamedScenarioInfo scenario in
+                    GameMepScenarioStore.ListNamed(_scene.MepGraph))
+                {
+                    _mepNamedScenarios.Add(scenario);
+                }
+                if (!string.IsNullOrWhiteSpace(selectedName))
+                {
+                    GameMepNamedScenarioInfo? selected = _mepNamedScenarios
+                        .FirstOrDefault(item => string.Equals(
+                            item.Name,
+                            selectedName,
+                            StringComparison.CurrentCultureIgnoreCase));
+                    if (selected != null)
+                        MepScenarioCombo.SelectedItem = selected;
+                    MepScenarioCombo.Text = selectedName;
+                }
+            }
+            catch (Exception exception)
+            {
+                GameRuntimeDiagnostics.Write(
+                    "Lecture des scénarios MEP nommés impossible",
+                    exception);
+            }
+        }
+
+        private string SelectedNamedScenario() =>
+            (MepScenarioCombo.Text ?? string.Empty).Trim();
+
+        private void MepSaveNamedScenarioButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            string name = SelectedNamedScenario();
+            try
+            {
+                GameMepScenarioStore.SaveNamed(_scene.MepGraph, name);
+                RefreshNamedScenarios(name);
+                ShowToast("Scénario enregistré : " + name);
+            }
+            catch (Exception exception)
+            {
+                GameRuntimeDiagnostics.Write(
+                    "Sauvegarde d'un scénario MEP nommé impossible",
+                    exception);
+                ShowToast("Scénario non enregistré : " + exception.Message);
+            }
+        }
+
+        private void MepLoadNamedScenarioButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            string name = SelectedNamedScenario();
+            try
+            {
+                bool changed = ExecuteMepScenarioMutation(
+                    "Charger le scénario " + name,
+                    "Scénario chargé : " + name,
+                    () => GameMepScenarioStore.RestoreNamed(
+                        _scene.MepGraph, name));
+                if (!changed)
+                    ShowToast("Le scénario est déjà actif : " + name);
+            }
+            catch (Exception exception)
+            {
+                GameRuntimeDiagnostics.Write(
+                    "Chargement d'un scénario MEP nommé impossible",
+                    exception);
+                ShowToast("Scénario non chargé : " + exception.Message);
+            }
+        }
+
+        private void MepDeleteNamedScenarioButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            string name = SelectedNamedScenario();
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                ShowToast("Choisis le scénario à supprimer");
+                return;
+            }
+            MessageBoxResult confirmation = MessageBox.Show(
+                this,
+                "Supprimer le scénario \"" + name + "\" ?",
+                "BIMaestro — Scénarios MEP",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+            if (confirmation != MessageBoxResult.Yes)
+                return;
+            try
+            {
+                bool deleted = GameMepScenarioStore.DeleteNamed(
+                    _scene.MepGraph, name);
+                RefreshNamedScenarios();
+                MepScenarioCombo.Text = string.Empty;
+                ShowToast(deleted
+                    ? "Scénario supprimé : " + name
+                    : "Scénario introuvable");
+            }
+            catch (Exception exception)
+            {
+                GameRuntimeDiagnostics.Write(
+                    "Suppression d'un scénario MEP nommé impossible",
+                    exception);
+                ShowToast("Suppression impossible : " + exception.Message);
+            }
         }
 
         private void RebuildMepSourceItems()
@@ -2129,6 +2291,9 @@ namespace BIMaestro.VideoGames
                 graph.HasData &&
                 graph.Valves.Any(valve => valve.IsEnabledAsValve) &&
                 !_mepRecalculationRunning;
+            int activeSources = graph.Sources.Count(source =>
+                source.IsActive &&
+                source.BoundaryKind == GameMepBoundaryKind.Inlet);
             MepFlowToggleButton.Content = _mepFlowEnabled
                 ? "Flux  •  actifs"
                 : "Flux  •  arrêtés";
@@ -2160,9 +2325,6 @@ namespace BIMaestro.VideoGames
                     ? "Analyse MEP indisponible pour cette maquette"
                     : "Aucun réseau de canalisation détecté";
 
-            int activeSources = graph.Sources.Count(source =>
-                source.IsActive &&
-                source.BoundaryKind == GameMepBoundaryKind.Inlet);
             int activeReturns = graph.Sources.Count(source =>
                 source.IsActive &&
                 source.BoundaryKind == GameMepBoundaryKind.Outlet);
@@ -3327,7 +3489,9 @@ namespace BIMaestro.VideoGames
 
             _mepRecalculationRunning = true;
             if (_mepRenderer != null)
+            {
                 _mepRenderer.Paused = true;
+            }
             UpdateMepUi();
             UpdateMepHistoryUi();
             try

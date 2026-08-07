@@ -24,7 +24,7 @@ SolidCompression=yes
 Source: "bin\Release\*.*"; \
   DestDir: "{localappdata}\BIMaestro\Bin"; \
   Flags: ignoreversion recursesubdirs createallsubdirs; \
-  Excludes: "*.pdb"
+  Excludes: "*.pdb,BIMaestro - Copie.dll"
 
 [Code]
 // -----------------------------------------------------------------
