@@ -55,15 +55,15 @@ public class AppUI : IExternalApplication
 
             }),
 
-            new RibbonPanelDefinition("Panneaux réservés au test", new List<RibbonItemDefinition>
+            new RibbonPanelDefinition("Beta", new List<RibbonItemDefinition>
             {
                 new RibbonItemDefinition(
                     "RevitGameCommand",
-                    "Maquette BIM",
+                    "Maquette MEP",
                     panel => AddPushButton(
                         panel,
                         "RevitGameCommand",
-                        "Maquette\nBIM",
+                        "Maquette\nMEP",
                        assemblyPath,
                         "BIMaestro.VideoGames.RevitGameCommand",
                        "3D.jpg",

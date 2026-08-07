@@ -31,7 +31,7 @@ namespace Couleur
             "Modification",
             "Outils IA",
             "Couleur et information",
-            "Panneaux réservés au test",
+            "Beta",
             "Analyse",
             "Spécifique aux familles"
         };

@@ -20,6 +20,8 @@ namespace BIMaestro.RibbonLayout
     public static class RibbonLayoutConfigManager
     {
         private const string ConfigFileName = "RibbonLayout.json";
+        private const string LegacyBetaPanelName = "Panneaux réservés au test";
+        private const string BetaPanelName = "Beta";
 
         public static RibbonLayoutConfig LoadLayout(IEnumerable<RibbonPanelDefinition> definitions)
         {
@@ -88,7 +90,17 @@ namespace BIMaestro.RibbonLayout
 
             foreach (var panel in config.Panels)
             {
-                if (!panelLookup.TryGetValue(panel.Name, out var def)) continue;
+                string panelName = string.Equals(
+                    panel.Name,
+                    LegacyBetaPanelName,
+                    StringComparison.OrdinalIgnoreCase)
+                    ? BetaPanelName
+                    : panel.Name;
+
+                if (!panelLookup.TryGetValue(panelName, out var def)) continue;
+                if (normalizedPanels.Any(p =>
+                    string.Equals(p.Name, def.Name, StringComparison.OrdinalIgnoreCase)))
+                    continue;
 
                 var buttons = panel.Buttons
                     .Where(id => def.Items.Any(i => i.Id == id))

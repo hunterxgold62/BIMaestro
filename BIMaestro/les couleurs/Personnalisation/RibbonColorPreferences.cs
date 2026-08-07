@@ -1323,6 +1323,8 @@ namespace Couleur
     public static class RibbonColorPreferences
     {
         private static readonly object SyncRoot = new object();
+        private const string LegacyBetaPanelName = "Panneaux réservés au test";
+        private const string BetaPanelName = "Beta";
 
         private static readonly Dictionary<string, RibbonPanelColorScheme> DefaultColors =
             new Dictionary<string, RibbonPanelColorScheme>(StringComparer.OrdinalIgnoreCase)
@@ -1333,7 +1335,7 @@ namespace Couleur
                 { "Analyse", CreateDefault(Color.FromRgb(230, 255, 255)) },
                 { "Spécifique aux familles", CreateDefault(Color.FromRgb(255, 230, 255)) },
                 { "Couleur et information", CreateDefault(Color.FromRgb(230, 230, 230)) },
-                { "Panneaux réservés au test", CreateDefault(Color.FromRgb(255, 255, 230)) }
+                { BetaPanelName, CreateDefault(Color.FromRgb(255, 255, 230)) }
             };
 
         private static Dictionary<string, RibbonPanelColorScheme> _cachedColors;
@@ -1511,7 +1513,14 @@ namespace Couleur
         {
             foreach (JProperty item in savedColors.Properties())
             {
-                if (!DefaultColors.TryGetValue(item.Name, out RibbonPanelColorScheme defaults))
+                string panelName = string.Equals(
+                    item.Name,
+                    LegacyBetaPanelName,
+                    StringComparison.OrdinalIgnoreCase)
+                    ? BetaPanelName
+                    : item.Name;
+
+                if (!DefaultColors.TryGetValue(panelName, out RibbonPanelColorScheme defaults))
                     continue;
 
                 // Compatibilité avec la première version :
@@ -1520,7 +1529,7 @@ namespace Couleur
                 {
                     if (TryParseColor(item.Value.Value<string>(), out Color legacyBackground))
                     {
-                        destination[item.Name] =
+                        destination[panelName] =
                             new RibbonPanelColorScheme(
                                 legacyBackground,
                                 legacyBackground,
@@ -1572,7 +1581,7 @@ namespace Couleur
                 patternStart = savedScheme.Value<double?>("DebutMotif") ?? 0;
                 patternEnd = savedScheme.Value<double?>("FinMotif") ?? 1;
 
-                destination[item.Name] = new RibbonPanelColorScheme(
+                destination[panelName] = new RibbonPanelColorScheme(
                     background,
                     backgroundEnd,
                     text,

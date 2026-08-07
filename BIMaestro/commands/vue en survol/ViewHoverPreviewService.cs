@@ -275,25 +275,29 @@ namespace BIMaestro.ViewHover
         private static string GetElementIdText(ElementId elementId)
         {
             if (elementId == null) return string.Empty;
-            try
+            foreach (string propertyName in new[]
+                     {
+                         "Value",
+                         "IntegerValue"
+                     })
             {
-                var valueProperty = elementId
-                    .GetType()
-                    .GetProperty("Value");
-                object value = valueProperty?.GetValue(elementId);
-                if (value != null)
+                try
                 {
-                    return Convert.ToString(
-                        value,
-                        CultureInfo.InvariantCulture);
+                    var valueProperty = elementId
+                        .GetType()
+                        .GetProperty(propertyName);
+                    object value = valueProperty?.GetValue(elementId);
+                    if (value != null)
+                    {
+                        return Convert.ToString(
+                            value,
+                            CultureInfo.InvariantCulture);
+                    }
                 }
+                catch { }
             }
-            catch { }
 
-#pragma warning disable CS0618
-            return elementId.IntegerValue.ToString(
-                CultureInfo.InvariantCulture);
-#pragma warning restore CS0618
+            return elementId.ToString() ?? string.Empty;
         }
     }
 }

@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows;
@@ -832,6 +833,89 @@ namespace Couleur
     /// </summary>
     public static class ProjectBrowserColoring
     {
+        [StructLayout(LayoutKind.Sequential)]
+        private struct NativePoint
+        {
+            public int X;
+            public int Y;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct NativeRect
+        {
+            public int Left;
+            public int Top;
+            public int Right;
+            public int Bottom;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct NativeMonitorInfo
+        {
+            public int Size;
+            public NativeRect Monitor;
+            public NativeRect WorkArea;
+            public uint Flags;
+        }
+
+        [DllImport("user32.dll")]
+        private static extern bool GetCursorPos(out NativePoint point);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr WindowFromPoint(NativePoint point);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetParent(IntPtr windowHandle);
+
+        [DllImport("user32.dll")]
+        private static extern bool GetWindowRect(
+            IntPtr windowHandle,
+            out NativeRect rectangle);
+
+        [DllImport("user32.dll")]
+        private static extern uint GetDpiForWindow(IntPtr windowHandle);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr MonitorFromPoint(
+            NativePoint point,
+            uint flags);
+
+        [DllImport("user32.dll")]
+        private static extern bool GetMonitorInfo(
+            IntPtr monitorHandle,
+            ref NativeMonitorInfo monitorInfo);
+
+        [DllImport("user32.dll")]
+        private static extern bool SetWindowPos(
+            IntPtr windowHandle,
+            IntPtr insertAfter,
+            int x,
+            int y,
+            int width,
+            int height,
+            uint flags);
+
+        [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
+        private static extern IntPtr GetWindowLongPtr(
+            IntPtr windowHandle,
+            int index);
+
+        [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
+        private static extern IntPtr SetWindowLongPtr(
+            IntPtr windowHandle,
+            int index,
+            IntPtr newValue);
+
+        private const int ExtendedWindowStyleIndex = -20;
+        private const long TransparentWindowStyle = 0x00000020L;
+        private const long ToolWindowStyle = 0x00000080L;
+        private const long NoActivateWindowStyle = 0x08000000L;
+        private const uint NearestMonitor = 0x00000002;
+        private const uint NoSizeWindowPosition = 0x0001;
+        private const uint NoZOrderWindowPosition = 0x0004;
+        private const uint NoActivateWindowPosition = 0x0010;
+        private const uint ShowWindowPosition = 0x0040;
+
         private static readonly Dictionary<
             DependencyObject,
             Dictionary<DependencyProperty, object>> OriginalValues =
@@ -850,6 +934,7 @@ namespace Couleur
             _viewHoverPopup;
         private static System.Windows.Controls.Image _viewHoverImage;
         private static string _visibleViewHoverKey = string.Empty;
+        private static int _viewHoverEmptyPollCount;
         private static string _revitVersion = "inconnue";
         private static bool _legacyNativeProjectBrowser;
         private static ProjectBrowserColorSettings _settings =
@@ -1176,14 +1261,17 @@ namespace Couleur
             if (elementId == null)
                 return string.Empty;
 
-            try
+            foreach (string propertyName in new[]
+                     {
+                         "Value",
+                         "IntegerValue"
+                     })
             {
-                System.Reflection.PropertyInfo valueProperty =
-                    elementId.GetType().GetProperty("Value");
-                if (valueProperty != null)
+                try
                 {
-                    object value =
-                        valueProperty.GetValue(elementId);
+                    System.Reflection.PropertyInfo valueProperty =
+                        elementId.GetType().GetProperty(propertyName);
+                    object value = valueProperty?.GetValue(elementId);
                     if (value != null)
                     {
                         return Convert.ToString(
@@ -1192,14 +1280,13 @@ namespace Couleur
                                 .CultureInfo.InvariantCulture);
                     }
                 }
-            }
-            catch
-            {
-                // Revit 2023 n'expose pas encore la valeur 64 bits.
+                catch
+                {
+                    // La propriété dépend de la génération de l'API Revit.
+                }
             }
 
-            return elementId.IntegerValue.ToString(
-                System.Globalization.CultureInfo.InvariantCulture);
+            return elementId.ToString() ?? string.Empty;
         }
 
         private static void PushActiveViewMarker()
@@ -2491,7 +2578,7 @@ namespace Couleur
       if(state.disposed||pendingKey!==info.key)return;
       currentKey=info.key;
       currentRowTop=pendingRowTop;
-    },2000);
+    },1000);
   };
   const onLeave=()=>hide();
   document.addEventListener('pointermove',onMove,true);
@@ -2598,15 +2685,6 @@ namespace Couleur
             string result = NormalizeBrowserEvaluationResult(rawValue);
             string[] parts = result.Split(new[] { '\t' }, 2);
             string key = parts.Length > 0 ? parts[0] : string.Empty;
-            double rowTop = 0;
-            if (parts.Length > 1)
-            {
-                double.TryParse(
-                    parts[1],
-                    System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    out rowTop);
-            }
 
             if (string.IsNullOrWhiteSpace(key) ||
                 !ViewHoverPreviews.TryGetValue(
@@ -2614,10 +2692,13 @@ namespace Couleur
                     out ViewHoverPreviewInfo preview) ||
                 preview == null)
             {
-                HideViewHoverPopup();
+                _viewHoverEmptyPollCount++;
+                if (_viewHoverEmptyPollCount >= 3)
+                    HideViewHoverPopup();
                 return;
             }
 
+            _viewHoverEmptyPollCount = 0;
             if (string.Equals(
                     _visibleViewHoverKey,
                     key,
@@ -2627,13 +2708,12 @@ namespace Couleur
                 return;
             }
 
-            ShowViewHoverPopup(key, preview, rowTop);
+            ShowViewHoverPopup(key, preview);
         }
 
         private static void ShowViewHoverPopup(
             string key,
-            ViewHoverPreviewInfo preview,
-            double rowTop)
+            ViewHoverPreviewInfo preview)
         {
             FrameworkElement root = _projectBrowserRoot;
             if (root == null || string.IsNullOrWhiteSpace(preview?.DataUri))
@@ -2653,57 +2733,113 @@ namespace Couleur
                     return;
                 }
 
-                FrameworkElement anchor =
-                    _chromiumBrowser as FrameworkElement;
-                if (anchor == null ||
-                    anchor.ActualWidth < 80 ||
-                    anchor.ActualHeight < 80 ||
-                    !IsAttachedToWindow(anchor))
+                if (!TryGetProjectBrowserBounds(
+                        root,
+                        out NativeRect browserBounds,
+                        out NativeRect workArea,
+                        out NativePoint cursor,
+                        out double scaleX,
+                        out double scaleY))
                 {
-                    anchor = root;
+                    HideViewHoverPopup();
+                    return;
                 }
 
-                DpiScale dpi = VisualTreeHelper.GetDpi(anchor);
-                System.Windows.Point topLeftPx = anchor.PointToScreen(
-                    new System.Windows.Point(0, 0));
-                System.Windows.Point bottomRightPx = anchor.PointToScreen(
-                    new System.Windows.Point(
-                        anchor.ActualWidth,
-                        anchor.ActualHeight));
-                double scaleX = dpi.DpiScaleX > 0 ? dpi.DpiScaleX : 1;
-                double scaleY = dpi.DpiScaleY > 0 ? dpi.DpiScaleY : 1;
-                double left = topLeftPx.X / scaleX;
-                double right = bottomRightPx.X / scaleX;
-                double top = topLeftPx.Y / scaleY;
                 const double popupWidth = 316;
                 const double popupHeight = 236;
                 const double gap = 12;
+                int popupWidthPixels = (int)Math.Ceiling(
+                    popupWidth * scaleX);
+                int popupHeightPixels = (int)Math.Ceiling(
+                    popupHeight * scaleY);
+                int gapPixels = (int)Math.Ceiling(gap * scaleX);
+                int marginPixels = (int)Math.Ceiling(6 * scaleX);
 
-                double virtualLeft = SystemParameters.VirtualScreenLeft;
-                double virtualRight = virtualLeft +
-                                      SystemParameters.VirtualScreenWidth;
-                double virtualTop = SystemParameters.VirtualScreenTop;
-                double virtualBottom = virtualTop +
-                                       SystemParameters.VirtualScreenHeight;
-                double x = right + gap;
-                if (x + popupWidth > virtualRight - 6)
-                    x = left - popupWidth - gap;
+                int xPixels = browserBounds.Right + gapPixels;
+                if (xPixels + popupWidthPixels >
+                    workArea.Right - marginPixels)
+                {
+                    xPixels = browserBounds.Left -
+                              popupWidthPixels - gapPixels;
+                }
 
-                double alignedTop = top + rowTop - popupHeight / 2 + 10;
-                double y = Math.Max(
-                    virtualTop + 6,
+                xPixels = Math.Max(
+                    workArea.Left + marginPixels,
                     Math.Min(
-                        alignedTop,
-                        virtualBottom - popupHeight - 6));
-                _viewHoverPopup.HorizontalOffset = x;
-                _viewHoverPopup.VerticalOffset = y;
+                        xPixels,
+                        workArea.Right - popupWidthPixels - marginPixels));
+                int yPixels = Math.Max(
+                    workArea.Top + marginPixels,
+                    Math.Min(
+                        cursor.Y - popupHeightPixels / 2,
+                        workArea.Bottom - popupHeightPixels - marginPixels));
+
+                _viewHoverPopup.HorizontalOffset = xPixels / scaleX;
+                _viewHoverPopup.VerticalOffset = yPixels / scaleY;
                 _visibleViewHoverKey = key;
                 _viewHoverPopup.IsOpen = true;
+                PositionViewHoverPopupNative(xPixels, yPixels);
+
+                root.Dispatcher.BeginInvoke(
+                    DispatcherPriority.Loaded,
+                    new Action(() =>
+                        PositionViewHoverPopupNative(xPixels, yPixels)));
             }
             catch
             {
                 HideViewHoverPopup();
             }
+        }
+
+        private static bool TryGetProjectBrowserBounds(
+            FrameworkElement browserRoot,
+            out NativeRect browserBounds,
+            out NativeRect workArea,
+            out NativePoint cursor,
+            out double scaleX,
+            out double scaleY)
+        {
+            browserBounds = default;
+            workArea = default;
+            scaleX = 1;
+            scaleY = 1;
+            if (!GetCursorPos(out cursor))
+                return false;
+
+            if (browserRoot == null ||
+                browserRoot.ActualWidth < 80 ||
+                browserRoot.ActualHeight < 80 ||
+                !IsAttachedToWindow(browserRoot))
+            {
+                return false;
+            }
+
+            DpiScale dpi = VisualTreeHelper.GetDpi(browserRoot);
+            scaleX = dpi.DpiScaleX > 0 ? dpi.DpiScaleX : 1;
+            scaleY = dpi.DpiScaleY > 0 ? dpi.DpiScaleY : 1;
+            System.Windows.Point topLeft = browserRoot.PointToScreen(
+                new System.Windows.Point(0, 0));
+            browserBounds.Left = (int)Math.Round(topLeft.X);
+            browserBounds.Top = (int)Math.Round(topLeft.Y);
+            browserBounds.Right = browserBounds.Left +
+                (int)Math.Round(browserRoot.ActualWidth * scaleX);
+            browserBounds.Bottom = browserBounds.Top +
+                (int)Math.Round(browserRoot.ActualHeight * scaleY);
+
+            IntPtr monitor = MonitorFromPoint(cursor, NearestMonitor);
+            var monitorInfo = new NativeMonitorInfo
+            {
+                Size = Marshal.SizeOf(typeof(NativeMonitorInfo))
+            };
+            if (monitor == IntPtr.Zero ||
+                !GetMonitorInfo(monitor, ref monitorInfo))
+            {
+                return false;
+            }
+
+            workArea = monitorInfo.WorkArea;
+            return browserBounds.Right > browserBounds.Left &&
+                   workArea.Right > workArea.Left;
         }
 
         private static void EnsureViewHoverPopup()
@@ -2739,6 +2875,62 @@ namespace Couleur
                 IsHitTestVisible = false,
                 Child = border
             };
+            _viewHoverPopup.Opened += (_, __) =>
+                MakeViewHoverPopupNonInteractive();
+        }
+
+        private static void MakeViewHoverPopupNonInteractive()
+        {
+            try
+            {
+                if (!(_viewHoverPopup?.Child is Visual child)) return;
+                HwndSource source = PresentationSource.FromVisual(child)
+                    as HwndSource;
+                if (source == null || source.Handle == IntPtr.Zero) return;
+
+                IntPtr current = GetWindowLongPtr(
+                    source.Handle,
+                    ExtendedWindowStyleIndex);
+                long updated = current.ToInt64() |
+                               TransparentWindowStyle |
+                               ToolWindowStyle |
+                               NoActivateWindowStyle;
+                SetWindowLongPtr(
+                    source.Handle,
+                    ExtendedWindowStyleIndex,
+                    new IntPtr(updated));
+            }
+            catch
+            {
+                // Le popup reste utilisable même si Windows refuse le style.
+            }
+        }
+
+        private static void PositionViewHoverPopupNative(int x, int y)
+        {
+            try
+            {
+                if (!(_viewHoverPopup?.Child is Visual child)) return;
+                HwndSource source = PresentationSource.FromVisual(child)
+                    as HwndSource;
+                if (source == null || source.Handle == IntPtr.Zero) return;
+
+                SetWindowPos(
+                    source.Handle,
+                    IntPtr.Zero,
+                    x,
+                    y,
+                    0,
+                    0,
+                    NoSizeWindowPosition |
+                    NoZOrderWindowPosition |
+                    NoActivateWindowPosition |
+                    ShowWindowPosition);
+            }
+            catch
+            {
+                // Le positionnement WPF reste le repli si Windows le refuse.
+            }
         }
 
         private static System.Windows.Media.Imaging.BitmapImage
@@ -2773,6 +2965,7 @@ namespace Couleur
         private static void HideViewHoverPopup()
         {
             _visibleViewHoverKey = string.Empty;
+            _viewHoverEmptyPollCount = 0;
             if (_viewHoverPopup != null)
                 _viewHoverPopup.IsOpen = false;
         }
@@ -2884,6 +3077,9 @@ namespace Couleur
                             StringComparison.Ordinal) ||
                         candidate.Name.Equals(
                             "ExecuteScriptAsync",
+                            StringComparison.Ordinal) ||
+                        candidate.Name.Equals(
+                            "ExecuteJavascript",
                             StringComparison.Ordinal))
                     .OrderBy(candidate =>
                         candidate.Name.Equals(
@@ -3096,6 +3292,9 @@ namespace Couleur
                                 StringComparison.Ordinal) ||
                             candidate.Name.Equals(
                                 "EvaluateScriptAsync",
+                                StringComparison.Ordinal) ||
+                            candidate.Name.Equals(
+                                "ExecuteJavascript",
                                 StringComparison.Ordinal);
                         if (!supportedName)
                             return false;
