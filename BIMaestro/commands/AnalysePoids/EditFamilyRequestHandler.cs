@@ -24,9 +24,9 @@ namespace Analyse
         public string GetName() => "SelectionRequestHandler";
     }
 
-    public class DeleteFamilyRequestHandler : IExternalEventHandler
+    public class DeleteElementRequestHandler : IExternalEventHandler
     {
-        public ElementId FamilyId { get; set; }
+        public IList<ElementId> ElementIds { get; set; }
         public Action<bool> OnCompleted { get; set; }
 
         public void Execute(UIApplication app)
@@ -42,32 +42,35 @@ namespace Analyse
                     return;
                 }
 
-                if (FamilyId == null)
+                var idsToDelete = ElementIds?
+                    .Where(id => id != null)
+                    .ToList();
+                if (idsToDelete == null || idsToDelete.Count == 0)
                 {
-                    TaskDialog.Show("Suppression famille", "Aucune famille à supprimer n'a été fournie.");
+                    TaskDialog.Show("Suppression", "Aucun élément à supprimer n'a été fourni.");
                     return;
                 }
 
-                using (var tx = new Transaction(doc, "Supprimer famille"))
+                using (var tx = new Transaction(doc, "Supprimer élément"))
                 {
                     tx.Start();
-                    doc.Delete(FamilyId);
+                    doc.Delete(idsToDelete);
                     tx.Commit();
                     success = true;
                 }
             }
             catch (Exception ex)
             {
-                TaskDialog.Show("Suppression famille", $"Erreur lors de la suppression : {ex.Message}");
+                TaskDialog.Show("Suppression", $"Erreur lors de la suppression : {ex.Message}");
             }
             finally
             {
                 OnCompleted?.Invoke(success);
-                FamilyId = null;
+                ElementIds = null;
                 OnCompleted = null;
             }
         }
 
-        public string GetName() => "DeleteFamilyRequestHandler";
+        public string GetName() => "DeleteElementRequestHandler";
     }
 }

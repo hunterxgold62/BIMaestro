@@ -841,8 +841,15 @@ namespace Couleur
 
         private static FrameworkElement _projectBrowserRoot;
         private static object _chromiumBrowser;
+        private static object _viewHoverPreviewBrowser;
         private static bool _browserInjectionSucceeded;
         private static DispatcherTimer _refreshTimer;
+        private static DispatcherTimer _viewHoverPollTimer;
+        private static bool _viewHoverPollPending;
+        private static System.Windows.Controls.Primitives.Popup
+            _viewHoverPopup;
+        private static System.Windows.Controls.Image _viewHoverImage;
+        private static string _visibleViewHoverKey = string.Empty;
         private static string _revitVersion = "inconnue";
         private static bool _legacyNativeProjectBrowser;
         private static ProjectBrowserColorSettings _settings =
@@ -852,6 +859,16 @@ namespace Couleur
         private static long _activeViewGeneration;
         private static IReadOnlyList<string> _activeViewFolderPath =
             Array.Empty<string>();
+        private sealed class ViewHoverPreviewInfo
+        {
+            public string ViewId { get; set; }
+            public string ViewName { get; set; }
+            public string DataUri { get; set; }
+        }
+        private static readonly Dictionary<string, ViewHoverPreviewInfo>
+            ViewHoverPreviews =
+                new Dictionary<string, ViewHoverPreviewInfo>(
+                    StringComparer.OrdinalIgnoreCase);
 
         private static SolidColorBrush BackgroundBrush =>
             new SolidColorBrush(_settings.BackgroundColor);
@@ -934,6 +951,11 @@ namespace Couleur
                     "if(css===null)el.removeAttribute('style');" +
                     "else el.setAttribute('style',css);});" +
                     "delete window.__bimaestroProjectBrowserTheme;}");
+                ExecuteBrowserScript(
+                    _chromiumBrowser,
+                    "if(window.__bimaestroViewHoverPreview){" +
+                    "window.__bimaestroViewHoverPreview.dispose();" +
+                    "delete window.__bimaestroViewHoverPreview;}");
             }
 
             if (_refreshTimer != null)
@@ -941,6 +963,14 @@ namespace Couleur
                 _refreshTimer.Stop();
                 _refreshTimer = null;
             }
+
+            if (_viewHoverPollTimer != null)
+            {
+                _viewHoverPollTimer.Stop();
+                _viewHoverPollTimer = null;
+            }
+            HideViewHoverPopup();
+            _viewHoverPollPending = false;
 
             foreach (KeyValuePair<
                          DependencyObject,
@@ -967,8 +997,37 @@ namespace Couleur
             OriginalValues.Clear();
             _projectBrowserRoot = null;
             _chromiumBrowser = null;
+            _viewHoverPreviewBrowser = null;
             _browserInjectionSucceeded = false;
             _legacyNativeProjectBrowser = false;
+        }
+
+        public static void SetViewHoverPreview(
+            string viewId,
+            string viewName,
+            string dataUri)
+        {
+            if (string.IsNullOrWhiteSpace(dataUri)) return;
+
+            string safeId = viewId ?? string.Empty;
+            string safeName = viewName ?? string.Empty;
+            string key = !string.IsNullOrWhiteSpace(safeId)
+                ? "id:" + safeId
+                : "name:" + safeName;
+            ViewHoverPreviews[key] = new ViewHoverPreviewInfo
+            {
+                ViewId = safeId,
+                ViewName = safeName,
+                DataUri = dataUri
+            };
+
+            if (_chromiumBrowser != null)
+            {
+                EnsureViewHoverPreviewScript(_chromiumBrowser);
+                PushViewHoverPreview(
+                    _chromiumBrowser,
+                    ViewHoverPreviews[key]);
+            }
         }
 
         public static void FocusSelectedSheetContent(
@@ -1225,6 +1284,27 @@ namespace Couleur
                 ApplyColors(_projectBrowserRoot);
             };
             _refreshTimer.Start();
+            EnsureViewHoverPollTimer(root);
+        }
+
+        private static void EnsureViewHoverPollTimer(FrameworkElement root)
+        {
+            if (_viewHoverPollTimer != null &&
+                _viewHoverPollTimer.Dispatcher == root.Dispatcher)
+            {
+                return;
+            }
+
+            _viewHoverPollTimer?.Stop();
+            _viewHoverPollTimer = new DispatcherTimer(
+                DispatcherPriority.Background,
+                root.Dispatcher)
+            {
+                Interval = TimeSpan.FromMilliseconds(250)
+            };
+            _viewHoverPollTimer.Tick += (_, __) =>
+                PollViewHoverPreview();
+            _viewHoverPollTimer.Start();
         }
 
         private static void ApplyColors(FrameworkElement root)
@@ -1246,6 +1326,12 @@ namespace Couleur
 
                 _chromiumBrowser = browser;
                 _browserInjectionSucceeded = true;
+                EnsureViewHoverPreviewScript(browser);
+                if (!ReferenceEquals(_viewHoverPreviewBrowser, browser))
+                {
+                    _viewHoverPreviewBrowser = browser;
+                    PushViewHoverPreviews(browser);
+                }
                 PushActiveViewMarker();
                 break;
             }
@@ -2270,6 +2356,658 @@ namespace Couleur
             }
 
             return "solid";
+        }
+
+        private static void EnsureViewHoverPreviewScript(object browser)
+        {
+            ExecuteBrowserScript(browser, @"
+(() => {
+  const key='__bimaestroViewHoverPreview';
+  if(window[key])return;
+  const state={byId:new Map(),byName:new Map(),disposed:false};
+  const normalize=value=>(value||'')
+    .replace(/[\u200B-\u200D\uFEFF]/g,'')
+    .replace(/\s+/g,' ')
+    .trim()
+    .toLocaleLowerCase();
+  let currentKey='';
+  let currentRowTop=0;
+  let pendingKey='';
+  let pendingRowTop=0;
+  let pendingTimer=0;
+  const hide=()=>{
+    if(pendingTimer){
+      clearTimeout(pendingTimer);
+      pendingTimer=0;
+    }
+    pendingKey='';
+    pendingRowTop=0;
+    currentKey='';
+    currentRowTop=0;
+  };
+  const closestTreeRow=element=>{
+    if(!element||element.nodeType!==1)return null;
+    if(element.matches&&element.matches('[role=""treeitem""]'))
+      return element;
+    if(!element.closest)return null;
+    return element.closest(
+      '[role=""treeitem""],' +
+      '[class*=""vTree_treeItemWrap""],' +
+      '[class*=""treeItemWrap""],' +
+      '[class*=""tree-item""]');
+  };
+  const collectRows=event=>{
+    const rows=[];
+    const add=element=>{
+      const row=closestTreeRow(element);
+      if(row&&!rows.includes(row))rows.push(row);
+    };
+    if(event&&typeof event.composedPath==='function')
+      event.composedPath().forEach(add);
+    if(event)add(event.target);
+    if(document.elementFromPoint&&event)
+      add(document.elementFromPoint(event.clientX,event.clientY));
+    return rows;
+  };
+  const namesForRow=row=>{
+    const values=[];
+    const add=value=>{
+      const normalized=normalize(value);
+      if(normalized&&!values.includes(normalized))
+        values.push(normalized);
+    };
+    add(row.getAttribute&&row.getAttribute('aria-label'));
+    add(row.getAttribute&&row.getAttribute('title'));
+    if(row.value!==undefined)add(row.value);
+    row.querySelectorAll&&row.querySelectorAll(
+      'input,[aria-label],[title]').forEach(element=>{
+        if(element.value!==undefined)add(element.value);
+        add(element.getAttribute('aria-label'));
+        add(element.getAttribute('title'));
+      });
+    add(row.textContent);
+    return values;
+  };
+  const findNameInfo=name=>{
+    if(!name)return null;
+    if(state.byName.has(name))
+      return {key:state.byName.get(name)};
+    let best=null;
+    state.byName.forEach((previewKey,knownName)=>{
+      if(best||!knownName)return;
+      if(name.endsWith(`: ${knownName}`)||
+         name.endsWith(` ${knownName}`))
+        best={key:previewKey};
+    });
+    return best;
+  };
+  const findInfo=event=>{
+    const rows=collectRows(event);
+    for(const row of rows){
+      const idCandidates=[
+        row.id,
+        row.getAttribute&&row.getAttribute('data-id'),
+        row.getAttribute&&row.getAttribute('data-element-id'),
+        row.getAttribute&&row.getAttribute('aria-rowindex')
+      ].filter(Boolean).map(String);
+      for(const id of idCandidates){
+        if(state.byId.has(id))
+          return {key:state.byId.get(id),row};
+        const numeric=id.match(/\d+/g);
+        if(numeric){
+          for(const token of numeric){
+            if(state.byId.has(token))
+              return {key:state.byId.get(token),row};
+          }
+        }
+      }
+      for(const name of namesForRow(row)){
+        const info=findNameInfo(name);
+        if(info){info.row=row;return info;}
+      }
+    }
+    return null;
+  };
+  const onMove=event=>{
+    const info=findInfo(event);
+    if(!info){hide();return;}
+    const rect=info.row&&info.row.getBoundingClientRect
+      ?info.row.getBoundingClientRect()
+      :null;
+    const rowTop=rect&&Number.isFinite(rect.top)?rect.top:0;
+    if(currentKey===info.key){
+      currentRowTop=rowTop;
+      return;
+    }
+    if(pendingKey===info.key){
+      pendingRowTop=rowTop;
+      return;
+    }
+    if(pendingTimer)clearTimeout(pendingTimer);
+    pendingKey=info.key;
+    pendingRowTop=rowTop;
+    pendingTimer=setTimeout(()=>{
+      pendingTimer=0;
+      if(state.disposed||pendingKey!==info.key)return;
+      currentKey=info.key;
+      currentRowTop=pendingRowTop;
+    },2000);
+  };
+  const onLeave=()=>hide();
+  document.addEventListener('pointermove',onMove,true);
+  document.addEventListener('mousemove',onMove,true);
+  document.addEventListener('mouseleave',onLeave,true);
+  state.setPreview=(id,name)=>{
+    const safeId=String(id||'');
+    const safeName=normalize(name);
+    const previewKey=safeId
+      ?`id:${safeId}`
+      :`name:${safeName}`;
+    if(!safeId&&!safeName)return;
+    if(safeId)state.byId.set(safeId,previewKey);
+    if(safeName)state.byName.set(safeName,previewKey);
+  };
+  state.getActiveKey=()=>currentKey
+    ?`${currentKey}\t${currentRowTop}`
+    :'';
+  state.dispose=()=>{
+    state.disposed=true;
+    hide();
+    document.removeEventListener('pointermove',onMove,true);
+    document.removeEventListener('mousemove',onMove,true);
+    document.removeEventListener('mouseleave',onLeave,true);
+    state.byId.clear();
+    state.byName.clear();
+  };
+  window[key]=state;
+})() ");
+        }
+
+        private static void PushViewHoverPreviews(object browser)
+        {
+            foreach (ViewHoverPreviewInfo preview
+                     in ViewHoverPreviews.Values.ToList())
+            {
+                PushViewHoverPreview(browser, preview);
+            }
+        }
+
+        private static void PushViewHoverPreview(
+            object browser,
+            ViewHoverPreviewInfo preview)
+        {
+            if (browser == null || preview == null ||
+                string.IsNullOrWhiteSpace(preview.DataUri))
+            {
+                return;
+            }
+
+            string idJson = Newtonsoft.Json.JsonConvert.SerializeObject(
+                preview.ViewId ?? string.Empty);
+            string nameJson = Newtonsoft.Json.JsonConvert.SerializeObject(
+                preview.ViewName ?? string.Empty);
+            ExecuteBrowserScript(
+                browser,
+                "if(window.__bimaestroViewHoverPreview)" +
+                "window.__bimaestroViewHoverPreview.setPreview(" +
+                idJson + "," + nameJson + ");");
+        }
+
+        private static void PollViewHoverPreview()
+        {
+            if (_viewHoverPollPending ||
+                _chromiumBrowser == null ||
+                _projectBrowserRoot == null ||
+                !IsAttachedToWindow(_projectBrowserRoot))
+            {
+                if (_chromiumBrowser == null)
+                    HideViewHoverPopup();
+                return;
+            }
+
+            _viewHoverPollPending = true;
+            if (!EvaluateBrowserScriptAsync(
+                    _chromiumBrowser,
+                    "window.__bimaestroViewHoverPreview" +
+                    "?window.__bimaestroViewHoverPreview.getActiveKey()" +
+                    ":'';",
+                    value =>
+                    {
+                        FrameworkElement root = _projectBrowserRoot;
+                        Dispatcher dispatcher = root?.Dispatcher;
+                        if (dispatcher == null)
+                        {
+                            _viewHoverPollPending = false;
+                            return;
+                        }
+
+                        dispatcher.BeginInvoke(new Action(() =>
+                        {
+                            _viewHoverPollPending = false;
+                            ApplyViewHoverResult(value);
+                        }));
+                    }))
+            {
+                _viewHoverPollPending = false;
+                HideViewHoverPopup();
+            }
+        }
+
+        private static void ApplyViewHoverResult(object rawValue)
+        {
+            string result = NormalizeBrowserEvaluationResult(rawValue);
+            string[] parts = result.Split(new[] { '\t' }, 2);
+            string key = parts.Length > 0 ? parts[0] : string.Empty;
+            double rowTop = 0;
+            if (parts.Length > 1)
+            {
+                double.TryParse(
+                    parts[1],
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out rowTop);
+            }
+
+            if (string.IsNullOrWhiteSpace(key) ||
+                !ViewHoverPreviews.TryGetValue(
+                    key,
+                    out ViewHoverPreviewInfo preview) ||
+                preview == null)
+            {
+                HideViewHoverPopup();
+                return;
+            }
+
+            if (string.Equals(
+                    _visibleViewHoverKey,
+                    key,
+                    StringComparison.OrdinalIgnoreCase) &&
+                _viewHoverPopup?.IsOpen == true)
+            {
+                return;
+            }
+
+            ShowViewHoverPopup(key, preview, rowTop);
+        }
+
+        private static void ShowViewHoverPopup(
+            string key,
+            ViewHoverPreviewInfo preview,
+            double rowTop)
+        {
+            FrameworkElement root = _projectBrowserRoot;
+            if (root == null || string.IsNullOrWhiteSpace(preview?.DataUri))
+            {
+                HideViewHoverPopup();
+                return;
+            }
+
+            try
+            {
+                EnsureViewHoverPopup();
+                _viewHoverImage.Source = CreateBitmapFromDataUri(
+                    preview.DataUri);
+                if (_viewHoverImage.Source == null)
+                {
+                    HideViewHoverPopup();
+                    return;
+                }
+
+                FrameworkElement anchor =
+                    _chromiumBrowser as FrameworkElement;
+                if (anchor == null ||
+                    anchor.ActualWidth < 80 ||
+                    anchor.ActualHeight < 80 ||
+                    !IsAttachedToWindow(anchor))
+                {
+                    anchor = root;
+                }
+
+                DpiScale dpi = VisualTreeHelper.GetDpi(anchor);
+                System.Windows.Point topLeftPx = anchor.PointToScreen(
+                    new System.Windows.Point(0, 0));
+                System.Windows.Point bottomRightPx = anchor.PointToScreen(
+                    new System.Windows.Point(
+                        anchor.ActualWidth,
+                        anchor.ActualHeight));
+                double scaleX = dpi.DpiScaleX > 0 ? dpi.DpiScaleX : 1;
+                double scaleY = dpi.DpiScaleY > 0 ? dpi.DpiScaleY : 1;
+                double left = topLeftPx.X / scaleX;
+                double right = bottomRightPx.X / scaleX;
+                double top = topLeftPx.Y / scaleY;
+                const double popupWidth = 316;
+                const double popupHeight = 236;
+                const double gap = 12;
+
+                double virtualLeft = SystemParameters.VirtualScreenLeft;
+                double virtualRight = virtualLeft +
+                                      SystemParameters.VirtualScreenWidth;
+                double virtualTop = SystemParameters.VirtualScreenTop;
+                double virtualBottom = virtualTop +
+                                       SystemParameters.VirtualScreenHeight;
+                double x = right + gap;
+                if (x + popupWidth > virtualRight - 6)
+                    x = left - popupWidth - gap;
+
+                double alignedTop = top + rowTop - popupHeight / 2 + 10;
+                double y = Math.Max(
+                    virtualTop + 6,
+                    Math.Min(
+                        alignedTop,
+                        virtualBottom - popupHeight - 6));
+                _viewHoverPopup.HorizontalOffset = x;
+                _viewHoverPopup.VerticalOffset = y;
+                _visibleViewHoverKey = key;
+                _viewHoverPopup.IsOpen = true;
+            }
+            catch
+            {
+                HideViewHoverPopup();
+            }
+        }
+
+        private static void EnsureViewHoverPopup()
+        {
+            if (_viewHoverPopup != null) return;
+
+            _viewHoverImage = new System.Windows.Controls.Image
+            {
+                Width = 300,
+                MaxHeight = 220,
+                Stretch = Stretch.Uniform,
+                SnapsToDevicePixels = true
+            };
+            var border = new Border
+            {
+                Width = 316,
+                MaxHeight = 236,
+                Padding = new Thickness(7),
+                Background = Brushes.White,
+                BorderBrush = new SolidColorBrush(
+                    Color.FromRgb(190, 190, 190)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(4),
+                Child = _viewHoverImage,
+                IsHitTestVisible = false
+            };
+            _viewHoverPopup = new System.Windows.Controls.Primitives.Popup
+            {
+                Placement = System.Windows.Controls.Primitives
+                    .PlacementMode.AbsolutePoint,
+                AllowsTransparency = true,
+                StaysOpen = true,
+                IsHitTestVisible = false,
+                Child = border
+            };
+        }
+
+        private static System.Windows.Media.Imaging.BitmapImage
+            CreateBitmapFromDataUri(string dataUri)
+        {
+            try
+            {
+                int comma = dataUri?.IndexOf(',') ?? -1;
+                if (comma < 0 || comma + 1 >= dataUri.Length)
+                    return null;
+
+                byte[] bytes = Convert.FromBase64String(
+                    dataUri.Substring(comma + 1));
+                using (var stream = new MemoryStream(bytes))
+                {
+                    var bitmap = new System.Windows.Media.Imaging.BitmapImage();
+                    bitmap.BeginInit();
+                    bitmap.CacheOption = System.Windows.Media.Imaging
+                        .BitmapCacheOption.OnLoad;
+                    bitmap.StreamSource = stream;
+                    bitmap.EndInit();
+                    bitmap.Freeze();
+                    return bitmap;
+                }
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static void HideViewHoverPopup()
+        {
+            _visibleViewHoverKey = string.Empty;
+            if (_viewHoverPopup != null)
+                _viewHoverPopup.IsOpen = false;
+        }
+
+        private static string NormalizeBrowserEvaluationResult(object value)
+        {
+            string text = Convert.ToString(
+                value,
+                System.Globalization.CultureInfo.InvariantCulture) ??
+                string.Empty;
+            text = text.Trim();
+            if (text.Length >= 2 && text[0] == '"' &&
+                text[text.Length - 1] == '"')
+            {
+                try
+                {
+                    return Newtonsoft.Json.JsonConvert
+                        .DeserializeObject<string>(text) ?? string.Empty;
+                }
+                catch { }
+            }
+
+            return text;
+        }
+
+        private static bool EvaluateBrowserScriptAsync(
+            object browser,
+            string script,
+            Action<object> completed)
+        {
+            return EvaluateBrowserScriptAsync(
+                browser,
+                script,
+                completed,
+                new HashSet<object>(),
+                0);
+        }
+
+        private static bool EvaluateBrowserScriptAsync(
+            object browser,
+            string script,
+            Action<object> completed,
+            HashSet<object> visited,
+            int depth)
+        {
+            if (browser == null || depth > 3 || !visited.Add(browser))
+                return false;
+
+            try
+            {
+                Type extensionsType = AppDomain.CurrentDomain
+                    .GetAssemblies()
+                    .Select(assembly =>
+                        assembly.GetType(
+                            "CefSharp.WebBrowserExtensions",
+                            false))
+                    .FirstOrDefault(type => type != null);
+                System.Reflection.MethodInfo extensionMethod =
+                    extensionsType?
+                        .GetMethods(
+                            System.Reflection.BindingFlags.Public |
+                            System.Reflection.BindingFlags.Static)
+                        .Where(candidate => candidate.Name.Equals(
+                            "EvaluateScriptAsync",
+                            StringComparison.Ordinal))
+                        .FirstOrDefault(candidate =>
+                        {
+                            System.Reflection.ParameterInfo[] parameters =
+                                candidate.GetParameters();
+                            return parameters.Length >= 2 &&
+                                   parameters[0].ParameterType
+                                       .IsInstanceOfType(browser) &&
+                                   parameters[1].ParameterType ==
+                                       typeof(string) &&
+                                   parameters.Skip(2).All(parameter =>
+                                       parameter.IsOptional);
+                        });
+                if (extensionMethod != null)
+                {
+                    object[] arguments = extensionMethod.GetParameters()
+                        .Select((parameter, index) =>
+                            index == 0
+                                ? browser
+                                : index == 1
+                                    ? (object)script
+                                    : Type.Missing)
+                        .ToArray();
+                    object invocation = extensionMethod.Invoke(
+                        null,
+                        arguments);
+                    if (AttachBrowserEvaluationTask(invocation, completed))
+                        return true;
+                }
+            }
+            catch
+            {
+                // Le navigateur peut ne pas être CefSharp.
+            }
+
+            try
+            {
+                System.Reflection.MethodInfo method = browser.GetType()
+                    .GetMethods(
+                        System.Reflection.BindingFlags.Public |
+                        System.Reflection.BindingFlags.Instance)
+                    .Where(candidate =>
+                        candidate.Name.Equals(
+                            "EvaluateScriptAsync",
+                            StringComparison.Ordinal) ||
+                        candidate.Name.Equals(
+                            "ExecuteScriptAsync",
+                            StringComparison.Ordinal))
+                    .OrderBy(candidate =>
+                        candidate.Name.Equals(
+                            "EvaluateScriptAsync",
+                            StringComparison.Ordinal)
+                            ? 0
+                            : 1)
+                    .FirstOrDefault(candidate =>
+                    {
+                        System.Reflection.ParameterInfo[] parameters =
+                            candidate.GetParameters();
+                        return parameters.Length >= 1 &&
+                               parameters[0].ParameterType == typeof(string) &&
+                               parameters.Skip(1).All(parameter =>
+                                   parameter.IsOptional);
+                    });
+                if (method != null)
+                {
+                    object[] arguments = method.GetParameters()
+                        .Select((parameter, index) =>
+                            index == 0 ? (object)script : Type.Missing)
+                        .ToArray();
+                    object invocation = method.Invoke(browser, arguments);
+                    if (AttachBrowserEvaluationTask(
+                            invocation,
+                            completed))
+                        return true;
+                }
+            }
+            catch
+            {
+                // On essaie les contrôles internes du conteneur.
+            }
+
+            string[] nestedPropertyNames =
+            {
+                "CoreWebView2",
+                "Browser",
+                "WebBrowser",
+                "WebView",
+                "Content",
+                "Child"
+            };
+            foreach (string propertyName in nestedPropertyNames)
+            {
+                try
+                {
+                    System.Reflection.PropertyInfo property = browser
+                        .GetType()
+                        .GetProperty(
+                            propertyName,
+                            System.Reflection.BindingFlags.Public |
+                            System.Reflection.BindingFlags.NonPublic |
+                            System.Reflection.BindingFlags.Instance);
+                    if (property == null ||
+                        property.GetIndexParameters().Length != 0)
+                    {
+                        continue;
+                    }
+
+                    object nested = property.GetValue(browser, null);
+                    if (nested != null &&
+                        EvaluateBrowserScriptAsync(
+                            nested,
+                            script,
+                            completed,
+                            visited,
+                            depth + 1))
+                    {
+                        return true;
+                    }
+                }
+                catch { }
+            }
+
+            return false;
+        }
+
+        private static bool AttachBrowserEvaluationTask(
+            object invocation,
+            Action<object> completed)
+        {
+            if (!(invocation is System.Threading.Tasks.Task task))
+                return false;
+
+            task.ContinueWith(done =>
+            {
+                object result = null;
+                if (!done.IsCanceled && !done.IsFaulted)
+                {
+                    try
+                    {
+                        result = done.GetType()
+                            .GetProperty("Result")
+                            ?.GetValue(done, null);
+                        if (result != null)
+                        {
+                            System.Reflection.PropertyInfo successProperty =
+                                result.GetType().GetProperty("Success");
+                            if (successProperty != null &&
+                                successProperty.GetValue(
+                                    result,
+                                    null) is bool success &&
+                                !success)
+                            {
+                                result = null;
+                            }
+                            else
+                            {
+                                System.Reflection.PropertyInfo valueProperty =
+                                    result.GetType().GetProperty("Result");
+                                if (valueProperty != null)
+                                    result = valueProperty.GetValue(
+                                        result,
+                                        null);
+                            }
+                        }
+                    }
+                    catch { result = null; }
+                }
+
+                completed?.Invoke(result);
+            });
+            return true;
         }
 
         private static bool ExecuteBrowserScript(

@@ -611,7 +611,7 @@ namespace Analyse
         public static void CaptureDocumentChanges(Document doc, DocumentChangedEventArgs e)
         {
             if (doc == null || e == null) return;
-            var user = Environment.UserName;
+            var user = GetCurrentHistoryUser(doc);
             var tx = e.GetTransactionNames()?.FirstOrDefault() ?? "Transaction";
             if (IsIgnoredTransaction(tx)) return;
             var addedIds = e.GetAddedElementIds().ToList();
@@ -1031,7 +1031,7 @@ namespace Analyse
                 return true;
             }
 
-            Queue.Enqueue(new ElementHistoryEvent
+            EnqueueHistoryEvent(new ElementHistoryEvent
             {
                 Ts = DateTime.UtcNow,
                 Project = doc.ProjectInformation?.Name ?? "Projet",
@@ -1138,7 +1138,7 @@ namespace Analyse
                     continue;
                 }
 
-                Queue.Enqueue(new ElementHistoryEvent
+                EnqueueHistoryEvent(new ElementHistoryEvent
                 {
                     Ts = DateTime.UtcNow,
                     Project = doc.ProjectInformation?.Name ?? doc.Title ?? "Famille",
@@ -1187,7 +1187,7 @@ namespace Analyse
                             continue;
                         }
 
-                        Queue.Enqueue(new ElementHistoryEvent
+                        EnqueueHistoryEvent(new ElementHistoryEvent
                         {
                             Ts = DateTime.UtcNow,
                             Project = doc.ProjectInformation?.Name ?? doc.Title ?? "Projet",
@@ -1945,7 +1945,7 @@ namespace Analyse
 
             if (ShouldIgnoreSnapshot(snapshot)) return;
 
-            Queue.Enqueue(new ElementHistoryEvent
+            EnqueueHistoryEvent(new ElementHistoryEvent
             {
                 Ts = DateTime.UtcNow,
                 Project = doc.ProjectInformation?.Name ?? "Projet",
@@ -2908,6 +2908,27 @@ namespace Analyse
         {
             if (oldPoint == null || newPoint == null) return false;
             return oldPoint.DistanceTo(newPoint) >= MinMoveFeet;
+        }
+
+        private static void EnqueueHistoryEvent(
+            ElementHistoryEvent historyEvent)
+        {
+            if (historyEvent == null) return;
+            LatestElementHistoryIndex.Observe(historyEvent);
+            Queue.Enqueue(historyEvent);
+        }
+
+        private static string GetCurrentHistoryUser(Document document)
+        {
+            try
+            {
+                string revitUser = document?.Application?.Username;
+                if (!string.IsNullOrWhiteSpace(revitUser))
+                    return revitUser.Trim();
+            }
+            catch { }
+
+            return Environment.UserName;
         }
 
         private static async Task WorkerLoop(CancellationToken token)

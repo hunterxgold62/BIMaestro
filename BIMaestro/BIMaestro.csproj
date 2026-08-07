@@ -311,7 +311,10 @@
     <Compile Include="commands\Suivi maquette collaboratif\CollaborativeModelTrackerWindow.xaml.cs">
       <DependentUpon>CollaborativeModelTrackerWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="commands\vue en survol\ViewHoverPreviewService.cs" />
     <Compile Include="commands\qui est le coupable\ElementHistoryTracker.cs" />
+    <Compile Include="commands\qui est le coupable\information au survol d%27un objet\LatestElementHistoryIndex.cs" />
+    <Compile Include="commands\qui est le coupable\information au survol d%27un objet\ElementHistoryHoverInfoService.cs" />
     <Compile Include="commands\qui est le coupable\ElementHistoryWindow.xaml.cs">
       <DependentUpon>ElementHistoryWindow.xaml</DependentUpon>
     </Compile>

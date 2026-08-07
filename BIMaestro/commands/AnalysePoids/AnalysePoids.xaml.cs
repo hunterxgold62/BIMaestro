@@ -16,7 +16,7 @@ namespace Analyse
         private readonly ObservableCollection<ElementInfo> _elements;
         private readonly SelectionRequestHandler _selectionHandler;
         private readonly ExternalEvent _selectionEvent;
-        private readonly DeleteFamilyRequestHandler _deleteHandler;
+        private readonly DeleteElementRequestHandler _deleteHandler;
         private readonly ExternalEvent _deleteEvent;
 
         public ResultWindow(List<ElementInfo> elements,
@@ -38,7 +38,7 @@ namespace Analyse
             _selectionHandler = new SelectionRequestHandler();
             _selectionEvent = ExternalEvent.Create(_selectionHandler);
 
-            _deleteHandler = new DeleteFamilyRequestHandler();
+            _deleteHandler = new DeleteElementRequestHandler();
             _deleteEvent = ExternalEvent.Create(_deleteHandler);
 
             ElementDataGrid.MouseDoubleClick += OnRowDoubleClick;
@@ -63,6 +63,23 @@ namespace Analyse
             {
                 e.Row.ContextMenu = CreateRowContextMenu();
             }
+
+            // Le DataGrid recycle ses lignes. Préparer le menu avant son affichage
+            // évite qu'un menu vide soit mesuré par Revit 2023 au clic droit.
+            e.Row.ContextMenuOpening -= OnRowContextMenuOpening;
+            e.Row.ContextMenuOpening += OnRowContextMenuOpening;
+        }
+
+        private void OnRowContextMenuOpening(object sender, ContextMenuEventArgs e)
+        {
+            var row = sender as DataGridRow;
+            if (row == null || row.ContextMenu == null)
+            {
+                return;
+            }
+
+            row.ContextMenu.DataContext = row.DataContext;
+            row.ContextMenu.PlacementTarget = row;
         }
 
         private ContextMenu CreateRowContextMenu()
@@ -70,28 +87,17 @@ namespace Analyse
             var contextMenu = new ContextMenu();
             var deleteMenuItem = new MenuItem
             {
-                Header = "Supprimer du projet"
+                Header = "Supprimer du projet",
+                MinWidth = 190,
+                MinHeight = 28,
+                Padding = new Thickness(12, 5, 12, 5)
             };
             deleteMenuItem.Click += OnDeleteFamilyClick;
 
             contextMenu.Items.Add(deleteMenuItem);
 
-            contextMenu.Opened += (s, args) =>
-            {
-                if (s is ContextMenu menu && menu.PlacementTarget is FrameworkElement element)
-                {
-                    if (element.DataContext is ElementInfo info)
-                    {
-                        deleteMenuItem.DataContext = info;
-                        deleteMenuItem.Visibility = info.IsFamily ? Visibility.Visible : Visibility.Collapsed;
-                    }
-                    else
-                    {
-                        deleteMenuItem.DataContext = null;
-                        deleteMenuItem.Visibility = Visibility.Collapsed;
-                    }
-                }
-            };
+            deleteMenuItem.SetBinding(FrameworkElement.DataContextProperty,
+                new System.Windows.Data.Binding());
 
             return contextMenu;
         }
@@ -125,22 +131,30 @@ namespace Analyse
         private void OnDeleteFamilyClick(object sender, RoutedEventArgs e)
         {
             if (sender is MenuItem menuItem &&
-                menuItem.DataContext is ElementInfo info &&
-                info.IsFamily)
+                menuItem.DataContext is ElementInfo info)
             {
-                if (info.PrimaryId == null)
+                var elementIds = info.IsFamily
+                    ? new[] { info.PrimaryId }
+                    : (info.ElementIds ?? new List<Autodesk.Revit.DB.ElementId>()).ToArray();
+
+                if (elementIds.Length == 0 || elementIds.Any(id => id == null))
                 {
                     MessageBox.Show(this,
-                        "Impossible de déterminer l'identifiant de la famille à supprimer.",
+                        "Impossible de déterminer l'identifiant de l'élément à supprimer.",
                         "Suppression impossible",
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);
                     return;
                 }
 
+                var details = info.IsFamily
+                    ? "Toutes ses instances seront également supprimées."
+                    : elementIds.Length > 1
+                        ? $"Les {elementIds.Length} éléments correspondants seront supprimés."
+                        : "L'élément sera supprimé du projet.";
                 var confirmation = MessageBox.Show(this,
-                    $"Supprimer définitivement la famille \"{info.Nom}\" du projet ?\nToutes ses instances seront également supprimées.",
-                    "Supprimer la famille",
+                    $"Supprimer définitivement \"{info.Nom}\" du projet ?\n{details}",
+                    "Supprimer l'élément",
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Question,
                     MessageBoxResult.No);
@@ -150,7 +164,7 @@ namespace Analyse
                     return;
                 }
 
-                _deleteHandler.FamilyId = info.PrimaryId;
+                _deleteHandler.ElementIds = elementIds;
                 _deleteHandler.OnCompleted = success =>
                 {
                     Dispatcher.Invoke(() =>

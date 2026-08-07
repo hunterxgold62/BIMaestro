@@ -183,6 +183,7 @@ public class BIMaestroApp : IExternalApplication
             Page.SecretGifShortcutManager.PollKeyboardState();
             Analyse.ElementHistoryTracker.ProcessDeferredPrime(_uiApp.ActiveUIDocument?.Document);
             RefreshProjectBrowserActiveViewWhenNeeded();
+            BIMaestro.ViewHover.ViewHoverPreviewService.ProcessPending(_uiApp);
 
             if (!Couleur.ColoringStateManager.IsColoringActive)
             {
@@ -259,6 +260,9 @@ public class BIMaestroApp : IExternalApplication
             Couleur.ProjectBrowserColoring.TrackActiveView(
                 args.Document,
                 args.CurrentActiveView);
+            BIMaestro.ViewHover.ViewHoverPreviewService.TrackActivatedView(
+                args.Document,
+                args.CurrentActiveView);
             _pendingProjectBrowserViewRefreshes = 3;
             _nextProjectBrowserViewRefreshUtc =
                 DateTime.UtcNow.AddMilliseconds(80);
@@ -319,6 +323,9 @@ public class BIMaestroApp : IExternalApplication
             var doc = args.GetDocument();
             var selectedIds = args.GetSelectedElements();
             Analyse.ElementHistoryTracker.CaptureSelectedElementDetails(doc, selectedIds);
+            Analyse.ElementHistoryHoverInfoService.OnSelectionChanged(
+                doc,
+                selectedIds);
             Couleur.ProjectBrowserColoring.FocusSelectedSheetContent(
                 doc,
                 selectedIds);
@@ -335,6 +342,7 @@ public class BIMaestroApp : IExternalApplication
         {
             _uiApp ??= new UIApplication(e.Document.Application);
             Analyse.ElementHistoryTracker.ScheduleDeferredPrime(e.Document);
+            Analyse.LatestElementHistoryIndex.ScheduleBackgroundLoad(e.Document);
             ExcelLogger.OnDocumentOpened(e.Document, _uiApp);
             Analyse.CollaborativeModelTrackerStore.TryAutoLog(e.Document, _uiApp);
         }
@@ -362,6 +370,9 @@ public class BIMaestroApp : IExternalApplication
         try
         {
             _uiApp ??= new UIApplication(e.Document.Application);
+            Analyse.ElementHistoryHoverInfoService.Hide();
+            BIMaestro.ViewHover.ViewHoverPreviewService.ForgetDocument(
+                e.Document);
             ExcelLogger.OnDocumentClosing(e.Document, _uiApp);
             Analyse.CollaborativeModelTrackerStore.TryAutoLog(e.Document, _uiApp);
         }
