@@ -15,6 +15,10 @@ namespace Couleur
         private readonly System.IntPtr _mainWindowHandle;
         private string _selectedPresetName;
         private ProjectBrowserColorSettings _browserPreferences;
+        private readonly System.Random _previewRandom = new System.Random();
+        private string _browserPreviewPrimaryViewName;
+        private string _browserPreviewSecondaryViewName;
+        private string _browserPreviewSectionName;
 
         public ColorPreferencesWindow(System.IntPtr mainWindowHandle)
         {
@@ -23,7 +27,7 @@ namespace Couleur
 
             _mainWindowHandle = mainWindowHandle;
             PanelColors = CreateItems(RibbonColorPreferences.Load());
-            _browserPreferences =
+            BrowserPreferences =
                 ProjectBrowserColorPreferences.Load();
             PreferenceFilePath =
                 $"Sauvegarde : {RibbonColorPreferences.PreferenceFilePath}";
@@ -37,6 +41,7 @@ namespace Couleur
                 .AsReadOnly();
             _selectedPresetName =
                 RibbonColorPresetCatalog.StandardPresetNames.FirstOrDefault();
+            GenerateBrowserPreviewNames();
             DataContext = this;
         }
 
@@ -61,10 +66,100 @@ namespace Couleur
             get => _browserPreferences;
             private set
             {
+                if (_browserPreferences != null)
+                {
+                    _browserPreferences.PropertyChanged -=
+                        BrowserPreferences_PropertyChanged;
+                }
+
                 _browserPreferences = value;
+                if (_browserPreferences != null)
+                {
+                    _browserPreferences.PropertyChanged +=
+                        BrowserPreferences_PropertyChanged;
+                }
+
+                OnPropertyChanged();
+                NotifyBrowserPreviewChanged();
+            }
+        }
+
+        public Brush BrowserPreviewBackgroundBrush =>
+            new SolidColorBrush(
+                BrowserPreferences?.BackgroundColor ?? Colors.White);
+
+        public Brush BrowserPreviewTextBrush =>
+            new SolidColorBrush(
+                BrowserPreferences?.TextColor ?? Colors.Black);
+
+        public Brush BrowserPreviewAccentBrush =>
+            new SolidColorBrush(
+                BrowserPreferences?.AccentColor ?? Colors.DodgerBlue);
+
+        public Brush BrowserPreviewActiveParentBrush =>
+            new SolidColorBrush(
+                BrowserPreferences?.ActiveViewParentColor ?? Colors.Red);
+
+        public Visibility BrowserBubblesVisibility =>
+            BrowserModeVisibility("Bulles pastel");
+
+        public Visibility BrowserWavesVisibility =>
+            BrowserModeVisibility("Vagues pastel");
+
+        public Visibility BrowserFirefliesVisibility =>
+            BrowserModeVisibility("Lucioles pastel");
+
+        public Visibility BrowserAuroraVisibility =>
+            BrowserModeVisibility("Dégradé pastel animé");
+
+        public string BrowserPreviewPrimaryViewName
+        {
+            get => _browserPreviewPrimaryViewName;
+            private set
+            {
+                _browserPreviewPrimaryViewName = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(BrowserPreviewSearchLabel));
+            }
+        }
+
+        public string BrowserPreviewSecondaryViewName
+        {
+            get => _browserPreviewSecondaryViewName;
+            private set
+            {
+                _browserPreviewSecondaryViewName = value;
                 OnPropertyChanged();
             }
         }
+
+        public string BrowserPreviewSectionName
+        {
+            get => _browserPreviewSectionName;
+            private set
+            {
+                _browserPreviewSectionName = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string BrowserPreviewSearchLabel =>
+            $"Rechercher : {BrowserPreviewPrimaryViewName}";
+
+        public Visibility BrowserSearchVisibility =>
+            BrowserPreferences?.IsSheetViewSearchEnabled == true
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+        public Visibility BrowserActiveParentVisibility =>
+            BrowserPreferences?.IsActiveViewParentHighlightEnabled == true
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+        public Visibility BrowserDisabledVisibility =>
+            BrowserPreferences?.IsEnabled == true
+                ? Visibility.Collapsed
+                : Visibility.Visible;
 
         public string SelectedPresetName
         {
@@ -82,6 +177,79 @@ namespace Couleur
                 if (preset.TryGetValue(item.PanelName, out RibbonPanelColorScheme scheme))
                     item.ApplyScheme(scheme);
             }
+        }
+
+        private void BrowserPreferences_PropertyChanged(
+            object sender,
+            PropertyChangedEventArgs e)
+        {
+            NotifyBrowserPreviewChanged();
+        }
+
+        private void RegenerateBrowserPreviewButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            GenerateBrowserPreviewNames();
+        }
+
+        private void GenerateBrowserPreviewNames()
+        {
+            string[] disciplines =
+            {
+                "Architecture", "Structure", "Aménagement", "Coordination"
+            };
+            string[] levels =
+            {
+                "RDC", "Niveau 01", "Niveau 02", "Toiture"
+            };
+            string[] sections =
+            {
+                "Coupe AA · Hall central",
+                "Coupe BB · Escalier principal",
+                "Façade · Nord",
+                "Détail · Entrée principale"
+            };
+
+            string level = levels[_previewRandom.Next(levels.Length)];
+            string secondLevel;
+            do
+            {
+                secondLevel = levels[_previewRandom.Next(levels.Length)];
+            }
+            while (secondLevel == level);
+
+            BrowserPreviewPrimaryViewName =
+                $"Plan {disciplines[_previewRandom.Next(disciplines.Length)]} · {level}";
+            BrowserPreviewSecondaryViewName =
+                $"Plan {disciplines[_previewRandom.Next(disciplines.Length)]} · {secondLevel}";
+            BrowserPreviewSectionName =
+                sections[_previewRandom.Next(sections.Length)];
+        }
+
+        private Visibility BrowserModeVisibility(string mode)
+        {
+            return string.Equals(
+                       BrowserPreferences?.BackgroundMode,
+                       mode,
+                       System.StringComparison.OrdinalIgnoreCase)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
+        private void NotifyBrowserPreviewChanged()
+        {
+            OnPropertyChanged(nameof(BrowserPreviewBackgroundBrush));
+            OnPropertyChanged(nameof(BrowserPreviewTextBrush));
+            OnPropertyChanged(nameof(BrowserPreviewAccentBrush));
+            OnPropertyChanged(nameof(BrowserPreviewActiveParentBrush));
+            OnPropertyChanged(nameof(BrowserBubblesVisibility));
+            OnPropertyChanged(nameof(BrowserWavesVisibility));
+            OnPropertyChanged(nameof(BrowserFirefliesVisibility));
+            OnPropertyChanged(nameof(BrowserAuroraVisibility));
+            OnPropertyChanged(nameof(BrowserSearchVisibility));
+            OnPropertyChanged(nameof(BrowserActiveParentVisibility));
+            OnPropertyChanged(nameof(BrowserDisabledVisibility));
         }
 
         private void ResetDefaultsButton_Click(object sender, RoutedEventArgs e)

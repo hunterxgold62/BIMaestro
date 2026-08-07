@@ -1661,23 +1661,84 @@ namespace Couleur
         }
     }
 
-    public sealed class ProjectBrowserColorSettings
+    public sealed class ProjectBrowserColorSettings :
+        System.ComponentModel.INotifyPropertyChanged
     {
-        public bool IsEnabled { get; set; }
+        private bool _isEnabled;
+        private string _backgroundMode;
+        private Color _backgroundColor;
+        private Color _textColor;
+        private Color _accentColor;
+        private bool _isSheetViewSearchEnabled;
+        private bool _isActiveViewParentHighlightEnabled;
+        private Color _activeViewParentColor;
 
-        public string BackgroundMode { get; set; }
+        public bool IsEnabled
+        {
+            get => _isEnabled;
+            set => SetField(ref _isEnabled, value);
+        }
 
-        public Color BackgroundColor { get; set; }
+        public string BackgroundMode
+        {
+            get => _backgroundMode;
+            set => SetField(ref _backgroundMode, value);
+        }
 
-        public Color TextColor { get; set; }
+        public Color BackgroundColor
+        {
+            get => _backgroundColor;
+            set => SetField(ref _backgroundColor, value);
+        }
 
-        public Color AccentColor { get; set; }
+        public Color TextColor
+        {
+            get => _textColor;
+            set => SetField(ref _textColor, value);
+        }
 
-        public bool IsSheetViewSearchEnabled { get; set; }
+        public Color AccentColor
+        {
+            get => _accentColor;
+            set => SetField(ref _accentColor, value);
+        }
 
-        public bool IsActiveViewParentHighlightEnabled { get; set; }
+        public bool IsSheetViewSearchEnabled
+        {
+            get => _isSheetViewSearchEnabled;
+            set => SetField(ref _isSheetViewSearchEnabled, value);
+        }
 
-        public Color ActiveViewParentColor { get; set; }
+        public bool IsActiveViewParentHighlightEnabled
+        {
+            get => _isActiveViewParentHighlightEnabled;
+            set => SetField(ref _isActiveViewParentHighlightEnabled, value);
+        }
+
+        public Color ActiveViewParentColor
+        {
+            get => _activeViewParentColor;
+            set => SetField(ref _activeViewParentColor, value);
+        }
+
+        public event System.ComponentModel.PropertyChangedEventHandler
+            PropertyChanged;
+
+        private void SetField<T>(
+            ref T field,
+            T value,
+            [System.Runtime.CompilerServices.CallerMemberName]
+            string propertyName = null)
+        {
+            if (EqualityComparer<T>.Default.Equals(field, value))
+                return;
+
+            field = value;
+            PropertyChanged?.Invoke(
+                this,
+                new System.ComponentModel.PropertyChangedEventArgs(
+                    propertyName));
+        }
     }
 
     public static class ProjectBrowserColorPreferences
