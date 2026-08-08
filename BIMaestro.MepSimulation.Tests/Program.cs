@@ -81,6 +81,12 @@ namespace BIMaestro.VideoGames
                 SelectionIndexRedirectsInsulationToPipe();
                 SelectionIndexPrefersPreciseGeometryToBoundsFallback();
                 SelectionIndexStaysWithinHoverBudget();
+                GroundContactPrefersFloorOverMepClutter();
+                GroundContactFallsBackToAnyWalkableSurface();
+                GroundContactKeepsElevatedPlatformOverFloor();
+                SupportedGroundRejectsIsolatedBump();
+                SupportedGroundPreservesSlopeHeight();
+                SupportedGroundRequiresSeveralContactPoints();
                 Console.WriteLine("MEP graph regression tests: " + _assertions + " assertions passed.");
                 return 0;
             }
@@ -89,6 +95,178 @@ namespace BIMaestro.VideoGames
                 Console.Error.WriteLine(exception.ToString());
                 return 1;
             }
+        }
+
+        private static void GroundContactPrefersFloorOverMepClutter()
+        {
+            GameSceneData scene = CreateGroundContactScene(includeFloor: true);
+            var world = new GameCollisionWorld(scene);
+
+            bool found = world.TryFindGround(
+                0.0,
+                0.0,
+                1.0,
+                -1.0,
+                out double ground);
+
+            Assert(found, "Ground contact must find the preferred floor.");
+            Assert(Math.Abs(ground) < 1e-8,
+                "MEP clutter above a floor must not become a sequence of camera steps.");
+        }
+
+        private static void GroundContactFallsBackToAnyWalkableSurface()
+        {
+            GameSceneData scene = CreateGroundContactScene(includeFloor: false);
+            var world = new GameCollisionWorld(scene);
+
+            bool found = world.TryFindGround(
+                0.0,
+                0.0,
+                1.0,
+                -1.0,
+                out double ground);
+
+            Assert(found, "Ground contact must keep non-floor platforms usable.");
+            Assert(Math.Abs(ground) < 1e-8,
+                "The highest generic surface must remain available when no floor exists.");
+        }
+
+        private static void GroundContactKeepsElevatedPlatformOverFloor()
+        {
+            GameSceneData scene = CreateGroundContactScene(
+                includeFloor: true,
+                genericHeight: 1.2);
+            var world = new GameCollisionWorld(scene);
+
+            bool found = world.TryFindGround(
+                0.0,
+                0.0,
+                2.0,
+                -1.0,
+                out double ground);
+
+            Assert(found, "Ground contact must find the elevated platform.");
+            Assert(Math.Abs(ground - 1.2) < 1e-8,
+                "A generic platform higher than one step must not be ignored.");
+        }
+
+        private static GameSceneData CreateGroundContactScene(
+            bool includeFloor,
+            double genericHeight = 0.3)
+        {
+            var scene = new GameSceneData();
+            if (includeFloor)
+            {
+                scene.Triangles.Add(new GameTriangle(
+                    new Point3D(-2.0, -2.0, 0.0),
+                    new Point3D(2.0, -2.0, 0.0),
+                    new Point3D(-2.0, 2.0, 0.0),
+                    new Vector3D(0.0, 0.0, 1.0),
+                    true));
+            }
+
+            scene.Triangles.Add(new GameTriangle(
+                new Point3D(-1.0, -1.0, genericHeight),
+                new Point3D(1.0, -1.0, genericHeight),
+                new Point3D(-1.0, 1.0, genericHeight),
+                new Vector3D(0.0, 0.0, 1.0),
+                false));
+            scene.NormalizeCoordinates(
+                new Point3D(0.0, 0.0, 6.0),
+                new Vector3D(1.0, 0.0, -0.2));
+            return scene;
+        }
+
+        private static void SupportedGroundRejectsIsolatedBump()
+        {
+            var scene = new GameSceneData();
+            AddGroundQuad(scene, -2.0, -2.0, 2.0, 2.0,
+                0.0, 0.0, 0.0, 0.0);
+            AddGroundQuad(scene, -0.12, -0.12, 0.12, 0.12,
+                0.30, 0.30, 0.30, 0.30);
+            NormalizeGroundScene(scene);
+            var world = new GameCollisionWorld(scene);
+
+            bool found = world.TryFindSupportedGround(
+                0.0, 0.0, 0.76, 1.0, -1.0,
+                out double ground,
+                out _);
+
+            Assert(found, "The footprint must retain the surrounding floor support.");
+            Assert(Math.Abs(ground) < 1e-8,
+                "A small isolated facet must not lift the whole player capsule.");
+        }
+
+        private static void SupportedGroundPreservesSlopeHeight()
+        {
+            var scene = new GameSceneData();
+            AddGroundQuad(scene, -2.0, -2.0, 2.0, 2.0,
+                0.0, 0.8, 0.0, 0.8);
+            NormalizeGroundScene(scene);
+            var world = new GameCollisionWorld(scene);
+
+            bool found = world.TryFindSupportedGround(
+                0.0, 0.0, 0.76, 1.5, -1.0,
+                out double ground,
+                out _);
+
+            Assert(found, "The footprint must find support on a slope.");
+            Assert(Math.Abs(ground - 0.4) < 1e-8,
+                "Symmetric footprint probes must preserve the slope height at the player center.");
+        }
+
+        private static void SupportedGroundRequiresSeveralContactPoints()
+        {
+            var scene = new GameSceneData();
+            AddGroundQuad(scene, -0.12, -0.12, 0.12, 0.12,
+                0.0, 0.0, 0.0, 0.0);
+            NormalizeGroundScene(scene);
+            var world = new GameCollisionWorld(scene);
+
+            bool found = world.TryFindSupportedGround(
+                0.0, 0.0, 0.76, 1.0, -1.0,
+                out _,
+                out _);
+
+            Assert(!found,
+                "A single contact under the center must not keep the player suspended.");
+        }
+
+        private static void AddGroundQuad(
+            GameSceneData scene,
+            double minX,
+            double minY,
+            double maxX,
+            double maxY,
+            double z00,
+            double z10,
+            double z01,
+            double z11)
+        {
+            var a = new Point3D(minX, minY, z00);
+            var b = new Point3D(maxX, minY, z10);
+            var c = new Point3D(minX, maxY, z01);
+            var d = new Point3D(maxX, maxY, z11);
+            AddGroundTriangle(scene, a, b, c);
+            AddGroundTriangle(scene, b, d, c);
+        }
+
+        private static void AddGroundTriangle(
+            GameSceneData scene,
+            Point3D a,
+            Point3D b,
+            Point3D c)
+        {
+            Vector3D normal = Vector3D.CrossProduct(b - a, c - a);
+            normal.Normalize();
+            scene.Triangles.Add(new GameTriangle(a, b, c, normal, false));
+        }
+
+        private static void NormalizeGroundScene(GameSceneData scene)
+        {
+            scene.NormalizeCoordinates(
+                new Point3D(0.0, 0.0, 6.0),
+                new Vector3D(1.0, 0.0, -0.2));
         }
 
         private static void StraightValveCutsOnlyPath()

@@ -78,6 +78,7 @@ namespace BIMaestro.VideoGames
         private readonly Stopwatch _frameClock = Stopwatch.StartNew();
         private readonly Stopwatch _fpsClock = Stopwatch.StartNew();
         private readonly DispatcherTimer _toastTimer;
+        private readonly DispatcherTimer _elementQuickInfoTimer;
         private readonly GameMepScenarioHistory _mepScenarioHistory =
             new GameMepScenarioHistory();
         private Point3D _footPosition;
@@ -186,6 +187,15 @@ namespace BIMaestro.VideoGames
             {
                 _toastTimer.Stop();
                 ToastBorder.Visibility = Visibility.Collapsed;
+            };
+            _elementQuickInfoTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(4.5)
+            };
+            _elementQuickInfoTimer.Tick += (_, __) =>
+            {
+                _elementQuickInfoTimer.Stop();
+                ElementQuickInfo2D.Visibility = Visibility.Collapsed;
             };
 
             UpdateSceneLabels();
@@ -309,6 +319,7 @@ namespace BIMaestro.VideoGames
             // est fermé avant la fin d'une sauvegarde asynchrone précédente.
             GameMepScenarioStore.SaveNow(_scene.MepGraph);
             _mepRecalculationQueued = false;
+            _elementQuickInfoTimer.Stop();
             CompositionTarget.Rendering -= CompositionTarget_Rendering;
             GameViewport.SizeChanged -= GameViewport_SizeChanged;
             GameViewport.MouseLeave -= GameViewport_MouseLeave;
@@ -789,6 +800,7 @@ namespace BIMaestro.VideoGames
                 return;
             }
 
+            Point3D positionBeforeHorizontalMove = _footPosition;
             if (movement.LengthSquared > 1e-8)
             {
                 Vector3D displacement = movement * speed * deltaTime;
@@ -800,12 +812,20 @@ namespace BIMaestro.VideoGames
                     TryMoveHorizontal(0.0, displacement.Y);
                 }
             }
+            bool movedHorizontally =
+                Math.Abs(_footPosition.X - positionBeforeHorizontalMove.X) > 1e-9 ||
+                Math.Abs(_footPosition.Y - positionBeforeHorizontalMove.Y) > 1e-9;
 
             if (_grounded)
             {
-                if (_world.TryFindGround(
+                if (!movedHorizontally)
+                {
+                    _verticalVelocity = 0.0;
+                }
+                else if (_world.TryFindSupportedGround(
                     _footPosition.X,
                     _footPosition.Y,
+                    PlayerRadius,
                     _footPosition.Z + MaximumStepHeight,
                     _footPosition.Z - 2.4,
                     out double ground,
@@ -1341,7 +1361,7 @@ namespace BIMaestro.VideoGames
         {
             Point releasedPosition = e.GetPosition(GameViewport);
             if (_readyToPlay && !_mouseLookActive)
-                ShowValveContextAction(releasedPosition);
+                ShowRightClickAction(releasedPosition);
             e.Handled = true;
         }
 
@@ -1362,6 +1382,7 @@ namespace BIMaestro.VideoGames
                 return;
 
             _mouseLookActive = true;
+            HideElementQuickInfo();
             ClearHoveredElement();
             _lookButton = button;
             _lastMousePosition = e.GetPosition(GameViewport);
@@ -1433,6 +1454,7 @@ namespace BIMaestro.VideoGames
 
         private void SelectObjectAtScreenPoint(Point screenPoint)
         {
+            HideElementQuickInfo();
             GameSelectionHit? hit = FindSelectionHitAtScreenPoint(screenPoint);
             if (hit == null)
             {
@@ -1460,20 +1482,30 @@ namespace BIMaestro.VideoGames
             return _selectionIndex?.FindNearest(origin, direction, 300.0);
         }
 
-        private void ShowValveContextAction(Point screenPoint)
+        private void ShowRightClickAction(Point screenPoint)
         {
             GameSelectionHit? hit = FindSelectionHitAtScreenPoint(screenPoint);
             if (hit == null)
-                return;
-
-            GameMepValveData? valve =
-                _scene.MepGraph.FindValve(hit.Element.Key);
-            if (valve == null || !valve.IsEnabledAsValve ||
-                valve.Kind != GameMepFlowControlKind.IsolationValve)
             {
+                HideElementQuickInfo();
                 return;
             }
 
+            GameMepValveData? valve =
+                _scene.MepGraph.FindValve(hit.Element.Key);
+            if (valve != null && valve.IsEnabledAsValve &&
+                valve.Kind == GameMepFlowControlKind.IsolationValve)
+            {
+                HideElementQuickInfo();
+                ShowValveContextMenu(valve);
+                return;
+            }
+
+            ShowElementQuickInfo(hit.Element, screenPoint);
+        }
+
+        private void ShowValveContextMenu(GameMepValveData valve)
+        {
             string valveKey = valve.ElementKey;
             var action = new System.Windows.Controls.MenuItem
             {
@@ -1500,6 +1532,49 @@ namespace BIMaestro.VideoGames
             };
             menu.Items.Add(action);
             menu.IsOpen = true;
+        }
+
+        private void ShowElementQuickInfo(GameElementData element, Point screenPoint)
+        {
+            string name = ValueOrFallback(element.Name, "Élément sans nom");
+            string category = ValueOrFallback(element.Category, "Élément Revit");
+            string type = ValueOrFallback(element.TypeName, "Non renseigné");
+            GameMepElementData? mepElement =
+                _scene.MepGraph.FindElement(element.Key);
+            string context = mepElement != null &&
+                !string.IsNullOrWhiteSpace(mepElement.SystemName)
+                    ? "Système : " + mepElement.SystemName
+                    : (string.IsNullOrWhiteSpace(element.LevelName)
+                        ? "ID Revit : " + element.ElementId
+                        : "Niveau : " + element.LevelName);
+
+            ElementQuickInfo2D.Text =
+                name + Environment.NewLine +
+                "Catégorie : " + category + Environment.NewLine +
+                "Type : " + type + Environment.NewLine +
+                context;
+            ElementQuickInfo2D.Visibility = Visibility.Visible;
+            PositionElementQuickInfo(screenPoint);
+            _elementQuickInfoTimer.Stop();
+            _elementQuickInfoTimer.Start();
+        }
+
+        private void PositionElementQuickInfo(Point screenPoint)
+        {
+            double left = Math.Max(8.0, Math.Min(
+                GameViewport.ActualWidth - ElementQuickInfo2D.Width - 8.0,
+                screenPoint.X + 18.0));
+            double top = Math.Max(8.0, Math.Min(
+                GameViewport.ActualHeight - ElementQuickInfo2D.Height - 8.0,
+                screenPoint.Y + 18.0));
+            Canvas2D.SetLeft(ElementQuickInfo2D, left);
+            Canvas2D.SetTop(ElementQuickInfo2D, top);
+        }
+
+        private void HideElementQuickInfo()
+        {
+            _elementQuickInfoTimer.Stop();
+            ElementQuickInfo2D.Visibility = Visibility.Collapsed;
         }
 
         private void UpdateHoveredElement(Point screenPoint, bool force)

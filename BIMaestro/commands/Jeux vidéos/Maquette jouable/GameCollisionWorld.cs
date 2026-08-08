@@ -16,14 +16,22 @@ namespace BIMaestro.VideoGames
         private const double SpawnRadius = 0.76;
         private const double SpawnHeight = 5.80;
         private const double SpawnStepHeight = 0.86;
+        private const double PreferredSurfaceOverrideHeight = SpawnStepHeight;
         private const double SpawnGroundOffset = 0.04;
         private const double SpawnSafetyMargin = 0.12;
+        private const int GroundSupportRingSamples = 4;
+        private const int MinimumGroundSupportPoints = 3;
+        private const double GroundSupportRadiusFactor = 0.72;
 
         private readonly IList<GameTriangle> _triangles;
         private readonly Dictionary<long, List<int>> _grid = new Dictionary<long, List<int>>();
         private readonly List<int> _largeTriangles = new List<int>();
         private readonly List<int> _queryBuffer = new List<int>(256);
         private readonly int[] _queryMarks;
+        private readonly double[] _supportHeightBuffer =
+            new double[GroundSupportRingSamples + 3];
+        private readonly double[] _supportNormalBuffer =
+            new double[GroundSupportRingSamples + 3];
         private readonly double _cellSize;
         private int _queryGeneration;
 
@@ -69,6 +77,96 @@ namespace BIMaestro.VideoGames
                 false,
                 out groundZ,
                 out groundNormalZ);
+        }
+
+        public bool TryFindSupportedGround(
+            double x,
+            double y,
+            double radius,
+            double maximumZ,
+            double minimumZ,
+            out double groundZ,
+            out double groundNormalZ)
+        {
+            int valueCount = 0;
+            int supportPointCount = 0;
+
+            // Le centre compte davantage dans la médiane afin que le passage
+            // d'une marche reste franc, mais il ne compte que pour un seul vrai
+            // point d'appui dans le contrôle de stabilité.
+            if (TryFindGroundDetailed(
+                x,
+                y,
+                maximumZ,
+                minimumZ,
+                false,
+                out double centerZ,
+                out double centerNormalZ))
+            {
+                supportPointCount++;
+                for (int weight = 0; weight < 3; weight++)
+                {
+                    _supportHeightBuffer[valueCount] = centerZ;
+                    _supportNormalBuffer[valueCount] = centerNormalZ;
+                    valueCount++;
+                }
+            }
+
+            double supportRadius = Math.Max(0.0, radius) * GroundSupportRadiusFactor;
+            for (int sample = 0; sample < GroundSupportRingSamples; sample++)
+            {
+                double angle = Math.PI * 2.0 * sample / GroundSupportRingSamples;
+                double sampleX = x + Math.Cos(angle) * supportRadius;
+                double sampleY = y + Math.Sin(angle) * supportRadius;
+                if (!TryFindGroundDetailed(
+                    sampleX,
+                    sampleY,
+                    maximumZ,
+                    minimumZ,
+                    false,
+                    out double sampleZ,
+                    out double sampleNormalZ))
+                {
+                    continue;
+                }
+
+                _supportHeightBuffer[valueCount] = sampleZ;
+                _supportNormalBuffer[valueCount] = sampleNormalZ;
+                valueCount++;
+                supportPointCount++;
+            }
+
+            if (supportPointCount < MinimumGroundSupportPoints || valueCount == 0)
+            {
+                groundZ = double.MinValue;
+                groundNormalZ = 1.0;
+                return false;
+            }
+
+            // La médiane rejette naturellement une petite facette ou un bord
+            // isolé sans lisser artificiellement les rampes : sur un plan incliné,
+            // les sondes opposées restent centrées sur la hauteur du joueur.
+            Array.Sort(
+                _supportHeightBuffer,
+                _supportNormalBuffer,
+                0,
+                valueCount);
+            int median = valueCount / 2;
+            if ((valueCount & 1) == 0)
+            {
+                groundZ =
+                    (_supportHeightBuffer[median - 1] +
+                     _supportHeightBuffer[median]) * 0.5;
+                groundNormalZ = Math.Min(
+                    _supportNormalBuffer[median - 1],
+                    _supportNormalBuffer[median]);
+            }
+            else
+            {
+                groundZ = _supportHeightBuffer[median];
+                groundNormalZ = _supportNormalBuffer[median];
+            }
+            return true;
         }
 
         public bool TryFindCeiling(double x, double y, double minimumZ, double maximumZ, out double ceilingZ)
@@ -381,6 +479,9 @@ namespace BIMaestro.VideoGames
             groundZ = double.MinValue;
             groundNormalZ = 1.0;
             bool found = false;
+            double fallbackGroundZ = double.MinValue;
+            double fallbackGroundNormalZ = 1.0;
+            bool fallbackFound = false;
 
             List<int> candidates = CollectPointCandidates(x, y);
             for (int candidateIndex = 0; candidateIndex < candidates.Count; candidateIndex++)
@@ -395,12 +496,39 @@ namespace BIMaestro.VideoGames
                     continue;
                 if (!TryInterpolateZ(triangle, x, y, out double z))
                     continue;
-                if (z <= maximumZ + 1e-5 && z >= minimumZ - 1e-5 && z > groundZ)
+                if (z > maximumZ + 1e-5 || z < minimumZ - 1e-5)
+                    continue;
+
+                if (triangle.PreferredWalkable)
                 {
-                    groundZ = z;
-                    groundNormalZ = triangle.Normal.Z;
-                    found = true;
+                    if (z > groundZ)
+                    {
+                        groundZ = z;
+                        groundNormalZ = triangle.Normal.Z;
+                        found = true;
+                    }
                 }
+                else if (!preferredOnly && z > fallbackGroundZ)
+                {
+                    fallbackGroundZ = z;
+                    fallbackGroundNormalZ = triangle.Normal.Z;
+                    fallbackFound = true;
+                }
+            }
+
+            // Les gaines, tuyaux, raccords et petits équipements possèdent eux
+            // aussi des faces supérieures praticables. Choisir systématiquement
+            // la plus haute transforme chaque objet MEP proche du plancher en
+            // mini-marche et fait trembler la caméra. Lorsqu'un vrai support Revit
+            // (sol, escalier, rampe ou terrain) existe juste dessous, il reste le
+            // contact de référence. Au-delà d'une hauteur de marche, la surface
+            // générique est une vraie plateforme et doit rester praticable.
+            if (fallbackFound &&
+                (!found || fallbackGroundZ > groundZ + PreferredSurfaceOverrideHeight))
+            {
+                groundZ = fallbackGroundZ;
+                groundNormalZ = fallbackGroundNormalZ;
+                found = true;
             }
 
             return found;

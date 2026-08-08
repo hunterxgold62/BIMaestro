@@ -59,6 +59,9 @@
     <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameSceneData.cs">
       <Link>GameSceneData.cs</Link>
     </Compile>
+    <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameCollisionWorld.cs">
+      <Link>GameCollisionWorld.cs</Link>
+    </Compile>
     <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameSelectionIndex.cs">
       <Link>GameSelectionIndex.cs</Link>
     </Compile>
