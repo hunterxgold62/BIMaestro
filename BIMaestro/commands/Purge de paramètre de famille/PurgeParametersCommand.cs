@@ -10,6 +10,7 @@ using System.Collections.ObjectModel;
 using System.Reflection;
 using System.Windows;
 using Licensing;
+using BIMaestro.Localization;
 
 namespace Famille
 {
@@ -27,7 +28,7 @@ namespace Famille
 
             if (!doc.IsFamilyDocument)
             {
-                TaskDialog.Show("Erreur", "Ce plugin doit être exécuté dans l'éditeur de familles.");
+                TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T("Ce plugin doit être exécuté dans l'éditeur de familles.", "This plugin must be run in the Family Editor."));
                 return Result.Cancelled;
             }
 
@@ -84,7 +85,7 @@ namespace Famille
 
             if (candidates.Count == 0)
             {
-                TaskDialog.Show("Information", "Aucun paramètre supprimable n'a été trouvé.");
+                TaskDialog.Show(UiLanguage.T("Information", "Information"), UiLanguage.T("Aucun paramètre supprimable n'a été trouvé.", "No removable parameter was found."));
                 return Result.Succeeded;
             }
 
@@ -104,7 +105,7 @@ namespace Famille
 
             if (toRemove.Count == 0)
             {
-                TaskDialog.Show("Information", "Aucun paramètre sélectionné pour la suppression.");
+                TaskDialog.Show(UiLanguage.T("Information", "Information"), UiLanguage.T("Aucun paramètre sélectionné pour la suppression.", "No parameter was selected for deletion."));
                 return Result.Succeeded;
             }
 
@@ -116,7 +117,7 @@ namespace Famille
             }
             catch (Exception ex)
             {
-                TaskDialog.Show("Erreur", $"Impossible de sauvegarder la famille : {ex.Message}");
+                TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T($"Impossible de sauvegarder la famille : {ex.Message}", $"Unable to save the family: {ex.Message}"));
                 return Result.Cancelled;
             }
 
@@ -138,11 +139,11 @@ namespace Famille
             }
 
             removedNames.Sort();
-            string resultMsg = $"Nombre total de paramètres supprimés : {removedNames.Count}";
+            string resultMsg = UiLanguage.T($"Nombre total de paramètres supprimés : {removedNames.Count}", $"Total parameters deleted: {removedNames.Count}");
             if (removedNames.Count > 0)
-                resultMsg += "\n\nParamètres supprimés :\n" + string.Join("\n", removedNames);
+                resultMsg += UiLanguage.T("\n\nParamètres supprimés :\n", "\n\nDeleted parameters:\n") + string.Join("\n", removedNames);
 
-            TaskDialog.Show("Résultat", resultMsg);
+            TaskDialog.Show(UiLanguage.T("Résultat", "Result"), resultMsg);
             return Result.Succeeded;
         }
 

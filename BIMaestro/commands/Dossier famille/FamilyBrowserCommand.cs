@@ -1,6 +1,7 @@
 ﻿using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 using Licensing;
 using System;
 using static Famille.FamilyBrowserWindow;
@@ -67,7 +68,7 @@ namespace Famille
             }
             catch (Exception ex)
             {
-                TaskDialog.Show("Erreur", ex.Message);
+                TaskDialog.Show(UiLanguage.T("Erreur", "Error"), ex.Message);
                 return Result.Failed;
             }
         }

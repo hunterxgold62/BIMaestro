@@ -5,6 +5,7 @@ using Autodesk.Revit.UI;
 using Licensing;
 using System;
 using System.IO;
+using BIMaestro.Localization;
 
 namespace Modification
 {
@@ -78,14 +79,17 @@ namespace Modification
             // Avertissement systématique si workshared
             if (isWorkshared)
             {
-                var warn = new TaskDialog("Modèle partagé détecté")
+                var warn = new TaskDialog(UiLanguage.T("Modèle partagé détecté", "Workshared Model Detected"))
                 {
-                    MainInstruction = "Le modèle est en travail partagé.",
-                    MainContent =
+                    MainInstruction = UiLanguage.T("Le modèle est en travail partagé.", "This is a workshared model."),
+                    MainContent = UiLanguage.T(
                         "La copie automatique de sécurité est déconseillée sur un central/local.\n" +
                         "Si vous devez travailler sur une copie, utilisez de préférence « Ouvrir » > « Détacher du central » " +
                         "puis enregistrez sous un nouveau nom.\n\n" +
                         "Voulez-vous continuer la purge sur le modèle ouvert ?",
+                        "An automatic safety copy is not recommended for a central or local model.\n" +
+                        "If you need a copy, use Open > Detach from Central and then save it under a new name.\n\n" +
+                        "Do you want to continue cleaning the open model?"),
                     CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No,
                     DefaultButton = TaskDialogResult.No,
                     MainIcon = TaskDialogIcon.TaskDialogIconWarning
@@ -104,12 +108,16 @@ namespace Modification
             // Proposer une copie auto seulement si non-workshared
             if (!isWorkshared)
             {
-                var ask = new TaskDialog("Créer une copie pour purge ?")
+                var ask = new TaskDialog(UiLanguage.T("Créer une copie pour purge ?", "Create a Cleanup Copy?"))
                 {
-                    MainInstruction = $"Créer automatiquement une copie « {title} - Purger.rvt » et travailler dessus ?",
-                    MainContent =
+                    MainInstruction = UiLanguage.T(
+                        $"Créer automatiquement une copie « {title} - Purger.rvt » et travailler dessus ?",
+                        $"Automatically create and work in a copy named '{title} - Cleanup.rvt'?"),
+                    MainContent = UiLanguage.T(
                         "La copie sera enregistrée dans le même dossier que le fichier actuel. " +
                         "Le document ouvert pointera ensuite vers cette copie (l’original reste intact).",
+                        "The copy will be saved in the same folder as the current file. " +
+                        "The open document will then point to this copy, while the original remains unchanged."),
                     CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No,
                     DefaultButton = TaskDialogResult.Yes,
                     MainIcon = TaskDialogIcon.TaskDialogIconInformation
@@ -118,9 +126,13 @@ namespace Modification
                 {
                     if (string.IsNullOrWhiteSpace(doc.PathName))
                     {
-                        TaskDialog.Show("Enregistrement requis",
-                            "Le projet n’a pas encore été enregistré. Impossible de déterminer un dossier pour la copie.\n" +
-                            "Veuillez enregistrer le fichier, puis relancer la commande.");
+                        TaskDialog.Show(
+                            UiLanguage.T("Enregistrement requis", "Save Required"),
+                            UiLanguage.T(
+                                "Le projet n’a pas encore été enregistré. Impossible de déterminer un dossier pour la copie.\n" +
+                                "Veuillez enregistrer le fichier, puis relancer la commande.",
+                                "The project has not been saved yet, so a folder for the copy cannot be determined.\n" +
+                                "Save the file, then run the command again."));
                         abortedByUser = true;
                         return true;
                     }
@@ -131,16 +143,20 @@ namespace Modification
                         var opts = new SaveAsOptions { OverwriteExistingFile = false };
                         doc.SaveAs(newPath, opts);
 
-                        TaskDialog.Show("Copie créée",
-                            $"La copie de purge a été créée :\n{newPath}\n\n" +
-                            "Vous travaillez désormais sur cette copie.");
+                        TaskDialog.Show(
+                            UiLanguage.T("Copie créée", "Copy Created"),
+                            UiLanguage.T(
+                                $"La copie de purge a été créée :\n{newPath}\n\nVous travaillez désormais sur cette copie.",
+                                $"The cleanup copy was created:\n{newPath}\n\nYou are now working in this copy."));
                     }
                     catch (Exception ex)
                     {
-                        var err = new TaskDialog("Erreur lors de la copie")
+                        var err = new TaskDialog(UiLanguage.T("Erreur lors de la copie", "Copy Error"))
                         {
-                            MainInstruction = "La création de la copie a échoué.",
-                            MainContent = $"Détail : {ex.Message}\n\nSouhaitez-vous continuer sans créer de copie ?",
+                            MainInstruction = UiLanguage.T("La création de la copie a échoué.", "The copy could not be created."),
+                            MainContent = UiLanguage.T(
+                                $"Détail : {ex.Message}\n\nSouhaitez-vous continuer sans créer de copie ?",
+                                $"Details: {ex.Message}\n\nDo you want to continue without creating a copy?"),
                             CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No,
                             DefaultButton = TaskDialogResult.No,
                             MainIcon = TaskDialogIcon.TaskDialogIconWarning

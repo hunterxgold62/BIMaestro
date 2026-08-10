@@ -5,6 +5,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Windows;
+using BIMaestro.Localization;
 
 namespace Visualisation
 {
@@ -164,7 +165,7 @@ namespace Visualisation
             }
             catch
             {
-                MessageBox.Show("Impossible d’ouvrir la page d’aide.", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.T("Impossible d’ouvrir la page d’aide.", "Unable to Open the Help Page."), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 

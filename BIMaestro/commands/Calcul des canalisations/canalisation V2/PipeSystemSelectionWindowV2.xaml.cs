@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using BIMaestro.Localization;
 
 namespace Analyse
 {
@@ -38,7 +39,9 @@ namespace Analyse
             }
             catch (System.Exception ex)
             {
-                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(
+                    UiLanguage.T($"Impossible d’ouvrir la page d’aide : {ex.Message}", $"Unable to open the help page: {ex.Message}"),
+                    "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -86,7 +89,9 @@ namespace Analyse
 
                 if (SelectedSystemTypes.Count == 0)
                 {
-                    MessageBox.Show("Veuillez sélectionner au moins un Type de système.", "Avertissement", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show(
+                        UiLanguage.T("Veuillez sélectionner au moins un Type de système.", "Select at least one system type."),
+                        UiLanguage.T("Avertissement", "Warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
             }

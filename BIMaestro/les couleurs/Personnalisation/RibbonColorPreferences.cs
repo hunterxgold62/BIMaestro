@@ -1877,7 +1877,7 @@ namespace Couleur
         {
             return new ProjectBrowserColorSettings
             {
-                IsEnabled = true,
+                IsEnabled = false,
                 BackgroundMode = "Bulles pastel",
                 BackgroundColor = Color.FromRgb(255, 249, 252),
                 TextColor = Color.FromRgb(58, 61, 72),
@@ -2128,6 +2128,11 @@ namespace Couleur
                 "Uni",
                 "Bulles pastel",
                 "Vagues pastel",
+                "Rubans fluides",
+                "Courbes topographiques",
+                "Grille d'architecte",
+                "Aurore boréale",
+                "Constellation douce",
                 "Lucioles pastel",
                 "Dégradé pastel animé"
             };

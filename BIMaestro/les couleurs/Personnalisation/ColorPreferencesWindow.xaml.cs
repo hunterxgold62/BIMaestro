@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Media;
+using BIMaestro.Localization;
 using BrowserOrganization = Autodesk.Revit.DB.BrowserOrganization;
 using Document = Autodesk.Revit.DB.Document;
 using FilteredElementCollector = Autodesk.Revit.DB.FilteredElementCollector;
@@ -42,8 +43,8 @@ namespace Couleur
             BrowserPreferences =
                 ProjectBrowserColorPreferences.Load();
             RefreshBrowserProfiles();
-            PreferenceFilePath =
-                $"Sauvegarde : {RibbonColorPreferences.PreferenceFilePath}";
+            PreferenceFilePath = UiLanguage.T("Sauvegarde : ", "Saved at: ") +
+                RibbonColorPreferences.PreferenceFilePath;
             PresetEntries = RibbonColorPresetCatalog.StandardPresetNames
                 .Select(name => new PresetMenuEntry(name, false))
                 .Concat(new[] { new PresetMenuEntry("Animé", true) })
@@ -91,34 +92,43 @@ namespace Couleur
 
         public string BrowserCategorySuggestionTitle =>
             BrowserCategorySuggestions.Count == 0
-                ? "Aucune nouvelle catégorie détectée"
-                : $"{BrowserCategorySuggestions.Count} catégories détectées";
+                ? UiLanguage.T("Aucune nouvelle catégorie détectée", "No New Category Detected")
+                : BrowserCategorySuggestions.Count + UiLanguage.T(" catégories détectées", " categories detected");
 
         public string PreferenceFilePath { get; }
 
         public IReadOnlyList<PresetMenuEntry> PresetEntries { get; }
 
-        public IReadOnlyList<string> BrowserBackgroundModes { get; } =
+        public IReadOnlyList<LocalizedOption> BrowserBackgroundModes { get; } =
             new[]
             {
-                "Uni",
-                "Bulles pastel",
-                "Vagues pastel",
-                "Lucioles pastel",
-                "Dégradé pastel animé"
+                new LocalizedOption("Uni", "Solid"),
+                new LocalizedOption("Bulles pastel", "Pastel Bubbles"),
+                new LocalizedOption("Vagues pastel", "Pastel Waves"),
+                new LocalizedOption("Rubans fluides", "Flowing Ribbons"),
+                new LocalizedOption("Courbes topographiques", "Topographic Contours"),
+                new LocalizedOption("Grille d'architecte", "Architect Grid"),
+                new LocalizedOption("Aurore boréale", "Northern Lights"),
+                new LocalizedOption("Constellation douce", "Soft Constellation"),
+                new LocalizedOption("Lucioles pastel", "Pastel Fireflies"),
+                new LocalizedOption("Dégradé pastel animé", "Animated Pastel Gradient")
             };
 
-        public IReadOnlyList<string> BrowserColoringModes { get; } =
+        public IReadOnlyList<LocalizedOption> BrowserColoringModes { get; } =
             new[]
             {
-                "Aucune coloration",
-                "Par type de vue",
-                "Par catégories personnelles",
-                "Combiner les deux"
+                new LocalizedOption("Aucune coloration", "No Coloring"),
+                new LocalizedOption("Par type de vue", "By View Type"),
+                new LocalizedOption("Par catégories personnelles", "By Custom Categories"),
+                new LocalizedOption("Combiner les deux", "Combine Both")
             };
 
-        public IReadOnlyList<string> BrowserViewColorTargets { get; } =
-            new[] { "Fond", "Texte" };
+        public IReadOnlyList<LocalizedOption> BrowserViewColorTargets { get; } =
+            new[]
+            {
+                new LocalizedOption("Fond", "Background"),
+                new LocalizedOption("Texte", "Text")
+            };
 
         public string BrowserColoringMode
         {
@@ -251,6 +261,21 @@ namespace Couleur
 
         public Visibility BrowserWavesVisibility =>
             BrowserModeVisibility("Vagues pastel");
+
+        public Visibility BrowserRibbonsVisibility =>
+            BrowserModeVisibility("Rubans fluides");
+
+        public Visibility BrowserTopographyVisibility =>
+            BrowserModeVisibility("Courbes topographiques");
+
+        public Visibility BrowserArchitectGridVisibility =>
+            BrowserModeVisibility("Grille d'architecte");
+
+        public Visibility BrowserNorthernLightsVisibility =>
+            BrowserModeVisibility("Aurore boréale");
+
+        public Visibility BrowserConstellationVisibility =>
+            BrowserModeVisibility("Constellation douce");
 
         public Visibility BrowserFirefliesVisibility =>
             BrowserModeVisibility("Lucioles pastel");
@@ -633,6 +658,11 @@ namespace Couleur
             OnPropertyChanged(nameof(BrowserPreviewThreeDTextBrush));
             OnPropertyChanged(nameof(BrowserBubblesVisibility));
             OnPropertyChanged(nameof(BrowserWavesVisibility));
+            OnPropertyChanged(nameof(BrowserRibbonsVisibility));
+            OnPropertyChanged(nameof(BrowserTopographyVisibility));
+            OnPropertyChanged(nameof(BrowserArchitectGridVisibility));
+            OnPropertyChanged(nameof(BrowserNorthernLightsVisibility));
+            OnPropertyChanged(nameof(BrowserConstellationVisibility));
             OnPropertyChanged(nameof(BrowserFirefliesVisibility));
             OnPropertyChanged(nameof(BrowserAuroraVisibility));
             OnPropertyChanged(nameof(BrowserSearchVisibility));
@@ -730,7 +760,7 @@ namespace Couleur
         private static void ShowSaveError(System.Exception ex)
         {
             MessageBox.Show(
-                $"Impossible d’enregistrer les couleurs.\n\n{ex.Message}",
+                UiLanguage.T("Impossible d’enregistrer les couleurs.\n\n", "Unable to Save Colors.\n\n") + ex.Message,
                 "BIMaestro",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
@@ -775,7 +805,22 @@ namespace Couleur
 
         public string Name { get; }
 
+        public string DisplayName => UiLanguage.T(Name);
+
         public bool IsHeader { get; }
+    }
+
+    public sealed class LocalizedOption
+    {
+        public LocalizedOption(string value, string english)
+        {
+            Value = value;
+            Label = UiLanguage.T(value, english);
+        }
+
+        public string Value { get; }
+
+        public string Label { get; }
     }
 
     public sealed class PanelColorItem : INotifyPropertyChanged
@@ -789,6 +834,12 @@ namespace Couleur
                 "Bulles pastel", "Vagues pastel", "Étoiles pastel",
                 "Nuages doux"
             };
+
+        private static readonly IReadOnlyList<LocalizedOption> LocalizedBackgroundModes =
+            AvailableBackgroundModes
+                .Select(value => new LocalizedOption(value, UiLanguage.T(value)))
+                .ToList()
+                .AsReadOnly();
 
         private Color? _backgroundColor;
         private Color? _backgroundEndColor;
@@ -805,7 +856,7 @@ namespace Couleur
 
         public string PanelName { get; }
 
-        public IReadOnlyList<string> BackgroundModes => AvailableBackgroundModes;
+        public IReadOnlyList<LocalizedOption> BackgroundModes => LocalizedBackgroundModes;
 
         public Color? BackgroundColor
         {
@@ -1091,6 +1142,8 @@ namespace Couleur
         public Color SuggestedColor { get; }
 
         public string CountLabel =>
-            ViewCount == 1 ? "1 vue" : $"{ViewCount} vues";
+            ViewCount == 1
+                ? UiLanguage.T("1 vue", "1 view")
+                : ViewCount + UiLanguage.T(" vues", " views");
     }
 }

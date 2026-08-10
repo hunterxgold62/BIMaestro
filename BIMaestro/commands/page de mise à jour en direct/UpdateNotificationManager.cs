@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Interop;
+using BIMaestro.Localization;
 
 namespace Page
 {
@@ -150,8 +151,9 @@ namespace Page
                 var btn = info?.PushButton;
                 if (btn == null) return;
 
-                btn.ItemText = "Note\nMAJ !";
-                btn.ToolTip = $"Une mise à jour BIMaestro est disponible.\nInstallée: v{_currentVersion}\nDisponible: v{_latestVersion}";
+                btn.ItemText = UiLanguage.T("Note\nMAJ !", "Update\nAvailable!");
+                btn.ToolTip = UiLanguage.T("Une mise à jour BIMaestro est disponible.\nInstallée: v", "A BIMaestro Update Is Available.\nInstalled: v") + _currentVersion +
+                    UiLanguage.T("\nDisponible: v", "\nAvailable: v") + _latestVersion;
                 _passiveSignalApplied = true;
             }
             catch

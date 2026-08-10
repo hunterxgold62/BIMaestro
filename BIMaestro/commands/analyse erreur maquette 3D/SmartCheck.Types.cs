@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using BIMaestro.Localization;
 
 namespace Analyse
 {
@@ -74,6 +75,7 @@ namespace Analyse
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(Severity));
                 OnPropertyChanged(nameof(SeverityText));
+                OnPropertyChanged(nameof(SeverityDisplayText));
                 OnPropertyChanged(nameof(IssueStateText));
                 OnPropertyChanged(nameof(SearchText));
             }
@@ -90,12 +92,15 @@ namespace Analyse
                 Ignored = IsResolvedStatus(next);
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(StatusText));
+                OnPropertyChanged(nameof(StatusDisplayText));
                 OnPropertyChanged(nameof(IssueStateText));
                 OnPropertyChanged(nameof(SearchText));
             }
         }
 
         public string StatusText => Status;
+        public string StatusDisplayText => UiLanguage.T(StatusText);
+        public string CategoryDisplayText => UiLanguage.T(Category);
 
         public string StatusComment
         {
@@ -160,7 +165,9 @@ namespace Analyse
         }
 
         public bool HasThumbnail => !string.IsNullOrWhiteSpace(ThumbnailPath);
-        public string ThumbnailStateText => ThumbnailLoading ? "Aperçu en cours" : "Aperçu non généré";
+        public string ThumbnailStateText => ThumbnailLoading
+            ? UiLanguage.T("Aperçu en cours", "Preview in Progress")
+            : UiLanguage.T("Aperçu non généré", "Preview Not Generated");
 
         public IssueSeverity Severity
         {
@@ -195,23 +202,27 @@ namespace Analyse
             }
         }
 
-        public string VisualTitle => string.IsNullOrWhiteSpace(Category) ? "Anomalie 3D" : Category;
+        public string SeverityDisplayText => UiLanguage.T(SeverityText);
+
+        public string VisualTitle => string.IsNullOrWhiteSpace(Category)
+            ? UiLanguage.T("Anomalie 3D", "3D Issue")
+            : UiLanguage.T(Category);
         public string VisualSubtitle => WhyText;
         public string IssueFamily => !string.IsNullOrWhiteSpace(ElementTypeName)
             ? ElementTypeName
-            : ElementIdValue > 0 ? "Élément " + ElementIdValue : "Élément";
+            : ElementIdValue > 0 ? UiLanguage.T("Élément ", "Element ") + ElementIdValue : UiLanguage.T("Élément", "Element");
         public string RelatedLabel
         {
             get
             {
                 if (!string.IsNullOrWhiteSpace(LinkName)) return LinkName;
                 return RelatedId != null && RelatedId != ElementId.InvalidElementId && RelatedId.GetIdValue() > 0
-                    ? "Lié à " + RelatedId.GetIdValue()
+                    ? UiLanguage.T("Lié à ", "Related to ") + RelatedId.GetIdValue()
                     : string.Empty;
             }
         }
 
-        public string IssueStateText => StatusText;
+        public string IssueStateText => StatusDisplayText;
 
         public string StatusUpdatedText
         {
@@ -229,13 +240,13 @@ namespace Analyse
             {
                 switch (Kind)
                 {
-                    case IssueKind.LinkPipeClash: return "Collision entre un réseau et un fichier lié.";
-                    case IssueKind.MepThroughWallNoSleeve: return "Traverse un mur sans réservation détectée.";
-                    case IssueKind.MepUnconnected: return "Connecteur ouvert ou réseau non raccordé.";
-                    case IssueKind.WallFloating: return "Mur sans support détecté sous sa base.";
-                    case IssueKind.WallOnWall: return "Mur posé directement sur un autre mur.";
-                    case IssueKind.WallEmbeddedInFloor: return "Mur noyé dans un plancher.";
-                    default: return string.IsNullOrWhiteSpace(Message) ? "Anomalie à vérifier." : Message;
+                    case IssueKind.LinkPipeClash: return UiLanguage.T("Collision entre un réseau et un fichier lié.", "Clash between a network and a linked file.");
+                    case IssueKind.MepThroughWallNoSleeve: return UiLanguage.T("Traverse un mur sans réservation détectée.", "Passes through a wall with no detected opening.");
+                    case IssueKind.MepUnconnected: return UiLanguage.T("Connecteur ouvert ou réseau non raccordé.", "Open connector or unconnected network.");
+                    case IssueKind.WallFloating: return UiLanguage.T("Mur sans support détecté sous sa base.", "Wall with no support detected below its base.");
+                    case IssueKind.WallOnWall: return UiLanguage.T("Mur posé directement sur un autre mur.", "Wall placed directly on another wall.");
+                    case IssueKind.WallEmbeddedInFloor: return UiLanguage.T("Mur noyé dans un plancher.", "Wall embedded in a floor.");
+                    default: return string.IsNullOrWhiteSpace(Message) ? UiLanguage.T("Anomalie à vérifier.", "Issue to review.") : Message;
                 }
             }
         }
@@ -246,13 +257,13 @@ namespace Analyse
             {
                 switch (Kind)
                 {
-                    case IssueKind.LinkPipeClash: return "Coordonner le tracé ou le lien.";
-                    case IssueKind.MepThroughWallNoSleeve: return "Créer une réservation ou corriger le passage.";
-                    case IssueKind.MepUnconnected: return "Raccorder, boucher ou confirmer le cas.";
-                    case IssueKind.WallFloating: return "Vérifier niveau, contrainte et support.";
-                    case IssueKind.WallOnWall: return "Contrôler les contraintes verticales.";
-                    case IssueKind.WallEmbeddedInFloor: return "Contrôler base, hauteur et plancher.";
-                    default: return "Ouvrir le détail avant décision.";
+                    case IssueKind.LinkPipeClash: return UiLanguage.T("Coordonner le tracé ou le lien.", "Coordinate the route or linked model.");
+                    case IssueKind.MepThroughWallNoSleeve: return UiLanguage.T("Créer une réservation ou corriger le passage.", "Create an opening or correct the penetration.");
+                    case IssueKind.MepUnconnected: return UiLanguage.T("Raccorder, boucher ou confirmer le cas.", "Connect, cap, or confirm the condition.");
+                    case IssueKind.WallFloating: return UiLanguage.T("Vérifier niveau, contrainte et support.", "Check the level, constraint, and support.");
+                    case IssueKind.WallOnWall: return UiLanguage.T("Contrôler les contraintes verticales.", "Check the vertical constraints.");
+                    case IssueKind.WallEmbeddedInFloor: return UiLanguage.T("Contrôler base, hauteur et plancher.", "Check the base, height, and floor.");
+                    default: return UiLanguage.T("Ouvrir le détail avant décision.", "Open the details before deciding.");
                 }
             }
         }

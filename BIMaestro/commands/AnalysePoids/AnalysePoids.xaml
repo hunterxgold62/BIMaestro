@@ -85,7 +85,7 @@
                       Background="Transparent">
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="Nom" Binding="{Binding Nom}" Width="3*"/>
-                    <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="2*"/>
+                    <DataGridTextColumn Header="Type" Binding="{Binding TypeAffiche}" Width="2*"/>
                     <DataGridTextColumn Header="Taille (Mo)"
                                         Binding="{Binding TailleAffiche}"
                                         SortMemberPath="TailleEnMo"

@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Threading;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 using DB = Autodesk.Revit.DB;
 
 namespace Famille.Orbit3D
@@ -39,7 +40,7 @@ namespace Famille.Orbit3D
         {
             if (uiapp == null || string.IsNullOrWhiteSpace(familyPath) || !File.Exists(familyPath))
             {
-                MessageBox.Show("Fichier famille introuvable.", "Aperçu 3D",
+                MessageBox.Show(UiLanguage.T("Fichier famille introuvable.", "Family file not found."), UiLanguage.T("Aperçu 3D", "3D Preview"),
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -52,7 +53,7 @@ namespace Famille.Orbit3D
                 try
                 {
                     _host.Window.ClearScene(); // nettoie l'ancien contenu si besoin
-                    _host.Window.ShowBusy(true, "Chargement de la famille…");
+                    _host.Window.ShowBusy(true, UiLanguage.T("Chargement de la famille…", "Loading family..."));
                     if (!_host.Window.IsVisible) _host.Window.Show();
                     RaisePreviewVisibilityChanged(_host.Window.IsVisible);
                     _host.Window.Activate();
@@ -75,7 +76,7 @@ namespace Famille.Orbit3D
                     if (info != null && info.Format != app.VersionNumber)
                     {
                         _host.Dispatcher.Invoke(() =>
-                            _host.Window.ShowBusy(true, "Mise à niveau du fichier… Cela peut prendre du temps."));
+                            _host.Window.ShowBusy(true, UiLanguage.T("Mise à niveau du fichier… Cela peut prendre du temps.", "Upgrading the file... This may take some time.")));
                     }
                 }
                 catch { /* non bloquant */ }
@@ -94,7 +95,7 @@ namespace Famille.Orbit3D
                 _host.Dispatcher.Invoke(() =>
                 {
                     if (meshes == null || meshes.Count == 0)
-                        _host.Window.ShowBusy(true, "Aucune géométrie affichable trouvée.");
+                        _host.Window.ShowBusy(true, UiLanguage.T("Aucune géométrie affichable trouvée.", "No displayable geometry was found."));
                     else
                         _host.Window.LoadMeshes(meshes);
                 });
@@ -102,7 +103,7 @@ namespace Famille.Orbit3D
             catch (Exception ex)
             {
                 _host.Dispatcher.Invoke(() =>
-                    _host.Window.ShowBusy(true, "Erreur : " + ex.Message));
+                    _host.Window.ShowBusy(true, UiLanguage.T("Erreur : ", "Error: ") + ex.Message));
             }
             finally
             {

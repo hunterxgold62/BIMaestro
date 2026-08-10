@@ -10,6 +10,7 @@ using Newtonsoft.Json;
 using System.Windows.Threading;
 using System.Windows.Interop;
 using Licensing;
+using BIMaestro.Localization;
 
 namespace Analyse
 {
@@ -39,10 +40,10 @@ namespace Analyse
             Document doc = uiDoc.Document;
 
             // 1. Confirmation rapide
-            var td = new TaskDialog("Analyse Poids")
+            var td = new TaskDialog(UiLanguage.T("Analyse Poids", "Size Analysis"))
             {
-                MainInstruction = "Lancement de l'analyse des familles et imports",
-                MainContent = "Cela peut prendre quelques instants.\nContinuer ?",
+                MainInstruction = UiLanguage.T("Lancement de l'analyse des familles et imports", "Analyze Families and Imports"),
+                MainContent = UiLanguage.T("Cela peut prendre quelques instants.\nContinuer ?", "This may take a few moments.\nContinue?"),
                 CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No,
                 DefaultButton = TaskDialogResult.No
             };
@@ -835,6 +836,22 @@ private List<string> GetImportNames(Document doc)
     {
         public string Nom { get; set; }
         public string Type { get; set; }
+        public string TypeAffiche
+        {
+            get
+            {
+                if (!UiLanguage.IsEnglish) return Type;
+                return Type switch
+                {
+                    "Famille" => "Family",
+                    "Lien CAO" => "CAD Link",
+                    "Import CAO" => "CAD Import",
+                    "Lien Revit/IFC" => "Revit/IFC Link",
+                    "Nuage de points" => "Point Cloud",
+                    _ => Type
+                };
+            }
+        }
         public double TailleEnMo { get; set; }
         public string TailleAffiche => $"{TailleEnMo:N2} Mo";
 

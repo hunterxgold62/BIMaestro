@@ -2,6 +2,7 @@
 using System.IO;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 
 namespace Famille
 {
@@ -40,7 +41,9 @@ namespace Famille
                 catch { fail++; }
             }
 
-            TaskDialog.Show("Collections", $"Familles chargées : {ok}\nÉchecs : {fail}");
+            TaskDialog.Show("Collections", UiLanguage.T(
+                $"Familles chargées : {ok}\nÉchecs : {fail}",
+                $"Families loaded: {ok}\nFailures: {fail}"));
         }
 
         public string GetName() => "LoadCollectionHandler";

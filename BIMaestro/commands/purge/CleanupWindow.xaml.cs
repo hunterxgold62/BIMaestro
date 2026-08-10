@@ -2,6 +2,7 @@
 using System;
 using System.Diagnostics;
 using System.Windows;
+using BIMaestro.Localization;
 
 namespace Modification
 {
@@ -39,7 +40,9 @@ namespace Modification
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(
+                    UiLanguage.T($"Impossible d’ouvrir la page d’aide : {ex.Message}", $"Unable to open the help page: {ex.Message}"),
+                    "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
     }

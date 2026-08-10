@@ -15,6 +15,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using Modification;
+using BIMaestro.Localization;
 
 namespace Analyse
 {
@@ -90,7 +91,7 @@ namespace Analyse
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.T($"Impossible d’ouvrir la page d’aide : {ex.Message}", $"Unable to open the help page: {ex.Message}"), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -99,25 +100,25 @@ namespace Analyse
             _isBindingFilters = true;
             try
             {
-                SeverityFilterCombo.ItemsSource = new[] { "Toutes", "Critique", "À vérifier", "Info", "OK" };
+                SeverityFilterCombo.ItemsSource = ToFilterOptions(new[] { "Toutes", "Critique", "À vérifier", "Info", "OK" });
                 SeverityFilterCombo.SelectedIndex = 0;
 
-                TypeFilterCombo.ItemsSource = ValuesWithAll(_all.Select(i => i.Category), "Tous");
+                TypeFilterCombo.ItemsSource = ToFilterOptions(ValuesWithAll(_all.Select(i => i.Category), "Tous"));
                 TypeFilterCombo.SelectedIndex = 0;
 
-                StateFilterCombo.ItemsSource = StatusFilters;
+                StateFilterCombo.ItemsSource = ToFilterOptions(StatusFilters);
                 StateFilterCombo.SelectedIndex = 0;
 
-                LevelFilterCombo.ItemsSource = ValuesWithAll(_all.Select(i => i.LevelName), "Tous");
+                LevelFilterCombo.ItemsSource = ToFilterOptions(ValuesWithAll(_all.Select(i => i.LevelName), "Tous"));
                 LevelFilterCombo.SelectedIndex = 0;
 
-                LinkFilterCombo.ItemsSource = ValuesWithAll(_all.Select(i => i.LinkName), "Tous");
+                LinkFilterCombo.ItemsSource = ToFilterOptions(ValuesWithAll(_all.Select(i => i.LinkName), "Tous"));
                 LinkFilterCombo.SelectedIndex = 0;
 
-                ElementCategoryFilterCombo.ItemsSource = ValuesWithAll(_all.Select(i => i.ElementCategory), "Toutes");
+                ElementCategoryFilterCombo.ItemsSource = ToFilterOptions(ValuesWithAll(_all.Select(i => i.ElementCategory), "Toutes"));
                 ElementCategoryFilterCombo.SelectedIndex = 0;
 
-                VisualModeCombo.ItemsSource = new[] { "Groupes intelligents", "Anomalies" };
+                VisualModeCombo.ItemsSource = ToFilterOptions(new[] { "Groupes intelligents", "Anomalies" });
                 VisualModeCombo.SelectedIndex = 0;
             }
             finally
@@ -136,6 +137,22 @@ namespace Analyse
             list.Insert(0, allLabel);
             return list;
         }
+
+        private sealed class FilterOption
+        {
+            public FilterOption(string value)
+            {
+                Value = value;
+                Label = UiLanguage.T(value);
+            }
+
+            public string Value { get; }
+            public string Label { get; }
+            public override string ToString() => Label;
+        }
+
+        private static List<FilterOption> ToFilterOptions(IEnumerable<string> values)
+            => (values ?? Enumerable.Empty<string>()).Select(value => new FilterOption(value)).ToList();
 
         private void Bind()
         {
@@ -250,8 +267,12 @@ namespace Analyse
         private void UpdateResultText()
         {
             if (ResultText == null) return;
-            var cardLabel = _visualCards.Count > 1 ? "cartes" : "carte";
-            ResultText.Text = $"{_filtered.Count} / {_all.Count} anomalies - {_visualCards.Count} {cardLabel}";
+            var cardLabel = UiLanguage.IsEnglish
+                ? (_visualCards.Count == 1 ? "card" : "cards")
+                : (_visualCards.Count > 1 ? "cartes" : "carte");
+            ResultText.Text = UiLanguage.T(
+                $"{_filtered.Count} / {_all.Count} anomalies - {_visualCards.Count} {cardLabel}",
+                $"{_filtered.Count} / {_all.Count} issues - {_visualCards.Count} {cardLabel}");
         }
 
         private void UpdateActiveFilterText()
@@ -267,17 +288,17 @@ namespace Analyse
             AddFilterPart(parts, SelectedText(ElementCategoryFilterCombo, "Toutes"), "Toutes");
 
             var search = SearchBox?.Text?.Trim();
-            if (!string.IsNullOrWhiteSpace(search)) parts.Add($"Recherche: {search}");
+            if (!string.IsNullOrWhiteSpace(search)) parts.Add(UiLanguage.T($"Recherche : {search}", $"Search: {search}"));
 
             ActiveFilterText.Text = parts.Count == 0
-                ? "Aucun filtre actif"
-                : "Filtre actif : " + string.Join(" · ", parts);
+                ? UiLanguage.T("Aucun filtre actif", "No Active Filter")
+                : UiLanguage.T("Filtre actif : ", "Active Filter: ") + string.Join(" · ", parts);
         }
 
         private static void AddFilterPart(ICollection<string> parts, string value, string allValue)
         {
             if (!string.IsNullOrWhiteSpace(value) && value != allValue)
-                parts.Add(value);
+                parts.Add(UiLanguage.T(value));
         }
 
         private static int StatusSort(string status)
@@ -291,7 +312,7 @@ namespace Analyse
         }
 
         private static string SelectedText(System.Windows.Controls.ComboBox combo, string fallback)
-            => combo?.SelectedItem as string ?? fallback;
+            => combo?.SelectedItem is FilterOption option ? option.Value : combo?.SelectedItem as string ?? fallback;
 
         private static void BindGrid(DataGrid grid, IEnumerable<ModelIssue> source)
         {
@@ -422,7 +443,7 @@ namespace Analyse
         {
             var item = new MenuItem
             {
-                Header = header,
+                Header = UiLanguage.T(header),
                 CommandParameter = parameter
             };
             item.Click += handler;
@@ -431,12 +452,12 @@ namespace Analyse
 
         private MenuItem BuildStatusMenu(object parameter)
         {
-            var menu = new MenuItem { Header = "Statut" };
+            var menu = new MenuItem { Header = UiLanguage.T("Statut", "Status") };
             foreach (var status in new[] { ModelIssue.StatusActive, ModelIssue.StatusToFix, ModelIssue.StatusReview, ModelIssue.StatusFixed, ModelIssue.StatusIgnored })
             {
                 var item = new MenuItem
                 {
-                    Header = status,
+                    Header = UiLanguage.T(status),
                     Tag = status,
                     CommandParameter = parameter
                 };
@@ -489,21 +510,22 @@ namespace Analyse
         private void ShowIssueDetails(ModelIssue issue)
         {
             var related = IsValidId(issue.RelatedId) ? issue.RelatedId.GetIdValue().ToString() : "-";
+            var localizedStatus = UiLanguage.T(issue.StatusText);
             var statusInfo = string.IsNullOrWhiteSpace(issue.StatusUpdatedText)
-                ? issue.StatusText
-                : issue.StatusText + " (" + issue.StatusUpdatedText + ")";
-            var comment = string.IsNullOrWhiteSpace(issue.StatusComment) ? string.Empty : "\nCommentaire : " + issue.StatusComment;
+                ? localizedStatus
+                : localizedStatus + " (" + issue.StatusUpdatedText + ")";
+            var comment = string.IsNullOrWhiteSpace(issue.StatusComment) ? string.Empty : UiLanguage.T("\nCommentaire : ", "\nComment: ") + issue.StatusComment;
 
             TaskDialog.Show(
-                "Clash 3D - détail",
-                $"Gravité : {issue.SeverityText}\n" +
-                $"Statut : {statusInfo}\n" +
-                $"Type : {issue.Category}\n" +
-                $"Niveau : {EmptyDash(issue.LevelName)}\n" +
-                $"Catégorie : {EmptyDash(issue.ElementCategory)}\n" +
-                $"Lien : {EmptyDash(issue.LinkName)}\n" +
-                $"Élément : {issue.ElementIdValue}\n" +
-                $"Élément lié : {related}\n\n" +
+                UiLanguage.T("Clash 3D - détail", "3D Clash - Details"),
+                UiLanguage.T("Gravité : ", "Severity: ") + UiLanguage.T(issue.SeverityText) + "\n" +
+                UiLanguage.T("Statut : ", "Status: ") + statusInfo + "\n" +
+                UiLanguage.T("Type : ", "Type: ") + UiLanguage.T(issue.Category) + "\n" +
+                UiLanguage.T("Niveau : ", "Level: ") + EmptyDash(issue.LevelName) + "\n" +
+                UiLanguage.T("Catégorie : ", "Category: ") + EmptyDash(issue.ElementCategory) + "\n" +
+                UiLanguage.T("Lien : ", "Link: ") + EmptyDash(issue.LinkName) + "\n" +
+                UiLanguage.T("Élément : ", "Element: ") + issue.ElementIdValue + "\n" +
+                UiLanguage.T("Élément lié : ", "Related Element: ") + related + "\n\n" +
                 $"{issue.WhyText}\n{issue.AdviceText}\n\n" +
                 $"{issue.Message}{comment}");
         }
@@ -619,8 +641,8 @@ namespace Analyse
 
             var existing = list.Count == 1 ? list[0].StatusComment ?? string.Empty : string.Empty;
             var comment = Microsoft.VisualBasic.Interaction.InputBox(
-                "Commentaire optionnel pour ce statut :",
-                "Clash 3D - commentaire",
+                UiLanguage.T("Commentaire optionnel pour ce statut :", "Optional comment for this status:"),
+                UiLanguage.T("Clash 3D - commentaire", "3D Clash - Comment"),
                 existing);
 
             if (comment == null) return;
@@ -742,7 +764,7 @@ namespace Analyse
                 SeverityFilterCombo.SelectedIndex = 0;
                 StateFilterCombo.SelectedIndex = 0;
                 SearchBox.Text = string.Empty;
-                TypeFilterCombo.SelectedItem = issue.Category;
+                SelectComboValue(TypeFilterCombo, issue.Category, "Tous");
             });
         }
 
@@ -876,10 +898,13 @@ namespace Analyse
         private static void SelectComboValue(System.Windows.Controls.ComboBox combo, string value, string fallback)
         {
             if (combo == null) return;
-            if (!string.IsNullOrWhiteSpace(value) && combo.Items.Contains(value))
-                combo.SelectedItem = value;
-            else if (combo.Items.Contains(fallback))
-                combo.SelectedItem = fallback;
+            var desired = combo.Items.OfType<FilterOption>()
+                .FirstOrDefault(option => string.Equals(option.Value, value, StringComparison.CurrentCultureIgnoreCase));
+            if (desired == null)
+                desired = combo.Items.OfType<FilterOption>()
+                    .FirstOrDefault(option => string.Equals(option.Value, fallback, StringComparison.CurrentCultureIgnoreCase));
+            if (desired != null)
+                combo.SelectedItem = desired;
             else if (combo.Items.Count > 0)
                 combo.SelectedIndex = 0;
         }
@@ -947,7 +972,7 @@ namespace Analyse
             }
             catch
             {
-                TaskDialog.Show("Clash 3D", "Rapport exporté :\n" + path);
+                TaskDialog.Show(UiLanguage.T("Clash 3D", "3D Clash"), UiLanguage.T("Rapport exporté :\n", "Report exported:\n") + path);
             }
         }
 

@@ -6,6 +6,7 @@ using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Licensing;
+using BIMaestro.Localization;
 
 namespace ScanTextRevit
 {
@@ -50,7 +51,7 @@ namespace ScanTextRevit
             List<ElementId> selectedIds = wpf.GetSelectedElementIds();
             if (selectedIds.Count == 0)
             {
-                TaskDialog.Show("Info", "Aucune vue/feuille sélectionnée.");
+                TaskDialog.Show("Info", UiLanguage.T("Aucune vue/feuille sélectionnée.", "No view or sheet was selected."));
                 return Result.Cancelled;
             }
 
@@ -86,7 +87,7 @@ namespace ScanTextRevit
             // S'il ne reste plus rien après la déduplication
             if (selectedIds.Count == 0)
             {
-                TaskDialog.Show("Info", "Après déduplication, aucune vue/feuille n'est sélectionnée.");
+                TaskDialog.Show("Info", UiLanguage.T("Après déduplication, aucune vue/feuille n'est sélectionnée.", "After removing duplicates, no view or sheet remains selected."));
                 return Result.Cancelled;
             }
 
@@ -95,7 +96,7 @@ namespace ScanTextRevit
             var scanResults = service.ScanSelectedViewsAndSheets(doc, selectedIds);
             if (scanResults.Count == 0 || !scanResults.Any(kvp => kvp.Value != null && kvp.Value.Count > 0))
             {
-                TaskDialog.Show("Info", "Aucun texte trouvé.");
+                TaskDialog.Show("Info", UiLanguage.T("Aucun texte trouvé.", "No text was found."));
                 return Result.Cancelled;
             }
 

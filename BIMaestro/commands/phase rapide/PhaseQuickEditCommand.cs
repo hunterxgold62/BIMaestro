@@ -5,6 +5,7 @@ using Licensing;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using BIMaestro.Localization;
 
 namespace Modification
 {
@@ -18,7 +19,7 @@ namespace Modification
             UIDocument uidoc = data.Application.ActiveUIDocument;
             if (uidoc == null)
             {
-                TaskDialog.Show("Phases rapides", "Aucun document Revit actif.");
+                TaskDialog.Show(UiLanguage.T("Phases rapides", "Quick Phases"), UiLanguage.T("Aucun document Revit actif.", "No active Revit document."));
                 return Result.Failed;
             }
 
@@ -26,14 +27,14 @@ namespace Modification
             ICollection<ElementId> selectedIds = uidoc.Selection.GetElementIds();
             if (selectedIds == null || selectedIds.Count == 0)
             {
-                TaskDialog.Show("Phases rapides", "Selectionne d'abord les objets a modifier.");
+                TaskDialog.Show(UiLanguage.T("Phases rapides", "Quick Phases"), UiLanguage.T("Selectionne d'abord les objets a modifier.", "Select the objects to modify first."));
                 return Result.Cancelled;
             }
 
             List<Phase> phases = doc.Phases.Cast<Phase>().ToList();
             if (phases.Count == 0)
             {
-                TaskDialog.Show("Phases rapides", "Aucune phase n'a ete trouvee dans ce projet.");
+                TaskDialog.Show(UiLanguage.T("Phases rapides", "Quick Phases"), UiLanguage.T("Aucune phase n'a ete trouvee dans ce projet.", "No phases were found in this project."));
                 return Result.Failed;
             }
 
@@ -44,7 +45,7 @@ namespace Modification
 
             if (!window.ChangeCreatedPhase && !window.ChangeDemolishedPhase)
             {
-                TaskDialog.Show("Phases rapides", "Choisis au moins une phase a modifier.");
+                TaskDialog.Show(UiLanguage.T("Phases rapides", "Quick Phases"), UiLanguage.T("Choisis au moins une phase a modifier.", "Choose at least one phase to modify."));
                 return Result.Cancelled;
             }
 
@@ -91,11 +92,16 @@ namespace Modification
             }
 
             TaskDialog.Show(
-                "Phases rapides",
-                "Modification terminee.\n\n" +
-                $"Objets modifies : {updated}\n" +
-                $"Objets ignores : {skipped}\n" +
-                $"Objets en echec : {failed}");
+                UiLanguage.T("Phases rapides", "Quick Phases"),
+                UiLanguage.T(
+                    "Modification terminee.\n\n" +
+                    $"Objets modifies : {updated}\n" +
+                    $"Objets ignores : {skipped}\n" +
+                    $"Objets en echec : {failed}",
+                    "Update complete.\n\n" +
+                    $"Objects updated: {updated}\n" +
+                    $"Objects skipped: {skipped}\n" +
+                    $"Objects failed: {failed}"));
 
             return Result.Succeeded;
         }

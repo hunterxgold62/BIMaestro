@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
+using BIMaestro.Localization;
 
 namespace Page
 {
@@ -129,7 +130,7 @@ namespace Page
                 LatestChip.Background = (System.Windows.Media.Brush)bc.ConvertFrom("#213428");
                 LatestChip.BorderBrush = (System.Windows.Media.Brush)bc.ConvertFrom("#2B5C3A");
                 LatestText.Foreground = (System.Windows.Media.Brush)bc.ConvertFrom("#B8F5C8");
-                LatestText.Text = "À jour (dernière v" + _latest + ")";
+                LatestText.Text = UiLanguage.T("À jour (dernière v", "Up to Date (Latest v") + _latest + ")";
             }
             else
             {
@@ -137,7 +138,7 @@ namespace Page
                 LatestChip.Background = (System.Windows.Media.Brush)bc.ConvertFrom("#3A2A1E");
                 LatestChip.BorderBrush = (System.Windows.Media.Brush)bc.ConvertFrom("#6B4A2D");
                 LatestText.Foreground = (System.Windows.Media.Brush)bc.ConvertFrom("#FFD9B3");
-                LatestText.Text = "MàJ dispo v" + _latest;
+                LatestText.Text = UiLanguage.T("MàJ dispo v", "Update Available v") + _latest;
             }
         }
         private IntPtr WindowProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -385,7 +386,7 @@ namespace Page
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Impossible d'ouvrir le lien : " + ex.Message, "Ouverture du lien",
+                MessageBox.Show(UiLanguage.T("Impossible d'ouvrir le lien : ", "Unable to Open the Link: ") + ex.Message, UiLanguage.T("Ouverture du lien", "Opening Link"),
                     MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }

@@ -51,7 +51,7 @@
             </Grid.ColumnDefinitions>
 
             <StackPanel Grid.Column="0">
-                <TextBlock Text="Modifier les phases des objets selectionnes"
+                <TextBlock Text="Modifier les phases des objets sélectionnés"
                            FontSize="17"
                            FontWeight="SemiBold"/>
                 <TextBlock x:Name="SelectionCountText"
@@ -68,12 +68,12 @@
         </Grid>
 
         <StackPanel Grid.Row="1">
-            <TextBlock Text="Phase de creation"/>
+            <TextBlock Text="Phase de création"/>
             <ComboBox x:Name="CreatedPhaseCombo"
                       DisplayMemberPath="Name"
                       SelectedValuePath="PhaseId"/>
 
-            <TextBlock Text="Phase de demolition"/>
+            <TextBlock Text="Phase de démolition"/>
             <ComboBox x:Name="DemolishedPhaseCombo"
                       DisplayMemberPath="Name"
                       SelectedValuePath="PhaseId"/>
@@ -91,7 +91,7 @@
                        Margin="0,0,12,0"
                        TextWrapping="Wrap"
                        Foreground="#FF5C6B73"
-                       Text="Les elements incompatibles seront ignores."/>
+                       Text="Les éléments incompatibles seront ignorés."/>
             <Button Grid.Column="1"
                     Content="Annuler"
                     IsCancel="True"/>

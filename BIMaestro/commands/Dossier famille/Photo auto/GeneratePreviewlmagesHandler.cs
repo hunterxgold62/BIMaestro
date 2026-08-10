@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Threading;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 
 using System.Windows;
 using System.Windows.Controls;
@@ -111,7 +112,7 @@ namespace Famille
             _items = items ?? new List<CompareItem>();
             _log = log;
 
-            Title = "BIMaestro – Choix des aperçus (A / B)";
+            Title = UiLanguage.T("BIMaestro – Choix des aperçus (A / B)", "BIMaestro – Preview Selection (A / B)");
             Width = 980;
             Height = 720;
             ResizeMode = ResizeMode.CanResize;
@@ -141,7 +142,7 @@ namespace Famille
                 Padding = new Thickness(14),
                 Child = new TextBlock
                 {
-                    Text = "Pour chaque famille, choisis l’image à conserver : A (vue existante) ou B (vue normalisée).",
+                    Text = UiLanguage.T("Pour chaque famille, choisis l’image à conserver : A (vue existante) ou B (vue normalisée).", "For each family, choose the image to keep: A (existing view) or B (normalized view)."),
                     Foreground = Brushes.White,
                     FontSize = 14,
                     FontWeight = FontWeights.SemiBold
@@ -184,10 +185,10 @@ namespace Famille
             var left = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left };
             DockPanel.SetDock(left, Dock.Left);
 
-            var btnAllA = new Button { Content = "Tout en A", Margin = new Thickness(0, 0, 8, 0), Padding = new Thickness(12, 6, 12, 6) };
+            var btnAllA = new Button { Content = UiLanguage.T("Tout en A", "All A"), Margin = new Thickness(0, 0, 8, 0), Padding = new Thickness(12, 6, 12, 6) };
             btnAllA.Click += (_, __) => SetAllChoices(VariantChoice.A);
 
-            var btnAllB = new Button { Content = "Tout en B", Margin = new Thickness(0, 0, 8, 0), Padding = new Thickness(12, 6, 12, 6) };
+            var btnAllB = new Button { Content = UiLanguage.T("Tout en B", "All B"), Margin = new Thickness(0, 0, 8, 0), Padding = new Thickness(12, 6, 12, 6) };
             btnAllB.Click += (_, __) => SetAllChoices(VariantChoice.B);
 
             left.Children.Add(btnAllA);
@@ -197,7 +198,7 @@ namespace Famille
             var right = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
             DockPanel.SetDock(right, Dock.Right);
 
-            var btnCancel = new Button { Content = "Annuler", Margin = new Thickness(0, 0, 8, 0), Padding = new Thickness(14, 6, 14, 6) };
+            var btnCancel = new Button { Content = UiLanguage.T("Annuler", "Cancel"), Margin = new Thickness(0, 0, 8, 0), Padding = new Thickness(14, 6, 14, 6) };
             btnCancel.Click += (_, __) =>
             {
                 WasCanceled = true;
@@ -206,7 +207,7 @@ namespace Famille
 
             var btnOk = new Button
             {
-                Content = "Valider (garder les choix)",
+                Content = UiLanguage.T("Valider (garder les choix)", "Confirm (Keep Selections)"),
                 Padding = new Thickness(16, 6, 16, 6),
                 Background = new SolidColorBrush(Color.FromRgb(40, 120, 255)),
                 Foreground = Brushes.White
@@ -234,7 +235,7 @@ namespace Famille
         {
             string famName = "";
             try { famName = Path.GetFileNameWithoutExtension(item?.Entry?.FamilyPath ?? "") ?? ""; } catch { famName = ""; }
-            if (string.IsNullOrWhiteSpace(famName)) famName = item?.Entry?.FamilyPath ?? "Famille";
+            if (string.IsNullOrWhiteSpace(famName)) famName = item?.Entry?.FamilyPath ?? UiLanguage.T("Famille", "Family");
 
             var border = new Border
             {
@@ -262,8 +263,8 @@ namespace Famille
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
-            var panelA = BuildVariantPanel(item, index, VariantChoice.A, "A – Vue existante", item.TempA);
-            var panelB = BuildVariantPanel(item, index, VariantChoice.B, "B – Vue normalisée", item.TempB);
+            var panelA = BuildVariantPanel(item, index, VariantChoice.A, UiLanguage.T("A – Vue existante", "A – Existing View"), item.TempA);
+            var panelB = BuildVariantPanel(item, index, VariantChoice.B, UiLanguage.T("B – Vue normalisée", "B – Normalized View"), item.TempB);
 
             Grid.SetColumn(panelA, 0);
             Grid.SetColumn(panelB, 1);
@@ -329,7 +330,7 @@ namespace Famille
             {
                 stack.Children.Add(new TextBlock
                 {
-                    Text = "(Image non chargée)",
+                    Text = UiLanguage.T("(Image non chargée)", "(Image not loaded)"),
                     Foreground = Brushes.Gray,
                     Margin = new Thickness(0, 0, 0, 6),
                     ToolTip = (failReason ?? "") + "\n" + (imagePath ?? "")
@@ -342,7 +343,7 @@ namespace Famille
 
             var rb = new RadioButton
             {
-                Content = (v == VariantChoice.A) ? "Choisir A" : "Choisir B",
+                Content = (v == VariantChoice.A) ? UiLanguage.T("Choisir A", "Choose A") : UiLanguage.T("Choisir B", "Choose B"),
                 GroupName = "choice_" + index,
                 Margin = new Thickness(0, 8, 0, 0),
                 FontSize = 13
@@ -1443,22 +1444,19 @@ namespace Famille
         {
             try
             {
-                var td = new TaskDialog("BIMaestro – Export des aperçus")
+                var td = new TaskDialog(UiLanguage.T("BIMaestro – Export des aperçus", "BIMaestro – Preview Export"))
                 {
-                    MainInstruction = "Des images d’aperçu existent déjà.",
-                    MainContent =
-                        $"Exemple : {Path.GetFileName(targetPng)}\n\n" +
-                        "Que veux-tu faire pour les fichiers déjà présents ?\n" +
-                        "• Écraser : recrée toutes les images.\n" +
-                        "• Ignorer : ne touche pas aux images existantes, mais génère celles manquantes.\n" +
-                        "• Annuler : stoppe l’export.",
+                    MainInstruction = UiLanguage.T("Des images d’aperçu existent déjà.", "Preview images already exist."),
+                    MainContent = UiLanguage.T(
+                        $"Exemple : {Path.GetFileName(targetPng)}\n\nQue veux-tu faire pour les fichiers déjà présents ?\n• Écraser : recrée toutes les images.\n• Ignorer : ne touche pas aux images existantes, mais génère celles manquantes.\n• Annuler : stoppe l’export.",
+                        $"Example: {Path.GetFileName(targetPng)}\n\nWhat would you like to do with existing files?\n• Overwrite: recreate all images.\n• Skip: keep existing images and generate only missing ones.\n• Cancel: stop the export."),
                     CommonButtons = TaskDialogCommonButtons.None,
                     AllowCancellation = true
                 };
 
-                td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Écraser toutes les images existantes");
-                td.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, "Ignorer les images existantes (générer seulement celles manquantes)");
-                td.AddCommandLink(TaskDialogCommandLinkId.CommandLink3, "Annuler");
+                td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, UiLanguage.T("Écraser toutes les images existantes", "Overwrite All Existing Images"));
+                td.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, UiLanguage.T("Ignorer les images existantes (générer seulement celles manquantes)", "Skip Existing Images (Generate Missing Images Only)"));
+                td.AddCommandLink(TaskDialogCommandLinkId.CommandLink3, UiLanguage.T("Annuler", "Cancel"));
 
                 var res = td.Show();
 
@@ -1472,7 +1470,7 @@ namespace Famille
             }
             catch
             {
-                SafeLog(req.LogCallback, "ℹ️ Impossible d’afficher la boîte de dialogue : images existantes ignorées.");
+                SafeLog(req.LogCallback, UiLanguage.T("ℹ️ Impossible d’afficher la boîte de dialogue : images existantes ignorées.", "ℹ️ Unable to display the dialog: existing images were skipped."));
                 return PreviewOverwriteMode.SkipExisting;
             }
         }

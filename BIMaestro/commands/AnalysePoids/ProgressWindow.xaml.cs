@@ -1,5 +1,7 @@
 ﻿using System.Windows;
 
+using BIMaestro.Localization;
+
 namespace Analyse
 {
     public partial class ProgressWindow : Window
@@ -15,7 +17,7 @@ namespace Analyse
         public void UpdateProgress(int current, int total, string familyName)
         {
             ProgressBar.Value = (double)current / total * 100.0;
-            StatusText.Text = $"Analyse de la famille {current}/{total} : {familyName}";
+            StatusText.Text = UiLanguage.T($"Analyse de la famille {current}/{total} : {familyName}", $"Analyzing family {current}/{total}: {familyName}");
         }
 
         private void CancelButton_Click(object sender, RoutedEventArgs e)

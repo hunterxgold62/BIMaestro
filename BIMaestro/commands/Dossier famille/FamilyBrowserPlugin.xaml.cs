@@ -1,4 +1,5 @@
 ﻿using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 using BIMaestro.UI;
 using Famille.Orbit3D;
 using Microsoft.Win32;
@@ -333,7 +334,9 @@ namespace Famille
 
             if (!Directory.Exists(familiesFolder))
             {
-                MessageBox.Show(this, "Le dossier de familles spécifié n'existe pas.", "Erreur",
+                MessageBox.Show(this,
+                    UiLanguage.T("Le dossier de familles spécifié n'existe pas.", "The specified family folder does not exist."),
+                    UiLanguage.T("Erreur", "Error"),
                     MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
@@ -992,7 +995,7 @@ namespace Famille
                     displayedFamilies = new List<FamilyItem>();
                     FamilyListView.ItemsSource = displayedFamilies;
                     UpdateCount(0);
-                    PagingStatusText.Text = "Aucun résultat.";
+                    PagingStatusText.Text = UiLanguage.T("Aucun résultat.", "No Results.");
                 }
                 finally
                 {
@@ -1079,7 +1082,9 @@ namespace Famille
             if (RememberUnmatchedSearch(query))
             {
                 PagingStatusText.Visibility = Visibility.Visible;
-                PagingStatusText.Text = $"Aucun résultat. Recherche « {string.Join(" ", query.Terms)} » mémorisée : ouvre maintenant la famille correspondante.";
+                PagingStatusText.Text = UiLanguage.T("Aucun résultat. Recherche « ", "No Results. Search “") +
+                    string.Join(" ", query.Terms) +
+                    UiLanguage.T(" » mémorisée : ouvre maintenant la famille correspondante.", "” Saved: Now Open the Matching Family.");
             }
         }
 
@@ -1451,7 +1456,9 @@ namespace Famille
             LoadGroupedVisualsDeferred(flatItems);
 
             PagingStatusText.Visibility = Visibility.Visible;
-            PagingStatusText.Text = flatItems.Count == 0 ? "Aucun résultat." : "Fin de la liste.";
+            PagingStatusText.Text = flatItems.Count == 0
+                ? UiLanguage.T("Aucun résultat.", "No Results.")
+                : UiLanguage.T("Fin de la liste.", "End of List.");
         }
 
         private int ShowInitialGroupedFolderSearchResults(List<FamilyItem> localItems)
@@ -1768,7 +1775,7 @@ namespace Famille
             if (items.Count == 0)
             {
                 PagingStatusText.Visibility = Visibility.Visible;
-                PagingStatusText.Text = "Aucun résultat.";
+                PagingStatusText.Text = UiLanguage.T("Aucun résultat.", "No Results.");
                 return;
             }
 
@@ -2130,9 +2137,10 @@ namespace Famille
 
             string searched = string.Join(", ", terms);
             var answer = MessageBox.Show(this,
-                $"Vous aviez recherché « {searched} » sans résultat.\n\n" +
-                $"Associer ce terme à la famille « {family.Name} » pour la retrouver plus facilement la prochaine fois ?",
-                "Améliorer la recherche",
+                UiLanguage.T(
+                    $"Vous aviez recherché « {searched} » sans résultat.\n\nAssocier ce terme à la famille « {family.Name} » pour la retrouver plus facilement la prochaine fois ?",
+                    $"You searched for “{searched}” with no results.\n\nAssociate this term with the family “{family.Name}” so it is easier to find next time?"),
+                UiLanguage.T("Améliorer la recherche", "Improve Search"),
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
             if (answer != MessageBoxResult.Yes)
@@ -2156,7 +2164,7 @@ namespace Famille
                 out string error,
                 out _))
             {
-                MessageBox.Show(this, error, "Améliorer la recherche", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(this, error, UiLanguage.T("Améliorer la recherche", "Improve Search"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -2366,7 +2374,9 @@ namespace Famille
             FamilyListView.ItemsSource = displayedFamilies;
 
             PagingStatusText.Visibility = Visibility.Visible;
-            PagingStatusText.Text = _currentResult.Count == 0 ? "Aucun résultat." : "Chargement...";
+            PagingStatusText.Text = _currentResult.Count == 0
+                ? UiLanguage.T("Aucun résultat.", "No Results.")
+                : UiLanguage.T("Chargement...", "Loading...");
 
             AppendNextPage();
             UpdateCount(_currentResult.Count);
@@ -2480,9 +2490,10 @@ namespace Famille
                 return;
 
             var answer = MessageBox.Show(this,
-                $"L’IA va proposer des mots-clés pour {families.Count} familles. " +
-                "Les mots-clés existants seront conservés et complétés. Continuer ?",
-                "Mots-clés de recherche",
+                UiLanguage.T(
+                    $"L’IA va proposer des mots-clés pour {families.Count} familles. Les mots-clés existants seront conservés et complétés. Continuer ?",
+                    $"AI will suggest keywords for {families.Count} families. Existing keywords will be kept and supplemented. Continue?"),
+                UiLanguage.T("Mots-clés de recherche", "Search Keywords"),
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
             if (answer != MessageBoxResult.Yes)
@@ -2497,7 +2508,9 @@ namespace Famille
                 {
                     var family = families[i];
                     PagingStatusText.Visibility = Visibility.Visible;
-                    PagingStatusText.Text = $"Mots-clés IA : {i + 1}/{families.Count} — {family.Name}";
+                    PagingStatusText.Text = UiLanguage.T(
+                        $"Mots-clés IA : {i + 1}/{families.Count} — {family.Name}",
+                        $"AI keywords: {i + 1}/{families.Count} — {family.Name}");
 
                     try
                     {
@@ -2547,14 +2560,16 @@ namespace Famille
             _index?.NotifySearchMetadataUpdated();
             ApplyFilters();
 
-            string message = $"Mots-clés enregistrés pour {saved} famille(s).";
+            string message = UiLanguage.T(
+                $"Mots-clés enregistrés pour {saved} famille(s).",
+                $"Keywords saved for {saved} family/families.");
             if (errors.Count > 0)
             {
                 string details = string.Join("\n", errors.Take(8));
-                if (errors.Count > 8) details += $"\n… et {errors.Count - 8} autre(s).";
-                message += $"\n\n{errors.Count} échec(s) :\n" + details;
+                if (errors.Count > 8) details += UiLanguage.T($"\n… et {errors.Count - 8} autre(s).", $"\n… and {errors.Count - 8} more.");
+                message += UiLanguage.T($"\n\n{errors.Count} échec(s) :\n", $"\n\n{errors.Count} failure(s):\n") + details;
             }
-            MessageBox.Show(this, message, "Mots-clés de recherche", MessageBoxButton.OK,
+            MessageBox.Show(this, message, UiLanguage.T("Mots-clés de recherche", "Search Keywords"), MessageBoxButton.OK,
                 errors.Count == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
         }
 
@@ -2613,8 +2628,8 @@ namespace Famille
                     if (!fam.HasDocumentation)
                     {
                         MessageBox.Show(this,
-                            "Aucun document n'a été associé à cette famille.",
-                            "Documentation",
+                            UiLanguage.T("Aucun document n'a été associé à cette famille.", "No document has been associated with this family."),
+                            UiLanguage.T("Documentation", "Documentation"),
                             MessageBoxButton.OK,
                             MessageBoxImage.Information);
                         return;
@@ -2624,8 +2639,8 @@ namespace Famille
                 {
                     fam.DocumentationAvailable = fam.HasDocumentation;
                     MessageBox.Show(this,
-                        "Aucun document n'a été associé à cette famille.",
-                        "Documentation",
+                        UiLanguage.T("Aucun document n'a été associé à cette famille.", "No document has been associated with this family."),
+                        UiLanguage.T("Documentation", "Documentation"),
                         MessageBoxButton.OK,
                         MessageBoxImage.Information);
                     return;
@@ -2728,8 +2743,8 @@ namespace Famille
 
             var dialog = new OpenFileDialog
             {
-                Title = "Sélectionner des documents",
-                Filter = "Tous les fichiers|*.*",
+                Title = UiLanguage.T("Sélectionner des documents", "Select Documents"),
+                Filter = UiLanguage.T("Tous les fichiers|*.*", "All Files|*.*"),
                 Multiselect = true,
                 CheckFileExists = true,
                 CheckPathExists = true
@@ -2842,8 +2857,8 @@ namespace Famille
             catch (Exception ex)
             {
                 MessageBox.Show(this,
-                    "Impossible d'enregistrer la documentation :\n" + ex.Message,
-                    "Documentation",
+                    UiLanguage.T("Impossible d'enregistrer la documentation :\n", "Unable to save documentation:\n") + ex.Message,
+                    UiLanguage.T("Documentation", "Documentation"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
                 return false;
@@ -2859,7 +2874,7 @@ namespace Famille
 
             var dialog = new Window
             {
-                Title = $"Documentation - {fam.Name}",
+                Title = UiLanguage.T($"Documentation - {fam.Name}", $"Documentation - {fam.Name}"),
                 Owner = this,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 ResizeMode = ResizeMode.NoResize,
@@ -2906,7 +2921,7 @@ namespace Famille
 
             var closeButton = new Button
             {
-                Content = "Fermer",
+                Content = UiLanguage.T("Fermer", "Close"),
                 MinWidth = 90,
                 Margin = new Thickness(8, 0, 0, 0),
                 IsCancel = true
@@ -2915,7 +2930,7 @@ namespace Famille
 
             var openSelectedButton = new Button
             {
-                Content = "Ouvrir la sélection",
+                Content = UiLanguage.T("Ouvrir la sélection", "Open Selected"),
                 MinWidth = 140,
                 Margin = new Thickness(8, 0, 0, 0),
                 IsDefault = true
@@ -2925,8 +2940,8 @@ namespace Famille
                 if (listBox.SelectedItems.Count == 0)
                 {
                     MessageBox.Show(dialog,
-                        "Sélectionne au moins un document.",
-                        "Documentation",
+                        UiLanguage.T("Sélectionne au moins un document.", "Select at least one document."),
+                        UiLanguage.T("Documentation", "Documentation"),
                         MessageBoxButton.OK,
                         MessageBoxImage.Information);
                     return;
@@ -2947,7 +2962,7 @@ namespace Famille
 
             var openAllButton = new Button
             {
-                Content = "Tout ouvrir",
+                Content = UiLanguage.T("Tout ouvrir", "Open All"),
                 MinWidth = 110,
                 Margin = new Thickness(8, 0, 0, 0)
             };
@@ -2959,7 +2974,7 @@ namespace Famille
 
             var addButton = new Button
             {
-                Content = "Ajouter...",
+                Content = UiLanguage.T("Ajouter...", "Add..."),
                 MinWidth = 100
             };
             addButton.Click += (_, __) =>
@@ -2972,7 +2987,7 @@ namespace Famille
 
             var changePathButton = new Button
             {
-                Content = "Modifier le chemin...",
+                Content = UiLanguage.T("Modifier le chemin...", "Change Path..."),
                 MinWidth = 140,
                 Margin = new Thickness(8, 0, 0, 0),
                 IsEnabled = false
@@ -2992,7 +3007,7 @@ namespace Famille
 
             var removeButton = new Button
             {
-                Content = "Supprimer le lien",
+                Content = UiLanguage.T("Supprimer le lien", "Remove Link"),
                 MinWidth = 125,
                 Margin = new Thickness(8, 0, 0, 0),
                 IsEnabled = false
@@ -3004,12 +3019,12 @@ namespace Famille
                     return;
 
                 string subject = linksToRemove.Count == 1
-                    ? $"le lien vers « {linksToRemove[0].DisplayName} »"
-                    : $"ces {linksToRemove.Count} liens";
+                    ? UiLanguage.T($"le lien vers « {linksToRemove[0].DisplayName} »", $"the link to “{linksToRemove[0].DisplayName}”")
+                    : UiLanguage.T($"ces {linksToRemove.Count} liens", $"these {linksToRemove.Count} links");
 
                 var answer = MessageBox.Show(dialog,
-                    $"Voulez-vous supprimer {subject} ?\n\nLes fichiers eux-mêmes ne seront pas supprimés.",
-                    "Documentation",
+                    UiLanguage.T($"Voulez-vous supprimer {subject} ?\n\nLes fichiers eux-mêmes ne seront pas supprimés.", $"Do you want to remove {subject}?\n\nThe files themselves will not be deleted."),
+                    UiLanguage.T("Documentation", "Documentation"),
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Question);
 
@@ -3067,8 +3082,8 @@ namespace Famille
 
             var dialog = new OpenFileDialog
             {
-                Title = $"Rechercher « {link.DisplayName} »",
-                Filter = "Tous les fichiers|*.*",
+                Title = UiLanguage.T($"Rechercher « {link.DisplayName} »", $"Locate “{link.DisplayName}”"),
+                Filter = UiLanguage.T("Tous les fichiers|*.*", "All Files|*.*"),
                 Multiselect = false,
                 CheckFileExists = true,
                 CheckPathExists = true,
@@ -3150,7 +3165,7 @@ namespace Famille
         {
             var dialog = new Window
             {
-                Title = "Document introuvable",
+                Title = UiLanguage.T("Document introuvable", "Document Not Found"),
                 Owner = this,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 ResizeMode = ResizeMode.NoResize,
@@ -3162,7 +3177,7 @@ namespace Famille
             var root = new StackPanel { Margin = new Thickness(18), MaxWidth = 680 };
             root.Children.Add(new TextBlock
             {
-                Text = $"Le document « {link.DisplayName} » est introuvable.",
+                Text = UiLanguage.T($"Le document « {link.DisplayName} » est introuvable.", $"The document “{link.DisplayName}” could not be found."),
                 FontWeight = FontWeights.SemiBold,
                 FontSize = 14,
                 TextWrapping = TextWrapping.Wrap
@@ -3176,7 +3191,7 @@ namespace Famille
             });
             root.Children.Add(new TextBlock
             {
-                Text = "Voulez-vous rechercher son nouvel emplacement, supprimer le lien ou gérer les documents associés ?",
+                Text = UiLanguage.T("Voulez-vous rechercher son nouvel emplacement, supprimer le lien ou gérer les documents associés ?", "Would you like to locate its new path, remove the link, or manage the associated documents?"),
                 Margin = new Thickness(0, 14, 0, 0),
                 TextWrapping = TextWrapping.Wrap
             });
@@ -3206,13 +3221,13 @@ namespace Famille
                 buttons.Children.Add(button);
             }
 
-            AddActionButton("Rechercher...", MissingDocumentAction.Relocate, isDefault: true);
-            AddActionButton("Supprimer le lien", MissingDocumentAction.Remove);
-            AddActionButton("Gérer les documents", MissingDocumentAction.Manage);
+            AddActionButton(UiLanguage.T("Rechercher...", "Locate..."), MissingDocumentAction.Relocate, isDefault: true);
+            AddActionButton(UiLanguage.T("Supprimer le lien", "Remove Link"), MissingDocumentAction.Remove);
+            AddActionButton(UiLanguage.T("Gérer les documents", "Manage Documents"), MissingDocumentAction.Manage);
 
             var cancelButton = new Button
             {
-                Content = "Annuler",
+                Content = UiLanguage.T("Annuler", "Cancel"),
                 MinWidth = 90,
                 Margin = new Thickness(8, 0, 0, 0),
                 IsCancel = true
@@ -3233,8 +3248,8 @@ namespace Famille
             if (string.IsNullOrWhiteSpace(rawPath))
             {
                 MessageBox.Show(this,
-                    "Le chemin du document est vide.",
-                    "Documentation",
+                    UiLanguage.T("Le chemin du document est vide.", "The document path is empty."),
+                    UiLanguage.T("Documentation", "Documentation"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
                 return;
@@ -3283,8 +3298,8 @@ namespace Famille
             catch (Exception ex)
             {
                 MessageBox.Show(this,
-                    $"Impossible d'ouvrir \"{link.DisplayName}\" :\n{ex.Message}",
-                    "Documentation",
+                    UiLanguage.T($"Impossible d'ouvrir \"{link.DisplayName}\" :\n{ex.Message}", $"Unable to open \"{link.DisplayName}\":\n{ex.Message}"),
+                    UiLanguage.T("Documentation", "Documentation"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }
@@ -3326,8 +3341,8 @@ namespace Famille
             catch (Exception ex)
             {
                 MessageBox.Show(this,
-                    $"Impossible d'ouvrir l'aide en ligne :\n{ex.Message}",
-                    "Aide",
+                    UiLanguage.T($"Impossible d'ouvrir l'aide en ligne :\n{ex.Message}", $"Unable to open online help:\n{ex.Message}"),
+                    UiLanguage.T("Aide", "Help"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
             }
@@ -3630,8 +3645,8 @@ namespace Famille
                 catch (Exception ex)
                 {
                     MessageBox.Show(this,
-                        "Impossible d’ouvrir la famille en mode travail :\n" + ex.Message,
-                        "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+                        UiLanguage.T("Impossible d’ouvrir la famille en mode travail :\n", "Unable to open the family in working mode:\n") + ex.Message,
+                        UiLanguage.T("Erreur", "Error"), MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
@@ -3643,7 +3658,7 @@ namespace Famille
             FamilyItem fam = (sender as FrameworkElement)?.DataContext as FamilyItem;
             if (fam == null || string.IsNullOrWhiteSpace(fam.Path) || !File.Exists(fam.Path))
             {
-                MessageBox.Show(this, "Fichier famille introuvable.", "Aperçu 3D",
+                MessageBox.Show(this, UiLanguage.T("Fichier famille introuvable.", "Family file not found."), UiLanguage.T("Aperçu 3D", "3D Preview"),
                                 MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -3682,8 +3697,8 @@ namespace Famille
             if (_selectedCollection == null || _selectedCollection.Paths.Count == 0)
             {
                 MessageBox.Show(this,
-                    "Sélectionne une collection non vide avant de la partager.",
-                    "Collections",
+                    UiLanguage.T("Sélectionne une collection non vide avant de la partager.", "Select a non-empty collection before sharing it."),
+                    UiLanguage.T("Collections", "Collections"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 return;
@@ -3693,8 +3708,8 @@ namespace Famille
 
             var dialog = new SaveFileDialog
             {
-                Title = "Exporter la collection",
-                Filter = "Fichier JSON (*.json)|*.json|Tous les fichiers (*.*)|*.*",
+                Title = UiLanguage.T("Exporter la collection", "Export Collection"),
+                Filter = UiLanguage.T("Fichier JSON (*.json)|*.json|Tous les fichiers (*.*)|*.*", "JSON File (*.json)|*.json|All Files (*.*)|*.*"),
                 FileName = defaultName + ".json"
             };
 
@@ -3704,16 +3719,16 @@ namespace Famille
             if (TrySaveCollectionAsJson(dialog.FileName, _selectedCollection, out var errorMessage))
             {
                 MessageBox.Show(this,
-                    $"Collection exportée vers :\n{dialog.FileName}",
-                    "Export collection",
+                    UiLanguage.T($"Collection exportée vers :\n{dialog.FileName}", $"Collection exported to:\n{dialog.FileName}"),
+                    UiLanguage.T("Export collection", "Export Collection"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
             }
             else
             {
                 MessageBox.Show(this,
-                    "Impossible d'exporter la collection :\n" + errorMessage,
-                    "Export collection",
+                    UiLanguage.T("Impossible d'exporter la collection :\n", "Unable to export the collection:\n") + errorMessage,
+                    UiLanguage.T("Export collection", "Export Collection"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }
@@ -3723,8 +3738,8 @@ namespace Famille
         {
             var dialog = new OpenFileDialog
             {
-                Title = "Importer une collection",
-                Filter = "Fichier JSON (*.json)|*.json|Tous les fichiers (*.*)|*.*",
+                Title = UiLanguage.T("Importer une collection", "Import Collection"),
+                Filter = UiLanguage.T("Fichier JSON (*.json)|*.json|Tous les fichiers (*.*)|*.*", "JSON File (*.json)|*.json|All Files (*.*)|*.*"),
                 Multiselect = false,
                 CheckFileExists = true,
                 CheckPathExists = true
@@ -3741,8 +3756,8 @@ namespace Famille
                 if (payload?.Paths == null || payload.Paths.Count == 0)
                 {
                     MessageBox.Show(this,
-                        "Le fichier sélectionné ne contient aucune collection valide.",
-                        "Import de collection",
+                        UiLanguage.T("Le fichier sélectionné ne contient aucune collection valide.", "The selected file does not contain a valid collection."),
+                        UiLanguage.T("Import de collection", "Collection Import"),
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);
                     return;
@@ -3757,8 +3772,8 @@ namespace Famille
                 if (sanitizedPaths.Count == 0)
                 {
                     MessageBox.Show(this,
-                        "Aucun chemin exploitable n'a été trouvé dans ce fichier.",
-                        "Import de collection",
+                        UiLanguage.T("Aucun chemin exploitable n'a été trouvé dans ce fichier.", "No usable path was found in this file."),
+                        UiLanguage.T("Import de collection", "Collection Import"),
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);
                     return;
@@ -3787,16 +3802,16 @@ namespace Famille
                 RefreshCollectionContent();
 
                 MessageBox.Show(this,
-                    $"Collection « {finalName} » importée ({sanitizedPaths.Count} élément(s)).",
-                    "Import de collection",
+                    UiLanguage.T($"Collection « {finalName} » importée ({sanitizedPaths.Count} élément(s)).", $"Collection “{finalName}” imported ({sanitizedPaths.Count} item(s))."),
+                    UiLanguage.T("Import de collection", "Collection Import"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
                 MessageBox.Show(this,
-                    "Impossible d'importer la collection :\n" + ex.Message,
-                    "Import de collection",
+                    UiLanguage.T("Impossible d'importer la collection :\n", "Unable to import the collection:\n") + ex.Message,
+                    UiLanguage.T("Import de collection", "Collection Import"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }
@@ -3808,13 +3823,13 @@ namespace Famille
 
             if (string.IsNullOrWhiteSpace(filePath))
             {
-                errorMessage = "Chemin de fichier invalide.";
+                errorMessage = UiLanguage.T("Chemin de fichier invalide.", "Invalid file path.");
                 return false;
             }
 
             if (collection == null)
             {
-                errorMessage = "Aucune collection n'est disponible.";
+                errorMessage = UiLanguage.T("Aucune collection n'est disponible.", "No collection is available.");
                 return false;
             }
 
@@ -4287,11 +4302,10 @@ namespace Famille
         private bool PromptForFolders()
         {
             MessageBox.Show(this,
-                "Le dossier par défaut n'a pas été trouvé.\n\n" +
-                "1) Choisis d'abord le dossier qui contient tes familles Revit (.rfa).\n" +
-                "2) Ensuite sélectionne le dossier des images (.png) avec le même nom que les familles.\n\n" +
-                "Tu pourras modifier ces chemins plus tard depuis l'onglet Paramètres.",
-                "Chemins introuvables",
+                UiLanguage.T(
+                    "Le dossier par défaut n'a pas été trouvé.\n\n1) Choisis d'abord le dossier qui contient tes familles Revit (.rfa).\n2) Ensuite sélectionne le dossier des images (.png) avec le même nom que les familles.\n\nTu pourras modifier ces chemins plus tard depuis l'onglet Paramètres.",
+                    "The default folder was not found.\n\n1) First select the folder containing your Revit families (.rfa).\n2) Then select the image folder (.png) whose files have the same names as the families.\n\nYou can change these paths later from the Settings tab."),
+                UiLanguage.T("Chemins introuvables", "Paths Not Found"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
 
@@ -4309,7 +4323,7 @@ namespace Famille
 
             var famDialog = new WinForms.FolderBrowserDialog
             {
-                Description = "Choisis le dossier avec les fichiers .rfa puis clique sur OK.",
+                Description = UiLanguage.T("Choisis le dossier avec les fichiers .rfa puis clique sur OK.", "Select the folder containing the .rfa files, then click OK."),
                 SelectedPath = Directory.Exists(familiesFolder) ? familiesFolder : string.Empty
             };
             if (famDialog.ShowDialog() != WinForms.DialogResult.OK)
@@ -4319,7 +4333,7 @@ namespace Famille
 
             var imgDialog = new WinForms.FolderBrowserDialog
             {
-                Description = "Choisis le dossier avec les images (.png) nommées comme les fichiers .rfa, puis clique sur OK.",
+                Description = UiLanguage.T("Choisis le dossier avec les images (.png) nommées comme les fichiers .rfa, puis clique sur OK.", "Select the folder containing the images (.png) named like the .rfa files, then click OK."),
                 SelectedPath = Directory.Exists(imagesFolder) ? imagesFolder : selectedFamilies
             };
             if (imgDialog.ShowDialog() == WinForms.DialogResult.OK)
@@ -4329,8 +4343,8 @@ namespace Famille
             else
             {
                 MessageBox.Show(this,
-                    "Aucun dossier d'images choisi. Les vignettes ne seront pas affichées.",
-                    "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                    UiLanguage.T("Aucun dossier d'images choisi. Les vignettes ne seront pas affichées.", "No image folder was selected. Thumbnails will not be displayed."),
+                    UiLanguage.T("Information", "Information"), MessageBoxButton.OK, MessageBoxImage.Information);
                 selectedImages = selectedFamilies;
             }
 
@@ -4343,7 +4357,7 @@ namespace Famille
 
             var famDialog = new WinForms.FolderBrowserDialog
             {
-                Description = "Choisis le dossier avec les familles .rfa à exporter.",
+                Description = UiLanguage.T("Choisis le dossier avec les familles .rfa à exporter.", "Select the folder containing the .rfa families to export."),
                 SelectedPath = Directory.Exists(previewSourceFolder) ? previewSourceFolder : familiesFolder
             };
             if (famDialog.ShowDialog() != WinForms.DialogResult.OK)
@@ -4353,7 +4367,7 @@ namespace Famille
 
             var imgDialog = new WinForms.FolderBrowserDialog
             {
-                Description = "Choisis le dossier miroir pour les PNG générés.",
+                Description = UiLanguage.T("Choisis le dossier miroir pour les PNG générés.", "Select the mirror folder for the generated PNG files."),
                 SelectedPath = Directory.Exists(previewTargetFolder) ? previewTargetFolder : selectedFamilies
             };
 
@@ -4410,8 +4424,8 @@ namespace Famille
             if (showSuccessMessage)
             {
                 MessageBox.Show(this,
-                    "Les dossiers sont enregistrés. Tu peux les modifier à tout moment dans l'onglet Paramètres.",
-                    "Chemins enregistrés", MessageBoxButton.OK, MessageBoxImage.Information);
+                    UiLanguage.T("Les dossiers sont enregistrés. Tu peux les modifier à tout moment dans l'onglet Paramètres.", "The folders have been saved. You can change them at any time from the Settings tab."),
+                    UiLanguage.T("Chemins enregistrés", "Paths Saved"), MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
@@ -4465,8 +4479,8 @@ namespace Famille
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, "Erreur création fichiers config : " + ex.Message,
-                    "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(this, UiLanguage.T("Erreur création fichiers config : ", "Error creating configuration files: ") + ex.Message,
+                    UiLanguage.T("Erreur", "Error"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -4555,7 +4569,7 @@ namespace Famille
             };
             Directory.CreateDirectory(Path.GetDirectoryName(configFile));
             File.WriteAllLines(configFile, lines);
-            MessageBox.Show("Configuration enregistrée. Redémarrez pour appliquer.");
+            MessageBox.Show(UiLanguage.T("Configuration enregistrée. Redémarrez pour appliquer.", "Configuration saved. Restart to apply it."));
         }
 
         private void ResetConfig_Click(object s, RoutedEventArgs e)
@@ -4589,8 +4603,8 @@ namespace Famille
             if (_index == null || !_index.IsReady)
             {
                 MessageBox.Show(this,
-                    "La bibliothèque est encore en cours d’indexation. Réessayez dans quelques instants.",
-                    "Mots-clés intelligents",
+                    UiLanguage.T("La bibliothèque est encore en cours d’indexation. Réessayez dans quelques instants.", "The library is still being indexed. Try again in a few moments."),
+                    UiLanguage.T("Mots-clés intelligents", "Smart Keywords"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 return;
@@ -4599,8 +4613,8 @@ namespace Famille
             var entries = _index.GetAll(max: 0).ToList();
             if (entries.Count == 0)
             {
-                MessageBox.Show(this, "Aucune famille n’a été trouvée dans la bibliothèque.",
-                    "Mots-clés intelligents", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(this, UiLanguage.T("Aucune famille n’a été trouvée dans la bibliothèque.", "No family was found in the library."),
+                    UiLanguage.T("Mots-clés intelligents", "Smart Keywords"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -4747,7 +4761,7 @@ namespace Famille
         {
             if (_isGeneratingPreviews)
             {
-                MessageBox.Show(this, "Patiente, un export est en cours.", "Export 3D", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(this, UiLanguage.T("Patiente, un export est en cours.", "Please wait, an export is in progress."), UiLanguage.T("Export 3D", "3D Export"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -4759,7 +4773,7 @@ namespace Famille
         {
             if (_isGeneratingPreviews)
             {
-                MessageBox.Show(this, "Un export est déjà en cours.", "Export 3D", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(this, UiLanguage.T("Un export est déjà en cours.", "An export is already in progress."), UiLanguage.T("Export 3D", "3D Export"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -4778,20 +4792,20 @@ namespace Famille
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, "Impossible d'explorer le dossier :\n" + ex.Message, "Export 3D", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(this, UiLanguage.T("Impossible d'explorer le dossier :\n", "Unable to browse the folder:\n") + ex.Message, UiLanguage.T("Export 3D", "3D Export"), MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
             if (families.Count == 0)
             {
-                MessageBox.Show(this, "Aucun fichier RFA trouvé dans ce dossier.", "Export 3D", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(this, UiLanguage.T("Aucun fichier RFA trouvé dans ce dossier.", "No RFA file was found in this folder."), UiLanguage.T("Export 3D", "3D Export"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
             if (FamilyBrowserCommand.GeneratePreviewEventInstance == null ||
                 FamilyBrowserCommand.GeneratePreviewHandlerInstance == null)
             {
-                MessageBox.Show(this, "L'événement Revit pour l'export 3D n'est pas initialisé.", "Export 3D", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(this, UiLanguage.T("L'événement Revit pour l'export 3D n'est pas initialisé.", "The Revit event for 3D export has not been initialized."), UiLanguage.T("Export 3D", "3D Export"), MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
@@ -5069,11 +5083,14 @@ namespace Famille
 
         private void CollectionNew_Click(object sender, RoutedEventArgs e)
         {
-            var name = Microsoft.VisualBasic.Interaction.InputBox("Nom de la collection :", "Nouvelle collection", "Nouvelle collection");
+            var name = Microsoft.VisualBasic.Interaction.InputBox(
+                UiLanguage.T("Nom de la collection :", "Collection name:"),
+                UiLanguage.T("Nouvelle collection", "New Collection"),
+                UiLanguage.T("Nouvelle collection", "New Collection"));
             if (string.IsNullOrWhiteSpace(name)) return;
             if (string.Equals(name, FavoritesCollectionName, StringComparison.OrdinalIgnoreCase))
             {
-                MessageBox.Show("Le nom « Favoris » est réservé.", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(UiLanguage.T("Le nom « Favoris » est réservé.", "The name “Favorites” is reserved."), UiLanguage.T("Info", "Info"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
             var c = new Collection { Name = name };
@@ -5087,15 +5104,15 @@ namespace Famille
             if (_selectedCollection == null) return;
             if (_selectedCollection.Id == FavoritesCollectionId)
             {
-                MessageBox.Show("La collection « Favoris » ne peut pas être renommée.", "Info",
+                MessageBox.Show(UiLanguage.T("La collection « Favoris » ne peut pas être renommée.", "The “Favorites” collection cannot be renamed."), UiLanguage.T("Info", "Info"),
                     MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
-            var name = Microsoft.VisualBasic.Interaction.InputBox("Nouveau nom :", "Renommer la collection", _selectedCollection.Name);
+            var name = Microsoft.VisualBasic.Interaction.InputBox(UiLanguage.T("Nouveau nom :", "New name:"), UiLanguage.T("Renommer la collection", "Rename Collection"), _selectedCollection.Name);
             if (string.IsNullOrWhiteSpace(name)) return;
             if (string.Equals(name, FavoritesCollectionName, StringComparison.OrdinalIgnoreCase))
             {
-                MessageBox.Show("Le nom « Favoris » est réservé.", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(UiLanguage.T("Le nom « Favoris » est réservé.", "The name “Favorites” is reserved."), UiLanguage.T("Info", "Info"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
             _selectedCollection.Name = name;
@@ -5112,13 +5129,14 @@ namespace Famille
             if (_selectedCollection == null) return;
             if (_selectedCollection.Id == FavoritesCollectionId)
             {
-                MessageBox.Show("La collection « Favoris » ne peut pas être supprimée.", "Info",
+                MessageBox.Show(UiLanguage.T("La collection « Favoris » ne peut pas être supprimée.", "The “Favorites” collection cannot be deleted."), UiLanguage.T("Info", "Info"),
                     MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
-            if (MessageBox.Show($"Supprimer la collection « {_selectedCollection.Name} » ?",
-                "Confirmation", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+            if (MessageBox.Show(
+                UiLanguage.T($"Supprimer la collection « {_selectedCollection.Name} » ?", $"Delete the collection “{_selectedCollection.Name}”?"),
+                UiLanguage.T("Confirmation", "Confirmation"), MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
 
             var idx = CollectionCombo.SelectedIndex;
             _collections.Remove(_selectedCollection);

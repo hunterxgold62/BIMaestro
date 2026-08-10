@@ -7,6 +7,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using Brushes = System.Windows.Media.Brushes;
+using BIMaestro.Localization;
 
 namespace Modification
 {
@@ -60,7 +61,7 @@ namespace Modification
             if (_uidoc == null || _document == null)
             {
                 MessageBox.Show(
-                    "Impossible de récupérer le document actif.",
+                    UiLanguage.T("Impossible de récupérer le document actif.", "Unable to Retrieve the Active Document."),
                     "BIMaestro",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
@@ -89,11 +90,11 @@ namespace Modification
 
             if (_copyExistingOverridesMode)
             {
-                Title = "BIMaestro - Copier les surcharges existantes";
-                ApplyButton.Content = "Copier";
+                Title = UiLanguage.T("BIMaestro - Copier les surcharges existantes", "BIMaestro - Copy Existing Overrides");
+                ApplyButton.Content = UiLanguage.T("Copier", "Copy");
 
                 MessageBox.Show(
-                    "Mode copie activé.\n\nLes options générales sont désactivées, car BIMaestro va copier la surcharge graphique existante détectée dans la vue active.",
+                    UiLanguage.T("Mode copie activé.\n\nLes options générales sont désactivées, car BIMaestro va copier la surcharge graphique existante détectée dans la vue active.", "Copy Mode Enabled.\n\nGeneral Options Are Disabled Because BIMaestro Will Copy the Existing Graphic Override Detected in the Active View."),
                     "BIMaestro",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
@@ -113,7 +114,7 @@ namespace Modification
             catch
             {
                 MessageBox.Show(
-                    "Impossible d’ouvrir la page d’aide.",
+                    UiLanguage.T("Impossible d’ouvrir la page d’aide.", "Unable to Open the Help Page."),
                     "BIMaestro",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
@@ -145,7 +146,7 @@ namespace Modification
 
             View activeView = _uidoc.ActiveView;
 
-            TreeViewItem activeGroup = CreateGroup("Vue active");
+            TreeViewItem activeGroup = CreateGroup(UiLanguage.T("Vue active", "Active View"));
 
             if (IsUsableGraphicView(activeView))
             {
@@ -153,12 +154,12 @@ namespace Modification
             }
             else
             {
-                activeGroup.Items.Add(CreateInfoItem("La vue active ne supporte pas les surcharges graphiques."));
+                activeGroup.Items.Add(CreateInfoItem(UiLanguage.T("La vue active ne supporte pas les surcharges graphiques.", "The Active View Does Not Support Graphic Overrides.")));
             }
 
             ViewsTreeView.Items.Add(activeGroup);
 
-            TreeViewItem sheetsGroup = CreateGroup("Feuilles - appliquer aux vues placées");
+            TreeViewItem sheetsGroup = CreateGroup(UiLanguage.T("Feuilles - appliquer aux vues placées", "Sheets - Apply to Placed Views"));
 
             foreach (ViewSheet sheet in _allSheets)
             {
@@ -357,7 +358,7 @@ namespace Modification
             if (SelectedViews.Count == 0)
             {
                 MessageBox.Show(
-                    "Sélectionne au moins une vue ou une feuille contenant des vues.",
+                    UiLanguage.T("Sélectionne au moins une vue ou une feuille contenant des vues.", "Select at Least One View or a Sheet Containing Views."),
                     "BIMaestro",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
@@ -375,7 +376,7 @@ namespace Modification
             if (SelectedViews.Count == 0)
             {
                 MessageBox.Show(
-                    "Sélectionne au moins une vue ou une feuille contenant des vues à réinitialiser.",
+                    UiLanguage.T("Sélectionne au moins une vue ou une feuille contenant des vues à réinitialiser.", "Select at Least One View or a Sheet Containing Views to Reset."),
                     "BIMaestro",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
@@ -383,8 +384,8 @@ namespace Modification
             }
 
             MessageBoxResult answer = MessageBox.Show(
-                "Voulez-vous aussi réafficher les éléments masqués dans les vues sélectionnées ?",
-                "Réinitialisation",
+                UiLanguage.T("Voulez-vous aussi réafficher les éléments masqués dans les vues sélectionnées ?", "Do You Also Want to Unhide Hidden Elements in the Selected Views?"),
+                UiLanguage.T("Réinitialisation", "Reset"),
                 MessageBoxButton.YesNoCancel,
                 MessageBoxImage.Question);
 

@@ -5,6 +5,7 @@ using Licensing;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using BIMaestro.Localization;
 
 namespace Modification
 {
@@ -18,7 +19,7 @@ namespace Modification
             UIDocument uidoc = data.Application.ActiveUIDocument;
             if (uidoc == null)
             {
-                TaskDialog.Show("BIMaestro", "Aucun document Revit actif.");
+                TaskDialog.Show("BIMaestro", UiLanguage.T("Aucun document Revit actif.", "No Active Revit Document."));
                 return Result.Failed;
             }
 
@@ -28,8 +29,8 @@ namespace Modification
             if (selectedElementIds == null || selectedElementIds.Count == 0)
             {
                 TaskDialog.Show(
-                    "Surcharges vues",
-                    "Sélectionne d’abord un ou plusieurs éléments Revit avant de lancer l’outil.");
+                    UiLanguage.T("Surcharges vues", "View Overrides"),
+                    UiLanguage.T("Sélectionne d’abord un ou plusieurs éléments Revit avant de lancer l’outil.", "Select One or More Revit Elements before Running the Tool."));
                 return Result.Cancelled;
             }
 
@@ -44,14 +45,12 @@ namespace Modification
                 Element referenceElement = doc.GetElement(existingOverrideInfo.ElementId);
                 string referenceName = GetReadableElementName(referenceElement, existingOverrideInfo.ElementId);
 
-                TaskDialog dialog = new TaskDialog("Surcharges graphiques existantes")
+                TaskDialog dialog = new TaskDialog(UiLanguage.T("Surcharges graphiques existantes", "Existing Graphic Overrides"))
                 {
-                    MainInstruction = "Un des éléments sélectionnés possède déjà une surcharge graphique dans la vue active.",
+                    MainInstruction = UiLanguage.T("Un des éléments sélectionnés possède déjà une surcharge graphique dans la vue active.", "One of the Selected Elements Already Has a Graphic Override in the Active View."),
                     MainContent =
-                        $"Élément détecté : {referenceName}\n\n" +
-                        "Voulez-vous copier ses réglages graphiques sur les autres éléments sélectionnés et dans les vues choisies ?\n\n" +
-                        "Oui : copier la surcharge existante.\n" +
-                        "Non : ouvrir les options normales de l’outil.",
+                        UiLanguage.T("Élément détecté : ", "Detected Element: ") + referenceName + "\n\n" +
+                        UiLanguage.T("Voulez-vous copier ses réglages graphiques sur les autres éléments sélectionnés et dans les vues choisies ?\n\nOui : copier la surcharge existante.\nNon : ouvrir les options normales de l’outil.", "Do You Want to Copy Its Graphic Settings to the Other Selected Elements and Chosen Views?\n\nYes: Copy the Existing Override.\nNo: Open the Tool's Normal Options."),
                     CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No | TaskDialogCommonButtons.Cancel,
                     DefaultButton = TaskDialogResult.Yes
                 };
@@ -84,8 +83,8 @@ namespace Modification
             if (targetViews.Count == 0)
             {
                 TaskDialog.Show(
-                    "Surcharges vues",
-                    "Aucune vue valide sélectionnée.\n\nNote : les feuilles ne supportent pas directement les surcharges graphiques. L’outil applique les réglages aux vues placées sur les feuilles sélectionnées.");
+                    UiLanguage.T("Surcharges vues", "View Overrides"),
+                    UiLanguage.T("Aucune vue valide sélectionnée.\n\nNote : les feuilles ne supportent pas directement les surcharges graphiques. L’outil applique les réglages aux vues placées sur les feuilles sélectionnées.", "No Valid View Selected.\n\nNote: Sheets Do Not Directly Support Graphic Overrides. The Tool Applies Settings to Views Placed on the Selected Sheets."));
                 return Result.Cancelled;
             }
 
@@ -100,8 +99,8 @@ namespace Modification
                 if (!existingOverrideInfo.HasOverride || existingOverrideInfo.OverrideSettings == null)
                 {
                     TaskDialog.Show(
-                        "Surcharges vues",
-                        "Impossible de récupérer la surcharge graphique existante.");
+                        UiLanguage.T("Surcharges vues", "View Overrides"),
+                        UiLanguage.T("Impossible de récupérer la surcharge graphique existante.", "Unable to Retrieve the Existing Graphic Override."));
                     return Result.Failed;
                 }
 

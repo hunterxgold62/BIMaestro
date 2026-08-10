@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using BIMaestro.Localization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -482,9 +483,9 @@ namespace BIMaestro.UI
             return index switch
             {
                 0 => "Top-8",
-                1 => "Récents (1/2)",
-                2 => "Récents (2/2)",
-                _ => $"Page {index + 1}/{pageCount}",
+                1 => UiLanguage.T("Récents (1/2)", "Recent (1/2)"),
+                2 => UiLanguage.T("Récents (2/2)", "Recent (2/2)"),
+                _ => UiLanguage.T($"Page {index + 1}/{pageCount}", $"Page {index + 1}/{pageCount}"),
             };
         }
 
@@ -501,7 +502,7 @@ namespace BIMaestro.UI
             if (_centerLabel != null)
             {
                 if (isActive && !string.IsNullOrWhiteSpace(collectionName))
-                    _centerLabel.ToolTip = $"Collection : {collectionName}";
+                    _centerLabel.ToolTip = UiLanguage.T($"Collection : {collectionName}", $"Collection: {collectionName}");
                 else
                     _centerLabel.ToolTip = null;
             }
@@ -573,7 +574,7 @@ namespace BIMaestro.UI
 
             if (provider != null)
             {
-                var loadItem = new MenuItem { Header = "Charger une collection" };
+                var loadItem = new MenuItem { Header = UiLanguage.T("Charger une collection", "Load a Collection") };
                 var options = provider() ?? Array.Empty<(string Id, string Name)>();
                 foreach (var option in options)
                 {
@@ -597,7 +598,7 @@ namespace BIMaestro.UI
                 if (loadItem.Items.Count == 0)
                 {
                     loadItem.IsEnabled = false;
-                    loadItem.Items.Add(new MenuItem { Header = "Aucune collection disponible", IsEnabled = false });
+                    loadItem.Items.Add(new MenuItem { Header = UiLanguage.T("Aucune collection disponible", "No Collection Available"), IsEnabled = false });
                 }
 
                 cm.Items.Add(loadItem);
@@ -605,7 +606,7 @@ namespace BIMaestro.UI
 
             if (_collectionModeActive && _collectionClearCallback != null)
             {
-                var cancelItem = new MenuItem { Header = "Annuler la collection" };
+                var cancelItem = new MenuItem { Header = UiLanguage.T("Annuler la collection", "Clear Collection") };
                 cancelItem.Click += (s, e) =>
                 {
                     try { _collectionClearCallback?.Invoke(); } catch { }

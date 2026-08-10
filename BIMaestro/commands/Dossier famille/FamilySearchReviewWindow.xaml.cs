@@ -1,3 +1,4 @@
+using BIMaestro.Localization;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -66,7 +67,7 @@ namespace Famille
             var selected = _rows.Where(r => r.IsSelected).ToList();
             if (selected.Count == 0)
             {
-                MessageBox.Show(this, "Cochez au moins une famille à analyser.", "Mots-clés", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(this, UiLanguage.T("Cochez au moins une famille à analyser.", "Select at least one family to analyze."), UiLanguage.T("Mots-clés", "Keywords"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -85,20 +86,20 @@ namespace Famille
                     if (_generationCts.IsCancellationRequested)
                         break;
 
-                    ProgressText.Text = $"Analyse IA {completed + 1}/{selected.Count} — {row.Name}";
-                    row.Status = "Analyse en cours…";
+                    ProgressText.Text = UiLanguage.T($"Analyse IA {completed + 1}/{selected.Count} — {row.Name}", $"AI analysis {completed + 1}/{selected.Count} — {row.Name}");
+                    row.Status = UiLanguage.T("Analyse en cours…", "Analysis in progress...");
                     try
                     {
                         var suggestion = await FamilySearchAiService.SuggestAsync(row.Name, row.Folder, row.Category);
                         row.Description = suggestion.Description;
                         row.KeywordsText = string.Join(", ", suggestion.Keywords);
                         row.Source = "ai-reviewed";
-                        row.Status = "Proposition IA — à vérifier";
+                        row.Status = UiLanguage.T("Proposition IA — à vérifier", "AI suggestion — review required");
                     }
                     catch (Exception ex)
                     {
                         errors++;
-                        row.Status = "Échec IA : " + ShortMessage(ex.Message);
+                        row.Status = UiLanguage.T("Échec IA : ", "AI failure: ") + ShortMessage(ex.Message);
                     }
 
                     completed++;
@@ -109,8 +110,8 @@ namespace Famille
             {
                 SetBusy(false);
                 ProgressText.Text = _generationCts.IsCancellationRequested
-                    ? $"Analyse arrêtée après {completed} famille(s)."
-                    : $"Analyse terminée : {completed - errors} proposition(s), {errors} échec(s).";
+                    ? UiLanguage.T($"Analyse arrêtée après {completed} famille(s).", $"Analysis stopped after {completed} family/families.")
+                    : UiLanguage.T($"Analyse terminée : {completed - errors} proposition(s), {errors} échec(s).", $"Analysis complete: {completed - errors} suggestion(s), {errors} failure(s).");
                 _generationCts.Dispose();
                 _generationCts = null;
                 UpdateSummary(keepProgressText: true);
@@ -121,7 +122,7 @@ namespace Famille
         {
             _generationCts?.Cancel();
             CancelButton.IsEnabled = false;
-            ProgressText.Text = "Arrêt demandé…";
+            ProgressText.Text = UiLanguage.T("Arrêt demandé…", "Stop requested...");
         }
 
         private void Save_Click(object sender, RoutedEventArgs e)
@@ -132,7 +133,7 @@ namespace Famille
             var dirty = _rows.Where(r => r.IsDirty).ToList();
             if (dirty.Count == 0)
             {
-                MessageBox.Show(this, "Aucune modification à enregistrer.", "Mots-clés", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(this, UiLanguage.T("Aucune modification à enregistrer.", "There are no changes to save."), UiLanguage.T("Mots-clés", "Keywords"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -151,7 +152,7 @@ namespace Famille
                 if (!FamilySearchMetadataService.TrySave(
                     row.Path, metadata, row.ExpectedLastWriteUtc, out string error, out DateTime? newWriteUtc))
                 {
-                    row.Status = "Non enregistré";
+                    row.Status = UiLanguage.T("Non enregistré", "Not saved");
                     errors.Add(row.Name + " : " + error);
                     continue;
                 }
@@ -163,13 +164,13 @@ namespace Famille
             }
 
             UpdateSummary();
-            string message = $"{saved} famille(s) enregistrée(s).";
+            string message = UiLanguage.T($"{saved} famille(s) enregistrée(s).", $"{saved} family/families saved.");
             if (errors.Count > 0)
             {
-                message += $"\n\n{errors.Count} échec(s) :\n" + string.Join("\n", errors.Take(8));
-                if (errors.Count > 8) message += $"\n… et {errors.Count - 8} autre(s).";
+                message += UiLanguage.T($"\n\n{errors.Count} échec(s) :\n", $"\n\n{errors.Count} failure(s):\n") + string.Join("\n", errors.Take(8));
+                if (errors.Count > 8) message += UiLanguage.T($"\n… et {errors.Count - 8} autre(s).", $"\n… and {errors.Count - 8} more.");
             }
-            MessageBox.Show(this, message, "Mots-clés", MessageBoxButton.OK,
+            MessageBox.Show(this, message, UiLanguage.T("Mots-clés", "Keywords"), MessageBoxButton.OK,
                 errors.Count == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
         }
 
@@ -192,7 +193,7 @@ namespace Famille
         {
             if (_isBusy)
             {
-                MessageBox.Show(this, "Arrêtez d’abord l’analyse IA en cours.", "Mots-clés", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(this, UiLanguage.T("Arrêtez d’abord l’analyse IA en cours.", "Stop the current AI analysis first."), UiLanguage.T("Mots-clés", "Keywords"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
             Close();
@@ -204,7 +205,7 @@ namespace Famille
                 return;
 
             e.Cancel = true;
-            MessageBox.Show(this, "Arrêtez d’abord l’analyse IA en cours.", "Mots-clés",
+            MessageBox.Show(this, UiLanguage.T("Arrêtez d’abord l’analyse IA en cours.", "Stop the current AI analysis first."), UiLanguage.T("Mots-clés", "Keywords"),
                 MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
@@ -223,12 +224,14 @@ namespace Famille
             int selected = _rows.Count(r => r.IsSelected);
             int enriched = _rows.Count(r => r.HasKeywords);
             int dirty = _rows.Count(r => r.IsDirty);
-            ProgressText.Text = $"{_rows.Count} familles — {selected} cochée(s) — {enriched} avec mots-clés — {dirty} modification(s) non enregistrée(s).";
+            ProgressText.Text = UiLanguage.T(
+                $"{_rows.Count} familles — {selected} cochée(s) — {enriched} avec mots-clés — {dirty} modification(s) non enregistrée(s).",
+                $"{_rows.Count} families — {selected} selected — {enriched} with keywords — {dirty} unsaved change(s).");
         }
 
         private static string ShortMessage(string message)
         {
-            message = (message ?? "Erreur inconnue").Replace('\r', ' ').Replace('\n', ' ').Trim();
+            message = (message ?? UiLanguage.T("Erreur inconnue", "Unknown error")).Replace('\r', ' ').Replace('\n', ' ').Trim();
             return message.Length <= 100 ? message : message.Substring(0, 100) + "…";
         }
     }

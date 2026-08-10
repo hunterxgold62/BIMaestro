@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Windows;
+using BIMaestro.Localization;
 
 namespace Modification
 {
@@ -153,14 +154,14 @@ namespace Modification
             ? Visibility.Collapsed
             : Visibility.Visible;
         public string WindowSubtitle => IsViewportMode
-            ? "Numérotez les pastilles ou renommez les vues selon leur position sur la feuille."
-            : "Configurez le paramètre cible, la structure de nommage et lancez le renommage en un clic.";
+            ? UiLanguage.T("Numérotez les pastilles ou renommez les vues selon leur position sur la feuille.", "Number View Tags or Rename Views Based on Their Position on the Sheet.")
+            : UiLanguage.T("Configurez le paramètre cible, la structure de nommage et lancez le renommage en un clic.", "Configure the Target Parameter and Naming Structure, Then Rename in One Click.");
         public string BandHeightLabel => IsViewportMode
-            ? "Tolérance de ligne (mm) :"
-            : "Hauteur de bande (m) :";
+            ? UiLanguage.T("Tolérance de ligne (mm) :", "Row Tolerance (mm):")
+            : UiLanguage.T("Hauteur de bande (m) :", "Band Height (m):");
         public string BandHeightToolTip => IsViewportMode
-            ? "Deux fenêtres de vue dont les centres sont proches verticalement sont considérées sur la même ligne, puis triées de gauche à droite."
-            : "Les éléments sont regroupés par bandes horizontales de cette hauteur et triés de gauche à droite.";
+            ? UiLanguage.T("Deux fenêtres de vue dont les centres sont proches verticalement sont considérées sur la même ligne, puis triées de gauche à droite.", "Two Viewports with Vertically Close Centers Are Treated as Being on the Same Row, Then Sorted Left to Right.")
+            : UiLanguage.T("Les éléments sont regroupés par bandes horizontales de cette hauteur et triés de gauche à droite.", "Elements Are Grouped into Horizontal Bands of This Height and Sorted Left to Right.");
 
         public bool IsReset { get; private set; } // Propriété pour savoir si l'utilisateur veut réinitialiser
         public bool IsNumberingEnabled { get; internal set; }
@@ -232,7 +233,7 @@ namespace Modification
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.T("Impossible d’ouvrir la page d’aide : ", "Unable to Open the Help Page: ") + ex.Message, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
     }

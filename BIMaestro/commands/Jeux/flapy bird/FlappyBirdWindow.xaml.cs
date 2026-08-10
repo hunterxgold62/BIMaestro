@@ -11,6 +11,7 @@ using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Threading.Tasks;
 using System.Diagnostics;
+using BIMaestro.Localization;
 
 using IOPath = System.IO.Path;
 
@@ -412,8 +413,8 @@ namespace BIMaestro.Bonus
             StopRenderLoop();
             _frameStopwatch.Reset();
 
-            OverlayTitle.Text = "Perdu !";
-            OverlayMessage.Text = $"Score : {_score} — Appuie sur Espace ou clique pour rejouer";
+            OverlayTitle.Text = UiLanguage.T("Perdu !", "Game Over!");
+            OverlayMessage.Text = UiLanguage.T("Score : ", "Score: ") + _score + UiLanguage.T(" — Appuie sur Espace ou clique pour rejouer", " — Press Space or Click to Play Again");
             UpdateBestScoreUi();
             UpdateOverlayBestScore();
             Overlay.Visibility = Visibility.Visible;
@@ -439,7 +440,7 @@ namespace BIMaestro.Bonus
         {
             if (OverlayBestScore != null)
             {
-                OverlayBestScore.Text = $"Record : {_bestScore}";
+                OverlayBestScore.Text = UiLanguage.T("Record : ", "High Score: ") + _bestScore;
             }
         }
 

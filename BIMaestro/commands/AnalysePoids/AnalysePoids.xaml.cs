@@ -1,5 +1,6 @@
 ﻿using Autodesk.Revit.UI;
 using System;
+using BIMaestro.Localization;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -53,7 +54,7 @@ namespace Analyse
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.T($"Impossible d’ouvrir la page d’aide : {ex.Message}", $"Unable to open the help page: {ex.Message}"), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -87,7 +88,7 @@ namespace Analyse
             var contextMenu = new ContextMenu();
             var deleteMenuItem = new MenuItem
             {
-                Header = "Supprimer du projet",
+                Header = UiLanguage.T("Supprimer du projet", "Delete from Project"),
                 MinWidth = 190,
                 MinHeight = 28,
                 Padding = new Thickness(12, 5, 12, 5)
@@ -112,9 +113,9 @@ namespace Analyse
                 .Where(e => !e.IsFamily)
                 .Sum(e => e.TailleEnMo);
 
-            FamilyTotalText.Text = $"Total Familles : {familyTotal:N2} Mo";
-            ImportTotalText.Text = $"Total Imports (PDF/DWG/etc.) : {importTotal:N2} Mo";
-            GrandTotalText.Text = $"Total Général : {(familyTotal + importTotal):N2} Mo";
+            FamilyTotalText.Text = UiLanguage.T($"Total Familles : {familyTotal:N2} Mo", $"Family Total: {familyTotal:N2} MB");
+            ImportTotalText.Text = UiLanguage.T($"Total Imports (PDF/DWG/etc.) : {importTotal:N2} Mo", $"Import Total (PDF/DWG/etc.): {importTotal:N2} MB");
+            GrandTotalText.Text = UiLanguage.T($"Total Général : {(familyTotal + importTotal):N2} Mo", $"Grand Total: {(familyTotal + importTotal):N2} MB");
         }
 
         private void OnRowDoubleClick(object sender, MouseButtonEventArgs e)
@@ -140,21 +141,21 @@ namespace Analyse
                 if (elementIds.Length == 0 || elementIds.Any(id => id == null))
                 {
                     MessageBox.Show(this,
-                        "Impossible de déterminer l'identifiant de l'élément à supprimer.",
-                        "Suppression impossible",
+                        UiLanguage.T("Impossible de déterminer l'identifiant de l'élément à supprimer.", "Unable to determine the ID of the element to delete."),
+                        UiLanguage.T("Suppression impossible", "Cannot Delete"),
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);
                     return;
                 }
 
                 var details = info.IsFamily
-                    ? "Toutes ses instances seront également supprimées."
+                    ? UiLanguage.T("Toutes ses instances seront également supprimées.", "All its instances will also be deleted.")
                     : elementIds.Length > 1
-                        ? $"Les {elementIds.Length} éléments correspondants seront supprimés."
-                        : "L'élément sera supprimé du projet.";
+                        ? UiLanguage.T($"Les {elementIds.Length} éléments correspondants seront supprimés.", $"The {elementIds.Length} corresponding elements will be deleted.")
+                        : UiLanguage.T("L'élément sera supprimé du projet.", "The element will be deleted from the project.");
                 var confirmation = MessageBox.Show(this,
-                    $"Supprimer définitivement \"{info.Nom}\" du projet ?\n{details}",
-                    "Supprimer l'élément",
+                    UiLanguage.T($"Supprimer définitivement \"{info.Nom}\" du projet ?\n{details}", $"Permanently delete \"{info.Nom}\" from the project?\n{details}"),
+                    UiLanguage.T("Supprimer l'élément", "Delete Element"),
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Question,
                     MessageBoxResult.No);

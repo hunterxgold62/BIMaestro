@@ -10,6 +10,7 @@ using System.Windows.Media;
 using System.Windows.Input;
 using IA;              // ← AiClient
 using Licensing;      // ← LicenseManager
+using BIMaestro.Localization;
 
 namespace IA
 {
@@ -53,7 +54,7 @@ namespace IA
             }
             catch (System.Exception ex)
             {
-                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.T("Impossible d’ouvrir la page d’aide : ", "Unable to Open the Help Page: ") + ex.Message, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -104,8 +105,8 @@ namespace IA
             {
                 // MessageBox.Show utilise la constante définie dans AiClient
                 MessageBox.Show(
-                    AiClient.QuotaExceededMessage,
-                    "Quota dépassé",
+                    UiLanguage.IsEnglish ? "Your AI quota has been exceeded." : AiClient.QuotaExceededMessage,
+                    UiLanguage.T("Quota dépassé", "Quota Exceeded"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning
                 );
@@ -113,7 +114,7 @@ namespace IA
             catch (InvalidOperationException ex)
             {
                 // autres erreurs IA
-                MessageBox.Show(ex.Message, "Erreur IA", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(ex.Message, UiLanguage.T("Erreur IA", "AI Error"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
         
@@ -179,6 +180,18 @@ namespace IA
 
         private string GeneratePrompt(string inputText, string style, string customInstruction)
         {
+            if (UiLanguage.IsEnglish)
+            {
+                return style switch
+                {
+                    "Professionnelle" => $"Rewrite the following text in a formal, professional style without adding information: {inputText}",
+                    "Baratin" => $"Rewrite the following text using sophisticated vocabulary and elaborate phrasing: {inputText}",
+                    "Cool" => $"Rewrite the following text in a relaxed, friendly tone: {inputText}",
+                    "Personnalisé" => $"Rewrite only according to these instructions, without explanations:\n{customInstruction}\n\n{inputText}",
+                    _ => $"Rewrite the following text to make it clearer without adding information: {inputText}",
+                };
+            }
+
             return style switch
             {
                 "Professionnelle" =>

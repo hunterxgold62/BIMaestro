@@ -13,6 +13,7 @@ using Autodesk.Revit.UI.Selection;
 using Dynamo.Applications;
 using Dynamo.Applications.Properties;
 using Licensing;
+using BIMaestro.Localization;
 #endregion
 
 namespace Modification
@@ -51,15 +52,17 @@ namespace Modification
                 var prof = win.SelectedExecutionProfile ?? GetProfileForRun(cfg, win.SelectedHost, win.SelectedShape);
                 if (prof == null || string.IsNullOrWhiteSpace(prof.FamilyName))
                 {
-                    TaskDialog.Show("BIMaestro",
-                        "Aucune famille configurée pour ce cas.\nVa dans Configuration et charge un .RFA puis mappe les paramètres.");
+                    TaskDialog.Show("BIMaestro", UiLanguage.T(
+                        "Aucune famille configurée pour ce cas.\nVa dans Configuration et charge un .RFA puis mappe les paramètres.",
+                        "No family is configured for this case.\nOpen Settings, load an .RFA file, and map its parameters."));
                     return Result.Cancelled;
                 }
 
                 if (!TryResolveSymbol(doc, prof, out var reservationSymbol))
                 {
-                    TaskDialog.Show("BIMaestro",
-                        "La famille configurée n’est pas chargée dans ce projet.\nCharge-la (onglet Configuration) ou corrige le mapping.");
+                    TaskDialog.Show("BIMaestro", UiLanguage.T(
+                        "La famille configurée n’est pas chargée dans ce projet.\nCharge-la (onglet Configuration) ou corrige le mapping.",
+                        "The configured family is not loaded in this project.\nLoad it from Settings or correct the parameter mapping."));
                     return Result.Cancelled;
                 }
 
@@ -68,7 +71,7 @@ namespace Modification
 
                 if (win.AutomatiqueEnabled && !isWall)
                 {
-                    TaskDialog.Show("BIMaestro", "Mode automatique : disponible uniquement pour les murs.");
+                    TaskDialog.Show("BIMaestro", UiLanguage.T("Mode automatique : disponible uniquement pour les murs.", "Automatic mode is available for walls only."));
                     return Result.Cancelled;
                 }
 
@@ -303,9 +306,13 @@ namespace Modification
             bool isWall = win.SelectedHost == ReservationAutoV3Window.HostTarget.Mur;
             bool isRect = win.SelectedShape == ReservationAutoV3Window.ShapeTarget.Rectangulaire;
 
-            string linkScope = win.DoubleLinkEnabled ? " Les deux éléments doivent appartenir à un lien." : "";
-            TaskDialog.Show("BIMaestro",
-                $"Mode manuel : sélectionne l’objet, puis le {(isWall ? "mur" : "sol")}.{linkScope}\nECHAP pour arrêter.");
+            string linkScope = win.DoubleLinkEnabled
+                ? UiLanguage.T(" Les deux éléments doivent appartenir à un lien.", " Both elements must belong to a linked model.")
+                : "";
+            string hostLabel = isWall ? UiLanguage.T("mur", "wall") : UiLanguage.T("sol", "floor");
+            TaskDialog.Show("BIMaestro", UiLanguage.T(
+                $"Mode manuel : sélectionne l’objet, puis le {hostLabel}.{linkScope}\nECHAP pour arrêter.",
+                $"Manual mode: select the object, then the {hostLabel}.{linkScope}\nPress ESC to stop."));
 
             while (true)
             {
@@ -332,10 +339,14 @@ namespace Modification
                     if (!CanCreateReservationWithoutHost(reservationSymbol))
                     {
                         TaskDialog.Show(
-                            "Famille sans hôte requise",
-                            $"Le {(isWall ? "mur" : "sol")} sera sélectionné dans une maquette liée.\n\n" +
-                            $"La famille « {reservationSymbol.Family.Name} » est une famille avec hôte et ne peut pas être créée dans ce cas.\n\n" +
-                            "Relance la commande et choisis une famille sans hôte.");
+                            UiLanguage.T("Famille sans hôte requise", "Unhosted Family Required"),
+                            UiLanguage.T(
+                                $"Le {hostLabel} sera sélectionné dans une maquette liée.\n\n" +
+                                $"La famille « {reservationSymbol.Family.Name} » est une famille avec hôte et ne peut pas être créée dans ce cas.\n\n" +
+                                "Relance la commande et choisis une famille sans hôte.",
+                                $"The {hostLabel} will be selected from a linked model.\n\n" +
+                                $"The family '{reservationSymbol.Family.Name}' is hosted and cannot be created in this case.\n\n" +
+                                "Run the command again and choose an unhosted family."));
                         break;
                     }
 
@@ -392,7 +403,7 @@ namespace Modification
 
                     var tdLinked = new TaskDialog("BIMaestro")
                     {
-                        MainInstruction = "Créer une autre réservation ?",
+                        MainInstruction = UiLanguage.T("Créer une autre réservation ?", "Create Another Opening?"),
                         CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No
                     };
                     if (tdLinked.Show() != TaskDialogResult.Yes)
@@ -405,12 +416,16 @@ namespace Modification
                 try
                 {
                     string hostPrompt = pickComesFromLink
-                        ? (isWall ? "Sélectionne le mur de ta maquette" : "Sélectionne le sol de ta maquette")
-                        : (isWall ? "Sélectionne le mur" : "Sélectionne le sol");
+                        ? (isWall
+                            ? UiLanguage.T("Sélectionne le mur de ta maquette", "Select the wall in your model")
+                            : UiLanguage.T("Sélectionne le sol de ta maquette", "Select the floor in your model"))
+                        : (isWall
+                            ? UiLanguage.T("Sélectionne le mur", "Select the wall")
+                            : UiLanguage.T("Sélectionne le sol", "Select the floor"));
 
                     var rHost = uiDoc.Selection.PickObject(ObjectType.Element,
                         new LocalHostSelectionFilter(win.SelectedHost),
-                        hostPrompt + " (ESC pour annuler)");
+                        hostPrompt + UiLanguage.T(" (ESC pour annuler)", " (press ESC to cancel)"));
                     host = doc.GetElement(rHost);
                 }
                 catch
@@ -420,12 +435,12 @@ namespace Modification
 
                 if (isWall && host is not Wall)
                 {
-                    TaskDialog.Show("Erreur", "Ce n’est pas un mur.");
+                    TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T("Ce n’est pas un mur.", "The selected element is not a wall."));
                     continue;
                 }
                 if (!isWall && host is not Floor)
                 {
-                    TaskDialog.Show("Erreur", "Ce n’est pas un sol.");
+                    TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T("Ce n’est pas un sol.", "The selected element is not a floor."));
                     continue;
                 }
 
@@ -466,7 +481,7 @@ namespace Modification
 
                 var td = new TaskDialog("BIMaestro")
                 {
-                    MainInstruction = "Créer une autre réservation ?",
+                    MainInstruction = UiLanguage.T("Créer une autre réservation ?", "Create Another Opening?"),
                     CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No
                 };
                 if (td.Show() != TaskDialogResult.Yes)
@@ -487,7 +502,7 @@ namespace Modification
 
             if (!walls.Any())
             {
-                TaskDialog.Show("BIMaestro", "Aucun mur trouvé.");
+                TaskDialog.Show("BIMaestro", UiLanguage.T("Aucun mur trouvé.", "No walls were found."));
                 return;
             }
 
@@ -520,7 +535,7 @@ namespace Modification
 
             if (!targets.Any())
             {
-                TaskDialog.Show("BIMaestro", "Aucun objet trouvé.");
+                TaskDialog.Show("BIMaestro", UiLanguage.T("Aucun objet trouvé.", "No matching objects were found."));
                 return;
             }
 
@@ -603,11 +618,14 @@ namespace Modification
                 }
             }
 
-            string message = $"Réservations créées : {created}";
+            string message = UiLanguage.T($"Réservations créées : {created}", $"Openings created: {created}");
             if (failedPlacements > 0)
             {
-                message += "\n\nNon créées : " + failedPlacements +
-                           "\nLa famille configurée semble nécessiter un hôte. Pour les murs d'un lien, utilise une famille de réservation non hébergée.";
+                message += UiLanguage.T(
+                    "\n\nNon créées : " + failedPlacements +
+                    "\nLa famille configurée semble nécessiter un hôte. Pour les murs d'un lien, utilise une famille de réservation non hébergée.",
+                    "\n\nNot created: " + failedPlacements +
+                    "\nThe configured family appears to require a host. For walls in a linked model, use an unhosted opening family.");
             }
 
             TaskDialog.Show("BIMaestro", message);
@@ -637,7 +655,9 @@ namespace Modification
                         win.SelectedObject,
                         win.DoubleLinkEnabled);
                 else
-                    r = uiDoc.Selection.PickObject(ObjectType.Element, "Sélectionne l’objet (ESC pour annuler)");
+                    r = uiDoc.Selection.PickObject(
+                        ObjectType.Element,
+                        UiLanguage.T("Sélectionne l’objet (ESC pour annuler)", "Select the object (press ESC to cancel)"));
 
                 if (!TryResolveReference(uiDoc, r, out var el, out var tr, out bool isLinked))
                     return new List<MepSelection>();
@@ -745,11 +765,15 @@ namespace Modification
         {
             try
             {
-                string hostLabel = hostTarget == ReservationAutoV3Window.HostTarget.Sol ? "sol" : "mur";
+                string hostLabel = hostTarget == ReservationAutoV3Window.HostTarget.Sol
+                    ? UiLanguage.T("sol", "floor")
+                    : UiLanguage.T("mur", "wall");
                 Reference reference = uiDoc.Selection.PickObject(
                     ObjectType.LinkedElement,
                     new LinkHostSelectionFilter(doc, source, hostTarget, allowAnyLink),
-                    $"Sélectionne le {hostLabel} du lien (ESC pour annuler)");
+                    UiLanguage.T(
+                        $"Sélectionne le {hostLabel} du lien (ESC pour annuler)",
+                        $"Select the linked {hostLabel} (press ESC to cancel)"));
 
                 if (reference == null || reference.LinkedElementId == ElementId.InvalidElementId)
                     return null;
@@ -977,7 +1001,9 @@ namespace Modification
             {
                 TaskDialog.Show(
                     "BIMaestro",
-                    $"Impossible de créer la réservation sans hôte.\nUtilise une famille de réservation non hébergée pour traverser un {(isWall ? "mur" : "sol")} de lien.");
+                    UiLanguage.T(
+                        $"Impossible de créer la réservation sans hôte.\nUtilise une famille de réservation non hébergée pour traverser un {(isWall ? "mur" : "sol")} de lien.",
+                        $"Unable to create the unhosted opening.\nUse an unhosted opening family to cross a linked {(isWall ? "wall" : "floor")}."));
                 return;
             }
 
@@ -1136,7 +1162,9 @@ namespace Modification
             {
                 TaskDialog.Show(
                     "BIMaestro",
-                    "Impossible de créer la réservation multi sans hôte.\nUtilise une famille de réservation non hébergée pour traverser un mur de lien.");
+                    UiLanguage.T(
+                        "Impossible de créer la réservation multi sans hôte.\nUtilise une famille de réservation non hébergée pour traverser un mur de lien.",
+                        "Unable to create the multi-opening without a host.\nUse an unhosted opening family to cross a linked wall."));
                 return;
             }
 
@@ -1232,7 +1260,9 @@ namespace Modification
             {
                 TaskDialog.Show(
                     "BIMaestro",
-                    "Impossible de créer la réservation multi sans hôte.\nUtilise une famille de réservation non hébergée pour traverser un sol de lien.");
+                    UiLanguage.T(
+                        "Impossible de créer la réservation multi sans hôte.\nUtilise une famille de réservation non hébergée pour traverser un sol de lien.",
+                        "Unable to create the multi-opening without a host.\nUse an unhosted opening family to cross a linked floor."));
                 return;
             }
 
@@ -1693,14 +1723,21 @@ namespace Modification
             if (!_voidCutWarnShown)
             {
                 _voidCutWarnShown = true;
-                TaskDialog.Show("BIMaestro",
+                TaskDialog.Show("BIMaestro", UiLanguage.T(
                     "Info découpe (familles 'vide') :\n" +
                     "Certaines familles ne coupent pas si l’option famille n’est pas activée.\n\n" +
                     "Vérifie dans l’éditeur de famille :\n" +
                     "- 'Cut with Voids When Loaded'\n" +
                     "- le vide est bien en 'Cut Geometry'\n" +
                     "- la catégorie/support autorise la coupe.\n\n" +
-                    "Le plugin a tenté de forcer la coupe automatiquement.");
+                    "Le plugin a tenté de forcer la coupe automatiquement.",
+                    "Void-cut information:\n" +
+                    "Some families do not cut their host unless the family option is enabled.\n\n" +
+                    "Check the Family Editor settings:\n" +
+                    "- 'Cut with Voids When Loaded' is enabled\n" +
+                    "- the void uses 'Cut Geometry'\n" +
+                    "- the category and host allow cutting.\n\n" +
+                    "BIMaestro attempted to force the cut automatically."));
             }
         }
 
@@ -3451,27 +3488,32 @@ namespace Modification
             var hostFilter = new HostMepCurveSelectionFilter(objectType);
             var hybridFilter = new HybridMepCurveSelectionFilter(doc, pipeSource, objectType, linksOnly);
 
-            string objectName = objectType == ReservationAutoV3Window.ObjectType.Gaine ? "gaine" : "canalisation";
+            string objectName = objectType == ReservationAutoV3Window.ObjectType.Gaine
+                ? UiLanguage.T("gaine", "duct")
+                : UiLanguage.T("canalisation", "pipe");
 
             if (linksOnly)
             {
                 return uiDoc.Selection.PickObject(
                     ObjectType.PointOnElement,
                     hybridFilter,
-                    $"Sélectionne la {objectName} dans un lien");
+                    UiLanguage.T($"Sélectionne la {objectName} dans un lien", $"Select the {objectName} in a linked model"));
             }
 
             return pipeSource switch
             {
                 ReservationAutoV3Window.PipeSource.Maquette => uiDoc.Selection.PickObject(
                     ObjectType.Element, hostFilter,
-                    $"Sélectionne la {objectName} (maquette)"),
+                    UiLanguage.T($"Sélectionne la {objectName} (maquette)", $"Select the {objectName} in your model")),
 
                 ReservationAutoV3Window.PipeSource.LienIFC or ReservationAutoV3Window.PipeSource.LienRVT => uiDoc.Selection.PickObject(
                     ObjectType.PointOnElement, hybridFilter,
-                    $"Sélectionne la {objectName} dans ta maquette ou dans le lien"),
+                    UiLanguage.T($"Sélectionne la {objectName} dans ta maquette ou dans le lien", $"Select the {objectName} in your model or in the linked model")),
 
-                _ => uiDoc.Selection.PickObject(ObjectType.Element, hostFilter, $"Sélectionne la {objectName}")
+                _ => uiDoc.Selection.PickObject(
+                    ObjectType.Element,
+                    hostFilter,
+                    UiLanguage.T($"Sélectionne la {objectName}", $"Select the {objectName}"))
             };
         }
 
@@ -3482,25 +3524,33 @@ namespace Modification
         {
             var hostFilter = new HostMepCurveSelectionFilter(objectType);
             var hybridFilter = new HybridMepCurveSelectionFilter(doc, pipeSource, objectType, linksOnly);
-            string objectLabelPlural = objectType == ReservationAutoV3Window.ObjectType.Gaine ? "gaines" : "canalisations";
+            string objectLabelPlural = objectType == ReservationAutoV3Window.ObjectType.Gaine
+                ? UiLanguage.T("gaines", "ducts")
+                : UiLanguage.T("canalisations", "pipes");
 
             if (linksOnly)
             {
                 return uiDoc.Selection.PickObjects(
                     ObjectType.PointOnElement,
                     hybridFilter,
-                    $"Sélectionne les {objectLabelPlural} dans les liens (CTRL + clic, ESC pour terminer)");
+                    UiLanguage.T(
+                        $"Sélectionne les {objectLabelPlural} dans les liens (CTRL + clic, ESC pour terminer)",
+                        $"Select {objectLabelPlural} in linked models (CTRL + click, ESC to finish)"));
             }
 
             return pipeSource switch
             {
                 ReservationAutoV3Window.PipeSource.Maquette => uiDoc.Selection.PickObjects(
                     ObjectType.Element, hostFilter,
-                    $"Sélectionne les {objectLabelPlural} (CTRL + clic, ESC pour terminer)"),
+                    UiLanguage.T(
+                        $"Sélectionne les {objectLabelPlural} (CTRL + clic, ESC pour terminer)",
+                        $"Select {objectLabelPlural} (CTRL + click, ESC to finish)")),
 
                 ReservationAutoV3Window.PipeSource.LienIFC or ReservationAutoV3Window.PipeSource.LienRVT => uiDoc.Selection.PickObjects(
                     ObjectType.PointOnElement, hybridFilter,
-                    $"Sélectionne les {objectLabelPlural} dans ta maquette ou dans le lien (CTRL + clic, ESC pour terminer)"),
+                    UiLanguage.T(
+                        $"Sélectionne les {objectLabelPlural} dans ta maquette ou dans le lien (CTRL + clic, ESC pour terminer)",
+                        $"Select {objectLabelPlural} in your model or in the linked model (CTRL + click, ESC to finish)")),
 
                 _ => null
             };

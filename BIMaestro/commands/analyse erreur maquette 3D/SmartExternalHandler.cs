@@ -1,5 +1,6 @@
 ﻿using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -125,7 +126,7 @@ namespace Analyse
             }
             catch (Exception ex)
             {
-                TaskDialog.Show("BIMaestro – SmartExternalHandler", ex.Message);
+                TaskDialog.Show(UiLanguage.T("BIMaestro – SmartExternalHandler", "BIMaestro – Smart External Handler"), ex.Message);
             }
             finally
             {

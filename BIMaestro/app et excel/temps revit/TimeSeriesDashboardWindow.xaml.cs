@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json;
 using NPOI.SS.UserModel;
+using BIMaestro.Localization;
 using NPOI.XSSF.UserModel;
 using OxyPlot;
 using OxyPlot.Axes;
@@ -71,7 +72,7 @@ namespace BIMaestro.Dashboard
             InitializeComponent();
 
             _currentDocumentPath = currentDocumentPath;
-            Title = "BIMaestro — Temps par type de document";
+            Title = UiLanguage.T("BIMaestro — Temps par type de document", "BIMaestro — Time by Document Type");
             AddHotkeys();
 
             _searchDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(220) };
@@ -84,7 +85,7 @@ namespace BIMaestro.Dashboard
             _tgRvt.IsChecked = true;
             _tgRfa.IsChecked = false;
 
-            _plotModel = new PlotModel { Title = "Temps passé" };
+            _plotModel = new PlotModel { Title = UiLanguage.T("Temps passé", "Time Spent") };
             _plotView.Model = _plotModel;
 
             LoadData();
@@ -116,7 +117,7 @@ namespace BIMaestro.Dashboard
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.T("Impossible d’ouvrir la page d’aide : ", "Unable to open the help page: ") + ex.Message, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -320,7 +321,7 @@ namespace BIMaestro.Dashboard
                     var versionSource = latestOpenEntry ?? latestEntry;
 
                     string id = g.Key;
-                    string name = string.IsNullOrWhiteSpace(latestEntry?.DocumentName) ? "(sans nom)" : latestEntry.DocumentName;
+                    string name = string.IsNullOrWhiteSpace(latestEntry?.DocumentName) ? UiLanguage.T("(sans nom)", "(unnamed)") : latestEntry.DocumentName;
                     string locationId = latestEntry?.DocumentId ?? id;
                     return new ProjectItem
                     {
@@ -394,13 +395,13 @@ namespace BIMaestro.Dashboard
                          .ThenBy(p => p.BaseName);
 
                 _filteredProjects = seq.Take(30).ToList();
-                if (_lblCount != null) _lblCount.Text = _filteredProjects.Count + " résultat(s)";
+                if (_lblCount != null) _lblCount.Text = _filteredProjects.Count + UiLanguage.T(" résultat(s)", " result(s)");
                 if (_icSuggestions != null) _icSuggestions.ItemsSource = _filteredProjects.Take(15).ToList();
             }
             else
             {
                 _filteredProjects = new List<ProjectItem>();
-                if (_lblCount != null) _lblCount.Text = "Commencez à taper pour afficher des raccourcis";
+                if (_lblCount != null) _lblCount.Text = UiLanguage.T("Commencez à taper pour afficher des raccourcis", "Start typing to display shortcuts");
                 if (_icSuggestions != null) _icSuggestions.ItemsSource = null;
             }
         }
@@ -459,7 +460,7 @@ namespace BIMaestro.Dashboard
 
                 var top = totals.Take(topN).ToList();
                 double others = Math.Max(0, totals.Skip(topN).Sum(x => x.Hours));
-                if (others > 0.0001) top.Add(new { DocId = "others", Hours = others, Name = "Autres" });
+                if (others > 0.0001) top.Add(new { DocId = "others", Hours = others, Name = UiLanguage.T("Autres", "Others") });
 
                 var shown = top.Where(t => !_hiddenBars.Contains(t.DocId ?? t.Name)).ToList();
 
@@ -467,8 +468,8 @@ namespace BIMaestro.Dashboard
                 foreach (var t in shown) catAxis.Labels.Add(Short(t.Name));
                 model.Axes.Add(catAxis);
 
-                model.Axes.Add(new LinearAxis { Position = AxisPosition.Left, Title = "heures (total)", Minimum = 0 });
-                model.Title = $"Temps passé — Aperçu (Top {topN})";
+                model.Axes.Add(new LinearAxis { Position = AxisPosition.Left, Title = UiLanguage.T("heures (total)", "hours (total)"), Minimum = 0 });
+                model.Title = UiLanguage.T($"Temps passé — Aperçu (Top {topN})", $"Time Spent — Overview (Top {topN})");
 
                 var rect = new RectangleBarSeries { Title = $"Top {topN}", StrokeThickness = 0.5, FillColor = GetOxyColor(0) };
                 for (int i = 0; i < shown.Count; i++)
@@ -527,8 +528,11 @@ namespace BIMaestro.Dashboard
                 var labelIndex = labels.Select((lab, i) => new { lab, i }).ToDictionary(x => x.lab, x => x.i);
 
                 model.Axes.Add(new CategoryAxis { Position = AxisPosition.Bottom, Angle = -50, ItemsSource = labels });
-                model.Axes.Add(new LinearAxis { Position = AxisPosition.Left, Title = $"heures / {(gran == AutoGran.Day ? "jour" : (gran == AutoGran.Week ? "semaine" : "mois"))}", Minimum = 0 });
-                model.Title = $"Temps passé — Comparer (Top {topN})";
+                string granularity = gran == AutoGran.Day
+                    ? UiLanguage.T("jour", "day")
+                    : gran == AutoGran.Week ? UiLanguage.T("semaine", "week") : UiLanguage.T("mois", "month");
+                model.Axes.Add(new LinearAxis { Position = AxisPosition.Left, Title = UiLanguage.T("heures", "hours") + " / " + granularity, Minimum = 0 });
+                model.Title = UiLanguage.T($"Temps passé — Comparer (Top {topN})", $"Time Spent — Compare (Top {topN})");
 
                 int idx = 0;
                 var legendItems = new List<LegendItemVM>();
@@ -635,7 +639,7 @@ namespace BIMaestro.Dashboard
                 _plotModel.Background = (OxyColor)originalBackground;
             }
 
-            MessageBox.Show("Exporté : " + dlg.FileName);
+            MessageBox.Show(UiLanguage.T("Exporté : ", "Exported: ") + dlg.FileName);
         }
 
         private void CopyChartToClipboard()
@@ -651,7 +655,7 @@ namespace BIMaestro.Dashboard
                 if (File.Exists(_excelPath))
                     System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = _excelPath, UseShellExecute = true });
                 else
-                    MessageBox.Show("Fichier Excel introuvable : " + _excelPath);
+                    MessageBox.Show(UiLanguage.T("Fichier Excel introuvable : ", "Excel file not found: ") + _excelPath);
             }
             catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
@@ -674,7 +678,7 @@ namespace BIMaestro.Dashboard
 
                 if (string.IsNullOrWhiteSpace(path))
                 {
-                    MessageBox.Show("Aucun chemin détecté pour ouvrir l'emplacement.");
+                    MessageBox.Show(UiLanguage.T("Aucun chemin détecté pour ouvrir l'emplacement.", "No path was found to open the location."));
                     return;
                 }
 
@@ -692,7 +696,7 @@ namespace BIMaestro.Dashboard
 
                 if (openedFolders.Count == 0)
                 {
-                    MessageBox.Show("Dossier introuvable pour : " + path);
+                    MessageBox.Show(UiLanguage.T("Dossier introuvable pour : ", "Folder not found for: ") + path);
                 }
             }
             catch (Exception ex)
@@ -807,7 +811,7 @@ namespace BIMaestro.Dashboard
             { try { s = Path.GetFileNameWithoutExtension(docId ?? ""); } catch { } }
             else
             { try { s = Path.GetFileNameWithoutExtension(s); } catch { } }
-            return string.IsNullOrWhiteSpace(s) ? "(sans nom)" : s;
+            return string.IsNullOrWhiteSpace(s) ? UiLanguage.T("(sans nom)", "(unnamed)") : s;
         }
 
         private static string NormalizeDocumentId(string docId)
@@ -856,7 +860,7 @@ namespace BIMaestro.Dashboard
             {
                 items.Add(new VersionLegendItem
                 {
-                    Label = "Inconnue",
+                    Label = UiLanguage.T("Inconnue", "Unknown"),
                     Brush = GetVersionBrush(null)
                 });
             }
@@ -883,14 +887,14 @@ namespace BIMaestro.Dashboard
         private static string BuildRevitVersionLabel(string rawVersion)
         {
             string normalized = NormalizeRevitVersion(rawVersion);
-            return string.IsNullOrWhiteSpace(normalized) ? "Version inconnue" : $"Revit {normalized}";
+            return string.IsNullOrWhiteSpace(normalized) ? UiLanguage.T("Version inconnue", "Unknown version") : $"Revit {normalized}";
         }
 
         private static string BuildRevitLegendLabel(string rawVersion)
         {
             string normalized = NormalizeRevitVersion(rawVersion);
             if (string.IsNullOrWhiteSpace(normalized))
-                return "Inconnue";
+                return UiLanguage.T("Inconnue", "Unknown");
 
             return normalized.Length >= 2 ? $"V{normalized.Substring(normalized.Length - 2)}" : $"V{normalized}";
         }

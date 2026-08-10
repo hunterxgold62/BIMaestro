@@ -933,6 +933,8 @@ namespace Couleur
         private static System.Windows.Controls.Primitives.Popup
             _viewHoverPopup;
         private static System.Windows.Controls.Image _viewHoverImage;
+        private static Border _viewHoverBorder;
+        private static TextBlock _viewHoverCaption;
         private static string _visibleViewHoverKey = string.Empty;
         private static int _viewHoverEmptyPollCount;
         private static string _revitVersion = "inconnue";
@@ -964,6 +966,8 @@ namespace Couleur
             public string ViewId { get; set; }
             public string ViewName { get; set; }
             public string DataUri { get; set; }
+            public bool IsStale { get; set; }
+            public DateTime CapturedAtLocal { get; set; }
         }
         private static readonly Dictionary<string, ViewHoverPreviewInfo>
             ViewHoverPreviews =
@@ -1115,7 +1119,9 @@ namespace Couleur
         public static void SetViewHoverPreview(
             string viewId,
             string viewName,
-            string dataUri)
+            string dataUri,
+            DateTime? capturedAtLocal = null,
+            bool isStale = false)
         {
             if (string.IsNullOrWhiteSpace(dataUri)) return;
 
@@ -1128,15 +1134,33 @@ namespace Couleur
             {
                 ViewId = safeId,
                 ViewName = safeName,
-                DataUri = dataUri
+                DataUri = dataUri,
+                IsStale = isStale,
+                CapturedAtLocal = capturedAtLocal ?? DateTime.Now
             };
+            ViewHoverPreviewInfo updatedPreview = ViewHoverPreviews[key];
+
+            if (string.Equals(
+                    _visibleViewHoverKey,
+                    key,
+                    StringComparison.OrdinalIgnoreCase) &&
+                _viewHoverPopup?.IsOpen == true)
+            {
+                if (_viewHoverImage != null)
+                {
+                    _viewHoverImage.Source = CreateBitmapFromDataUri(
+                        updatedPreview.DataUri);
+                }
+                ApplyViewHoverBorder(updatedPreview);
+                UpdateViewHoverCaption(updatedPreview);
+            }
 
             if (_chromiumBrowser != null)
             {
                 EnsureViewHoverPreviewScript(_chromiumBrowser);
                 PushViewHoverPreview(
                     _chromiumBrowser,
-                    ViewHoverPreviews[key]);
+                    updatedPreview);
             }
         }
 
@@ -1308,6 +1332,43 @@ namespace Couleur
                     return string.Empty;
                 default:
                     return "other";
+            }
+        }
+
+        public static void SetViewHoverPreviewStale(
+            string viewId,
+            string viewName,
+            bool isStale)
+        {
+            string safeId = viewId ?? string.Empty;
+            string safeName = viewName ?? string.Empty;
+            string key = !string.IsNullOrWhiteSpace(safeId)
+                ? "id:" + safeId
+                : "name:" + safeName;
+            if (!ViewHoverPreviews.TryGetValue(
+                    key,
+                    out ViewHoverPreviewInfo preview) ||
+                preview == null)
+            {
+                return;
+            }
+
+            preview.IsStale = isStale;
+            if (!string.IsNullOrWhiteSpace(safeName))
+                preview.ViewName = safeName;
+            if (_chromiumBrowser != null)
+            {
+                EnsureViewHoverPreviewScript(_chromiumBrowser);
+                PushViewHoverPreview(_chromiumBrowser, preview);
+            }
+            if (string.Equals(
+                    _visibleViewHoverKey,
+                    key,
+                    StringComparison.OrdinalIgnoreCase) &&
+                _viewHoverPopup?.IsOpen == true)
+            {
+                ApplyViewHoverBorder(preview);
+                UpdateViewHoverCaption(preview);
             }
         }
 
@@ -1631,7 +1692,7 @@ namespace Couleur
             string script = @"
 (()=>{
   const key='__bimaestroProjectBrowserTheme';
-  const version=22;
+  const version=24;
   const theme={
     appearanceEnabled:__BIMAESTRO_BROWSER_APPEARANCE_ENABLED__,
     activeParentEnabled:__BIMAESTRO_ACTIVE_PARENT_ENABLED__,
@@ -1726,24 +1787,38 @@ namespace Couleur
               28px 96px,
               118px 126px;
           }
-          50%{
-            background-position:
-              42px -62px,
-              22px -46px,
-              76px 26px,
-              68px 54px;
-          }
           100%{
             background-position:
-              72px -142px,
-              -30px -134px,
-              124px -44px,
-              18px -18px;
+              168px -138px,
+              -150px -182px,
+              216px -92px,
+              -168px -160px;
           }
         }
         @keyframes bimaestroWaveDrift{
-          0%{background-position:0 0,40px 20px;}
-          100%{background-position:80px 0,120px 20px;}
+          0%{background-position:0 22px,96px 112px;}
+          100%{background-position:240px 22px,-224px 112px;}
+        }
+        @keyframes bimaestroRibbonDrift{
+          0%{background-position:0 0;}
+          100%{background-position:480px 0;}
+        }
+        @keyframes bimaestroTopographyDrift{
+          0%{background-position:0 0;}
+          100%{background-position:360px 240px;}
+        }
+        @keyframes bimaestroArchitectGridDrift{
+          0%{background-position:0 0,0 0,0 0,0 0;}
+          100%{background-position:100px 100px,100px 100px,100px 100px,100px 100px;}
+        }
+        @keyframes bimaestroNorthernLightsDrift{
+          0%{background-position:0% 45%,100% 55%,45% 100%;}
+          50%{background-position:100% 58%,0% 42%,58% 0%;}
+          100%{background-position:0% 45%,100% 55%,45% 100%;}
+        }
+        @keyframes bimaestroConstellationDrift{
+          0%{background-position:0 0;}
+          100%{background-position:320px -220px;}
         }
         @keyframes bimaestroFireflyDrift{
           0%{
@@ -1803,19 +1878,56 @@ namespace Couleur
         }
         [data-bimaestro-bubble-surface='waves']{
           background-image:
-            radial-gradient(
-              ellipse at 50% 100%,
-              transparent 0 17px,
-              rgba(166,211,241,.42) 18px 20px,
-              transparent 21px),
-            radial-gradient(
-              ellipse at 50% 0%,
-              transparent 0 17px,
-              rgba(244,177,205,.34) 18px 20px,
-              transparent 21px);
-          background-size:80px 40px,80px 40px;
+            url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22240%22 height=%2260%22 viewBox=%220 0 240 60%22%3E%3Cpath d=%22M0 30 C15 8 45 8 60 30 S105 52 120 30 S165 8 180 30 S225 52 240 30%22 fill=%22none%22 stroke=%22%23A6D3F1%22 stroke-opacity=%22.46%22 stroke-width=%223%22 stroke-linecap=%22round%22/%3E%3C/svg%3E'),
+            url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22320%22 height=%2280%22 viewBox=%220 0 320 80%22%3E%3Cpath d=%22M0 40 C20 12 60 12 80 40 S140 68 160 40 S220 12 240 40 S300 68 320 40%22 fill=%22none%22 stroke=%22%23F4B1CD%22 stroke-opacity=%22.38%22 stroke-width=%223%22 stroke-linecap=%22round%22/%3E%3C/svg%3E');
+          background-size:240px 60px,320px 80px;
           background-repeat:repeat;
-          animation:bimaestroWaveDrift 9s linear infinite;
+          background-attachment:fixed;
+          animation:bimaestroWaveDrift 16s linear infinite;
+        }
+        [data-bimaestro-bubble-surface='ribbons']{
+          background-image:
+            url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22480%22 height=%22180%22 viewBox=%220 0 480 180%22%3E%3Cpath d=%22M0 72 C120 -8 360 152 480 72%22 fill=%22none%22 stroke=%22%23A6D3F1%22 stroke-opacity=%22.24%22 stroke-width=%2224%22 stroke-linecap=%22round%22/%3E%3Cpath d=%22M0 118 C120 38 360 198 480 118%22 fill=%22none%22 stroke=%22%23F4B1CD%22 stroke-opacity=%22.20%22 stroke-width=%2218%22 stroke-linecap=%22round%22/%3E%3Cpath d=%22M0 28 C120 -52 360 108 480 28%22 fill=%22none%22 stroke=%22%23BFEED3%22 stroke-opacity=%22.18%22 stroke-width=%2212%22 stroke-linecap=%22round%22/%3E%3C/svg%3E');
+          background-size:480px 180px;
+          background-repeat:repeat;
+          background-attachment:fixed;
+          animation:bimaestroRibbonDrift 24s linear infinite;
+        }
+        [data-bimaestro-bubble-surface='topography']{
+          background-image:
+            url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22360%22 height=%22240%22 viewBox=%220 0 360 240%22%3E%3Cg fill=%22none%22 stroke=%22%2388B8C9%22 stroke-opacity=%22.30%22 stroke-width=%221.4%22%3E%3Cpath d=%22M-20 66 C38 16 94 22 132 55 S211 100 258 58 S332 18 382 52%22/%3E%3Cpath d=%22M-24 91 C31 42 88 45 126 77 S211 123 266 83 S335 46 386 76%22/%3E%3Cpath d=%22M-18 121 C36 75 83 72 119 103 S203 153 268 113 S337 77 382 102%22/%3E%3Cpath d=%22M-25 153 C24 112 76 103 114 132 S204 181 272 144 S339 110 385 132%22/%3E%3Cpath d=%22M-18 188 C29 150 75 140 119 166 S211 210 278 176 S340 145 382 166%22/%3E%3C/g%3E%3C/svg%3E');
+          background-size:360px 240px;
+          background-repeat:repeat;
+          background-attachment:fixed;
+          animation:bimaestroTopographyDrift 34s linear infinite;
+        }
+        [data-bimaestro-bubble-surface='architect-grid']{
+          background-image:
+            linear-gradient(rgba(115,151,170,.13) 1px,transparent 1px),
+            linear-gradient(90deg,rgba(115,151,170,.13) 1px,transparent 1px),
+            linear-gradient(rgba(85,126,148,.22) 1px,transparent 1px),
+            linear-gradient(90deg,rgba(85,126,148,.22) 1px,transparent 1px);
+          background-size:20px 20px,20px 20px,100px 100px,100px 100px;
+          background-repeat:repeat;
+          background-attachment:fixed;
+          animation:bimaestroArchitectGridDrift 30s linear infinite;
+        }
+        [data-bimaestro-bubble-surface='northern-lights']{
+          background-image:
+            radial-gradient(ellipse at 18% 45%,rgba(95,225,190,.30),transparent 54%),
+            radial-gradient(ellipse at 78% 52%,rgba(116,180,255,.28),transparent 58%),
+            radial-gradient(ellipse at 52% 82%,rgba(208,150,255,.24),transparent 56%);
+          background-size:180% 180%,220% 220%,190% 210%;
+          background-repeat:no-repeat;
+          animation:bimaestroNorthernLightsDrift 20s ease-in-out infinite;
+        }
+        [data-bimaestro-bubble-surface='constellation']{
+          background-image:
+            url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22320%22 height=%22220%22 viewBox=%220 0 320 220%22%3E%3Cg fill=%22none%22 stroke=%22%2390B7D4%22 stroke-opacity=%22.25%22 stroke-width=%221%22%3E%3Cpath d=%22M22 42 L82 76 L138 34 L204 92 L286 54 M82 76 L112 154 L204 92 L264 172 M112 154 L48 190%22/%3E%3C/g%3E%3Cg fill=%22%23A9CCE3%22 fill-opacity=%22.62%22%3E%3Ccircle cx=%2222%22 cy=%2242%22 r=%222.5%22/%3E%3Ccircle cx=%2282%22 cy=%2276%22 r=%223%22/%3E%3Ccircle cx=%22138%22 cy=%2234%22 r=%222%22/%3E%3Ccircle cx=%22204%22 cy=%2292%22 r=%223.2%22/%3E%3Ccircle cx=%22286%22 cy=%2254%22 r=%222.2%22/%3E%3Ccircle cx=%22112%22 cy=%22154%22 r=%222.6%22/%3E%3Ccircle cx=%22264%22 cy=%22172%22 r=%222.8%22/%3E%3Ccircle cx=%2248%22 cy=%22190%22 r=%222%22/%3E%3C/g%3E%3C/svg%3E');
+          background-size:320px 220px;
+          background-repeat:repeat;
+          background-attachment:fixed;
+          animation:bimaestroConstellationDrift 38s linear infinite;
         }
         [data-bimaestro-bubble-surface='fireflies']{
           background-image:
@@ -1893,6 +2005,11 @@ namespace Couleur
         @media (prefers-reduced-motion:reduce){
           [data-bimaestro-bubble-surface='bubbles'],
           [data-bimaestro-bubble-surface='waves'],
+          [data-bimaestro-bubble-surface='ribbons'],
+          [data-bimaestro-bubble-surface='topography'],
+          [data-bimaestro-bubble-surface='architect-grid'],
+          [data-bimaestro-bubble-surface='northern-lights'],
+          [data-bimaestro-bubble-surface='constellation'],
           [data-bimaestro-bubble-surface='fireflies'],
           [data-bimaestro-bubble-surface='aurora']{
             animation:none;
@@ -2823,6 +2940,46 @@ namespace Couleur
 
             if (string.Equals(
                     mode,
+                    "Rubans fluides",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return "ribbons";
+            }
+
+            if (string.Equals(
+                    mode,
+                    "Courbes topographiques",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return "topography";
+            }
+
+            if (string.Equals(
+                    mode,
+                    "Grille d'architecte",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return "architect-grid";
+            }
+
+            if (string.Equals(
+                    mode,
+                    "Aurore boréale",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return "northern-lights";
+            }
+
+            if (string.Equals(
+                    mode,
+                    "Constellation douce",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return "constellation";
+            }
+
+            if (string.Equals(
+                    mode,
                     "Lucioles pastel",
                     StringComparison.OrdinalIgnoreCase))
             {
@@ -3131,6 +3288,8 @@ namespace Couleur
                     HideViewHoverPopup();
                     return;
                 }
+                ApplyViewHoverBorder(preview);
+                UpdateViewHoverCaption(preview);
 
                 if (!TryGetProjectBrowserBounds(
                         root,
@@ -3145,7 +3304,7 @@ namespace Couleur
                 }
 
                 const double popupWidth = 316;
-                const double popupHeight = 236;
+                const double popupHeight = 260;
                 const double gap = 12;
                 int popupWidthPixels = (int)Math.Ceiling(
                     popupWidth * scaleX);
@@ -3252,17 +3411,29 @@ namespace Couleur
                 Stretch = Stretch.Uniform,
                 SnapsToDevicePixels = true
             };
-            var border = new Border
+            _viewHoverCaption = new TextBlock
+            {
+                Margin = new Thickness(0, 5, 0, 0),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Foreground = new SolidColorBrush(
+                    Color.FromRgb(90, 90, 90)),
+                FontSize = 11,
+                TextAlignment = TextAlignment.Center
+            };
+            var content = new StackPanel();
+            content.Children.Add(_viewHoverImage);
+            content.Children.Add(_viewHoverCaption);
+            _viewHoverBorder = new Border
             {
                 Width = 316,
-                MaxHeight = 236,
+                MaxHeight = 260,
                 Padding = new Thickness(7),
                 Background = Brushes.White,
                 BorderBrush = new SolidColorBrush(
                     Color.FromRgb(190, 190, 190)),
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(4),
-                Child = _viewHoverImage,
+                Child = content,
                 IsHitTestVisible = false
             };
             _viewHoverPopup = new System.Windows.Controls.Primitives.Popup
@@ -3272,10 +3443,39 @@ namespace Couleur
                 AllowsTransparency = true,
                 StaysOpen = true,
                 IsHitTestVisible = false,
-                Child = border
+                Child = _viewHoverBorder
             };
             _viewHoverPopup.Opened += (_, __) =>
                 MakeViewHoverPopupNonInteractive();
+        }
+
+        private static void ApplyViewHoverBorder(
+            ViewHoverPreviewInfo preview)
+        {
+            if (_viewHoverBorder == null) return;
+            bool isStale = preview?.IsStale == true;
+            _viewHoverBorder.BorderBrush = isStale
+                ? new SolidColorBrush(Color.FromRgb(245, 132, 31))
+                : new SolidColorBrush(Color.FromRgb(190, 190, 190));
+            _viewHoverBorder.BorderThickness = isStale
+                ? new Thickness(3)
+                : new Thickness(1);
+        }
+
+        private static void UpdateViewHoverCaption(
+            ViewHoverPreviewInfo preview)
+        {
+            if (_viewHoverCaption == null || preview == null) return;
+            string timestamp = preview.CapturedAtLocal > DateTime.MinValue
+                ? preview.CapturedAtLocal.ToString(
+                    "dd/MM/yyyy - HH'h'mm",
+                    System.Globalization.CultureInfo.InvariantCulture)
+                : "Date inconnue";
+            _viewHoverCaption.Text = timestamp + " - " +
+                (preview.IsStale ? "à actualiser" : "à jour");
+            _viewHoverCaption.Foreground = preview.IsStale
+                ? new SolidColorBrush(Color.FromRgb(220, 105, 15))
+                : new SolidColorBrush(Color.FromRgb(90, 90, 90));
         }
 
         private static void MakeViewHoverPopupNonInteractive()

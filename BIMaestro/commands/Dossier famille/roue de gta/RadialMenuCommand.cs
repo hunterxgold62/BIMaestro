@@ -1,6 +1,7 @@
 ﻿using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 using Famille; // Usage/Recent + CatalogImageResolver + ThumbnailCache + ShellThumbnailProvider + ReloadFamilyHandler
 using Licensing;
 using System;
@@ -158,9 +159,9 @@ namespace BIMaestro.UI
                 PageLabelFactory = (index, count) => index switch
                 {
                     0 => "Top-8",
-                    1 => "Récents (1/2)",
-                    2 => "Récents (2/2)",
-                    _ => $"Page {index + 1}/{count}",
+                    1 => UiLanguage.T("Récents (1/2)", "Recent (1/2)"),
+                    2 => UiLanguage.T("Récents (2/2)", "Recent (2/2)"),
+                    _ => UiLanguage.T($"Page {index + 1}/{count}", $"Page {index + 1}/{count}"),
                 }
             };
         }
@@ -197,7 +198,7 @@ namespace BIMaestro.UI
                 }
 
                 if (string.IsNullOrEmpty(displayName))
-                    return $"Page {index + 1}/{count}";
+                    return UiLanguage.T($"Page {index + 1}/{count}", $"Page {index + 1}/{count}");
 
                 return $"{displayName}({index + 1}/{count})";
             };

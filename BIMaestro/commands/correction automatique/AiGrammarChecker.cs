@@ -1,6 +1,7 @@
 ﻿using IA;
 using Licensing;
 using Newtonsoft.Json;
+using BIMaestro.Localization;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
@@ -169,17 +170,9 @@ namespace ScanTextRevit
 
         private string BuildPrompt(string linesJson)
         {
-            return
-              "Tu es un correcteur expert en français. Pour chaque objet du tableau JSON ci‑dessous, "
-            + "fournis LineNumber, OriginalText, CorrectedText, Explanation, Category. "
-            + "Réponds uniquement avec un tableau JSON valide, sans markdown, sans texte avant ou après. "
-            + "Contrôle les fautes d'orthographe, accents, grammaire, accords, conjugaison, mots oubliés, mots doublés, ponctuation qui gêne la lecture et formulations manifestement incorrectes. "
-            + "Ne signale pas les micro-variantes de mise en forme (espaces en trop/en moins, doubles espaces, espace insécable, ponctuation purement cosmétique) sauf si la lecture ou le sens change réellement. "
-            + "Pour les textes très courts ou de type étiquette/code (ex: 'Niv. 01', 'A-101', 'Lot CVC'), évite les corrections stylistiques et corrige uniquement les fautes évidentes qui nuisent à la lisibilité. "
-            + "Ne modifie pas les codes, numéros de plans, indices de révision, noms de lots, abréviations techniques ou valeurs numériques sauf faute de langue évidente autour de ces valeurs. "
-            + "Si une correction est uniquement mineure mais utile, renvoie Category=Mineur. Si c'est une vraie faute de langue (orthographe/grammaire/conjugaison/accord/sens), renvoie Category=Erreur. "
-            + "Si aucun texte ne requiert de correction, réponds strictement avec [] (tableau JSON vide).\n"
-            + linesJson;
+            return UiLanguage.T(
+                "Tu es un correcteur expert en français. Pour chaque objet du tableau JSON ci-dessous, fournis LineNumber, OriginalText, CorrectedText, Explanation, Category. Réponds uniquement avec un tableau JSON valide, sans markdown, sans texte avant ou après. Contrôle les fautes d'orthographe, accents, grammaire, accords, conjugaison, mots oubliés, mots doublés, ponctuation qui gêne la lecture et formulations manifestement incorrectes. Ne signale pas les micro-variantes de mise en forme sauf si la lecture ou le sens change réellement. Pour les textes très courts ou de type étiquette/code, évite les corrections stylistiques et corrige uniquement les fautes évidentes. Ne modifie pas les codes, numéros de plans, indices de révision, noms de lots, abréviations techniques ou valeurs numériques sauf faute de langue évidente autour de ces valeurs. Si une correction est uniquement mineure mais utile, renvoie Category=Mineur. Si c'est une vraie faute de langue, renvoie Category=Erreur. Si aucun texte ne requiert de correction, réponds strictement avec [].\n" + linesJson,
+                "You are an expert English proofreader. For each object in the JSON array below, return LineNumber, OriginalText, CorrectedText, Explanation, and Category. Reply only with a valid JSON array, with no markdown or surrounding text. Check spelling, grammar, agreement, missing or duplicated words, punctuation that impairs readability, and clearly incorrect wording. Do not flag tiny formatting variations unless readability or meaning changes. For very short labels or codes, avoid stylistic edits and correct only obvious language errors. Do not modify codes, drawing numbers, revision marks, discipline names, technical abbreviations, or numeric values unless the surrounding language contains an obvious error. For a useful but minor correction, return Category=Mineur. For a genuine language error, return Category=Erreur. If no text requires correction, reply exactly with []. Write Explanation in English.\n" + linesJson);
         }
 
         private List<List<ScannedTextItem>> SplitScannedTextsIntoChunks(List<ScannedTextItem> items, int maxChars)

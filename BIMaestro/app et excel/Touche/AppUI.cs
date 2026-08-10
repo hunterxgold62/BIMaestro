@@ -1,6 +1,7 @@
 ﻿using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using BIMaestro.RibbonLayout;
+using BIMaestro.Localization;
 using Modification;
 using System;
 using System.Collections.Generic;
@@ -223,7 +224,7 @@ public class AppUI : IExternalApplication
         ribbonPanels.Clear();
         foreach (var panelConfig in OrderPanels(definitions, layout))
         {
-            var panel = application.CreateRibbonPanel(tabName, panelConfig.Name);
+            var panel = application.CreateRibbonPanel(tabName, UiLanguage.T(panelConfig.Name));
             ribbonPanels.Add(panel);
 
             var definition = definitions.First(d => d.Name == panelConfig.Name);
@@ -358,8 +359,8 @@ public class AppUI : IExternalApplication
         RegisterButtonDefinition(noteButton.buttonName, noteButton.buttonText, noteButton.className, noteButton.resourceImageName);
 
         var noteData = CreatePushButtonData(noteButton.buttonName, noteButton.buttonText, assemblyPath, noteButton.className, noteButton.resourceImageName, noteButton.toolTip);
-        var gamesData = new SplitButtonData(gamesSplit.splitButtonName, gamesSplit.splitButtonText);
-        var optionData = new SplitButtonData(optionSplit.splitButtonName, optionSplit.splitButtonText);
+        var gamesData = new SplitButtonData(gamesSplit.splitButtonName, UiLanguage.T(gamesSplit.splitButtonText));
+        var optionData = new SplitButtonData(optionSplit.splitButtonName, UiLanguage.T(optionSplit.splitButtonText));
 
         var stacked = panel.AddStackedItems(noteData, gamesData, optionData);
         if (stacked == null)
@@ -395,8 +396,8 @@ public class AppUI : IExternalApplication
         RegisterButtonDefinition(purgeButton.buttonName, purgeButton.buttonText, purgeButton.className, purgeButton.resourceImageName);
 
         var purgeData = CreatePushButtonData(purgeButton.buttonName, purgeButton.buttonText, assemblyPath, purgeButton.className, purgeButton.resourceImageName, purgeButton.toolTip);
-        var traductionData = new SplitButtonData(traductionSplit.splitButtonName, traductionSplit.splitButtonText);
-        var unitsData = new SplitButtonData(unitsSplit.splitButtonName, unitsSplit.splitButtonText);
+        var traductionData = new SplitButtonData(traductionSplit.splitButtonName, UiLanguage.T(traductionSplit.splitButtonText));
+        var unitsData = new SplitButtonData(unitsSplit.splitButtonName, UiLanguage.T(unitsSplit.splitButtonText));
 
         var stacked = panel.AddStackedItems(purgeData, traductionData, unitsData);
         if (stacked == null)
@@ -436,6 +437,8 @@ public class AppUI : IExternalApplication
 
     private static PushButtonData CreatePushButtonData(string buttonName, string buttonText, string assemblyPath, string className, string toolTipImageName, string toolTip)
     {
+        buttonText = UiLanguage.T(buttonText);
+        toolTip = UiLanguage.T(toolTip);
         PushButtonData buttonData = new PushButtonData(buttonName, buttonText, assemblyPath, className);
 
         // ToolTip / LongDescription (comme tu faisais)
@@ -443,7 +446,7 @@ public class AppUI : IExternalApplication
         string[] parts = tt.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
         string shortTip = parts.Length > 0 ? parts[0] : "";
         if (string.IsNullOrWhiteSpace(shortTip))
-            shortTip = $"Exécuter {buttonText}";
+            shortTip = UiLanguage.T($"Exécuter {buttonText}", $"Run {buttonText}");
         buttonData.ToolTip = shortTip;
 
         bool hasMultiLine = parts.Length > 1;
@@ -474,7 +477,7 @@ public class AppUI : IExternalApplication
        bool keepDefaultCurrentButton = true,
        string fixedDisplayText = null)
     {
-        var splitButtonData = new SplitButtonData(splitButtonName, splitButtonText);
+        var splitButtonData = new SplitButtonData(splitButtonName, UiLanguage.T(splitButtonText));
         var splitButton = panel.AddItem(splitButtonData) as SplitButton;
         ConfigureSplitButton(splitButton, assemblyPath, buttons, splitToolTip, splitToolTipImageResource, keepDefaultCurrentButton, fixedDisplayText);
     }
@@ -494,7 +497,7 @@ public class AppUI : IExternalApplication
         }
         if (!string.IsNullOrWhiteSpace(splitToolTip))
         {
-            splitButton.ToolTip = splitToolTip;
+            splitButton.ToolTip = UiLanguage.T(splitToolTip);
 
             if (!string.IsNullOrWhiteSpace(splitToolTipImageResource))
             {
@@ -547,14 +550,14 @@ public class AppUI : IExternalApplication
         if (splitButton == null || string.IsNullOrWhiteSpace(fixedDisplayText))
             return;
 
-        TrySetRibbonItemText(splitButton, fixedDisplayText);
+        TrySetRibbonItemText(splitButton, UiLanguage.T(fixedDisplayText));
 
         try
         {
             var eventInfo = splitButton.GetType().GetEvent("CurrentButtonChanged");
             if (eventInfo != null)
             {
-                EventHandler handler = (_, __) => TrySetRibbonItemText(splitButton, fixedDisplayText);
+                EventHandler handler = (_, __) => TrySetRibbonItemText(splitButton, UiLanguage.T(fixedDisplayText));
                 var del = Delegate.CreateDelegate(eventInfo.EventHandlerType, handler.Target, handler.Method);
                 eventInfo.AddEventHandler(splitButton, del);
             }

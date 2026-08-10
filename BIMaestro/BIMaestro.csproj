@@ -224,6 +224,7 @@
     <Compile Include="Controls\SimpleColorPicker.xaml.cs">
       <DependentUpon>SimpleColorPicker.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Localization\UiLanguage.cs" />
     <Compile Include="animation touche\chargement et salto\StuntSpinner.xaml.cs">
       <DependentUpon>StuntSpinner.xaml</DependentUpon>
     </Compile>

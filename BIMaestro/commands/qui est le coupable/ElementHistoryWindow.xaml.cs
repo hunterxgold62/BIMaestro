@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using BIMaestro.Localization;
 
 namespace Analyse
 {
@@ -195,6 +196,8 @@ namespace Analyse
         private int _loadVersion;
         private string _scopeFilter = "model";
         private bool _showAllLoadedEvents;
+        private static string AllActionsLabel => UiLanguage.T("Toutes", "All");
+        private static string AllUsersLabel => UiLanguage.T("Tous", "All");
 
         public ElementHistoryWindow(UIDocument uidoc, Element selected)
             : this(uidoc, selected, null, null)
@@ -219,8 +222,10 @@ namespace Analyse
 
             if (selected != null)
             {
-                HeaderText.Text = "Qui a fait ça ??";
-                HeaderSubtitleText.Text = $"BETA - Lecture visuelle des évènements liés à {selected.Name} (Id {selected.Id.GetIdValue()}).";
+                HeaderText.Text = UiLanguage.T("Qui a fait ça ??", "Who Did This?");
+                HeaderSubtitleText.Text = UiLanguage.T(
+                    $"BETA - Lecture visuelle des évènements liés à {selected.Name} (Id {selected.Id.GetIdValue()}).",
+                    $"BETA - Visual review of events related to {selected.Name} (ID {selected.Id.GetIdValue()}).");
                 if (initialEvents != null)
                     Bind(initialEvents, defaultAction);
                 else
@@ -228,8 +233,8 @@ namespace Analyse
             }
             else
             {
-                HeaderText.Text = "Qui a fait ça ??";
-                HeaderSubtitleText.Text = "BETA - Lecture visuelle des suppressions, déplacements, créations et clusters de la maquette.";
+                HeaderText.Text = UiLanguage.T("Qui a fait ça ??", "Who Did This?");
+                HeaderSubtitleText.Text = UiLanguage.T("BETA - Lecture visuelle des suppressions, déplacements, créations et clusters de la maquette.", "BETA - Visual review of deletions, moves, creations, and model clusters.");
                 if (initialEvents != null)
                     Bind(initialEvents, defaultAction);
                 else
@@ -253,7 +258,7 @@ namespace Analyse
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.T($"Impossible d’ouvrir la page d’aide : {ex.Message}", $"Unable to open the help page: {ex.Message}"), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -268,7 +273,7 @@ namespace Analyse
         {
             var version = ++_loadVersion;
             Bind(new List<ElementHistoryEvent>(), defaultAction, false, false);
-            ResultText.Text = "Chargement des évènements...";
+            ResultText.Text = UiLanguage.T("Chargement des évènements...", "Loading events...");
 
             Task.Run(() =>
             {
@@ -287,7 +292,7 @@ namespace Analyse
                     {
                         if (version != _loadVersion) return;
                         if (ResultText != null)
-                            ResultText.Text = "Historique partiellement chargé.";
+                            ResultText.Text = UiLanguage.T("Historique partiellement chargé.", "History partially loaded.");
                     }));
                 }
             });
@@ -326,7 +331,7 @@ namespace Analyse
             var modelKeys = ElementHistoryTracker.GetDocumentKeysForHistory(_doc);
             var version = ++_loadVersion;
             Bind(new List<ElementHistoryEvent>(), null, false, true);
-            ResultText.Text = "Chargement complet du " + localDate.Date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) + "...";
+            ResultText.Text = UiLanguage.T("Chargement complet du ", "Loading full history for ") + localDate.Date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) + "...";
 
             if (ScopeModelRadio != null)
                 ScopeModelRadio.IsChecked = true;
@@ -348,7 +353,7 @@ namespace Analyse
                     {
                         if (version != _loadVersion) return;
                         if (ResultText != null)
-                            ResultText.Text = "Historique du jour partiellement chargé.";
+                            ResultText.Text = UiLanguage.T("Historique du jour partiellement chargé.", "The day's history was partially loaded.");
                     }));
                 }
             });
@@ -440,15 +445,15 @@ namespace Analyse
                 : query.Take(MaxLoadedHistoryEvents).ToList();
 
             _rows = BuildRows(events);
-            ActionFilterCombo.ItemsSource = new[] { "Toutes" }.Concat(_rows.Select(x => x.ActionText).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().OrderBy(x => x)).ToList();
-            UserFilterCombo.ItemsSource = new[] { "Tous" }.Concat(_rows.Select(x => x.User).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().OrderBy(x => x)).ToList();
+            ActionFilterCombo.ItemsSource = new[] { AllActionsLabel }.Concat(_rows.Select(x => x.ActionText).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().OrderBy(x => x)).ToList();
+            UserFilterCombo.ItemsSource = new[] { AllUsersLabel }.Concat(_rows.Select(x => x.User).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().OrderBy(x => x)).ToList();
             var defaultActionText = GetDefaultActionText(defaultAction, _rows);
             if (preserveFilters && !string.IsNullOrWhiteSpace(previousAction) && ActionFilterCombo.Items.Contains(previousAction))
                 ActionFilterCombo.SelectedItem = previousAction;
             else
                 ActionFilterCombo.SelectedItem = !string.IsNullOrWhiteSpace(defaultActionText) && ActionFilterCombo.Items.Contains(defaultActionText)
                     ? defaultActionText
-                    : "Toutes";
+                    : AllActionsLabel;
 
             if (preserveFilters && !string.IsNullOrWhiteSpace(previousUser) && UserFilterCombo.Items.Contains(previousUser))
                 UserFilterCombo.SelectedItem = previousUser;
@@ -508,17 +513,17 @@ namespace Analyse
             var row = new RowVm
             {
                 ElementId = first.ElementId,
-                ElementIdText = "Cluster x" + events.Count.ToString(CultureInfo.InvariantCulture),
+                ElementIdText = UiLanguage.T("Cluster x", "Cluster x") + events.Count.ToString(CultureInfo.InvariantCulture),
                 DateText = first.Ts.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
                 Source = first,
                 Events = events,
                 Action = first.Action,
                 ActionText = GetClusterActionText(first.Action),
                 User = first.User,
-                Category = SummarizeText(events.Select(e => CleanCellText(e.Category)), "catégories"),
-                Family = SummarizeText(events.Select(e => CleanCellText(e.Family)), "familles"),
-                TypeName = SummarizeText(events.Select(e => CleanCellText(e.TypeName)), "types"),
-                PositionText = events.Count.ToString(CultureInfo.InvariantCulture) + " évènements groupés",
+                Category = SummarizeText(events.Select(e => CleanCellText(e.Category)), UiLanguage.T("catégories", "categories")),
+                Family = SummarizeText(events.Select(e => CleanCellText(e.Family)), UiLanguage.T("familles", "families")),
+                TypeName = SummarizeText(events.Select(e => CleanCellText(e.TypeName)), UiLanguage.T("types", "types")),
+                PositionText = events.Count.ToString(CultureInfo.InvariantCulture) + UiLanguage.T(" évènements groupés", " grouped events"),
                 Tx = CleanCellText(first.Tx)
             };
             EnrichVisualRow(row);
@@ -532,7 +537,7 @@ namespace Analyse
             row.AccentSoftBrush = GetActionBrush(row.Action, 0.14);
             row.ActionBadgeShort = GetActionBadgeShort(row.Action);
             row.ClusterBadgeText = row.IsCluster
-                ? row.EventCount.ToString(CultureInfo.InvariantCulture) + " éléments"
+                ? row.EventCount.ToString(CultureInfo.InvariantCulture) + UiLanguage.T(" éléments", " elements")
                 : string.Empty;
             row.ImportanceBadgeText = GetImportanceBadgeText(row);
             row.VisualInitials = BuildVisualInitials(row, events);
@@ -553,13 +558,13 @@ namespace Analyse
         private static string BuildTileTitle(RowVm row, List<ElementHistoryEvent> events)
         {
             if (row.IsCluster && string.Equals(row.Action, "move", StringComparison.OrdinalIgnoreCase))
-                return "Déplacements";
+                return UiLanguage.T("Déplacements", "Moves");
 
             var title = row.IsCluster
                 ? GetMostUsefulLabel(events)
                 : FirstNonEmpty(row.TypeName, row.Family, row.Category);
 
-            return string.IsNullOrWhiteSpace(title) ? "Elément " + row.ElementIdText : title;
+            return string.IsNullOrWhiteSpace(title) ? UiLanguage.T("Élément ", "Element ") + row.ElementIdText : title;
         }
 
         private static string BuildTileSubtitle(RowVm row, List<ElementHistoryEvent> events)
@@ -575,14 +580,14 @@ namespace Analyse
                 return parameterSummary;
 
             if (string.Equals(row.Action, "geometry_change", StringComparison.OrdinalIgnoreCase))
-                return "Forme ou dimensions modifiées";
+                return UiLanguage.T("Forme ou dimensions modifiées", "Shape or Dimensions Modified");
 
             if (row.IsCluster)
             {
                 var values = new[]
                     {
-                        SummarizeText(events.Select(e => CleanCellText(e.Category)), "catégories"),
-                        SummarizeText(events.Select(e => CleanCellText(e.Family)), "familles"),
+                        SummarizeText(events.Select(e => CleanCellText(e.Category)), UiLanguage.T("catégories", "categories")),
+                        SummarizeText(events.Select(e => CleanCellText(e.Family)), UiLanguage.T("familles", "families")),
                     }
                     .Where(x => !string.IsNullOrWhiteSpace(x))
                     .ToList();
@@ -604,40 +609,40 @@ namespace Analyse
             {
                 var count = GetParameterDeltaCount(GetRowEvents(row));
                 if (count > 1)
-                    return count.ToString(CultureInfo.InvariantCulture) + " PARAMÈTRES";
+                    return count.ToString(CultureInfo.InvariantCulture) + UiLanguage.T(" PARAMÈTRES", " PARAMETERS");
             }
 
             if (!row.IsCluster) return string.Empty;
-            if (row.EventCount >= 50) return "MASSIF";
-            if (row.EventCount >= 20) return "IMPORTANT";
+            if (row.EventCount >= 50) return UiLanguage.T("MASSIF", "MASSIVE");
+            if (row.EventCount >= 20) return UiLanguage.T("IMPORTANT", "IMPORTANT");
             return string.Empty;
         }
 
         private static string BuildStoryText(RowVm row, List<ElementHistoryEvent> events)
         {
             var count = Math.Max(1, events?.Count ?? row.EventCount);
-            var actor = string.IsNullOrWhiteSpace(row.User) ? "Un utilisateur" : row.User;
+            var actor = string.IsNullOrWhiteSpace(row.User) ? UiLanguage.T("Un utilisateur", "A user") : row.User;
             var target = GetStoryTarget(row, events, count);
 
             switch ((row.Action ?? string.Empty).Trim().ToLowerInvariant())
             {
                 case "delete":
-                    return actor + " a supprimé " + target;
+                    return UiLanguage.T(actor + " a supprimé " + target, actor + " deleted " + target);
                 case "move":
-                    return actor + " a déplacé " + target;
+                    return UiLanguage.T(actor + " a déplacé " + target, actor + " moved " + target);
                 case "create":
-                    return actor + " a créé " + target;
+                    return UiLanguage.T(actor + " a créé " + target, actor + " created " + target);
                 case "type_change":
-                    return actor + " a changé le type de " + target;
+                    return UiLanguage.T(actor + " a changé le type de " + target, actor + " changed the type of " + target);
                 case "param_change":
                     var parameterSummary = GetParameterDeltaSummary(events);
                     return string.IsNullOrWhiteSpace(parameterSummary)
-                        ? actor + " a modifié les paramètres de " + target
-                        : actor + " a modifié " + parameterSummary + " de " + target;
+                        ? UiLanguage.T(actor + " a modifié les paramètres de " + target, actor + " changed the parameters of " + target)
+                        : UiLanguage.T(actor + " a modifié " + parameterSummary + " de " + target, actor + " changed " + parameterSummary + " on " + target);
                 case "geometry_change":
-                    return actor + " a modifié la forme ou les dimensions de " + target;
+                    return UiLanguage.T(actor + " a modifié la forme ou les dimensions de " + target, actor + " changed the shape or dimensions of " + target);
                 default:
-                    return actor + " a modifié " + target;
+                    return UiLanguage.T(actor + " a modifié " + target, actor + " modified " + target);
             }
         }
 
@@ -646,13 +651,13 @@ namespace Analyse
             if (row.IsCluster)
             {
                 var label = GetMostUsefulLabel(events);
-                if (string.IsNullOrWhiteSpace(label)) label = "éléments";
+                if (string.IsNullOrWhiteSpace(label)) label = UiLanguage.T("éléments", "elements");
                 return count.ToString(CultureInfo.InvariantCulture) + " " + label;
             }
 
             var single = events?.FirstOrDefault() ?? row.Source;
             var text = FirstNonEmpty(CleanCellText(single?.TypeName), CleanCellText(single?.Family), CleanCellText(single?.Category));
-            return string.IsNullOrWhiteSpace(text) ? "l'élément " + row.ElementIdText : text;
+            return string.IsNullOrWhiteSpace(text) ? UiLanguage.T("l'élément ", "element ") + row.ElementIdText : text;
         }
 
         private static string BuildVisualSubtitle(RowVm row, List<ElementHistoryEvent> events)
@@ -662,7 +667,7 @@ namespace Analyse
                 var categories = CountDistinct(events.Select(e => CleanCellText(e.Category)));
                 var families = CountDistinct(events.Select(e => CleanCellText(e.Family)));
                 var types = CountDistinct(events.Select(e => CleanCellText(e.TypeName)));
-                return categories + " catégories · " + families + " familles · " + types + " types";
+                return categories + UiLanguage.T(" catégories · ", " categories · ") + families + UiLanguage.T(" familles · ", " families · ") + types + " types";
             }
 
             return string.Join(" · ", new[]
@@ -677,7 +682,7 @@ namespace Analyse
         private static string BuildEvidenceText(RowVm row)
         {
             var tx = CleanCellText(row.Tx);
-            if (string.IsNullOrWhiteSpace(tx)) tx = "Transaction non renseignée";
+            if (string.IsNullOrWhiteSpace(tx)) tx = UiLanguage.T("Transaction non renseignée", "Transaction Not Specified");
             return row.DateText + " · " + tx;
         }
 
@@ -687,9 +692,9 @@ namespace Analyse
             var today = DateTime.Today;
             var date = local.Date;
 
-            if (date == today) return "Aujourd'hui";
-            if (date == today.AddDays(-1)) return "Hier";
-            if (date >= today.AddDays(-7)) return "Cette semaine";
+            if (date == today) return UiLanguage.T("Aujourd'hui", "Today");
+            if (date == today.AddDays(-1)) return UiLanguage.T("Hier", "Yesterday");
+            if (date >= today.AddDays(-7)) return UiLanguage.T("Cette semaine", "This Week");
             if (date.Year == today.Year) return local.ToString("MMMM", CultureInfo.CurrentCulture);
             return local.ToString("yyyy", CultureInfo.InvariantCulture);
         }
@@ -702,7 +707,7 @@ namespace Analyse
                 .Select(e => new MiniEventVm
                 {
                     Label = "Id " + e.ElementId.ToString(CultureInfo.InvariantCulture),
-                    Detail = FirstNonEmpty(CleanCellText(e.TypeName), CleanCellText(e.Family), CleanCellText(e.Category), "Elément")
+                    Detail = FirstNonEmpty(CleanCellText(e.TypeName), CleanCellText(e.Family), CleanCellText(e.Category), UiLanguage.T("Élément", "Element"))
                 })
                 .ToList();
         }
@@ -729,7 +734,7 @@ namespace Analyse
             var preview = distinct.Take(3).ToList();
             var extra = distinct.Count - preview.Count;
             return distinct.Count.ToString(CultureInfo.InvariantCulture) +
-                   " paramètres modifiés: " +
+                   UiLanguage.T(" paramètres modifiés : ", " modified parameters: ") +
                    string.Join(", ", preview) +
                    (extra > 0 ? " +" + extra.ToString(CultureInfo.InvariantCulture) : string.Empty);
         }
@@ -774,27 +779,27 @@ namespace Analyse
             if (action == "type_change")
             {
                 var summary = GetTypeChangeSummary(new[] { ev });
-                return string.IsNullOrWhiteSpace(summary) ? string.Empty : "Avant / après: " + summary;
+                return string.IsNullOrWhiteSpace(summary) ? string.Empty : UiLanguage.T("Avant / après : ", "Before / After: ") + summary;
             }
 
             if (action == "param_change")
             {
                 var summary = GetParameterBeforeAfterSummary(ev);
-                return string.IsNullOrWhiteSpace(summary) ? string.Empty : "Avant / après: " + summary;
+                return string.IsNullOrWhiteSpace(summary) ? string.Empty : UiLanguage.T("Avant / après : ", "Before / After: ") + summary;
             }
 
             if (action == "move" && ev.Delta != null && ev.Delta.TryGetValue("new", out var newPos) && ev.Delta.TryGetValue("old", out var oldPos))
             {
                 var moveSummary = GetMoveDeltaSummary(ev);
                 return string.IsNullOrWhiteSpace(moveSummary)
-                    ? "Avant / après: " + CompactPoint(oldPos) + " -> " + CompactPoint(newPos)
-                    : "Avant / après: " + moveSummary;
+                    ? UiLanguage.T("Avant / après : ", "Before / After: ") + CompactPoint(oldPos) + " -> " + CompactPoint(newPos)
+                    : UiLanguage.T("Avant / après : ", "Before / After: ") + moveSummary;
             }
 
             if (action == "geometry_change")
             {
                 var summary = GetGeometrySizeSummary(ev);
-                return string.IsNullOrWhiteSpace(summary) ? "Forme / dimensions modifiées" : "Avant / après: " + summary;
+                return string.IsNullOrWhiteSpace(summary) ? UiLanguage.T("Forme / dimensions modifiées", "Shape / Dimensions Modified") : UiLanguage.T("Avant / après : ", "Before / After: ") + summary;
             }
 
             return string.Empty;
@@ -815,7 +820,7 @@ namespace Analyse
             AddSizeChange(parts, "Y", oldY, newY);
             AddSizeChange(parts, "Z", oldZ, newZ);
 
-            return parts.Count == 0 ? "Forme modifiée sans variation de taille lisible" : "Dimensions " + string.Join(", ", parts);
+            return parts.Count == 0 ? UiLanguage.T("Forme modifiée sans variation de taille lisible", "Shape modified with no readable size variation") : UiLanguage.T("Dimensions ", "Dimensions ") + string.Join(", ", parts);
         }
 
         private static string GetMoveDeltaSummary(ElementHistoryEvent ev)
@@ -825,7 +830,7 @@ namespace Analyse
             AddMoveAxis(parts, "X", ReadDeltaDouble(ev.Delta, "dx"));
             AddMoveAxis(parts, "Y", ReadDeltaDouble(ev.Delta, "dy"));
             AddMoveAxis(parts, "Z", ReadDeltaDouble(ev.Delta, "dz"));
-            return parts.Count == 0 ? string.Empty : "Déplacement " + string.Join(", ", parts);
+            return parts.Count == 0 ? string.Empty : UiLanguage.T("Déplacement ", "Move ") + string.Join(", ", parts);
         }
 
         private static void AddMoveAxis(List<string> parts, string label, double? feet)
@@ -1278,13 +1283,13 @@ namespace Analyse
             if (string.IsNullOrWhiteSpace(action)) return string.Empty;
             switch (action.Trim().ToLowerInvariant())
             {
-                case "delete": return "Suppression";
-                case "move": return "Déplacement";
-                case "create": return "Création";
-                case "type_change": return "Changement de type";
-                case "param_change": return "Modification paramètres";
-                case "geometry_change": return "Forme / dimensions";
-                case "modify": return "Modification";
+                case "delete": return UiLanguage.T("Suppression", "Deletion");
+                case "move": return UiLanguage.T("Déplacement", "Move");
+                case "create": return UiLanguage.T("Création", "Creation");
+                case "type_change": return UiLanguage.T("Changement de type", "Type Change");
+                case "param_change": return UiLanguage.T("Modification paramètres", "Parameter Changes");
+                case "geometry_change": return UiLanguage.T("Forme / dimensions", "Shape / Dimensions");
+                case "modify": return UiLanguage.T("Modification", "Modification");
                 default: return action.Trim();
             }
         }
@@ -1294,9 +1299,9 @@ namespace Analyse
             if (string.IsNullOrWhiteSpace(action)) return string.Empty;
             switch (action.Trim().ToLowerInvariant())
             {
-                case "move": return "Déplacements";
-                case "delete": return "Suppressions";
-                case "create": return "Créations";
+                case "move": return UiLanguage.T("Déplacements", "Moves");
+                case "delete": return UiLanguage.T("Suppressions", "Deletions");
+                case "create": return UiLanguage.T("Créations", "Creations");
                 default: return GetActionText(action);
             }
         }
@@ -1360,7 +1365,7 @@ namespace Analyse
             if (VisualizeDeletedButton != null)
             {
                 VisualizeDeletedButton.IsEnabled = hasRow;
-                VisualizeDeletedButton.Content = hasRow ? GetPrimaryActionText(row) : "Visualiser";
+                VisualizeDeletedButton.Content = hasRow ? GetPrimaryActionText(row) : UiLanguage.T("Visualiser", "Visualize");
             }
 
             if (FocusButton != null)
@@ -1374,17 +1379,19 @@ namespace Analyse
         private static string GetPrimaryActionText(RowVm row)
         {
             if (row == null || row.Source == null)
-                return "Visualiser";
+                return UiLanguage.T("Visualiser", "Visualize");
 
             if (row.IsCluster)
-                return GetRowEvents(row).Any(CanVisualize) ? "Visualiser cluster" : "Focus cluster";
+                return GetRowEvents(row).Any(CanVisualize)
+                    ? UiLanguage.T("Visualiser cluster", "Visualize Cluster")
+                    : UiLanguage.T("Focus cluster", "Focus Cluster");
 
             if (string.Equals(row.Source.Action, "delete", StringComparison.OrdinalIgnoreCase))
-                return "Visualiser suppression";
+                return UiLanguage.T("Visualiser suppression", "Visualize Deletion");
             if (HasMoveDelta(row.Source))
-                return "Visualiser déplacement";
+                return UiLanguage.T("Visualiser déplacement", "Visualize Move");
 
-            return "Focus élément";
+            return UiLanguage.T("Focus élément", "Focus Element");
         }
 
         private void UpdateRestoreButtonLabel(RowVm row)
@@ -1475,31 +1482,31 @@ namespace Analyse
         {
             var row = GetMenuRow(sender);
             var family = GetSingleDistinctValue(row, x => x.Family);
-            ApplyQuickFilter("Toutes", "Tous", family);
+            ApplyQuickFilter(AllActionsLabel, AllUsersLabel, family);
         }
 
         private void QuickFilterType_Click(object sender, RoutedEventArgs e)
         {
             var row = GetMenuRow(sender);
             var type = GetSingleDistinctValue(row, x => x.TypeName);
-            ApplyQuickFilter("Toutes", "Tous", type);
+            ApplyQuickFilter(AllActionsLabel, AllUsersLabel, type);
         }
 
         private void QuickFilterUser_Click(object sender, RoutedEventArgs e)
         {
             var row = GetMenuRow(sender);
-            ApplyQuickFilter("Toutes", FirstNonEmpty(row?.User, "Tous"), string.Empty);
+            ApplyQuickFilter(AllActionsLabel, FirstNonEmpty(row?.User, AllUsersLabel), string.Empty);
         }
 
         private void QuickFilterAction_Click(object sender, RoutedEventArgs e)
         {
             var row = GetMenuRow(sender);
-            ApplyQuickFilter(FirstNonEmpty(row?.ActionText, "Toutes"), "Tous", string.Empty);
+            ApplyQuickFilter(FirstNonEmpty(row?.ActionText, AllActionsLabel), AllUsersLabel, string.Empty);
         }
 
         private void QuickFilterReset_Click(object sender, RoutedEventArgs e)
         {
-            ApplyQuickFilter("Toutes", "Tous", string.Empty);
+            ApplyQuickFilter(AllActionsLabel, AllUsersLabel, string.Empty);
         }
 
         private static RowVm GetMenuRow(object sender)
@@ -1525,13 +1532,13 @@ namespace Analyse
         {
             if (ActionFilterCombo?.Items.Contains(action) == true)
                 ActionFilterCombo.SelectedItem = action;
-            else if (ActionFilterCombo?.Items.Contains("Toutes") == true)
-                ActionFilterCombo.SelectedItem = "Toutes";
+            else if (ActionFilterCombo?.Items.Contains(AllActionsLabel) == true)
+                ActionFilterCombo.SelectedItem = AllActionsLabel;
 
             if (UserFilterCombo?.Items.Contains(user) == true)
                 UserFilterCombo.SelectedItem = user;
-            else if (UserFilterCombo?.Items.Contains("Tous") == true)
-                UserFilterCombo.SelectedItem = "Tous";
+            else if (UserFilterCombo?.Items.Contains(AllUsersLabel) == true)
+                UserFilterCombo.SelectedItem = AllUsersLabel;
 
             if (SearchBox != null)
                 SearchBox.Text = search ?? string.Empty;
@@ -1543,16 +1550,16 @@ namespace Analyse
         {
             if (!AreFilterControlsReady()) return;
 
-            var action = ActionFilterCombo?.SelectedItem as string ?? "Toutes";
-            var user = UserFilterCombo?.SelectedItem as string ?? "Tous";
+            var action = ActionFilterCombo?.SelectedItem as string ?? AllActionsLabel;
+            var user = UserFilterCombo?.SelectedItem as string ?? AllUsersLabel;
             var q = (SearchBox?.Text ?? string.Empty).Trim();
 
             IEnumerable<RowVm> rows = _rows;
             rows = rows.Where(MatchesScope);
 
-            if (!string.Equals(action, "Toutes", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(action, AllActionsLabel, StringComparison.OrdinalIgnoreCase))
                 rows = rows.Where(r => string.Equals(r.ActionText, action, StringComparison.OrdinalIgnoreCase));
-            if (!string.Equals(user, "Tous", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(user, AllUsersLabel, StringComparison.OrdinalIgnoreCase))
                 rows = rows.Where(r => string.Equals(r.User, user, StringComparison.OrdinalIgnoreCase));
             if (!string.IsNullOrWhiteSpace(q))
             {
@@ -1679,8 +1686,8 @@ namespace Analyse
             {
                 var total = _rows.SelectMany(GetRowEvents).Count();
                 ResultText.Text = events.Count == total
-                    ? total.ToString(CultureInfo.InvariantCulture) + " évènements affichés"
-                    : events.Count.ToString(CultureInfo.InvariantCulture) + " / " + total.ToString(CultureInfo.InvariantCulture) + " évènements affichés";
+                    ? total.ToString(CultureInfo.InvariantCulture) + UiLanguage.T(" évènements affichés", " events displayed")
+                    : events.Count.ToString(CultureInfo.InvariantCulture) + " / " + total.ToString(CultureInfo.InvariantCulture) + UiLanguage.T(" évènements affichés", " events displayed");
             }
         }
 
@@ -1699,7 +1706,9 @@ namespace Analyse
             _detailsVisible = !_detailsVisible;
             UpdateDetailsLayout();
             if (DetailsButton != null)
-                DetailsButton.Content = _detailsVisible ? "Masquer détails" : "Détails";
+                DetailsButton.Content = _detailsVisible
+                    ? UiLanguage.T("Masquer détails", "Hide Details")
+                    : UiLanguage.T("Détails", "Details");
             UpdateDetails();
         }
 
@@ -1746,8 +1755,8 @@ namespace Analyse
             if (!CanRestoreParameters(row?.Source)) return;
 
             var confirm = MessageBox.Show(
-                "Restaurer les anciennes valeurs de paramètres pour cet évènement ?",
-                "BIMaestro - Qui a fait ça ?",
+                UiLanguage.T("Restaurer les anciennes valeurs de paramètres pour cet évènement ?", "Restore the previous parameter values for this event?"),
+                UiLanguage.T("BIMaestro - Qui a fait ça ?", "BIMaestro - Who Did This?"),
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
             if (confirm != MessageBoxResult.Yes) return;
@@ -1811,7 +1820,7 @@ namespace Analyse
         {
             _detailsVisible = true;
             if (DetailsButton != null)
-                DetailsButton.Content = "Masquer détails";
+                DetailsButton.Content = UiLanguage.T("Masquer détails", "Hide Details");
 
             UpdateDetailsLayout();
             UpdateDetails();
@@ -1970,7 +1979,7 @@ namespace Analyse
             var row = GetPrimarySelectedRow();
             if (row == null || row.Source == null)
             {
-                DetailsText.Text = "Sélectionne une ligne pour afficher ses détails.";
+                DetailsText.Text = UiLanguage.T("Sélectionne une ligne pour afficher ses détails.", "Select a row to display its details.");
                 SetClusterDetails(null);
                 return;
             }
@@ -1979,17 +1988,17 @@ namespace Analyse
             if (row.IsCluster)
             {
                 DetailsText.Text =
-                    $"Résumé: {BuildClusterSummary(row.Events)}\n\n" +
-                    $"Cluster: {row.EventCount} évènements\n" +
-                    $"Action: {row.ActionText}\n" +
-                    $"Utilisateur: {row.User}\n" +
+                    UiLanguage.T("Résumé : ", "Summary: ") + BuildClusterSummary(row.Events) + "\n\n" +
+                    $"Cluster: {row.EventCount}" + UiLanguage.T(" évènements\n", " events\n") +
+                    UiLanguage.T("Action : ", "Action: ") + row.ActionText + "\n" +
+                    UiLanguage.T("Utilisateur : ", "User: ") + row.User + "\n" +
                     $"Date UTC: {ev.Ts:O}\n" +
-                    $"Projet: {ev.Project}\n" +
-                    $"Maquette: {ev.ModelKey}\n" +
-                    $"Catégorie: {row.Category}\n" +
-                    $"Famille: {row.Family}\n" +
-                    $"Type: {row.TypeName}\n" +
-                    $"Transaction: {row.Tx}";
+                    UiLanguage.T("Projet : ", "Project: ") + ev.Project + "\n" +
+                    UiLanguage.T("Maquette : ", "Model: ") + ev.ModelKey + "\n" +
+                    UiLanguage.T("Catégorie : ", "Category: ") + row.Category + "\n" +
+                    UiLanguage.T("Famille : ", "Family: ") + row.Family + "\n" +
+                    UiLanguage.T("Type : ", "Type: ") + row.TypeName + "\n" +
+                    UiLanguage.T("Transaction : ", "Transaction: ") + row.Tx;
                 SetClusterDetails(row.Events);
                 return;
             }
@@ -2000,20 +2009,20 @@ namespace Analyse
             DetailsText.Text =
                 $"Id: {ev.ElementId}\n" +
                 $"UniqueId: {ev.UniqueId}\n" +
-                $"Action: {GetActionText(ev.Action)}\n" +
-                $"Utilisateur: {ev.User}\n" +
+                UiLanguage.T("Action : ", "Action: ") + GetActionText(ev.Action) + "\n" +
+                UiLanguage.T("Utilisateur : ", "User: ") + ev.User + "\n" +
                 $"Date UTC: {ev.Ts:O}\n" +
-                $"Projet: {ev.Project}\n" +
-                $"Maquette: {ev.ModelKey}\n" +
-                $"Catégorie: {ev.Category}\n" +
-                $"Famille: {ev.Family}\n" +
-                $"Type: {ev.TypeName}\n" +
-                $"Transaction: {ev.Tx}\n" +
+                UiLanguage.T("Projet : ", "Project: ") + ev.Project + "\n" +
+                UiLanguage.T("Maquette : ", "Model: ") + ev.ModelKey + "\n" +
+                UiLanguage.T("Catégorie : ", "Category: ") + ev.Category + "\n" +
+                UiLanguage.T("Famille : ", "Family: ") + ev.Family + "\n" +
+                UiLanguage.T("Type : ", "Type: ") + ev.TypeName + "\n" +
+                UiLanguage.T("Transaction : ", "Transaction: ") + ev.Tx + "\n" +
                 (string.IsNullOrWhiteSpace(readableDeltaBlock)
                     ? (string.IsNullOrWhiteSpace(readableDelta) ? string.Empty : readableDelta + "\n")
                     : readableDeltaBlock + "\n") +
                 "\n" +
-                "Delta:\n" +
+                UiLanguage.T("Delta :\n", "Delta:\n") +
                 (ev.Delta == null ? "-" : JsonConvert.SerializeObject(ev.Delta, Formatting.Indented));
         }
 
@@ -2026,7 +2035,7 @@ namespace Analyse
             {
                 var lines = ReadParameterChangeLines(raw).Take(12).ToList();
                 if (lines.Count > 0)
-                    return "Avant / après:\n" + string.Join("\n", lines.Select(x => "- " + x));
+                    return UiLanguage.T("Avant / après :\n", "Before / After:\n") + string.Join("\n", lines.Select(x => "- " + x));
             }
 
             var summary = GetReadableDeltaSummary(ev);
@@ -2050,13 +2059,13 @@ namespace Analyse
                 .ThenBy(e => e.ElementId)
                 .Select(e =>
                 {
-                    var family = FirstNonEmpty(CleanCellText(e.Family), CleanCellText(e.Category), "Sans famille");
+                    var family = FirstNonEmpty(CleanCellText(e.Family), CleanCellText(e.Category), UiLanguage.T("Sans famille", "No Family"));
                     return new ClusterItemVm
                     {
                         Source = e,
                         FamilyGroup = family,
                         Display = "Id " + e.ElementId.ToString(CultureInfo.InvariantCulture) +
-                                  " | " + FirstNonEmpty(CleanCellText(e.TypeName), CleanCellText(e.Category), "Elément")
+                                  " | " + FirstNonEmpty(CleanCellText(e.TypeName), CleanCellText(e.Category), UiLanguage.T("Élément", "Element"))
                     };
                 })
                 .ToList();
@@ -2074,13 +2083,13 @@ namespace Analyse
         {
             events = events ?? new List<ElementHistoryEvent>();
             var action = GetActionText(events.FirstOrDefault()?.Action);
-            if (string.IsNullOrWhiteSpace(action)) action = "évènements";
+            if (string.IsNullOrWhiteSpace(action)) action = UiLanguage.T("évènements", "events");
 
             var families = CountDistinct(events.Select(e => CleanCellText(e.Family)));
             var types = CountDistinct(events.Select(e => CleanCellText(e.TypeName)));
 
             return events.Count.ToString(CultureInfo.InvariantCulture) + " " + action.ToLowerInvariant() +
-                   " · " + families.ToString(CultureInfo.InvariantCulture) + " familles" +
+                   " · " + families.ToString(CultureInfo.InvariantCulture) + UiLanguage.T(" familles", " families") +
                    " · " + types.ToString(CultureInfo.InvariantCulture) + " types";
         }
 
@@ -2392,9 +2401,9 @@ namespace Analyse
             if (result == null) return;
             MessageBox.Show(
                 result.Applied > 0
-                    ? $"{result.Applied} valeur(s) restaurée(s)." + (result.Failed > 0 ? $"\n{result.Failed} valeur(s) n'ont pas pu être restaurée(s)." : "")
-                    : "Aucune valeur n'a pu être restaurée.",
-                "BIMaestro - Qui a fait ça ?",
+                    ? UiLanguage.T($"{result.Applied} valeur(s) restaurée(s).", $"{result.Applied} value(s) restored.") + (result.Failed > 0 ? UiLanguage.T($"\n{result.Failed} valeur(s) n'ont pas pu être restaurée(s).", $"\n{result.Failed} value(s) could not be restored.") : "")
+                    : UiLanguage.T("Aucune valeur n'a pu être restaurée.", "No value could be restored."),
+                UiLanguage.T("BIMaestro - Qui a fait ça ?", "BIMaestro - Who Did This?"),
                 MessageBoxButton.OK,
                 result.Applied > 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
         }

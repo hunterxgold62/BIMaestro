@@ -15,6 +15,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using Color = System.Windows.Media.Color;
+using BIMaestro.Localization;
 
 namespace Modification
 {
@@ -109,6 +110,12 @@ namespace Modification
         {
             ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
+            LocalizeStableComboBoxItems(
+                comboPipeSource,
+                cbConfigSupport,
+                cbConfigShape,
+                cbConfigHosting,
+                cbVerticalReference);
 
             _doc = doc;
             Config = cfg ?? new ReservationAutoV3Config();
@@ -182,16 +189,18 @@ namespace Modification
             }
 
             int ready = profiles.Count(x => IsReady(x.Profile, x.Unhosted));
-            txtConfigProgress.Text = $"{ready} configuration{(ready > 1 ? "s" : "")} prête{(ready > 1 ? "s" : "")} sur 8";
+            txtConfigProgress.Text = UiLanguage.T(
+                $"{ready} configuration{(ready > 1 ? "s" : "")} prête{(ready > 1 ? "s" : "")} sur 8",
+                $"{ready} configuration{(ready == 1 ? "" : "s")} ready out of 8");
 
             ProfileConfig selected = GetSelectedTargetProfileConfig();
             if (selected == null || !selected.IsConfigured)
             {
-                txtSelectedConfigStatus.Text = "Aucune famille utilisateur configurée pour ce cas.";
+                txtSelectedConfigStatus.Text = UiLanguage.T("Aucune famille utilisateur configurée pour ce cas.", "No Custom Family Configured for This Case.");
             }
             else if (!loadedSymbols.Any(s => string.Equals(s.Family.Name, selected.FamilyName, StringComparison.OrdinalIgnoreCase)))
             {
-                txtSelectedConfigStatus.Text = $"Configurée mais non chargée dans ce projet : {selected.FamilyName}";
+                txtSelectedConfigStatus.Text = UiLanguage.T("Configurée mais non chargée dans ce projet : ", "Configured but Not Loaded in This Project: ") + selected.FamilyName;
             }
             else if (!IsReady(selected, SelectedConfigUnhosted))
             {
@@ -1012,7 +1021,7 @@ namespace Modification
             var dlg = new OpenFileDialog
             {
                 Filter = "Famille Revit (*.rfa)|*.rfa",
-                Title = "Sélectionner une famille de réservation (.rfa)"
+                Title = UiLanguage.T("Sélectionner une famille de réservation (.rfa)", "Select an opening family (.rfa)")
             };
 
             if (!string.IsNullOrWhiteSpace(tbRfaPath.Text))
@@ -1038,7 +1047,7 @@ namespace Modification
             var dlg = new OpenFileDialog
             {
                 Filter = "Script Dynamo (*.dyn)|*.dyn",
-                Title = "Sélectionner le script Dynamo"
+                Title = UiLanguage.T("Sélectionner le script Dynamo", "Select the Dynamo script")
             };
 
             string currentPath = tbDynamoPath?.Text?.Trim();
@@ -1064,7 +1073,7 @@ namespace Modification
             string path = tbRfaPath.Text?.Trim();
             if (string.IsNullOrWhiteSpace(path) || !System.IO.File.Exists(path))
             {
-                MessageBox.Show("Sélectionne un fichier .RFA valide.", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.T("Sélectionne un fichier .RFA valide.", "Select a valid .RFA file."), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -1077,7 +1086,7 @@ namespace Modification
                     if (!_doc.LoadFamily(path, new NoPromptFamilyLoadOptions(), out var fam))
                     {
                         t.RollBack();
-                        MessageBox.Show("Impossible de charger la famille (LoadFamily a échoué).", "BIMaestro",
+                        MessageBox.Show(UiLanguage.T("Impossible de charger la famille (LoadFamily a échoué).", "Unable to load the family (LoadFamily failed)."), "BIMaestro",
                             MessageBoxButton.OK, MessageBoxImage.Error);
                         return;
                     }
@@ -1096,20 +1105,24 @@ namespace Modification
 
                     if (preferred == null)
                     {
-                        string expected = SelectedConfigUnhosted ? "sans hôte, basée sur un niveau" : "hébergée par un niveau";
-                        MessageBox.Show($"La famille est chargée, mais aucun de ses types n'est compatible avec le mode {expected}.",
+                        string expected = SelectedConfigUnhosted
+                            ? UiLanguage.T("sans hôte, basée sur un niveau", "unhosted and level-based")
+                            : UiLanguage.T("hébergée par un niveau", "level-hosted");
+                        MessageBox.Show(UiLanguage.T(
+                                $"La famille est chargée, mais aucun de ses types n'est compatible avec le mode {expected}.",
+                                $"The family is loaded, but none of its types is compatible with {expected} mode."),
                             "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
                     }
                     else
                     {
-                        MessageBox.Show("Famille chargée. Vérifie les paramètres puis applique la configuration.",
+                        MessageBox.Show(UiLanguage.T("Famille chargée. Vérifie les paramètres puis applique la configuration.", "Family loaded. Check the parameters, then apply the configuration."),
                             "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Erreur chargement famille : " + ex.Message, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(UiLanguage.T("Erreur chargement famille : ", "Family loading error: ") + ex.Message, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -1507,7 +1520,7 @@ namespace Modification
 
             if (sym == null)
             {
-                MessageBox.Show("Choisis une famille compatible chargée dans le projet.", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.T("Choisis une famille compatible chargée dans le projet.", "Choose a compatible family loaded in the project."), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -1552,18 +1565,18 @@ namespace Modification
             {
                 if (!ReservationAutoV3PersoConfigStore.Save(_persoConfig, out var persoErr))
                 {
-                    MessageBox.Show("Famille configurée mais erreur de sauvegarde : " + persoErr, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show(UiLanguage.T("Famille configurée mais erreur de sauvegarde : ", "Family configured, but saving failed: ") + persoErr, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
                 RefreshProfilesSummary();
                 RefreshShapeOptions();
                 RefreshVerticalPlacementUiFromCurrentProfile();
-                MessageBox.Show("Famille utilisateur configurée et sauvegardée.", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(UiLanguage.T("Famille utilisateur configurée et sauvegardée.", "User family configured and saved."), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             else
             {
-                MessageBox.Show("Erreur sauvegarde : " + err, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(UiLanguage.T("Erreur sauvegarde : ", "Save error: ") + err, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -1578,25 +1591,25 @@ namespace Modification
 
             if (!ReservationAutoV3ConfigStore.Save(Config, out var err))
             {
-                MessageBox.Show("Erreur sauvegarde : " + err, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(UiLanguage.T("Erreur sauvegarde : ", "Save error: ") + err, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
             if (!ReservationAutoV3PersoConfigStore.Save(_persoConfig, out var persoErr))
             {
-                MessageBox.Show("Erreur sauvegarde familles : " + persoErr, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(UiLanguage.T("Erreur sauvegarde familles : ", "Family settings save error: ") + persoErr, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
             RefreshProfilesSummary();
-            MessageBox.Show("Configuration sauvegardée.", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(UiLanguage.T("Configuration sauvegardée.", "Configuration saved."), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void OnOk(object sender, RoutedEventArgs e)
         {
             if (!comboShape.IsEnabled || !_shapeOptionByLabel.Any())
             {
-                MessageBox.Show("Aucune famille de réservation disponible pour le support sélectionné.", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.T("Aucune famille de réservation disponible pour le support sélectionné.", "No opening family is available for the selected host."), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -1619,11 +1632,10 @@ namespace Modification
                 _ => ObjectType.Autre
             };
 
-            var src = (comboPipeSource.SelectedItem as ComboBoxItem)?.Content as string ?? "Maquette";
-            SelectedPipeSource = src switch
+            SelectedPipeSource = comboPipeSource.SelectedIndex switch
             {
-                "Lien IFC" => PipeSource.LienIFC,
-                "Lien RVT" => PipeSource.LienRVT,
+                1 => PipeSource.LienIFC,
+                2 => PipeSource.LienRVT,
                 _ => PipeSource.Maquette
             };
 
@@ -1637,10 +1649,14 @@ namespace Modification
             if (DoubleLinkEnabled && !selectedProfileIsUnhosted)
             {
                 MessageBox.Show(
-                    "Le mode Double lien nécessite une famille sans hôte.\n\n" +
-                    "Le mur ou le sol appartient à une maquette liée et ne peut pas héberger une famille créée dans votre projet.\n\n" +
-                    "Choisissez une option « Ma famille sans hôte » ou « BIMaestro sans hôte » dans la liste Forme.",
-                    "Famille sans hôte requise",
+                    UiLanguage.T(
+                        "Le mode Double lien nécessite une famille sans hôte.\n\n" +
+                        "Le mur ou le sol appartient à une maquette liée et ne peut pas héberger une famille créée dans votre projet.\n\n" +
+                        "Choisissez une option « Ma famille sans hôte » ou « BIMaestro sans hôte » dans la liste Forme.",
+                        "Two Linked Models mode requires an unhosted family.\n\n" +
+                        "The wall or floor belongs to a linked model and cannot host a family created in your project.\n\n" +
+                        "Choose a 'My unhosted family' or 'BIMaestro unhosted' option in the Shape list."),
+                    UiLanguage.T("Famille sans hôte requise", "Unhosted Family Required"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
                 return;
@@ -1650,19 +1666,25 @@ namespace Modification
                                  || SelectedPipeSource == PipeSource.LienRVT;
             if (usesModelLink && !DoubleLinkEnabled)
             {
-                string selectedMode = selectedProfileIsUnhosted ? "SANS HÔTE" : "AVEC HÔTE";
+                string selectedMode = selectedProfileIsUnhosted
+                    ? UiLanguage.T("SANS HÔTE", "UNHOSTED")
+                    : UiLanguage.T("AVEC HÔTE", "HOSTED");
                 string suitableDirection = selectedProfileIsUnhosted
-                    ? "réseau de votre maquette → mur ou sol lié"
-                    : "réseau lié → mur ou sol de votre maquette";
+                    ? UiLanguage.T("réseau de votre maquette → mur ou sol lié", "network in your model → linked wall or floor")
+                    : UiLanguage.T("réseau lié → mur ou sol de votre maquette", "linked network → wall or floor in your model");
                 string otherDirection = selectedProfileIsUnhosted
-                    ? "Pour un réseau lié vers un support de votre maquette, choisissez une famille avec hôte."
-                    : "Pour un réseau de votre maquette vers un support lié, choisissez une famille sans hôte.";
+                    ? UiLanguage.T("Pour un réseau lié vers un support de votre maquette, choisissez une famille avec hôte.", "For a linked network crossing a host in your model, choose a hosted family.")
+                    : UiLanguage.T("Pour un réseau de votre maquette vers un support lié, choisissez une famille sans hôte.", "For a network in your model crossing a linked host, choose an unhosted family.");
 
                 var answer = MessageBox.Show(
-                    $"La famille sélectionnée est {selectedMode}.\n\n" +
-                    $"Elle convient au cas :\n{suitableDirection}.\n\n" +
-                    $"{otherDirection}\n\nContinuer avec cette famille ?",
-                    "Vérification du lien",
+                    UiLanguage.T(
+                        $"La famille sélectionnée est {selectedMode}.\n\n" +
+                        $"Elle convient au cas :\n{suitableDirection}.\n\n" +
+                        $"{otherDirection}\n\nContinuer avec cette famille ?",
+                        $"The selected family is {selectedMode}.\n\n" +
+                        $"It is suitable for:\n{suitableDirection}.\n\n" +
+                        $"{otherDirection}\n\nContinue with this family?"),
+                    UiLanguage.T("Vérification du lien", "Link Check"),
                     MessageBoxButton.OKCancel,
                     MessageBoxImage.Information,
                     MessageBoxResult.Cancel);
@@ -1693,6 +1715,21 @@ namespace Modification
             Close();
         }
 
+        private static void LocalizeStableComboBoxItems(params ComboBox[] comboBoxes)
+        {
+            if (!UiLanguage.IsEnglish || comboBoxes == null) return;
+
+            foreach (ComboBox comboBox in comboBoxes)
+            {
+                if (comboBox == null) continue;
+                foreach (object item in comboBox.Items)
+                {
+                    if (item is ComboBoxItem comboBoxItem && comboBoxItem.Content is string text)
+                        comboBoxItem.Content = UiLanguage.T(text);
+                }
+            }
+        }
+
         private void HelpButton_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -1701,7 +1738,9 @@ namespace Modification
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Impossible d'ouvrir l'aide en ligne : {ex.Message}", "Aide", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(
+                    UiLanguage.T($"Impossible d'ouvrir l'aide en ligne : {ex.Message}", $"Unable to open online help: {ex.Message}"),
+                    UiLanguage.T("Aide", "Help"), MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
         private class NoPromptFamilyLoadOptions : IFamilyLoadOptions

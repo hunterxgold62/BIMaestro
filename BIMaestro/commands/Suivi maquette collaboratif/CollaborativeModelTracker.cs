@@ -3,6 +3,7 @@ using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Licensing;
 using System.Windows.Interop;
+using BIMaestro.Localization;
 
 namespace Analyse
 {
@@ -17,7 +18,7 @@ namespace Analyse
             var uidoc = uiapp.ActiveUIDocument;
             if (uidoc == null || uidoc.Document == null)
             {
-                TaskDialog.Show("Suivi maquette", "Aucun document actif.");
+                TaskDialog.Show(UiLanguage.T("Suivi maquette", "Model Tracking"), UiLanguage.T("Aucun document actif.", "No active document."));
                 return Result.Cancelled;
             }
 

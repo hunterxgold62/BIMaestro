@@ -8,6 +8,7 @@ using System.Windows.Interop;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 
 namespace Modification
 {
@@ -49,7 +50,7 @@ namespace Modification
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.T("Impossible d’ouvrir la page d’aide : ", "Unable to Open the Help Page: ") + ex.Message, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -128,7 +129,7 @@ namespace Modification
 
             if (symbols.Count == 0)
             {
-                TaskDialog.Show("Choisir une bride", "Aucun type de bride trouvé dans ce projet.");
+                TaskDialog.Show(UiLanguage.T("Choisir une bride", "Choose a Flange"), UiLanguage.T("Aucun type de bride trouvé dans ce projet.", "No Flange Type Found in This Project."));
                 return Result.Cancelled;
             }
 
@@ -145,9 +146,9 @@ namespace Modification
             FlangeChoiceCache.FamilyName = chosen.FamilyName;
             FlangeChoiceCache.SymbolName = chosen.Name;
 
-            TaskDialog.Show("Bride sélectionnée (session)",
+            TaskDialog.Show(UiLanguage.T("Bride sélectionnée (session)", "Flange Selected (Session)"),
                 $"{chosen.FamilyName} : {chosen.Name}\n\n" +
-                "Cette sélection sera utilisée par la commande principale tant que Revit reste ouvert.");
+                UiLanguage.T("Cette sélection sera utilisée par la commande principale tant que Revit reste ouvert.", "This Selection Will Be Used by the Main Command While Revit Remains Open."));
 
             return Result.Succeeded;
         }

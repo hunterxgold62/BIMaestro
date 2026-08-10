@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 
 namespace BIMaestro.UI
 {
@@ -69,7 +70,7 @@ namespace BIMaestro.UI
             }
             catch (Exception ex)
             {
-                TaskDialog.Show("BIMaestro - Rosace (erreur)", ex.Message);
+                TaskDialog.Show(UiLanguage.T("BIMaestro - Rosace (erreur)", "BIMaestro - Radial Menu Error"), ex.Message);
             }
         }
 

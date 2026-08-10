@@ -101,7 +101,7 @@
                                     <Grid MinWidth="180">
                                         <TextBlock x:Name="PresetName"
                                                    VerticalAlignment="Center"
-                                                   Text="{Binding Name}"/>
+                                                   Text="{Binding DisplayName}"/>
                                         <Grid x:Name="SectionHeader"
                                               Margin="0,5"
                                               Visibility="Collapsed">
@@ -217,7 +217,9 @@
                                                   Margin="12,0,0,0"
                                                   VerticalContentAlignment="Center"
                                                   ItemsSource="{Binding BackgroundModes}"
-                                                  SelectedItem="{Binding BackgroundMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                  DisplayMemberPath="Label"
+                                                  SelectedValuePath="Value"
+                                                  SelectedValue="{Binding BackgroundMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                   ToolTip="Uni, horizontal, vertical ou diagonal"/>
 
                                         <ui:SimpleColorPicker Grid.Column="2"
@@ -358,15 +360,207 @@
                                             </Border>
 
                                             <Canvas IsHitTestVisible="False" Visibility="{Binding BrowserBubblesVisibility}">
-                                                <Ellipse Canvas.Left="22" Canvas.Top="18" Width="22" Height="22" Fill="#48FFB4CF" Stroke="#70FFB4CF" StrokeThickness="2"/>
-                                                <Ellipse Canvas.Left="285" Canvas.Top="38" Width="34" Height="34" Fill="#42B2DCFF" Stroke="#68B2DCFF" StrokeThickness="2"/>
-                                                <Ellipse Canvas.Left="126" Canvas.Top="102" Width="17" Height="17" Fill="#42BFEED3" Stroke="#66BFEED3" StrokeThickness="2"/>
-                                                <Ellipse Canvas.Left="305" Canvas.Top="154" Width="25" Height="25" Fill="#3FE1C7FF" Stroke="#64E1C7FF" StrokeThickness="2"/>
+                                                <Canvas.Triggers>
+                                                    <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <DoubleAnimation Storyboard.TargetName="BrowserBubbleLoopTransform"
+                                                                                 Storyboard.TargetProperty="Y"
+                                                                                 From="0" To="-218" Duration="0:0:18"
+                                                                                 RepeatBehavior="Forever"/>
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </EventTrigger>
+                                                </Canvas.Triggers>
+                                                <Canvas RenderTransformOrigin="0,0">
+                                                    <Canvas.RenderTransform>
+                                                        <TranslateTransform x:Name="BrowserBubbleLoopTransform"/>
+                                                    </Canvas.RenderTransform>
+                                                    <Canvas>
+                                                        <Ellipse Canvas.Left="22" Canvas.Top="18" Width="22" Height="22" Fill="#48FFB4CF" Stroke="#70FFB4CF" StrokeThickness="2"/>
+                                                        <Ellipse Canvas.Left="285" Canvas.Top="38" Width="34" Height="34" Fill="#42B2DCFF" Stroke="#68B2DCFF" StrokeThickness="2"/>
+                                                        <Ellipse Canvas.Left="126" Canvas.Top="102" Width="17" Height="17" Fill="#42BFEED3" Stroke="#66BFEED3" StrokeThickness="2"/>
+                                                        <Ellipse Canvas.Left="305" Canvas.Top="154" Width="25" Height="25" Fill="#3FE1C7FF" Stroke="#64E1C7FF" StrokeThickness="2"/>
+                                                        <Ellipse Canvas.Left="62" Canvas.Top="188" Width="28" Height="28" Fill="#3FB2DCFF" Stroke="#64B2DCFF" StrokeThickness="2"/>
+                                                    </Canvas>
+                                                    <Canvas Canvas.Top="218">
+                                                        <Ellipse Canvas.Left="22" Canvas.Top="18" Width="22" Height="22" Fill="#48FFB4CF" Stroke="#70FFB4CF" StrokeThickness="2"/>
+                                                        <Ellipse Canvas.Left="285" Canvas.Top="38" Width="34" Height="34" Fill="#42B2DCFF" Stroke="#68B2DCFF" StrokeThickness="2"/>
+                                                        <Ellipse Canvas.Left="126" Canvas.Top="102" Width="17" Height="17" Fill="#42BFEED3" Stroke="#66BFEED3" StrokeThickness="2"/>
+                                                        <Ellipse Canvas.Left="305" Canvas.Top="154" Width="25" Height="25" Fill="#3FE1C7FF" Stroke="#64E1C7FF" StrokeThickness="2"/>
+                                                        <Ellipse Canvas.Left="62" Canvas.Top="188" Width="28" Height="28" Fill="#3FB2DCFF" Stroke="#64B2DCFF" StrokeThickness="2"/>
+                                                    </Canvas>
+                                                </Canvas>
                                             </Canvas>
 
-                                            <Canvas IsHitTestVisible="False" Opacity="0.72" Visibility="{Binding BrowserWavesVisibility}">
-                                                <Path Canvas.Left="-5" Canvas.Top="28" Stroke="#70A6D3F1" StrokeThickness="3" Data="M0,20 C20,-5 40,-5 60,20 C80,45 100,45 120,20 C140,-5 160,-5 180,20 C200,45 220,45 240,20 C260,-5 280,-5 300,20 C320,45 340,45 380,20"/>
-                                                <Path Canvas.Left="-5" Canvas.Top="116" Stroke="#62F4B1CD" StrokeThickness="3" Data="M0,20 C20,-5 40,-5 60,20 C80,45 100,45 120,20 C140,-5 160,-5 180,20 C200,45 220,45 240,20 C260,-5 280,-5 300,20 C320,45 340,45 380,20"/>
+                                            <Canvas IsHitTestVisible="False" Opacity="0.76" Visibility="{Binding BrowserWavesVisibility}">
+                                                <Canvas.Triggers>
+                                                    <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <DoubleAnimation Storyboard.TargetName="BrowserBlueWaveTransform"
+                                                                                 Storyboard.TargetProperty="X"
+                                                                                 From="0" To="-240" Duration="0:0:16"
+                                                                                 RepeatBehavior="Forever"/>
+                                                                <DoubleAnimation Storyboard.TargetName="BrowserPinkWaveTransform"
+                                                                                 Storyboard.TargetProperty="X"
+                                                                                 From="0" To="-320" Duration="0:0:22"
+                                                                                 RepeatBehavior="Forever"/>
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </EventTrigger>
+                                                </Canvas.Triggers>
+                                                <Path Canvas.Top="28" Stroke="#70A6D3F1" StrokeThickness="3"
+                                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                                      Data="M-240,20 C-210,-4 -150,-4 -120,20 S-30,44 0,20 S90,-4 120,20 S210,44 240,20 S330,-4 360,20 S450,44 480,20 S570,-4 600,20 S690,44 720,20">
+                                                    <Path.RenderTransform>
+                                                        <TranslateTransform x:Name="BrowserBlueWaveTransform"/>
+                                                    </Path.RenderTransform>
+                                                </Path>
+                                                <Path Canvas.Top="116" Stroke="#62F4B1CD" StrokeThickness="3"
+                                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                                      Data="M-320,20 C-280,-8 -200,-8 -160,20 S-40,48 0,20 S120,-8 160,20 S280,48 320,20 S440,-8 480,20 S600,48 640,20 S760,-8 800,20">
+                                                    <Path.RenderTransform>
+                                                        <TranslateTransform x:Name="BrowserPinkWaveTransform"/>
+                                                    </Path.RenderTransform>
+                                                </Path>
+                                            </Canvas>
+
+                                            <Canvas IsHitTestVisible="False" Opacity="0.72" Visibility="{Binding BrowserRibbonsVisibility}">
+                                                <Canvas.Triggers>
+                                                    <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <DoubleAnimation Storyboard.TargetName="BrowserRibbonTransform"
+                                                                                 Storyboard.TargetProperty="X"
+                                                                                 From="0" To="-480" Duration="0:0:24"
+                                                                                 RepeatBehavior="Forever"/>
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </EventTrigger>
+                                                </Canvas.Triggers>
+                                                <Canvas>
+                                                    <Canvas.RenderTransform>
+                                                        <TranslateTransform x:Name="BrowserRibbonTransform"/>
+                                                    </Canvas.RenderTransform>
+                                                    <Path Stroke="#4DA6D3F1" StrokeThickness="24" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                                          Data="M-480,72 C-360,-8 -120,152 0,72 S360,-8 480,72 S840,152 960,72"/>
+                                                    <Path Stroke="#42F4B1CD" StrokeThickness="18" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                                          Data="M-480,118 C-360,38 -120,198 0,118 S360,38 480,118 S840,198 960,118"/>
+                                                    <Path Stroke="#38BFEED3" StrokeThickness="12" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                                          Data="M-480,28 C-360,-52 -120,108 0,28 S360,-52 480,28 S840,108 960,28"/>
+                                                </Canvas>
+                                            </Canvas>
+
+                                            <Canvas IsHitTestVisible="False" Opacity="0.58" Visibility="{Binding BrowserTopographyVisibility}">
+                                                <Canvas.Triggers>
+                                                    <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+                                                        <BeginStoryboard>
+                                                            <Storyboard AutoReverse="True" RepeatBehavior="Forever">
+                                                                <DoubleAnimation Storyboard.TargetName="BrowserTopographyTransform"
+                                                                                 Storyboard.TargetProperty="X"
+                                                                                 From="-12" To="18" Duration="0:0:17"/>
+                                                                <DoubleAnimation Storyboard.TargetName="BrowserTopographyTransform"
+                                                                                 Storyboard.TargetProperty="Y"
+                                                                                 From="-6" To="12" Duration="0:0:17"/>
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </EventTrigger>
+                                                </Canvas.Triggers>
+                                                <Canvas>
+                                                    <Canvas.RenderTransform>
+                                                        <TranslateTransform x:Name="BrowserTopographyTransform"/>
+                                                    </Canvas.RenderTransform>
+                                                    <Path Stroke="#7888B8C9" StrokeThickness="1.4" Data="M-30,40 C30,-5 92,1 135,35 S220,82 285,39 S352,3 410,30"/>
+                                                    <Path Stroke="#7888B8C9" StrokeThickness="1.4" Data="M-35,70 C25,24 88,29 130,61 S220,106 292,69 S355,35 415,59"/>
+                                                    <Path Stroke="#7888B8C9" StrokeThickness="1.4" Data="M-31,103 C23,61 83,58 126,89 S218,136 294,100 S360,67 417,90"/>
+                                                    <Path Stroke="#7888B8C9" StrokeThickness="1.4" Data="M-36,138 C18,99 78,91 122,120 S218,164 298,132 S362,101 419,121"/>
+                                                    <Path Stroke="#7888B8C9" StrokeThickness="1.4" Data="M-30,177 C22,143 77,132 126,158 S225,199 303,168 S365,141 420,159"/>
+                                                </Canvas>
+                                            </Canvas>
+
+                                            <Rectangle IsHitTestVisible="False" Opacity="0.64" Visibility="{Binding BrowserArchitectGridVisibility}">
+                                                <Rectangle.Triggers>
+                                                    <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <DoubleAnimation Storyboard.TargetName="BrowserGridTransform" Storyboard.TargetProperty="X"
+                                                                                 From="0" To="20" Duration="0:0:12" RepeatBehavior="Forever"/>
+                                                                <DoubleAnimation Storyboard.TargetName="BrowserGridTransform" Storyboard.TargetProperty="Y"
+                                                                                 From="0" To="20" Duration="0:0:12" RepeatBehavior="Forever"/>
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </EventTrigger>
+                                                </Rectangle.Triggers>
+                                                <Rectangle.Fill>
+                                                    <DrawingBrush TileMode="Tile" Viewport="0,0,20,20" ViewportUnits="Absolute">
+                                                        <DrawingBrush.Transform>
+                                                            <TranslateTransform x:Name="BrowserGridTransform"/>
+                                                        </DrawingBrush.Transform>
+                                                        <DrawingBrush.Drawing>
+                                                            <GeometryDrawing Brush="Transparent" Geometry="M0,0 H20 V20 H0 Z">
+                                                                <GeometryDrawing.Pen>
+                                                                    <Pen Brush="#557397AA" Thickness="0.8"/>
+                                                                </GeometryDrawing.Pen>
+                                                            </GeometryDrawing>
+                                                        </DrawingBrush.Drawing>
+                                                    </DrawingBrush>
+                                                </Rectangle.Fill>
+                                            </Rectangle>
+
+                                            <Border IsHitTestVisible="False" Opacity="0.74" Visibility="{Binding BrowserNorthernLightsVisibility}">
+                                                <Border.Triggers>
+                                                    <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+                                                        <BeginStoryboard>
+                                                            <Storyboard AutoReverse="True" RepeatBehavior="Forever">
+                                                                <DoubleAnimation Storyboard.TargetName="BrowserNorthernLightsTransform"
+                                                                                 Storyboard.TargetProperty="X"
+                                                                                 From="-0.18" To="0.18" Duration="0:0:10"/>
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </EventTrigger>
+                                                </Border.Triggers>
+                                                <Border.Background>
+                                                    <LinearGradientBrush StartPoint="0,0.2" EndPoint="1,0.8">
+                                                        <LinearGradientBrush.RelativeTransform>
+                                                            <TranslateTransform x:Name="BrowserNorthernLightsTransform"/>
+                                                        </LinearGradientBrush.RelativeTransform>
+                                                        <GradientStop Color="#00FFFFFF" Offset="0"/>
+                                                        <GradientStop Color="#6595E1BE" Offset="0.22"/>
+                                                        <GradientStop Color="#5574B4FF" Offset="0.52"/>
+                                                        <GradientStop Color="#4ED096FF" Offset="0.76"/>
+                                                        <GradientStop Color="#00FFFFFF" Offset="1"/>
+                                                    </LinearGradientBrush>
+                                                </Border.Background>
+                                            </Border>
+
+                                            <Canvas IsHitTestVisible="False" Opacity="0.68" Visibility="{Binding BrowserConstellationVisibility}">
+                                                <Canvas.Triggers>
+                                                    <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+                                                        <BeginStoryboard>
+                                                            <Storyboard AutoReverse="True" RepeatBehavior="Forever">
+                                                                <DoubleAnimation Storyboard.TargetName="BrowserConstellationTransform" Storyboard.TargetProperty="X"
+                                                                                 From="-8" To="12" Duration="0:0:15"/>
+                                                                <DoubleAnimation Storyboard.TargetName="BrowserConstellationTransform" Storyboard.TargetProperty="Y"
+                                                                                 From="5" To="-9" Duration="0:0:15"/>
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </EventTrigger>
+                                                </Canvas.Triggers>
+                                                <Canvas>
+                                                    <Canvas.RenderTransform>
+                                                        <TranslateTransform x:Name="BrowserConstellationTransform"/>
+                                                    </Canvas.RenderTransform>
+                                                    <Path Stroke="#5590B7D4" StrokeThickness="1" Data="M22,42 L82,76 138,34 204,92 286,54 M82,76 L112,154 204,92 264,172 M112,154 L48,190"/>
+                                                    <Ellipse Canvas.Left="19" Canvas.Top="39" Width="6" Height="6" Fill="#A9CCE3"/>
+                                                    <Ellipse Canvas.Left="78.5" Canvas.Top="72.5" Width="7" Height="7" Fill="#A9CCE3"/>
+                                                    <Ellipse Canvas.Left="135.5" Canvas.Top="31.5" Width="5" Height="5" Fill="#B9D9ED"/>
+                                                    <Ellipse Canvas.Left="200" Canvas.Top="88" Width="8" Height="8" Fill="#A9CCE3"/>
+                                                    <Ellipse Canvas.Left="283" Canvas.Top="51" Width="6" Height="6" Fill="#B9D9ED"/>
+                                                    <Ellipse Canvas.Left="109" Canvas.Top="151" Width="6" Height="6" Fill="#A9CCE3"/>
+                                                    <Ellipse Canvas.Left="260.5" Canvas.Top="168.5" Width="7" Height="7" Fill="#B9D9ED"/>
+                                                    <Ellipse Canvas.Left="45.5" Canvas.Top="187.5" Width="5" Height="5" Fill="#A9CCE3"/>
+                                                </Canvas>
                                             </Canvas>
 
                                             <Canvas IsHitTestVisible="False" Visibility="{Binding BrowserFirefliesVisibility}">
@@ -488,7 +682,9 @@
                                                FontWeight="SemiBold" Text="Style du fond"/>
                                     <ComboBox Height="32" Margin="0,0,0,8"
                                               ItemsSource="{Binding BrowserBackgroundModes}"
-                                              SelectedItem="{Binding BrowserPreferences.BackgroundMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                              DisplayMemberPath="Label"
+                                              SelectedValuePath="Value"
+                                              SelectedValue="{Binding BrowserPreferences.BackgroundMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
                                     <TextBlock Margin="0,0,0,5" Style="{StaticResource Hint}" FontWeight="SemiBold" Text="Fond principal"/>
                                     <ui:SimpleColorPicker HorizontalAlignment="Stretch"
                                                           SelectedColor="{Binding BrowserPreferences.BackgroundColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
@@ -543,7 +739,9 @@
                                                Text="Coloration des lignes"/>
                                     <ComboBox Height="34"
                                               ItemsSource="{Binding BrowserColoringModes}"
-                                              SelectedItem="{Binding BrowserColoringMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                              DisplayMemberPath="Label"
+                                              SelectedValuePath="Value"
+                                              SelectedValue="{Binding BrowserColoringMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
                                     <TextBlock Margin="0,6,0,0" FontSize="10"
                                                Foreground="{DynamicResource Text.Secondary}"
                                                Text="Priorité : catégorie personnelle → type de vue → fond général"/>
@@ -558,7 +756,9 @@
                                                    Text="Appliquer la couleur au"/>
                                         <ComboBox Grid.Column="1" Height="32"
                                                   ItemsSource="{Binding BrowserViewColorTargets}"
-                                                  SelectedItem="{Binding BrowserPreferences.ViewColorTarget, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                                  DisplayMemberPath="Label"
+                                                  SelectedValuePath="Value"
+                                                  SelectedValue="{Binding BrowserPreferences.ViewColorTarget, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
                                     </Grid>
                                 </StackPanel>
                             </Grid>

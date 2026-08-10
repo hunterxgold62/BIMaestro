@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
+using BIMaestro.Localization;
 
 namespace Page
 {
@@ -24,8 +25,9 @@ namespace Page
         {
             InitializeComponent();
 
-            TitleText.Text = $"Nouvelle version BIMaestro : v{latestVersion}";
-            ContentText.Text = $"Version installée : v{currentVersion}\n\nVoulez-vous ouvrir la page de mise à jour ?";
+            TitleText.Text = UiLanguage.T("Nouvelle version BIMaestro : v", "New BIMaestro Version: v") + latestVersion;
+            ContentText.Text = UiLanguage.T("Version installée : v", "Installed Version: v") + currentVersion +
+                UiLanguage.T("\n\nVoulez-vous ouvrir la page de mise à jour ?", "\n\nWould You Like to Open the Update Page?");
 
             TryAttachEmbeddedGif(GifImage, "BIMaestro.Resources.OLD.Mickey.gif");
         }

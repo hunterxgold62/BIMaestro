@@ -8,6 +8,7 @@ using Autodesk.Revit.Attributes;
 using System.IO;
 using System.Diagnostics;
 using Licensing;
+using BIMaestro.Localization;
 
 // Références pour WPF
 using System.Windows;
@@ -77,7 +78,7 @@ namespace Analyse
                     {
                         TaskDialog.Show(
                             "BIMaestro",
-                            "Le document du calcul n'est plus le document actif.");
+                            UiLanguage.T("Le document du calcul n'est plus le document actif.", "The document used for the calculation is no longer active."));
                         return;
                     }
 
@@ -92,7 +93,7 @@ namespace Analyse
                 {
                     TaskDialog.Show(
                         "BIMaestro",
-                        "Impossible d'afficher ce réseau sans risque pour Revit.\n\n" + ex.Message);
+                        UiLanguage.T("Impossible d'afficher ce réseau sans risque pour Revit.\n\n", "Unable to display this network safely in Revit.\n\n") + ex.Message);
                 }
             }
 
@@ -126,7 +127,7 @@ namespace Analyse
                 bool? dialogResult = selectionWindow.ShowDialog();
                 if (dialogResult != true)
                 {
-                    TaskDialog.Show("Information", "Opération annulée.");
+                    TaskDialog.Show(UiLanguage.T("Information", "Information"), UiLanguage.T("Opération annulée.", "Operation cancelled."));
                     return Result.Cancelled;
                 }
 
@@ -138,7 +139,7 @@ namespace Analyse
                 ICollection<ElementId> selectedIds = uidoc.Selection.GetElementIds();
                 if (selectedIds == null || selectedIds.Count == 0)
                 {
-                    TaskDialog.Show("Information", "Veuillez sélectionner des éléments avant de lancer le script.");
+                    TaskDialog.Show(UiLanguage.T("Information", "Information"), UiLanguage.T("Veuillez sélectionner des éléments avant de lancer le script.", "Select elements before running the calculation."));
                     return Result.Cancelled;
                 }
 
@@ -496,7 +497,7 @@ namespace Analyse
                 double totalPipeLength = 0;
                 if (pipeLengths.Count > 0)
                 {
-                    sb.AppendLine("Longueur totale des canalisations par diamètre (DN) :");
+                    sb.AppendLine(UiLanguage.T("Longueur totale des canalisations par diamètre (DN) :", "Total pipe length by diameter (DN):"));
                     foreach (var item in pipeLengths.OrderBy(kvp => kvp.Key))
                     {
                         sb.AppendLine($"{item.Key:N0} mm : {item.Value:F2} m");
@@ -508,7 +509,7 @@ namespace Analyse
                 if (pipeVolumes.Count > 0)
                 {
                     double totalWaterVolume = 0;
-                    sb.AppendLine("Volume total d'eau par diamètre intérieur :");
+                    sb.AppendLine(UiLanguage.T("Volume total d'eau par diamètre intérieur :", "Total water volume by internal diameter:"));
                     foreach (var item in pipeVolumes.OrderBy(kvp => kvp.Key))
                     {
                         sb.AppendLine($"{item.Key:N0} mm : {item.Value:F3} m³");
@@ -519,14 +520,14 @@ namespace Analyse
                 }
                 if (elbowCounts.Count > 0)
                 {
-                    sb.AppendLine("Nombre de coudes par diamètre :");
+                    sb.AppendLine(UiLanguage.T("Nombre de coudes par diamètre :", "Elbow count by diameter:"));
                     foreach (var item in elbowCounts.OrderBy(kvp => kvp.Key))
                         sb.AppendLine($"{item.Key} : {item.Value}");
                     sb.AppendLine();
                 }
                 if (teeCounts.Count > 0)
                 {
-                    sb.AppendLine("Nombre de tés par diamètre :");
+                    sb.AppendLine(UiLanguage.T("Nombre de tés par diamètre :", "Tee count by diameter:"));
                     foreach (var item in teeCounts.OrderBy(kvp => kvp.Key))
                         sb.AppendLine($"{item.Key} : {item.Value}");
                     sb.AppendLine();
@@ -534,7 +535,7 @@ namespace Analyse
                 if (includeDucts && ductLengths.Count > 0)
                 {
                     double totalDuctLength = 0;
-                    sb.AppendLine("Longueur totale des gaines par dimension :");
+                    sb.AppendLine(UiLanguage.T("Longueur totale des gaines par dimension :", "Total duct length by size:"));
                     foreach (var item in ductLengths.OrderBy(kvp => kvp.Key))
                     {
                         sb.AppendLine($"{item.Key} : {item.Value:F2} m");
@@ -546,7 +547,7 @@ namespace Analyse
                 if (includeDucts && ductFittingLengths.Count > 0)
                 {
                     double totalDuctFittingLength = 0;
-                    sb.AppendLine("Accessoires de gaines (approximatif) :");
+                    sb.AppendLine(UiLanguage.T("Accessoires de gaines (approximatif) :", "Duct fittings (approximate):"));
                     foreach (var item in ductFittingLengths.OrderBy(kvp => kvp.Key))
                     {
                         sb.AppendLine($"{item.Key} : {item.Value:F2} m");
@@ -556,7 +557,7 @@ namespace Analyse
                     sb.AppendLine();
                 }
                 // Remarque : Le tableau "Accessoires de canalisations (approximatif)" sera traité plus bas.
-                TaskDialog.Show("Résultats", sb.ToString());
+                TaskDialog.Show(UiLanguage.T("Résultats", "Results"), sb.ToString());
 
                 // Déterminer le système unique pour le nom du fichier (si applicable)
                 string singleSystemType = "";
@@ -584,8 +585,11 @@ namespace Analyse
                         networkColors);
 
                     // À la fin, proposer d'ouvrir le fichier
-                    if (MessageBox.Show("Les résultats ont été exportés vers Excel avec succès.\nVoulez-vous ouvrir le fichier ?",
-                                        "Succès", MessageBoxButton.YesNo, MessageBoxImage.Information) == MessageBoxResult.Yes)
+                    if (MessageBox.Show(
+                            UiLanguage.T(
+                                "Les résultats ont été exportés vers Excel avec succès.\nVoulez-vous ouvrir le fichier ?",
+                                "The results were exported to Excel successfully.\nDo you want to open the file?"),
+                            UiLanguage.T("Succès", "Success"), MessageBoxButton.YesNo, MessageBoxImage.Information) == MessageBoxResult.Yes)
                     {
                         Process.Start(new ProcessStartInfo(excelFilePath) { UseShellExecute = true });
                     }
@@ -989,7 +993,7 @@ namespace Analyse
                 if (request == ExternalEventRequest.Denied)
                 {
                     MessageBox.Show(
-                        "Revit ne peut pas traiter cette demande pour le moment.",
+                        UiLanguage.T("Revit ne peut pas traiter cette demande pour le moment.", "Revit cannot process this request right now."),
                         "BIMaestro",
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);

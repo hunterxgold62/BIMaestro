@@ -10,6 +10,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Media3D;
 using System.Windows.Threading;
+using BIMaestro.Localization;
 using System.Threading.Tasks;
 using HelixToolkit.Wpf.SharpDX;
 using HelixToolkit.Wpf.SharpDX.Elements2D;
@@ -201,7 +202,7 @@ namespace BIMaestro.VideoGames
             UpdateSceneLabels();
             LoadingMetricsText.Text =
                 _scene.OriginalRenderTriangleCount.ToString("N0") +
-                " triangles haute qualité";
+                UiLanguage.T(" triangles haute qualité", " high-quality triangles");
 
             Loaded += RevitGameWindow_Loaded;
             Closed += RevitGameWindow_Closed;
@@ -355,32 +356,32 @@ namespace BIMaestro.VideoGames
             try
             {
                 GameRuntimeDiagnostics.Write("PrepareScene - début");
-                SetLoadingStatus("Construction des collisions…");
+                SetLoadingStatus(UiLanguage.T("Construction des collisions…", "Building Collisions…"));
                 _world = new GameCollisionWorld(_scene);
                 GameRuntimeDiagnostics.Write("PrepareScene - collisions terminées");
 
-                SetLoadingStatus("Indexation des objets sélectionnables…");
+                SetLoadingStatus(UiLanguage.T("Indexation des objets sélectionnables…", "Indexing Selectable Objects…"));
                 _selectionIndex = new GameSelectionIndex(_scene.Elements);
                 GameRuntimeDiagnostics.Write(
                     "PrepareScene - index de sélection : " +
                     _selectionIndex.ElementCount + " éléments");
 
-                SetLoadingStatus("Calcul de la continuité des réseaux MEP…");
+                SetLoadingStatus(UiLanguage.T("Calcul de la continuité des réseaux MEP…", "Calculating MEP Network Continuity…"));
                 _mepSimulation = new GameMepSimulationEngine(_scene.MepGraph);
                 _mepSimulation.Recalculate();
                 RefreshMepDiagnosticItems();
                 GameRuntimeDiagnostics.Write("PrepareScene - graphe MEP calculé");
 
-                SetLoadingStatus("Création des buffers DirectX haute qualité…");
+                SetLoadingStatus(UiLanguage.T("Création des buffers DirectX haute qualité…", "Creating High-Quality DirectX Buffers…"));
                 GameGpuSceneBuildResult gpuScene = GameGpuSceneBuilder.Build(_scene);
                 GameRuntimeDiagnostics.Write("PrepareScene - scène GPU construite");
                 LoadingMetricsText.Text =
-                    gpuScene.TriangleCount.ToString("N0") + " triangles conservés  •  " +
+                    gpuScene.TriangleCount.ToString("N0") + UiLanguage.T(" triangles conservés  •  ", " retained triangles  •  ") +
                     gpuScene.Meshes.Count.ToString("N0") + " zones GPU  •  " +
-                    gpuScene.Doors.Count.ToString("N0") + " portes interactives  •  " +
-                    _scene.MepGraph.Elements.Count.ToString("N0") + " éléments MEP";
+                    gpuScene.Doors.Count.ToString("N0") + UiLanguage.T(" portes interactives  •  ", " interactive doors  •  ") +
+                    _scene.MepGraph.Elements.Count.ToString("N0") + UiLanguage.T(" éléments MEP", " MEP elements");
 
-                SetLoadingStatus("Transfert de la maquette vers DirectX 11…");
+                SetLoadingStatus(UiLanguage.T("Transfert de la maquette vers DirectX 11…", "Transferring the Model to DirectX 11…"));
                 BuildSceneModel(gpuScene.Meshes);
                 GameRuntimeDiagnostics.Write("PrepareScene - modèles ajoutés au viewport");
                 foreach (GameGpuDoorAnimation door in gpuScene.Doors)
@@ -391,14 +392,14 @@ namespace BIMaestro.VideoGames
                 // pendant la finalisation du swap-chain pouvait déclencher une
                 // exception différée impossible à contenir ici. Le renderer est
                 // créé uniquement lors d'un clic explicite sur « Activer ».
-                SetLoadingStatus("Préparation du panneau Fluides MEP…");
+                SetLoadingStatus(UiLanguage.T("Préparation du panneau Fluides MEP…", "Preparing the MEP Fluids Panel…"));
                 _mepRenderer = null;
                 UpdateMepUi();
                 UpdateSceneLabels();
                 SetLightMode(true, false);
                 ResetPlayer(false);
 
-                SetLoadingStatus("Nettoyage de la mémoire avant le démarrage…");
+                SetLoadingStatus(UiLanguage.T("Nettoyage de la mémoire avant le démarrage…", "Cleaning Memory Before Startup…"));
                 try
                 {
                     GCSettings.LargeObjectHeapCompactionMode =
@@ -410,7 +411,7 @@ namespace BIMaestro.VideoGames
 
                 _scenePrepared = true;
                 _renderWarmupFrames = 0;
-                SetLoadingStatus("Finalisation des buffers sur la carte graphique…");
+                SetLoadingStatus(UiLanguage.T("Finalisation des buffers sur la carte graphique…", "Finalizing Buffers on the Graphics Card…"));
                 GameRuntimeDiagnostics.Write("PrepareScene - attente du premier rendu");
                 GameViewport.InvalidateRender();
             }
@@ -419,9 +420,9 @@ namespace BIMaestro.VideoGames
                 GameRuntimeDiagnostics.Write("PrepareScene - exception contenue", exception);
                 _loadingFailed = true;
                 LoadingProgress.Visibility = Visibility.Collapsed;
-                LoadingTitleText.Text = "CHARGEMENT IMPOSSIBLE";
+                LoadingTitleText.Text = UiLanguage.T("CHARGEMENT IMPOSSIBLE", "LOADING FAILED");
                 LoadingStatusText.Text = exception.Message;
-                LoadingCloseButton.Content = "Fermer";
+                LoadingCloseButton.Content = UiLanguage.T("Fermer", "Close");
             }
         }
 
@@ -446,7 +447,7 @@ namespace BIMaestro.VideoGames
             _simulationAccumulator = 0.0;
             ControlsHud.Visibility = Visibility.Collapsed;
             Keyboard.Focus(GameViewport);
-            ShowToast("Maquette entièrement chargée — vous pouvez entrer");
+            ShowToast(UiLanguage.T("Maquette entièrement chargée — vous pouvez entrer", "Model Fully Loaded — You May Enter"));
         }
 
         private void BuildSceneModel(IList<GameGpuRenderMesh> renderMeshes)
@@ -508,8 +509,8 @@ namespace BIMaestro.VideoGames
             if (announce)
             {
                 ShowToast(realistic
-                    ? "Éclairage réaliste activé"
-                    : "Éclairage uniforme activé — couleurs Revit pures");
+                    ? UiLanguage.T("Éclairage réaliste activé", "Realistic Lighting Enabled")
+                    : UiLanguage.T("Éclairage uniforme activé — couleurs Revit pures", "Uniform Lighting Enabled — Pure Revit Colors"));
             }
         }
 
@@ -579,11 +580,11 @@ namespace BIMaestro.VideoGames
             _readyToPlay = false;
             LoadingGate.Visibility = Visibility.Visible;
             LoadingProgress.Visibility = Visibility.Collapsed;
-            LoadingTitleText.Text = "RENDU DIRECTX IMPOSSIBLE";
+            LoadingTitleText.Text = UiLanguage.T("RENDU DIRECTX IMPOSSIBLE", "DIRECTX RENDERING FAILED");
             LoadingStatusText.Text =
                 exception?.Message ??
                 "La carte graphique n'a pas pu initialiser le moteur DirectX 11.";
-            LoadingCloseButton.Content = "Fermer";
+            LoadingCloseButton.Content = UiLanguage.T("Fermer", "Close");
         }
 
         private void GameDispatcher_UnhandledException(
@@ -613,7 +614,7 @@ namespace BIMaestro.VideoGames
                     _pressedKeys.Clear();
                     ClearDoubleTapSprint();
                     GameViewport.Focus();
-                    ShowToast("Panneau Fluides fermé après une erreur contenue");
+                    ShowToast(UiLanguage.T("Panneau Fluides fermé après une erreur contenue", "Fluids Panel Closed After a Contained Error"));
                     return;
                 }
 
@@ -623,11 +624,11 @@ namespace BIMaestro.VideoGames
                 _mepValveMarkersEnabled = false;
                 LoadingGate.Visibility = Visibility.Visible;
                 LoadingProgress.Visibility = Visibility.Collapsed;
-                LoadingTitleText.Text = "ERREUR CONTENUE";
+                LoadingTitleText.Text = UiLanguage.T("ERREUR CONTENUE", "CONTAINED ERROR");
                 LoadingStatusText.Text =
                     "La visite a été arrêtée sans fermer Revit.\n\n" +
                     e.Exception.Message;
-                LoadingCloseButton.Content = "Fermer la visite";
+                LoadingCloseButton.Content = UiLanguage.T("Fermer la visite", "Close the Walkthrough");
             }
             catch (Exception displayException)
             {
@@ -672,10 +673,10 @@ namespace BIMaestro.VideoGames
 
             _previousFootPosition = _footPosition;
             _renderFootPosition = _footPosition;
-            ModeText.Text = _flyMode ? "VOL LIBRE" : "MARCHE";
+            ModeText.Text = _flyMode ? UiLanguage.T("VOL LIBRE", "FREE FLIGHT") : UiLanguage.T("MARCHE", "WALK");
             UpdateCamera(_renderFootPosition);
             if (announce)
-                ShowToast("Retour au point de départ");
+                ShowToast(UiLanguage.T("Retour au point de départ", "Returned to the Starting Point"));
         }
 
         private void CompositionTarget_Rendering(object sender, EventArgs e)
@@ -954,7 +955,7 @@ namespace BIMaestro.VideoGames
                 if (!_isCrouching)
                 {
                     _isCrouching = true;
-                    ModeText.Text = "ACCROUPI";
+                    ModeText.Text = UiLanguage.T("ACCROUPI", "CROUCHED");
                 }
                 return;
             }
@@ -976,7 +977,7 @@ namespace BIMaestro.VideoGames
                 return;
 
             _isCrouching = false;
-            ModeText.Text = "MARCHE";
+            ModeText.Text = UiLanguage.T("MARCHE", "WALK");
         }
 
         private void UpdateCrouchCamera(double elapsed)
@@ -1026,20 +1027,20 @@ namespace BIMaestro.VideoGames
 
         private void UpdateSceneLabels()
         {
-            ViewNameText.Text = "Vue Revit : " + _scene.ViewName;
+            ViewNameText.Text = UiLanguage.T("Vue Revit : ", "Revit View: ") + _scene.ViewName;
             int renderedTriangles = _scene.OptimizedRenderTriangleCount > 0
                 ? _scene.OptimizedRenderTriangleCount
                 : (_scene.OriginalRenderTriangleCount > 0
                     ? _scene.OriginalRenderTriangleCount
                     : _scene.TriangleCount);
             SceneStatsText.Text =
-                _scene.VisibleElementCount.ToString("N0") + " éléments  •  " +
+                _scene.VisibleElementCount.ToString("N0") + UiLanguage.T(" éléments  •  ", " elements  •  ") +
                 renderedTriangles.ToString("N0") + " triangles GPU  •  " +
                 _scene.RenderBucketCount.ToString("N0") + " zones DirectX  •  " +
-                _scene.Doors.Count.ToString("N0") + " portes" +
+                _scene.Doors.Count.ToString("N0") + UiLanguage.T(" portes", " doors") +
                 (_scene.MepGraph.HasData
                     ? "  •  " + _scene.MepGraph.Systems.Count.ToString("N0") +
-                        " réseaux MEP"
+                        UiLanguage.T(" réseaux MEP", " MEP networks")
                     : string.Empty);
         }
 
@@ -1116,10 +1117,10 @@ namespace BIMaestro.VideoGames
                 ClearDoubleTapSprint();
                 _grounded = false;
                 _verticalVelocity = 0.0;
-                ModeText.Text = _flyMode ? "VOL LIBRE" : "MARCHE";
+                ModeText.Text = _flyMode ? UiLanguage.T("VOL LIBRE", "FREE FLIGHT") : UiLanguage.T("MARCHE", "WALK");
                 ShowToast(_flyMode
                     ? "Mode vol libre — Espace monte, Maj descend"
-                    : "Collisions et gravité réactivées");
+                    : UiLanguage.T("Collisions et gravité réactivées", "Collisions and Gravity Re-enabled"));
                 e.Handled = true;
             }
             else if (e.Key == Key.R)
@@ -1157,7 +1158,7 @@ namespace BIMaestro.VideoGames
 
             if (nearestDoor == null)
             {
-                ShowToast("Aucune porte assez proche");
+                ShowToast(UiLanguage.T("Aucune porte assez proche", "No Door Close Enough"));
                 return;
             }
 
@@ -1166,11 +1167,11 @@ namespace BIMaestro.VideoGames
             {
                 nearestDoor.OpenAngleDegrees =
                     ChooseDoorOpeningDirection(nearestDoor.Door) * 92.0;
-                ShowToast("Ouverture de la porte");
+                ShowToast(UiLanguage.T("Ouverture de la porte", "Opening Door"));
             }
             else
             {
-                ShowToast("Fermeture de la porte");
+                ShowToast(UiLanguage.T("Fermeture de la porte", "Closing Door"));
             }
         }
 
@@ -1458,7 +1459,7 @@ namespace BIMaestro.VideoGames
             GameSelectionHit? hit = FindSelectionHitAtScreenPoint(screenPoint);
             if (hit == null)
             {
-                ShowToast("Aucun objet identifié dans le viseur");
+                ShowToast(UiLanguage.T("Aucun objet identifié dans le viseur", "No Object Identified in the Crosshair"));
                 return;
             }
 
@@ -1979,14 +1980,14 @@ namespace BIMaestro.VideoGames
             {
                 GameMepScenarioStore.SaveNamed(_scene.MepGraph, name);
                 RefreshNamedScenarios(name);
-                ShowToast("Scénario enregistré : " + name);
+                ShowToast(UiLanguage.T("Scénario enregistré : ", "Scenario Saved: ") + name);
             }
             catch (Exception exception)
             {
                 GameRuntimeDiagnostics.Write(
                     "Sauvegarde d'un scénario MEP nommé impossible",
                     exception);
-                ShowToast("Scénario non enregistré : " + exception.Message);
+                ShowToast(UiLanguage.T("Scénario non enregistré : ", "Scenario Not Saved: ") + exception.Message);
             }
         }
 
@@ -1998,19 +1999,19 @@ namespace BIMaestro.VideoGames
             try
             {
                 bool changed = ExecuteMepScenarioMutation(
-                    "Charger le scénario " + name,
-                    "Scénario chargé : " + name,
+                    UiLanguage.T("Charger le scénario ", "Load Scenario ") + name,
+                    UiLanguage.T("Scénario chargé : ", "Scenario Loaded: ") + name,
                     () => GameMepScenarioStore.RestoreNamed(
                         _scene.MepGraph, name));
                 if (!changed)
-                    ShowToast("Le scénario est déjà actif : " + name);
+                    ShowToast(UiLanguage.T("Le scénario est déjà actif : ", "The Scenario Is Already Active: ") + name);
             }
             catch (Exception exception)
             {
                 GameRuntimeDiagnostics.Write(
                     "Chargement d'un scénario MEP nommé impossible",
                     exception);
-                ShowToast("Scénario non chargé : " + exception.Message);
+                ShowToast(UiLanguage.T("Scénario non chargé : ", "Scenario Not Loaded: ") + exception.Message);
             }
         }
 
@@ -2021,13 +2022,13 @@ namespace BIMaestro.VideoGames
             string name = SelectedNamedScenario();
             if (string.IsNullOrWhiteSpace(name))
             {
-                ShowToast("Choisis le scénario à supprimer");
+                ShowToast(UiLanguage.T("Choisis le scénario à supprimer", "Choose the Scenario to Delete"));
                 return;
             }
             MessageBoxResult confirmation = MessageBox.Show(
                 this,
-                "Supprimer le scénario \"" + name + "\" ?",
-                "BIMaestro — Scénarios MEP",
+                UiLanguage.T("Supprimer le scénario \"", "Delete Scenario \"") + name + "\" ?",
+                UiLanguage.T("BIMaestro — Scénarios MEP", "BIMaestro — MEP Scenarios"),
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
             if (confirmation != MessageBoxResult.Yes)
@@ -2039,15 +2040,15 @@ namespace BIMaestro.VideoGames
                 RefreshNamedScenarios();
                 MepScenarioCombo.Text = string.Empty;
                 ShowToast(deleted
-                    ? "Scénario supprimé : " + name
-                    : "Scénario introuvable");
+                    ? UiLanguage.T("Scénario supprimé : ", "Scenario Deleted: ") + name
+                    : UiLanguage.T("Scénario introuvable", "Scenario Not Found"));
             }
             catch (Exception exception)
             {
                 GameRuntimeDiagnostics.Write(
                     "Suppression d'un scénario MEP nommé impossible",
                     exception);
-                ShowToast("Suppression impossible : " + exception.Message);
+                ShowToast(UiLanguage.T("Suppression impossible : ", "Deletion Failed: ") + exception.Message);
             }
         }
 
@@ -2068,29 +2069,29 @@ namespace BIMaestro.VideoGames
             _bindingMepDiagnosticFilters = true;
             MepDiagnosticSeverityFilter.ItemsSource = new[]
             {
-                new GameMepDiagnosticFilterOption("Toutes les gravités"),
+                new GameMepDiagnosticFilterOption(UiLanguage.T("Toutes les gravités", "All Severities")),
                 new GameMepDiagnosticFilterOption(
-                    "Critiques",
+                    UiLanguage.T("Critiques", "Critical"),
                     GameMepDiagnosticSeverity.Critical),
                 new GameMepDiagnosticFilterOption(
-                    "Avertissements",
+                    UiLanguage.T("Avertissements", "Warnings"),
                     GameMepDiagnosticSeverity.Warning),
                 new GameMepDiagnosticFilterOption(
-                    "Informations",
+                    UiLanguage.T("Informations", "Information"),
                     GameMepDiagnosticSeverity.Information)
             };
             MepDiagnosticTypeFilter.ItemsSource = new[]
             {
-                new GameMepDiagnosticFilterOption("Tous les types"),
-                new GameMepDiagnosticFilterOption("Conflits de sens", GameMepDiagnosticKind.DirectionConflict),
-                new GameMepDiagnosticFilterOption("Clapets sans sens", GameMepDiagnosticKind.CheckValveDirectionMissing),
-                new GameMepDiagnosticFilterOption("Vannes et accessoires ambigus", GameMepDiagnosticKind.AmbiguousFlowControl),
-                new GameMepDiagnosticFilterOption("Composants non classés", GameMepDiagnosticKind.UnknownPassThroughComponent),
-                new GameMepDiagnosticFilterOption("Branches sans source", GameMepDiagnosticKind.BranchWithoutSource),
-                new GameMepDiagnosticFilterOption("Systèmes différents", GameMepDiagnosticKind.IncompatibleSystems),
-                new GameMepDiagnosticFilterOption("Éléments déconnectés", GameMepDiagnosticKind.DisconnectedElement),
-                new GameMepDiagnosticFilterOption("Connecteurs ouverts", GameMepDiagnosticKind.OpenConnector),
-                new GameMepDiagnosticFilterOption("Réglages sauvegardés invalides", GameMepDiagnosticKind.InvalidSavedSetting)
+                new GameMepDiagnosticFilterOption(UiLanguage.T("Tous les types", "All Types")),
+                new GameMepDiagnosticFilterOption(UiLanguage.T("Conflits de sens", "Direction Conflicts"), GameMepDiagnosticKind.DirectionConflict),
+                new GameMepDiagnosticFilterOption(UiLanguage.T("Clapets sans sens", "Check Valves Without Direction"), GameMepDiagnosticKind.CheckValveDirectionMissing),
+                new GameMepDiagnosticFilterOption(UiLanguage.T("Vannes et accessoires ambigus", "Ambiguous Valves and Fittings"), GameMepDiagnosticKind.AmbiguousFlowControl),
+                new GameMepDiagnosticFilterOption(UiLanguage.T("Composants non classés", "Unclassified Components"), GameMepDiagnosticKind.UnknownPassThroughComponent),
+                new GameMepDiagnosticFilterOption(UiLanguage.T("Branches sans source", "Branches Without Source"), GameMepDiagnosticKind.BranchWithoutSource),
+                new GameMepDiagnosticFilterOption(UiLanguage.T("Systèmes différents", "Different Systems"), GameMepDiagnosticKind.IncompatibleSystems),
+                new GameMepDiagnosticFilterOption(UiLanguage.T("Éléments déconnectés", "Disconnected Elements"), GameMepDiagnosticKind.DisconnectedElement),
+                new GameMepDiagnosticFilterOption(UiLanguage.T("Connecteurs ouverts", "Open Connectors"), GameMepDiagnosticKind.OpenConnector),
+                new GameMepDiagnosticFilterOption(UiLanguage.T("Réglages sauvegardés invalides", "Invalid Saved Settings"), GameMepDiagnosticKind.InvalidSavedSetting)
             };
             MepDiagnosticSystemFilter.ItemsSource = _mepDiagnosticSystemOptions;
             MepDiagnosticSeverityFilter.SelectedIndex = 0;
@@ -2106,7 +2107,7 @@ namespace BIMaestro.VideoGames
             _bindingMepDiagnosticFilters = true;
             _mepDiagnosticSystemOptions.Clear();
             _mepDiagnosticSystemOptions.Add(
-                new GameMepDiagnosticFilterOption("Tous les systèmes", string.Empty));
+                new GameMepDiagnosticFilterOption(UiLanguage.T("Tous les systèmes", "All Systems"), string.Empty));
             foreach (GameMepSystemData system in _scene.MepGraph.Systems
                 .OrderBy(system => system.Name, StringComparer.CurrentCultureIgnoreCase))
             {
@@ -2178,11 +2179,10 @@ namespace BIMaestro.VideoGames
                 item.Severity == GameMepDiagnosticSeverity.Warning);
             int information = modeSnapshot.Count(item =>
                 item.Severity == GameMepDiagnosticSeverity.Information);
-            MepDiagnosticSummaryText.Text = critical + " critique(s)  •  " +
-                warnings + " avertissement(s)  •  " +
-                information + " information(s)";
-            MepDiagnosticsTabButton.Content =
-                "Diagnostics (" + modeSnapshot.Count + ")";
+            MepDiagnosticSummaryText.Text = critical + UiLanguage.T(" critique(s)  •  ", " critical  •  ") +
+                warnings + UiLanguage.T(" avertissement(s)  •  ", " warning(s)  •  ") +
+                information + UiLanguage.T(" information(s)", " information item(s)");
+            MepDiagnosticsTabButton.Content = UiLanguage.T("Diagnostics (", "Diagnostics (") + modeSnapshot.Count + ")";
             MepDiagnosticEmptyText.Visibility = _mepDiagnosticItems.Count == 0
                 ? Visibility.Visible
                 : Visibility.Collapsed;
@@ -2223,8 +2223,8 @@ namespace BIMaestro.VideoGames
                 ? VerticalAlignment.Stretch
                 : VerticalAlignment.Top;
             MepAdvancedToggleButton.Content = show
-                ? "Masquer les réglages  −"
-                : "Réglages et analyses  +";
+                ? UiLanguage.T("Masquer les réglages  −", "Hide Settings  −")
+                : UiLanguage.T("Réglages et analyses  +", "Settings and Analysis  +");
             UpdateMepTabStyles(false);
         }
 
@@ -2370,11 +2370,11 @@ namespace BIMaestro.VideoGames
                 source.IsActive &&
                 source.BoundaryKind == GameMepBoundaryKind.Inlet);
             MepFlowToggleButton.Content = _mepFlowEnabled
-                ? "Flux  •  actifs"
-                : "Flux  •  arrêtés";
+                ? UiLanguage.T("Flux  •  actifs", "Flow  •  active")
+                : UiLanguage.T("Flux  •  arrêtés", "Flow  •  stopped");
             MepValveMarkersToggleButton.Content = _mepValveMarkersEnabled
-                ? "Vannes  •  visibles"
-                : "Vannes  •  masquées";
+                ? UiLanguage.T("Vannes  •  visibles", "Valves  •  visible")
+                : UiLanguage.T("Vannes  •  masquées", "Valves  •  hidden");
             Brush activeBrush = (Brush)FindResource("GameBrandDark");
             Brush inactiveBrush = new SolidColorBrush(
                 Color.FromArgb(0x99, 0x17, 0x23, 0x1E));
@@ -2392,49 +2392,49 @@ namespace BIMaestro.VideoGames
                 valve.IsEnabledAsValve &&
                 valve.Kind == GameMepFlowControlKind.CheckValve);
             MepStatsText.Text = graph.HasData
-                ? graph.Systems.Count.ToString("N0") + " systèmes  •  " +
-                    graph.Elements.Count.ToString("N0") + " éléments  •  " +
-                    enabledIsolationValves.ToString("N0") + " vannes  •  " +
-                    enabledCheckValves.ToString("N0") + " clapets"
+                ? graph.Systems.Count.ToString("N0") + UiLanguage.T(" systèmes  •  ", " systems  •  ") +
+                    graph.Elements.Count.ToString("N0") + UiLanguage.T(" éléments  •  ", " elements  •  ") +
+                    enabledIsolationValves.ToString("N0") + UiLanguage.T(" vannes  •  ", " valves  •  ") +
+                    enabledCheckValves.ToString("N0") + UiLanguage.T(" clapets", " check valves")
                 : !string.IsNullOrWhiteSpace(graph.ExtractionError)
-                    ? "Analyse MEP indisponible pour cette maquette"
-                    : "Aucun réseau de canalisation détecté";
+                    ? UiLanguage.T("Analyse MEP indisponible pour cette maquette", "MEP Analysis Unavailable for This Model")
+                    : UiLanguage.T("Aucun réseau de canalisation détecté", "No Pipe Network Detected");
 
             int activeReturns = graph.Sources.Count(source =>
                 source.IsActive &&
                 source.BoundaryKind == GameMepBoundaryKind.Outlet);
             MepArrivalSummaryText.Text = activeSources.ToString("N0") +
-                (activeSources == 1 ? " active" : " actives");
+                (activeSources == 1 ? UiLanguage.T(" active", " active") : UiLanguage.T(" actives", " active"));
             MepReturnSummaryText.Text = activeReturns.ToString("N0") +
-                (activeReturns == 1 ? " actif" : " actifs");
+                (activeReturns == 1 ? UiLanguage.T(" actif", " active") : UiLanguage.T(" actifs", " active"));
             if (!string.IsNullOrWhiteSpace(_mepRuntimeError))
-                MepStatusText.Text = "Affichage des fluides désactivé sans fermer la maquette BIM : " +
+                MepStatusText.Text = UiLanguage.T("Affichage des fluides désactivé sans fermer la maquette BIM : ", "Fluid Display Disabled Without Closing the BIM Model: ") +
                     _mepRuntimeError;
             else if (!string.IsNullOrWhiteSpace(graph.ExtractionError))
-                MepStatusText.Text = "La maquette BIM reste disponible. Détail MEP : " +
+                MepStatusText.Text = UiLanguage.T("La maquette BIM reste disponible. Détail MEP : ", "The BIM Model Remains Available. MEP Details: ") +
                     graph.ExtractionError;
             else if (!graph.HasData)
-                MepStatusText.Text = "Le document actif ne contient aucun connecteur de canalisation exploitable.";
+                MepStatusText.Text = UiLanguage.T("Le document actif ne contient aucun connecteur de canalisation exploitable.", "The Active Document Contains No Usable Pipe Connector.");
             else if (activeSources == 0)
-                MepStatusText.Text = "Source principale à définir : fais un clic gauche sur la canalisation d'arrivée puis choisis son sens.";
+                MepStatusText.Text = UiLanguage.T("Source principale à définir : fais un clic gauche sur la canalisation d'arrivée puis choisis son sens.", "Main Source to Define: Left-click the Inlet Pipe, Then Choose Its Direction.");
             else if (_mepRecalculationRunning)
-                MepStatusText.Text = "Recalcul de la continuité du réseau…";
+                MepStatusText.Text = UiLanguage.T("Recalcul de la continuité du réseau…", "Recalculating Network Continuity…");
             else
                 MepStatusText.Text = activeSources +
-                    (activeSources == 1 ? " arrivée active" : " arrivées actives") +
+                    (activeSources == 1 ? UiLanguage.T(" arrivée active", " active inlet") : UiLanguage.T(" arrivées actives", " active inlets")) +
                     "  •  " + activeReturns +
-                    (activeReturns == 1 ? " retour" : " retours") +
-                    "  •  " + graph.DirectionConflictCount + " conflit(s) de sens" +
-                    "  •  calcul " + graph.LastCalculationMilliseconds.ToString("0.0") + " ms";
+                    (activeReturns == 1 ? UiLanguage.T(" retour", " return") : UiLanguage.T(" retours", " returns")) +
+                    "  •  " + graph.DirectionConflictCount + UiLanguage.T(" conflit(s) de sens", " direction conflict(s)") +
+                    UiLanguage.T("  •  calcul ", "  •  calculation ") + graph.LastCalculationMilliseconds.ToString("0.0") + " ms";
 
             MepNoSourceText.Visibility = activeSources == 0
                 ? Visibility.Visible
                 : Visibility.Collapsed;
             string diagnostics = !string.IsNullOrWhiteSpace(graph.ExtractionError)
-                ? "Extraction MEP interrompue sans fermer la scène."
-                : graph.OpenConnectorCount.ToString("N0") + " connecteurs ouverts  •  " +
-                    graph.UncertainValveCount.ToString("N0") + " vannes à valider  •  " +
-                    "analyse " + graph.ExtractionMilliseconds.ToString("0") + " ms";
+                ? UiLanguage.T("Extraction MEP interrompue sans fermer la scène.", "MEP Extraction Stopped Without Closing the Scene.")
+                : graph.OpenConnectorCount.ToString("N0") + UiLanguage.T(" connecteurs ouverts  •  ", " open connectors  •  ") +
+                    graph.UncertainValveCount.ToString("N0") + UiLanguage.T(" vannes à valider  •  ", " valves to validate  •  ") +
+                    UiLanguage.T("analyse ", "analysis ") + graph.ExtractionMilliseconds.ToString("0") + " ms";
             if (graph.RestoredSourceCount > 0 || graph.RestoredValveCount > 0)
             {
                 diagnostics += "  •  restauré : " +
@@ -2501,9 +2501,9 @@ namespace BIMaestro.VideoGames
                 MepFlowToggleButton.IsEnabled = false;
                 MepValveMarkersToggleButton.IsEnabled = false;
                 MepStatusText.Text =
-                    "Panneau Fluides indisponible pour cette maquette : " +
+                    UiLanguage.T("Panneau Fluides indisponible pour cette maquette : ", "Fluids Panel Unavailable for This Model: ") +
                     exception.Message;
-                ShowToast("Fluides MEP indisponibles, la visite reste active");
+                ShowToast(UiLanguage.T("Fluides MEP indisponibles, la visite reste active", "MEP Fluids Unavailable; the Walkthrough Remains Active"));
             }
         }
 
@@ -2538,7 +2538,7 @@ namespace BIMaestro.VideoGames
                         "Fluides MEP indisponibles : " +
                         _scene.MepGraph.ExtractionError);
                 }
-                ShowToast("Aucun réseau MEP exploitable dans le document actif");
+                ShowToast(UiLanguage.T("Aucun réseau MEP exploitable dans le document actif", "No Usable MEP Network in the Active Document"));
                 return;
             }
 
@@ -2568,13 +2568,13 @@ namespace BIMaestro.VideoGames
                     "Activation du rendu des flux MEP impossible",
                     exception);
                 DisableMepRenderingAfterError(exception);
-                ShowToast("Flux MEP désactivés : " + exception.Message);
+                ShowToast(UiLanguage.T("Flux MEP désactivés : ", "MEP Flow Disabled: ") + exception.Message);
                 return;
             }
             UpdateMepUi();
             ShowToast(_mepFlowEnabled
-                ? "Flux MEP activés"
-                : "Flux MEP masqués");
+                ? UiLanguage.T("Flux MEP activés", "MEP Flow Enabled")
+                : UiLanguage.T("Flux MEP masqués", "MEP Flow Hidden"));
         }
 
         private void MepValveMarkersToggleButton_Click(
@@ -2583,7 +2583,7 @@ namespace BIMaestro.VideoGames
         {
             if (!_scene.MepGraph.HasData)
             {
-                ShowToast("Aucune vanne MEP exploitable dans cette maquette");
+                ShowToast(UiLanguage.T("Aucune vanne MEP exploitable dans cette maquette", "No Usable MEP Valve in This Model"));
                 return;
             }
 
@@ -2604,13 +2604,13 @@ namespace BIMaestro.VideoGames
                     "Affichage des repères de vannes impossible",
                     exception);
                 DisableMepRenderingAfterError(exception);
-                ShowToast("Repères de vannes désactivés : " + exception.Message);
+                ShowToast(UiLanguage.T("Repères de vannes désactivés : ", "Valve Markers Disabled: ") + exception.Message);
                 return;
             }
             UpdateMepUi();
             ShowToast(enable
-                ? "Repères de vannes affichés"
-                : "Repères de vannes masqués");
+                ? UiLanguage.T("Repères de vannes affichés", "Valve Markers Shown")
+                : UiLanguage.T("Repères de vannes masqués", "Valve Markers Hidden"));
         }
 
         private void MepSystemFilter_Changed(object sender, RoutedEventArgs e)
@@ -3470,7 +3470,7 @@ namespace BIMaestro.VideoGames
         {
             if (_mepRecalculationRunning)
             {
-                ShowToast("Action refusée : calcul MEP en cours");
+                ShowToast(UiLanguage.T("Action refusée : calcul MEP en cours", "Action Denied: MEP Calculation in Progress"));
                 return false;
             }
             bool changed = _mepScenarioHistory.Execute(
@@ -3482,7 +3482,7 @@ namespace BIMaestro.VideoGames
             {
                 RebuildMepSourceItems();
                 UpdateMepHistoryUi();
-                ShowToast("Aucune modification à enregistrer");
+                ShowToast(UiLanguage.T("Aucune modification à enregistrer", "No Change to Save"));
                 return false;
             }
             RebuildMepSourceItems();
@@ -3495,7 +3495,7 @@ namespace BIMaestro.VideoGames
         {
             if (_mepRecalculationRunning)
             {
-                ShowToast("Annulation refusée : calcul MEP en cours");
+                ShowToast(UiLanguage.T("Annulation refusée : calcul MEP en cours", "Undo Denied: MEP Calculation in Progress"));
                 return;
             }
             if (!_mepScenarioHistory.TryUndo(
@@ -3503,13 +3503,13 @@ namespace BIMaestro.VideoGames
                     calculationInProgress: false,
                     out string label))
             {
-                ShowToast("Aucune action MEP à annuler");
+                ShowToast(UiLanguage.T("Aucune action MEP à annuler", "No MEP Action to Undo"));
                 return;
             }
             RebuildMepSourceItems();
             UpdateMepHistoryUi();
             RecalculateMepAsync(
-                "Annulé : " + label,
+                UiLanguage.T("Annulé : ", "Undone: ") + label,
                 saveScenarioAfterCalculation: true);
         }
 
@@ -3517,7 +3517,7 @@ namespace BIMaestro.VideoGames
         {
             if (_mepRecalculationRunning)
             {
-                ShowToast("Rétablissement refusé : calcul MEP en cours");
+                ShowToast(UiLanguage.T("Rétablissement refusé : calcul MEP en cours", "Redo Denied: MEP Calculation in Progress"));
                 return;
             }
             if (!_mepScenarioHistory.TryRedo(
@@ -3525,13 +3525,13 @@ namespace BIMaestro.VideoGames
                     calculationInProgress: false,
                     out string label))
             {
-                ShowToast("Aucune action MEP à rétablir");
+                ShowToast(UiLanguage.T("Aucune action MEP à rétablir", "No MEP Action to Redo"));
                 return;
             }
             RebuildMepSourceItems();
             UpdateMepHistoryUi();
             RecalculateMepAsync(
-                "Rétabli : " + label,
+                UiLanguage.T("Rétabli : ", "Redone: ") + label,
                 saveScenarioAfterCalculation: true);
         }
 
@@ -3544,11 +3544,11 @@ namespace BIMaestro.VideoGames
             MepRedoButton.IsEnabled =
                 _mepScenarioHistory.CanRedo && !_mepRecalculationRunning;
             MepUndoButton.ToolTip = _mepScenarioHistory.CanUndo
-                ? "Annuler : " + _mepScenarioHistory.UndoLabel
-                : "Aucune action à annuler";
+                ? UiLanguage.T("Annuler : ", "Undo: ") + _mepScenarioHistory.UndoLabel
+                : UiLanguage.T("Aucune action à annuler", "No Action to Undo");
             MepRedoButton.ToolTip = _mepScenarioHistory.CanRedo
-                ? "Rétablir : " + _mepScenarioHistory.RedoLabel
-                : "Aucune action à rétablir";
+                ? UiLanguage.T("Rétablir : ", "Redo: ") + _mepScenarioHistory.RedoLabel
+                : UiLanguage.T("Aucune action à rétablir", "No Action to Redo");
         }
 
         private async void RecalculateMepAsync(

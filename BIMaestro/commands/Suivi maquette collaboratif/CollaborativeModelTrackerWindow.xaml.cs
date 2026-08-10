@@ -13,15 +13,16 @@ using System.Windows.Threading;
 using Modification;
 using Color = System.Windows.Media.Color;
 using Forms = System.Windows.Forms;
+using BIMaestro.Localization;
 
 namespace Analyse
 {
     public partial class CollaborativeModelTrackerWindow : Window
     {
         private const string HelpUrl = "https://www.bimaestro.fr/analyse?outil=suivi-maquette";
-        private const string AllUsersLabel = "Tout le monde";
-        private const string AllVersionsLabel = "Toutes versions";
-        private const string AllFilesLabel = "Tous fichiers";
+        private static string AllUsersLabel => UiLanguage.T("Tout le monde", "Everyone");
+        private static string AllVersionsLabel => UiLanguage.T("Toutes versions", "All Versions");
+        private static string AllFilesLabel => UiLanguage.T("Tous fichiers", "All Files");
         private readonly Document _doc;
         private readonly UIApplication _uiapp;
         private List<CollaborativeModelRecord> _allRecords = new List<CollaborativeModelRecord>();
@@ -56,7 +57,7 @@ namespace Analyse
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.T($"Impossible d’ouvrir la page d’aide : {ex.Message}", $"Unable to open the help page: {ex.Message}"), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -113,7 +114,9 @@ namespace Analyse
             FileTypeComboBox.Text = selectedFileTypeItem;
 
             InfoText.Text =
-                $"{_allRecords.Select(r => r.ModelName).Distinct(StringComparer.OrdinalIgnoreCase).Count()} maquettes | JSON: {CollaborativeModelTrackerStore.JsonPath}" +
+                UiLanguage.T(
+                    $"{_allRecords.Select(r => r.ModelName).Distinct(StringComparer.OrdinalIgnoreCase).Count()} maquettes | JSON : {CollaborativeModelTrackerStore.JsonPath}",
+                    $"{_allRecords.Select(r => r.ModelName).Distinct(StringComparer.OrdinalIgnoreCase).Count()} models | JSON: {CollaborativeModelTrackerStore.JsonPath}") +
                 (string.IsNullOrWhiteSpace(CollaborativeModelTrackerStore.LastDirectoryResolutionMessage)
                     ? string.Empty
                     : $"\n{CollaborativeModelTrackerStore.LastDirectoryResolutionMessage}");
@@ -132,9 +135,8 @@ namespace Analyse
                 return;
 
             var result = MessageBox.Show(
-                "Le chemin partagé par défaut est inaccessible.Voulez - vous choisir maintenant un dossier commun(serveur) ?",
-
-                "Choisir un chemin commun",
+                UiLanguage.T("Le chemin partagé par défaut est inaccessible. Voulez-vous choisir maintenant un dossier commun (serveur) ?", "The default shared path is unavailable. Would you like to select a common server folder now?"),
+                UiLanguage.T("Choisir un chemin commun", "Select a Common Path"),
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
 
@@ -143,7 +145,7 @@ namespace Analyse
 
             using (var dialog = new Forms.FolderBrowserDialog())
             {
-                dialog.Description = "Sélectionnez le dossier commun pour stocker le JSON/Excel de suivi";
+                dialog.Description = UiLanguage.T("Sélectionnez le dossier commun pour stocker le JSON/Excel de suivi", "Select the common folder used to store the tracking JSON/Excel files");
                 dialog.SelectedPath = CollaborativeModelTrackerStore.ActiveDirectory;
 
                 if (dialog.ShowDialog() != Forms.DialogResult.OK || string.IsNullOrWhiteSpace(dialog.SelectedPath))
@@ -151,9 +153,8 @@ namespace Analyse
 
                 if (!CollaborativeModelTrackerStore.TrySetSharedDirectory(dialog.SelectedPath, out var error))
                 {
-                    MessageBox.Show($"Le chemin sélectionné n'est pas utilisable : { error}",
-
-                     "Chemin invalide", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show(UiLanguage.T($"Le chemin sélectionné n'est pas utilisable : {error}", $"The selected path cannot be used: {error}"),
+                     UiLanguage.T("Chemin invalide", "Invalid Path"), MessageBoxButton.OK, MessageBoxImage.Warning);
                    
                     
                     return;
@@ -219,9 +220,9 @@ namespace Analyse
                 var m = models[i];
                 cards.Add(new ProjectCard
                 {
-                    ModelName = m.ModelName,
-                    ProjectName = m.ProjectName,
-                    ModelPath = m.ModelPath,
+                    ModelName = UiLanguage.T(m.ModelName),
+                    ProjectName = UiLanguage.T(m.ProjectName),
+                    ModelPath = UiLanguage.T(m.ModelPath),
                     UserName = m.UserName,
                     CreatorName = m.CreatorName,
                     RevitVersion = m.RevitVersion,
@@ -298,7 +299,7 @@ namespace Analyse
             }
 
             if (string.IsNullOrWhiteSpace(ext))
-                return "(sans extension)";
+                return UiLanguage.T("(sans extension)", "(no extension)");
 
             return ext.Trim().TrimStart('.').ToUpperInvariant();
         }
@@ -317,12 +318,13 @@ namespace Analyse
         private void ChangeSharedPath_Click(object sender, RoutedEventArgs e)
         {
             var explanation =
-                "Pour un suivi collaboratif fiable, choisissez un dossier sur un serveur commun. " +
-                "Si le chemin reste local (PC perso), les autres utilisateurs ne pourront pas lire ou écrire les mêmes fichiers JSON/Excel.";
+                UiLanguage.T(
+                    "Pour un suivi collaboratif fiable, choisissez un dossier sur un serveur commun. Si le chemin reste local (PC perso), les autres utilisateurs ne pourront pas lire ou écrire les mêmes fichiers JSON/Excel.",
+                    "For reliable collaborative tracking, select a folder on a shared server. If the path remains local to your computer, other users will not be able to read or write the same JSON/Excel files.");
 
             var userChoice = MessageBox.Show(
-                explanation + "\n\nVoulez-vous choisir ou modifier ce chemin maintenant ?",
-                "Chemin commun recommandé",
+                explanation + UiLanguage.T("\n\nVoulez-vous choisir ou modifier ce chemin maintenant ?", "\n\nWould you like to select or change this path now?"),
+                UiLanguage.T("Chemin commun recommandé", "Common Path Recommended"),
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Information);
 
@@ -331,7 +333,7 @@ namespace Analyse
 
             using (var dialog = new Forms.FolderBrowserDialog())
             {
-                dialog.Description = "Sélectionnez le dossier commun (serveur) pour le suivi des maquettes";
+                dialog.Description = UiLanguage.T("Sélectionnez le dossier commun (serveur) pour le suivi des maquettes", "Select the common server folder for model tracking");
                 dialog.SelectedPath = CollaborativeModelTrackerStore.ActiveDirectory;
 
                 if (dialog.ShowDialog() != Forms.DialogResult.OK || string.IsNullOrWhiteSpace(dialog.SelectedPath))
@@ -339,8 +341,8 @@ namespace Analyse
 
                 if (!CollaborativeModelTrackerStore.TrySetSharedDirectory(dialog.SelectedPath, out var error))
                 {
-                    MessageBox.Show($"Le chemin sélectionné n'est pas utilisable : {error}",
-                        "Chemin invalide",
+                    MessageBox.Show(UiLanguage.T($"Le chemin sélectionné n'est pas utilisable : {error}", $"The selected path cannot be used: {error}"),
+                        UiLanguage.T("Chemin invalide", "Invalid Path"),
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);
                     return;
@@ -350,8 +352,8 @@ namespace Analyse
                 ApplyFilters();
 
                 MessageBox.Show(
-                    "Chemin commun mis à jour avec succès. Tous les utilisateurs pointant ce même dossier partageront les mêmes fichiers de suivi.",
-                    "Chemin mis à jour",
+                    UiLanguage.T("Chemin commun mis à jour avec succès. Tous les utilisateurs pointant ce même dossier partageront les mêmes fichiers de suivi.", "The common path was updated successfully. All users pointing to this folder will share the same tracking files."),
+                    UiLanguage.T("Chemin mis à jour", "Path Updated"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
             }
@@ -382,13 +384,15 @@ namespace Analyse
             }
             catch
             {
-                MessageBox.Show("Impossible d'ouvrir le dossier du projet sélectionné.", "Info", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.T("Impossible d'ouvrir le dossier du projet sélectionné.", "Unable to open the selected project folder."), "Info", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
         private static string ResolveFolderFromModelPath(string modelPath)
         {
-            if (!string.IsNullOrWhiteSpace(modelPath) && !modelPath.Equals("Chemin non disponible", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrWhiteSpace(modelPath) &&
+                !modelPath.Equals("Chemin non disponible", StringComparison.OrdinalIgnoreCase) &&
+                !modelPath.Equals("Path unavailable", StringComparison.OrdinalIgnoreCase))
             {
                 var candidates = modelPath
                     .Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries)

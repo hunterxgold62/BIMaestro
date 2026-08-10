@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using BIMaestro.Localization;
 
 namespace Modification
 {
@@ -27,7 +28,7 @@ namespace Modification
             ICollection<ElementId> selectedIds = uiDoc.Selection.GetElementIds();
             if (selectedIds.Count == 0)
             {
-                TaskDialog.Show("Sélection", "Aucun élément sélectionné. Veuillez sélectionner des éléments dans Revit.");
+                TaskDialog.Show(UiLanguage.T("Sélection", "Selection"), UiLanguage.T("Aucun élément sélectionné. Veuillez sélectionner des éléments dans Revit.", "No Element Selected. Select Elements in Revit."));
                 return Result.Cancelled;
             }
 
@@ -42,9 +43,8 @@ namespace Modification
                 if (viewportCount != selectedElements.Count)
                 {
                     TaskDialog.Show(
-                        "Sélection incompatible",
-                        "La sélection mélange des fenêtres de vue et d'autres éléments.\n\n" +
-                        "Sélectionnez uniquement les fenêtres de vue à numéroter.");
+                        UiLanguage.T("Sélection incompatible", "Incompatible Selection"),
+                        UiLanguage.T("La sélection mélange des fenêtres de vue et d'autres éléments.\n\nSélectionnez uniquement les fenêtres de vue à numéroter.", "The Selection Mixes Viewports and Other Elements.\n\nSelect Only the Viewports to Number."));
                     return Result.Cancelled;
                 }
 
@@ -57,7 +57,7 @@ namespace Modification
 
             if (!textParameters.Any())
             {
-                TaskDialog.Show("Erreur", "Aucun paramètre texte modifiable trouvé sur les éléments sélectionnés.");
+                TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T("Aucun paramètre texte modifiable trouvé sur les éléments sélectionnés.", "No Editable Text Parameter Found on the Selected Elements."));
                 return Result.Failed;
             }
 
@@ -104,7 +104,7 @@ namespace Modification
                             {
                                 if (!int.TryParse(renamerWindow.StartNumber, out currentNumber))
                                 {
-                                    TaskDialog.Show("Erreur", "Le numéro de départ doit être un nombre entier pour le format sélectionné.");
+                                    TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T("Le numéro de départ doit être un nombre entier pour le format sélectionné.", "The Starting Number Must Be an Integer for the Selected Format."));
                                     tx.RollBack();
                                     return Result.Failed;
                                 }
@@ -114,7 +114,7 @@ namespace Modification
                                 currentNumber = LettersToNumber(renamerWindow.StartNumber.ToUpper());
                                 if (currentNumber == -1)
                                 {
-                                    TaskDialog.Show("Erreur", "Le numéro de départ doit être une lettre (A-Z) ou une séquence alphabétique valide pour le format alphabétique.");
+                                    TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T("Le numéro de départ doit être une lettre (A-Z) ou une séquence alphabétique valide pour le format alphabétique.", "The Starting Number Must Be a Letter (A-Z) or a Valid Alphabetic Sequence."));
                                     tx.RollBack();
                                     return Result.Failed;
                                 }
@@ -141,7 +141,7 @@ namespace Modification
                                 // Vérifier si tous les éléments ont un paramètre de niveau
                                 if (!AllElementsHaveLevel(elementLocations))
                                 {
-                                    TaskDialog.Show("Erreur", "Tous les éléments n'ont pas de paramètre 'Niveau'. Le tri par niveau n'est pas possible pour ces éléments. Veuillez trier niveau par niveau.");
+                                    TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T("Tous les éléments n'ont pas de paramètre 'Niveau'. Le tri par niveau n'est pas possible pour ces éléments. Veuillez trier niveau par niveau.", "Not All Elements Have a 'Level' Parameter. These Elements Cannot Be Sorted by Level; Process One Level at a Time."));
                                     tx.RollBack();
                                     return Result.Failed;
                                 }
@@ -197,7 +197,7 @@ namespace Modification
                     catch (Exception ex)
                     {
                         tx.RollBack();
-                        TaskDialog.Show("Erreur", $"Une erreur est survenue : {ex.Message}");
+                        TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T("Une erreur est survenue : ", "An Error Occurred: ") + ex.Message);
                         return Result.Failed;
                     }
                 }
@@ -218,7 +218,7 @@ namespace Modification
             {
                 TaskDialog.Show(
                     "Feuille requise",
-                    "Pour numéroter des fenêtres de vue, ouvrez leur feuille puis relancez Organisateur.");
+                    UiLanguage.T("Pour numéroter des fenêtres de vue, ouvrez leur feuille puis relancez Organisateur.", "To Number Viewports, Open Their Sheet and Run Organizer Again."));
                 return Result.Cancelled;
             }
 
@@ -227,8 +227,8 @@ namespace Modification
             if (selectedViewports.Any(viewport => !viewportIdsOnSheet.Contains(viewport.Id.IntegerValue)))
             {
                 TaskDialog.Show(
-                    "Sélection incompatible",
-                    "Toutes les fenêtres de vue sélectionnées doivent appartenir à la feuille active.");
+                    UiLanguage.T("Sélection incompatible", "Incompatible Selection"),
+                    UiLanguage.T("Toutes les fenêtres de vue sélectionnées doivent appartenir à la feuille active.", "All Selected Viewports Must Belong to the Active Sheet."));
                 return Result.Cancelled;
             }
 
@@ -393,13 +393,13 @@ namespace Modification
                 currentNumber = LettersToNumber((renamerWindow.StartNumber ?? string.Empty).ToUpperInvariant());
                 if (currentNumber < 1)
                 {
-                    error = "Le numéro de départ doit être une lettre ou une séquence alphabétique valide.";
+                    error = UiLanguage.T("Le numéro de départ doit être une lettre ou une séquence alphabétique valide.", "The Starting Number Must Be a Letter or a Valid Alphabetic Sequence.");
                     return false;
                 }
             }
             else if (!int.TryParse(renamerWindow.StartNumber, out currentNumber))
             {
-                error = "Le numéro de départ doit être un nombre entier.";
+                error = UiLanguage.T("Le numéro de départ doit être un nombre entier.", "The Starting Number Must Be an Integer.");
                 return false;
             }
 
@@ -456,7 +456,7 @@ namespace Modification
             if (conflicts.Count > 0)
             {
                 throw new InvalidOperationException(
-                    "Ces numéros sont déjà utilisés par d'autres fenêtres de la feuille : " +
+                    UiLanguage.T("Ces numéros sont déjà utilisés par d'autres fenêtres de la feuille : ", "These Numbers Are Already Used by Other Viewports on the Sheet: ") +
                     string.Join(", ", conflicts) + ".");
             }
 
@@ -486,7 +486,7 @@ namespace Modification
             if (parameter == null || parameter.IsReadOnly || parameter.StorageType != StorageType.String)
             {
                 throw new InvalidOperationException(
-                    "Le numéro de détail d'une fenêtre de vue sélectionnée n'est pas modifiable.");
+                    UiLanguage.T("Le numéro de détail d'une fenêtre de vue sélectionnée n'est pas modifiable.", "The Detail Number of a Selected Viewport Cannot Be Modified."));
             }
 
             parameter.Set(value);
@@ -501,7 +501,7 @@ namespace Modification
             if (views.Count != viewports.Count)
             {
                 throw new InvalidOperationException(
-                    "Une même vue est présente plusieurs fois dans la sélection et ne peut pas recevoir plusieurs noms.");
+                    UiLanguage.T("Une même vue est présente plusieurs fois dans la sélection et ne peut pas recevoir plusieurs noms.", "The Same View Appears Multiple Times in the Selection and Cannot Receive Multiple Names."));
             }
 
             var selectedViewIds = new HashSet<int>(views.Select(view => view.Id.IntegerValue));
@@ -520,7 +520,7 @@ namespace Modification
             if (conflicts.Count > 0)
             {
                 throw new InvalidOperationException(
-                    "Ces noms de vue existent déjà dans le projet : " +
+                    UiLanguage.T("Ces noms de vue existent déjà dans le projet : ", "These View Names Already Exist in the Project: ") +
                     string.Join(", ", conflicts) + ".");
             }
 
@@ -551,7 +551,7 @@ namespace Modification
                 if (parameter == null || parameter.IsReadOnly || parameter.StorageType != StorageType.String)
                 {
                     throw new InvalidOperationException(
-                        "Le titre sur la feuille d'une vue sélectionnée n'est pas modifiable.");
+                        UiLanguage.T("Le titre sur la feuille d'une vue sélectionnée n'est pas modifiable.", "The Title on Sheet of a Selected View Cannot Be Modified."));
                 }
 
                 parameter.Set(desiredValues[index]);

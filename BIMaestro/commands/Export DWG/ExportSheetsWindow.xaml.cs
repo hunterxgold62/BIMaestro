@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using MessageBox = System.Windows.MessageBox;
+using BIMaestro.Localization;
 
 namespace Visualisation
 {
@@ -39,7 +40,7 @@ namespace Visualisation
         {
             var dlg = new CommonOpenFileDialog
             {
-                Title = "Choisissez le dossier d’export DWG",
+                Title = UiLanguage.T("Choisissez le dossier d’export DWG", "Choose the DWG export folder"),
                 IsFolderPicker = true,
                 AllowNonFileSystemItems = false,
                 EnsurePathExists = true,
@@ -59,7 +60,7 @@ namespace Visualisation
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro",
+                MessageBox.Show(UiLanguage.T($"Impossible d’ouvrir la page d’aide : {ex.Message}", $"Unable to open the help page: {ex.Message}"), "BIMaestro",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
@@ -68,7 +69,7 @@ namespace Visualisation
             string setName = SheetSetComboBox.Text?.Trim();
             if (string.IsNullOrEmpty(setName))
             {
-                MessageBox.Show("Veuillez saisir un nom de jeu de feuilles.", "Erreur",
+                MessageBox.Show(UiLanguage.T("Veuillez saisir un nom de jeu de feuilles.", "Enter a sheet set name."), UiLanguage.T("Erreur", "Error"),
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -78,7 +79,7 @@ namespace Visualisation
 
             if (sheetSet == null)
             {
-                MessageBox.Show($"Le jeu '{setName}' n'existe pas.", "Erreur",
+                MessageBox.Show(UiLanguage.T($"Le jeu '{setName}' n'existe pas.", $"The sheet set '{setName}' does not exist."), UiLanguage.T("Erreur", "Error"),
                     MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
@@ -86,7 +87,7 @@ namespace Visualisation
             string exportDir = FolderTextBox.Text;
             if (string.IsNullOrEmpty(exportDir) || !Directory.Exists(exportDir))
             {
-                MessageBox.Show("Veuillez choisir un dossier d’export valide.", "Erreur",
+                MessageBox.Show(UiLanguage.T("Veuillez choisir un dossier d’export valide.", "Choose a valid export folder."), UiLanguage.T("Erreur", "Error"),
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -97,7 +98,7 @@ namespace Visualisation
             var sheets = sheetSet.Views.OfType<ViewSheet>().ToList();
             if (sheets.Count == 0)
             {
-                MessageBox.Show("Aucune feuille à exporter dans ce jeu.", "Info",
+                MessageBox.Show(UiLanguage.T("Aucune feuille à exporter dans ce jeu.", "This set contains no sheets to export."), UiLanguage.T("Info", "Information"),
                     MessageBoxButton.OK, MessageBoxImage.Information);
                 Close();
                 return;
@@ -140,8 +141,10 @@ namespace Visualisation
             sw.Stop();
 
             MessageBox.Show(
-                $"Export de {sheets.Count} feuilles réalisé en {sw.Elapsed:mm\\:ss}.",
-                "Terminé", MessageBoxButton.OK, MessageBoxImage.Information);
+                UiLanguage.T(
+                    $"Export de {sheets.Count} feuilles réalisé en {sw.Elapsed:mm\\:ss}.",
+                    $"Exported {sheets.Count} sheets in {sw.Elapsed:mm\\:ss}."),
+                UiLanguage.T("Terminé", "Complete"), MessageBoxButton.OK, MessageBoxImage.Information);
 
             Close();
         }

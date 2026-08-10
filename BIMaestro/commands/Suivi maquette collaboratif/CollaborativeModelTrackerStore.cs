@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using BIMaestro.Localization;
 
 namespace Analyse
 {
@@ -88,7 +89,7 @@ namespace Analyse
             {
                 if (string.IsNullOrWhiteSpace(directory))
                 {
-                    error = "Chemin vide.";
+                    error = UiLanguage.T("Chemin vide.", "The path is empty.");
                     return false;
                 }
 
@@ -99,7 +100,7 @@ namespace Analyse
                 _configuredSharedDirectory = directory;
                 PersistConfiguredDirectory(directory);
                 _activeDirectory = directory;
-                _lastDirectoryResolutionMessage = $"Dossier commun personnalisé utilisé: {directory}";
+                _lastDirectoryResolutionMessage = UiLanguage.T($"Dossier commun personnalisé utilisé : {directory}", $"Custom common folder in use: {directory}");
                 return true;
             }
         }
@@ -323,14 +324,14 @@ namespace Analyse
 
                 string[] headers =
                 {
-                    "Projet",
-                    "Maquette",
-                    "Chemin",
-                    "Utilisateur",
-                    "Créateur (1er ouvert)",
-                    "Dernière modification",
-                    "Version Revit",
-                    "Date"
+                    UiLanguage.T("Projet", "Project"),
+                    UiLanguage.T("Maquette", "Model"),
+                    UiLanguage.T("Chemin", "Path"),
+                    UiLanguage.T("Utilisateur", "User"),
+                    UiLanguage.T("Créateur (1er ouvert)", "Creator (First Opened)"),
+                    UiLanguage.T("Dernière modification", "Last Modified By"),
+                    UiLanguage.T("Version Revit", "Revit Version"),
+                    UiLanguage.T("Date", "Date")
                 };
 
                 var headerRow = ws.CreateRow(0);
@@ -481,14 +482,14 @@ namespace Analyse
             if (!string.IsNullOrWhiteSpace(_configuredSharedDirectory) && TryCreateAndWrite(_configuredSharedDirectory, out var customErr))
             {
                 _activeDirectory = _configuredSharedDirectory;
-                _lastDirectoryResolutionMessage = $"Dossier commun personnalisé utilisé: {_configuredSharedDirectory}";
+                _lastDirectoryResolutionMessage = UiLanguage.T($"Dossier commun personnalisé utilisé : {_configuredSharedDirectory}", $"Custom common folder in use: {_configuredSharedDirectory}");
                 return _activeDirectory;
             }
 
             if (TryCreateAndWrite(PreferredSharedDirectory, out var prefError))
             {
                 _activeDirectory = PreferredSharedDirectory;
-                _lastDirectoryResolutionMessage = $"Dossier partagé utilisé: {PreferredSharedDirectory}";
+                _lastDirectoryResolutionMessage = UiLanguage.T($"Dossier partagé utilisé : {PreferredSharedDirectory}", $"Shared folder in use: {PreferredSharedDirectory}");
                 return _activeDirectory;
             }
 
@@ -496,13 +497,17 @@ namespace Analyse
             {
                 _activeDirectory = FallbackDirectory;
                 _lastDirectoryResolutionMessage =
-                    $"Lecteur partagé indisponible ({PreferredSharedDirectory}). Fallback local utilisé: {FallbackDirectory}. Erreur initiale: {prefError}";
+                    UiLanguage.T(
+                        $"Lecteur partagé indisponible ({PreferredSharedDirectory}). Dossier local utilisé : {FallbackDirectory}. Erreur initiale : {prefError}",
+                        $"Shared drive unavailable ({PreferredSharedDirectory}). Local folder in use: {FallbackDirectory}. Initial error: {prefError}");
                 return _activeDirectory;
             }
 
             _activeDirectory = PreferredSharedDirectory;
             _lastDirectoryResolutionMessage =
-                $"Impossible d'initialiser les dossiers de sortie. Erreur partagé: {prefError} | Erreur fallback: {fallbackError}";
+                UiLanguage.T(
+                    $"Impossible d'initialiser les dossiers de sortie. Erreur partagée : {prefError} | Erreur locale : {fallbackError}",
+                    $"Unable to initialize output folders. Shared error: {prefError} | Local error: {fallbackError}");
             return _activeDirectory;
         }
 

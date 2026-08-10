@@ -12,6 +12,7 @@ using System.IO;
 using Newtonsoft.Json;
 using Grid = System.Windows.Controls.Grid;
 using Color = System.Windows.Media.Color;
+using BIMaestro.Localization;
 
 namespace ScanTextRevit
 {
@@ -88,7 +89,7 @@ namespace ScanTextRevit
             }
             catch (System.Exception ex)
             {
-                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.T($"Impossible d’ouvrir la page d’aide : {ex.Message}", $"Unable to open the help page: {ex.Message}"), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -152,7 +153,7 @@ namespace ScanTextRevit
             ProgressBarPanel.Visibility = System.Windows.Visibility.Collapsed;
             TextBlock done = new TextBlock
             {
-                Text = "Toutes les corrections sont terminées.",
+                Text = UiLanguage.T("Toutes les corrections sont terminées.", "All corrections are complete."),
                 FontSize = 14,
                 FontWeight = FontWeights.Bold,
                 Foreground = Brushes.DarkGreen,
@@ -266,6 +267,16 @@ namespace ScanTextRevit
 
         private void AddHeader(string text)
         {
+            if (UiLanguage.IsEnglish && !string.IsNullOrWhiteSpace(text))
+            {
+                if (text.StartsWith("Feuille :", StringComparison.CurrentCultureIgnoreCase))
+                    text = "Sheet:" + text.Substring("Feuille :".Length);
+                else if (text.StartsWith("Vue :", StringComparison.CurrentCultureIgnoreCase))
+                    text = "View:" + text.Substring("Vue :".Length);
+                else if (text.StartsWith("Nomenclature :", StringComparison.CurrentCultureIgnoreCase))
+                    text = "Schedule:" + text.Substring("Nomenclature :".Length);
+            }
+
             TextBlock header = new TextBlock
             {
                 Text = text,
@@ -298,7 +309,7 @@ namespace ScanTextRevit
             // Texte original
             TextBlock originalText = new TextBlock
             {
-                Text = "Texte original : " + item.OriginalText,
+                Text = UiLanguage.T("Texte original : ", "Original Text: ") + item.OriginalText,
                 FontSize = 13,
                 TextWrapping = TextWrapping.Wrap,
                 Foreground = new SolidColorBrush(Colors.Black)
@@ -322,7 +333,7 @@ namespace ScanTextRevit
             {
                 correctedColor = Color.FromRgb(199, 119, 0);
             }
-            string correctedLabel = "Texte corrigé : " + item.CorrectedText;
+            string correctedLabel = UiLanguage.T("Texte corrigé : ", "Corrected Text: ") + item.CorrectedText;
             if (repetitionCount > 1)
             {
                 correctedLabel += $" (x{repetitionCount})";
@@ -342,7 +353,7 @@ namespace ScanTextRevit
             // Bouton "Copier"
             Button copyButton = new Button
             {
-                Content = "Copier",
+                Content = UiLanguage.T("Copier", "Copy"),
                 Margin = new Thickness(0, 0, 8, 0),
                 Padding = new Thickness(5, 2, 5, 2),
                 Cursor = Cursors.Hand,
@@ -358,7 +369,9 @@ namespace ScanTextRevit
             // Bouton "Afficher"
             Button showButton = new Button
             {
-                Content = repetitions != null && repetitions.Count > 1 ? "Afficher ▼" : "Afficher",
+                Content = repetitions != null && repetitions.Count > 1
+                    ? UiLanguage.T("Afficher ▼", "Show ▼")
+                    : UiLanguage.T("Afficher", "Show"),
                 Margin = new Thickness(0),
                 Padding = new Thickness(5, 2, 5, 2),
                 Cursor = Cursors.Hand,
@@ -407,7 +420,7 @@ namespace ScanTextRevit
             // Explication
             TextBlock explanationText = new TextBlock
             {
-                Text = "Explication : " + item.Explanation,
+                Text = UiLanguage.T("Explication : ", "Explanation: ") + item.Explanation,
                 FontSize = 12,
                 FontStyle = FontStyles.Italic,
                 TextWrapping = TextWrapping.Wrap,
@@ -436,7 +449,7 @@ namespace ScanTextRevit
                 _showElementEvent == null)
             {
                 MessageBox.Show(
-                    "L'élément ne peut pas être affiché.",
+                    UiLanguage.T("L'élément ne peut pas être affiché.", "The element cannot be displayed."),
                     "BIMaestro",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
@@ -452,7 +465,7 @@ namespace ScanTextRevit
             if (result == ExternalEventRequest.Denied)
             {
                 MessageBox.Show(
-                    "Revit ne peut pas traiter cette demande pour le moment.",
+                    UiLanguage.T("Revit ne peut pas traiter cette demande pour le moment.", "Revit cannot process this request right now."),
                     "BIMaestro",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
@@ -503,14 +516,14 @@ namespace ScanTextRevit
                     {
                         TaskDialog.Show(
                             "BIMaestro",
-                            "Le document analysé n'est plus le document actif. Revenez dans ce document puis réessayez.");
+                            UiLanguage.T("Le document analysé n'est plus le document actif. Revenez dans ce document puis réessayez.", "The analyzed document is no longer active. Return to that document and try again."));
                         return;
                     }
 
                     Element element = _document.GetElement(CreateElementId(elementId.Value));
                     if (element == null)
                     {
-                        TaskDialog.Show("BIMaestro", "L'élément n'existe plus dans le document.");
+                        TaskDialog.Show("BIMaestro", UiLanguage.T("L'élément n'existe plus dans le document.", "The element no longer exists in the document."));
                         return;
                     }
 
@@ -550,7 +563,7 @@ namespace ScanTextRevit
                 {
                     TaskDialog.Show(
                         "BIMaestro",
-                        "Impossible d'afficher cet élément sans risque pour Revit.\n\n" + ex.Message);
+                        UiLanguage.T("Impossible d'afficher cet élément sans risque pour Revit.\n\n", "Unable to display this element safely in Revit.\n\n") + ex.Message);
                 }
             }
 

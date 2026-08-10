@@ -5,6 +5,7 @@ using System.Linq;
 using System.Collections.Generic;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 
 namespace Famille
 {
@@ -41,8 +42,8 @@ namespace Famille
                 targetPaths = targetPaths.Where(File.Exists).ToList();
                 if (targetPaths.Count == 0)
                 {
-                    TaskDialog.Show("BIMaestro - Rechargement",
-                        "Chemin de famille invalide ou fichier introuvable.");
+                    TaskDialog.Show(UiLanguage.T("BIMaestro - Rechargement", "BIMaestro - Reload"),
+                        UiLanguage.T("Chemin de famille invalide ou fichier introuvable.", "Invalid family path or file not found."));
                     return;
                 }
 
@@ -77,16 +78,20 @@ namespace Famille
                                 .Cast<Family>()
                                 .FirstOrDefault(f => f.Name.Equals(famName, StringComparison.OrdinalIgnoreCase));
                             if (reloaded == null)
-                                throw new InvalidOperationException($"Impossible de retrouver « {famName} » après rechargement.");
+                                throw new InvalidOperationException(UiLanguage.T(
+                                    $"Impossible de retrouver « {famName} » après rechargement.",
+                                    $"Unable to find “{famName}” after reloading."));
                         }
 
                         SafeRegenerate(doc);
 
                         if (singleMode)
                         {
-                            string suffix = fileUnchanged ? " (déjà à jour)." : " (nouvelle version détectée).";
-                            TaskDialog.Show("BIMaestro - Rechargement",
-                                $"La famille « {famName} » a été rechargée avec succès{suffix}");
+                            string suffix = fileUnchanged
+                                ? UiLanguage.T(" (déjà à jour).", " (already up to date).")
+                                : UiLanguage.T(" (nouvelle version détectée).", " (new version detected).");
+                            TaskDialog.Show(UiLanguage.T("BIMaestro - Rechargement", "BIMaestro - Reload"),
+                                UiLanguage.T($"La famille « {famName} » a été rechargée avec succès{suffix}", $"The family “{famName}” was reloaded successfully{suffix}"));
 
                             ElementId symId = reloaded.GetFamilySymbolIds().FirstOrDefault();
                             if (symId != ElementId.InvalidElementId)
@@ -124,16 +129,16 @@ namespace Famille
 
                 if (!singleMode)
                 {
-                    string message = $"Familles rechargées : {ok}\nÉchecs : {fail}";
+                    string message = UiLanguage.T($"Familles rechargées : {ok}\nÉchecs : {fail}", $"Families reloaded: {ok}\nFailures: {fail}");
                     if (!string.IsNullOrWhiteSpace(firstError))
-                        message += $"\n\nPremier détail d'erreur : {firstError}";
-                    TaskDialog.Show("BIMaestro - Rechargement", message);
+                        message += UiLanguage.T($"\n\nPremier détail d'erreur : {firstError}", $"\n\nFirst error detail: {firstError}");
+                    TaskDialog.Show(UiLanguage.T("BIMaestro - Rechargement", "BIMaestro - Reload"), message);
                 }
             }
             catch (Exception ex)
             {
                 // Si quelque chose d'autre plante, on l'affiche.
-                TaskDialog.Show("BIMaestro - Rechargement (erreur)", ex.Message);
+                TaskDialog.Show(UiLanguage.T("BIMaestro - Rechargement (erreur)", "BIMaestro - Reload Error"), ex.Message);
             }
         }
 

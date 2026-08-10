@@ -3,6 +3,7 @@ using Autodesk.Revit.DB;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using BIMaestro.Localization;
 
 namespace Analyse
 {
@@ -47,7 +48,7 @@ namespace Analyse
                     .ToList();
                 if (idsToDelete == null || idsToDelete.Count == 0)
                 {
-                    TaskDialog.Show("Suppression", "Aucun élément à supprimer n'a été fourni.");
+                    TaskDialog.Show(UiLanguage.T("Suppression", "Deletion"), UiLanguage.T("Aucun élément à supprimer n'a été fourni.", "No element was provided for deletion."));
                     return;
                 }
 
@@ -61,7 +62,7 @@ namespace Analyse
             }
             catch (Exception ex)
             {
-                TaskDialog.Show("Suppression", $"Erreur lors de la suppression : {ex.Message}");
+                TaskDialog.Show(UiLanguage.T("Suppression", "Deletion"), UiLanguage.T($"Erreur lors de la suppression : {ex.Message}", $"Error while deleting: {ex.Message}"));
             }
             finally
             {

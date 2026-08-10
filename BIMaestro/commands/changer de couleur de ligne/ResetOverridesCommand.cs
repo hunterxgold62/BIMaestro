@@ -3,6 +3,7 @@ using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using System;
 using System.Linq;
+using BIMaestro.Localization;
 
 namespace Modification
 {
@@ -18,7 +19,7 @@ namespace Modification
             var selectedIds = uidoc.Selection.GetElementIds();
             if (selectedIds.Count == 0)
             {
-                TaskDialog.Show("Error", "Oops, t'as oublié un truc... genre, un choix. Clique, c’est facile ! 😏");
+                TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T("Aucun élément sélectionné. Sélectionnez d’abord les éléments à réinitialiser.", "No Element Selected. First Select the Elements to Reset."));
                 return Result.Failed;
             }
 

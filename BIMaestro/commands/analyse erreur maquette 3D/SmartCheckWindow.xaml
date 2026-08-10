@@ -532,9 +532,9 @@
                                   RowStyle="{StaticResource IssueRowStyle}"
                                   CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="Gravité" Binding="{Binding SeverityText}" Width="110"/>
-                                <DataGridTextColumn Header="Statut" Binding="{Binding StatusText}" Width="105"/>
-                                <DataGridTextColumn Header="Type" Binding="{Binding Category}" Width="170"/>
+                                <DataGridTextColumn Header="Gravité" Binding="{Binding SeverityDisplayText}" Width="110"/>
+                                <DataGridTextColumn Header="Statut" Binding="{Binding StatusDisplayText}" Width="105"/>
+                                <DataGridTextColumn Header="Type" Binding="{Binding CategoryDisplayText}" Width="170"/>
                                 <DataGridTextColumn Header="Niveau" Binding="{Binding LevelName}" Width="120"/>
                                 <DataGridTextColumn Header="Catégorie" Binding="{Binding ElementCategory}" Width="130"/>
                                 <DataGridTextColumn Header="Lien" Binding="{Binding LinkName}" Width="140"/>
@@ -560,9 +560,9 @@
                                   RowStyle="{StaticResource IssueRowStyle}"
                                   CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="Gravité" Binding="{Binding SeverityText}" Width="110"/>
-                                <DataGridTextColumn Header="Statut" Binding="{Binding StatusText}" Width="105"/>
-                                <DataGridTextColumn Header="Type" Binding="{Binding Category}" Width="170"/>
+                                <DataGridTextColumn Header="Gravité" Binding="{Binding SeverityDisplayText}" Width="110"/>
+                                <DataGridTextColumn Header="Statut" Binding="{Binding StatusDisplayText}" Width="105"/>
+                                <DataGridTextColumn Header="Type" Binding="{Binding CategoryDisplayText}" Width="170"/>
                                 <DataGridTextColumn Header="Niveau" Binding="{Binding LevelName}" Width="120"/>
                                 <DataGridTextColumn Header="Catégorie" Binding="{Binding ElementCategory}" Width="130"/>
                                 <DataGridTextColumn Header="Id" Binding="{Binding ElementIdValue}" Width="80"/>
@@ -587,9 +587,9 @@
                                   RowStyle="{StaticResource IssueRowStyle}"
                                   CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="Gravité" Binding="{Binding SeverityText}" Width="110"/>
-                                <DataGridTextColumn Header="Statut" Binding="{Binding StatusText}" Width="105"/>
-                                <DataGridTextColumn Header="Type" Binding="{Binding Category}" Width="170"/>
+                                <DataGridTextColumn Header="Gravité" Binding="{Binding SeverityDisplayText}" Width="110"/>
+                                <DataGridTextColumn Header="Statut" Binding="{Binding StatusDisplayText}" Width="105"/>
+                                <DataGridTextColumn Header="Type" Binding="{Binding CategoryDisplayText}" Width="170"/>
                                 <DataGridTextColumn Header="Niveau" Binding="{Binding LevelName}" Width="120"/>
                                 <DataGridTextColumn Header="Lien" Binding="{Binding LinkName}" Width="160"/>
                                 <DataGridTextColumn Header="Id" Binding="{Binding ElementIdValue}" Width="80"/>
@@ -614,9 +614,9 @@
                                   RowStyle="{StaticResource IssueRowStyle}"
                                   CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="Gravité" Binding="{Binding SeverityText}" Width="110"/>
-                                <DataGridTextColumn Header="Statut" Binding="{Binding StatusText}" Width="105"/>
-                                <DataGridTextColumn Header="Type" Binding="{Binding Category}" Width="170"/>
+                                <DataGridTextColumn Header="Gravité" Binding="{Binding SeverityDisplayText}" Width="110"/>
+                                <DataGridTextColumn Header="Statut" Binding="{Binding StatusDisplayText}" Width="105"/>
+                                <DataGridTextColumn Header="Type" Binding="{Binding CategoryDisplayText}" Width="170"/>
                                 <DataGridTextColumn Header="Niveau" Binding="{Binding LevelName}" Width="120"/>
                                 <DataGridTextColumn Header="Catégorie" Binding="{Binding ElementCategory}" Width="130"/>
                                 <DataGridTextColumn Header="Id" Binding="{Binding ElementIdValue}" Width="80"/>

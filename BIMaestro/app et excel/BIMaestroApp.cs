@@ -6,6 +6,7 @@ using Licensing;
 using System;
 using System.IO;
 using System.Reflection;
+using BIMaestro.Localization;
 
 
 public class BIMaestroApp : IExternalApplication
@@ -44,6 +45,7 @@ public class BIMaestroApp : IExternalApplication
         try
         {
             UIControlledApp = application;
+            UiLanguage.Initialize(application.ControlledApplication.Language.ToString());
 
             // --- WPF BIMaestroApp ---
             if (System.Windows.Application.Current == null)
@@ -341,6 +343,8 @@ public class BIMaestroApp : IExternalApplication
             Analyse.ElementHistoryTracker.ScheduleDeferredPrime(e.Document);
             ExcelLogger.OnDocumentOpened(e.Document, _uiApp);
             Analyse.CollaborativeModelTrackerStore.TryAutoLog(e.Document, _uiApp);
+            BIMaestro.ViewHover.ViewHoverPreviewService
+                .ScheduleCacheMaintenance(e.Document);
         }
         catch (Exception ex)
         {
@@ -354,6 +358,8 @@ public class BIMaestroApp : IExternalApplication
         {
             _uiApp ??= new UIApplication(e.Document.Application);
             Analyse.ElementHistoryTracker.ScheduleDeferredPrime(e.Document);
+            BIMaestro.ViewHover.ViewHoverPreviewService
+                .ScheduleCacheMaintenance(e.Document);
         }
         catch (Exception ex)
         {
@@ -379,9 +385,22 @@ public class BIMaestroApp : IExternalApplication
 
     private void OnDocumentChangedSafe(object sender, DocumentChangedEventArgs e)
     {
+        Document document = null;
         try
         {
-            Analyse.ElementHistoryTracker.CaptureDocumentChanges(e.GetDocument(), e);
+            document = e.GetDocument();
+            Analyse.ElementHistoryTracker.CaptureDocumentChanges(document, e);
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            document ??= e.GetDocument();
+            BIMaestro.ViewHover.ViewHoverPreviewService.TrackDocumentChanges(
+                document,
+                e);
         }
         catch
         {

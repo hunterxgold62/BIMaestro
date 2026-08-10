@@ -5,6 +5,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using Forms = System.Windows.Forms;
 using DrawingColor = System.Drawing.Color;
+using BIMaestro.Localization;
 
 namespace BIMaestro.UI
 {
@@ -168,7 +169,7 @@ namespace BIMaestro.UI
             if (!color.HasValue)
             {
                 ColorSwatch.Fill = Brushes.Transparent;
-                ColorText.Text = "Aucune";
+                ColorText.Text = UiLanguage.T("Aucune", "None");
                 return;
             }
 

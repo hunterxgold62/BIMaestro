@@ -2,6 +2,7 @@ using Autodesk.Revit.DB;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
+using BIMaestro.Localization;
 
 namespace Modification
 {
@@ -13,7 +14,9 @@ namespace Modification
         {
             InitializeComponent();
 
-            SelectionCountText.Text = selectedElementCount + " objet(s) selectionne(s)";
+            SelectionCountText.Text = UiLanguage.T(
+                selectedElementCount + " objet(s) selectionne(s)",
+                selectedElementCount + " selected object(s)");
 
             List<PhaseOption> projectPhases = phases
                 .Select(phase => new PhaseOption(phase.Name, phase.Id))
@@ -42,7 +45,9 @@ namespace Modification
             }
             catch (System.Exception ex)
             {
-                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(
+                    UiLanguage.T($"Impossible d’ouvrir la page d’aide : {ex.Message}", $"Unable to open the help page: {ex.Message}"),
+                    "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -104,7 +109,7 @@ namespace Modification
 
             public static PhaseOption NoChange()
             {
-                return new PhaseOption("Ne pas modifier", ElementId.InvalidElementId)
+                return new PhaseOption(UiLanguage.T("Ne pas modifier", "Do not change"), ElementId.InvalidElementId)
                 {
                     IsNoChange = true
                 };
@@ -112,7 +117,7 @@ namespace Modification
 
             public static PhaseOption None()
             {
-                return new PhaseOption("Aucune demolition", ElementId.InvalidElementId);
+                return new PhaseOption(UiLanguage.T("Aucune demolition", "None"), ElementId.InvalidElementId);
             }
         }
     }

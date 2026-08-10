@@ -4,6 +4,7 @@ using Autodesk.Revit.DB.Electrical;
 using Autodesk.Revit.DB.Mechanical;
 using Autodesk.Revit.DB.Plumbing;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 using Licensing;
 using System;
 using System.Collections.Generic;
@@ -26,16 +27,16 @@ namespace Analyse
             var issues = new List<ModelIssue>();
 
             try { issues.AddRange(FindFloatingWallsWithContext(doc, tolMm: 20, embedMm: 30)); }
-            catch (Exception ex) { TaskDialog.Show("Smart Check", $"Scan murs : {ex.Message}"); }
+            catch (Exception ex) { TaskDialog.Show("Smart Check", UiLanguage.T($"Scan murs : {ex.Message}", $"Wall scan: {ex.Message}")); }
 
             try { issues.AddRange(FindMepThroughWallsWithoutReservation(doc, volTolMm3: 1500)); }
-            catch (Exception ex) { TaskDialog.Show("Smart Check", $"Scan traversées : {ex.Message}"); }
+            catch (Exception ex) { TaskDialog.Show("Smart Check", UiLanguage.T($"Scan traversées : {ex.Message}", $"Penetration scan: {ex.Message}")); }
 
             try { issues.AddRange(FindLinkPipeClashes(doc, extraTolMm: 5)); }
-            catch (Exception ex) { TaskDialog.Show("Smart Check", $"Scan liens : {ex.Message}"); }
+            catch (Exception ex) { TaskDialog.Show("Smart Check", UiLanguage.T($"Scan liens : {ex.Message}", $"Link scan: {ex.Message}")); }
 
             try { issues.AddRange(FindUnconnectedMEP(doc)); }
-            catch (Exception ex) { TaskDialog.Show("Smart Check", $"Scan raccords ouverts : {ex.Message}"); }
+            catch (Exception ex) { TaskDialog.Show("Smart Check", UiLanguage.T($"Scan raccords ouverts : {ex.Message}", $"Open connector scan: {ex.Message}")); }
 
             var docKey = SmartCheckState.GetDocKey(doc);
             EnrichIssues(doc, issues);

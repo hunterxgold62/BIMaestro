@@ -179,6 +179,17 @@
                 <TabItem Header="Contact" Margin="12,0,-12,0">
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <StackPanel Margin="12">
+                            <TextBlock Style="{StaticResource H2}" Text="Langue de l’interface"/>
+                            <TextBlock Style="{StaticResource Hint}"
+                                       Margin="0,0,0,8"
+                                       Text="Choisissez la langue de BIMaestro. Le changement sera appliqué au prochain démarrage de Revit."/>
+                            <ComboBox ItemsSource="{Binding LanguageOptions}"
+                                      SelectedItem="{Binding SelectedLanguage}"
+                                      DisplayMemberPath="Label"
+                                      MinWidth="260"
+                                      HorizontalAlignment="Left"
+                                      Margin="0,0,0,18"/>
+
                             <TextBlock Style="{StaticResource H2}" Text="Informations (optionnel)"/>
                             <TextBlock Style="{StaticResource Hint}"
                                        Margin="0,0,0,14"

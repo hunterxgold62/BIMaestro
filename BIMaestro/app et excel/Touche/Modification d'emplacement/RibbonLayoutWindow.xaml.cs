@@ -8,6 +8,7 @@ using System.Reflection;
 using System.Windows;
 using System.Windows.Navigation;
 using BIMaestro.Welcome;
+using BIMaestro.Localization;
 
 namespace BIMaestro.RibbonLayout
 {
@@ -19,6 +20,7 @@ namespace BIMaestro.RibbonLayout
         private string _email = string.Empty;
         private string _firstName = string.Empty;
         private string _lastName = string.Empty;
+        private UiLanguageOption _selectedLanguage;
 
         public RibbonLayoutWindow(IEnumerable<RibbonPanelDefinition> definitions, RibbonLayoutConfig layout)
         {
@@ -31,6 +33,8 @@ namespace BIMaestro.RibbonLayout
             Email = _welcomeState.Email ?? string.Empty;
             FirstName = _welcomeState.FirstName ?? string.Empty;
             LastName = _welcomeState.LastName ?? string.Empty;
+            LanguageOptions = UiLanguage.Options;
+            SelectedLanguage = LanguageOptions.First(option => option.Value == UiLanguage.Choice);
 
             DataContext = this;
             SelectedPanel = Panels.FirstOrDefault();
@@ -51,6 +55,18 @@ namespace BIMaestro.RibbonLayout
         public event PropertyChangedEventHandler? PropertyChanged;
 
         public ObservableCollection<PanelViewModel> Panels { get; }
+        public IReadOnlyList<UiLanguageOption> LanguageOptions { get; }
+
+        public UiLanguageOption SelectedLanguage
+        {
+            get => _selectedLanguage;
+            set
+            {
+                if (_selectedLanguage == value) return;
+                _selectedLanguage = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedLanguage)));
+            }
+        }
 
         public string Email
         {
@@ -159,7 +175,34 @@ namespace BIMaestro.RibbonLayout
 
         private void Save(object sender, RoutedEventArgs e)
         {
+            bool languageChanged = SelectedLanguage != null &&
+                SelectedLanguage.Value != UiLanguage.Choice;
+            bool languageSaved = true;
+            if (SelectedLanguage != null)
+                languageSaved = UiLanguage.SetChoice(SelectedLanguage.Value);
             SaveWelcomeProfile();
+
+            if (!languageSaved)
+            {
+                MessageBox.Show(
+                    UiLanguage.T(
+                        "Impossible d’enregistrer le choix de langue dans Documents\\RevitLogs\\SauvegardePréférence.",
+                        "Unable to save the language choice in Documents\\RevitLogs\\SauvegardePréférence."),
+                    "BIMaestro",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+            else if (languageChanged)
+            {
+                MessageBox.Show(
+                    UiLanguage.T(
+                        "Le choix de langue a bien été enregistré. Pour appliquer la nouvelle langue partout dans BIMaestro, il est préférable de sauvegarder votre travail puis de redémarrer Revit.",
+                        "Your language choice has been saved. To apply the new language everywhere in BIMaestro, we recommend saving your work and restarting Revit."),
+                    "BIMaestro",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+
             DialogResult = true;
             Close();
         }
@@ -232,7 +275,7 @@ namespace BIMaestro.RibbonLayout
 
         public string Name { get; }
 
-        public string DisplayName => Name;
+        public string DisplayName => UiLanguage.T(Name);
 
         public ObservableCollection<ButtonViewModel> Buttons { get; }
 
@@ -254,7 +297,7 @@ namespace BIMaestro.RibbonLayout
         public ButtonViewModel(string id, string displayName)
         {
             Id = id;
-            DisplayName = displayName;
+            DisplayName = UiLanguage.T(displayName);
         }
 
         public string Id { get; }

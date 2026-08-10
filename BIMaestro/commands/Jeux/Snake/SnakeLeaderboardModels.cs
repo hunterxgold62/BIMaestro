@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using BIMaestro.Localization;
 
 namespace BIMaestro.Bonus
 {
@@ -50,7 +51,7 @@ namespace BIMaestro.Bonus
                 rows.Add(new LeaderboardRow
                 {
                     Rank = rank,
-                    PlayerName = string.IsNullOrWhiteSpace(entry.PlayerName) ? "Joueur" : entry.PlayerName,
+                    PlayerName = string.IsNullOrWhiteSpace(entry.PlayerName) ? UiLanguage.T("Joueur", "Player") : entry.PlayerName,
                     Score = entry.Score
                 });
                 rank++;
@@ -61,7 +62,7 @@ namespace BIMaestro.Bonus
                 rows.Add(new LeaderboardRow
                 {
                     Rank = 1,
-                    PlayerName = "Aucun score",
+                    PlayerName = UiLanguage.T("Aucun score", "No Score"),
                     Score = 0
                 });
             }

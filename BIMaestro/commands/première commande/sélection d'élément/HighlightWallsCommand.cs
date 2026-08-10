@@ -4,6 +4,7 @@ using Autodesk.Revit.UI;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using BIMaestro.Localization;
 using System.Windows;
 using Licensing;
 
@@ -24,7 +25,7 @@ namespace Visualisation
             var selIds = uidoc.Selection.GetElementIds();
             if (!selIds.Any())
             {
-                TaskDialog.Show("Sélection", "Veuillez sélectionner au moins un élément.");
+                TaskDialog.Show(UiLanguage.T("Sélection", "Selection"), UiLanguage.T("Veuillez sélectionner au moins un élément.", "Select at Least One Element."));
                 return Result.Cancelled;
             }
 
@@ -241,8 +242,9 @@ namespace Visualisation
 
             // 12) Feedback utilisateur
             int totalElements = finalSel.Count;
-            string msg = $"Portée : {(entireModel ? "maquette entière" : "vue active")}\n" +
-                         $"Nombre total d'éléments sélectionnés : {totalElements}\n\n";
+            string msg = UiLanguage.T("Portée : ", "Scope: ") +
+                         (entireModel ? UiLanguage.T("maquette entière", "entire model") : UiLanguage.T("vue active", "active view")) + "\n" +
+                         UiLanguage.T("Nombre total d'éléments sélectionnés : ", "Total Number of Selected Elements: ") + totalElements + "\n\n";
 
             var famCount = new Dictionary<string, int>(StringComparer.CurrentCultureIgnoreCase);
             foreach (var id in finalSel)
@@ -258,11 +260,11 @@ namespace Visualisation
                 famCount[fName]++;
             }
 
-            msg += "Nombre d'éléments par famille :\n";
+            msg += UiLanguage.T("Nombre d'éléments par famille :\n", "Number of Elements by Family:\n");
             foreach (var kv in famCount.OrderBy(k => k.Key, StringComparer.CurrentCultureIgnoreCase))
                 msg += $"- {kv.Value} × {kv.Key}\n";
 
-            TaskDialog.Show("Mon Plugin - Sélection", msg);
+            TaskDialog.Show(UiLanguage.T("Mon Plugin - Sélection", "My Plugin - Selection"), msg);
 
             return Result.Succeeded;
         }

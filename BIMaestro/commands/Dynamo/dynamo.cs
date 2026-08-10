@@ -9,6 +9,7 @@ using Dynamo.Applications;
 using Dynamo.Applications.Properties;
 using Licensing;
 using Newtonsoft.Json;
+using BIMaestro.Localization;
 
 namespace Modification
 {
@@ -108,7 +109,7 @@ namespace Modification
             }
             catch (Exception ex)
             {
-                TaskDialog.Show("Erreur", "Impossible d'enregistrer la configuration :\n" + ex.Message);
+                TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T("Impossible d'enregistrer la configuration :\n", "Unable to Save the Configuration:\n") + ex.Message);
             }
         }
 
@@ -198,7 +199,7 @@ namespace Modification
             {
                 if (!File.Exists(dynPath))
                 {
-                    TaskDialog.Show("Erreur", $"Le fichier Dynamo n'existe pas :\n{dynPath}");
+                    TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T("Le fichier Dynamo n'existe pas :\n", "The Dynamo File Does Not Exist:\n") + dynPath);
                     return Result.Failed;
                 }
             }
@@ -308,15 +309,15 @@ namespace Modification
 
                 string labelPreview = DynamoSettings.GetLabel(wnd.SelectedButtonIndex).Replace("\n", " / ");
                 string pathPreview = string.Join("\n", wnd.SelectedPaths);
-                TaskDialog.Show("Configuration enregistrée",
-                    $"Le bouton \"{labelPreview}\" utilisera :\n{pathPreview}\n\n" +
-                    "Note : le nouveau nom du bouton sera visible après la prochaine réouverture de Revit.");
+                TaskDialog.Show(UiLanguage.T("Configuration enregistrée", "Configuration Saved"),
+                    UiLanguage.T("Le bouton \"", "The Button \"") + labelPreview + UiLanguage.T("\" utilisera :\n", "\" Will Use:\n") + pathPreview + "\n\n" +
+                    UiLanguage.T("Note : le nouveau nom du bouton sera visible après la prochaine réouverture de Revit.", "Note: the New Button Name Will Be Visible after Revit Is Restarted."));
                 return Result.Succeeded;
             }
             catch (Exception ex)
             {
                 // Affiche le détail de l'exception pour diagnostiquer
-                TaskDialog.Show("Erreur inattendue", ex.ToString());
+                TaskDialog.Show(UiLanguage.T("Erreur inattendue", "Unexpected Error"), ex.ToString());
                 return Result.Failed;
             }
         }
