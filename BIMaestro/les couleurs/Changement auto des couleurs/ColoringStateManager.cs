@@ -349,13 +349,12 @@ namespace Couleur
                 var val = prop?.GetValue(dc)?.ToString();
                 if (string.IsNullOrEmpty(val)) continue;
 
-                foreach (var panelColor in panelColors)
+                if (RibbonColorPreferences.TryGetPanelScheme(
+                    val,
+                    panelColors,
+                    out RibbonPanelColorScheme matchedScheme))
                 {
-                    if (val.IndexOf(panelColor.Key, StringComparison.OrdinalIgnoreCase) >= 0)
-                    {
-                        targets.Add((border, panelColor.Value));
-                        break;
-                    }
+                    targets.Add((border, matchedScheme));
                 }
             }
 
@@ -618,8 +617,10 @@ namespace Couleur
                 var prop = ptb.GetType().GetProperty("Title");
                 if (prop == null) continue;
                 var title = prop.GetValue(ptb)?.ToString();
-                if (title != null &&
-                    panelColors.TryGetValue(title, out RibbonPanelColorScheme scheme))
+                if (RibbonColorPreferences.TryGetPanelScheme(
+                    title,
+                    panelColors,
+                    out RibbonPanelColorScheme scheme))
                 {
                     var b = FindChildrenByType<Border>(ptb).FirstOrDefault() as Border ?? (ptb as Border);
                     if (b != null)

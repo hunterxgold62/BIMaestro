@@ -1,6 +1,7 @@
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Windows;
@@ -91,43 +92,130 @@ namespace BIMaestro.Localization
 
         public static void LocalizeWindow(Window window)
         {
-            if (window == null || !IsEnglish) return;
-            window.Title = T(window.Title);
+            if (window == null || !IsEnglish || !IsBIMaestroWindow(window)) return;
+
+            try
+            {
+                window.Title = T(window.Title);
+            }
+            catch (Exception ex)
+            {
+                LogLocalizationError(window, ex);
+            }
+
             LocalizeElement(window);
         }
 
         private static void OnWindowLoaded(object sender, RoutedEventArgs e)
         {
-            if (sender is Window window) LocalizeWindow(window);
+            // This is a process-wide WPF class handler. Never inspect or modify a
+            // Revit/third-party window, and never let localization escape the
+            // Loaded event: an unhandled exception here terminates Revit.
+            if (sender is not Window window || !IsBIMaestroWindow(window)) return;
+
+            try
+            {
+                LocalizeWindow(window);
+            }
+            catch (Exception ex)
+            {
+                LogLocalizationError(window, ex);
+            }
         }
 
         private static void LocalizeElement(DependencyObject element)
         {
-            if (element is TextBlock textBlock)
+            if (element == null) return;
+
+            var pending = new Stack<DependencyObject>();
+            var visited = new HashSet<DependencyObject>();
+            pending.Push(element);
+
+            while (pending.Count > 0)
             {
-                if (textBlock.Inlines.Count == 0)
-                    textBlock.Text = T(textBlock.Text);
-                else
-                    foreach (Inline inline in textBlock.Inlines)
-                        if (inline is Run run) run.Text = T(run.Text);
+                DependencyObject current = pending.Pop();
+                if (current == null || !visited.Add(current)) continue;
+
+                TryLocalizeCurrentElement(current);
+
+                int count;
+                try
+                {
+                    count = VisualTreeHelper.GetChildrenCount(current);
+                }
+                catch (Exception ex)
+                {
+                    LogLocalizationError(current, ex);
+                    continue;
+                }
+
+                for (int i = count - 1; i >= 0; i--)
+                {
+                    try
+                    {
+                        DependencyObject child = VisualTreeHelper.GetChild(current, i);
+                        if (child != null) pending.Push(child);
+                    }
+                    catch (Exception ex)
+                    {
+                        LogLocalizationError(current, ex);
+                    }
+                }
             }
+        }
 
-            // ComboBox item text is often also used as a legacy business value.
-            // Translate it explicitly when that window has been migrated to stable values.
-            if (element is ContentControl contentControl &&
-                contentControl is not ComboBoxItem &&
-                contentControl.Content is string content)
-                contentControl.Content = T(content);
+        private static void TryLocalizeCurrentElement(DependencyObject element)
+        {
+            try
+            {
+                if (element is TextBlock textBlock)
+                {
+                    if (textBlock.Inlines.Count == 0)
+                        textBlock.Text = T(textBlock.Text);
+                    else
+                    {
+                        // Snapshot the collection before changing Run.Text. Some
+                        // custom controls invalidate their inline enumerator when
+                        // a Run changes during Loaded.
+                        var runs = new List<Run>();
+                        foreach (Inline inline in textBlock.Inlines)
+                            if (inline is Run run) runs.Add(run);
 
-            if (element is HeaderedContentControl headered && headered.Header is string header)
-                headered.Header = T(header);
+                        foreach (Run run in runs)
+                            run.Text = T(run.Text);
+                    }
+                }
 
-            if (element is FrameworkElement frameworkElement && frameworkElement.ToolTip is string toolTip)
-                frameworkElement.ToolTip = T(toolTip);
+                // ComboBox item text is often also used as a legacy business value.
+                // Translate it explicitly when that window has been migrated to stable values.
+                if (element is ContentControl contentControl &&
+                    contentControl is not ComboBoxItem &&
+                    contentControl.Content is string content)
+                    contentControl.Content = T(content);
 
-            int count = VisualTreeHelper.GetChildrenCount(element);
-            for (int i = 0; i < count; i++)
-                LocalizeElement(VisualTreeHelper.GetChild(element, i));
+                if (element is HeaderedContentControl headered && headered.Header is string header)
+                    headered.Header = T(header);
+
+                if (element is FrameworkElement frameworkElement && frameworkElement.ToolTip is string toolTip)
+                    frameworkElement.ToolTip = T(toolTip);
+            }
+            catch (Exception ex)
+            {
+                // A single custom control must not prevent the rest of the
+                // window from being translated or bring down the Revit process.
+                LogLocalizationError(element, ex);
+            }
+        }
+
+        private static bool IsBIMaestroWindow(Window window)
+        {
+            return window?.GetType().Assembly == typeof(UiLanguage).Assembly;
+        }
+
+        private static void LogLocalizationError(object source, Exception ex)
+        {
+            string sourceType = source?.GetType().FullName ?? "unknown";
+            Debug.WriteLine($"[UiLanguage] Localization skipped for '{sourceType}': {ex}");
         }
 
         private static UiLanguageChoice LoadChoice()

@@ -16,7 +16,7 @@ namespace BIMaestro.ViewHover
     /// activée. Un simple survol dans l'arborescence ne déclenche jamais
     /// d'export Revit.
     /// </summary>
-    internal static class ViewHoverPreviewService
+    internal static partial class ViewHoverPreviewService
     {
         private sealed class PendingPreview
         {
@@ -297,6 +297,7 @@ namespace BIMaestro.ViewHover
         internal static void ProcessPending(UIApplication uiApplication)
         {
             ProcessScheduledCacheMaintenance(uiApplication);
+            if (ProcessBatch(uiApplication)) return;
 
             PendingPreview pending;
             lock (Sync)
@@ -460,6 +461,7 @@ namespace BIMaestro.ViewHover
                     documentPrefix,
                     StringComparison.OrdinalIgnoreCase));
             }
+            CancelBatchForDocument(documentKey);
         }
 
         private static bool CanCapture(Document document, View view)

@@ -1385,6 +1385,24 @@ namespace Couleur
                 { BetaPanelName, CreateDefault(Color.FromRgb(255, 255, 230)) }
             };
 
+        private static readonly Dictionary<string, string> PanelNameAliases =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "Outils de Visualisation", "Outils de Visualisation" },
+                { "Visualization Tools", "Outils de Visualisation" },
+                { "Modification", "Modification" },
+                { "Modify", "Modification" },
+                { "Outils IA", "Outils IA" },
+                { "AI Tools", "Outils IA" },
+                { "Analyse", "Analyse" },
+                { "Analysis", "Analyse" },
+                { "Spécifique aux familles", "Spécifique aux familles" },
+                { "Family Tools", "Spécifique aux familles" },
+                { "Couleur et information", "Couleur et information" },
+                { "Colors and Information", "Couleur et information" },
+                { BetaPanelName, BetaPanelName }
+            };
+
         private static Dictionary<string, RibbonPanelColorScheme> _cachedColors;
 
         public static string PreferenceFilePath { get; } =
@@ -1441,8 +1459,43 @@ namespace Couleur
 
         public static bool IsKnownPanel(string panelName)
         {
-            return !string.IsNullOrWhiteSpace(panelName) &&
-                   DefaultColors.ContainsKey(panelName);
+            return TryGetCanonicalPanelName(panelName, out _);
+        }
+
+        public static bool TryGetPanelScheme(
+            string displayedNameOrCookie,
+            IDictionary<string, RibbonPanelColorScheme> schemes,
+            out RibbonPanelColorScheme scheme)
+        {
+            scheme = null;
+            if (schemes == null ||
+                !TryGetCanonicalPanelName(displayedNameOrCookie, out string canonicalName))
+            {
+                return false;
+            }
+
+            return schemes.TryGetValue(canonicalName, out scheme) && scheme != null;
+        }
+
+        private static bool TryGetCanonicalPanelName(string value, out string canonicalName)
+        {
+            canonicalName = null;
+            if (string.IsNullOrWhiteSpace(value)) return false;
+
+            if (PanelNameAliases.TryGetValue(value.Trim(), out canonicalName))
+                return true;
+
+            foreach (KeyValuePair<string, string> alias in
+                     PanelNameAliases.OrderByDescending(item => item.Key.Length))
+            {
+                if (value.IndexOf(alias.Key, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    canonicalName = alias.Value;
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         public static void Save(IDictionary<string, RibbonPanelColorScheme> colors)

@@ -209,7 +209,7 @@
                                                 CornerRadius="4">
                                             <TextBlock Style="{StaticResource PanelNameStyle}"
                                                        Foreground="{Binding TextBrush}"
-                                                       Text="{Binding PanelName}"/>
+                                                       Text="{Binding DisplayPanelName}"/>
                                         </Border>
 
                                         <ComboBox Grid.Column="1"

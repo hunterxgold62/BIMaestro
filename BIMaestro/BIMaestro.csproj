@@ -313,6 +313,11 @@
       <DependentUpon>CollaborativeModelTrackerWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="commands\vue en survol\ViewHoverPreviewService.cs" />
+    <Compile Include="commands\vue en survol\ViewHoverPreviewBatchService.cs" />
+    <Compile Include="commands\vue en survol\ViewThumbnailBatchCommand.cs" />
+    <Compile Include="commands\vue en survol\ViewThumbnailBatchWindow.xaml.cs">
+      <DependentUpon>ViewThumbnailBatchWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="commands\qui est le coupable\ElementHistoryTracker.cs" />
     <Compile Include="commands\qui est le coupable\ElementHistoryWindow.xaml.cs">
       <DependentUpon>ElementHistoryWindow.xaml</DependentUpon>
@@ -622,6 +627,10 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Include="commands\phase rapide\PhaseQuickEditWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\vue en survol\ViewThumbnailBatchWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>

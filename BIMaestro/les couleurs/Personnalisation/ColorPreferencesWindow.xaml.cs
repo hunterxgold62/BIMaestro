@@ -856,6 +856,8 @@ namespace Couleur
 
         public string PanelName { get; }
 
+        public string DisplayPanelName => UiLanguage.T(PanelName);
+
         public IReadOnlyList<LocalizedOption> BackgroundModes => LocalizedBackgroundModes;
 
         public Color? BackgroundColor
