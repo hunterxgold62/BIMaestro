@@ -51,6 +51,9 @@ $RECYCLE.BIN/
 # Ignorer les packages npm
 node_modules/
 
+# Fichiers de travail temporaires locaux
+/tmp/
+
 # Supabase local secrets
 supabase/functions/.env
 supabase/functions/.env.*

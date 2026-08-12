@@ -53,7 +53,7 @@ Name: "french"; MessagesFile: "compiler:Languages\French.isl"
 ; DLL principale et dépendances. Les symboles de débogage ne sont pas distribués.
 Source: "bin\Release\*.*"; DestDir: "{app}\Contents"; \
   Flags: ignoreversion recursesubdirs createallsubdirs; \
-  Excludes: "*.pdb"
+  Excludes: "*.pdb,BIMaestro - Copie.dll"
 
 ; Ressources publiques du paquet Autodesk.
 Source: "Resources\OLD\BIMaestro.png"; DestDir: "{app}\Contents"; \
