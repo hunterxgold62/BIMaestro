@@ -18,6 +18,7 @@ namespace Modification
         {
             ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
+            UiLanguage.LocalizeWindow(this);
         }
 
         private void OkButton_Click(object sender, RoutedEventArgs e)

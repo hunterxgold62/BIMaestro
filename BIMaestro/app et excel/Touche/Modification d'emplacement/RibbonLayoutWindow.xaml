@@ -98,7 +98,7 @@
                     <TextBlock Style="{StaticResource Hint}"
                                Foreground="White"
                                Margin="0,6,0,0"
-                               Text="Personnalisez l’ordre des panneaux et boutons du ruban, puis renseignez vos informations de contact si besoin."/>
+                               Text="Choisissez la langue, organisez le ruban et gérez vos informations générales."/>
                 </StackPanel>
 
                 <Button Grid.Column="1"
@@ -115,6 +115,22 @@
 
         <Border Grid.Row="1" Style="{StaticResource Card}">
             <TabControl>
+                <TabItem Header="Langue">
+                    <StackPanel Margin="22,20">
+                        <TextBlock Style="{StaticResource H2}"
+                                   Text="Langue de l’interface"/>
+                        <TextBlock Style="{StaticResource Hint}"
+                                   Margin="0,6,0,14"
+                                   TextWrapping="Wrap"
+                                   Text="Choisissez la langue de BIMaestro. Le changement sera appliqué au prochain démarrage de Revit."/>
+                        <ComboBox ItemsSource="{Binding LanguageOptions}"
+                                  SelectedItem="{Binding SelectedLanguage}"
+                                  DisplayMemberPath="Label"
+                                  MinWidth="280"
+                                  HorizontalAlignment="Left"/>
+                    </StackPanel>
+                </TabItem>
+
                 <TabItem Header="Ruban" Margin="0,0,-4,0">
                     <Grid Margin="10,12,10,0">
                         <Grid.ColumnDefinitions>
@@ -176,20 +192,9 @@
                     </Grid>
                 </TabItem>
 
-                <TabItem Header="Contact" Margin="12,0,-12,0">
+                <TabItem Header="Général" Margin="12,0,-12,0">
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <StackPanel Margin="12">
-                            <TextBlock Style="{StaticResource H2}" Text="Langue de l’interface"/>
-                            <TextBlock Style="{StaticResource Hint}"
-                                       Margin="0,0,0,8"
-                                       Text="Choisissez la langue de BIMaestro. Le changement sera appliqué au prochain démarrage de Revit."/>
-                            <ComboBox ItemsSource="{Binding LanguageOptions}"
-                                      SelectedItem="{Binding SelectedLanguage}"
-                                      DisplayMemberPath="Label"
-                                      MinWidth="260"
-                                      HorizontalAlignment="Left"
-                                      Margin="0,0,0,18"/>
-
                             <TextBlock Style="{StaticResource H2}" Text="Informations (optionnel)"/>
                             <TextBlock Style="{StaticResource Hint}"
                                        Margin="0,0,0,14"

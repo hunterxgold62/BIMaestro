@@ -2,6 +2,7 @@
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.UI.Selection;
+using BIMaestro.Localization;
 using Licensing;
 using System;
 using System.Collections.Generic;
@@ -24,7 +25,9 @@ namespace Visualisation
             try
             {
                 // 1) Sélection de l'élément
-                Reference pickedRef = uidoc.Selection.PickObject(ObjectType.Element, "Sélectionnez un élément");
+                Reference pickedRef = uidoc.Selection.PickObject(
+                    ObjectType.Element,
+                    UiLanguage.T("Sélectionnez un élément", "Select an element"));
                 Element elem = doc.GetElement(pickedRef.ElementId);
 
                 // 2) Récupération des matériaux de base et de peinture
@@ -50,27 +53,37 @@ namespace Visualisation
 
                 if (objectMaterials.Count > 0)
                 {
-                    sb.AppendLine("Matériaux présents sur l'objet :");
+                    sb.AppendLine(UiLanguage.T(
+                        "Matériaux présents sur l'objet :",
+                        "Materials present on the element:"));
                     foreach (var m in objectMaterials)
                         sb.AppendLine($" - {m.Name}");
                 }
                 else
                 {
-                    sb.AppendLine("Aucun matériau présent directement sur l'objet.");
+                    sb.AppendLine(UiLanguage.T(
+                        "Aucun matériau présent directement sur l'objet.",
+                        "No material is directly present on the element."));
                 }
 
                 if (paintedMaterials.Count > 0)
                 {
-                    sb.AppendLine("\nMatériaux de peinture trouvés :");
+                    sb.AppendLine("\n" + UiLanguage.T(
+                        "Matériaux de peinture trouvés :",
+                        "Paint materials found:"));
                     foreach (var m in paintedMaterials)
                         sb.AppendLine($" - {m.Name}");
                 }
                 else
                 {
-                    sb.AppendLine("\nAucun matériau de peinture trouvé.");
+                    sb.AppendLine("\n" + UiLanguage.T(
+                        "Aucun matériau de peinture trouvé.",
+                        "No paint material was found."));
                 }
 
-                TaskDialog.Show("Matériaux de l'élément", sb.ToString());
+                TaskDialog.Show(
+                    UiLanguage.T("Matériaux de l'élément", "Element Materials"),
+                    sb.ToString());
             }
             catch (Autodesk.Revit.Exceptions.OperationCanceledException)
             {

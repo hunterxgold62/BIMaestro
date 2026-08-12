@@ -1,4 +1,5 @@
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 using System;
 using System.Diagnostics;
 using System.Text;
@@ -49,7 +50,7 @@ namespace Licensing
                 CommonButtons = TaskDialogCommonButtons.Close
             };
 
-            td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Signaler un souci");
+            td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, UiLanguage.T("Signaler un souci", "Report an Issue"));
 
             var result = td.Show();
             if (result != TaskDialogResult.CommandLink1) return;
@@ -62,7 +63,7 @@ namespace Licensing
             }
             catch (Exception openEx)
             {
-                TaskDialog.Show("BIMaestro - Contact", $"Impossible d'ouvrir LinkedIn : {openEx.Message}");
+                TaskDialog.Show(UiLanguage.T("BIMaestro - Contact", "BIMaestro - Contact"), UiLanguage.T($"Impossible d'ouvrir LinkedIn : {openEx.Message}", $"Unable to open LinkedIn: {openEx.Message}"));
             }
         }
 

@@ -319,6 +319,9 @@
       <DependentUpon>ViewThumbnailBatchWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="commands\qui est le coupable\ElementHistoryTracker.cs" />
+    <Compile Include="commands\qui est le coupable\information au survol d%27un objet\LatestElementHistoryIndex.cs" />
+    <Compile Include="commands\qui est le coupable\information au survol d%27un objet\ElementHistoryHoverInfoService.cs" />
+    <Compile Include="commands\qui est le coupable\information au survol d%27un objet\ElementHistoryHoverToggleCommand.cs" />
     <Compile Include="commands\qui est le coupable\ElementHistoryWindow.xaml.cs">
       <DependentUpon>ElementHistoryWindow.xaml</DependentUpon>
     </Compile>
@@ -380,7 +383,6 @@
     </Compile>
     <Compile Include="commands\changer de couleur de ligne\OverrideColorCommand.cs" />
     <Compile Include="commands\phase rapide\PhaseQuickEditCommand.cs" />
-    <Compile Include="commands\Déplacement protégé\SafeMoveCommand.cs" />
     <Compile Include="commands\phase rapide\PhaseQuickEditWindow.xaml.cs">
       <DependentUpon>PhaseQuickEditWindow.xaml</DependentUpon>
     </Compile>
@@ -948,6 +950,7 @@
     <EmbeddedResource Include="Resources\Face 3D.png" />
     <EmbeddedResource Include="Resources\Gestion Excel.png" />
     <EmbeddedResource Include="Resources\Import unités.png" />
+    <EmbeddedResource Include="Resources\Miniature.png" />
     <EmbeddedResource Include="Resources\Option.png" />
     <EmbeddedResource Include="Resources\Organisateur.png" />
     <EmbeddedResource Include="Resources\Ouvrir la vue.png" />
@@ -980,6 +983,7 @@
     <EmbeddedResource Include="Resources\Purge famille.png" />
     <EmbeddedResource Include="Resources\Déplacement protégé.png" />
     <EmbeddedResource Include="Resources\3D.jpg" />
+    <EmbeddedResource Include="Resources\Maquette MEP v2.png" />
     <Content Include="Themes\BIMaestro_Charte_Graphique.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

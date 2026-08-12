@@ -45,6 +45,7 @@ namespace Modification
             ThemeManager.EnsureThemeLoaded();
 
             InitializeComponent();
+            UiLanguage.LocalizeWindow(this);
 
             _uiapp = uiapp;
             _uidoc = _uiapp?.ActiveUIDocument;

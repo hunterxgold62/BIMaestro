@@ -16,6 +16,7 @@ using System.Text.RegularExpressions;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 using NPOI.SS.UserModel;
 using Licensing;
 using NPOI.XSSF.UserModel;
@@ -288,10 +289,10 @@ namespace ScheduleIO
 
         protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
-            var td = new TaskDialog("Nomenclature ↔ Excel");
-            td.MainInstruction = "Que veux-tu faire ?";
-            td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Exporter la nomenclature vers Excel");
-            td.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, "Importer les modifications depuis Excel");
+            var td = new TaskDialog(UiLanguage.T("Nomenclature ↔ Excel", "Schedule ↔ Excel"));
+            td.MainInstruction = UiLanguage.T("Que veux-tu faire ?", "What would you like to do?");
+            td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, UiLanguage.T("Exporter la nomenclature vers Excel", "Export the schedule to Excel"));
+            td.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, UiLanguage.T("Importer les modifications depuis Excel", "Import changes from Excel"));
             td.CommonButtons = TaskDialogCommonButtons.Cancel;
             var choice = td.Show();
 
@@ -309,9 +310,9 @@ namespace ScheduleIO
                 var doc = ui.Document;
 
                 var schedule = doc.ActiveView as ViewSchedule;
-                if (schedule == null) { TaskDialog.Show("Export Excel", "Active une nomenclature."); return Result.Failed; }
-                if (schedule.Definition == null || schedule.IsTemplate || schedule.IsTitleblockRevisionSchedule) { TaskDialog.Show("Export Excel", "Vue non exportable."); return Result.Failed; }
-                if (schedule.Definition.IsKeySchedule) { TaskDialog.Show("Export Excel", "Nomenclatures de clés non gérées."); return Result.Failed; }
+                if (schedule == null) { TaskDialog.Show(UiLanguage.T("Export Excel", "Excel Export"), UiLanguage.T("Active une nomenclature.", "Activate a schedule.")); return Result.Failed; }
+                if (schedule.Definition == null || schedule.IsTemplate || schedule.IsTitleblockRevisionSchedule) { TaskDialog.Show(UiLanguage.T("Export Excel", "Excel Export"), UiLanguage.T("Vue non exportable.", "This schedule cannot be exported.")); return Result.Failed; }
+                if (schedule.Definition.IsKeySchedule) { TaskDialog.Show(UiLanguage.T("Export Excel", "Excel Export"), UiLanguage.T("Nomenclatures de clés non gérées.", "Key schedules are not supported.")); return Result.Failed; }
 
                 var def = schedule.Definition;
                 // Champs utilisés pour le tri/groupe dans la nomenclature
@@ -435,11 +436,11 @@ namespace ScheduleIO
 
                 using (var fs = new FileStream(path, FileMode.Create, FileAccess.Write)) wb.Write(fs);
 
-                var dlg = new TaskDialog("Export Excel");
-                dlg.MainInstruction = "Export terminé";
+                var dlg = new TaskDialog(UiLanguage.T("Export Excel", "Excel Export"));
+                dlg.MainInstruction = UiLanguage.T("Export terminé", "Export Completed");
                 dlg.MainContent = path;
-                dlg.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Ouvrir le fichier Excel");
-                dlg.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, "Ouvrir le dossier");
+                dlg.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, UiLanguage.T("Ouvrir le fichier Excel", "Open the Excel file"));
+                dlg.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, UiLanguage.T("Ouvrir le dossier", "Open the folder"));
                 dlg.CommonButtons = TaskDialogCommonButtons.Close;
                 var r = dlg.Show();
                 try
@@ -463,13 +464,13 @@ namespace ScheduleIO
                 var doc = ui.Document;
 
                 var schedule = doc.ActiveView as ViewSchedule;
-                if (schedule == null) { TaskDialog.Show("Import Excel", "Active une nomenclature."); return Result.Failed; }
+                if (schedule == null) { TaskDialog.Show(UiLanguage.T("Import Excel", "Excel Import"), UiLanguage.T("Active une nomenclature.", "Activate a schedule.")); return Result.Failed; }
 
                 var exportDir = PathUtil.EnsureExportDir();
                 var guess = Directory.GetFiles(exportDir, PathUtil.SanitizeFileName(schedule.Name) + ".xlsx").FirstOrDefault();
                 if (guess == null)
                 {
-                    TaskDialog.Show("Import Excel", $"Fichier introuvable : {PathUtil.SanitizeFileName(schedule.Name)}.xlsx\nDans: {exportDir}\nLance d'abord l'export.");
+                    TaskDialog.Show(UiLanguage.T("Import Excel", "Excel Import"), UiLanguage.T($"Fichier introuvable : {PathUtil.SanitizeFileName(schedule.Name)}.xlsx\nDans: {exportDir}\nLance d'abord l'export.", $"File not found: {PathUtil.SanitizeFileName(schedule.Name)}.xlsx\nIn: {exportDir}\nRun the export first."));
                     return Result.Failed;
                 }
 
@@ -480,7 +481,7 @@ namespace ScheduleIO
                 {
                     IWorkbook wb = new XSSFWorkbook(fs);
                     var ws = wb.GetSheet("Edition");
-                    if (ws == null) { TaskDialog.Show("Import Excel", "Onglet 'Edition' introuvable."); return Result.Failed; }
+                    if (ws == null) { TaskDialog.Show(UiLanguage.T("Import Excel", "Excel Import"), UiLanguage.T("Onglet 'Edition' introuvable.", "The 'Edition' worksheet was not found.")); return Result.Failed; }
 
                     var meta = wb.GetSheet("Meta");
                     mapByHeader = (meta != null) ? ReadMeta(meta) : BuildHeaderMapFromActiveSchedule(((ViewSchedule)ui.Document.ActiveView).Definition);
@@ -490,7 +491,7 @@ namespace ScheduleIO
 
                 if (!dataRows.Any() || !dataRows[0].ContainsKey("UniqueId"))
                 {
-                    TaskDialog.Show("Import Excel", "Fichier invalide : aucune donnée ou 'UniqueId' manquant.");
+                    TaskDialog.Show(UiLanguage.T("Import Excel", "Excel Import"), UiLanguage.T("Fichier invalide : aucune donnée ou 'UniqueId' manquant.", "Invalid file: no data or missing 'UniqueId'."));
                     return Result.Failed;
                 }
 
@@ -572,7 +573,7 @@ namespace ScheduleIO
                     t.Commit();
                 }
 
-                TaskDialog.Show("Import Excel", "Import terminé ✅");
+                TaskDialog.Show(UiLanguage.T("Import Excel", "Excel Import"), UiLanguage.T("Import terminé ✅", "Import completed ✅"));
                 return Result.Succeeded;
             }
             catch (Exception ex) { message = ex.Message; return Result.Failed; }

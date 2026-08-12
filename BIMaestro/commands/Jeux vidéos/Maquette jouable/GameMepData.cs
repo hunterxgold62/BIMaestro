@@ -261,6 +261,7 @@ namespace BIMaestro.VideoGames
     {
         public string Key { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
+        public string Abbreviation { get; set; } = string.Empty;
         public string Classification { get; set; } = string.Empty;
         public Color Color { get; set; } = Color.FromRgb(40, 190, 230);
         public bool IsVisible { get; set; } = true;
@@ -378,6 +379,107 @@ namespace BIMaestro.VideoGames
                 foreach (GameMepPathData path in element.Paths)
                     path.Translate(delta);
             }
+        }
+    }
+
+    internal static class GameMepSystemTraversalPolicy
+    {
+        private const string UnassignedSystemKey = "MEP|NON_AFFECTE";
+
+        public static bool CanTraverse(
+            GameMepGraphData graph,
+            GameMepConnectionData edge)
+        {
+            if (edge.ConnectorA < 0 || edge.ConnectorB < 0 ||
+                edge.ConnectorA >= graph.Connectors.Count ||
+                edge.ConnectorB >= graph.Connectors.Count)
+            {
+                return false;
+            }
+
+            string first = graph.Connectors[edge.ConnectorA].SystemKey ??
+                string.Empty;
+            string second = graph.Connectors[edge.ConnectorB].SystemKey ??
+                string.Empty;
+            if (string.Equals(first, second, StringComparison.Ordinal) ||
+                IsUnassigned(first) || IsUnassigned(second))
+            {
+                return true;
+            }
+
+            if (!edge.IsInternal || string.IsNullOrWhiteSpace(edge.ElementKey))
+                return HaveSameFunctionalType(graph, first, second);
+
+            GameMepElementData? owner = graph.FindElement(edge.ElementKey);
+            if (owner != null && owner.ConnectorIndices.Count == 2 &&
+                HaveSameFunctionalType(graph, first, second))
+            {
+                return true;
+            }
+
+            // Une pompe peut séparer deux instances de système Revit tout en
+            // faisant circuler le même fluide. La contrainte de pression créée
+            // explicitement par l'utilisateur constitue l'autorisation de
+            // franchir cette frontière, uniquement entre ses deux connecteurs.
+            return graph.DirectionConstraints.Any(constraint =>
+                constraint.IsActive &&
+                constraint.HasExplicitDirection &&
+                constraint.Scope ==
+                    GameMepDirectionConstraintScope.EquipmentPressureRise &&
+                string.Equals(
+                    constraint.ElementKey,
+                    edge.ElementKey,
+                    StringComparison.Ordinal) &&
+                MatchesPair(
+                    edge,
+                    constraint.EntryConnectorIndex,
+                    constraint.ExitConnectorIndex));
+        }
+
+        private static bool HaveSameFunctionalType(
+            GameMepGraphData graph,
+            string firstKey,
+            string secondKey)
+        {
+            GameMepSystemData? first = graph.FindSystem(firstKey);
+            GameMepSystemData? second = graph.FindSystem(secondKey);
+            if (first == null || second == null ||
+                string.IsNullOrWhiteSpace(first.Abbreviation) ||
+                string.IsNullOrWhiteSpace(second.Abbreviation) ||
+                !string.Equals(
+                    first.Abbreviation.Trim(),
+                    second.Abbreviation.Trim(),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            // L'abréviation est un regroupement métier choisi par l'utilisateur,
+            // mais la classification Revit reste le garde-fou hydraulique.
+            return string.IsNullOrWhiteSpace(first.Classification) ||
+                string.IsNullOrWhiteSpace(second.Classification) ||
+                string.Equals(
+                    first.Classification.Trim(),
+                    second.Classification.Trim(),
+                    StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsUnassigned(string systemKey)
+        {
+            return string.IsNullOrWhiteSpace(systemKey) ||
+                string.Equals(
+                    systemKey,
+                    UnassignedSystemKey,
+                    StringComparison.Ordinal);
+        }
+
+        private static bool MatchesPair(
+            GameMepConnectionData edge,
+            int first,
+            int second)
+        {
+            return (edge.ConnectorA == first && edge.ConnectorB == second) ||
+                (edge.ConnectorA == second && edge.ConnectorB == first);
         }
     }
 
@@ -1514,32 +1616,7 @@ namespace BIMaestro.VideoGames
 
         private bool IsSystemCompatibleEdge(GameMepConnectionData edge)
         {
-            if (edge.ConnectorA < 0 || edge.ConnectorB < 0 ||
-                edge.ConnectorA >= _graph.Connectors.Count ||
-                edge.ConnectorB >= _graph.Connectors.Count)
-            {
-                return false;
-            }
-
-            string first = _graph.Connectors[edge.ConnectorA].SystemKey ??
-                string.Empty;
-            string second = _graph.Connectors[edge.ConnectorB].SystemKey ??
-                string.Empty;
-            if (string.Equals(first, second, StringComparison.Ordinal))
-                return true;
-
-            // Un raccord sans système propre peut transmettre le réseau qui
-            // l'entoure. Deux systèmes Revit explicitement différents restent
-            // en revanche deux calculs indépendants, même s'ils se rencontrent
-            // dans une pompe ou un autre équipement multi-systèmes.
-            return IsUnassignedSystem(first) || IsUnassignedSystem(second);
-        }
-
-        private static bool IsUnassignedSystem(string systemKey)
-        {
-            return string.IsNullOrWhiteSpace(systemKey) ||
-                string.Equals(systemKey, "MEP|NON_AFFECTE",
-                    StringComparison.Ordinal);
+            return GameMepSystemTraversalPolicy.CanTraverse(_graph, edge);
         }
 
         private bool IsBlockedByFlowControl(

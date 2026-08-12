@@ -8,6 +8,7 @@ using Autodesk.Revit.DB.Plumbing;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.UI.Events;
 using Autodesk.Revit.UI.Selection;
+using BIMaestro.Localization;
 using Licensing;
 
 namespace Modification
@@ -59,7 +60,7 @@ namespace Modification
 
                 if (targets.Count == 0)
                 {
-                    TaskDialog.Show("Retrait de brides", "Aucun élément MEP (piping/HVAC) valide dans la sélection.");
+                    TaskDialog.Show(UiLanguage.T("Retrait de brides", "Remove Flanges"), UiLanguage.T("Aucun élément MEP (piping/HVAC) valide dans la sélection.", "No valid MEP (piping/HVAC) element was selected."));
                     return Result.Cancelled;
                 }
 
@@ -257,15 +258,9 @@ namespace Modification
 
                 try { uiDoc.RefreshActiveView(); } catch { }
 
-                TaskDialog.Show("Retrait de brides",
-                    $"Brides supprimées : {removedFlanges}\n" +
-                    $"Skippables supprimés : {removedSkippables}\n" +
-                    $"Réductions conservées : {keptReducers}\n" +
-                    $"Réductions déplacées : {movedKeptReducers}\n" +
-                    $"Transitions neuves créées : {createdTransitions}\n" +
-                    $"Connexions rétablies : {reconnected}\n" +
-                    $"Ignorées : {skipped}\n" +
-                    $"Échecs (rollback) : {failures}");
+                TaskDialog.Show(UiLanguage.T("Retrait de brides", "Remove Flanges"), UiLanguage.T(
+                    $"Brides supprimées : {removedFlanges}\nSkippables supprimés : {removedSkippables}\nRéductions conservées : {keptReducers}\nRéductions déplacées : {movedKeptReducers}\nTransitions neuves créées : {createdTransitions}\nConnexions rétablies : {reconnected}\nIgnorées : {skipped}\nÉchecs (rollback) : {failures}",
+                    $"Flanges removed: {removedFlanges}\nSkippables removed: {removedSkippables}\nReducers kept: {keptReducers}\nReducers moved: {movedKeptReducers}\nNew transitions created: {createdTransitions}\nConnections restored: {reconnected}\nSkipped: {skipped}\nRollback failures: {failures}"));
 
                 return Result.Succeeded;
             }

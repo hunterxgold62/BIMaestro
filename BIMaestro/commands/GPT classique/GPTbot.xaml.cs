@@ -17,6 +17,7 @@ using System.IO;
 using System.Windows.Documents;
 using Markdown.Xaml;
 using Licensing;
+using BIMaestro.Localization;
 using LicenseManager = Licensing.LicenseManager;
 
 namespace IA
@@ -55,7 +56,7 @@ namespace IA
             _jwt = BIMaestroApp.LicenseJwt;
             if (string.IsNullOrEmpty(_jwt))
             {
-                MessageBox.Show("Licence non initialisée. Relancez le plugin.");
+                MessageBox.Show(UiLanguage.T("Licence non initialisée. Relancez le plugin.", "License is not initialized. Restart the plugin."));
                 this.Close();
                 return;
             }
@@ -76,7 +77,7 @@ namespace IA
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.T($"Impossible d’ouvrir la page d’aide : {ex.Message}", $"Unable to open the help page: {ex.Message}"), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -141,7 +142,7 @@ namespace IA
                 ICollection<ElementId> selectedElementIds = uidoc.Selection.GetElementIds();
                 if (selectedElementIds == null || !selectedElementIds.Any())
                 {
-                    MessageBox.Show("Aucun élément sélectionné. Veuillez sélectionner des éléments dans Revit avant de cliquer sur 'Élément'.");
+                    MessageBox.Show(UiLanguage.T("Aucun élément sélectionné. Veuillez sélectionner des éléments dans Revit avant de cliquer sur 'Élément'.", "No element selected. Select elements in Revit before clicking 'Element'."));
                     return;
                 }
 
@@ -196,7 +197,7 @@ namespace IA
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Erreur lors de la récupération des éléments sélectionnés : " + ex.Message);
+                MessageBox.Show(UiLanguage.T("Erreur lors de la récupération des éléments sélectionnés : ", "Error while retrieving the selected elements: ") + ex.Message);
             }
         }
 

@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Windows;
+using BIMaestro.Localization;
 
 namespace TonNamespace
 {
@@ -22,7 +23,7 @@ namespace TonNamespace
             }
             else
             {
-                MessageBox.Show("Veuillez sélectionner une commande.");
+                MessageBox.Show(UiLanguage.T("Veuillez sélectionner une commande.", "Select a command."));
             }
         }
 

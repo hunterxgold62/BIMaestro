@@ -1,6 +1,7 @@
 ﻿using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 using Licensing;
 using System;
 using System.Collections.Generic;
@@ -8,7 +9,6 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
-using System.Threading;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -24,8 +24,8 @@ namespace Couleur
     public class ToggleCombinedColoringCommand : BaseTrackedCommand
     {
         private const int DoubleClickThresholdMs = 300;
-        private static bool _waitingForDoubleClick = false;
-        private static Timer _singleClickTimer = null;
+        private static DispatcherTimer _singleClickTimer;
+        private static ExternalCommandData _pendingCommandData;
         protected override string ButtonId => "ToggleCombinedColoringCommand";
         protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
@@ -34,16 +34,21 @@ namespace Couleur
             {
                 ColoringStateManager.LoadState();
 
-                if (!_waitingForDoubleClick)
+                if (_singleClickTimer == null)
                 {
-                    _waitingForDoubleClick = true;
-                    _singleClickTimer = new Timer(SingleClickAction, commandData, DoubleClickThresholdMs, Timeout.Infinite);
+                    _pendingCommandData = commandData;
+                    _singleClickTimer = new DispatcherTimer(
+                        DispatcherPriority.Normal)
+                    {
+                        Interval = TimeSpan.FromMilliseconds(
+                            DoubleClickThresholdMs)
+                    };
+                    _singleClickTimer.Tick += SingleClickTimer_Tick;
+                    _singleClickTimer.Start();
                 }
                 else
                 {
-                    _waitingForDoubleClick = false;
-                    _singleClickTimer?.Dispose();
-                    _singleClickTimer = null;
+                    CancelPendingSingleClick();
                     DoDoubleClick(commandData);
                 }
 
@@ -56,40 +61,53 @@ namespace Couleur
             }
         }
 
-        private void SingleClickAction(object state)
+        private static void SingleClickTimer_Tick(
+            object sender,
+            EventArgs e)
         {
-            _waitingForDoubleClick = false;
-            if (state is ExternalCommandData cdata)
-                DoSingleClick(cdata);
+            ExternalCommandData commandData = _pendingCommandData;
+            CancelPendingSingleClick();
+            if (commandData != null)
+                DoSingleClick(commandData);
         }
 
-        private void DoSingleClick(ExternalCommandData commandData)
+        private static void CancelPendingSingleClick()
         {
-            try
+            if (_singleClickTimer != null)
             {
-                ColoringStateManager.ToggleColoring();
-                IntPtr h = commandData.Application.MainWindowHandle;
-                CombinedColoringApplication.ResetColorings(h);
-                PartialColoringHelper.ResetPartialColoring(h);
-
-                if (ColoringStateManager.IsColoringActive)
-                {
-                    CombinedColoringApplication.ApplyTabItemColoring(h);
-                    if (ColoringStateManager.IsFullMode)
-                        CombinedColoringApplication.ApplyPapanoelColoring(h);
-                    else
-                        PartialColoringHelper.ApplyPartialColoring(h);
-                }
+                _singleClickTimer.Stop();
+                _singleClickTimer.Tick -= SingleClickTimer_Tick;
+                _singleClickTimer = null;
             }
-            catch { }
+            _pendingCommandData = null;
         }
 
-        private void DoDoubleClick(ExternalCommandData commandData)
+        private static void DoSingleClick(
+            ExternalCommandData commandData)
+        {
+            try
+            {
+                CustomizeRibbonColorsCommand.ShowPreferences(
+                    commandData);
+            }
+            catch (Exception ex)
+            {
+                TaskDialog.Show(
+                    "BIMaestro",
+                    UiLanguage.T(
+                        "Impossible d’ouvrir la personnalisation des couleurs : ",
+                        "Unable to Open Color Customization: ") +
+                    ex.Message);
+            }
+        }
+
+        private static void DoDoubleClick(
+            ExternalCommandData commandData)
         {
             try
             {
                 IntPtr h = commandData.Application.MainWindowHandle;
-                ColoringStateManager.SwitchMode();
+                ColoringStateManager.ToggleColoring();
                 CombinedColoringApplication.ResetColorings(h);
                 PartialColoringHelper.ResetPartialColoring(h);
 
@@ -150,7 +168,7 @@ namespace Couleur
             }
             catch
             {
-                TaskDialog.Show("Erreur de Chargement", "Impossible de charger l'état, valeurs par défaut appliquées.");
+                TaskDialog.Show(UiLanguage.T("Erreur de Chargement", "Load Error"), UiLanguage.T("Impossible de charger l'état, valeurs par défaut appliquées.", "Unable to load the state; default values were applied."));
                 IsColoringActive = DefaultColoringActive;
                 IsFullMode = DefaultFullMode;
             }
@@ -167,7 +185,7 @@ namespace Couleur
             }
             catch
             {
-                TaskDialog.Show("Erreur de Sauvegarde", "Impossible de sauvegarder l'état.");
+                TaskDialog.Show(UiLanguage.T("Erreur de Sauvegarde", "Save Error"), UiLanguage.T("Impossible de sauvegarder l'état.", "Unable to save the state."));
             }
         }
 
@@ -177,9 +195,23 @@ namespace Couleur
             SaveState();
         }
 
+        public static void SetColoringActive(bool isActive)
+        {
+            if (IsColoringActive == isActive) return;
+            IsColoringActive = isActive;
+            SaveState();
+        }
+
         public static void SwitchMode()
         {
             IsFullMode = !IsFullMode;
+            SaveState();
+        }
+
+        public static void SetFullMode(bool isFullMode)
+        {
+            if (IsFullMode == isFullMode) return;
+            IsFullMode = isFullMode;
             SaveState();
         }
 

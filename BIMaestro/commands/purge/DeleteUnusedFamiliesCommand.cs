@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 
 namespace Modification
 { 
@@ -45,8 +46,8 @@ namespace Modification
             if (!unused.Any())
             {
                 TaskDialog.Show(
-                    "Aucune famille inutilisée",
-                    "Aucune famille chargée inutilisée trouvée."
+                    UiLanguage.T("Aucune famille inutilisée", "No Unused Families"),
+                    UiLanguage.T("Aucune famille chargée inutilisée trouvée.", "No unused loaded family was found.")
                 );
                 return Result.Succeeded;
             }
@@ -57,9 +58,9 @@ namespace Modification
                 unused.Select(f => f.Name)
             );
 
-            var confirm = new TaskDialog("Familles inutilisées détectées")
+            var confirm = new TaskDialog(UiLanguage.T("Familles inutilisées détectées", "Unused Families Detected"))
             {
-                MainInstruction = $"Vous allez purger {unused.Count} famille(s) inutilisée(s) :",
+                MainInstruction = UiLanguage.T($"Vous allez purger {unused.Count} famille(s) inutilisée(s) :", $"You are about to purge {unused.Count} unused family(ies):"),
                 MainContent = listNames,
                 CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.Cancel,
                 DefaultButton = TaskDialogResult.Cancel,

@@ -115,7 +115,8 @@ namespace Modification
                 cbConfigSupport,
                 cbConfigShape,
                 cbConfigHosting,
-                cbVerticalReference);
+                cbVerticalReference,
+                cbTargetProfile);
 
             _doc = doc;
             Config = cfg ?? new ReservationAutoV3Config();

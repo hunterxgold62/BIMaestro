@@ -2,6 +2,7 @@
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,7 +23,7 @@ namespace IA
                 ICollection<ElementId> selectedIds = uidoc.Selection.GetElementIds();
                 if (selectedIds == null || !selectedIds.Any())
                 {
-                    TaskDialog.Show("Sélection", "Aucun élément sélectionné. Veuillez sélectionner des éléments.");
+                    TaskDialog.Show(UiLanguage.T("Sélection", "Selection"), UiLanguage.T("Aucun élément sélectionné. Veuillez sélectionner des éléments.", "No elements selected. Select some elements first."));
                     return Result.Cancelled;
                 }
 
@@ -66,7 +67,7 @@ namespace IA
                     elementInfos.Select(ei => ei.ToString())
                 );
 
-                TaskDialog.Show("Informations des éléments", elementsInfoLog);
+                TaskDialog.Show(UiLanguage.T("Informations des éléments", "Element Information"), elementsInfoLog);
                 return Result.Succeeded;
             }
             catch (Exception ex)

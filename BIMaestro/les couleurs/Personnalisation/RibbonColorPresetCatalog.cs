@@ -25,6 +25,7 @@ namespace Couleur
         public static IReadOnlyList<string> AnimatedPresetNames { get; } =
             new[]
             {
+                "Pastel animé",
                 "Pokéball douce",
                 "Pokémon pixel",
                 "Arc-en-ciel animé",
@@ -44,6 +45,10 @@ namespace Couleur
         {
             switch (presetName)
             {
+                case "Pastel":
+                    return RibbonColorPreferences.GetDefaults();
+                case "Pastel animé":
+                    return CreateAnimatedPastelMix();
                 case "Sombre":
                     return CreateSombre();
                 case "Contraste élevé":
@@ -199,6 +204,60 @@ namespace Couleur
                     false,
                     RibbonGradientDirection.Horizontal,
                     RibbonBackgroundPattern.AnimatedPokemonPixelContinuous));
+        }
+
+        private static Dictionary<string, RibbonPanelColorScheme> CreateAnimatedPastelMix()
+        {
+            Dictionary<string, RibbonPanelColorScheme> result =
+                RibbonColorPreferences.GetDefaults();
+
+            SetPattern(
+                result,
+                "Outils de Visualisation",
+                RibbonBackgroundPattern.AnimatedPastelStarsContinuous);
+            SetPattern(
+                result,
+                "Modification",
+                RibbonBackgroundPattern.AnimatedPastelWavesContinuous);
+            SetPattern(
+                result,
+                "Outils IA",
+                RibbonBackgroundPattern.AnimatedPastelBubblesContinuous);
+            SetPattern(
+                result,
+                "Analyse",
+                RibbonBackgroundPattern.AnimatedSoftCloudsContinuous);
+            SetPattern(
+                result,
+                "Spécifique aux familles",
+                RibbonBackgroundPattern.PokeBallPixel);
+            SetPattern(
+                result,
+                "Couleur et information",
+                RibbonBackgroundPattern.AnimatedPokemonPixelContinuous);
+            SetPattern(
+                result,
+                "Beta",
+                RibbonBackgroundPattern.AnimatedRainbowContinuous);
+
+            return result;
+        }
+
+        private static void SetPattern(
+            IDictionary<string, RibbonPanelColorScheme> schemes,
+            string panelName,
+            RibbonBackgroundPattern pattern)
+        {
+            if (!schemes.TryGetValue(panelName, out RibbonPanelColorScheme scheme))
+                return;
+
+            schemes[panelName] = new RibbonPanelColorScheme(
+                scheme.BackgroundColor,
+                scheme.BackgroundEndColor,
+                scheme.TextColor,
+                false,
+                RibbonGradientDirection.Horizontal,
+                pattern);
         }
 
         private static Dictionary<string, RibbonPanelColorScheme> CreateAnimatedRainbow()

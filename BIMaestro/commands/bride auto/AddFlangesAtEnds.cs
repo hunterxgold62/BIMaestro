@@ -7,6 +7,7 @@ using Autodesk.Revit.DB.Structure;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.UI.Events;
 using Autodesk.Revit.UI.Selection;
+using BIMaestro.Localization;
 using Licensing;
 using System;
 using System.Collections.Generic;
@@ -147,7 +148,7 @@ namespace Modification
                                  .ToList();
                 if (targets.Count == 0)
                 {
-                    TaskDialog.Show("Brides", "Aucun élément MEP (piping) valide dans la sélection.");
+                    TaskDialog.Show(UiLanguage.T("Brides", "Flanges"), UiLanguage.T("Aucun élément MEP (piping) valide dans la sélection.", "No valid MEP (piping) element was selected."));
                     return Result.Cancelled;
                 }
 
@@ -155,8 +156,8 @@ namespace Modification
                 var baseFlangeSymbol = FindFlangeSymbol(doc);
                 if (baseFlangeSymbol == null)
                 {
-                    TaskDialog.Show("Brides manquantes",
-                        "Aucun type 'bride' admissible. Charge par ex. 'CML Bride à collerette tous PN2'.");
+                    TaskDialog.Show(UiLanguage.T("Brides manquantes", "Missing Flanges"),
+                        UiLanguage.T("Aucun type 'bride' admissible. Charge par ex. 'CML Bride à collerette tous PN2'.", "No eligible flange type was found. Load, for example, 'CML Bride à collerette tous PN2'."));
                     return Result.Cancelled;
                 }
 
@@ -164,9 +165,9 @@ namespace Modification
                 if (fpt != FamilyPlacementType.OneLevelBased &&
                     fpt != FamilyPlacementType.TwoLevelsBased)
                 {
-                    TaskDialog.Show("Bride incompatible",
-                        $"La famille '{baseFlangeSymbol.FamilyName}' a un type de placement non supporté : {fpt}.\n" +
-                        "Utilise une bride OneLevelBased/TwoLevelsBased (non hébergée).");
+                    TaskDialog.Show(UiLanguage.T("Bride incompatible", "Incompatible Flange"),
+                        UiLanguage.T($"La famille '{baseFlangeSymbol.FamilyName}' a un type de placement non supporté : {fpt}.\nUtilise une bride OneLevelBased/TwoLevelsBased (non hébergée).",
+                            $"The family '{baseFlangeSymbol.FamilyName}' uses an unsupported placement type: {fpt}.\nUse a OneLevelBased/TwoLevelsBased flange (not hosted)."));
                     return Result.Failed;
                 }
 
@@ -281,7 +282,7 @@ namespace Modification
                     t.Commit();
                 }
 
-                TaskDialog.Show("Brides", $"Brides posées : {placed}\nIgnorées/échouées : {skipped}");
+                TaskDialog.Show(UiLanguage.T("Brides", "Flanges"), UiLanguage.T($"Brides posées : {placed}\nIgnorées/échouées : {skipped}", $"Flanges placed: {placed}\nSkipped/failed: {skipped}"));
                 return Result.Succeeded;
             }
             finally

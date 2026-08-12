@@ -15,6 +15,8 @@ namespace Page
     internal static class ButtonUpdateNotesManager
     {
         private const string FirstAssumedPreviousVersion = "1.0.6.1";
+        private const string Release1062 = "1.0.6.2";
+        private const string Release1063 = "1.0.6.3";
         private static readonly object Sync = new object();
         private static ButtonUpdateNotesState _state;
 
@@ -95,10 +97,18 @@ namespace Page
 
         private static string GetPreviousVersionForDisplay(ButtonUpdateNotesState state, Version currentVersion)
         {
-            if (currentVersion != null &&
-                string.Equals(currentVersion.ToString(), "1.0.6.2", StringComparison.OrdinalIgnoreCase))
-            {
+            if (currentVersion == null)
+                return state?.LastKnownVersion;
+
+            if (string.Equals(currentVersion.ToString(), Release1062, StringComparison.OrdinalIgnoreCase))
                 return FirstAssumedPreviousVersion;
+
+            if (string.Equals(currentVersion.ToString(), Release1063, StringComparison.OrdinalIgnoreCase))
+            {
+                var lastKnownVersion = ParseVersion(state?.LastKnownVersion);
+                var release1062 = ParseVersion(Release1062);
+                if (lastKnownVersion == null || lastKnownVersion.CompareTo(release1062) < 0)
+                    return Release1062;
             }
 
             return state?.LastKnownVersion;

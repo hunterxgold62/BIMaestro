@@ -4,6 +4,7 @@ using Autodesk.Revit.UI;
 using System.Linq;
 using Autodesk.Revit.UI.Selection;
 using System.Collections.Generic;
+using BIMaestro.Localization;
 
 [Transaction(TransactionMode.ReadOnly)]
 public class CountElementsCommand : IExternalCommand
@@ -20,7 +21,7 @@ public class CountElementsCommand : IExternalCommand
         // Vérifier si un élément est sélectionné
         if (selectedIds.Count == 0)
         {
-            TaskDialog.Show("Sélectionner un élément", "Sélectionne un élément dans le projet.");
+            TaskDialog.Show(UiLanguage.T("Sélectionner un élément", "Select an Element"), UiLanguage.T("Sélectionne un élément dans le projet.", "Select an element in the project."));
             return Result.Cancelled;
         }
 
@@ -32,7 +33,7 @@ public class CountElementsCommand : IExternalCommand
 
         if (category == null)
         {
-            TaskDialog.Show("Erreur", "L'élément sélectionné n'a pas de catégorie valide.");
+            TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T("L'élément sélectionné n'a pas de catégorie valide.", "The selected element has no valid category."));
             return Result.Failed;
         }
 
@@ -44,7 +45,7 @@ public class CountElementsCommand : IExternalCommand
         int elementCount = collector.Count();
 
         // Afficher le nombre d'éléments dans une boîte de dialogue
-        TaskDialog.Show("Nombre d'Éléments", $"Il y a {elementCount} éléments dans la catégorie '{category.Name}'.");
+        TaskDialog.Show(UiLanguage.T("Nombre d'Éléments", "Element Count"), UiLanguage.T($"Il y a {elementCount} éléments dans la catégorie '{category.Name}'.", $"There are {elementCount} elements in the '{category.Name}' category."));
 
         return Result.Succeeded;
     }

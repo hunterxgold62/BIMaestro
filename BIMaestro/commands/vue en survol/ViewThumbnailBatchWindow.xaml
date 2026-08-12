@@ -3,9 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="BIMaestro - Miniatures des vues"
         Width="620"
-        Height="520"
+        Height="550"
         MinWidth="560"
-        MinHeight="470"
+        MinHeight="510"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
         Background="{DynamicResource App.Background}"
@@ -71,20 +71,22 @@
                         Grid.Column="1"
                         Width="120"
                         Height="38"
-                        VerticalAlignment="Top"
+                        VerticalAlignment="Center"
                         Content="Démarrer"
                         Click="StartButton_Click"/>
             </Grid>
         </Border>
 
-        <Border Grid.Row="2" Style="{StaticResource Card}">
+        <Border Grid.Row="2"
+                MinHeight="180"
+                Style="{StaticResource Card}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <Grid Grid.Row="0">
@@ -143,7 +145,6 @@
 
                 <TextBlock Grid.Row="4"
                            Margin="0,16,0,0"
-                           VerticalAlignment="Bottom"
                            Foreground="{DynamicResource Text.Secondary}"
                            FontSize="11"
                            TextWrapping="Wrap"

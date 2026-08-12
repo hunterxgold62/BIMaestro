@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;           // ← pour CancelEventArgs (OnClosing)
+using BIMaestro.Localization;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -15,6 +16,7 @@ namespace Famille.Orbit3D
         public Family3DPreviewWindow()
         {
             InitializeComponent();
+            UiLanguage.LocalizeWindow(this);
 
             ShowInTaskbar = false;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;

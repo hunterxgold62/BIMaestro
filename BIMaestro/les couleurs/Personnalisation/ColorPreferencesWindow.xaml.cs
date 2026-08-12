@@ -29,6 +29,8 @@ namespace Couleur
         private bool _isUpdatingBrowserColoringMode;
         private ProjectBrowserColorProfile _selectedBrowserColorProfile;
         private string _newBrowserColorProfileName = string.Empty;
+        private bool _areColoredPanelsEnabled;
+        private bool _useFullPanelColoring;
 
         public ColorPreferencesWindow(
             System.IntPtr mainWindowHandle,
@@ -39,6 +41,10 @@ namespace Couleur
 
             _mainWindowHandle = mainWindowHandle;
             _document = document;
+            _areColoredPanelsEnabled =
+                ColoringStateManager.IsColoringActive;
+            _useFullPanelColoring =
+                ColoringStateManager.IsFullMode;
             PanelColors = CreateItems(RibbonColorPreferences.Load());
             BrowserPreferences =
                 ProjectBrowserColorPreferences.Load();
@@ -96,6 +102,28 @@ namespace Couleur
                 : BrowserCategorySuggestions.Count + UiLanguage.T(" catégories détectées", " categories detected");
 
         public string PreferenceFilePath { get; }
+
+        public bool AreColoredPanelsEnabled
+        {
+            get => _areColoredPanelsEnabled;
+            set
+            {
+                if (_areColoredPanelsEnabled == value) return;
+                _areColoredPanelsEnabled = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool UseFullPanelColoring
+        {
+            get => _useFullPanelColoring;
+            set
+            {
+                if (_useFullPanelColoring == value) return;
+                _useFullPanelColoring = value;
+                OnPropertyChanged();
+            }
+        }
 
         public IReadOnlyList<PresetMenuEntry> PresetEntries { get; }
 
@@ -747,6 +775,10 @@ namespace Couleur
 
         private void SaveCurrentColors()
         {
+            ColoringStateManager.SetColoringActive(
+                AreColoredPanelsEnabled);
+            ColoringStateManager.SetFullMode(
+                UseFullPanelColoring);
             var colors = PanelColors.ToDictionary(
                 item => item.PanelName,
                 item => item.CreateScheme());

@@ -3,7 +3,7 @@
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Revit](https://img.shields.io/badge/Revit-2022%20%C3%A0%202027-blue)
 ![.NET Framework](https://img.shields.io/badge/.NET%20Framework-4.8-512BD4)
-![Version](https://img.shields.io/badge/version-1.0.6.2-green)
+![Version](https://img.shields.io/badge/version-1.0.6.3-green)
 [![Site officiel](https://img.shields.io/badge/site-bimaestro.fr-111827)](https://bimaestro.fr)
 
 **BIMaestro** est un add-in Revit conçu pour accélérer le quotidien des dessinateurs, projeteurs, BIM modeleurs et BIM managers.

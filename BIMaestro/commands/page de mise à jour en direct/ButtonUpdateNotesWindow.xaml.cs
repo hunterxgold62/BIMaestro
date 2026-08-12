@@ -43,11 +43,20 @@ namespace Page
                 Version = note.Version,
                 ButtonId = note.ButtonId,
                 CommandClass = note.CommandClass,
-                Title = TranslateNoteText(note.Title),
-                Summary = TranslateNoteText(note.Summary),
-                Changes = (note.Changes ?? new List<string>())
-                    .Select(TranslateNoteText)
-                    .ToList()
+                Title = string.IsNullOrWhiteSpace(note.EnglishTitle)
+                    ? TranslateNoteText(note.Title)
+                    : note.EnglishTitle,
+                Summary = string.IsNullOrWhiteSpace(note.EnglishSummary)
+                    ? TranslateNoteText(note.Summary)
+                    : note.EnglishSummary,
+                Changes = note.EnglishChanges != null && note.EnglishChanges.Count > 0
+                    ? note.EnglishChanges.ToList()
+                    : (note.Changes ?? new List<string>())
+                        .Select(TranslateNoteText)
+                        .ToList(),
+                EnglishTitle = note.EnglishTitle,
+                EnglishSummary = note.EnglishSummary,
+                EnglishChanges = note.EnglishChanges?.ToList() ?? new List<string>()
             };
         }
 

@@ -213,7 +213,8 @@ namespace BIMaestro.VideoGames
                     int next = edge.ConnectorA == current
                         ? edge.ConnectorB
                         : edge.ConnectorA;
-                    if ((externalStops.Contains(current) && !edge.IsInternal) ||
+                    if (!GameMepSystemTraversalPolicy.CanTraverse(graph, edge) ||
+                        (externalStops.Contains(current) && !edge.IsInternal) ||
                         IsBlocked(graph, edge, current, next, reverseCheckValves))
                     {
                         continue;

@@ -1,6 +1,7 @@
 ﻿using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 using Licensing;
 using System;
 using System.Collections.Generic;
@@ -25,7 +26,7 @@ namespace Famille
 
             if (!doc.IsFamilyDocument)
             {
-                TaskDialog.Show("BIMaestro", "Cette commande doit être lancée dans l'éditeur de familles (.rfa).");
+                TaskDialog.Show("BIMaestro", UiLanguage.T("Cette commande doit être lancée dans l'éditeur de familles (.rfa).", "This command must be run in the Family Editor (.rfa)."));
                 return Result.Cancelled;
             }
 
@@ -37,7 +38,7 @@ namespace Famille
 
             if (sharedParameters.Count == 0)
             {
-                TaskDialog.Show("BIMaestro", "Aucun paramètre partagé à convertir.");
+                TaskDialog.Show("BIMaestro", UiLanguage.T("Aucun paramètre partagé à convertir.", "No shared parameter is available to convert."));
                 return Result.Succeeded;
             }
 

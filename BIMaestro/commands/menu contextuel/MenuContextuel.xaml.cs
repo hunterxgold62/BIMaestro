@@ -5,6 +5,7 @@ using System.IO;
 using Newtonsoft.Json;
 using System.Windows;
 using System.Windows.Controls;
+using BIMaestro.Localization;
 using System.Windows.Input;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
@@ -249,7 +250,7 @@ namespace TonNamespace
 
             if (available.Count == 0)
             {
-                MessageBox.Show("Toutes les commandes disponibles ont été ajoutées.");
+                MessageBox.Show(UiLanguage.T("Toutes les commandes disponibles ont été ajoutées.", "All available commands have already been added."));
                 return;
             }
 

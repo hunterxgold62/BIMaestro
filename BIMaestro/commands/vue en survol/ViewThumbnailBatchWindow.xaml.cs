@@ -1,4 +1,5 @@
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 using System;
 using System.Windows;
 using System.Windows.Threading;
@@ -20,7 +21,7 @@ namespace BIMaestro.ViewHover
             InitializeComponent();
             _startHandler = startHandler;
             _startEvent = startEvent;
-            DocumentText.Text = "Projet : " +
+            DocumentText.Text = UiLanguage.T("Projet : ", "Project: ") +
                                 (documentTitle ?? string.Empty);
 
             _startHandler.StartFailed += OnStartFailed;
@@ -52,13 +53,15 @@ namespace BIMaestro.ViewHover
             if (request == ExternalEventRequest.Denied)
             {
                 OnStartFailed(
-                    "Revit ne peut pas démarrer le traitement maintenant.");
+                    UiLanguage.T(
+                        "Revit ne peut pas démarrer le traitement maintenant.",
+                        "Revit cannot start the process right now."));
                 return;
             }
 
             StartButton.IsEnabled = false;
             ModeComboBox.IsEnabled = false;
-            StatusText.Text = "Préparation de la file…";
+            StatusText.Text = UiLanguage.T("Préparation de la file…", "Preparing the queue…");
         }
 
         private void PauseResumeButton_Click(
@@ -83,7 +86,7 @@ namespace BIMaestro.ViewHover
             Dispatcher.BeginInvoke(new Action(() =>
             {
                 StatusText.Text = string.IsNullOrWhiteSpace(error)
-                    ? "Impossible de démarrer le traitement."
+                    ? UiLanguage.T("Impossible de démarrer le traitement.", "Unable to start the process.")
                     : error;
                 StartButton.IsEnabled = true;
                 ModeComboBox.IsEnabled = true;
@@ -108,23 +111,23 @@ namespace BIMaestro.ViewHover
                 return;
             }
 
-            DocumentText.Text = "Projet : " + progress.DocumentTitle;
-            StatusText.Text = progress.Status ?? string.Empty;
+            DocumentText.Text = UiLanguage.T("Projet : ", "Project: ") + progress.DocumentTitle;
+            StatusText.Text = UiLanguage.T(progress.Status ?? string.Empty);
             CounterText.Text = progress.Completed + " / " + progress.Total;
             ProgressBar.Maximum = Math.Max(1, progress.Total);
             ProgressBar.Value = Math.Min(
                 progress.Completed,
                 Math.Max(1, progress.Total));
-            CurrentViewText.Text = "Vue : " +
+            CurrentViewText.Text = UiLanguage.T("Vue : ", "View: ") +
                 (string.IsNullOrWhiteSpace(progress.CurrentViewName)
                     ? "—"
                     : progress.CurrentViewName);
-            ElapsedText.Text = "Écoulé : " + FormatDuration(progress.Elapsed);
-            RemainingText.Text = "Restant estimé : " +
+            ElapsedText.Text = UiLanguage.T("Écoulé : ", "Elapsed: ") + FormatDuration(progress.Elapsed);
+            RemainingText.Text = UiLanguage.T("Restant estimé : ", "Estimated remaining: ") +
                 (progress.EstimatedRemaining.HasValue
                     ? FormatDuration(progress.EstimatedRemaining.Value)
                     : "—");
-            FailedText.Text = "Échecs : " + progress.Failed;
+            FailedText.Text = UiLanguage.T("Échecs : ", "Failures: ") + progress.Failed;
 
             bool finished = progress.IsCompleted || progress.IsCanceled;
             StartButton.IsEnabled = finished;
@@ -132,8 +135,8 @@ namespace BIMaestro.ViewHover
             PauseResumeButton.IsEnabled = !finished;
             StopButton.IsEnabled = !finished;
             PauseResumeButton.Content = progress.IsPaused
-                ? "Reprendre"
-                : "Pause";
+                ? UiLanguage.T("Reprendre", "Resume")
+                : UiLanguage.T("Pause", "Pause");
         }
 
         private static string FormatDuration(TimeSpan duration)

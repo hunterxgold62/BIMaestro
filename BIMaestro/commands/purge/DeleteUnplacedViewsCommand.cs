@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 
 namespace Modification
 { 
@@ -49,15 +50,15 @@ namespace Modification
 
             if (toDelete.Count == 0)
             {
-                TaskDialog.Show("Supprimer vues non implantées",
-                    "Aucune vue plan/coupe/3D/detail/rendering non implantée à supprimer.");
+                TaskDialog.Show(UiLanguage.T("Supprimer vues non implantées", "Delete Unplaced Views"),
+                    UiLanguage.T("Aucune vue plan/coupe/3D/detail/rendering non implantée à supprimer.", "No unplaced plan, section, 3D, detail, or rendering view was found to delete."));
                 return Result.Succeeded;
             }
 
             // 4) Confirmation avant suppression
-            var dlg = new TaskDialog("Supprimer vues non implantées")
+            var dlg = new TaskDialog(UiLanguage.T("Supprimer vues non implantées", "Delete Unplaced Views"))
             {
-                MainInstruction = $"Vous allez supprimer {toDelete.Count} vue(s) non implantée(s).",
+                MainInstruction = UiLanguage.T($"Vous allez supprimer {toDelete.Count} vue(s) non implantée(s).", $"You are about to delete {toDelete.Count} unplaced view(s)."),
                 CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No
             };
             if (dlg.Show() != TaskDialogResult.Yes)
@@ -75,8 +76,8 @@ namespace Modification
                 tx.Commit();
             }
 
-            TaskDialog.Show("Supprimer vues non implantées",
-                $"{toDelete.Count} vue(s) supprimée(s).");
+            TaskDialog.Show(UiLanguage.T("Supprimer vues non implantées", "Delete Unplaced Views"),
+                UiLanguage.T($"{toDelete.Count} vue(s) supprimée(s).", $"{toDelete.Count} view(s) deleted."));
             return Result.Succeeded;
         }
     }

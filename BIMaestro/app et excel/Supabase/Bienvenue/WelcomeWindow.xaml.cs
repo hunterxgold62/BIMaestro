@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Media.Imaging;
+using BIMaestro.Localization;
 
 namespace BIMaestro.Welcome
 {
@@ -38,7 +39,7 @@ namespace BIMaestro.Welcome
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, "Impossible d’ouvrir l’exemple : " + ex.Message,
+                MessageBox.Show(this, UiLanguage.T("Impossible d’ouvrir l’exemple : ", "Unable to open the example: ") + ex.Message,
                     "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
 
@@ -57,7 +58,7 @@ namespace BIMaestro.Welcome
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, "Impossible d’ouvrir LinkedIn : " + ex.Message,
+                MessageBox.Show(this, UiLanguage.T("Impossible d’ouvrir LinkedIn : ", "Unable to open LinkedIn: ") + ex.Message,
                     "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
@@ -66,14 +67,14 @@ namespace BIMaestro.Welcome
         {
             if (string.IsNullOrWhiteSpace(Email))
             {
-                MessageBox.Show(this, "Indique un email, ou clique sur “Plus tard” si tu préfères passer.",
+                MessageBox.Show(this, UiLanguage.T("Indique un email, ou clique sur “Plus tard” si tu préfères passer.", "Enter an email, or click “Later” if you prefer to skip."),
                     "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
             if (!IsValidEmail(Email))
             {
-                MessageBox.Show(this, "Cet email ne semble pas valide.",
+                MessageBox.Show(this, UiLanguage.T("Cet email ne semble pas valide.", "This email does not appear to be valid."),
                     "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }

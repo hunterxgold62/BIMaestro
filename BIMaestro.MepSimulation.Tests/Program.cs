@@ -30,6 +30,9 @@ namespace BIMaestro.VideoGames
                 OpenIsolationValveIsDirectionallyTransparent();
                 SourceOnlyNetworkKeepsDirectionAcrossOpenValve();
                 DifferentRevitSystemsDoNotExchangeDirection();
+                SharedSystemAbbreviationBridgesInlineEquipment();
+                SharedSystemAbbreviationDoesNotBridgeMultiPortEquipment();
+                PumpConstraintBridgesDifferentRevitSystems();
                 ReturnOnlySystemFlowsTowardDeclaredOutlet();
                 ClosedValveDeadEndStaysPressurizedWithoutCirculation();
                 UnmarkedOpenEndKeepsCirculation();
@@ -545,6 +548,87 @@ namespace BIMaestro.VideoGames
             AssertState(fixture, "pipe-b", GameMepFlowState.Unknown);
             Assert(fixture.Path("pipe-a").FlowForward,
                 "System A must keep the direction propagated by its own source.");
+        }
+
+        private static void PumpConstraintBridgesDifferentRevitSystems()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("arrival-a", 1, source: true);
+            fixture.AddElement("pipe-a", 2);
+            fixture.AddElement("pump", 2);
+            fixture.AddElement("pipe-b", 2);
+            fixture.Connect("arrival-a", 0, "pipe-a", 0);
+            fixture.Connect("pipe-a", 1, "pump", 0);
+            fixture.Connect("pump", 1, "pipe-b", 0);
+            fixture.SetElementSystem("arrival-a", "system-a");
+            fixture.SetElementSystem("pipe-a", "system-a");
+            fixture.SetConnectorSystem("pump", 0, "system-a");
+            fixture.SetConnectorSystem("pump", 1, "system-b");
+            fixture.SetElementSystem("pipe-b", "system-b");
+            fixture.SetDirectionConstraint(
+                "pump",
+                0,
+                1,
+                GameMepDirectionConstraintScope.EquipmentPressureRise);
+
+            fixture.Calculate();
+
+            AssertState(fixture, "pipe-a", GameMepFlowState.Supplied);
+            AssertState(fixture, "pump", GameMepFlowState.Supplied);
+            AssertState(fixture, "pipe-b", GameMepFlowState.Supplied);
+            Assert(fixture.Path("pump").FlowForward,
+                "A declared pump must bridge its two Revit system instances.");
+        }
+
+        private static void SharedSystemAbbreviationBridgesInlineEquipment()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddSystem("system-a", "PRI.R", "HydronicReturn");
+            fixture.AddSystem("system-b", "PRI.R", "HydronicReturn");
+            fixture.AddElement("arrival-a", 1, source: true);
+            fixture.AddElement("pipe-a", 2);
+            fixture.AddElement("inline-equipment", 2);
+            fixture.AddElement("pipe-b", 2);
+            fixture.Connect("arrival-a", 0, "pipe-a", 0);
+            fixture.Connect("pipe-a", 1, "inline-equipment", 0);
+            fixture.Connect("inline-equipment", 1, "pipe-b", 0);
+            fixture.SetElementSystem("arrival-a", "system-a");
+            fixture.SetElementSystem("pipe-a", "system-a");
+            fixture.SetConnectorSystem("inline-equipment", 0, "system-a");
+            fixture.SetConnectorSystem("inline-equipment", 1, "system-b");
+            fixture.SetElementSystem("pipe-b", "system-b");
+
+            fixture.Calculate();
+
+            AssertState(fixture, "pipe-b", GameMepFlowState.Supplied);
+        }
+
+        private static void SharedSystemAbbreviationDoesNotBridgeMultiPortEquipment()
+        {
+            GraphFixture fixture = new GraphFixture();
+            foreach (string key in new[]
+                { "system-a", "system-b", "system-c", "system-d" })
+            {
+                fixture.AddSystem(key, "PRI.R", "HydronicReturn");
+            }
+            fixture.AddElement("arrival-a", 1, source: true);
+            fixture.AddElement("pipe-a", 2);
+            fixture.AddElement("heat-exchanger", 4);
+            fixture.AddElement("pipe-b", 2);
+            fixture.Connect("arrival-a", 0, "pipe-a", 0);
+            fixture.Connect("pipe-a", 1, "heat-exchanger", 0);
+            fixture.Connect("heat-exchanger", 1, "pipe-b", 0);
+            fixture.SetElementSystem("arrival-a", "system-a");
+            fixture.SetElementSystem("pipe-a", "system-a");
+            fixture.SetConnectorSystem("heat-exchanger", 0, "system-a");
+            fixture.SetConnectorSystem("heat-exchanger", 1, "system-b");
+            fixture.SetConnectorSystem("heat-exchanger", 2, "system-c");
+            fixture.SetConnectorSystem("heat-exchanger", 3, "system-d");
+            fixture.SetElementSystem("pipe-b", "system-b");
+
+            fixture.Calculate();
+
+            AssertState(fixture, "pipe-b", GameMepFlowState.Unknown);
         }
 
         private static void ReturnOnlySystemFlowsTowardDeclaredOutlet()
@@ -2135,6 +2219,21 @@ namespace BIMaestro.VideoGames
             {
                 GameMepElementData element = _elements[key];
                 Graph.Connectors[element.ConnectorIndices[port]].SystemKey = systemKey;
+            }
+
+            public void AddSystem(
+                string key,
+                string abbreviation,
+                string classification)
+            {
+                Graph.Systems.Add(new GameMepSystemData
+                {
+                    Key = key,
+                    Name = key,
+                    Abbreviation = abbreviation,
+                    Classification = classification
+                });
+                Graph.RebuildIndexes();
             }
 
             public void SetElementSystem(string key, string systemKey)

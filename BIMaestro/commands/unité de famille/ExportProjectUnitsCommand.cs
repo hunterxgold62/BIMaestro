@@ -4,6 +4,7 @@ using System.IO;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 using Licensing;
 using Newtonsoft.Json;
 using System.Linq;
@@ -53,7 +54,7 @@ namespace Famille
             File.WriteAllText(filePath, JsonConvert.SerializeObject(list, Formatting.Indented));
 
             var disciplineCount = UnitUtils.GetAllDisciplines().Count();
-            TaskDialog.Show("Export unités", $"✅ {list.Count} unité(s) exportée(s) (toutes disciplines, {disciplineCount} discipline(s)) vers :\n{filePath}");
+            TaskDialog.Show(UiLanguage.T("Export unités", "Export Units"), UiLanguage.T($"✅ {list.Count} unité(s) exportée(s) (toutes disciplines, {disciplineCount} discipline(s)) vers :\n{filePath}", $"✅ {list.Count} unit(s) exported (all disciplines, {disciplineCount} discipline(s)) to:\n{filePath}"));
             return Result.Succeeded;
         }
     }

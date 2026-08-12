@@ -6,6 +6,7 @@ using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Architecture;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 
 namespace Modification
 {
@@ -76,17 +77,17 @@ namespace Modification
 
             if (!toDelete.Any())
             {
-                TaskDialog.Show("Familles inutilisées",
-                                "Aucune famille chargée inutilisée trouvée.");
+                TaskDialog.Show(UiLanguage.T("Familles inutilisées", "Unused Families"),
+                                UiLanguage.T("Aucune famille chargée inutilisée trouvée.", "No unused loaded family was found."));
                 return Result.Succeeded;
             }
 
             // 6) Affichage complet des noms à l'utilisateur
             string allNames = string.Join(Environment.NewLine,
                 toDelete.Select(f => f.Name));
-            var confirm = new TaskDialog("Familles inutilisées détectées")
+            var confirm = new TaskDialog(UiLanguage.T("Familles inutilisées détectées", "Unused Families Detected"))
             {
-                MainInstruction = $"Vous allez supprimer {toDelete.Count} famille(s) inutilisée(s):",
+                MainInstruction = UiLanguage.T($"Vous allez supprimer {toDelete.Count} famille(s) inutilisée(s):", $"You are about to delete {toDelete.Count} unused family(ies):"),
                 MainContent = allNames,
                 CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.Cancel,
                 DefaultButton = TaskDialogResult.Cancel,
@@ -112,8 +113,8 @@ namespace Modification
             }
             tx.Commit();
 
-            TaskDialog.Show("Suppression terminée",
-                            $"{toDelete.Count} famille(s) supprimée(s).");
+            TaskDialog.Show(UiLanguage.T("Suppression terminée", "Deletion Completed"),
+                            UiLanguage.T($"{toDelete.Count} famille(s) supprimée(s).", $"{toDelete.Count} family(ies) deleted."));
             return Result.Succeeded;
         }
     }

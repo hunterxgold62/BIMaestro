@@ -18,7 +18,7 @@
 ; directement le manifeste du bundle via PackageContents.xml.
 ; ---------------------------------------------------------------------------
 
-#define AppVersion "1.0.6.2"
+#define AppVersion "1.0.6.3"
 #define AddInId "{E3B0C442-98FC-1C14-9AF7-7D7CE11B9A09}"
 #define ProductCode "{61D3E380-DC30-49B3-BC8E-B7AD886F29A0}"
 #define UpgradeCode "{49998F77-82A0-4D32-BF80-FFA6542040F6}"

@@ -294,6 +294,76 @@ namespace BIMaestro.ViewHover
             }
         }
 
+        internal static void LoadCachedPreviews(Document document)
+        {
+            if (document == null) return;
+
+            string documentKey = Analyse.ElementHistoryTracker
+                .GetDocumentKeyForHistory(document);
+            string documentVersion = GetDocumentVersionSignature(document);
+            List<View> views;
+            try
+            {
+                views = new FilteredElementCollector(document)
+                    .OfClass(typeof(View))
+                    .Cast<View>()
+                    .Where(view => CanCapture(document, view))
+                    .ToList();
+            }
+            catch
+            {
+                return;
+            }
+
+            foreach (View view in views)
+            {
+                string targetPath = GetPreviewPath(
+                    documentKey,
+                    view.UniqueId);
+                if (!File.Exists(targetPath)) continue;
+
+                try
+                {
+                    byte[] bytes = File.ReadAllBytes(targetPath);
+                    string dataUri = "data:image/png;base64," +
+                                     Convert.ToBase64String(bytes);
+                    bool isStale = !HasMatchingDocumentVersion(
+                        targetPath,
+                        documentVersion);
+
+                    Couleur.ProjectBrowserColoring.SetViewHoverPreview(
+                        GetElementIdText(view.Id),
+                        view.Name ?? string.Empty,
+                        dataUri,
+                        File.GetLastWriteTime(targetPath),
+                        isStale);
+
+                    lock (Sync)
+                    {
+                        DocumentPreviewState state = GetOrCreateState(
+                            documentKey);
+                        state.Views[view.UniqueId] = CreateIdentity(view);
+                        if (!isStale)
+                        {
+                            state.CapturedRevisions[view.UniqueId] =
+                                state.Revision;
+                        }
+                        Published.Add(BuildPreviewKey(
+                            documentKey,
+                            view.UniqueId));
+                        FailedThisSession.Remove(BuildPreviewKey(
+                            documentKey,
+                            view.UniqueId));
+                    }
+                }
+                catch
+                {
+                    // Une miniature illisible ne doit pas bloquer le
+                    // chargement des autres vues du projet.
+                }
+            }
+        }
+
         internal static void ProcessPending(UIApplication uiApplication)
         {
             ProcessScheduledCacheMaintenance(uiApplication);

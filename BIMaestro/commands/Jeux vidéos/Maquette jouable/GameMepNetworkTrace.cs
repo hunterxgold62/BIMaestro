@@ -397,7 +397,8 @@ namespace BIMaestro.VideoGames
             {
                 GameMepConnectionData edge = graph.Connections[edgeIndex];
                 if (!IsValidConnector(graph, edge.ConnectorA) ||
-                    !IsValidConnector(graph, edge.ConnectorB))
+                    !IsValidConnector(graph, edge.ConnectorB) ||
+                    !GameMepSystemTraversalPolicy.CanTraverse(graph, edge))
                 {
                     continue;
                 }

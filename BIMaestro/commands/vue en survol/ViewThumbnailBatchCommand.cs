@@ -1,6 +1,7 @@
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 using Licensing;
 using System;
 using System.Windows;
@@ -24,8 +25,8 @@ namespace BIMaestro.ViewHover
             if (uiApplication?.ActiveUIDocument?.Document == null)
             {
                 TaskDialog.Show(
-                    "BIMaestro - Miniatures",
-                    "Aucun projet Revit actif.");
+                    UiLanguage.T("BIMaestro - Miniatures", "BIMaestro - Thumbnails"),
+                    UiLanguage.T("Aucun projet Revit actif.", "No active Revit project."));
                 return Result.Cancelled;
             }
 
@@ -93,7 +94,9 @@ namespace BIMaestro.ViewHover
 
         public string GetName()
         {
-            return "BIMaestro - Génération des miniatures de vues";
+            return UiLanguage.T(
+                "BIMaestro - Génération des miniatures de vues",
+                "BIMaestro - Generate View Thumbnails");
         }
     }
 }

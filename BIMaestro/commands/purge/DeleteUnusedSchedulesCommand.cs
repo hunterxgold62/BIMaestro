@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 
 namespace Modification
 {
@@ -56,15 +57,15 @@ namespace Modification
 
             if (finalList.Count == 0)
             {
-                TaskDialog.Show("Supprimer nomenclatures inutilisées",
-                    "Aucune nomenclature non placée à supprimer.");
+                TaskDialog.Show(UiLanguage.T("Supprimer nomenclatures inutilisées", "Delete Unused Schedules"),
+                    UiLanguage.T("Aucune nomenclature non placée à supprimer.", "No unplaced schedule was found to delete."));
                 return Result.Succeeded;
             }
 
             // 6) Confirmation utilisateur
-            var dlg = new TaskDialog("Supprimer nomenclatures inutilisées")
+            var dlg = new TaskDialog(UiLanguage.T("Supprimer nomenclatures inutilisées", "Delete Unused Schedules"))
             {
-                MainInstruction = $"Vous allez supprimer {finalList.Count} nomenclature(s) non placée(s).",
+                MainInstruction = UiLanguage.T($"Vous allez supprimer {finalList.Count} nomenclature(s) non placée(s).", $"You are about to delete {finalList.Count} unplaced schedule(s)."),
                 CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No
             };
             if (dlg.Show() != TaskDialogResult.Yes)
@@ -110,9 +111,11 @@ namespace Modification
                 tx.Commit();
             }
 
-            TaskDialog.Show("Supprimer nomenclatures inutilisées",
-                $"{deletedCount} nomenclature(s) supprimée(s)." +
-                (skippedCount > 0 ? $"\n{skippedCount} nomenclature(s) ignorée(s) par sécurité." : string.Empty));
+            TaskDialog.Show(UiLanguage.T("Supprimer nomenclatures inutilisées", "Delete Unused Schedules"),
+                UiLanguage.T($"{deletedCount} nomenclature(s) supprimée(s)." +
+                             (skippedCount > 0 ? $"\n{skippedCount} nomenclature(s) ignorée(s) par sécurité." : string.Empty),
+                             $"{deletedCount} schedule(s) deleted." +
+                             (skippedCount > 0 ? $"\n{skippedCount} schedule(s) skipped for safety." : string.Empty)));
             return Result.Succeeded;
         }
 

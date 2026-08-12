@@ -1,6 +1,7 @@
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 using Licensing;
 using Microsoft.Win32;
 using Newtonsoft.Json.Linq;
@@ -72,7 +73,7 @@ namespace IA
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.T($"Impossible d’ouvrir la page d’aide : {ex.Message}", $"Unable to open the help page: {ex.Message}"), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -94,7 +95,7 @@ namespace IA
 
             if (!candidateViews.Any())
             {
-                TaskDialog.Show("IA Image", "Aucune vue Plan/Coupe/3D exploitable trouvée.");
+                TaskDialog.Show(UiLanguage.T("IA Image", "AI Image"), UiLanguage.T("Aucune vue Plan/Coupe/3D exploitable trouvée.", "No usable plan/section/3D view was found."));
                 return Result.Cancelled;
             }
 
@@ -111,7 +112,7 @@ namespace IA
 
             if (string.IsNullOrWhiteSpace(jwt))
             {
-                TaskDialog.Show("IA Image", "Licence/JWT introuvable.");
+                TaskDialog.Show(UiLanguage.T("IA Image", "AI Image"), UiLanguage.T("Licence/JWT introuvable.", "License/JWT not found."));
                 return Result.Failed;
             }
 
@@ -119,7 +120,7 @@ namespace IA
 
             if (string.IsNullOrWhiteSpace(exportedPath) || !File.Exists(exportedPath))
             {
-                TaskDialog.Show("IA Image", "Impossible d'exporter la vue sélectionnée.");
+                TaskDialog.Show(UiLanguage.T("IA Image", "AI Image"), UiLanguage.T("Impossible d’exporter la vue sélectionnée.", "Unable to export the selected view."));
                 return Result.Failed;
             }
 

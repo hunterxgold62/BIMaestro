@@ -1,6 +1,7 @@
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 using Licensing;
 using System;
 using System.Diagnostics;
@@ -28,7 +29,7 @@ namespace Page
             }
             catch (Exception ex)
             {
-                TaskDialog.Show("BIMaestro - Contact", $"Impossible d'ouvrir LinkedIn : {ex.Message}");
+                TaskDialog.Show(UiLanguage.T("BIMaestro - Contact", "BIMaestro - Contact"), UiLanguage.T($"Impossible d'ouvrir LinkedIn : {ex.Message}", $"Unable to open LinkedIn: {ex.Message}"));
                 return Result.Failed;
             }
         }
@@ -55,7 +56,7 @@ namespace Page
             }
             catch (Exception ex)
             {
-                TaskDialog.Show("BIMaestro - Soutenir", $"Impossible d'ouvrir la page Ko-fi : {ex.Message}");
+                TaskDialog.Show(UiLanguage.T("BIMaestro - Soutenir", "BIMaestro - Support"), UiLanguage.T($"Impossible d'ouvrir la page Ko-fi : {ex.Message}", $"Unable to open the Ko-fi page: {ex.Message}"));
                 return Result.Failed;
             }
         }

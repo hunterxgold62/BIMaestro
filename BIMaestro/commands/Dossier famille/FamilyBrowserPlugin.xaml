@@ -1200,23 +1200,6 @@
                                       ScrollChanged="ItemsScroll_ScrollChanged">
                                     <StackPanel>
 
-                                        <!-- Top-8 -->
-                                        <ItemsControl x:Name="TopFamiliesView"
-                                              ItemTemplate="{StaticResource FamilyItemTemplate}"
-                                              Visibility="Collapsed">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <WrapPanel IsItemsHost="True"/>
-                                                </ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                        </ItemsControl>
-
-                                        <Rectangle x:Name="TopSeparator"
-                                           Height="1"
-                                           Fill="#CCCCCC"
-                                           Margin="0,5"
-                                           Visibility="Collapsed"/>
-
                                         <!-- Résultats paginés -->
                                         <ItemsControl x:Name="FamilyListView"
                                               ItemTemplateSelector="{StaticResource FamilyListItemTemplateSelector}"
@@ -1504,7 +1487,6 @@
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" SharedSizeGroup="SettingLabel"/>
@@ -1520,17 +1502,8 @@
                                                 VerticalAlignment="Center"
                                                 Toggled="DarkModeSwitch_Toggled"/>
 
-                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Afficher le Top-8" Style="{StaticResource SettingLabelStyle}" Margin="0,12,16,0"/>
-                            <CheckBox Grid.Row="1" Grid.Column="1"
-                                      Margin="0,12,0,0"
-                                      x:Name="ShowTop8CheckBox"
-                                      VerticalAlignment="Center"
-                                      IsChecked="False"
-                                      Checked="ShowTop8CheckBox_Changed"
-                                      Unchecked="ShowTop8CheckBox_Changed"/>
-
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Toujours au-dessus" Style="{StaticResource SettingLabelStyle}" Margin="0,12,16,0"/>
-                            <ui:GhostSwitch Grid.Row="2" Grid.Column="1"
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Toujours au-dessus" Style="{StaticResource SettingLabelStyle}" Margin="0,12,16,0"/>
+                            <ui:GhostSwitch Grid.Row="1" Grid.Column="1"
                                             Margin="0,12,0,0"
                                             x:Name="AlwaysOnTopSwitch"
                                             Width="160"

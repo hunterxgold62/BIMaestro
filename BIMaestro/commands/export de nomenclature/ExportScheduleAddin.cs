@@ -2,6 +2,7 @@
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 using Licensing;
 using System;
 using System.Collections.Generic;
@@ -31,7 +32,7 @@ namespace Visualisation
                 // 1) Vérifier qu'on est sur une nomenclature
                 if (doc.ActiveView is not ViewSchedule schedule)
                 {
-                    TaskDialog.Show("Erreur", "Activez une vue de nomenclature avant de lancer l'export.");
+                    TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T("Activez une vue de nomenclature avant de lancer l'export.", "Activate a schedule view before starting the export."));
                     return Result.Failed;
                 }
 
@@ -54,10 +55,10 @@ namespace Visualisation
                 string fileBaseName = SanitizeFileNamePart($"{projectName}_{scheduleName}");
 
                 // 4) Choix du format
-                TaskDialog dlg = new TaskDialog("Type d'export")
+                TaskDialog dlg = new TaskDialog(UiLanguage.T("Type d'export", "Export Type"))
                 {
-                    MainInstruction = "Choisissez le format d'export de la nomenclature :",
-                    MainContent = $"Projet : {projectName}\nNomenclature : {scheduleName}",
+                    MainInstruction = UiLanguage.T("Choisissez le format d'export de la nomenclature :", "Choose the schedule export format:"),
+                    MainContent = UiLanguage.T($"Projet : {projectName}\nNomenclature : {scheduleName}", $"Project: {projectName}\nSchedule: {scheduleName}"),
                     CommonButtons = TaskDialogCommonButtons.Close
                 };
                 dlg.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Excel");
@@ -85,13 +86,13 @@ namespace Visualisation
             }
             catch (COMException comEx)
             {
-                TaskDialog.Show("Excel/COM", $"Erreur COM: {comEx.Message}");
+                TaskDialog.Show(UiLanguage.T("Excel/COM", "Excel/COM"), UiLanguage.T($"Erreur COM: {comEx.Message}", $"COM error: {comEx.Message}"));
                 message = comEx.Message;
                 return Result.Failed;
             }
             catch (Exception ex)
             {
-                TaskDialog.Show("Erreur", ex.ToString());
+                TaskDialog.Show(UiLanguage.T("Erreur", "Error"), ex.ToString());
                 message = ex.Message;
                 return Result.Failed;
             }
@@ -224,14 +225,14 @@ namespace Visualisation
 
         private void AskAndOpen(string filePath, string formatLabel)
         {
-            TaskDialog td = new TaskDialog("Export terminé")
+            TaskDialog td = new TaskDialog(UiLanguage.T("Export terminé", "Export Completed"))
             {
-                MainInstruction = $"La nomenclature a bien été exportée en {formatLabel}.",
-                MainContent = $"Chemin :{Environment.NewLine}{filePath}",
+                MainInstruction = UiLanguage.T($"La nomenclature a bien été exportée en {formatLabel}.", $"The schedule was successfully exported as {formatLabel}."),
+                MainContent = UiLanguage.T($"Chemin :{Environment.NewLine}{filePath}", $"Path:{Environment.NewLine}{filePath}"),
                 CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No,
                 DefaultButton = TaskDialogResult.Yes
             };
-            td.MainInstruction += "\n\nOuvrir le fichier ?";
+            td.MainInstruction += UiLanguage.T("\n\nOuvrir le fichier ?", "\n\nOpen the file?");
             if (td.Show() == TaskDialogResult.Yes)
             {
                 Process.Start(new ProcessStartInfo(filePath) { UseShellExecute = true });

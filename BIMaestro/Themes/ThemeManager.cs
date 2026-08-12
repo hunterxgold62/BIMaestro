@@ -1,4 +1,5 @@
 ﻿using Famille;
+using BIMaestro.Localization;
 using System;
 using System.Diagnostics;
 using System.Linq;
@@ -69,6 +70,7 @@ internal static class ThemeManager
 
         if (alreadyMerged)
         {
+            UiLanguage.LocalizeWindow(wnd);
             return;
         }
 
@@ -78,6 +80,7 @@ internal static class ThemeManager
             var uri = new Uri(ThemeDictionaryPath, UriKind.Relative);
             var dictionary = new ResourceDictionary { Source = uri };
             wnd.Resources.MergedDictionaries.Add(dictionary);
+            UiLanguage.LocalizeWindow(wnd);
         }
         catch (Exception ex)
         {

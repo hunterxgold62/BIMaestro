@@ -823,8 +823,8 @@ namespace BIMaestro.VideoGames
             if (!string.IsNullOrWhiteSpace(storageDirectoryOverride))
                 return storageDirectoryOverride;
             return Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "BIMaestro",
+                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                "RevitLogs",
                 "MaquetteJouable",
                 "FluidesMEP");
         }

@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Licensing
 {
@@ -83,8 +84,10 @@ namespace Licensing
             if (!string.IsNullOrWhiteSpace(userAgent))
                 client.DefaultRequestHeaders.UserAgent.ParseAdd(userAgent);
 
+            // Cette fonction amorce la licence avant qu'un JWT de licence existe.
+            // L'API key reste dans "apikey" ; "Authorization" est réservé au JWT
+            // de licence utilisé par les autres Edge Functions.
             client.DefaultRequestHeaders.Add("apikey", ApiKey);
-            client.DefaultRequestHeaders.Add("Authorization", $"Bearer {ApiKey}");
 
             var body = new { license_key = licenseKey, machine_id = machineId };
             var json = Newtonsoft.Json.JsonConvert.SerializeObject(body);
@@ -101,6 +104,20 @@ namespace Licensing
             if (!resp.IsSuccessStatusCode)
             {
                 var err = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+
+                // Une erreur de passerelle ou de serveur ne doit pas bloquer Revit
+                // si un jeton local non expiré existe. Les refus métier (400/403)
+                // restent bloquants et ne contournent jamais l'état de la licence.
+                int statusCode = (int)resp.StatusCode;
+                if (resp.StatusCode == HttpStatusCode.Unauthorized ||
+                    resp.StatusCode == HttpStatusCode.RequestTimeout ||
+                    statusCode == 429 ||
+                    statusCode >= 500)
+                {
+                    throw new HttpRequestException(
+                        $"Serveur de licence temporairement indisponible (HTTP {statusCode}) : {err}");
+                }
+
                 throw new InvalidOperationException($"Erreur licence : {err}");
             }
 
@@ -130,6 +147,7 @@ namespace Licensing
             }
             catch (HttpRequestException ex) { netErr = ex; }
             catch (WebException ex) { netErr = ex; }
+            catch (TaskCanceledException ex) { netErr = ex; }
 
             // réseau KO -> tente le cache
             string cached = LoadTokenIfValid(licenseKey, machineId);

@@ -4056,10 +4056,10 @@ namespace BIMaestro.VideoGames
                     ? Visibility.Visible
                     : Visibility.Collapsed;
                 SourceActionText = source == null
-                    ? "Définir comme source de fluide"
+                    ? UiLanguage.T("Définir comme source de fluide", "Set as Fluid Source")
                     : source.IsActive
-                        ? "Désactiver cette source"
-                        : "Activer cette source";
+                        ? UiLanguage.T("Désactiver cette source", "Deactivate This Source")
+                        : UiLanguage.T("Activer cette source", "Activate This Source");
                 SourceRemoveVisibility = source != null && source.IsUserCreated
                     ? Visibility.Visible
                     : Visibility.Collapsed;
@@ -4067,43 +4067,43 @@ namespace BIMaestro.VideoGames
                     ? Visibility.Visible
                     : Visibility.Collapsed;
                 SourcePickerActionText = source == null
-                    ? "Définir comme arrivée"
-                    : "Modifier le sens de l’arrivée";
+                    ? UiLanguage.T("Définir comme arrivée", "Set as Inlet")
+                    : UiLanguage.T("Modifier le sens de l’arrivée", "Change Inlet Direction");
                 ReturnPickerActionText = outlet == null
-                    ? "Définir comme retour"
-                    : "Modifier le sens du retour";
+                    ? UiLanguage.T("Définir comme retour", "Set as Return")
+                    : UiLanguage.T("Modifier le sens du retour", "Change Return Direction");
                 SourceForwardActionText = source != null &&
                     directionalPath != null &&
                     source.IsActive &&
                     source.EntryConnectorIndex == directionalPath.StartConnector
-                        ? "✓ Sens début → fin"
-                        : "Choisir le sens début → fin";
+                        ? UiLanguage.T("✓ Sens début → fin", "✓ Start → End Direction")
+                        : UiLanguage.T("Choisir le sens début → fin", "Choose Start → End Direction");
                 SourceReverseActionText = source != null &&
                     directionalPath != null &&
                     source.IsActive &&
                     source.EntryConnectorIndex == directionalPath.EndConnector
-                        ? "✓ Sens fin → début"
-                        : "Choisir le sens fin → début";
+                        ? UiLanguage.T("✓ Sens fin → début", "✓ End → Start Direction")
+                        : UiLanguage.T("Choisir le sens fin → début", "Choose End → Start Direction");
                 ReturnForwardActionText = outlet != null &&
                     directionalPath != null && outlet.IsActive &&
                     outlet.EntryConnectorIndex == directionalPath.StartConnector
-                        ? "✓ Retour début → fin"
-                        : "Définir retour début → fin";
+                        ? UiLanguage.T("✓ Retour début → fin", "✓ Start → End Return")
+                        : UiLanguage.T("Définir retour début → fin", "Set Start → End Return");
                 ReturnReverseActionText = outlet != null &&
                     directionalPath != null && outlet.IsActive &&
                     outlet.EntryConnectorIndex == directionalPath.EndConnector
-                        ? "✓ Retour fin → début"
-                        : "Définir retour fin → début";
+                        ? UiLanguage.T("✓ Retour fin → début", "✓ End → Start Return")
+                        : UiLanguage.T("Définir retour fin → début", "Set End → Start Return");
                 ConstraintForwardActionText = constraint != null &&
                     directionalPath != null && constraint.IsActive &&
                     constraint.EntryConnectorIndex == directionalPath.StartConnector
-                        ? "✓ Pompe début → fin (retirer)"
-                        : "Imposer pompe début → fin";
+                        ? UiLanguage.T("✓ Pompe début → fin (retirer)", "✓ Start → End Pump (Remove)")
+                        : UiLanguage.T("Imposer pompe début → fin", "Force Start → End Pump");
                 ConstraintReverseActionText = constraint != null &&
                     directionalPath != null && constraint.IsActive &&
                     constraint.EntryConnectorIndex == directionalPath.EndConnector
-                        ? "✓ Pompe fin → début (retirer)"
-                        : "Imposer pompe fin → début";
+                        ? UiLanguage.T("✓ Pompe fin → début (retirer)", "✓ End → Start Pump (Remove)")
+                        : UiLanguage.T("Imposer pompe fin → début", "Force End → Start Pump");
 
                 GameMepValveData? valve = mepGraph.FindValve(UniqueKey);
                 if (valve == null)
@@ -4239,37 +4239,37 @@ namespace BIMaestro.VideoGames
                 GameMepDirectionExplanationData explanation)
             {
                 var lines = new List<string>();
-                lines.Add("Règle : " + ValueOrFallback(
-                    explanation.Rule, "aucune règle concluante"));
-                lines.Add("Source principale : " + ValueOrFallback(
-                    explanation.PrimarySourceName, "aucune source accessible"));
+                lines.Add(UiLanguage.T("Règle : ", "Rule: ") + ValueOrFallback(
+                    explanation.Rule, UiLanguage.T("aucune règle concluante", "no conclusive rule")));
+                lines.Add(UiLanguage.T("Source principale : ", "Primary source: ") + ValueOrFallback(
+                    explanation.PrimarySourceName, UiLanguage.T("aucune source accessible", "no accessible source")));
                 if (explanation.AlternativeSourceNames.Count > 0)
                 {
-                    lines.Add("Sources alternatives : " + string.Join(
+                    lines.Add(UiLanguage.T("Sources alternatives : ", "Alternative sources: ") + string.Join(
                         ", ", explanation.AlternativeSourceNames.Take(4)) +
                         (explanation.AlternativeSourceNames.Count > 4
                             ? "…"
                             : string.Empty));
                 }
                 if (!string.IsNullOrWhiteSpace(explanation.InfluencingReturnName))
-                    lines.Add("Retour influençant : " +
+                    lines.Add(UiLanguage.T("Retour influençant : ", "Influencing return: ") +
                         explanation.InfluencingReturnName);
                 if (explanation.UpstreamElementNames.Count > 0)
                 {
-                    lines.Add("Chemin amont : " + string.Join(
+                    lines.Add(UiLanguage.T("Chemin amont : ", "Upstream path: ") + string.Join(
                         "  →  ", explanation.UpstreamElementNames.Take(7)) +
                         (explanation.UpstreamElementNames.Count > 7
                             ? "  →  …"
                             : string.Empty));
                 }
                 if (explanation.LimitingControls.Count > 0)
-                    lines.Add("Limites : " + string.Join(
+                    lines.Add(UiLanguage.T("Limites : ", "Constraints: ") + string.Join(
                         " ; ", explanation.LimitingControls.Take(4)));
                 if (explanation.HasAlternativeRoute)
-                    lines.Add("Une route alternative ou une autre source peut aussi atteindre ce tronçon.");
+                    lines.Add(UiLanguage.T("Une route alternative ou une autre source peut aussi atteindre ce tronçon.", "An alternative route or another source can also reach this segment."));
                 lines.Add(explanation.IsManual
-                    ? "Résultat issu d'une correction manuelle enregistrée."
-                    : "Résultat calculé automatiquement sur le graphe MEP.");
+                    ? UiLanguage.T("Résultat issu d'une correction manuelle enregistrée.", "Result from a saved manual correction.")
+                    : UiLanguage.T("Résultat calculé automatiquement sur le graphe MEP.", "Result calculated automatically from the MEP graph."));
                 return string.Join("\n", lines);
             }
 
@@ -4279,13 +4279,13 @@ namespace BIMaestro.VideoGames
                 switch (reliability)
                 {
                     case GameMepDirectionReliability.Reliable:
-                        return "FIABLE";
+                        return UiLanguage.T("FIABLE", "RELIABLE");
                     case GameMepDirectionReliability.Inferred:
-                        return "DÉDUIT";
+                        return UiLanguage.T("DÉDUIT", "INFERRED");
                     case GameMepDirectionReliability.Manual:
-                        return "CORRIGÉ MANUELLEMENT";
+                        return UiLanguage.T("CORRIGÉ MANUELLEMENT", "MANUALLY CORRECTED");
                     default:
-                        return "AMBIGU";
+                        return UiLanguage.T("AMBIGU", "AMBIGUOUS");
                 }
             }
 
@@ -4373,9 +4373,9 @@ namespace BIMaestro.VideoGames
                 if (element != null)
                 {
                     ReferenceShortText = string.IsNullOrWhiteSpace(element.Name)
-                        ? "élément #" + element.ElementId
+                        ? UiLanguage.T("élément #", "element #") + element.ElementId
                         : element.Name;
-                    ReferenceText = "Objet : " + ReferenceShortText +
+                    ReferenceText = UiLanguage.T("Objet : ", "Object: ") + ReferenceShortText +
                         (string.IsNullOrWhiteSpace(element.Category)
                             ? string.Empty
                             : "  •  " + element.Category) +
@@ -4384,12 +4384,12 @@ namespace BIMaestro.VideoGames
                             : "  •  #" + element.ElementId) +
                         (data.ConnectorIndex < 0
                             ? string.Empty
-                            : "  •  connecteur " + data.ConnectorIndex);
+                            : UiLanguage.T("  •  connecteur ", "  •  connector ") + data.ConnectorIndex);
                     ReferenceVisibility = Visibility.Visible;
                 }
                 else
                 {
-                    ReferenceShortText = "diagnostic global";
+                    ReferenceShortText = UiLanguage.T("diagnostic global", "global diagnostic");
                 }
                 switch (data.Severity)
                 {

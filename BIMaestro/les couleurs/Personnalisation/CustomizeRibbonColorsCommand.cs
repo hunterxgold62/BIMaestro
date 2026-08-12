@@ -19,18 +19,7 @@ namespace Couleur
         {
             try
             {
-                ColoringStateManager.LoadState();
-
-                var window = new ColorPreferencesWindow(
-                    data.Application.MainWindowHandle,
-                    data.Application.ActiveUIDocument?.Document);
-                new WindowInteropHelper(window)
-                {
-                    Owner = data.Application.MainWindowHandle
-                };
-
-                if (window.ShowDialog() == true)
-                    ReapplyColors(data.Application.MainWindowHandle);
+                ShowPreferences(data);
 
                 return Result.Succeeded;
             }
@@ -39,6 +28,24 @@ namespace Couleur
                 message = ex.Message;
                 return Result.Failed;
             }
+        }
+
+        internal static void ShowPreferences(ExternalCommandData data)
+        {
+            if (data == null) return;
+
+            ColoringStateManager.LoadState();
+
+            var window = new ColorPreferencesWindow(
+                data.Application.MainWindowHandle,
+                data.Application.ActiveUIDocument?.Document);
+            new WindowInteropHelper(window)
+            {
+                Owner = data.Application.MainWindowHandle
+            };
+
+            if (window.ShowDialog() == true)
+                ReapplyColors(data.Application.MainWindowHandle);
         }
 
         private static void ReapplyColors(IntPtr mainWindowHandle)

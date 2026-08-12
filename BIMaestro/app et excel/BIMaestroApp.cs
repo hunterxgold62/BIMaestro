@@ -276,12 +276,12 @@ public class BIMaestroApp : IExternalApplication
             if (_hasShownTimeTrackingError) return;
             _hasShownTimeTrackingError = true;
 
-            var td = new TaskDialog("BIMaestro - Suivi du temps")
+            var td = new TaskDialog(UiLanguage.T("BIMaestro - Suivi du temps", "BIMaestro - Time Tracking"))
             {
-                MainInstruction = "Un problème est survenu avec l'enregistrement du temps.",
-                MainContent =
-                    "BIMaestro n'arrive plus à suivre correctement le temps sur ce projet.\n\n" +
-                    "Pour rétablir le suivi, enregistre ton travail puis relance Revit."
+                MainInstruction = UiLanguage.T("Un problème est survenu avec l'enregistrement du temps.", "A problem occurred while recording time."),
+                MainContent = UiLanguage.T(
+                    "BIMaestro n'arrive plus à suivre correctement le temps sur ce projet.\n\nPour rétablir le suivi, enregistre ton travail puis relance Revit.",
+                    "BIMaestro can no longer track time correctly for this project.\n\nTo restore tracking, save your work and restart Revit.")
             };
             td.CommonButtons = TaskDialogCommonButtons.Close;
             td.Show();
@@ -325,6 +325,9 @@ public class BIMaestroApp : IExternalApplication
             var doc = args.GetDocument();
             var selectedIds = args.GetSelectedElements();
             Analyse.ElementHistoryTracker.CaptureSelectedElementDetails(doc, selectedIds);
+            Analyse.ElementHistoryHoverInfoService.OnSelectionChanged(
+                doc,
+                selectedIds);
             Couleur.ProjectBrowserColoring.FocusSelectedSheetContent(
                 doc,
                 selectedIds);
@@ -341,14 +344,17 @@ public class BIMaestroApp : IExternalApplication
         {
             _uiApp ??= new UIApplication(e.Document.Application);
             Analyse.ElementHistoryTracker.ScheduleDeferredPrime(e.Document);
+            Analyse.ElementHistoryHoverInfoService.OnDocumentOpened(e.Document);
             ExcelLogger.OnDocumentOpened(e.Document, _uiApp);
             Analyse.CollaborativeModelTrackerStore.TryAutoLog(e.Document, _uiApp);
+            BIMaestro.ViewHover.ViewHoverPreviewService
+                .LoadCachedPreviews(e.Document);
             BIMaestro.ViewHover.ViewHoverPreviewService
                 .ScheduleCacheMaintenance(e.Document);
         }
         catch (Exception ex)
         {
-            TaskDialog.Show("Erreur DocumentOpened", ex.ToString());
+            TaskDialog.Show(UiLanguage.T("Erreur DocumentOpened", "DocumentOpened Error"), ex.ToString());
         }
     }
 
@@ -372,6 +378,7 @@ public class BIMaestroApp : IExternalApplication
         try
         {
             _uiApp ??= new UIApplication(e.Document.Application);
+            Analyse.ElementHistoryHoverInfoService.Hide();
             BIMaestro.ViewHover.ViewHoverPreviewService.ForgetDocument(
                 e.Document);
             ExcelLogger.OnDocumentClosing(e.Document, _uiApp);
@@ -379,7 +386,7 @@ public class BIMaestroApp : IExternalApplication
         }
         catch (Exception ex)
         {
-            TaskDialog.Show("Erreur DocumentClosing", ex.ToString());
+            TaskDialog.Show(UiLanguage.T("Erreur DocumentClosing", "DocumentClosing Error"), ex.ToString());
         }
     }
 

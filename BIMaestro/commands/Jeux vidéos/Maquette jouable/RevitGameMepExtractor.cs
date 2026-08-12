@@ -321,12 +321,33 @@ namespace BIMaestro.VideoGames
                 Name = string.IsNullOrWhiteSpace(systemName)
                     ? "Réseau sans nom"
                     : systemName,
+                Abbreviation = GetSystemAbbreviation(document, system),
                 Classification = string.IsNullOrWhiteSpace(classification)
                     ? "Canalisation"
                     : classification,
                 Color = GetSystemColor(document, system, systemName, classification)
             });
             graph.RebuildIndexes();
+        }
+
+        private static string GetSystemAbbreviation(
+            Document document,
+            MEPSystem? system)
+        {
+            if (system == null)
+                return string.Empty;
+            try
+            {
+                Element? systemType = document.GetElement(system.GetTypeId());
+                PropertyInfo? property = systemType?.GetType()
+                    .GetProperty("Abbreviation");
+                return property?.GetValue(systemType, null)?.ToString() ??
+                    string.Empty;
+            }
+            catch
+            {
+                return string.Empty;
+            }
         }
 
         private static string GetSystemClassification(Document document, MEPSystem system)
@@ -699,17 +720,10 @@ namespace BIMaestro.VideoGames
             {
                 for (int second = first + 1; second < element.ConnectorIndices.Count; second++)
                 {
-                    string firstSystem = graph.Connectors[
-                        element.ConnectorIndices[first]].SystemKey;
-                    string secondSystem = graph.Connectors[
-                        element.ConnectorIndices[second]].SystemKey;
-                    bool compatibleSystems =
-                        string.Equals(firstSystem, secondSystem, StringComparison.Ordinal) ||
-                        string.Equals(firstSystem, UnassignedSystemKey, StringComparison.Ordinal) ||
-                        string.Equals(secondSystem, UnassignedSystemKey, StringComparison.Ordinal);
-                    if (!compatibleSystems)
-                        continue;
-
+                    // Conserver la topologie physique complète de l'équipement,
+                    // même lorsque Revit crée un système distinct de chaque côté.
+                    // La simulation décide ensuite si cette transition est
+                    // traversable (notamment lorsqu'elle est déclarée pompe).
                     graph.Connections.Add(new GameMepConnectionData
                     {
                         ConnectorA = element.ConnectorIndices[first],

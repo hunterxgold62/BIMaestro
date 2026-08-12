@@ -264,7 +264,7 @@ namespace Modification
                 out List<string> desiredValues,
                 out string validationError))
             {
-                TaskDialog.Show("Erreur", validationError);
+                TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T(validationError));
                 return Result.Failed;
             }
 

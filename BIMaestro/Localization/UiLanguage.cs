@@ -6,8 +6,10 @@ using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace BIMaestro.Localization
 {
@@ -66,7 +68,13 @@ namespace BIMaestro.Localization
             EventManager.RegisterClassHandler(
                 typeof(Window),
                 FrameworkElement.LoadedEvent,
-                new RoutedEventHandler(OnWindowLoaded));
+                new RoutedEventHandler(OnWindowLoaded),
+                handledEventsToo: true);
+            EventManager.RegisterClassHandler(
+                typeof(FrameworkElement),
+                FrameworkElement.ContextMenuOpeningEvent,
+                new ContextMenuEventHandler(OnContextMenuOpening),
+                handledEventsToo: true);
             _windowHookInstalled = true;
         }
 
@@ -116,10 +124,28 @@ namespace BIMaestro.Localization
             try
             {
                 LocalizeWindow(window);
+                window.Dispatcher.BeginInvoke(
+                    new Action(() => LocalizeWindow(window)),
+                    DispatcherPriority.Loaded);
             }
             catch (Exception ex)
             {
                 LogLocalizationError(window, ex);
+            }
+        }
+
+        private static void OnContextMenuOpening(object sender, ContextMenuEventArgs e)
+        {
+            if (!IsEnglish || !(sender is FrameworkElement element)) return;
+
+            try
+            {
+                if (element.ContextMenu != null)
+                    LocalizeElement(element.ContextMenu);
+            }
+            catch (Exception ex)
+            {
+                LogLocalizationError(element, ex);
             }
         }
 
@@ -146,7 +172,7 @@ namespace BIMaestro.Localization
                 catch (Exception ex)
                 {
                     LogLocalizationError(current, ex);
-                    continue;
+                    count = 0;
                 }
 
                 for (int i = count - 1; i >= 0; i--)
@@ -161,6 +187,22 @@ namespace BIMaestro.Localization
                         LogLocalizationError(current, ex);
                     }
                 }
+
+                try
+                {
+                    foreach (object child in LogicalTreeHelper.GetChildren(current))
+                    {
+                        if (child is DependencyObject dependencyChild)
+                            pending.Push(dependencyChild);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogLocalizationError(current, ex);
+                }
+
+                if (current is Popup popup && popup.Child != null)
+                    pending.Push(popup.Child);
             }
         }
 
@@ -195,6 +237,18 @@ namespace BIMaestro.Localization
 
                 if (element is HeaderedContentControl headered && headered.Header is string header)
                     headered.Header = T(header);
+
+                if (element is HeaderedItemsControl headeredItems && headeredItems.Header is string itemHeader)
+                    headeredItems.Header = T(itemHeader);
+
+                if (element is DataGrid dataGrid)
+                {
+                    foreach (DataGridColumn column in dataGrid.Columns)
+                    {
+                        if (column.Header is string columnHeader)
+                            column.Header = T(columnHeader);
+                    }
+                }
 
                 if (element is FrameworkElement frameworkElement && frameworkElement.ToolTip is string toolTip)
                     frameworkElement.ToolTip = T(toolTip);
@@ -274,6 +328,9 @@ namespace BIMaestro.Localization
                 ["Configuration BIMaestro"] = "BIMaestro settings",
                 ["Personnalisez l’ordre des panneaux et boutons du ruban, puis renseignez vos informations de contact si besoin."] = "Customize the ribbon panel and button order, then enter your contact details if needed.",
                 ["Ouvrir l’aide en ligne"] = "Open online help",
+                ["Choisissez la langue, organisez le ruban et gérez vos informations générales."] = "Choose the language, organize the ribbon, and manage your general information.",
+                ["Langue"] = "Language",
+                ["Général"] = "General",
                 ["Ruban"] = "Ribbon",
                 ["Panneaux"] = "Panels",
                 ["Boutons du panneau sélectionné"] = "Buttons in the selected panel",
@@ -355,11 +412,17 @@ namespace BIMaestro.Localization
                 ["Unités"] = "Units",
                 ["Import\nd'unité"] = "Import\nUnits",
                 ["Changement de couleur"] = "Color Controls",
+                ["Couleurs"] = "Colors",
+                ["Clic : ouvre la personnalisation des couleurs. Double-clic : active ou désactive les panneaux colorés."] = "Click: opens color customization. Double-click: enables or disables colored panels.",
+                ["Impossible d’ouvrir la personnalisation des couleurs : "] = "Unable to Open Color Customization: ",
                 ["couleur\nOui/Non"] = "Colors\nOn/Off",
                 ["Couleur\nOui/Non"] = "Colors\nOn/Off",
                 ["Couleur reset"] = "Reset Colors",
                 ["papa\nNoël"] = "Christmas\nMode",
                 ["Personnaliser les couleurs"] = "Customize Colors",
+                ["Panneaux colorés actifs"] = "Colored Panels Enabled",
+                ["Colorer le panneau complet"] = "Color the Full Panel",
+                ["Décoché : bandeau de titre seulement. L’activation générale correspond au double-clic sur Couleurs."] = "Unchecked: title bar only. The main enable switch matches double-clicking Colors.",
                 ["Palette"] = "Palette",
                 ["Exemple"] = "Example",
                 ["Infos empilées"] = "Information Buttons",
@@ -371,6 +434,14 @@ namespace BIMaestro.Localization
                 ["Met en évidence et filtre les éléments de catégories choisies.\r\nRegroupe automatiquement les éléments similaires pour accélérer la sélection et les actions répétitives."] = "Highlights and filters elements from selected categories.\r\nAutomatically groups similar elements to speed up selection and repeated actions.",
                 ["Passe rapidement de la vue active à la feuille associée (et inversement).\r\nPermet aussi d'ouvrir une vue directement depuis un viewport sélectionné sur une feuille."] = "Quickly switches between the active view and its sheet.\r\nYou can also open a view directly from a viewport selected on a sheet.",
                 ["Exporte les nomenclatures Revit sélectionnées en fichier Excel ou PDF."] = "Exports selected Revit schedules to Excel or PDF.",
+                ["Génère automatiquement les miniatures manquantes ou obsolètes du projet, une vue à la fois. Affiche la progression et permet de mettre en pause, reprendre ou arrêter le traitement sans changer la vue active."] = "Automatically generates missing or outdated project thumbnails, one view at a time. Shows progress and lets you pause, resume, or stop processing without changing the active view.",
+                ["Déplace précisément les objets entre deux points sans les dissocier ni les recréer.\r\nAnnule intégralement l'opération si Revit détecte une contrainte ou un risque pour une étiquette ou une cotation."] = "Moves elements precisely between two points without disconnecting or recreating them.\r\nFully cancels the operation if Revit detects a constraint or a risk to a tag or dimension.",
+                ["Ouvre un assistant IA conversationnel connecté à votre contexte Revit.\r\nAnalyse les éléments sélectionnés et répond selon le profil choisi (Basique, Revit, BIM Manager)."] = "Opens a conversational AI assistant connected to your Revit context.\r\nAnalyzes selected elements and responds according to the chosen profile (Basic, Revit, BIM Manager).",
+                ["Corrige et reformule les textes Revit sélectionnés avec l'IA.\r\nPropose plusieurs styles et laisse valider, modifier ou ignorer chaque suggestion."] = "Corrects and rewrites selected Revit text with AI.\r\nOffers several styles and lets you accept, edit, or ignore each suggestion.",
+                ["Analyse les textes des vues/feuilles sélectionnées pour détecter les fautes d'orthographe, de grammaire et de ponctuation. \r\n\r\nPourquoi ce bouton est utile :\r\n- évite les oublis avant envoi client,\r\n- classe les anomalies par gravité (Mineur / Erreur),\r\n- propose des corrections détaillées ligne par ligne.\r\n\r\nConseil : sélectionne seulement les vues/feuilles à contrôler pour accélérer l'analyse."] = "Analyzes text in selected views/sheets to detect spelling, grammar, and punctuation errors. \r\n\r\nWhy this tool is useful:\r\n- prevents omissions before sending to a client,\r\n- classifies issues by severity (Minor / Error),\r\n- provides detailed line-by-line corrections.\r\n\r\nTip: select only the views/sheets you want to check to speed up the analysis.",
+                ["Génère un rendu réaliste à partir d'une vue Plan/Coupe/3D via gpt-image-2.\r\n\r\nCe que fait le bouton :\r\n- conserve le cadrage et la géométrie de la vue source,\r\n- optimise l'image avant envoi ,\r\n- crée une variante visuelle rapide pour présentation client.\r\n\r\nConseil : lancez-le sur une vue propre (annotations masquées) pour obtenir un résultat plus lisible."] = "Generates a realistic render from a plan/section/3D view using gpt-image-2.\r\n\r\nWhat this tool does:\r\n- preserves the framing and geometry of the source view,\r\n- optimizes the image before sending it,\r\n- creates a quick visual variant for client presentations.\r\n\r\nTip: run it on a clean view with annotations hidden for a clearer result.",
+                ["Description :\r\n- Calcule les longueurs des canalisations et gaines par diamètre (DN ou dimensions).\r\n- Compte les accessoires de type coudes et tés par diamètre.\r\n- Estime les volumes d'eau par diamètre intérieur.\r\n- Intègre un filtre par type de système pour une analyse précise.\r\n- Permet d'inclure ou non les gaines dans les calculs.\r\n- Exporte les résultats sous forme de tableau Excel détaillé.\r\n\r\nUtilité :\r\nOptimisez votre gestion des systèmes MEP en obtenant rapidement une analyse précise des longueurs, volumes et accessoires, avec possibilité d'exportation."] = "Description:\r\n- Calculates pipe and duct lengths by diameter (DN or dimensions).\r\n- Counts elbows and tees by diameter.\r\n- Estimates water volume by internal diameter.\r\n- Includes a system type filter for precise analysis.\r\n- Lets you include or exclude ducts from calculations.\r\n- Exports results as a detailed Excel table.\r\n\r\nUse:\r\nQuickly analyze MEP system lengths, volumes, and accessories, with export support.",
+                ["Fonctionnalités principales :\r\n1. **Analyse des Familles** :\r\n   - Taille de chaque famille (Mo).\r\n   - Nombre d'instances pour chaque famille.\r\n   - Classement par taille décroissante.\r\n\r\n2. **Analyse des Imports CAO** :\r\n   - Taille des imports (Mo).\r\n   - Types d'éléments analysés : Imports CAO, Lien Revit/IFC.\r\n\r\n3. **Export des Résultats** :\r\n   - Export vers un fichier Excel (RevitLogs/TailleFamilleRevit).\r\n   - Organisation claire par nom, type, taille et nombre d'instances.\r\n\r\nUtilité :\r\n- Identifier les éléments volumineux dans votre projet.\r\n- Optimiser la performance du modèle en réduisant les familles et les imports inutiles."] = "Main features:\r\n1. **Family Analysis**:\r\n   - Size of each family (MB).\r\n   - Number of instances for each family.\r\n   - Ranking by descending size.\r\n\r\n2. **CAD Import Analysis**:\r\n   - Import sizes (MB).\r\n   - Analyzed element types: CAD imports, Revit/IFC links.\r\n\r\n3. **Results Export**:\r\n   - Export to an Excel file (RevitLogs/TailleFamilleRevit).\r\n   - Clear organization by name, type, size, and instance count.\r\n\r\nUse:\r\n- Identify oversized elements in your project.\r\n- Improve model performance by reducing unnecessary families and imports.",
                 ["Sélectionne des éléments similaires dans le projet"] = "Selects similar elements in the project.",
                 ["Permet de réorienter une vue 3D active en fonction de la géométrie d'une face sélectionnée."] = "Reorients the active 3D view from the geometry of a selected face.",
                 ["Exporte automatiquement plusieurs vues ou feuilles en DWG, en nommant chaque fichier selon le projet et la vue comme pour les PDF."] = "Exports multiple views or sheets to DWG and names each file from the project and view, like PDF exports.",
@@ -381,6 +452,10 @@ namespace BIMaestro.Localization
                 ["Permet de supprimer les brides"] = "Removes flanges and reconnects the network.",
                 ["Configure les paramètres Dynamo"] = "Configures Dynamo settings.",
                 ["Exporter ou importer une nomenclature au format Excel"] = "Exports or imports a schedule in Excel format.",
+                ["Exporter ou importer une nomenclature au format Excel."] = "Exports or imports a schedule in Excel format.",
+                ["Applique ou réinitialise rapidement la demi-teinte, la transparence ou le masquage des éléments sélectionnés dans les vues choisies. Si une feuille est sélectionnée, BIMaestro applique l’action aux vues placées sur cette feuille."] = "Quickly applies or resets halftone, transparency, or hiding for selected elements in the chosen views. If a sheet is selected, BIMaestro applies the action to the views placed on that sheet.",
+                ["Renomme les éléments sélectionnés avec préfixes, suffixes et numérotation.\r\nSur une feuille, numérote les fenêtres de vue de haut en bas puis de gauche à droite.\r\nTrie aussi les éléments par niveau/emplacement et peut réinitialiser le paramètre texte ciblé."] = "Renames selected elements with prefixes, suffixes, and numbering.\r\nOn a sheet, numbers viewports from top to bottom, then left to right.\r\nIt can also sort elements by level/location and reset the targeted text parameter.",
+                ["Supprime les vues non placées, les familles et les nomenclatures inutilisées afin d'alléger le projet.\r\nUne fenêtre permet de choisir précisément les éléments à purger avant exécution.\r\n"] = "Removes unplaced views, unused families, and unused schedules to reduce project bloat.\r\nA window lets you choose exactly what to clean before execution.\r\n",
                 ["Modifie rapidement la phase de creation et la phase de demolition des objets selectionnes."] = "Quickly changes the created and demolished phases of selected objects.",
                 ["Affiche le temps passé par projet."] = "Shows time spent per project.",
                 ["Vérifie les éléments 3D sélectionnés pour détecter les incohérences."] = "Checks selected 3D elements for inconsistencies.",
@@ -431,6 +506,68 @@ namespace BIMaestro.Localization
                 ["Encore + · Couleurs de Revit"] = "Encore + · Revit Colors",
                 ["Interaction réseaux - Calcul des canalisations"] = "Network Interaction - Pipe Calculation",
                 ["Suivi maquettes collaboratif"] = "Collaborative Model Tracking",
+                ["BIMaestro - Miniatures des vues"] = "BIMaestro - View Thumbnails",
+                ["Miniature"] = "Thumbnail",
+                ["Miniatures des vues"] = "View Thumbnails",
+                ["Vues à traiter"] = "Views to Process",
+                ["Miniatures manquantes et obsolètes"] = "Missing and Outdated Thumbnails",
+                ["Miniatures manquantes uniquement"] = "Missing Thumbnails Only",
+                ["Toutes les miniatures"] = "All Thumbnails",
+                ["Dans ce dossier"] = "In this folder",
+                ["Trouvé dans"] = "Found in",
+                ["Autre dossier"] = "Other folder",
+                ["Les gabarits, vues internes, nomenclatures non graphiques et vues non imprimables sont ignorés."] = "Templates, internal views, non-graphical schedules, and non-printable views are ignored.",
+                ["Démarrer"] = "Start",
+                ["Prêt à démarrer."] = "Ready to start.",
+                ["Vue : —"] = "View: —",
+                ["Écoulé : —"] = "Elapsed: —",
+                ["Restant estimé : —"] = "Estimated remaining: —",
+                ["Échecs : 0"] = "Failures: 0",
+                ["Une vue est exportée à la fois pendant l’inactivité de Revit. Pause et arrêt sont pris en compte après la capture en cours. Les miniatures déjà terminées restent enregistrées."] = "One view is exported at a time while Revit is idle. Pause and stop take effect after the current capture. Completed thumbnails remain saved.",
+                ["Pause"] = "Pause",
+                ["Reprendre"] = "Resume",
+                ["Créer des réservations"] = "Create Openings",
+                ["Créer des réservations V2"] = "Create Openings V2",
+                ["Choisissez le type d’objet et la famille ; les options avancées restent discrètes."] = "Choose the object type and family; advanced options remain unobtrusive.",
+                ["Choisissez le type d’objet et la famille V2 (rectangulaire ou circulaire)."] = "Choose the V2 object type and family (rectangular or round).",
+                ["Choisissez la famille utilisée pour créer les réservations."] = "Choose the family used to create openings.",
+                ["Choisissez la famille V2 (rectangulaire ou circulaire)."] = "Choose the V2 family (rectangular or round).",
+                ["Choisissez si la réservation est créée dans un mur ou un sol."] = "Choose whether the opening is created in a wall or floor.",
+                ["Choisissez si les canalisations à sélectionner sont dans la maquette ou dans un lien."] = "Choose whether the pipes to select are in the model or a link.",
+                ["Support :"] = "Host:",
+                ["Support"] = "Host",
+                ["Source canalisations :"] = "Pipe source:",
+                ["Famille de réservation :"] = "Opening family:",
+                ["Famille V2 :"] = "V2 family:",
+                ["Sélectionnez le type d’objet concerné."] = "Select the object type.",
+                ["Appliquer la norme (incréments de 50 mm)"] = "Apply the standard (50 mm increments)",
+                ["Appliquer la norme (arrondis)"] = "Apply the standard (rounding)",
+                ["Arrondit les dimensions à des pas de 50 mm."] = "Rounds dimensions to 50 mm increments.",
+                ["Exécuter le script Dynamo automatiquement"] = "Run the Dynamo script automatically",
+                ["Lance automatiquement le script Dynamo associé."] = "Automatically runs the associated Dynamo script.",
+                ["Multi-sélection canalisations (rectangle)"] = "Multi-select pipes (rectangle)",
+                ["Uniquement pour les familles rectangulaires (comme V1)."] = "Only for rectangular families (as in V1).",
+                ["Mur = familles verticales / Sol = familles horizontales."] = "Wall = vertical families / Floor = horizontal families.",
+                ["Activation du plugin"] = "Plugin Activation",
+                ["Veuillez entrer votre clé d'activation :"] = "Enter your activation key:",
+                ["Valider"] = "Validate",
+                ["Choisir une couleur"] = "Choose a color",
+                ["Couleurs rapides"] = "Quick Colors",
+                ["Erreur"] = "Error",
+                ["Exception"] = "Exception",
+                ["Terminé"] = "Completed",
+                ["Sélection"] = "Selection",
+                ["Dashboard"] = "Dashboard",
+                ["Brides"] = "Flanges",
+                ["Brides manquantes"] = "Missing Flanges",
+                ["Bride incompatible"] = "Incompatible Flange",
+                ["Retrait de brides"] = "Remove Flanges",
+                ["Importer unités"] = "Import Units",
+                ["Erreur JSON"] = "JSON Error",
+                ["Export Excel"] = "Excel Export",
+                ["Import Excel"] = "Excel Import",
+                ["Matériaux de l’élément"] = "Element Materials",
+                ["Matériaux de l'élément"] = "Element Materials",
                 ["Fermer"] = "Close",
                 ["Appliquer"] = "Apply",
                 ["Réinitialiser"] = "Reset",
@@ -548,6 +685,9 @@ namespace BIMaestro.Localization
                 ["Options de calcul"] = "Calculation Options",
                 ["Sélectionnez les Types de système :"] = "Select System Types:",
                 ["Réservations automatiques"] = "Automatic Openings",
+                ["Si coché : exécution en mode automatique. Sinon : mode manuel."] = "If checked: run in automatic mode. Otherwise: manual mode.",
+                ["Si coché : exécution en mode automatique (murs uniquement). Sinon : mode manuel."] = "If checked: run in automatic mode (walls only). Otherwise: manual mode.",
+                ["Disponible pour canalisations (ou 'Autre') avec famille rectangulaire."] = "Available for pipes (or 'Other') with a rectangular family.",
                 ["Choisissez le cas à configurer. Les familles BIMaestro restent disponibles en solution de secours."] = "Choose the case to configure. BIMaestro families remain available as a fallback.",
                 ["Cibles"] = "Targets",
                 ["Canalisation / gaine"] = "Pipe / Duct",
@@ -594,7 +734,6 @@ namespace BIMaestro.Localization
                 ["Bas"] = "Bottom",
                 ["Haut"] = "Top",
                 ["Affiche l’aperçu, le nom, la description et les mots-clés proposés pour chaque famille. Vous pouvez tout corriger avant l’enregistrement."] = "Shows the preview, name, description, and suggested keywords for each family. You can edit everything before saving.",
-                ["Afficher le Top-8"] = "Show Top 8",
                 ["Ajouter/retirer des Favoris"] = "Add/Remove Favorites",
                 ["Aperçu 3D de la famille"] = "3D Family Preview",
                 ["Après une recherche sans résultat, appuie sur Entrée pour mémoriser le terme. BIMaestro pourra ensuite proposer de l’associer à la famille finalement ouverte."] = "After a search with no results, press Enter to remember the term. BIMaestro can then suggest associating it with the family you eventually open.",
@@ -949,6 +1088,7 @@ namespace BIMaestro.Localization
                 ["Pokéball douce"] = "Soft Poké Ball",
                 ["Pokémon pixel"] = "Pixel Pokémon",
                 ["Arc-en-ciel animé"] = "Animated Rainbow",
+                ["Pastel animé"] = "Animated Pastel",
                 ["Bulles pastel"] = "Pastel Bubbles",
                 ["Vagues pastel"] = "Pastel Waves",
                 ["Étoiles pastel"] = "Pastel Stars",
@@ -1061,7 +1201,22 @@ namespace BIMaestro.Localization
                 ["Fenêtre"] = "Window",
                 ["Hébergement"] = "Hosting",
                 ["Couleur hexadécimale"] = "Hex Color",
-                ["Personnaliser…"] = "Customize…"
+                ["Personnaliser…"] = "Customize…",
+                ["Terminer"] = "Finish",
+                ["Envoyer"] = "Send",
+                ["Transparent"] = "Transparent",
+                ["Classement jeux"] = "Game Leaderboard",
+                ["Joueur"] = "Player",
+                ["Pluie"] = "Rain",
+                ["Classement global"] = "Global Leaderboard",
+                ["Objet"] = "Object",
+                ["Source"] = "Source",
+                ["Longueur"] = "Length",
+                ["Longueur (axe du mur)"] = "Length (wall axis)",
+                ["Mur - Rectangulaire"] = "Wall - Rectangular",
+                ["Mur - Circulaire"] = "Wall - Circular",
+                ["Sol - Rectangulaire"] = "Floor - Rectangular",
+                ["Sol - Circulaire"] = "Floor - Circular"
             };
 
         internal static bool TryGetEnglish(string french, out string english)

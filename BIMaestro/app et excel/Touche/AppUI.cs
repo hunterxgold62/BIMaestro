@@ -40,19 +40,23 @@ public class AppUI : IExternalApplication
                 new RibbonItemDefinition("HighlightElementsByCategories", "Sélection d'éléments", panel => AddPushButton(panel, "HighlightElementsByCategories", "Sélection\nd'éléments", assemblyPath, "Visualisation.HighlightElementsByCategoriesCommand", "Sélection d'éléments.png", "Met en évidence et filtre les éléments de catégories choisies.\r\nRegroupe automatiquement les éléments similaires pour accélérer la sélection et les actions répétitives.")),                
                 new RibbonItemDefinition("OpenSheetFromViewButton", "Ouvrir la vue du Plan", panel => AddPushButton(panel, "OpenSheetFromViewButton", " Ouvrir \nla vue", assemblyPath, "Visualisation.OpenSheetFromView", "Ouvrir la vue.png", "Passe rapidement de la vue active à la feuille associée (et inversement).\r\nPermet aussi d'ouvrir une vue directement depuis un viewport sélectionné sur une feuille.")),
                 new RibbonItemDefinition("Export Nomenclature", "Export Nomenclature", panel => AddPushButton(panel, "Export Nomenclature", "Export de\nNomenclature", assemblyPath, "Visualisation.ExportScheduleCommand", "Export de Nomenclature.png", "Exporte les nomenclatures Revit sélectionnées en fichier Excel ou PDF.")),
-                new RibbonItemDefinition("ViewThumbnailBatch", "Miniatures des vues", panel => AddPushButton(panel, "ViewThumbnailBatch", "Miniatures\ndes vues", assemblyPath, "BIMaestro.ViewHover.ViewThumbnailBatchCommand", "Ouvrir la vue.png", "Génère automatiquement les miniatures manquantes ou obsolètes du projet, une vue à la fois. Affiche la progression et permet de mettre en pause, reprendre ou arrêter le traitement sans changer la vue active.")),
                 new RibbonItemDefinition("Sélection d'objet", "Sélection d'objet", panel => AddPushButton(panel, "Sélection d'objet", "Sélection\nd'objet", assemblyPath, "Visualisation.SelectSimilarCommand", "Sélection d'objet.png", "Sélectionne des éléments similaires dans le projet")),
-                new RibbonItemDefinition("Boutons de Visualisation", "Boutons de Visualisation", panel => AddStackedPushButtons(
+                new RibbonItemDefinition("Boutons de Visualisation", "Boutons de Visualisation", panel => AddStackedVisualizationButtons(
             panel,
             assemblyPath,
-    
-            ("ReorientViewButton", "Face 3D", "Visualisation.ReorientViewCommand", "Face 3D.png",
-                "Permet de réorienter une vue 3D active en fonction de la géométrie d'une face sélectionnée."),
+
+            ("ViewThumbnailBatch", "Miniature", "BIMaestro.ViewHover.ViewThumbnailBatchCommand", "Miniature.png",
+                "Génère automatiquement les miniatures manquantes ou obsolètes du projet, une vue à la fois. Affiche la progression et permet de mettre en pause, reprendre ou arrêter le traitement sans changer la vue active."),
             ("ExportDwgBatch", "DWG Exp.", "Visualisation.ExportSheetsCommand", "DWG Exp..png",
                 "Exporte automatiquement plusieurs vues ou feuilles en DWG, en nommant chaque fichier selon le projet et la vue comme pour les PDF."),
-            ("GetPaintedMaterialsButton", "Peinture", "Visualisation.GetPaintedMaterialsCommand", "Peinture.png",
-                "Liste les matériaux (y compris peinture) appliqués à un élément.")
-    
+            ("GetPaintedMaterialsButton", "Peinture", new List<(string, string, string, string, string)>
+            {
+                ("GetPaintedMaterialsButton", "Peinture", "Visualisation.GetPaintedMaterialsCommand", "Peinture.png",
+                    "Liste les matériaux (y compris peinture) appliqués à un élément."),
+                ("ReorientViewButton", "Face 3D", "Visualisation.ReorientViewCommand", "Face 3D.png",
+                    "Permet de réorienter une vue 3D active en fonction de la géométrie d'une face sélectionnée.")
+            })
+
         )),
 
             }),
@@ -68,7 +72,7 @@ public class AppUI : IExternalApplication
                         "Maquette\nMEP",
                        assemblyPath,
                         "BIMaestro.VideoGames.RevitGameCommand",
-                       "3D.jpg",
+                       "Maquette MEP v2.png",
                         "Transforme en un clic la vue 3D Revit active en maquette BIM interactive.\r\n\r\n" +
                         "Fonctionnalités :\r\n" +
                         "- conserve les éléments visibles, la boîte de coupe et les couleurs de la vue,\r\n" +
@@ -125,7 +129,11 @@ public class AppUI : IExternalApplication
            new RibbonPanelDefinition("Analyse", new List<RibbonItemDefinition>
             {
                 new RibbonItemDefinition("PipeLengthByDiameterV2", "Calcul des canalisations", panel => AddPushButton(panel, "PipeLengthByDiameterV2", "Calcul des\ncanalisations", assemblyPath, "Analyse.PipeLengthByDiameterCommandV2", "Calcul de canalisation.png", "Description :\r\n- Calcule les longueurs des canalisations et gaines par diamètre (DN ou dimensions).\r\n- Compte les accessoires de type coudes et tés par diamètre.\r\n- Estime les volumes d'eau par diamètre intérieur.\r\n- Intègre un filtre par type de système pour une analyse précise.\r\n- Permet d'inclure ou non les gaines dans les calculs.\r\n- Exporte les résultats sous forme de tableau Excel détaillé.\r\n\r\nUtilité :\r\nOptimisez votre gestion des systèmes MEP en obtenant rapidement une analyse précise des longueurs, volumes et accessoires, avec possibilité d'exportation.")),
-                new RibbonItemDefinition("Qui a fait ça ?", "Qui a fait ça ??", panel => AddPushButton(panel, "Qui a fait ça ?", "Qui a\nfait ça ??", assemblyPath, "Analyse.MainCommand", "qui à fait ça (2).png", "BETA - Qui a fait ça ? Version historique visuel.\r\n\r\nDans l'esprit du bouton original, cet outil aide à répondre à des questions simples :\r\n- qui a créé ou modifié un élément ?\r\n- qui a créé ou modifié la vue active ?\r\n- qu'est-ce qui a été supprimé, déplacé ou ajouté dans la maquette ?\r\n\r\nCe que fait cette version bêta :\r\n- affiche les suppressions, créations, déplacements, changements de type et modifications de paramètres enregistrés,\r\n- regroupe automatiquement les actions répétées en clusters lisibles,\r\n- permet de filtrer par action, utilisateur ou recherche,\r\n- permet de focaliser un élément, un cluster ou un élément précis dans un cluster,\r\n- visualise les suppressions et déplacements via des aperçus temporaires dans la maquette.\r\n\r\nImportant : l'historique utilise le même dossier actif que le suivi maquette. Si le dossier partagé n'est pas disponible, les journaux peuvent être stockés localement.")),
+                new RibbonItemDefinition("Qui a fait ça ?", "Qui a fait ça ??", panel => AddSplitButton(panel, "Qui a fait ça ?", "Qui a fait ça ?", assemblyPath, new List<(string, string, string, string, string)>
+                {
+                    ("Qui a fait ça ?", "Qui a\nfait ça ??", "Analyse.MainCommand", "qui à fait ça (2).png", "BETA - Qui a fait ça ? Version historique visuel.\r\n\r\nDans l'esprit du bouton original, cet outil aide à répondre à des questions simples :\r\n- qui a créé ou modifié un élément ?\r\n- qui a créé ou modifié la vue active ?\r\n- qu'est-ce qui a été supprimé, déplacé ou ajouté dans la maquette ?\r\n\r\nCe que fait cette version bêta :\r\n- affiche les suppressions, créations, déplacements, changements de type et modifications de paramètres enregistrés,\r\n- regroupe automatiquement les actions répétées en clusters lisibles,\r\n- permet de filtrer par action, utilisateur ou recherche,\r\n- permet de focaliser un élément, un cluster ou un élément précis dans un cluster,\r\n- visualise les suppressions et déplacements via des aperçus temporaires dans la maquette.\r\n\r\nImportant : l'historique utilise le même dossier actif que le suivi maquette. Si le dossier partagé n'est pas disponible, les journaux peuvent être stockés localement."),
+                    ("ElementHistoryHoverToggle", "Infos objet : OFF", "Analyse.ElementHistoryHoverToggleCommand", "Information (2).png", "Active l'affichage d'une phrase sur le dernier changement connu après la sélection d'un objet. L'option est désactivée à chaque démarrage de Revit.")
+                }, keepDefaultCurrentButton: true, fixedDisplayText: "Qui a fait ça ?")),
                 new RibbonItemDefinition("AnalysePoidsButton", "Analyse de Poids", panel => AddPushButton(panel, "AnalysePoidsButton", "Analyse\nde Poids", assemblyPath, "Analyse.CommandAnalysePoids", "Analyse de poid.png", "Fonctionnalités principales :\r\n1. **Analyse des Familles** :\r\n   - Taille de chaque famille (Mo).\r\n   - Nombre d'instances pour chaque famille.\r\n   - Classement par taille décroissante.\r\n\r\n2. **Analyse des Imports CAO** :\r\n   - Taille des imports (Mo).\r\n   - Types d'éléments analysés : Imports CAO, Lien Revit/IFC.\r\n\r\n3. **Export des Résultats** :\r\n   - Export vers un fichier Excel (RevitLogs/TailleFamilleRevit).\r\n   - Organisation claire par nom, type, taille et nombre d'instances.\r\n\r\nUtilité :\r\n- Identifier les éléments volumineux dans votre projet.\r\n- Optimiser la performance du modèle en réduisant les familles et les imports inutiles.")),
 
                 new RibbonItemDefinition("Temps par projet", "Temps par projet", panel => AddSplitButton(panel, "Temps par projet", "Temps par\nprojet", assemblyPath, new List<(string, string, string, string, string)>
@@ -162,19 +170,17 @@ public class AppUI : IExternalApplication
 
            new RibbonPanelDefinition("Couleur et information", new List<RibbonItemDefinition>
             {
-                new RibbonItemDefinition("Changement de couleur", "Changement de couleur", panel => AddSplitButton(panel, "Changement de couleur", "couleur\nOui/Non", assemblyPath, new List<(string, string, string, string, string)>
+                new RibbonItemDefinition("Changement de couleur", "Couleurs", panel => AddSplitButton(panel, "Changement de couleur", "Couleurs", assemblyPath, new List<(string, string, string, string, string)>
                 {
-                    ("Couleur de projet", "Couleur\nOui/Non", "Couleur.ToggleCombinedColoringCommand", "Couleur oui non.png","Active ou désactive les couleurs du projet (simple ou double clic)"),
+                    ("Couleur de projet", "Couleurs", "Couleur.ToggleCombinedColoringCommand", "Couleur oui non.png","Clic : ouvre la personnalisation des couleurs. Double-clic : active ou désactive les panneaux colorés."),
                     ("Couleur de maquette", "Couleur reset", "Couleur.ResetTabItemRandomColorsCommand", "reset.png","Réinitialise les couleurs appliquées"),
                     ("papa Noël", "papa\nNoël", "Couleur.PapanoelCommand", "papa noel.png","Fait apparaître des couleurs comme des guirlandes\nDouble clic pour revenir à la normale.\n\nAttention désactiver <couleur Oui/Non> avant activation."),
-                    ("Personnaliser les couleurs", "Palette", "Couleur.CustomizeRibbonColorsCommand", "Couleur.png","Choisit une couleur unie, un dégradé ou un thème prédéfini, ainsi que la couleur du texte de chaque panneau du ruban BIMaestro."),
                     ("BIMaestro_Exemple", "Exemple", "Page.GuideCommand", "Exemple.png", "Page d'information sur le plugin"),
                 })),
 
                 new RibbonItemDefinition("InfoStack", "Infos empilées", panel => AddStackedInfoButtons(
                     panel,
                     assemblyPath,
-                    // (name, text, className, icon, tooltip)
                     ("NOTE_MAJ", "Note", "Page.MiseAJourCommand", "Information (2).png", "Page de mise à jour"),
                     ("JeuxSplit", "Snake", new List<(string, string, string, string, string)>
                     {
@@ -286,6 +292,80 @@ public class AppUI : IExternalApplication
     }
 
     // ====== NOUVEAU : 3 petits boutons empilés (stack) ======
+    private static void AddStackedVisualizationButtons(
+        RibbonPanel panel,
+        string assemblyPath,
+        (string buttonName, string buttonText, string className, string resourceImageName, string toolTip) thumbnailButton,
+        (string buttonName, string buttonText, string className, string resourceImageName, string toolTip) dwgButton,
+        (string splitButtonName, string splitButtonText, List<(string buttonName, string buttonText, string className, string resourceImageName, string toolTip)> buttons) paintSplit)
+    {
+        RegisterButtonDefinition(
+            thumbnailButton.buttonName,
+            thumbnailButton.buttonText,
+            thumbnailButton.className,
+            thumbnailButton.resourceImageName);
+        RegisterButtonDefinition(
+            dwgButton.buttonName,
+            dwgButton.buttonText,
+            dwgButton.className,
+            dwgButton.resourceImageName);
+
+        var thumbnailData = CreatePushButtonData(
+            thumbnailButton.buttonName,
+            thumbnailButton.buttonText,
+            assemblyPath,
+            thumbnailButton.className,
+            thumbnailButton.resourceImageName,
+            thumbnailButton.toolTip);
+        var dwgData = CreatePushButtonData(
+            dwgButton.buttonName,
+            dwgButton.buttonText,
+            assemblyPath,
+            dwgButton.className,
+            dwgButton.resourceImageName,
+            dwgButton.toolTip);
+        var paintData = new SplitButtonData(
+            paintSplit.splitButtonName,
+            UiLanguage.T(paintSplit.splitButtonText));
+
+        var stacked = panel.AddStackedItems(
+            thumbnailData,
+            dwgData,
+            paintData);
+        if (stacked == null)
+        {
+            return;
+        }
+
+        if (stacked.Count > 0 && stacked[0] is PushButton thumbnail)
+        {
+            RegisterButtonInstance(
+                thumbnailButton.buttonName,
+                thumbnail);
+            RegisterButtonCommandId(
+                thumbnailButton.buttonName,
+                TryGetCommandId(thumbnail));
+        }
+
+        if (stacked.Count > 1 && stacked[1] is PushButton dwg)
+        {
+            RegisterButtonInstance(dwgButton.buttonName, dwg);
+            RegisterButtonCommandId(
+                dwgButton.buttonName,
+                TryGetCommandId(dwg));
+        }
+
+        if (stacked.Count > 2 && stacked[2] is SplitButton paint)
+        {
+            ConfigureSplitButton(
+                paint,
+                assemblyPath,
+                paintSplit.buttons,
+                null,
+                null);
+        }
+    }
+
     private static void AddStackedPushButtons(
         RibbonPanel panel,
         string assemblyPath,
@@ -691,6 +771,23 @@ public class AppUI : IExternalApplication
     public static Document GetCurrentDocument()
     {
         return UiApplication?.ActiveUIDocument?.Document;
+    }
+
+    public static void UpdatePushButtonPresentation(
+        string buttonId,
+        string itemText,
+        string toolTip)
+    {
+        if (string.IsNullOrWhiteSpace(buttonId) ||
+            !ribbonButtonRegistry.TryGetValue(buttonId, out var info) ||
+            info.PushButton == null)
+        {
+            return;
+        }
+
+        TrySetRibbonItemText(info.PushButton, UiLanguage.T(itemText));
+        if (!string.IsNullOrWhiteSpace(toolTip))
+            info.PushButton.ToolTip = UiLanguage.T(toolTip);
     }
 
     private static void RegisterButtonDefinition(string buttonId, string displayName, string commandClass, string imageResourceName)

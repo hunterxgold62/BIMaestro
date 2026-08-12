@@ -2,6 +2,7 @@
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.UI.Selection;
+using BIMaestro.Localization;
 using Licensing;
 using System;
 
@@ -24,7 +25,7 @@ namespace Visualisation
                 try
                 {
                     // Sélectionner une face
-                    Reference pickedRef = uidoc.Selection.PickObject(ObjectType.Face, "Sélectionne une face à orienter");
+                    Reference pickedRef = uidoc.Selection.PickObject(ObjectType.Face, UiLanguage.T("Sélectionne une face à orienter", "Select a face to orient the view"));
                     Element selectedElement = doc.GetElement(pickedRef.ElementId);
                     GeometryObject geomObj = selectedElement?.GetGeometryObjectFromReference(pickedRef);
 
@@ -40,7 +41,7 @@ namespace Visualisation
                     }
                     else
                     {
-                        TaskDialog.Show("Erreur", "L'objet sélectionné n'est pas une face. Réessaie avec une surface valide.");
+                        TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T("L'objet sélectionné n'est pas une face. Réessaie avec une surface valide.", "The selected object is not a face. Try again with a valid surface."));
                         return Result.Failed;
                     }
 
@@ -68,7 +69,7 @@ namespace Visualisation
             else
             {
                 // Message d'erreur si la vue n'est pas 3D
-                TaskDialog.Show("Oups !", "Heeey, tu dois être sur une vue 3D pour que ça marche !");
+                TaskDialog.Show(UiLanguage.T("Oups !", "Oops!"), UiLanguage.T("Heeey, tu dois être sur une vue 3D pour que ça marche !", "Hey, you must be in a 3D view for this to work!"));
                 return Result.Failed;
             }
         }

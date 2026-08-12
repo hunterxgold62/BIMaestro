@@ -12,6 +12,7 @@
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 using Licensing;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -45,7 +46,7 @@ namespace Famille
             var doc = uiDoc?.Document;
             if (doc == null || !doc.IsFamilyDocument)
             {
-                TaskDialog.Show("Erreur", "Ouvrez une famille avant d’exécuter ce plugin.");
+                TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T("Ouvrez une famille avant d’exécuter ce plugin.", "Open a family before running this plugin."));
                 return Result.Cancelled;
             }
 
@@ -89,9 +90,10 @@ namespace Famille
                 if (candidates.Count == 0)
                 {
                     TaskDialog.Show(
-                        "BIMaestro - Résultat",
-                        "Aucun paramètre *renommable* détecté dans cette famille.\n\n" +
-                        $"Total: {totalParams}  •  Utilisateur: {userParams}  •  Partagés: {sharedParams}  •  Intégrés: {builtinParams}"
+                        UiLanguage.T("BIMaestro - Résultat", "BIMaestro - Result"),
+                        UiLanguage.T("Aucun paramètre *renommable* détecté dans cette famille.\n\n", "No *renameable* parameter was found in this family.\n\n") +
+                        UiLanguage.T($"Total: {totalParams}  •  Utilisateur: {userParams}  •  Partagés: {sharedParams}  •  Intégrés: {builtinParams}",
+                            $"Total: {totalParams}  •  User: {userParams}  •  Shared: {sharedParams}  •  Built-in: {builtinParams}")
                     );
                     return Result.Succeeded;
                 }
@@ -181,9 +183,9 @@ namespace Famille
 
                 if (renameMap.Count == 0)
                 {
-                    TaskDialog.Show("BIMaestro - Résultat",
-                        "Aucune traduction appliquée (tout est déjà en FR ou identique).\n\n" +
-                        $"Paramètres analysés: {items.Count}");
+                    TaskDialog.Show(UiLanguage.T("BIMaestro - Résultat", "BIMaestro - Result"),
+                        UiLanguage.T("Aucune traduction appliquée (tout est déjà en FR ou identique).\n\n", "No translation applied (everything is already in French or identical).\n\n") +
+                        UiLanguage.T($"Paramètres analysés: {items.Count}", $"Parameters analyzed: {items.Count}"));
                     return Result.Succeeded;
                 }
 
@@ -228,57 +230,58 @@ namespace Famille
                 // 7) Message FINAL unique
                 {
                     var sb = new StringBuilder();
-                    sb.AppendLine($"Paramètres *renommables* détectés : {items.Count}");
-                    sb.AppendLine($"Paramètres traduits : {finalRenamed.Count}");
+                    sb.AppendLine(UiLanguage.T($"Paramètres *renommables* détectés : {items.Count}", $"*Renameable* parameters found: {items.Count}"));
+                    sb.AppendLine(UiLanguage.T($"Paramètres traduits : {finalRenamed.Count}", $"Parameters translated: {finalRenamed.Count}"));
                     sb.AppendLine();
 
                     if (finalRenamed.Count > 0)
                     {
-                        sb.AppendLine("Renommages appliqués :");
+                        sb.AppendLine(UiLanguage.T("Renommages appliqués :", "Applied renames:"));
                         foreach (var p in finalRenamed.Take(30))
                             sb.AppendLine($" - {p.OldName} → {p.NewName}");
                         if (finalRenamed.Count > 30)
-                            sb.AppendLine($"… (+ {finalRenamed.Count - 30} autres)");
+                            sb.AppendLine(UiLanguage.T($"… (+ {finalRenamed.Count - 30} autres)", $"… (+ {finalRenamed.Count - 30} more)"));
                         sb.AppendLine();
                     }
 
                     if (finalRenameErrors.Count > 0)
                     {
-                        sb.AppendLine("Erreurs de renommage :");
+                        sb.AppendLine(UiLanguage.T("Erreurs de renommage :", "Rename errors:"));
                         foreach (var e in finalRenameErrors.Take(10)) sb.AppendLine(" - " + e);
                         if (finalRenameErrors.Count > 10)
-                            sb.AppendLine($"… (+ {finalRenameErrors.Count - 10} autres)");
+                            sb.AppendLine(UiLanguage.T($"… (+ {finalRenameErrors.Count - 10} autres)", $"… (+ {finalRenameErrors.Count - 10} more)"));
                         sb.AppendLine();
                     }
 
                     if (finalWarnings.Count > 0)
                     {
-                        sb.AppendLine("Avertissements :");
+                        sb.AppendLine(UiLanguage.T("Avertissements :", "Warnings:"));
                         foreach (var w in finalWarnings) sb.AppendLine(w);
                         sb.AppendLine();
                     }
 
-                    sb.AppendLine($"Total paramètres: {totalParams}  •  Utilisateur: {userParams}  •  Partagés: {sharedParams}  •  Intégrés: {builtinParams}");
+                    sb.AppendLine(UiLanguage.T($"Total paramètres: {totalParams}  •  Utilisateur: {userParams}  •  Partagés: {sharedParams}  •  Intégrés: {builtinParams}",
+                        $"Total parameters: {totalParams}  •  User: {userParams}  •  Shared: {sharedParams}  •  Built-in: {builtinParams}"));
 
-                    TaskDialog.Show("BIMaestro - Traduction terminée", sb.ToString());
+                    TaskDialog.Show(UiLanguage.T("BIMaestro - Traduction terminée", "BIMaestro - Translation completed"), sb.ToString());
                 }
 
                 return Result.Succeeded;
             }
             catch (InvalidOperationException ex) when (ex.Message == AiClient.QuotaExceededMessage)
             {
-                TaskDialog.Show("Quota dépassé", AiClient.QuotaExceededMessage);
+                TaskDialog.Show(UiLanguage.T("Quota dépassé", "Quota exceeded"), UiLanguage.T(AiClient.QuotaExceededMessage, "The AI quota has been exceeded."));
                 return Result.Cancelled;
             }
             catch (AggregateException agg)
             {
                 var flat = agg.Flatten().InnerExceptions.Select(e => e.Message).Distinct();
-                TaskDialog.Show("Erreur IA", "Des erreurs réseau sont survenues :\n" + string.Join("\n", flat));
+                TaskDialog.Show(UiLanguage.T("Erreur IA", "AI Error"), UiLanguage.T("Des erreurs réseau sont survenues :\n", "Network errors occurred:\n") + string.Join("\n", flat));
                 return Result.Failed;
             }
             catch (Exception ex)
             {
-                TaskDialog.Show("Erreur", ex.Message);
+                TaskDialog.Show(UiLanguage.T("Erreur", "Error"), ex.Message);
                 return Result.Failed;
             }
         }

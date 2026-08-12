@@ -1,7 +1,9 @@
 project_id = "xqovxfgghbqxwsadzhzl"
 
 [functions.validate]
-verify_jwt = true
+# validate est l'etape d'amorcage : le client ne possede pas encore de JWT
+# de licence. La fonction controle elle-meme la licence et la machine en base.
+verify_jwt = false
 
 [functions.collect-usage]
 verify_jwt = true
@@ -17,4 +19,3 @@ verify_jwt = true
 
 [functions.refres_les_donn-es_d-analyse]
 verify_jwt = true
-

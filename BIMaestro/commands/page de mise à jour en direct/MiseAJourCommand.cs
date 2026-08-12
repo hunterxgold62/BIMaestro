@@ -2,6 +2,7 @@
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 using Licensing;
 using System;
 
@@ -22,7 +23,7 @@ namespace Page
             }
             catch (Exception ex)
             {
-                TaskDialog.Show("BIMaestro - Erreur", $"Une erreur s'est produite : {ex.Message}");
+                TaskDialog.Show(UiLanguage.T("BIMaestro - Erreur", "BIMaestro - Error"), UiLanguage.T($"Une erreur s'est produite : {ex.Message}", $"An error occurred: {ex.Message}"));
                 return Result.Failed;
             }
         }

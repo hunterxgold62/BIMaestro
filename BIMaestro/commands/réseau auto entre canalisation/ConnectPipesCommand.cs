@@ -2,6 +2,7 @@
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Plumbing;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 using Licensing;
 using System;
 using System.Collections.Generic;
@@ -31,7 +32,7 @@ namespace Modification
                 var (p1, p2) = PickExactlyTwoPipes(uidoc);
                 if (p1 == null || p2 == null)
                 {
-                    TaskDialog.Show("Connexion canalisations", "Sélectionne exactement deux canalisations.");
+                    TaskDialog.Show(UiLanguage.T("Connexion canalisations", "Connect Pipes"), UiLanguage.T("Sélectionne exactement deux canalisations.", "Select exactly two pipes."));
                     return Result.Cancelled;
                 }
 
@@ -56,7 +57,7 @@ namespace Modification
                 var c2 = GetBestConnector(p2, GetPipeCenter(p1));
                 if (c1 == null || c2 == null)
                 {
-                    TaskDialog.Show("Connexion canalisations", "Connecteurs introuvables.");
+                    TaskDialog.Show(UiLanguage.T("Connexion canalisations", "Connect Pipes"), UiLanguage.T("Connecteurs introuvables.", "No connectors were found."));
                     return Result.Cancelled;
                 }
 
@@ -111,7 +112,7 @@ namespace Modification
 
                 if (routes.Count == 0)
                 {
-                    TaskDialog.Show("Connexion canalisations", "Aucun itinéraire généré.");
+                    TaskDialog.Show(UiLanguage.T("Connexion canalisations", "Connect Pipes"), UiLanguage.T("Aucun itinéraire généré.", "No route was generated."));
                     return Result.Cancelled;
                 }
 
@@ -1286,7 +1287,7 @@ namespace Modification
             var filter = new PreviewSelFilter(accepted);
             try
             {
-                var r = uidoc.Selection.PickObject(Autodesk.Revit.UI.Selection.ObjectType.Element, filter, "Clique la ligne colorée de l'itinéraire");
+                var r = uidoc.Selection.PickObject(Autodesk.Revit.UI.Selection.ObjectType.Element, filter, UiLanguage.T("Clique la ligne colorée de l'itinéraire", "Click the route's coloured line"));
                 var id = r.ElementId;
                 for (int i = 0; i < sets.Count; i++) if (sets[i].Contains(id)) return i;
             }

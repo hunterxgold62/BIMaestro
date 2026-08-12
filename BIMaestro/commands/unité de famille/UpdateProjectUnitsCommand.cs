@@ -1,6 +1,7 @@
 ﻿using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 using Licensing;
 using Newtonsoft.Json;
 using System;
@@ -25,7 +26,7 @@ namespace Famille
 
             if (!File.Exists(filePath))
             {
-                TaskDialog.Show("Importer unités", $"⚠️ Aucun fichier trouvé :\n{filePath}");
+                TaskDialog.Show(UiLanguage.T("Importer unités", "Import Units"), UiLanguage.T($"⚠️ Aucun fichier trouvé :\n{filePath}", $"⚠️ No file was found:\n{filePath}"));
                 return Result.Failed;
             }
 
@@ -40,7 +41,7 @@ namespace Famille
             }
             catch (Exception ex)
             {
-                TaskDialog.Show("Erreur JSON", ex.Message);
+                TaskDialog.Show(UiLanguage.T("Erreur JSON", "JSON Error"), ex.Message);
                 return Result.Failed;
             }
 
@@ -80,7 +81,7 @@ namespace Famille
                 tx.Commit();
 
                 var disciplineCount = UnitUtils.GetAllDisciplines().Count();
-                TaskDialog.Show("Importer unités", $"✅ {appliedCount} unité(s) importée(s) (toutes disciplines, {disciplineCount} discipline(s)) depuis :\n{filePath}\n\n⚠️ {skippedUnmodifiableCount} unité(s) ignorée(s) car non modifiables dans ce projet.");
+                TaskDialog.Show(UiLanguage.T("Importer unités", "Import Units"), UiLanguage.T($"✅ {appliedCount} unité(s) importée(s) (toutes disciplines, {disciplineCount} discipline(s)) depuis :\n{filePath}\n\n⚠️ {skippedUnmodifiableCount} unité(s) ignorée(s) car non modifiables dans ce projet.", $"✅ {appliedCount} unit(s) imported (all disciplines, {disciplineCount} discipline(s)) from:\n{filePath}\n\n⚠️ {skippedUnmodifiableCount} unit(s) skipped because they cannot be modified in this project."));
             }
 
             return Result.Succeeded;

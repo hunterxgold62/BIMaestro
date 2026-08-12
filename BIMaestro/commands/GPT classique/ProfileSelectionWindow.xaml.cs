@@ -21,7 +21,7 @@ namespace IA
             }
             catch (System.Exception ex)
             {
-                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(BIMaestro.Localization.UiLanguage.T($"Impossible d’ouvrir la page d’aide : {ex.Message}", $"Unable to open the help page: {ex.Message}"), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 

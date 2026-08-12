@@ -291,6 +291,11 @@ namespace Famille
 
         private async void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            // The browser contains menus, templates and dynamically materialized
+            // controls. Re-run the shared pass here after XAML has finished
+            // loading so the browser follows the same language as the ribbon.
+            UiLanguage.LocalizeWindow(this);
+
             LoadConfig();
             UpdateTheme();
             EnsureFilesExist();
@@ -305,7 +310,7 @@ namespace Famille
             Famille.FamilyThumbnailProvider.Initialize(FamilyBrowserCommand.uiapp);
             Famille.FamilyMetadataProvider.Initialize(FamilyBrowserCommand.uiapp);
 
-            // Arbo + Top-8
+            // Arborescence des familles
             LoadFolderTree();
 
             PlaceholderText.Visibility = Visibility.Visible;
@@ -352,7 +357,6 @@ namespace Famille
             }
 
             RefreshCurrentFolder();
-            RefreshTop8_UsageOnly();
         }
 
 
@@ -464,8 +468,6 @@ namespace Famille
                 allFamilies = familyItems;
             }
 
-            TopFamiliesView.Visibility = Visibility.Collapsed;
-            TopSeparator.Visibility = Visibility.Collapsed;
         }
 
         private void RefreshCurrentFolder()
@@ -478,8 +480,6 @@ namespace Famille
             UpdateFolderHeader();
             BeginPaging(ApplyInteractiveSorting(new List<FamilyItem>(allFamilies)));
 
-            TopFamiliesView.Visibility = Visibility.Collapsed;
-            TopSeparator.Visibility = Visibility.Collapsed;
         }
 
         private void LoadFreshnessFolder(FreshnessFolderKind kind)
@@ -501,8 +501,6 @@ namespace Famille
                     : f.LastModifiedUtc)
                 .ThenBy(f => f.Name, NaturalSort.Strings));
 
-            TopFamiliesView.Visibility = Visibility.Collapsed;
-            TopSeparator.Visibility = Visibility.Collapsed;
         }
 
         private void RefreshFreshnessFamilyPaths()
@@ -590,11 +588,12 @@ namespace Famille
             int familyCount = allFamilies.Count(f => !f.IsFolder);
 
             if (FolderSummaryText != null)
-                FolderSummaryText.Text = string.Format(CultureInfo.CurrentCulture, "{0} dossier{1} | {2} famille{3}",
-                    folderCount,
-                    folderCount > 1 ? "s" : string.Empty,
-                    familyCount,
-                    familyCount > 1 ? "s" : string.Empty);
+                FolderSummaryText.Text = folderCount + " " + UiLanguage.T(
+                    folderCount > 1 ? "dossiers" : "dossier",
+                    folderCount > 1 ? "folders" : "folder") + " | " +
+                    familyCount + " " + UiLanguage.T(
+                    familyCount > 1 ? "familles" : "famille",
+                    familyCount > 1 ? "families" : "family");
         }
 
         private void UpdateBreadcrumbItems()
@@ -675,50 +674,6 @@ namespace Famille
             {
                 return Enumerable.Empty<DirectoryInfo>();
             }
-        }
-
-        #endregion
-
-        #region Top-8
-
-        private void RefreshTop8_UsageOnly()
-        {
-            bool show = (ShowTop8CheckBox?.IsChecked == true);
-            if (!show)
-            {
-                TopFamiliesView.Visibility = Visibility.Collapsed;
-                TopSeparator.Visibility = Visibility.Collapsed;
-                return;
-            }
-
-            var usage = FamilyUsageManager.Load();
-            var topPaths = usage.OrderByDescending(kv => kv.Value)
-                                .Select(kv => kv.Key)
-                                .Where(File.Exists)
-                                .Take(8)
-                                .ToList();
-
-            var topItems = new List<FamilyItem>();
-            foreach (var p in topPaths)
-                topItems.Add(CreateFamilyItemFromPath(p));
-
-            TopFamiliesView.ItemsSource = topItems;
-            var vis = topItems.Any() ? Visibility.Visible : Visibility.Collapsed;
-            TopFamiliesView.Visibility = vis;
-            TopSeparator.Visibility = vis;
-
-            foreach (var it in topItems)
-            {
-                LoadThumbnailForFamilyItem(it);
-                LoadMetadataForFamilyItem(it);
-            }
-
-        }
-
-        private void ShowTop8CheckBox_Changed(object sender, RoutedEventArgs e)
-        {
-            if (string.Equals(currentFolderPath, rootFolderPath, StringComparison.OrdinalIgnoreCase))
-                RefreshTop8_UsageOnly();
         }
 
         #endregion
@@ -1182,12 +1137,14 @@ namespace Famille
                 SearchDescription = entry.Description,
                 SearchKeywords = entry.Keywords?.ToList() ?? new List<string>(),
                 MatchedKeywordsText = matchedKeywords.Count > 0
-                    ? "Trouvé grâce à : " + string.Join(", ", matchedKeywords)
-                    : descriptionOnlyMatch ? "Trouvé grâce à la description" : null,
+                    ? UiLanguage.T("Trouvé grâce à : ", "Found via: ") + string.Join(", ", matchedKeywords)
+                    : descriptionOnlyMatch ? UiLanguage.T("Trouvé grâce à la description", "Found via description") : null,
                 ApproximateMatchText = isApproximate ? GetApproximateMatchText(entry, query) : null,
                 SearchScore = isApproximate ? 10 : CalculateSearchScore(entry, query),
                 IsInCurrentFolder = isInCurrentFolder,
-                SearchLocationLabel = isInCurrentFolder ? "Dans ce dossier" : "Trouvé dans",
+                SearchLocationLabel = isInCurrentFolder
+                    ? UiLanguage.T("Dans ce dossier", "In this folder")
+                    : UiLanguage.T("Trouvé dans", "Found in"),
                 SearchFolderPath = folderPath,
                 SearchLocationVisibility = showLocation ? Visibility.Visible : Visibility.Collapsed
             };
@@ -1199,7 +1156,7 @@ namespace Famille
                 return;
 
             item.IsInCurrentFolder = IsPathInCurrentFolder(item.Path);
-            item.SearchLocationLabel = label;
+            item.SearchLocationLabel = UiLanguage.T(label);
             item.SearchFolderPath = GetDisplayFolderPath(item.Path);
             item.SearchLocationVisibility = Visibility.Visible;
         }
@@ -1362,13 +1319,15 @@ namespace Famille
 
         private FamilyItem CreateSearchGroupHeader(string folderPath, int count)
         {
-            var displayFolder = string.IsNullOrWhiteSpace(folderPath) ? "Autre dossier" : folderPath;
+            var displayFolder = string.IsNullOrWhiteSpace(folderPath)
+                ? UiLanguage.T("Autre dossier", "Other folder")
+                : folderPath;
             return new FamilyItem
             {
                 Name = displayFolder,
                 IsSearchGroupHeader = true,
-                SearchGroupTitle = $"Dossier : {displayFolder}",
-                SearchGroupCountText = count == 1 ? "1 famille" : $"{count} familles",
+                SearchGroupTitle = UiLanguage.T("Dossier : ", "Folder: ") + displayFolder,
+                SearchGroupCountText = FormatFamilyCount(count),
                 SearchLocationVisibility = Visibility.Collapsed
             };
         }
@@ -1404,8 +1363,8 @@ namespace Famille
             {
                 groups.Add(new FamilySearchGroup
                 {
-                    Title = "Dans ce dossier",
-                    CountText = localSorted.Count == 1 ? "1 famille" : $"{localSorted.Count} familles",
+                    Title = UiLanguage.T("Dans ce dossier", "In this folder"),
+                    CountText = FormatFamilyCount(localSorted.Count),
                     Families = new ObservableCollection<FamilyItem>(localSorted)
                 });
             }
@@ -1423,8 +1382,10 @@ namespace Famille
 
                 groups.Add(new FamilySearchGroup
                 {
-                    Title = group.Key,
-                    CountText = sorted.Count == 1 ? "1 famille" : $"{sorted.Count} familles",
+                    Title = group.Key == "Autre dossier"
+                        ? UiLanguage.T("Autre dossier", "Other folder")
+                        : group.Key,
+                    CountText = FormatFamilyCount(sorted.Count),
                     Families = new ObservableCollection<FamilyItem>(sorted)
                 });
             }
@@ -1479,8 +1440,8 @@ namespace Famille
             {
                 _activeSearchGroups.Add(new FamilySearchGroup
                 {
-                    Title = "Dans ce dossier",
-                    CountText = initialItems.Count == 1 ? "1 famille" : $"{initialItems.Count} familles",
+                    Title = UiLanguage.T("Dans ce dossier", "In this folder"),
+                    CountText = FormatFamilyCount(initialItems.Count),
                     Families = new ObservableCollection<FamilyItem>(initialItems)
                 });
             }
@@ -1495,8 +1456,9 @@ namespace Famille
 
             PagingStatusText.Visibility = Visibility.Visible;
             PagingStatusText.Text = initialItems.Count == 0
-                ? "Recherche dans les autres dossiers…"
-                : $"Dans ce dossier : {initialItems.Count}. Recherche ailleurs…";
+                ? UiLanguage.T("Recherche dans les autres dossiers…", "Searching other folders…")
+                : UiLanguage.T("Dans ce dossier : ", "In this folder: ") + initialItems.Count +
+                  UiLanguage.T(". Recherche ailleurs…", ". Searching elsewhere…");
 
             return version;
         }
@@ -1575,8 +1537,9 @@ namespace Famille
 
                     PagingStatusText.Visibility = Visibility.Visible;
                     PagingStatusText.Text = otherCount == 0
-                        ? $"Dans ce dossier : {localCount}."
-                        : $"Dans ce dossier : {localCount}. Autres dossiers : {otherCount}.";
+                        ? UiLanguage.T("Dans ce dossier : ", "In this folder: ") + localCount + "."
+                        : UiLanguage.T("Dans ce dossier : ", "In this folder: ") + localCount +
+                          UiLanguage.T(". Autres dossiers : ", ". Other folders: ") + otherCount + ".";
                 }), DispatcherPriority.Background);
             });
         }
@@ -1630,8 +1593,10 @@ namespace Famille
 
             PagingStatusText.Visibility = Visibility.Visible;
             PagingStatusText.Text = isComplete
-                ? $"Dans ce dossier : {localCount}. Autres dossiers : {otherCount}."
-                : $"Dans ce dossier : {localCount}. Autres dossiers trouvés : {otherCount}…";
+                ? UiLanguage.T("Dans ce dossier : ", "In this folder: ") + localCount +
+                  UiLanguage.T(". Autres dossiers : ", ". Other folders: ") + otherCount + "."
+                : UiLanguage.T("Dans ce dossier : ", "In this folder: ") + localCount +
+                  UiLanguage.T(". Autres dossiers trouvés : ", ". Other folders found: ") + otherCount + "…";
         }
 
         private async void LoadGroupedVisualsDeferred(List<FamilyItem> items)
@@ -1742,12 +1707,12 @@ namespace Famille
             var localItems = items.Where(i => i?.IsInCurrentFolder == true).ToList();
             foreach (var item in localItems)
             {
-                item.SearchLocationLabel = "Dans ce dossier";
+                item.SearchLocationLabel = UiLanguage.T("Dans ce dossier", "In this folder");
                 item.SearchLocationVisibility = Visibility.Visible;
             }
 
             if (localItems.Count > 0)
-                definitions.Add(("Dans ce dossier", localItems));
+                definitions.Add((UiLanguage.T("Dans ce dossier", "In this folder"), localItems));
 
             definitions.AddRange(items
                 .Where(i => i != null && !i.IsInCurrentFolder)
@@ -1758,8 +1723,10 @@ namespace Famille
             _activeSearchGroups = new ObservableCollection<FamilySearchGroup>(
                 definitions.Select(d => new FamilySearchGroup
                 {
-                    Title = d.Title,
-                    CountText = d.Items.Count == 1 ? "1 famille" : $"{d.Items.Count} familles",
+                    Title = d.Title == "Autre dossier"
+                        ? UiLanguage.T("Autre dossier", "Other folder")
+                        : d.Title,
+                    CountText = FormatFamilyCount(d.Items.Count),
                     Families = new ObservableCollection<FamilyItem>()
                 }));
 
@@ -1808,8 +1775,9 @@ namespace Famille
                     displayedCount += batch.Count;
                     PagingStatusText.Visibility = Visibility.Visible;
                     PagingStatusText.Text = displayedCount >= items.Count
-                        ? $"Dans ce dossier : {localItems.Count}. Autres dossiers : {otherCount}."
-                        : $"Affichage : {displayedCount}/{items.Count}…";
+                        ? UiLanguage.T("Dans ce dossier : ", "In this folder: ") + localItems.Count +
+                          UiLanguage.T(". Autres dossiers : ", ". Other folders: ") + otherCount + "."
+                        : UiLanguage.T("Affichage : ", "Showing: ") + displayedCount + "/" + items.Count + "…";
 
                     // Rend les nouvelles cartes puis redonne immédiatement la
                     // priorité à la frappe avant de préparer le lot suivant.
@@ -1875,21 +1843,22 @@ namespace Famille
                         var otherFolderMatches = allMatches.Where(i => !i.IsInCurrentFolder).ToList();
                         foreach (var item in currentFolderMatches)
                         {
-                            item.SearchLocationLabel = "Dans ce dossier";
+                            item.SearchLocationLabel = UiLanguage.T("Dans ce dossier", "In this folder");
                             item.SearchLocationVisibility = Visibility.Visible;
                         }
 
                         ShowGroupedFolderSearchResults(currentFolderMatches, otherFolderMatches);
                         PagingStatusText.Text = otherFolderMatches.Count == 0
-                            ? $"Dans ce dossier : {currentFolderMatches.Count}."
-                            : $"Dans ce dossier : {currentFolderMatches.Count}. Autres dossiers : {otherFolderMatches.Count}.";
+                            ? UiLanguage.T("Dans ce dossier : ", "In this folder: ") + currentFolderMatches.Count + "."
+                            : UiLanguage.T("Dans ce dossier : ", "In this folder: ") + currentFolderMatches.Count +
+                              UiLanguage.T(". Autres dossiers : ", ". Other folders: ") + otherFolderMatches.Count + ".";
                         return;
                     }
 
                     baseSet = baseSet.Where(f => !f.IsBackNavigation && f.NormalizedName.Contains(txt));
                     var currentFolderMatchesFallback = baseSet.ToList();
                     foreach (var item in currentFolderMatchesFallback)
-                        MarkSearchLocation(item, "Dans ce dossier");
+                        MarkSearchLocation(item, UiLanguage.T("Dans ce dossier", "In this folder"));
 
                     BeginPaging(ApplyInteractiveSorting(currentFolderMatchesFallback));
                     PagingStatusText.Visibility = Visibility.Visible;
@@ -2061,10 +2030,17 @@ namespace Famille
             return previous[b.Length];
         }
 
+        private static string FormatFamilyCount(int count)
+        {
+            return count == 1
+                ? UiLanguage.T("1 famille", "1 family")
+                : count + " " + UiLanguage.T("familles", "families");
+        }
+
         private static string GetApproximateMatchText(FamilyIndexService.Entry entry, FamilySearchQuery query)
         {
             if (entry == null || query == null)
-                return "Résultat approché";
+                return UiLanguage.T("Résultat approché", "Approximate result");
 
             foreach (var term in query.Terms.Where(CanUseApproximateSearch))
             {
@@ -2075,9 +2051,10 @@ namespace Famille
                     .OrderBy(token => BoundedEditDistance(term, token, term.Length >= 8 ? 2 : 1))
                     .FirstOrDefault();
                 if (!string.IsNullOrWhiteSpace(closest))
-                    return $"Recherche approchée : « {term} » ≈ « {closest} »";
+                    return UiLanguage.T("Recherche approchée : « ", "Approximate search: “") + term +
+                           UiLanguage.T(" » ≈ « ", "” ≈ “") + closest + "”";
             }
-            return "Résultat approché";
+            return UiLanguage.T("Résultat approché", "Approximate result");
         }
 
         private static bool ContainsNormalized(string source, string term)
@@ -3676,7 +3653,6 @@ namespace Famille
             }
 
             NavigateToFolder(rootFolderPath);
-            RefreshTop8_UsageOnly();
         }
 
         private void CollectionActionsButton_Click(object sender, RoutedEventArgs e)
@@ -4506,7 +4482,6 @@ namespace Famille
                    contentPanel = "#F0F0F0", treeBg = "#F0F0F0", itemsBg = "Transparent", tabBg = "Transparent",
                    tileSize = "Normal";
             bool dark = false;
-            bool showTop8 = false;
             bool alwaysOnTop = false;
             bool detailedView = false;
 
@@ -4523,7 +4498,6 @@ namespace Famille
                     else if (line.StartsWith("TabBackground=", StringComparison.OrdinalIgnoreCase)) tabBg = line.Substring("TabBackground=".Length);
                     else if (line.StartsWith("TileSize=", StringComparison.OrdinalIgnoreCase)) tileSize = line.Substring("TileSize=".Length);
                     else if (line.StartsWith("DarkMode=", StringComparison.OrdinalIgnoreCase)) bool.TryParse(line.Substring("DarkMode=".Length), out dark);
-                    else if (line.StartsWith("ShowTop8=", StringComparison.OrdinalIgnoreCase)) bool.TryParse(line.Substring("ShowTop8=".Length), out showTop8);
                     else if (line.StartsWith("AlwaysOnTop=", StringComparison.OrdinalIgnoreCase)) bool.TryParse(line.Substring("AlwaysOnTop=".Length), out alwaysOnTop);
                     else if (line.StartsWith("DetailedView=", StringComparison.OrdinalIgnoreCase)) bool.TryParse(line.Substring("DetailedView=".Length), out detailedView);
                     else if (line.StartsWith("UseShellThumbs=", StringComparison.OrdinalIgnoreCase)) bool.TryParse(line.Substring("UseShellThumbs=".Length), out useShellThumbs);
@@ -4540,7 +4514,7 @@ namespace Famille
             TabBackgroundPicker.SelectedColor = ColorFromHex(tabBg);
             SetTileSizeSelection(tileSize);
             ApplyTileLayout(tileSize, resizeWindow: true);
-            if (DarkModeSwitch != null) DarkModeSwitch.IsOn = dark; if (ShowTop8CheckBox != null) ShowTop8CheckBox.IsChecked = showTop8;
+            if (DarkModeSwitch != null) DarkModeSwitch.IsOn = dark;
             if (AlwaysOnTopSwitch != null) AlwaysOnTopSwitch.IsOn = alwaysOnTop;
             detailedViewMode = detailedView;
             if (DetailedViewCheckBox != null) DetailedViewCheckBox.IsChecked = detailedViewMode;
@@ -4561,7 +4535,6 @@ namespace Famille
                 "TabBackground="      + (TabBackgroundPicker.SelectedColor   == Colors.Transparent ? "Transparent" : ColorToHex(TabBackgroundPicker.SelectedColor.Value)),
                 "TileSize=" + GetSelectedTileSize(),
                 "DarkMode="   + ((DarkModeSwitch?.IsOn == true) ? "true" : "false"),
-                "ShowTop8="   + ((ShowTop8CheckBox?.IsChecked == true) ? "true" : "false"),
                 "AlwaysOnTop="+ ((AlwaysOnTopSwitch?.IsOn == true) ? "true" : "false"),
                 "DetailedView=" + ((DetailedViewCheckBox?.IsChecked == true) ? "true" : "false"),
                 "UseShellThumbs="  + (useShellThumbs  ? "true" : "false"),
@@ -4584,7 +4557,6 @@ namespace Famille
             SetTileSizeSelection("Normal");
             ApplyTileLayout("Normal", resizeWindow: true);
             if (DarkModeSwitch != null) DarkModeSwitch.IsOn = false;
-            if (ShowTop8CheckBox != null) ShowTop8CheckBox.IsChecked = false;
             if (AlwaysOnTopSwitch != null) AlwaysOnTopSwitch.IsOn = false;
             if (DetailedViewCheckBox != null) DetailedViewCheckBox.IsChecked = false;
             UpdateTheme();
@@ -4825,7 +4797,9 @@ namespace Famille
             if (CancelPreviewButton != null) CancelPreviewButton.IsEnabled = true;
             if (PreviewProgressText != null) PreviewProgressText.Text = $"0/{families.Count}";
             PreviewLogTextBox?.Clear();
-            AppendPreviewLog($"Début de l'export ({families.Count} familles)…");
+            AppendPreviewLog(
+                UiLanguage.T("Début de l'export (", "Starting export (") +
+                families.Count + UiLanguage.T(" familles)…", " families)…"));
 
             var entries = families.Select(f => new PreviewEntry
             {
@@ -5488,7 +5462,9 @@ namespace Famille
 
         public void RefreshCountText()
         {
-            CountText = Families.Count == 1 ? "1 famille" : $"{Families.Count} familles";
+            CountText = Families.Count == 1
+                ? UiLanguage.T("1 famille", "1 family")
+                : Families.Count + " " + UiLanguage.T("familles", "families");
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
@@ -5683,7 +5659,9 @@ namespace Famille
                 if (IsScrollTopNavigation)
                     return "HAUT";
 
-                return FolderFamilyCount == 1 ? "1 famille" : $"{FolderFamilyCount} familles";
+                return FolderFamilyCount == 1
+                    ? UiLanguage.T("1 famille", "1 family")
+                    : FolderFamilyCount + " " + UiLanguage.T("familles", "families");
             }
         }
 

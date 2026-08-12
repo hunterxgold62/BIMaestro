@@ -2,6 +2,7 @@
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 using Licensing;
 using System;
 using System.Diagnostics;
@@ -29,7 +30,7 @@ namespace Page
             }
             catch (Exception ex)
             {
-                TaskDialog.Show("BIMaestro - Erreur", $"Impossible d'ouvrir le guide dans le navigateur : {ex.Message}");
+                TaskDialog.Show(UiLanguage.T("BIMaestro - Erreur", "BIMaestro - Error"), UiLanguage.T($"Impossible d'ouvrir le guide dans le navigateur : {ex.Message}", $"Unable to open the guide in the browser: {ex.Message}"));
                 return Result.Failed;
             }
         }
