@@ -119,7 +119,6 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="14"/>
                         <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <StackPanel>
@@ -159,46 +158,27 @@
                             </StackPanel>
                         </Grid>
 
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="42"/>
-                                <ColumnDefinition Width="12"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <Border Width="42" Height="42" CornerRadius="12" Background="#FEF3C7">
-                                <TextBlock Text="3" Foreground="#92400E" FontWeight="Bold" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Border>
-                            <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                                <TextBlock Text="Améliorer avec tes retours" Style="{StaticResource MiniTitle}"/>
-                                <TextBlock Text="Si un bouton marche mal, si une commande n'est pas claire, ou si une idée manque, le plus utile c'est de me le dire." Style="{StaticResource MiniText}" Margin="0,2,0,0"/>
-                            </StackPanel>
-                        </Grid>
+                        <Border Padding="14"
+                                CornerRadius="14"
+                                Background="#FFFBEB"
+                                BorderBrush="#F59E0B"
+                                BorderThickness="1.5">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="42"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Width="42" Height="42" CornerRadius="12" Background="#FDE68A">
+                                    <TextBlock Text="3" Foreground="#92400E" FontWeight="Bold" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                    <TextBlock Text="Tes retours font avancer BIMaestro" Style="{StaticResource MiniTitle}" Foreground="#92400E"/>
+                                    <TextBlock Text="Je développe seul BIMaestro. Tes retours sont essentiels pour savoir ce qui fonctionne, ce qui manque, ce qui pourrait être amélioré et quelles idées te seraient vraiment utiles." Style="{StaticResource MiniText}" Margin="0,4,0,0" LineHeight="19"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
                     </StackPanel>
-
-                    <Border Grid.Row="3"
-                            Margin="0,16,0,0"
-                            Padding="14"
-                            CornerRadius="14"
-                            Background="#F8FAFC"
-                            BorderBrush="{DynamicResource Divider}"
-                            BorderThickness="1">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel>
-                                <TextBlock Text="Besoin d'un exemple ?" Style="{StaticResource MiniTitle}"/>
-                                <TextBlock Text="Ouvre le guide BIMaestro pour voir rapidement l'esprit du plugin." Style="{StaticResource MiniText}" Margin="0,2,0,0"/>
-                            </StackPanel>
-                            <Button Grid.Column="1"
-                                    Content="Voir le guide"
-                                    Margin="12,0,0,0"
-                                    VerticalAlignment="Center"
-                                    Style="{StaticResource WelcomeGhostButton}"
-                                    Click="OpenGuide_Click"/>
-                        </Grid>
-                    </Border>
                 </Grid>
             </Border>
 

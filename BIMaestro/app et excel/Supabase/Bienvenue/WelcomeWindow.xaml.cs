@@ -10,7 +10,6 @@ namespace BIMaestro.Welcome
 {
     public partial class WelcomeWindow : Window
     {
-        private const string GuideUrl = "https://www.bimaestro.fr";
         private const string LinkedInUrl = "https://www.linkedin.com/in/paul-lemert-b40921207";
 
         public WelcomeResultAction ResultAction { get; private set; } = WelcomeResultAction.None;
@@ -24,26 +23,6 @@ namespace BIMaestro.Welcome
             ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
             LogoImage.Source = LoadBitmapFromResource("BIMaestro.png");
-        }
-
-        private void OpenGuide_Click(object sender, RoutedEventArgs e)
-        {
-            // Ouvre le site sans fermer la fenêtre, pour laisser le choix de renseigner le contact.
-            try
-            {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = GuideUrl,
-                    UseShellExecute = true
-                });
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(this, UiLanguage.T("Impossible d’ouvrir l’exemple : ", "Unable to open the example: ") + ex.Message,
-                    "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
-
-            // On ne change pas ResultAction, on ne Close() pas.
         }
 
         private void Contact_Click(object sender, RoutedEventArgs e)
