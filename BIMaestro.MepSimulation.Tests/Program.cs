@@ -17,6 +17,20 @@ namespace BIMaestro.VideoGames
             {
                 StraightValveCutsOnlyPath();
                 TeeSuppliesBothBranches();
+                SmallInletFeedsLargeHeaderWithoutReversingIt();
+                SmallDnCannotSplitAContinuousReturnHeader();
+                NativePipeTapUsesDiameterRule();
+                TwoSmallReturnsMergeIntoLargeCollector();
+                ReducerAfterEqualTeeProvidesEffectiveCollectorDn();
+                CollectorMergeSurvivesDownstreamTee();
+                PumpOutletAnchorsLocalDnMerge();
+                LargeSupplyStillDistributesToTwoSmallerBranches();
+                PumpBranchesKeepTheirEstablishedDirection();
+                ExplicitSmallOutletPreventsMergeInference();
+                SubthresholdDnDoesNotInferMerge();
+                LocalOverrideDoesNotDisableNeighboringDnMerge();
+                DnMergeInferenceSkipsRejoinedBypass();
+                BalancedBypassAtOneNodeRemainsStagnant();
                 LoopBypassesClosedValve();
                 SecondSourceMaintainsSupply();
                 DisconnectedBranchIsIsolated();
@@ -32,6 +46,7 @@ namespace BIMaestro.VideoGames
                 DifferentRevitSystemsDoNotExchangeDirection();
                 SharedSystemAbbreviationBridgesInlineEquipment();
                 SharedSystemAbbreviationDoesNotBridgeMultiPortEquipment();
+                PipeJunctionBridgesPhysicallyConnectedRevitSystems();
                 PumpConstraintBridgesDifferentRevitSystems();
                 ReturnOnlySystemFlowsTowardDeclaredOutlet();
                 ClosedValveDeadEndStaysPressurizedWithoutCirculation();
@@ -304,6 +319,673 @@ namespace BIMaestro.VideoGames
             fixture.Calculate();
             AssertState(fixture, "a", GameMepFlowState.Supplied);
             AssertState(fixture, "b", GameMepFlowState.Supplied);
+        }
+
+        private static void SmallInletFeedsLargeHeaderWithoutReversingIt()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("main-inlet", 1, source: true);
+            fixture.AddElement("main-before", 2);
+            fixture.AddElement("junction", 3);
+            fixture.AddElement("main-after", 2);
+            fixture.AddElement("return", 1);
+            fixture.AddElement("small-inlet", 1, source: true);
+            fixture.AddElement("small-branch", 2);
+
+            fixture.Connect("main-inlet", 0, "main-before", 0);
+            fixture.Connect("main-before", 1, "junction", 0);
+            fixture.Connect("junction", 1, "main-after", 0);
+            fixture.Connect("main-after", 1, "return", 0);
+            // L'ordre géométrique du petit tuyau est volontairement inversé :
+            // son chemin interne va du té vers l'arrivée. Le résultat visuel
+            // doit dépendre de l'hydraulique et jamais de l'ordre Revit.
+            fixture.Connect("small-inlet", 0, "small-branch", 1);
+            fixture.Connect("small-branch", 0, "junction", 2);
+            fixture.AddBoundary("return", GameMepBoundaryKind.Outlet);
+            fixture.SetPortDiameter("junction", 0, 300.0);
+            fixture.SetPortDiameter("junction", 1, 300.0);
+            fixture.SetPortDiameter("junction", 2, 80.0);
+            fixture.AddJunctionPaths("junction");
+            fixture.SetPathLength("main-before", 8.0);
+            fixture.SetPathLength("main-after", 8.0);
+            fixture.SetPathLength("small-branch", 6.0);
+
+            fixture.Calculate();
+
+            Assert(fixture.Path("main-before").HasCirculation &&
+                fixture.Path("main-before").FlowForward &&
+                fixture.Path("main-after").HasCirculation &&
+                fixture.Path("main-after").FlowForward,
+                "A small inlet must not reverse the large header.");
+            Assert(fixture.Path("small-branch").HasCirculation &&
+                !fixture.Path("small-branch").FlowForward,
+                "The small inlet must circulate all the way to the header.");
+            AssertRenderableFlow(fixture, "small-branch");
+            Assert(fixture.Path("small-branch").DirectionState ==
+                    GameMepDirectionState.Resolved,
+                "The visible small pipe must stay resolved without overriding an already coherent direction.");
+            Assert(fixture.JunctionPath("junction", 0).FlowForward &&
+                !fixture.JunctionPath("junction", 1).FlowForward &&
+                fixture.JunctionPath("junction", 2).FlowForward,
+                "Both inlets must converge at the junction and leave through the header.");
+            Assert(fixture.JunctionPath("junction", 2).DirectionReason.IndexOf(
+                    "DN", StringComparison.OrdinalIgnoreCase) >= 0,
+                "A large diameter contrast must be reported by the junction rule.");
+            Assert(fixture.Graph.DiameterDirectedPathCount == 0 &&
+                new[] { "main-before", "main-after", "small-branch" }.All(key =>
+                    fixture.Path(key).DirectionReason.IndexOf(
+                        "jonction de DN", StringComparison.OrdinalIgnoreCase) < 0),
+                "A coherent header and inlet must not have their resolved pipe directions overwritten by DN.");
+        }
+
+        private static void NativePipeTapUsesDiameterRule()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("main-inlet", 1, source: true);
+            fixture.AddElement("host-pipe", 3);
+            fixture.AddElement("main-after", 2);
+            fixture.AddElement("outlet", 1);
+            fixture.AddElement("branch-inlet", 1, source: true);
+            fixture.AddElement("branch", 2);
+
+            fixture.Connect("main-inlet", 0, "host-pipe", 0);
+            fixture.Connect("host-pipe", 1, "main-after", 0);
+            fixture.Connect("main-after", 1, "outlet", 0);
+            fixture.Connect("branch-inlet", 0, "branch", 0);
+            fixture.Connect("branch", 1, "host-pipe", 2);
+            fixture.AddBoundary("outlet", GameMepBoundaryKind.Outlet);
+            fixture.SetPortDiameter("host-pipe", 0, 300.0);
+            fixture.SetPortDiameter("host-pipe", 1, 300.0);
+            // Les piquages Revit natifs exposent parfois un port Curve sans DN.
+            // La canalisation de branche doit alors fournir son DN effectif.
+            fixture.SetPortDiameter("host-pipe", 2, 0.0);
+            fixture.SetPipeDiameter("main-after", 300.0);
+            fixture.SetPipeDiameter("branch", 80.0);
+            fixture.AddNativeTapPath("host-pipe", 0, 1, 8.0);
+            fixture.SetPathLength("main-after", 8.0);
+            fixture.SetPathLength("branch", 6.0);
+
+            fixture.Calculate();
+
+            Assert(fixture.Graph.DiameterAwareJunctionCount == 1,
+                "A host pipe carrying a native Curve tap must participate in the DN rule.");
+            Assert(fixture.Path("host-pipe").FlowForward &&
+                fixture.Path("branch").FlowForward,
+                "The native tap injection must join the large host pipe without reversing it.");
+            AssertRenderableFlow(fixture, "host-pipe");
+            AssertRenderableFlow(fixture, "branch");
+            AssertRenderableFlow(fixture, "main-after");
+        }
+
+        private static void SmallDnCannotSplitAContinuousReturnHeader()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("far-left", 2);
+            fixture.AddElement("crossing", 4);
+            fixture.AddElement("left-main", 2);
+            fixture.AddElement("junction", 3);
+            fixture.AddElement("right-main", 2);
+            fixture.AddElement("right-outlet", 1);
+            fixture.AddElement("small-inlet", 1, source: true);
+            fixture.AddElement("small-valve", 2, valve: true);
+            fixture.AddElement("small-branch", 2);
+            fixture.AddElement("cross-side-a", 2);
+            fixture.AddElement("cross-side-b", 2);
+
+            // Le DN300 de gauche continue hors de la zone modélisée. Son bout
+            // libre est l'amont aspiré et traverse d'abord un autre croisement.
+            fixture.Connect("far-left", 1, "crossing", 1);
+            fixture.Connect("crossing", 0, "left-main", 0);
+            fixture.Connect("crossing", 2, "cross-side-a", 0);
+            fixture.Connect("crossing", 3, "cross-side-b", 0);
+            fixture.Connect("left-main", 1, "junction", 0);
+            fixture.Connect("junction", 1, "right-main", 0);
+            fixture.Connect("right-main", 1, "right-outlet", 0);
+            fixture.Connect("small-inlet", 0, "small-valve", 0);
+            fixture.Connect("small-valve", 1, "small-branch", 0);
+            fixture.Connect("small-branch", 1, "junction", 2);
+            fixture.AddBoundary("right-outlet", GameMepBoundaryKind.Outlet);
+            fixture.SetPortDiameter("junction", 0, 300.0);
+            fixture.SetPortDiameter("junction", 1, 300.0);
+            fixture.SetPortDiameter("junction", 2, 200.0);
+            for (int port = 0; port < 4; port++)
+                fixture.SetPortDiameter("crossing", port, 300.0);
+            fixture.SetPortDirection("crossing", 0, 1.0, 0.0, 0.0);
+            fixture.SetPortDirection("crossing", 1, -1.0, 0.0, 0.0);
+            fixture.SetPortDirection("crossing", 2, 0.0, 1.0, 0.0);
+            fixture.SetPortDirection("crossing", 3, 0.0, -1.0, 0.0);
+            fixture.AddJunctionPaths("junction");
+            fixture.AddJunctionPaths("crossing");
+            fixture.SetPathLength("far-left", 8.0);
+            fixture.SetPathLength("left-main", 8.0);
+            fixture.SetPathLength("right-main", 8.0);
+            fixture.SetPathLength("small-branch", 6.0);
+            fixture.SetPathLength("cross-side-a", 6.0);
+            fixture.SetPathLength("cross-side-b", 6.0);
+
+            fixture.CloseValve("small-valve");
+            fixture.Calculate();
+            bool closedLeftDirection = fixture.Path("left-main").FlowForward;
+            bool closedFarDirection = fixture.Path("far-left").FlowForward;
+            Assert(closedFarDirection && closedLeftDirection &&
+                fixture.Path("right-main").FlowForward,
+                "With the DN 200 valve closed, the DN 300 return must flow continuously through the preceding crossing.");
+            Assert(fixture.Graph.StableHeaderDirections.TryGetValue(
+                    "junction", out Dictionary<int, bool>? remembered) &&
+                remembered.Count == 2,
+                "Closing the DN 200 valve must memorize the stable DN 300 header direction.");
+
+            fixture.Graph.FindValve("small-valve")!.IsClosed = false;
+            fixture.Calculate();
+
+            Assert(fixture.Path("far-left").FlowForward &&
+                fixture.Path("left-main").FlowForward &&
+                fixture.Path("right-main").FlowForward &&
+                fixture.Path("small-branch").FlowForward,
+                "Opening the DN 200 valve must join the return without reversing the left DN 300.");
+            Assert(fixture.Path("left-main").FlowForward == closedLeftDirection,
+                "Opening or closing the DN 200 valve must never change the DN 300 header direction.");
+            Assert(fixture.Path("far-left").FlowForward == closedFarDirection,
+                "The stable DN 300 direction must propagate beyond the next crossing.");
+            Assert(!fixture.JunctionPath("crossing", 0).FlowForward &&
+                fixture.JunctionPath("crossing", 1).FlowForward,
+                "The two aligned DN 300 ports of the crossing must follow the propagated backbone direction.");
+            Assert(fixture.JunctionPath("crossing", 2).FlowForward ==
+                    !fixture.Path("cross-side-a").FlowForward &&
+                fixture.JunctionPath("crossing", 3).FlowForward ==
+                    !fixture.Path("cross-side-b").FlowForward,
+                "Each lateral crossing port must agree locally with its own neighboring pipe.");
+            Assert(fixture.JunctionPath("junction", 0).FlowForward &&
+                !fixture.JunctionPath("junction", 1).FlowForward &&
+                fixture.JunctionPath("junction", 2).FlowForward,
+                "At the tee, the left DN 300 and DN 200 must enter while the right DN 300 remains the only outlet.");
+            AssertRenderableFlow(fixture, "left-main");
+            AssertRenderableFlow(fixture, "far-left");
+            AssertRenderableFlow(fixture, "right-main");
+            AssertRenderableFlow(fixture, "small-branch");
+        }
+
+        private static void TwoSmallReturnsMergeIntoLargeCollector()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("return-a-inlet", 1, source: true);
+            fixture.AddElement("return-a", 2);
+            fixture.AddElement("return-b-far", 2);
+            fixture.AddElement("return-b-near", 2);
+            fixture.AddElement("junction", 3);
+            fixture.AddElement("collector", 2);
+            fixture.AddElement("declared-return", 1);
+
+            fixture.Connect("return-a-inlet", 0, "return-a", 0);
+            fixture.Connect("return-a", 1, "junction", 0);
+            // Ce deuxième retour n'est pas déclaré comme arrivée : son bout
+            // ouvert représente l'amont tronqué de la maquette. Sans la règle
+            // de collecteur, il était pris à tort pour une sortie implicite.
+            // Deux tronçons successifs sont volontairement dessinés dans des
+            // ordres opposés. Toute la branche doit néanmoins converger sans
+            // qu'une portion intermédiaire reparte à contre-sens.
+            fixture.Connect("return-b-far", 1, "return-b-near", 1);
+            fixture.Connect("return-b-near", 0, "junction", 1);
+            fixture.Connect("junction", 2, "collector", 0);
+            fixture.Connect("collector", 1, "declared-return", 0);
+            fixture.AddBoundary("declared-return", GameMepBoundaryKind.Outlet);
+            fixture.SetPortDiameter("junction", 0, 200.0);
+            fixture.SetPortDiameter("junction", 1, 200.0);
+            fixture.SetPortDiameter("junction", 2, 300.0);
+            fixture.AddJunctionPaths("junction");
+            fixture.SetPathLength("return-a", 6.0);
+            fixture.SetPathLength("return-b-far", 5.0);
+            fixture.SetPathLength("return-b-near", 5.0);
+            fixture.SetPathLength("collector", 8.0);
+
+            fixture.Calculate();
+
+            Assert(fixture.Path("return-a").FlowForward &&
+                fixture.Path("return-b-far").FlowForward &&
+                !fixture.Path("return-b-near").FlowForward &&
+                fixture.Path("collector").FlowForward,
+                "Every segment of both DN 200 returns must merge continuously into the DN 300 collector.");
+            Assert(fixture.JunctionPath("junction", 0).FlowForward &&
+                fixture.JunctionPath("junction", 1).FlowForward &&
+                !fixture.JunctionPath("junction", 2).FlowForward,
+                "The two small legs must enter the junction and the large leg must leave it.");
+            Assert(fixture.JunctionPath("junction", 0).HasCirculation &&
+                fixture.JunctionPath("junction", 1).HasCirculation &&
+                fixture.JunctionPath("junction", 2).HasCirculation,
+                "Every leg of a collector merge must remain animated.");
+            AssertRenderableFlow(fixture, "return-a");
+            AssertRenderableFlow(fixture, "return-b-far");
+            AssertRenderableFlow(fixture, "return-b-near");
+            AssertRenderableFlow(fixture, "collector");
+            Assert(fixture.Graph.DiameterAwareJunctionCount == 1 &&
+                fixture.Graph.DiameterInferredInletCount == 1 &&
+                fixture.Graph.DiameterDirectedPathCount >= 1,
+                "The diagnostics must prove that the ambiguous DN 200 path was recalculated by DN.");
+        }
+
+        private static void ReducerAfterEqualTeeProvidesEffectiveCollectorDn()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("inlet", 1, source: true);
+            fixture.AddElement("small-a", 2);
+            fixture.AddElement("small-b", 2);
+            fixture.AddElement("junction", 3);
+            fixture.AddElement("reducer", 2);
+            fixture.AddElement("collector", 2);
+            fixture.AddElement("outlet", 1);
+
+            fixture.Connect("inlet", 0, "small-a", 0);
+            fixture.Connect("small-a", 1, "junction", 0);
+            fixture.Connect("small-b", 0, "junction", 1);
+            fixture.Connect("junction", 2, "reducer", 0);
+            fixture.Connect("reducer", 1, "collector", 0);
+            fixture.Connect("collector", 1, "outlet", 0);
+            fixture.AddBoundary("outlet", GameMepBoundaryKind.Outlet);
+            // La famille du té ne publie volontairement aucune section. Les
+            // trois DN doivent être récupérés depuis les canalisations réelles
+            // de chaque bras, y compris derrière le réducteur.
+            fixture.SetPortDiameter("reducer", 0, 200.0);
+            fixture.SetPortDiameter("reducer", 1, 300.0);
+            fixture.SetPipeDiameter("small-a", 200.0);
+            fixture.SetPipeDiameter("small-b", 200.0);
+            fixture.SetPipeDiameter("collector", 300.0);
+            fixture.AddJunctionPaths("junction");
+            fixture.SetPathLength("small-a", 6.0);
+            fixture.SetPathLength("small-b", 6.0);
+            fixture.SetPathLength("collector", 8.0);
+
+            fixture.Calculate();
+
+            Assert(fixture.Graph.DiameterAwareJunctionCount == 1 &&
+                fixture.Graph.DiameterInferredInletCount == 1,
+                "A reducer immediately after an equal-size tee must expose the effective DN 300 arm.");
+            Assert(!fixture.Path("small-b").FlowForward,
+                "The second DN 200 must still merge through an equal-size tee followed by a reducer.");
+            AssertRenderableFlow(fixture, "small-a");
+            AssertRenderableFlow(fixture, "small-b");
+            AssertRenderableFlow(fixture, "collector");
+        }
+
+        private static void CollectorMergeSurvivesDownstreamTee()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("inlet", 1, source: true);
+            fixture.AddElement("small-a", 2);
+            fixture.AddElement("small-b", 2);
+            fixture.AddElement("merge-tee", 3);
+            fixture.AddElement("collector", 2);
+            fixture.AddElement("downstream-tee", 3);
+            fixture.AddElement("toward-return", 2);
+            fixture.AddElement("side-leg", 2);
+            fixture.AddElement("outlet", 1);
+
+            fixture.Connect("inlet", 0, "small-a", 0);
+            fixture.Connect("small-a", 1, "merge-tee", 0);
+            fixture.Connect("small-b", 0, "merge-tee", 1);
+            fixture.Connect("merge-tee", 2, "collector", 0);
+            fixture.Connect("collector", 1, "downstream-tee", 0);
+            fixture.Connect("downstream-tee", 1, "toward-return", 0);
+            fixture.Connect("toward-return", 1, "outlet", 0);
+            fixture.Connect("downstream-tee", 2, "side-leg", 0);
+            fixture.AddBoundary("outlet", GameMepBoundaryKind.Outlet);
+            fixture.SetPortDiameter("merge-tee", 0, 200.0);
+            fixture.SetPortDiameter("merge-tee", 1, 200.0);
+            fixture.SetPortDiameter("merge-tee", 2, 300.0);
+            fixture.SetPortDiameter("downstream-tee", 0, 300.0);
+            fixture.SetPortDiameter("downstream-tee", 1, 300.0);
+            fixture.SetPortDiameter("downstream-tee", 2, 300.0);
+            fixture.SetPipeDiameter("small-a", 200.0);
+            fixture.SetPipeDiameter("small-b", 200.0);
+            fixture.SetPipeDiameter("collector", 300.0);
+            fixture.SetPipeDiameter("toward-return", 300.0);
+            fixture.SetPipeDiameter("side-leg", 300.0);
+            fixture.AddJunctionPaths("merge-tee");
+            fixture.AddJunctionPaths("downstream-tee");
+            fixture.SetPathLength("small-a", 6.0);
+            fixture.SetPathLength("small-b", 6.0);
+            fixture.SetPathLength("collector", 8.0);
+
+            fixture.Calculate();
+
+            Assert(fixture.Graph.DiameterAwareJunctionCount == 1 &&
+                fixture.Graph.DiameterInferredInletCount == 1,
+                "A downstream tee on the DN 300 must be a local boundary, not cancel the upstream merge.");
+            Assert(!fixture.Path("small-b").FlowForward &&
+                fixture.Path("collector").FlowForward,
+                "Both DN 200 legs must still converge into the DN 300 before the next tee.");
+            AssertRenderableFlow(fixture, "small-a");
+            AssertRenderableFlow(fixture, "small-b");
+            AssertRenderableFlow(fixture, "collector");
+        }
+
+        private static void LargeSupplyStillDistributesToTwoSmallerBranches()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("supply", 1, source: true);
+            fixture.AddElement("large-leg", 2);
+            fixture.AddElement("junction", 3);
+            fixture.AddElement("branch-a", 2);
+            fixture.AddElement("branch-b", 2);
+
+            fixture.Connect("supply", 0, "large-leg", 0);
+            fixture.Connect("large-leg", 1, "junction", 2);
+            fixture.Connect("junction", 0, "branch-a", 0);
+            fixture.Connect("junction", 1, "branch-b", 1);
+            fixture.SetPortDiameter("junction", 0, 200.0);
+            fixture.SetPortDiameter("junction", 1, 200.0);
+            fixture.SetPortDiameter("junction", 2, 300.0);
+            fixture.AddJunctionPaths("junction");
+            fixture.SetPathLength("large-leg", 8.0);
+            fixture.SetPathLength("branch-a", 6.0);
+            fixture.SetPathLength("branch-b", 6.0);
+
+            fixture.Calculate();
+
+            Assert(fixture.Path("large-leg").FlowForward &&
+                fixture.Path("branch-a").FlowForward &&
+                !fixture.Path("branch-b").FlowForward,
+                "A DN 300 supply must still split toward both DN 200 branches.");
+            Assert(fixture.JunctionPath("junction", 2).FlowForward &&
+                !fixture.JunctionPath("junction", 0).FlowForward &&
+                !fixture.JunctionPath("junction", 1).FlowForward,
+                "The collector heuristic must not turn a genuine distribution tee into a merge.");
+            Assert(fixture.Graph.DiameterInferredInletCount == 0,
+                "A genuine distribution must not infer any extra inlet.");
+            Assert(fixture.Graph.DiameterAwareJunctionCount == 0 &&
+                fixture.Graph.DiameterDirectedPathCount == 0 &&
+                new[] { "large-leg", "branch-a", "branch-b" }.All(key =>
+                    fixture.Path(key).DirectionReason.IndexOf(
+                        "jonction de DN", StringComparison.OrdinalIgnoreCase) < 0),
+                "A genuine large-to-small distribution must stay outside the DN correction scope.");
+            AssertRenderableFlow(fixture, "large-leg");
+            AssertRenderableFlow(fixture, "branch-a");
+            AssertRenderableFlow(fixture, "branch-b");
+        }
+
+        private static void PumpOutletAnchorsLocalDnMerge()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("source", 1, source: true);
+            fixture.AddElement("pump", 2);
+            fixture.AddElement("small-a", 2);
+            fixture.AddElement("small-b", 2);
+            fixture.AddElement("junction", 3);
+            fixture.AddElement("collector", 2);
+            fixture.AddElement("outlet", 1);
+
+            fixture.Connect("source", 0, "pump", 0);
+            fixture.Connect("pump", 1, "small-a", 0);
+            fixture.Connect("small-a", 1, "junction", 0);
+            fixture.Connect("small-b", 0, "junction", 1);
+            fixture.Connect("junction", 2, "collector", 0);
+            fixture.Connect("collector", 1, "outlet", 0);
+            fixture.AddBoundary("outlet", GameMepBoundaryKind.Outlet);
+            fixture.SetDirectionConstraint(
+                "pump", 0, 1,
+                GameMepDirectionConstraintScope.EquipmentPressureRise);
+            fixture.SetPortDiameter("junction", 0, 200.0);
+            fixture.SetPortDiameter("junction", 1, 200.0);
+            fixture.SetPortDiameter("junction", 2, 300.0);
+            fixture.AddJunctionPaths("junction");
+            fixture.SetPathLength("small-a", 6.0);
+            fixture.SetPathLength("small-b", 6.0);
+            fixture.SetPathLength("collector", 8.0);
+
+            fixture.Calculate();
+
+            Assert(fixture.Path("pump").FlowForward &&
+                fixture.Path("small-a").FlowForward &&
+                !fixture.Path("small-b").FlowForward &&
+                fixture.Path("collector").FlowForward,
+                "A pump discharge on DN 200 must anchor both small returns toward the DN 300 collector.");
+            Assert(fixture.Graph.DiameterAwareJunctionCount == 1 &&
+                fixture.Graph.DiameterInferredInletCount == 1,
+                "A pump outlet must be accepted as a local merge inlet without becoming a global source.");
+            AssertRenderableFlow(fixture, "small-a");
+            AssertRenderableFlow(fixture, "small-b");
+            AssertRenderableFlow(fixture, "collector");
+        }
+
+        private static void PumpBranchesKeepTheirEstablishedDirection()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("supply", 1, source: true);
+            fixture.AddElement("large-leg", 2);
+            fixture.AddElement("junction", 3);
+            fixture.AddElement("left-branch", 2);
+            fixture.AddElement("left-pump", 2);
+            fixture.AddElement("left-after", 2);
+            fixture.AddElement("left-outlet", 1);
+            fixture.AddElement("right-branch", 2);
+            fixture.AddElement("right-pump", 2);
+            fixture.AddElement("right-after", 2);
+            fixture.AddElement("right-outlet", 1);
+
+            fixture.Connect("supply", 0, "large-leg", 0);
+            fixture.Connect("large-leg", 1, "junction", 2);
+            fixture.Connect("junction", 0, "left-branch", 0);
+            fixture.Connect("left-branch", 1, "left-pump", 0);
+            fixture.Connect("left-pump", 1, "left-after", 0);
+            fixture.Connect("left-after", 1, "left-outlet", 0);
+            fixture.Connect("junction", 1, "right-branch", 0);
+            fixture.Connect("right-branch", 1, "right-pump", 0);
+            fixture.Connect("right-pump", 1, "right-after", 0);
+            fixture.Connect("right-after", 1, "right-outlet", 0);
+            fixture.AddBoundary("left-outlet", GameMepBoundaryKind.Outlet);
+            fixture.AddBoundary("right-outlet", GameMepBoundaryKind.Outlet);
+            fixture.SetDirectionConstraint(
+                "left-pump", 0, 1,
+                GameMepDirectionConstraintScope.EquipmentPressureRise);
+            fixture.SetDirectionConstraint(
+                "right-pump", 0, 1,
+                GameMepDirectionConstraintScope.EquipmentPressureRise);
+            fixture.SetPortDiameter("junction", 0, 200.0);
+            fixture.SetPortDiameter("junction", 1, 200.0);
+            fixture.SetPortDiameter("junction", 2, 300.0);
+            fixture.AddJunctionPaths("junction");
+            foreach (string key in new[]
+            {
+                "large-leg", "left-branch", "left-after",
+                "right-branch", "right-after"
+            })
+            {
+                fixture.SetPathLength(key, 6.0);
+            }
+
+            fixture.Calculate();
+
+            foreach (string key in new[]
+            {
+                "large-leg", "left-branch", "left-after",
+                "right-branch", "right-after"
+            })
+            {
+                Assert(fixture.Path(key).FlowForward,
+                    "Both pump branches must keep one continuous downstream direction: " + key);
+                AssertRenderableFlow(fixture, key);
+            }
+            Assert(fixture.Path("left-pump").FlowForward &&
+                fixture.Path("right-pump").FlowForward,
+                "Explicit pump directions must remain authoritative.");
+            Assert(fixture.Graph.DiameterAwareJunctionCount == 0 &&
+                fixture.Graph.DiameterDirectedPathCount == 0 &&
+                fixture.Graph.DiameterInferredInletCount == 0,
+                "A pump distribution must never activate the collector DN heuristic.");
+        }
+
+        private static void ExplicitSmallOutletPreventsMergeInference()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("inlet", 1, source: true);
+            fixture.AddElement("small-a", 2);
+            fixture.AddElement("small-b", 2);
+            fixture.AddElement("small-outlet", 1);
+            fixture.AddElement("junction", 3);
+            fixture.AddElement("collector", 2);
+            fixture.AddElement("large-outlet", 1);
+
+            fixture.Connect("inlet", 0, "small-a", 0);
+            fixture.Connect("small-a", 1, "junction", 0);
+            fixture.Connect("junction", 1, "small-b", 0);
+            fixture.Connect("small-b", 1, "small-outlet", 0);
+            fixture.Connect("junction", 2, "collector", 0);
+            fixture.Connect("collector", 1, "large-outlet", 0);
+            fixture.AddBoundary("small-outlet", GameMepBoundaryKind.Outlet);
+            fixture.AddBoundary("large-outlet", GameMepBoundaryKind.Outlet);
+            fixture.SetPortDiameter("junction", 0, 200.0);
+            fixture.SetPortDiameter("junction", 1, 200.0);
+            fixture.SetPortDiameter("junction", 2, 300.0);
+            fixture.AddJunctionPaths("junction");
+            fixture.SetPathLength("small-a", 6.0);
+            fixture.SetPathLength("small-b", 6.0);
+            fixture.SetPathLength("collector", 8.0);
+
+            fixture.Calculate();
+
+            Assert(fixture.Graph.DiameterInferredInletCount == 0,
+                "An explicit outlet on a small leg must always beat the DN merge heuristic.");
+            Assert(fixture.Path("small-b").FlowForward,
+                "The explicitly declared small outlet must keep receiving flow from the tee.");
+            AssertRenderableFlow(fixture, "small-b");
+        }
+
+        private static void SubthresholdDnDoesNotInferMerge()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("inlet", 1, source: true);
+            fixture.AddElement("small-a", 2);
+            fixture.AddElement("small-b", 2);
+            fixture.AddElement("junction", 3);
+            fixture.AddElement("collector", 2);
+            fixture.AddElement("outlet", 1);
+
+            fixture.Connect("inlet", 0, "small-a", 0);
+            fixture.Connect("small-a", 1, "junction", 0);
+            fixture.Connect("junction", 1, "small-b", 0);
+            fixture.Connect("junction", 2, "collector", 0);
+            fixture.Connect("collector", 1, "outlet", 0);
+            fixture.AddBoundary("outlet", GameMepBoundaryKind.Outlet);
+            fixture.SetPortDiameter("junction", 0, 250.0);
+            fixture.SetPortDiameter("junction", 1, 250.0);
+            fixture.SetPortDiameter("junction", 2, 300.0);
+            fixture.AddJunctionPaths("junction");
+            fixture.SetPathLength("small-a", 6.0);
+            fixture.SetPathLength("small-b", 6.0);
+            fixture.SetPathLength("collector", 8.0);
+
+            fixture.Calculate();
+
+            Assert(fixture.Graph.DiameterAwareJunctionCount == 0 &&
+                fixture.Graph.DiameterInferredInletCount == 0,
+                "A DN ratio below 1.25 must preserve the historical topology.");
+            Assert(fixture.Path("small-a").FlowForward &&
+                fixture.Path("small-b").FlowForward &&
+                fixture.Path("collector").FlowForward,
+                "Below the DN threshold, the historical split direction must remain unchanged.");
+            AssertRenderableFlow(fixture, "small-a");
+            Assert(fixture.Path("small-b").FlowState == GameMepFlowState.Supplied &&
+                fixture.Path("small-b").HasCirculation,
+                "Below the threshold, the historical implicit outlet must remain supplied and circulating.");
+            AssertRenderableFlow(fixture, "collector");
+        }
+
+        private static void LocalOverrideDoesNotDisableNeighboringDnMerge()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("inlet", 1, source: true);
+            fixture.AddElement("small-a", 2);
+            fixture.AddElement("small-b", 2);
+            fixture.AddElement("junction", 3);
+            fixture.AddElement("collector", 2);
+            fixture.AddElement("outlet", 1);
+
+            fixture.Connect("inlet", 0, "small-a", 0);
+            fixture.Connect("small-a", 1, "junction", 0);
+            fixture.Connect("small-b", 0, "junction", 1);
+            fixture.Connect("junction", 2, "collector", 0);
+            fixture.Connect("collector", 1, "outlet", 0);
+            fixture.AddBoundary("outlet", GameMepBoundaryKind.Outlet);
+            fixture.SetDirectionConstraint("small-a", 0, 1);
+            fixture.SetPortDiameter("junction", 0, 200.0);
+            fixture.SetPortDiameter("junction", 1, 200.0);
+            fixture.SetPortDiameter("junction", 2, 300.0);
+            fixture.AddJunctionPaths("junction");
+            fixture.SetPathLength("small-a", 6.0);
+            fixture.SetPathLength("small-b", 6.0);
+            fixture.SetPathLength("collector", 8.0);
+
+            fixture.Calculate();
+
+            Assert(fixture.Path("small-a").FlowForward &&
+                fixture.Path("small-a").DirectionReason.IndexOf(
+                    "Correction locale", StringComparison.OrdinalIgnoreCase) >= 0,
+                "The local override must keep priority on its own DN 200 branch.");
+            Assert(fixture.Graph.DiameterInferredInletCount == 1 &&
+                !fixture.Path("small-b").FlowForward,
+                "A local override must not disable merge inference on the neighboring DN 200.");
+            AssertRenderableFlow(fixture, "small-a");
+            AssertRenderableFlow(fixture, "small-b");
+            AssertRenderableFlow(fixture, "collector");
+        }
+
+        private static void DnMergeInferenceSkipsRejoinedBypass()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("inlet", 1, source: true);
+            fixture.AddElement("small-a", 2);
+            fixture.AddElement("bypass", 2);
+            fixture.AddElement("junction", 3);
+            fixture.AddElement("collector", 2);
+            fixture.AddElement("outlet", 1);
+
+            fixture.Connect("inlet", 0, "small-a", 0);
+            fixture.Connect("small-a", 1, "junction", 0);
+            fixture.Connect("junction", 1, "bypass", 0);
+            fixture.Connect("bypass", 1, "collector", 0);
+            fixture.Connect("junction", 2, "collector", 0);
+            fixture.Connect("collector", 1, "outlet", 0);
+            fixture.AddBoundary("outlet", GameMepBoundaryKind.Outlet);
+            fixture.SetPortDiameter("junction", 0, 200.0);
+            fixture.SetPortDiameter("junction", 1, 200.0);
+            fixture.SetPortDiameter("junction", 2, 300.0);
+            fixture.SetPipeDiameter("small-a", 200.0);
+            fixture.SetPipeDiameter("bypass", 200.0);
+            fixture.SetPipeDiameter("collector", 300.0);
+            fixture.AddJunctionPaths("junction");
+            fixture.SetPathLength("small-a", 6.0);
+            fixture.SetPathLength("bypass", 6.0);
+            fixture.SetPathLength("collector", 8.0);
+
+            fixture.Calculate();
+
+            Assert(fixture.Graph.DiameterAwareJunctionCount == 0 &&
+                fixture.Graph.DiameterInferredInletCount == 0 &&
+                fixture.Graph.DiameterDirectedPathCount == 0,
+                "Two tee arms rejoined outside the fitting are a bypass and must not activate the DN rule.");
+            Assert(new[] { "small-a", "bypass", "collector" }.All(key =>
+                    fixture.Path(key).DirectionReason.IndexOf(
+                        "jonction de DN", StringComparison.OrdinalIgnoreCase) < 0),
+                "A rejected bypass must preserve the historical pipe directions.");
+        }
+
+        private static void BalancedBypassAtOneNodeRemainsStagnant()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("arrival", 1, source: true);
+            fixture.AddElement("node", 1);
+            fixture.AddElement("bypass", 2);
+            fixture.AddElement("return", 1);
+            fixture.Connect("arrival", 0, "node", 0);
+            fixture.Connect("return", 0, "node", 0);
+            fixture.Connect("bypass", 0, "node", 0);
+            fixture.Connect("bypass", 1, "node", 0);
+            fixture.AddBoundary("return", GameMepBoundaryKind.Outlet);
+
+            fixture.Calculate();
+
+            AssertState(fixture, "bypass", GameMepFlowState.Supplied);
+            Assert(!fixture.Path("bypass").HasCirculation,
+                "A bypass tied to the same hydraulic node must remain stagnant.");
         }
 
         private static void LoopBypassesClosedValve()
@@ -631,6 +1313,44 @@ namespace BIMaestro.VideoGames
             AssertState(fixture, "pipe-b", GameMepFlowState.Unknown);
         }
 
+        private static void PipeJunctionBridgesPhysicallyConnectedRevitSystems()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddSystem("cold-system", "EFS", "DomesticColdWater");
+            fixture.AddSystem("process-system", "PROC", "OtherPipe");
+            fixture.AddSystem("return-system", "RET", "HydronicReturn");
+            fixture.AddElement("cold-inlet", 1, source: true);
+            fixture.AddElement("cold-branch", 2);
+            fixture.AddElement("junction", 3);
+            fixture.AddElement("collector", 2);
+            fixture.AddElement("declared-return", 1);
+
+            fixture.Connect("cold-inlet", 0, "cold-branch", 0);
+            fixture.Connect("cold-branch", 1, "junction", 0);
+            fixture.Connect("junction", 2, "collector", 0);
+            fixture.Connect("collector", 1, "declared-return", 0);
+            fixture.SetElementSystem("cold-inlet", "cold-system");
+            fixture.SetElementSystem("cold-branch", "cold-system");
+            fixture.SetConnectorSystem("junction", 0, "cold-system");
+            fixture.SetConnectorSystem("junction", 1, "process-system");
+            fixture.SetConnectorSystem("junction", 2, "return-system");
+            fixture.SetElementSystem("collector", "return-system");
+            fixture.SetElementSystem("declared-return", "return-system");
+            fixture.AddBoundary("declared-return", GameMepBoundaryKind.Outlet);
+            fixture.SetPortDiameter("junction", 0, 80.0);
+            fixture.SetPortDiameter("junction", 1, 80.0);
+            fixture.SetPortDiameter("junction", 2, 300.0);
+            fixture.AddJunctionPaths("junction");
+            fixture.SetPathLength("cold-branch", 6.0);
+            fixture.SetPathLength("collector", 8.0);
+
+            fixture.Calculate();
+
+            AssertState(fixture, "collector", GameMepFlowState.Supplied);
+            AssertRenderableFlow(fixture, "cold-branch");
+            AssertRenderableFlow(fixture, "collector");
+        }
+
         private static void ReturnOnlySystemFlowsTowardDeclaredOutlet()
         {
             GraphFixture fixture = new GraphFixture();
@@ -770,6 +1490,9 @@ namespace BIMaestro.VideoGames
             Assert(fixture.Path("bypass-b").DirectionState == GameMepDirectionState.Resolved &&
                 fixture.Path("bypass-b").FlowForward,
                 "The parallel bypass must keep the same arrival-to-return direction.");
+            Assert(fixture.Path("bypass-a").HasCirculation &&
+                fixture.Path("bypass-b").HasCirculation,
+                "A real alternative route between an arrival and a return must keep circulating.");
         }
 
         private static void PumpConstraintDoesNotCreateSupply()
@@ -2053,6 +2776,22 @@ namespace BIMaestro.VideoGames
                 key + ": expected " + expected + ", received " + actual + ".");
         }
 
+        private static void AssertRenderableFlow(GraphFixture fixture, string key)
+        {
+            GameMepPathData path = fixture.Path(key);
+            Assert(path.IsVisible &&
+                path.Points.Count >= 2 &&
+                path.FlowState == GameMepFlowState.Supplied &&
+                path.HasCirculation &&
+                path.DirectionState == GameMepDirectionState.Resolved &&
+                path.Length > 0.02 &&
+                !double.IsNaN(path.Length) &&
+                !double.IsInfinity(path.Length) &&
+                (fixture.Graph.FindSystem(path.SystemKey)?.IsVisible ?? true),
+                key + ": the renderer must receive a visible, supplied, " +
+                "circulating and direction-resolved path.");
+        }
+
         private static void Assert(bool condition, string message)
         {
             _assertions++;
@@ -2175,6 +2914,82 @@ namespace BIMaestro.VideoGames
                 Graph.Connectors[secondConnector].IsConnected = true;
             }
 
+            public void SetPortDiameter(string key, int port, double diameter)
+            {
+                GameMepElementData element = _elements[key];
+                int connector = element.ConnectorIndices[port];
+                Graph.Connectors[connector].CrossSectionArea =
+                    Math.PI * diameter * diameter * 0.25;
+            }
+
+            public void SetPortDirection(
+                string key,
+                int port,
+                double x,
+                double y,
+                double z)
+            {
+                GameMepElementData element = _elements[key];
+                int connector = element.ConnectorIndices[port];
+                var direction = new Vector3D(x, y, z);
+                direction.Normalize();
+                Graph.Connectors[connector].Direction = direction;
+                Graph.Connectors[connector].HasDirection = true;
+            }
+
+            public void SetPipeDiameter(string key, double diameter)
+            {
+                GameMepElementData element = _elements[key];
+                element.IsPipeCurve = true;
+                foreach (int connector in element.ConnectorIndices)
+                {
+                    Graph.Connectors[connector].CrossSectionArea =
+                        Math.PI * diameter * diameter * 0.25;
+                }
+            }
+
+            public void AddJunctionPaths(string key)
+            {
+                GameMepElementData element = _elements[key];
+                if (element.ConnectorIndices.Count < 3)
+                    throw new InvalidOperationException("A junction needs at least three ports.");
+                element.IsPipeJunction = true;
+                foreach (int connector in element.ConnectorIndices)
+                {
+                    element.Paths.Add(new GameMepPathData
+                    {
+                        ElementKey = key,
+                        SystemKey = element.SystemKey,
+                        StartConnector = connector,
+                        EndConnector = -1
+                    });
+                }
+            }
+
+            public void AddNativeTapPath(
+                string key,
+                int startPort,
+                int endPort,
+                double length)
+            {
+                GameMepElementData element = _elements[key];
+                element.IsPipeCurve = true;
+                element.IsPipeJunction = true;
+                var path = new GameMepPathData
+                {
+                    ElementKey = key,
+                    SystemKey = element.SystemKey,
+                    StartConnector = element.ConnectorIndices[startPort],
+                    EndConnector = element.ConnectorIndices[endPort],
+                    IsVisible = true
+                };
+                path.Points.Add(new Point3D(0.0, 0.0, 0.0));
+                path.Points.Add(new Point3D(length, 0.0, 0.0));
+                path.FinalizePath();
+                element.Paths.Add(path);
+                element.IsVisible = true;
+            }
+
             public void CloseValve(string key)
             {
                 Graph.FindValve(key)!.IsClosed = true;
@@ -2254,10 +3069,14 @@ namespace BIMaestro.VideoGames
             public void SetPathLength(string key, double length)
             {
                 GameMepPathData path = Path(key);
+                GameMepElementData element = _elements[key];
                 path.Points.Clear();
                 path.Points.Add(new Point3D(0.0, 0.0, 0.0));
                 path.Points.Add(new Point3D(length, 0.0, 0.0));
                 path.FinalizePath();
+                path.IsVisible = true;
+                element.IsVisible = true;
+                element.IsPipeCurve = true;
             }
 
             public void SetDirectedSource(
@@ -2286,10 +3105,11 @@ namespace BIMaestro.VideoGames
 
             public void AddBoundary(string key, GameMepBoundaryKind kind)
             {
+                GameMepElementData element = _elements[key];
                 Graph.Sources.Add(new GameMepSourceData
                 {
                     ElementKey = key,
-                    SystemKey = SystemKey,
+                    SystemKey = element.SystemKey,
                     Name = key,
                     IsActive = true,
                     IsUserCreated = true,
@@ -2328,6 +3148,14 @@ namespace BIMaestro.VideoGames
             public GameMepPathData Path(string key)
             {
                 return _elements[key].Paths.Single();
+            }
+
+            public GameMepPathData JunctionPath(string key, int port)
+            {
+                GameMepElementData element = _elements[key];
+                int connector = element.ConnectorIndices[port];
+                return element.Paths.Single(path =>
+                    path.StartConnector == connector && path.EndConnector < 0);
             }
 
             public void Calculate()

@@ -84,6 +84,7 @@ namespace BIMaestro.VideoGames
                     Category = SafeText(() => element.Category?.Name),
                     TypeName = GetTypeName(document, element),
                     IsPipeCurve = element is MEPCurve,
+                    IsPipeJunction = IsPipeJunction(element, connectors),
                     IsVisible = visibleElementKeys.Contains(elementKey)
                 };
 
@@ -115,7 +116,8 @@ namespace BIMaestro.VideoGames
                         SystemKey = systemKey,
                         Position = origin,
                         IsConnected = SafeGet(() => connector.IsConnected, false),
-                        FlowDirection = SafeText(() => connector.Direction.ToString())
+                        FlowDirection = SafeText(() => connector.Direction.ToString()),
+                        CrossSectionArea = GetConnectorCrossSectionArea(connector)
                     };
                     SetConnectorDirection(connector, connectorData);
                     graph.Connectors.Add(connectorData);
@@ -173,6 +175,7 @@ namespace BIMaestro.VideoGames
             }
 
             BuildPhysicalConnections(rawConnectors, connectorByKey, graph);
+            ResolveMissingConnectorAreas(graph);
             ResolveUnassignedSystems(graph);
             BuildSources(sourceScores, graph);
             graph.OpenConnectorCount = graph.Connectors.Count(connector => !connector.IsConnected);
@@ -422,6 +425,60 @@ namespace BIMaestro.VideoGames
                 connectorData.HasDirection = true;
             }
             catch { }
+        }
+
+        private static double GetConnectorCrossSectionArea(Connector connector)
+        {
+            // Les propriétés Radius et Width/Height lèvent une exception quand
+            // elles ne correspondent pas à la forme du connecteur. SafeGet
+            // permet donc de rester compatible avec les familles rondes,
+            // rectangulaires et ovales, quelle que soit la version de Revit.
+            double radius = SafeGet(() => connector.Radius, 0.0);
+            if (radius > 1e-9)
+                return Math.PI * radius * radius;
+
+            double width = SafeGet(() => connector.Width, 0.0);
+            double height = SafeGet(() => connector.Height, 0.0);
+            if (width <= 1e-9 || height <= 1e-9)
+                return 0.0;
+
+            string shape = SafeText(() => connector.Shape.ToString());
+            return shape.IndexOf("oval", StringComparison.OrdinalIgnoreCase) >= 0
+                ? Math.PI * width * height * 0.25
+                : width * height;
+        }
+
+        private static bool IsPipeJunction(
+            Element element,
+            IList<Connector> connectors)
+        {
+            int connectorCount = connectors.Count;
+            if (connectorCount < 3)
+                return false;
+
+            // Un piquage Revit natif peut être porté directement par la
+            // canalisation principale : deux connecteurs End et au moins un
+            // connecteur Curve au point du tap. Il n'existe alors aucun raccord
+            // autonome à trois ports à reconnaître.
+            if (element is MEPCurve && connectors.Any(connector =>
+                    SafeGet(
+                        () => connector.ConnectorType == ConnectorType.Curve,
+                        false)))
+            {
+                return true;
+            }
+
+            if (element.Category?.Id.GetIdValue() ==
+                (int)BuiltInCategory.OST_PipeFitting)
+            {
+                return true;
+            }
+
+            string partType = GetPartType(element).ToLowerInvariant();
+            return ContainsAny(
+                partType,
+                "tee", "tap", "junction", "branch", "lateral", "wye",
+                "piquage", "culotte", "té");
         }
 
         private static GameMepValveData? DetectValve(
@@ -778,6 +835,47 @@ namespace BIMaestro.VideoGames
                     }
                 }
                 catch { }
+            }
+        }
+
+        private static void ResolveMissingConnectorAreas(GameMepGraphData graph)
+        {
+            // Certaines familles personnalisées ne publient pas leur rayon sur
+            // le connecteur du raccord, alors que le connecteur de la conduite
+            // physiquement raccordée le connaît. Recopier cette section évite
+            // de désactiver silencieusement toute l'analyse DN du té/piquage.
+            for (int pass = 0; pass < 2; pass++)
+            {
+                bool changed = false;
+                foreach (GameMepConnectionData connection in graph.Connections.Where(
+                    item => !item.IsInternal))
+                {
+                    if (connection.ConnectorA < 0 || connection.ConnectorB < 0 ||
+                        connection.ConnectorA >= graph.Connectors.Count ||
+                        connection.ConnectorB >= graph.Connectors.Count)
+                    {
+                        continue;
+                    }
+
+                    GameMepConnectorData first =
+                        graph.Connectors[connection.ConnectorA];
+                    GameMepConnectorData second =
+                        graph.Connectors[connection.ConnectorB];
+                    if (first.CrossSectionArea <= 1e-12 &&
+                        second.CrossSectionArea > 1e-12)
+                    {
+                        first.CrossSectionArea = second.CrossSectionArea;
+                        changed = true;
+                    }
+                    else if (second.CrossSectionArea <= 1e-12 &&
+                        first.CrossSectionArea > 1e-12)
+                    {
+                        second.CrossSectionArea = first.CrossSectionArea;
+                        changed = true;
+                    }
+                }
+                if (!changed)
+                    break;
             }
         }
 

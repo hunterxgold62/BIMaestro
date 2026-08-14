@@ -138,18 +138,6 @@
                              Width="1280"
                              Height="720"
                              IsHitTestVisible="False">
-                    <h2:TextModel2D x:Name="Crosshair2D"
-                                    Text="+"
-                                    Width="28"
-                                    Height="28"
-                                    FontFamily="Segoe UI Semibold"
-                                    FontSize="22"
-                                    Foreground="White"
-                                    Background="#00000000"
-                                    HorizontalAlignment="Center"
-                                    VerticalAlignment="Center"
-                                    TextAlignment="Center"
-                                    IsHitTestVisible="False"/>
                     <h2:TextModel2D x:Name="HoverLabel2D"
                                     Text=""
                                     Width="280"
@@ -1154,7 +1142,7 @@
                 <TextBlock Text="E" Style="{StaticResource HudValue}"/>
                 <TextBlock Text="  ouvrir / fermer une porte   •   " Style="{StaticResource HudCaption}"/>
                 <TextBlock Text="P" Style="{StaticResource HudValue}"/>
-                <TextBlock Text="  fluides MEP   •   " Style="{StaticResource HudCaption}"/>
+                <TextBlock Text="  flux MEP marche / arrêt   •   " Style="{StaticResource HudCaption}"/>
                 <TextBlock Text="R" Style="{StaticResource HudValue}"/>
                 <TextBlock Text="  réapparaître" Style="{StaticResource HudCaption}"/>
             </WrapPanel>

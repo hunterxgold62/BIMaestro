@@ -1107,7 +1107,7 @@ namespace BIMaestro.VideoGames
             }
             else if (e.Key == Key.P)
             {
-                ToggleMepPanel();
+                MepFlowToggleButton_Click(this, new RoutedEventArgs());
                 e.Handled = true;
             }
             else if (e.Key == Key.F)
@@ -1459,7 +1459,7 @@ namespace BIMaestro.VideoGames
             GameSelectionHit? hit = FindSelectionHitAtScreenPoint(screenPoint);
             if (hit == null)
             {
-                ShowToast(UiLanguage.T("Aucun objet identifié dans le viseur", "No Object Identified in the Crosshair"));
+                ShowToast(UiLanguage.T("Aucun objet identifié au centre de l’écran", "No Object Identified at the Center of the Screen"));
                 return;
             }
 
@@ -2434,6 +2434,9 @@ namespace BIMaestro.VideoGames
                 ? UiLanguage.T("Extraction MEP interrompue sans fermer la scène.", "MEP Extraction Stopped Without Closing the Scene.")
                 : graph.OpenConnectorCount.ToString("N0") + UiLanguage.T(" connecteurs ouverts  •  ", " open connectors  •  ") +
                     graph.UncertainValveCount.ToString("N0") + UiLanguage.T(" vannes à valider  •  ", " valves to validate  •  ") +
+                    graph.DiameterAwareJunctionCount.ToString("N0") + UiLanguage.T(" jonctions DN  •  ", " diameter-aware junctions  •  ") +
+                    graph.DiameterInferredInletCount.ToString("N0") + UiLanguage.T(" branches de fusion déduites  •  ", " inferred merge branches  •  ") +
+                    graph.DiameterDirectedPathCount.ToString("N0") + UiLanguage.T(" tronçons orientés par DN  •  ", " paths directed by diameter  •  ") +
                     UiLanguage.T("analyse ", "analysis ") + graph.ExtractionMilliseconds.ToString("0") + " ms";
             if (graph.RestoredSourceCount > 0 || graph.RestoredValveCount > 0)
             {
@@ -3822,8 +3825,6 @@ namespace BIMaestro.VideoGames
             // selon le chemin de rendu utilise par le swap chain.
             GameHudCanvas2D.Width = viewportWidth;
             GameHudCanvas2D.Height = viewportHeight;
-            Canvas2D.SetLeft(Crosshair2D, (viewportWidth - 28.0) * 0.5);
-            Canvas2D.SetTop(Crosshair2D, (viewportHeight - 28.0) * 0.5);
         }
 
         private void ShowToast(string message)

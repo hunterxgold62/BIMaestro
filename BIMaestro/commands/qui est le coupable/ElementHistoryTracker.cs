@@ -696,18 +696,22 @@ namespace Analyse
 
         internal static List<ElementHistoryEvent> LoadModelHistoryForLocalDate(string modelKey, DateTime localDate)
         {
-            return LoadModelHistoryForLocalDate(new[] { modelKey }, localDate);
+            return LoadModelHistoryForLocalRange(new[] { modelKey }, localDate, localDate);
         }
 
         internal static List<ElementHistoryEvent> LoadModelHistoryForLocalDate(IEnumerable<string> modelKeys, DateTime localDate)
+        {
+            return LoadModelHistoryForLocalRange(modelKeys, localDate, localDate);
+        }
+
+        internal static List<ElementHistoryEvent> LoadModelHistoryForLocalRange(IEnumerable<string> modelKeys, DateTime localStartDate, DateTime localEndDate)
         {
             var scope = BuildHistoryModelScope(modelKeys);
             if (scope.Keys.Count == 0 && scope.Names.Count == 0)
                 return new List<ElementHistoryEvent>();
 
-            var day = localDate.Date;
-            var startLocal = day;
-            var endLocal = day.AddDays(1);
+            var startLocal = localStartDate.Date;
+            var endLocal = localEndDate.Date.AddDays(1);
             var startUtc = startLocal.ToUniversalTime();
             var endUtc = endLocal.ToUniversalTime();
 

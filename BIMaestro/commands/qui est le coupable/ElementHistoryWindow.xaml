@@ -255,9 +255,18 @@
                     <ComboBox x:Name="UserFilterCombo" Width="150" Margin="0,0,12,0" SelectionChanged="UserFilterCombo_SelectionChanged"/>
                     <TextBlock Text="Recherche" Style="{StaticResource FilterLabel}"/>
                     <TextBox x:Name="SearchBox" Width="210" Margin="0,0,12,0" TextChanged="SearchBox_TextChanged"/>
-                    <TextBlock Text="Jour" Style="{StaticResource FilterLabel}"/>
-                    <DatePicker x:Name="HistoryDayPicker" Width="125" Margin="0,0,8,0"/>
-                    <Button x:Name="LoadDayButton" Content="Charger jour" Width="115" Style="{StaticResource HistoryButton}" Click="LoadDayButton_Click"/>
+                    <TextBlock Text="Du" Style="{StaticResource FilterLabel}"/>
+                    <DatePicker x:Name="HistoryStartDatePicker" Width="125" Margin="0,0,8,0"/>
+                    <TextBlock Text="Au" Style="{StaticResource FilterLabel}"/>
+                    <DatePicker x:Name="HistoryEndDatePicker" Width="125" Margin="0,0,8,0"/>
+                    <Button x:Name="LoadRangeButton" Content="Charger période" Width="135" Style="{StaticResource HistoryButton}" Click="LoadRangeButton_Click"/>
+                    <Button x:Name="ExtendActionSearchButton"
+                            Content="Étendre à 10 000"
+                            Width="140"
+                            Style="{StaticResource HistoryButton}"
+                            ToolTip="Rechercher l’action sélectionnée dans les 10 000 évènements les plus récents"
+                            Visibility="Collapsed"
+                            Click="ExtendActionSearchButton_Click"/>
                     <TextBlock x:Name="ResultText" VerticalAlignment="Center" Foreground="{DynamicResource Text.Secondary}" Text="0 / 0 évènements affichés"/>
                 </WrapPanel>
                 <WrapPanel x:Name="DeletedMeshModePanel" Grid.Row="1" Margin="0,8,0,0">

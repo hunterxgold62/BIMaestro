@@ -25,6 +25,7 @@ namespace Analyse
         private const string MoveArrowPreviewPrefix = PreviewPrefix + "MoveArrow_";
         private const int MaxVisibleHistoryEvents = 2000;
         private const int MaxLoadedHistoryEvents = 2000;
+        private const int MaxActionSearchHistoryEvents = 10000;
 
         private sealed class RowVm
         {
@@ -196,6 +197,10 @@ namespace Analyse
         private int _loadVersion;
         private string _scopeFilter = "model";
         private bool _showAllLoadedEvents;
+        private bool _isBinding;
+        private bool _extendedActionLoadInProgress;
+        private bool _loadedHistoryReachedLimit;
+        private int _loadedHistoryEventLimit = MaxLoadedHistoryEvents;
         private static string AllActionsLabel => UiLanguage.T("Toutes", "All");
         private static string AllUsersLabel => UiLanguage.T("Tous", "All");
 
@@ -217,8 +222,10 @@ namespace Analyse
             _externalEvent = ExternalEvent.Create(_requestHandler);
             ConfigureScopePanel();
             ConfigureDeletedMeshMode();
-            if (HistoryDayPicker != null)
-                HistoryDayPicker.SelectedDate = DateTime.Today;
+            if (HistoryStartDatePicker != null)
+                HistoryStartDatePicker.SelectedDate = DateTime.Today;
+            if (HistoryEndDatePicker != null)
+                HistoryEndDatePicker.SelectedDate = DateTime.Today;
 
             if (selected != null)
             {
@@ -326,12 +333,16 @@ namespace Analyse
             return ElementHistoryTracker.LoadRecentModelHistory(modelKeys, take);
         }
 
-        private void BeginDayLoad(DateTime localDate)
+        private void BeginRangeLoad(DateTime localStartDate, DateTime localEndDate)
         {
             var modelKeys = ElementHistoryTracker.GetDocumentKeysForHistory(_doc);
             var version = ++_loadVersion;
+            _extendedActionLoadInProgress = false;
             Bind(new List<ElementHistoryEvent>(), null, false, true);
-            ResultText.Text = UiLanguage.T("Chargement complet du ", "Loading full history for ") + localDate.Date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) + "...";
+            var periodText = localStartDate.Date == localEndDate.Date
+                ? localStartDate.Date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)
+                : localStartDate.Date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) + " au " + localEndDate.Date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+            ResultText.Text = UiLanguage.T("Chargement complet du ", "Loading full history from ") + periodText + "...";
 
             if (ScopeModelRadio != null)
                 ScopeModelRadio.IsChecked = true;
@@ -340,7 +351,7 @@ namespace Analyse
             {
                 try
                 {
-                    var events = ElementHistoryTracker.LoadModelHistoryForLocalDate(modelKeys, localDate.Date);
+                    var events = ElementHistoryTracker.LoadModelHistoryForLocalRange(modelKeys, localStartDate.Date, localEndDate.Date);
                     Dispatcher.BeginInvoke(new Action(() =>
                     {
                         if (version != _loadVersion) return;
@@ -353,7 +364,7 @@ namespace Analyse
                     {
                         if (version != _loadVersion) return;
                         if (ResultText != null)
-                            ResultText.Text = UiLanguage.T("Historique du jour partiellement chargé.", "The day's history was partially loaded.");
+                            ResultText.Text = UiLanguage.T("Historique de la période partiellement chargé.", "The period's history was partially loaded.");
                     }));
                 }
             });
@@ -430,9 +441,12 @@ namespace Analyse
             return ids;
         }
 
-        private void Bind(List<ElementHistoryEvent> eventsData, string defaultAction = null, bool preserveFilters = false, bool showAllLoadedEvents = false)
+        private void Bind(List<ElementHistoryEvent> eventsData, string defaultAction = null, bool preserveFilters = false, bool showAllLoadedEvents = false, int maxLoadedEvents = MaxLoadedHistoryEvents)
         {
+            _isBinding = true;
             _showAllLoadedEvents = showAllLoadedEvents;
+            _loadedHistoryEventLimit = showAllLoadedEvents ? int.MaxValue : Math.Max(1, maxLoadedEvents);
+            _loadedHistoryReachedLimit = !showAllLoadedEvents && (eventsData?.Count ?? 0) >= _loadedHistoryEventLimit;
             var previousAction = preserveFilters ? ActionFilterCombo?.SelectedItem as string : null;
             var previousUser = preserveFilters ? UserFilterCombo?.SelectedItem as string : null;
             var previousSearch = preserveFilters ? SearchBox?.Text : null;
@@ -442,7 +456,7 @@ namespace Analyse
                 .OrderByDescending(e => e.Ts);
             var events = showAllLoadedEvents
                 ? query.ToList()
-                : query.Take(MaxLoadedHistoryEvents).ToList();
+                : query.Take(_loadedHistoryEventLimit).ToList();
 
             _rows = BuildRows(events);
             ActionFilterCombo.ItemsSource = new[] { AllActionsLabel }.Concat(_rows.Select(x => x.ActionText).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().OrderBy(x => x)).ToList();
@@ -465,7 +479,9 @@ namespace Analyse
             else if (SearchBox != null && !string.IsNullOrEmpty(SearchBox.Text))
                 SearchBox.Text = string.Empty;
 
+            _isBinding = false;
             ApplyFilters();
+            UpdateExtendedActionSearchOffer();
         }
 
         private static List<RowVm> BuildRows(List<ElementHistoryEvent> events)
@@ -1408,7 +1424,59 @@ namespace Analyse
 
         private void ActionFilterCombo_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
+            if (_isBinding) return;
             ApplyFilters();
+            UpdateExtendedActionSearchOffer();
+        }
+
+        private void UpdateExtendedActionSearchOffer()
+        {
+            var action = ActionFilterCombo?.SelectedItem as string;
+            var canExtend = !_showAllLoadedEvents
+                && !_extendedActionLoadInProgress
+                && _loadedHistoryReachedLimit
+                && _loadedHistoryEventLimit < MaxActionSearchHistoryEvents
+                && !string.IsNullOrWhiteSpace(action)
+                && !string.Equals(action, AllActionsLabel, StringComparison.OrdinalIgnoreCase);
+
+            if (ExtendActionSearchButton != null)
+                ExtendActionSearchButton.Visibility = canExtend ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+        }
+
+        private void ExtendActionSearchButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_extendedActionLoadInProgress || _loadedHistoryEventLimit >= MaxActionSearchHistoryEvents)
+                return;
+
+            var modelKeys = ElementHistoryTracker.GetDocumentKeysForHistory(_doc);
+            var version = ++_loadVersion;
+            _extendedActionLoadInProgress = true;
+            UpdateExtendedActionSearchOffer();
+            ResultText.Text = UiLanguage.T("Recherche étendue dans 10 000 évènements...", "Extended search across 10,000 events...");
+
+            Task.Run(() =>
+            {
+                try
+                {
+                    var events = LoadWindowHistory(modelKeys, _initialUniqueIds, MaxActionSearchHistoryEvents);
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        _extendedActionLoadInProgress = false;
+                        if (version != _loadVersion) return;
+                        Bind(events, null, true, false, MaxActionSearchHistoryEvents);
+                    }));
+                }
+                catch
+                {
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        _extendedActionLoadInProgress = false;
+                        if (version != _loadVersion) return;
+                        UpdateExtendedActionSearchOffer();
+                        ResultText.Text = UiLanguage.T("Recherche étendue partiellement chargée.", "Extended search partially loaded.");
+                    }));
+                }
+            });
         }
 
         private void UserFilterCombo_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
@@ -1472,10 +1540,21 @@ namespace Analyse
                 RaiseRequest(new UiRequest { Type = UiRequestType.CaptureSelectedDetails });
         }
 
-        private void LoadDayButton_Click(object sender, RoutedEventArgs e)
+        private void LoadRangeButton_Click(object sender, RoutedEventArgs e)
         {
-            var selectedDate = HistoryDayPicker?.SelectedDate ?? DateTime.Today;
-            BeginDayLoad(selectedDate);
+            var startDate = HistoryStartDatePicker?.SelectedDate ?? DateTime.Today;
+            var endDate = HistoryEndDatePicker?.SelectedDate ?? startDate;
+            if (endDate.Date < startDate.Date)
+            {
+                MessageBox.Show(
+                    UiLanguage.T("La date de fin doit être postérieure ou égale à la date de début.", "The end date must be on or after the start date."),
+                    "BIMaestro",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            BeginRangeLoad(startDate.Date, endDate.Date);
         }
 
         private void QuickFilterFamily_Click(object sender, RoutedEventArgs e)
@@ -1572,9 +1651,11 @@ namespace Analyse
             }
 
             var matching = rows.ToList();
+            var hasActionFilter = !string.Equals(action, AllActionsLabel, StringComparison.OrdinalIgnoreCase);
+            var visibleLimit = hasActionFilter ? MaxActionSearchHistoryEvents : MaxVisibleHistoryEvents;
             var filtered = _showAllLoadedEvents
                 ? matching.ToList()
-                : matching.Take(MaxVisibleHistoryEvents).ToList();
+                : matching.Take(visibleLimit).ToList();
             HistoryGrid.ItemsSource = filtered;
             VisualCardsList.ItemsSource = BuildTimelineItems(filtered);
             if (filtered.Count > 0 && GetPrimarySelectedRow() == null)

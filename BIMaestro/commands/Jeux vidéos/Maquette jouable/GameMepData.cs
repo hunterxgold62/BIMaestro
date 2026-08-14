@@ -82,6 +82,13 @@ namespace BIMaestro.VideoGames
         public bool HasDirection { get; set; }
         public bool IsConnected { get; set; }
         public string FlowDirection { get; set; } = string.Empty;
+        /// <summary>
+        /// Section du connecteur en unités internes Revit (pieds carrés).
+        /// Elle sert uniquement à pondérer les jonctions multi-voies : un petit
+        /// piquage ne doit pas avoir la même influence qu'un gros collecteur.
+        /// Une valeur nulle conserve le comportement topologique historique.
+        /// </summary>
+        public double CrossSectionArea { get; set; }
 
         public void Translate(Vector3D delta)
         {
@@ -186,6 +193,12 @@ namespace BIMaestro.VideoGames
         public string Classification { get; set; } = string.Empty;
         public bool IsVisible { get; set; }
         public bool IsPipeCurve { get; set; }
+        /// <summary>
+        /// Vrai uniquement pour un raccord de canalisation multi-voies
+        /// (té, piquage, culotte ou croix). Un équipement à plusieurs ports ne
+        /// doit pas être assimilé à un nœud de mélange hydraulique.
+        /// </summary>
+        public bool IsPipeJunction { get; set; }
         public IList<int> ConnectorIndices { get; } = new List<int>();
         public IList<GameMepPathData> Paths { get; } = new List<GameMepPathData>();
         public GameMepFlowState FlowState { get; set; }
@@ -306,6 +319,11 @@ namespace BIMaestro.VideoGames
         public string ScenarioPersistenceError { get; set; } = string.Empty;
         public double LastCalculationMilliseconds { get; set; }
         public double LastDiagnosticMilliseconds { get; set; }
+        public int DiameterAwareJunctionCount { get; set; }
+        public int DiameterDirectedPathCount { get; set; }
+        public int DiameterInferredInletCount { get; set; }
+        public IDictionary<string, Dictionary<int, bool>> StableHeaderDirections { get; } =
+            new Dictionary<string, Dictionary<int, bool>>(StringComparer.Ordinal);
         public int OpenConnectorCount { get; set; }
         public int UncertainValveCount => Valves.Count(v =>
             v.Confidence == GameMepConfidence.Low && !v.WasManuallyOverridden);
@@ -407,10 +425,27 @@ namespace BIMaestro.VideoGames
                 return true;
             }
 
-            if (!edge.IsInternal || string.IsNullOrWhiteSpace(edge.ElementKey))
+            if (!edge.IsInternal)
+            {
+                GameMepElementData? firstOwner = graph.FindElement(
+                    graph.Connectors[edge.ConnectorA].ElementKey);
+                GameMepElementData? secondOwner = graph.FindElement(
+                    graph.Connectors[edge.ConnectorB].ElementKey);
+                if ((firstOwner?.IsPipeJunction ?? false) ||
+                    (secondOwner?.IsPipeJunction ?? false))
+                {
+                    // Une liaison physique avec un té/piquage est précisément
+                    // le point où deux systèmes Revit peuvent se mélanger.
+                    return true;
+                }
+                return HaveSameFunctionalType(graph, first, second);
+            }
+            if (string.IsNullOrWhiteSpace(edge.ElementKey))
                 return HaveSameFunctionalType(graph, first, second);
 
             GameMepElementData? owner = graph.FindElement(edge.ElementKey);
+            if (owner?.IsPipeJunction ?? false)
+                return true;
             if (owner != null && owner.ConnectorIndices.Count == 2 &&
                 HaveSameFunctionalType(graph, first, second))
             {
@@ -655,6 +690,7 @@ namespace BIMaestro.VideoGames
                 inletSeeds,
                 outletSeeds,
                 new HashSet<int>(inletExternalStops.Concat(outletExternalStops)),
+                returnDistance,
                 highDistance,
                 lowDistance);
             UpdateValveStates(activeBoundarySystems, activeBoundaryDistance);
@@ -904,6 +940,7 @@ namespace BIMaestro.VideoGames
             IEnumerable<int> inletSeedValues,
             IEnumerable<int> outletSeedValues,
             ISet<int> externalStops,
+            int[] declaredReturnDistance,
             int[] highDistance,
             int[] lowDistance)
         {
@@ -912,7 +949,34 @@ namespace BIMaestro.VideoGames
                 index >= 0 && index < connectorCount));
             var outletSeeds = new HashSet<int>(outletSeedValues.Where(index =>
                 index >= 0 && index < connectorCount));
+            var explicitInletSeeds = new HashSet<int>(inletSeeds);
             var explicitOutletSeeds = new HashSet<int>(outletSeeds);
+
+            // Les raccords à trois voies ou plus sont des nœuds de mélange.
+            // La section de rôle sera affinée sur le premier tronçon droit de
+            // chaque bras : un té 3 x DN 200 suivi immédiatement d'un réducteur
+            // vers un DN 300 doit être reconnu comme 200/200/300.
+            const double significantAreaRatio = 1.5625; // rapport de DN 1,25
+            var candidateJunctionPortAreas = new Dictionary<
+                string,
+                Dictionary<int, double>>(StringComparer.Ordinal);
+            var junctionPortWeights = new Dictionary<string, Dictionary<int, double>>(
+                StringComparer.Ordinal);
+            foreach (GameMepElementData junction in _graph.Elements.Where(item =>
+                item.IsPipeJunction && item.ConnectorIndices.Count >= 3))
+            {
+                int[] ports = junction.ConnectorIndices.Where(index =>
+                    index >= 0 && index < connectorCount).Distinct().ToArray();
+                if (ports.Length < 3)
+                    continue;
+
+                candidateJunctionPortAreas[junction.Key] = ports.ToDictionary(
+                    index => index,
+                    index => _graph.Connectors[index].CrossSectionArea);
+            }
+            _graph.DiameterAwareJunctionCount = 0;
+            _graph.DiameterDirectedPathCount = 0;
+            _graph.DiameterInferredInletCount = 0;
 
             // Une extrémité topologique non renseignée représente une sortie
             // implicite. Les connecteurs d'une vanne d'isolement fermée sont
@@ -930,6 +994,7 @@ namespace BIMaestro.VideoGames
                         : Enumerable.Empty<int>();
                 }));
             var topologyDegree = new int[connectorCount];
+            var implicitOutletSeeds = new HashSet<int>();
             foreach (GameMepConnectionData edge in _graph.Connections)
             {
                 if (edge.ConnectorA < 0 || edge.ConnectorA >= connectorCount ||
@@ -946,22 +1011,9 @@ namespace BIMaestro.VideoGames
                     !closedValveConnectors.Contains(index))
                 {
                     outletSeeds.Add(index);
+                    if (!explicitOutletSeeds.Contains(index))
+                        implicitOutletSeeds.Add(index);
                 }
-            }
-
-            // Sans couple arrivée/retour, conserver le comportement historique :
-            // le moteur ne doit pas faire disparaître tous les flux d'un ancien
-            // scénario qui ne possède encore que des arrivées.
-            if ((inletSeeds.Count == 0 && explicitOutletSeeds.Count == 0) ||
-                outletSeeds.Count == 0)
-            {
-                foreach (GameMepPathData path in _graph.Elements.SelectMany(item => item.Paths))
-                {
-                    path.HasCirculation =
-                        path.FlowState == GameMepFlowState.Supplied &&
-                        path.DirectionState == GameMepDirectionState.Resolved;
-                }
-                return;
             }
 
             int edgeCount = _graph.Connections.Count;
@@ -977,6 +1029,360 @@ namespace BIMaestro.VideoGames
                     !(!edge.IsInternal &&
                       (externalStops.Contains(edge.ConnectorA) ||
                        externalStops.Contains(edge.ConnectorB)));
+            }
+
+            // Pré-indexer les seules contraintes qui rendent un bras impropre à
+            // une inférence globale. Une correction locale reste locale et sera
+            // protégée plus tard par TryGetImposedDirection.
+            var restrictedArmElementKeys = new HashSet<string>(
+                _graph.DirectionConstraints.Where(item => item.IsActive &&
+                    item.Scope ==
+                        GameMepDirectionConstraintScope.EquipmentPressureRise)
+                .Select(item => item.ElementKey),
+                StringComparer.Ordinal);
+            var inletAnchorSeeds = new HashSet<int>(explicitInletSeeds);
+            foreach (GameMepDirectionConstraintData constraint in
+                _graph.DirectionConstraints.Where(item => item.IsActive &&
+                    item.HasExplicitDirection &&
+                    item.Scope ==
+                        GameMepDirectionConstraintScope.EquipmentPressureRise))
+            {
+                if (constraint.ExitConnectorIndex >= 0 &&
+                    constraint.ExitConnectorIndex < connectorCount)
+                {
+                    // La sortie d'une pompe est un ancrage amont fiable pour le
+                    // bras local, sans être transformée en source globale.
+                    inletAnchorSeeds.Add(constraint.ExitConnectorIndex);
+                }
+            }
+            foreach (GameMepValveData valve in _graph.Valves.Where(item =>
+                item.IsEnabledAsValve &&
+                item.Kind == GameMepFlowControlKind.CheckValve))
+            {
+                restrictedArmElementKeys.Add(valve.ElementKey);
+            }
+
+            var junctionArms = new Dictionary<
+                string,
+                Dictionary<int, HashSet<int>>>(StringComparer.Ordinal);
+            var junctionSimpleArms = new Dictionary<
+                string,
+                Dictionary<int, bool>>(StringComparer.Ordinal);
+            var junctionEffectiveAreas = new Dictionary<
+                string,
+                Dictionary<int, double>>(StringComparer.Ordinal);
+            var junctionTerminalJunctions = new Dictionary<
+                string,
+                Dictionary<int, string>>(StringComparer.Ordinal);
+            foreach (string junctionKey in candidateJunctionPortAreas.Keys.OrderBy(
+                key => key, StringComparer.Ordinal))
+            {
+                GameMepElementData? junction = _graph.FindElement(junctionKey);
+                if (junction == null)
+                    continue;
+
+                var arms = new Dictionary<int, HashSet<int>>();
+                var simpleArms = new Dictionary<int, bool>();
+                var effectiveAreas = new Dictionary<int, double>();
+                var terminalJunctions = new Dictionary<int, string>();
+                foreach (int port in junction.ConnectorIndices.Distinct())
+                {
+                    bool simple = TryCollectJunctionArm(
+                        junction,
+                        port,
+                        allowed,
+                        explicitInletSeeds,
+                        explicitOutletSeeds,
+                        implicitOutletSeeds,
+                        restrictedArmElementKeys,
+                        out HashSet<int> arm,
+                        out double effectiveArea,
+                        out string terminalJunctionKey);
+                    arms[port] = arm;
+                    simpleArms[port] = simple;
+                    effectiveAreas[port] = effectiveArea;
+                    terminalJunctions[port] = terminalJunctionKey;
+                }
+                junctionArms[junctionKey] = arms;
+                junctionSimpleArms[junctionKey] = simpleArms;
+                junctionEffectiveAreas[junctionKey] = effectiveAreas;
+                junctionTerminalJunctions[junctionKey] = terminalJunctions;
+
+                double maximumArea = effectiveAreas.Values.Max();
+                double minimumArea = effectiveAreas.Values.Min();
+                if (minimumArea <= 1e-12 ||
+                    maximumArea / minimumArea < significantAreaRatio)
+                {
+                    continue;
+                }
+                junctionPortWeights[junctionKey] = effectiveAreas.ToDictionary(
+                    item => item.Key,
+                    item => Math.Max(0.05, item.Value / maximumArea));
+            }
+            _graph.DiameterAwareJunctionCount = junctionPortWeights.Count;
+
+            // Limiter l'influence DN aux bras réellement reliés au raccord.
+            // On s'arrête à une autre jonction ou à une frontière : un té de
+            // fusion ne doit jamais retourner une distribution située plus loin
+            // dans le même système Revit.
+            var diameterInfluencedElementKeys = new HashSet<string>(
+                StringComparer.Ordinal);
+            var diameterForcedElementKeys = new HashSet<string>(
+                StringComparer.Ordinal);
+            var diameterActivatedJunctionKeys = new HashSet<string>(
+                StringComparer.Ordinal);
+            var diameterForcedJunctionPorts = new HashSet<int>();
+            var diameterHeaderContinuityElementKeys = new HashSet<string>(
+                StringComparer.Ordinal);
+            var diameterHeaderElementDirections = new Dictionary<string, bool>(
+                StringComparer.Ordinal);
+            var diameterJunctionPortDirections = new Dictionary<int, bool>();
+            var inferredInletCandidates = new HashSet<int>();
+            foreach (string junctionKey in junctionPortWeights.Keys.OrderBy(
+                key => key, StringComparer.Ordinal))
+            {
+                GameMepElementData? junction = _graph.FindElement(junctionKey);
+                if (junction == null ||
+                    !junctionArms.TryGetValue(junctionKey,
+                        out Dictionary<int, HashSet<int>> arms) ||
+                    !junctionSimpleArms.TryGetValue(junctionKey,
+                        out Dictionary<int, bool> simpleArms) ||
+                    !junctionEffectiveAreas.TryGetValue(junctionKey,
+                        out Dictionary<int, double> effectiveAreas) ||
+                    !junctionTerminalJunctions.TryGetValue(junctionKey,
+                        out Dictionary<int, string> terminalJunctions))
+                {
+                    continue;
+                }
+
+                // Les bras doivent rester indépendants hors du té. Si un bypass
+                // les rejoint ailleurs, le DN ne réoriente aucun de leurs paths.
+                HashSet<int>[] armSets = arms.Values.ToArray();
+                bool armsOverlap = false;
+                for (int first = 0; first < armSets.Length && !armsOverlap; first++)
+                {
+                    for (int second = first + 1; second < armSets.Length; second++)
+                    {
+                        if (!armSets[first].Overlaps(armSets[second]))
+                            continue;
+                        armsOverlap = true;
+                        break;
+                    }
+                }
+                string[] terminalKeys = terminalJunctions.Values.Where(key =>
+                        !string.IsNullOrWhiteSpace(key))
+                    .ToArray();
+                if (terminalKeys.Length != terminalKeys.Distinct(
+                        StringComparer.Ordinal).Count())
+                {
+                    armsOverlap = true;
+                }
+                if (armsOverlap)
+                    continue;
+
+                if (junction.ConnectorIndices.Count != 3 ||
+                    simpleArms.Values.Any(simple => !simple) ||
+                    junction.ConnectorIndices.Any(index => index < 0 ||
+                        index >= connectorCount ||
+                        !_graph.Connectors[index].IsConnected))
+                {
+                    continue;
+                }
+
+                int[] ports = junction.ConnectorIndices.Distinct().ToArray();
+                int[] orderedPorts = ports.OrderByDescending(index =>
+                    effectiveAreas[index]).ToArray();
+                double largestArea = effectiveAreas[orderedPorts[0]];
+                double secondArea = effectiveAreas[orderedPorts[1]];
+                double smallestArea = effectiveAreas[orderedPorts[2]];
+                if (secondArea <= 1e-12 || smallestArea <= 1e-12)
+                {
+                    continue;
+                }
+
+                bool hasUniqueSmallPort =
+                    largestArea / secondArea < significantAreaRatio &&
+                    secondArea / smallestArea >= significantAreaRatio;
+                if (hasUniqueSmallPort)
+                {
+                    // Piquage sur un collecteur continu : les deux gros bras
+                    // gardent leur sens historique. Seule la petite branche peut
+                    // être résolue par le DN, et uniquement si une arrivée ou une
+                    // sortie de pompe la situe réellement côté amont.
+                    int smallPort = orderedPorts[2];
+                    int[] largePorts = orderedPorts.Take(2).ToArray();
+                    HashSet<int> smallArm = arms[smallPort];
+                    bool smallHasInlet = smallArm.Overlaps(inletAnchorSeeds) ||
+                        IsStrictlyCloserToBoundary(
+                            smallPort, largePorts, highDistance);
+                    bool smallHasOutlet = smallArm.Overlaps(explicitOutletSeeds);
+                    bool smallIsActiveInlet = smallHasInlet && !smallHasOutlet;
+
+                    Dictionary<int, bool>? headerDirections = null;
+                    if (!smallIsActiveInlet && TryReadResolvedHeaderDirections(
+                            junction, largePorts, arms,
+                            out Dictionary<int, bool> stable))
+                    {
+                        // Vanne du petit DN fermée : mémoriser le sens réellement
+                        // résolu du collecteur. Plusieurs pompes en DN200/150 ne
+                        // pourront ensuite plus le retourner à la réouverture.
+                        _graph.StableHeaderDirections[junctionKey] =
+                            new Dictionary<int, bool>(stable);
+                        headerDirections = stable;
+                    }
+                    else if (_graph.StableHeaderDirections.TryGetValue(
+                            junctionKey, out Dictionary<int, bool> remembered) &&
+                        largePorts.All(remembered.ContainsKey))
+                    {
+                        headerDirections = new Dictionary<int, bool>(remembered);
+                    }
+                    else if (TryBuildHeaderDirectionsFromBoundary(
+                            largePorts,
+                            declaredReturnDistance,
+                            out Dictionary<int, bool> declaredDirections))
+                    {
+                        // Contrairement à lowDistance, cette distance ne contient
+                        // aucune entrée de pompe : seul le retour déclaré décide.
+                        headerDirections = declaredDirections;
+                    }
+                    else if (TryReadResolvedHeaderDirections(
+                            junction, largePorts, arms,
+                            out Dictionary<int, bool> currentDirections))
+                    {
+                        headerDirections = currentDirections;
+                    }
+
+                    if (headerDirections != null)
+                    {
+                        diameterActivatedJunctionKeys.Add(junctionKey);
+                        foreach (int headerPort in largePorts)
+                        {
+                            AddArmPipeElements(
+                                arms[headerPort],
+                                diameterHeaderContinuityElementKeys);
+                            diameterJunctionPortDirections[headerPort] =
+                                headerDirections[headerPort];
+                            AddHeaderArmDirections(
+                                headerPort,
+                                arms[headerPort],
+                                headerDirections[headerPort],
+                                diameterHeaderElementDirections);
+                            ExtendHeaderBackbone(
+                                junctionKey,
+                                headerPort,
+                                headerDirections[headerPort]);
+                        }
+                    }
+                    if (smallIsActiveInlet)
+                    {
+                        diameterActivatedJunctionKeys.Add(junctionKey);
+                        AddArmPipeElements(
+                            smallArm, diameterInfluencedElementKeys);
+                        diameterJunctionPortDirections[smallPort] = true;
+                    }
+                    continue;
+                }
+
+                bool hasUniqueLargePort =
+                    largestArea / secondArea >= significantAreaRatio &&
+                    secondArea / smallestArea <= significantAreaRatio;
+                if (!hasUniqueLargePort)
+                    continue;
+
+                int largePort = orderedPorts[0];
+                int[] smallPorts = orderedPorts.Skip(1).ToArray();
+                HashSet<int> largeArm = arms[largePort];
+                bool largeHasOutlet = largeArm.Overlaps(explicitOutletSeeds) ||
+                    IsStrictlyCloserToBoundary(
+                        largePort, smallPorts, lowDistance);
+                bool largeHasInlet = largeArm.Overlaps(inletAnchorSeeds) ||
+                    IsStrictlyCloserToBoundary(
+                        largePort, smallPorts, highDistance);
+                if (!largeHasOutlet || largeHasInlet)
+                    continue;
+
+                bool hasExplicitSmallInlet = false;
+                bool validMerge = true;
+                var localCandidates = new List<int>();
+                foreach (int smallPort in smallPorts)
+                {
+                    HashSet<int> arm = arms[smallPort];
+                    bool hasInlet = arm.Overlaps(inletAnchorSeeds);
+                    bool hasOutlet = arm.Overlaps(explicitOutletSeeds);
+                    int[] implicitLeaves = implicitOutletSeeds.Where(
+                        arm.Contains).ToArray();
+                    if (hasOutlet || (hasInlet && implicitLeaves.Length > 0) ||
+                        (!hasInlet && implicitLeaves.Length != 1))
+                    {
+                        validMerge = false;
+                        break;
+                    }
+                    if (hasInlet)
+                        hasExplicitSmallInlet = true;
+                    else
+                        localCandidates.Add(implicitLeaves[0]);
+                }
+                if (validMerge && hasExplicitSmallInlet)
+                {
+                    diameterActivatedJunctionKeys.Add(junctionKey);
+                    diameterJunctionPortDirections[largePort] = false;
+                    foreach (int smallPort in smallPorts)
+                        diameterJunctionPortDirections[smallPort] = true;
+                    foreach (HashSet<int> arm in arms.Values)
+                    {
+                        AddArmPipeElements(
+                            arm, diameterInfluencedElementKeys);
+                    }
+                    foreach (int candidate in localCandidates)
+                    {
+                        inferredInletCandidates.Add(candidate);
+                        foreach (KeyValuePair<int, HashSet<int>> arm in arms.Where(
+                            item => item.Value.Contains(candidate)))
+                        {
+                            AddArmPipeElements(
+                                arm.Value, diameterForcedElementKeys);
+                            diameterForcedJunctionPorts.Add(arm.Key);
+                        }
+                    }
+                }
+            }
+
+            // Un simple contraste de DN ne suffit jamais à retourner un réseau.
+            // Seuls un piquage amont démontré ou une fusion locale validée gardent
+            // la pondération hydraulique. Les divisions ordinaires, notamment
+            // celles situées autour des pompes, restent entièrement historiques.
+            foreach (string inactiveKey in junctionPortWeights.Keys.Where(key =>
+                    !diameterActivatedJunctionKeys.Contains(key)).ToArray())
+            {
+                junctionPortWeights.Remove(inactiveKey);
+            }
+            _graph.DiameterAwareJunctionCount = junctionPortWeights.Count;
+
+            // Toutes les décisions ci-dessus sont fondées exclusivement sur les
+            // frontières initiales. Une entrée inférée au té A ne peut donc pas
+            // déclencher en cascade une nouvelle inférence au té B.
+            foreach (int candidate in inferredInletCandidates)
+            {
+                if (explicitOutletSeeds.Contains(candidate))
+                    continue;
+                outletSeeds.Remove(candidate);
+                inletSeeds.Add(candidate);
+                _graph.DiameterInferredInletCount++;
+            }
+
+            // Sans couple arrivée/retour, conserver le comportement historique :
+            // le moteur ne doit pas faire disparaître tous les flux d'un ancien
+            // scénario qui ne possède encore que des arrivées.
+            if ((inletSeeds.Count == 0 && explicitOutletSeeds.Count == 0) ||
+                outletSeeds.Count == 0)
+            {
+                foreach (GameMepPathData path in _graph.Elements.SelectMany(item => item.Paths))
+                {
+                    path.HasCirculation =
+                        path.FlowState == GameMepFlowState.Supplied &&
+                        path.DirectionState == GameMepDirectionState.Resolved;
+                }
+                return;
             }
 
             var component = Enumerable.Repeat(-1, connectorCount).ToArray();
@@ -1189,7 +1595,7 @@ namespace BIMaestro.VideoGames
                         continue;
                     }
                     double total = 0.0;
-                    int neighborCount = 0;
+                    double totalWeight = 0.0;
                     foreach (int edgeIndex in _adjacentEdges![index])
                     {
                         if (!retained[edgeIndex])
@@ -1198,12 +1604,13 @@ namespace BIMaestro.VideoGames
                         int next = edge.ConnectorA == index
                             ? edge.ConnectorB
                             : edge.ConnectorA;
-                        total += potential[next];
-                        neighborCount++;
+                        double weight = GetRelaxationWeight(edge);
+                        total += potential[next] * weight;
+                        totalWeight += weight;
                     }
-                    if (neighborCount == 0)
+                    if (totalWeight <= 1e-12)
                         continue;
-                    double average = total / neighborCount;
+                    double average = total / totalWeight;
                     double nextValue = potential[index] +
                         relaxation * (average - potential[index]);
                     nextValue = Math.Max(0.0, Math.Min(1.0, nextValue));
@@ -1268,6 +1675,78 @@ namespace BIMaestro.VideoGames
                     }
 
                     path.HasCirculation = Math.Abs(difference) > 1e-5;
+                    if (path.EndConnector >= 0 &&
+                        diameterHeaderContinuityElementKeys.Contains(
+                            path.ElementKey) &&
+                        !TryGetImposedDirection(path, out _, out _) &&
+                        diameterHeaderElementDirections.TryGetValue(
+                            path.ElementKey, out bool headerForward))
+                    {
+                        // Corriger uniquement une contradiction. Un gros tronçon
+                        // déjà cohérent garde ainsi sa raison et son sens initial.
+                        path.HasCirculation = true;
+                        if (path.DirectionState !=
+                                GameMepDirectionState.Resolved ||
+                            path.FlowForward != headerForward)
+                        {
+                            path.FlowForward = headerForward;
+                            path.DirectionState =
+                                GameMepDirectionState.Resolved;
+                            path.DirectionReason =
+                                "Continuité du gros DN vers le retour aspiré";
+                            _graph.DiameterDirectedPathCount++;
+                        }
+                    }
+                    if (path.HasCirculation && path.EndConnector >= 0 &&
+                        diameterInfluencedElementKeys.Contains(path.ElementKey) &&
+                        (path.DirectionState != GameMepDirectionState.Resolved ||
+                         diameterForcedElementKeys.Contains(path.ElementKey)) &&
+                        !TryGetImposedDirection(path, out _, out _))
+                    {
+                        // La pondération DN doit atteindre les canalisations qui
+                        // portent les grandes flèches visibles, et pas seulement
+                        // les quelques centimètres dessinés dans le raccord.
+                        path.FlowForward = difference > 0.0;
+                        path.DirectionState = GameMepDirectionState.Resolved;
+                        path.DirectionReason =
+                            "Gradient propagé depuis une jonction de DN différents";
+                        _graph.DiameterDirectedPathCount++;
+                    }
+                    if (path.EndConnector < 0 && element.IsPipeJunction &&
+                        diameterActivatedJunctionKeys.Contains(element.Key) &&
+                        diameterJunctionPortDirections.TryGetValue(
+                            path.StartConnector, out bool junctionForward) &&
+                        !TryGetImposedDirection(path, out _, out _))
+                    {
+                        path.HasCirculation = true;
+                        path.FlowForward = junctionForward;
+                        path.DirectionState = GameMepDirectionState.Resolved;
+                        path.DirectionReason = junctionForward
+                            ? "Piquage vers le collecteur (continuité du gros DN)"
+                            : "Sortie du collecteur (continuité du gros DN)";
+                    }
+                    else if (path.HasCirculation && path.EndConnector < 0 &&
+                        element.IsPipeJunction &&
+                        diameterActivatedJunctionKeys.Contains(element.Key) &&
+                        (path.DirectionState != GameMepDirectionState.Resolved ||
+                         diameterForcedJunctionPorts.Contains(
+                             path.StartConnector)))
+                    {
+                        // Les chemins d'un té/piquage vont du connecteur vers
+                        // un centre géométrique virtuel. Le signe du gradient
+                        // permet donc de représenter plusieurs injections qui
+                        // convergent, ou plusieurs retours aspirés vers un même
+                        // collecteur. Le même gradient est ensuite propagé aux
+                        // canalisations automatiques du composant.
+                        path.FlowForward = difference > 0.0;
+                        path.DirectionState = GameMepDirectionState.Resolved;
+                        path.DirectionReason = junctionPortWeights.ContainsKey(
+                                element.Key)
+                            ? (path.FlowForward
+                                ? "Piquage vers le collecteur (sections/DN comparés)"
+                                : "Sortie du collecteur (sections/DN comparés)")
+                            : "Sens déduit au centre de la jonction";
+                    }
                     if (!path.HasCirculation)
                     {
                         path.DirectionReason =
@@ -1275,11 +1754,340 @@ namespace BIMaestro.VideoGames
                         continue;
                     }
 
-                    // Le potentiel décide uniquement si le fluide circule ou
-                    // stagne. Le sens a déjà été établi depuis les arrivées,
-                    // retours, clapets et corrections manuelles : une boucle
-                    // numérique ne doit jamais retourner une flèche locale.
+                    // Hors d'un composant contenant une jonction DN significative,
+                    // les chemins classiques conservent le comportement historique.
                 }
+            }
+
+            void AddArmPipeElements(
+                IEnumerable<int> connectors,
+                ISet<string> destination)
+            {
+                foreach (int connector in connectors)
+                {
+                    if (connector < 0 || connector >= connectorCount)
+                        continue;
+                    string ownerKey = _graph.Connectors[connector].ElementKey;
+                    GameMepElementData? owner = _graph.FindElement(ownerKey);
+                    // Un MEPCurve hôte peut lui-même représenter le piquage.
+                    // Son chemin principal ne doit jamais être retourné par la
+                    // petite branche raccordée dessus.
+                    if (owner?.IsPipeCurve == true && !owner.IsPipeJunction)
+                        destination.Add(ownerKey);
+                }
+            }
+
+            void AddHeaderArmDirections(
+                int headerPort,
+                ISet<int> arm,
+                bool portFlowsTowardCenter,
+                IDictionary<string, bool> destination)
+            {
+                Dictionary<int, int> distances = BuildArmDistances(
+                    headerPort, arm);
+
+                foreach (GameMepElementData owner in arm.Where(index =>
+                        index >= 0 && index < connectorCount)
+                    .Select(index => _graph.FindElement(
+                        _graph.Connectors[index].ElementKey))
+                    .Where(item => item?.IsPipeCurve == true &&
+                        !item.IsPipeJunction)
+                    .Cast<GameMepElementData>()
+                    .Distinct())
+                {
+                    GameMepPathData? path = owner.Paths.FirstOrDefault(item =>
+                        item.EndConnector >= 0 &&
+                        distances.ContainsKey(item.StartConnector) &&
+                        distances.ContainsKey(item.EndConnector) &&
+                        distances[item.StartConnector] !=
+                            distances[item.EndConnector]);
+                    if (path == null)
+                        continue;
+                    bool forwardTowardJunction =
+                        distances[path.StartConnector] >
+                        distances[path.EndConnector];
+                    destination[owner.Key] = portFlowsTowardCenter
+                        ? forwardTowardJunction
+                        : !forwardTowardJunction;
+                }
+            }
+
+            Dictionary<int, int> BuildArmDistances(
+                int headerPort,
+                ISet<int> arm)
+            {
+                var distances = new Dictionary<int, int>();
+                var queue = new Queue<int>();
+                distances[headerPort] = 0;
+                queue.Enqueue(headerPort);
+                while (queue.Count > 0)
+                {
+                    int current = queue.Dequeue();
+                    foreach (int edgeIndex in _adjacentEdges![current])
+                    {
+                        if (edgeIndex < 0 || edgeIndex >= allowed.Length ||
+                            !allowed[edgeIndex])
+                        {
+                            continue;
+                        }
+                        GameMepConnectionData edge =
+                            _graph.Connections[edgeIndex];
+                        if (edge.IsInternal && string.Equals(
+                                edge.ElementKey,
+                                _graph.Connectors[headerPort].ElementKey,
+                                StringComparison.Ordinal))
+                        {
+                            continue;
+                        }
+                        int next = edge.ConnectorA == current
+                            ? edge.ConnectorB
+                            : edge.ConnectorA;
+                        if (!arm.Contains(next) || distances.ContainsKey(next))
+                            continue;
+                        distances[next] = distances[current] + 1;
+                        queue.Enqueue(next);
+                    }
+                }
+                return distances;
+            }
+
+            void ExtendHeaderBackbone(
+                string initialJunctionKey,
+                int initialPort,
+                bool portFlowsTowardCenter)
+            {
+                string currentJunctionKey = initialJunctionKey;
+                int currentPort = initialPort;
+                var visited = new HashSet<string>(StringComparer.Ordinal);
+                for (int depth = 0; depth < 64; depth++)
+                {
+                    string visitKey = currentJunctionKey + "|" + currentPort;
+                    if (!visited.Add(visitKey) ||
+                        !junctionArms.TryGetValue(currentJunctionKey,
+                            out Dictionary<int, HashSet<int>> currentArms) ||
+                        !junctionTerminalJunctions.TryGetValue(currentJunctionKey,
+                            out Dictionary<int, string> currentTerminals) ||
+                        !currentArms.TryGetValue(currentPort,
+                            out HashSet<int> currentArm) ||
+                        !currentTerminals.TryGetValue(currentPort,
+                            out string terminalKey) ||
+                        string.IsNullOrWhiteSpace(terminalKey))
+                    {
+                        return;
+                    }
+
+                    GameMepElementData? nextJunction =
+                        _graph.FindElement(terminalKey);
+                    if (nextJunction == null || !nextJunction.IsPipeJunction ||
+                        !junctionArms.TryGetValue(terminalKey,
+                            out Dictionary<int, HashSet<int>> nextArms) ||
+                        !junctionSimpleArms.TryGetValue(terminalKey,
+                            out Dictionary<int, bool> nextSimpleArms) ||
+                        !junctionEffectiveAreas.TryGetValue(terminalKey,
+                            out Dictionary<int, double> nextAreas))
+                    {
+                        return;
+                    }
+
+                    int[] incomingPorts = nextJunction.ConnectorIndices.Where(
+                        index => index >= 0 && index < connectorCount &&
+                            currentArm.Contains(index)).Distinct().ToArray();
+                    if (incomingPorts.Length != 1)
+                        return;
+                    int incomingPort = incomingPorts[0];
+                    int continuationPort = SelectBackboneContinuation(
+                        nextJunction, incomingPort, nextAreas);
+                    if (continuationPort < 0 ||
+                        !nextSimpleArms.TryGetValue(
+                            continuationPort, out bool continuationIsSimple) ||
+                        !continuationIsSimple ||
+                        !nextArms.TryGetValue(
+                            continuationPort, out HashSet<int> continuationArm))
+                    {
+                        return;
+                    }
+
+                    bool incomingDirection = !portFlowsTowardCenter;
+                    if ((diameterJunctionPortDirections.TryGetValue(
+                                incomingPort, out bool existingIncoming) &&
+                            existingIncoming != incomingDirection) ||
+                        (diameterJunctionPortDirections.TryGetValue(
+                                continuationPort, out bool existingContinuation) &&
+                            existingContinuation != portFlowsTowardCenter))
+                    {
+                        return;
+                    }
+
+                    diameterActivatedJunctionKeys.Add(terminalKey);
+                    diameterJunctionPortDirections[incomingPort] =
+                        incomingDirection;
+                    diameterJunctionPortDirections[continuationPort] =
+                        portFlowsTowardCenter;
+                    foreach (int sidePort in nextJunction.ConnectorIndices.Where(
+                        port => port != incomingPort &&
+                            port != continuationPort))
+                    {
+                        if (!diameterJunctionPortDirections.ContainsKey(sidePort) &&
+                            nextArms.TryGetValue(
+                                sidePort, out HashSet<int> sideArm) &&
+                            TryReadResolvedArmDirection(
+                                sidePort, sideArm, out bool sideDirection))
+                        {
+                            // Le croisement peut porter un autre réseau latéral.
+                            // Son petit chemin interne reprend son propre tuyau,
+                            // sans propager le sens du collecteur sur cette branche.
+                            diameterJunctionPortDirections[sidePort] = sideDirection;
+                        }
+                    }
+                    AddArmPipeElements(
+                        continuationArm,
+                        diameterHeaderContinuityElementKeys);
+                    AddHeaderArmDirections(
+                        continuationPort,
+                        continuationArm,
+                        portFlowsTowardCenter,
+                        diameterHeaderElementDirections);
+
+                    currentJunctionKey = terminalKey;
+                    currentPort = continuationPort;
+                }
+            }
+
+            int SelectBackboneContinuation(
+                GameMepElementData junction,
+                int incomingPort,
+                IReadOnlyDictionary<int, double> effectiveAreas)
+            {
+                if (!effectiveAreas.TryGetValue(
+                        incomingPort, out double incomingArea) ||
+                    incomingArea <= 1e-12)
+                {
+                    return -1;
+                }
+                int[] candidates = junction.ConnectorIndices.Where(port =>
+                        port != incomingPort && port >= 0 &&
+                        port < connectorCount &&
+                        effectiveAreas.TryGetValue(port, out double area) &&
+                        area > 1e-12 &&
+                        Math.Max(area, incomingArea) /
+                            Math.Min(area, incomingArea) < significantAreaRatio)
+                    .Distinct().ToArray();
+                if (candidates.Length == 1)
+                    return candidates[0];
+                if (candidates.Length == 0 ||
+                    !_graph.Connectors[incomingPort].HasDirection)
+                {
+                    return -1;
+                }
+
+                Vector3D incomingDirection =
+                    _graph.Connectors[incomingPort].Direction;
+                var aligned = candidates.Where(port =>
+                        _graph.Connectors[port].HasDirection)
+                    .Select(port => new
+                    {
+                        Port = port,
+                        Dot = Vector3D.DotProduct(
+                            incomingDirection,
+                            _graph.Connectors[port].Direction)
+                    })
+                    .OrderBy(item => item.Dot)
+                    .ToArray();
+                if (aligned.Length == 0 || aligned[0].Dot > -0.5 ||
+                    (aligned.Length > 1 &&
+                     aligned[1].Dot - aligned[0].Dot < 0.2))
+                {
+                    return -1;
+                }
+                return aligned[0].Port;
+            }
+
+            static bool TryBuildHeaderDirectionsFromBoundary(
+                int[] largePorts,
+                int[] distances,
+                out Dictionary<int, bool> directions)
+            {
+                directions = new Dictionary<int, bool>();
+                if (largePorts.Length != 2 ||
+                    largePorts.Any(port => port < 0 ||
+                        port >= distances.Length || distances[port] < 0) ||
+                    distances[largePorts[0]] == distances[largePorts[1]])
+                {
+                    return false;
+                }
+                directions[largePorts[0]] =
+                    distances[largePorts[0]] > distances[largePorts[1]];
+                directions[largePorts[1]] = !directions[largePorts[0]];
+                return true;
+            }
+
+            bool TryReadResolvedHeaderDirections(
+                GameMepElementData junction,
+                int[] largePorts,
+                IReadOnlyDictionary<int, HashSet<int>> arms,
+                out Dictionary<int, bool> directions)
+            {
+                directions = new Dictionary<int, bool>();
+                foreach (int port in largePorts)
+                {
+                    if (arms.TryGetValue(port, out HashSet<int> arm) &&
+                        TryReadResolvedArmDirection(
+                            port, arm, out bool armDirection))
+                    {
+                        directions[port] = armDirection;
+                        continue;
+                    }
+
+                    GameMepPathData? path = junction.Paths.FirstOrDefault(item =>
+                        item.StartConnector == port && item.EndConnector < 0 &&
+                        item.DirectionState == GameMepDirectionState.Resolved);
+                    if (path != null)
+                    {
+                        directions[port] = path.FlowForward;
+                        continue;
+                    }
+
+                    return false;
+                }
+                // Un collecteur continu possède exactement une entrée et une
+                // sortie. Deux flèches vers le centre ou deux flèches vers
+                // l'extérieur sont précisément le défaut à ne pas mémoriser.
+                return directions.Values.Distinct().Count() == 2;
+            }
+
+            bool TryReadResolvedArmDirection(
+                int port,
+                ISet<int> arm,
+                out bool portFlowsTowardCenter)
+            {
+                portFlowsTowardCenter = false;
+                Dictionary<int, int> distances = BuildArmDistances(port, arm);
+                GameMepPathData? visiblePath = arm.Where(index =>
+                        index >= 0 && index < connectorCount)
+                    .Select(index => _graph.FindElement(
+                        _graph.Connectors[index].ElementKey))
+                    .Where(item => item?.IsPipeCurve == true &&
+                        !item.IsPipeJunction)
+                    .Cast<GameMepElementData>()
+                    .SelectMany(item => item.Paths)
+                    .Where(item => item.EndConnector >= 0 &&
+                        item.DirectionState == GameMepDirectionState.Resolved &&
+                        distances.ContainsKey(item.StartConnector) &&
+                        distances.ContainsKey(item.EndConnector) &&
+                        distances[item.StartConnector] !=
+                            distances[item.EndConnector])
+                    .OrderBy(item => Math.Min(
+                        distances[item.StartConnector],
+                        distances[item.EndConnector]))
+                    .FirstOrDefault();
+                if (visiblePath == null)
+                    return false;
+                bool forwardTowardJunction =
+                    distances[visiblePath.StartConnector] >
+                    distances[visiblePath.EndConnector];
+                portFlowsTowardCenter = visiblePath.FlowForward ==
+                    forwardTowardJunction;
+                return true;
             }
 
             bool TryGetPathPotentialDifference(
@@ -1346,9 +2154,54 @@ namespace BIMaestro.VideoGames
                      outletSeeds.Contains(index))).ToList();
                 if (useful.Count < 2)
                     return false;
-                double center = useful.Average(index => values[index]);
+                double center = GetJunctionCenterPotential(element, useful, values);
                 difference = values[start] - center;
                 return true;
+            }
+
+            double GetRelaxationWeight(GameMepConnectionData edge)
+            {
+                if (!edge.IsInternal || string.IsNullOrWhiteSpace(edge.ElementKey) ||
+                    !junctionPortWeights.TryGetValue(
+                        edge.ElementKey,
+                        out Dictionary<int, double> weights) ||
+                    !weights.TryGetValue(edge.ConnectorA, out double first) ||
+                    !weights.TryGetValue(edge.ConnectorB, out double second))
+                {
+                    return 1.0;
+                }
+
+                // La moyenne géométrique conserve une liaison réelle entre le
+                // piquage et le collecteur, tout en empêchant le petit DN de
+                // retourner artificiellement le potentiel du gros DN.
+                return Math.Sqrt(first * second);
+            }
+
+            double GetJunctionCenterPotential(
+                GameMepElementData element,
+                IList<int> useful,
+                double[] values)
+            {
+                if (!junctionPortWeights.TryGetValue(
+                        element.Key,
+                        out Dictionary<int, double> weights))
+                {
+                    return useful.Average(index => values[index]);
+                }
+
+                double weightedTotal = 0.0;
+                double totalWeight = 0.0;
+                foreach (int index in useful)
+                {
+                    double weight = weights.TryGetValue(index, out double value)
+                        ? value
+                        : 1.0;
+                    weightedTotal += values[index] * weight;
+                    totalWeight += weight;
+                }
+                return totalWeight > 1e-12
+                    ? weightedTotal / totalWeight
+                    : useful.Average(index => values[index]);
             }
 
             double GetExternalSidePotential(
@@ -1386,6 +2239,194 @@ namespace BIMaestro.VideoGames
             return valve != null && valve.IsEnabledAsValve &&
                 !valve.IsClosed &&
                 valve.Kind == GameMepFlowControlKind.IsolationValve;
+        }
+
+        private static bool IsStrictlyCloserToBoundary(
+            int candidate,
+            IEnumerable<int> otherPorts,
+            int[] distances)
+        {
+            if (candidate < 0 || candidate >= distances.Length ||
+                distances[candidate] < 0)
+            {
+                return false;
+            }
+
+            int comparisonCount = 0;
+            foreach (int other in otherPorts)
+            {
+                if (other < 0 || other >= distances.Length ||
+                    distances[other] < 0 ||
+                    distances[candidate] >= distances[other])
+                {
+                    return false;
+                }
+                comparisonCount++;
+            }
+            return comparisonCount > 0;
+        }
+
+        private bool TryCollectJunctionArm(
+            GameMepElementData junction,
+            int startConnector,
+            bool[] allowedEdges,
+            ISet<int> explicitInletSeeds,
+            ISet<int> explicitOutletSeeds,
+            ISet<int> implicitOutletSeeds,
+            ISet<string> restrictedElementKeys,
+            out HashSet<int> arm,
+            out double effectiveArea,
+            out string terminalJunctionKey)
+        {
+            arm = new HashSet<int>();
+            terminalJunctionKey = string.Empty;
+            effectiveArea = startConnector >= 0 &&
+                startConnector < _graph.Connectors.Count
+                    ? _graph.Connectors[startConnector].CrossSectionArea
+                    : 0.0;
+            if (startConnector < 0 || startConnector >= _graph.Connectors.Count ||
+                _adjacentEdges == null)
+            {
+                return false;
+            }
+
+            bool simple = true;
+            int nearestPipeDistance = int.MaxValue;
+            var traversedEdges = new HashSet<int>();
+            var queue = new Queue<int>();
+            var distance = new Dictionary<int, int>();
+            arm.Add(startConnector);
+            distance[startConnector] = 0;
+            queue.Enqueue(startConnector);
+            while (queue.Count > 0)
+            {
+                int current = queue.Dequeue();
+                GameMepConnectorData connector = _graph.Connectors[current];
+                GameMepElementData? owner =
+                    _graph.FindElement(connector.ElementKey);
+
+                // Le connecteur du té peut conserver le diamètre nominal avant
+                // un réducteur. Le premier MEPCurve rencontré sur le bras porte
+                // le DN effectif du tronçon réellement dessiné par l'utilisateur.
+                // Pour un piquage natif, le MEPCurve hôte est aussi la jonction.
+                // Ne pas utiliser ses autres ports comme aire de repli : un port
+                // Curve sans DN hériterait sinon à tort du DN du collecteur.
+                if (owner?.IsPipeCurve == true &&
+                    !string.Equals(owner.Key, junction.Key, StringComparison.Ordinal) &&
+                    distance.TryGetValue(current, out int currentDistance))
+                {
+                    double pipeArea = connector.CrossSectionArea;
+                    if (pipeArea <= 1e-12)
+                    {
+                        pipeArea = owner.ConnectorIndices.Where(index =>
+                                index >= 0 && index < _graph.Connectors.Count)
+                            .Select(index =>
+                                _graph.Connectors[index].CrossSectionArea)
+                            .Where(area => area > 1e-12)
+                            .DefaultIfEmpty(0.0)
+                            .Max();
+                    }
+                    if (pipeArea > 1e-12 &&
+                        currentDistance <= nearestPipeDistance)
+                    {
+                        if (currentDistance < nearestPipeDistance)
+                            effectiveArea = pipeArea;
+                        else
+                            effectiveArea = Math.Max(effectiveArea, pipeArea);
+                        nearestPipeDistance = currentDistance;
+                    }
+                }
+
+                if (current != startConnector && owner?.IsPipeJunction == true)
+                {
+                    // Une seconde jonction est une frontière locale sûre : le
+                    // gradient peut atteindre ce segment sans traverser le té
+                    // suivant. Son rôle aval reste lisible via lowDistance.
+                    if (string.IsNullOrWhiteSpace(terminalJunctionKey))
+                        terminalJunctionKey = owner.Key;
+                    else if (!string.Equals(
+                            terminalJunctionKey,
+                            owner.Key,
+                            StringComparison.Ordinal))
+                    {
+                        simple = false;
+                    }
+                    continue;
+                }
+
+                bool isBoundary = current != startConnector &&
+                    (explicitInletSeeds.Contains(current) ||
+                     explicitOutletSeeds.Contains(current) ||
+                     implicitOutletSeeds.Contains(current));
+                if (isBoundary)
+                    continue;
+
+                if (owner != null && !string.Equals(
+                        owner.Key, junction.Key, StringComparison.Ordinal) &&
+                    restrictedElementKeys.Contains(owner.Key))
+                {
+                    // Une pompe ou un clapet est une frontière directionnelle,
+                    // pas une raison d'invalider tout le bras. L'analyse locale
+                    // s'arrête ici et TryGetImposedDirection garde la priorité.
+                    continue;
+                }
+
+                var candidates = new List<int>();
+                foreach (int edgeIndex in _adjacentEdges[current])
+                {
+                    if (edgeIndex < 0 || edgeIndex >= allowedEdges.Length ||
+                        !allowedEdges[edgeIndex])
+                    {
+                        continue;
+                    }
+                    GameMepConnectionData edge = _graph.Connections[edgeIndex];
+                    if (edge.IsInternal && string.Equals(
+                            edge.ElementKey, junction.Key,
+                            StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+                    candidates.Add(edgeIndex);
+                }
+                if (candidates.Count > 2)
+                {
+                    simple = false;
+                    continue;
+                }
+
+                foreach (int edgeIndex in candidates)
+                {
+                    GameMepConnectionData edge = _graph.Connections[edgeIndex];
+                    int next = edge.ConnectorA == current
+                        ? edge.ConnectorB
+                        : edge.ConnectorA;
+                    if (next < 0 || next >= _graph.Connectors.Count)
+                    {
+                        simple = false;
+                        continue;
+                    }
+                    traversedEdges.Add(edgeIndex);
+                    if (junction.ConnectorIndices.Contains(next) &&
+                        next != startConnector)
+                    {
+                        // Les deux bras se rejoignent hors du chemin interne du
+                        // té : c'est un bypass, pas une fusion déductible du DN.
+                        simple = false;
+                        continue;
+                    }
+                    if (arm.Add(next))
+                    {
+                        distance[next] = distance[current] + 1;
+                        queue.Enqueue(next);
+                    }
+                }
+            }
+
+            // Pour une chaîne simple, E = V - 1. Une arête supplémentaire
+            // révèle une boucle même si elle rejoint le bras loin du raccord.
+            if (traversedEdges.Count >= arm.Count)
+                simple = false;
+            return simple;
         }
 
         private bool IsClosedIsolationValve(string elementKey)

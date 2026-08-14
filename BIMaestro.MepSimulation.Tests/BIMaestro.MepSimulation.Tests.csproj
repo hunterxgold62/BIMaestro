@@ -9,6 +9,7 @@
     <RootNamespace>BIMaestro.VideoGames</RootNamespace>
     <AssemblyName>BIMaestro.MepSimulation.Tests</AssemblyName>
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <LangVersion>9.0</LangVersion>
     <Nullable>annotations</Nullable>
     <Deterministic>true</Deterministic>
