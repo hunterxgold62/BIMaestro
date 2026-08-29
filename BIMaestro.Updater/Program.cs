@@ -28,7 +28,10 @@ namespace BIMaestro.Updater
                     WorkingDirectory = Path.GetDirectoryName(args[0])
                 });
                 installer?.WaitForExit();
-                return installer?.ExitCode ?? 3;
+                int exitCode = installer?.ExitCode ?? 3;
+                if (exitCode == 0)
+                    CleanupInstalledAndOlderUpdates(args[0]);
+                return exitCode;
             }
             catch
             {
@@ -72,6 +75,51 @@ namespace BIMaestro.Updater
                 Thread.Sleep(500);
             }
             return false;
+        }
+
+        private static void CleanupInstalledAndOlderUpdates(string installerPath)
+        {
+            try
+            {
+                string fullInstallerPath = Path.GetFullPath(installerPath);
+                string installedVersionDirectory = Path.GetDirectoryName(fullInstallerPath);
+                string updatesDirectory = Directory.GetParent(installedVersionDirectory)?.FullName;
+                string expectedUpdatesDirectory = Path.GetFullPath(Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "BIMaestro",
+                    "Updates"));
+
+                if (string.IsNullOrWhiteSpace(updatesDirectory)
+                    || !string.Equals(
+                        Path.GetFullPath(updatesDirectory).TrimEnd(Path.DirectorySeparatorChar),
+                        expectedUpdatesDirectory.TrimEnd(Path.DirectorySeparatorChar),
+                        StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                string installedVersionText = Path.GetFileName(installedVersionDirectory);
+                if (!Version.TryParse(installedVersionText, out Version installedVersion))
+                    return;
+
+                foreach (string directory in Directory.GetDirectories(expectedUpdatesDirectory))
+                {
+                    string directoryName = Path.GetFileName(directory);
+                    if (Version.TryParse(directoryName, out Version cachedVersion)
+                        && cachedVersion <= installedVersion)
+                    {
+                        try { Directory.Delete(directory, true); }
+                        catch { }
+                    }
+                }
+
+                try
+                {
+                    if (Directory.Exists(expectedUpdatesDirectory)
+                        && Directory.GetFileSystemEntries(expectedUpdatesDirectory).Length == 0)
+                        Directory.Delete(expectedUpdatesDirectory, false);
+                }
+                catch { }
+            }
+            catch { }
         }
 
         private static void TryDeleteSelfLater(string path)
