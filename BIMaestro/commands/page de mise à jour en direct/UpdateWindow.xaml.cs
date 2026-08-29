@@ -18,7 +18,6 @@ namespace Page
     public partial class UpdateWindow : Window
     {
         private const string SiteUrl = "https://sites.google.com/view/bimaestro";
-        private const string DownloadUrl = "https://www.bimaestro.fr/telechargement";
 
         // Hosts autorisés (tout le reste s'ouvre dans le navigateur)
         private static readonly HashSet<string> AllowedHosts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -403,11 +402,49 @@ namespace Page
         }
 
 
-        private void UpdateNow_Click(object sender, RoutedEventArgs e) => OpenExternal(DownloadUrl);
+        private async void UpdateNow_Click(object sender, RoutedEventArgs e)
+        {
+            LoadingPanel.Visibility = Visibility.Visible;
+            try
+            {
+                UpdateManifest manifest = await DirectUpdateService.FetchManifestAsync();
+                Version current = ParseVersion(GetCurrentVersionString()) ?? new Version(0, 0, 0);
+                if (manifest.Version <= current)
+                {
+                    MessageBox.Show(
+                        UiLanguage.T("BIMaestro est déjà à jour.", "BIMaestro is already up to date."),
+                        "BIMaestro",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                    return;
+                }
+
+                await DirectUpdateService.DownloadAndScheduleAsync(manifest, null);
+                MessageBox.Show(
+                    UiLanguage.T(
+                        "La mise à jour est téléchargée. Elle s'installera automatiquement après la fermeture de toutes les fenêtres Revit.",
+                        "The update has been downloaded. It will install automatically after all Revit windows are closed."),
+                    "BIMaestro",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    UiLanguage.T("Impossible de télécharger la mise à jour : ", "Unable to download the update: ") + ex.Message,
+                    "BIMaestro",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+            finally
+            {
+                LoadingPanel.Visibility = Visibility.Collapsed;
+            }
+        }
 
         private void OpenInBrowser_Click(object sender, RoutedEventArgs e) => OpenExternal(SiteUrl);
 
-        private void CopyLink_Click(object sender, RoutedEventArgs e) => Clipboard.SetText(DownloadUrl);
+        private void CopyLink_Click(object sender, RoutedEventArgs e) => Clipboard.SetText(SiteUrl);
 
         private void Close_Click(object sender, RoutedEventArgs e) => Close();
 

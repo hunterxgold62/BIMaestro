@@ -2,8 +2,6 @@
 using Newtonsoft.Json;
 using System;
 using System.IO;
-using System.Net.Http;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Diagnostics;
 using System.Windows;
@@ -14,8 +12,6 @@ namespace Page
 {
     internal static class UpdateNotificationManager
     {
-        private const string SiteUrl = "https://sites.google.com/view/bimaestro";
-        private const string DownloadUrl = "https://www.bimaestro.fr/telechargement";
         private const string ReasonMuteToday = "mute_today";
         private const string ReasonLater = "later";
         private static readonly TimeSpan LaterSuppressDuration = TimeSpan.FromDays(7);
@@ -31,6 +27,7 @@ namespace Page
 
         private static Version _currentVersion = new Version(0, 0, 0);
         private static Version _latestVersion;
+        private static UpdateManifest _latestManifest;
 
         private static UpdateNotifierState _state;
 
@@ -72,8 +69,8 @@ namespace Page
         {
             try
             {
-                var latest = await FetchLatestVersionAsync();
-                if (latest == null)
+                var manifest = await DirectUpdateService.FetchManifestAsync();
+                if (manifest?.Version == null)
                 {
                     lock (Sync) { _checkCompleted = true; }
                     return;
@@ -81,7 +78,8 @@ namespace Page
 
                 lock (Sync)
                 {
-                    _latestVersion = latest;
+                    _latestManifest = manifest;
+                    _latestVersion = manifest.Version;
                     _hasUpdate = _currentVersion.CompareTo(_latestVersion) < 0;
 
                     if (_hasUpdate)
@@ -107,40 +105,10 @@ namespace Page
             }
         }
 
-        private static async Task<Version> FetchLatestVersionAsync()
-        {
-            using (var http = new HttpClient())
-            {
-                http.Timeout = TimeSpan.FromSeconds(8);
-                string html = await http.GetStringAsync(SiteUrl);
-                return ParseVersion(html);
-            }
-        }
-
         private static Version ParseVersion(string input)
         {
             if (string.IsNullOrWhiteSpace(input)) return null;
-
-            var m4 = Regex.Match(input, @"\b(\d+)\.(\d+)\.(\d+)\.(\d+)\b");
-            if (m4.Success)
-            {
-                return new Version(
-                    int.Parse(m4.Groups[1].Value),
-                    int.Parse(m4.Groups[2].Value),
-                    int.Parse(m4.Groups[3].Value),
-                    int.Parse(m4.Groups[4].Value));
-            }
-
-            var m3 = Regex.Match(input, @"\b(\d+)\.(\d+)\.(\d+)\b");
-            if (m3.Success)
-            {
-                return new Version(
-                    int.Parse(m3.Groups[1].Value),
-                    int.Parse(m3.Groups[2].Value),
-                    int.Parse(m3.Groups[3].Value));
-            }
-
-            return null;
+            return Version.TryParse(input.Trim(), out Version version) ? version : null;
         }
 
         private static void ApplyPassiveSignal()
@@ -166,7 +134,10 @@ namespace Page
         {
             try
             {
-                var prompt = new UpdatePromptWindow(_latestVersion?.ToString() ?? "?", _currentVersion?.ToString() ?? "?");
+                var prompt = new UpdatePromptWindow(
+                    _latestVersion?.ToString() ?? "?",
+                    _currentVersion?.ToString() ?? "?",
+                    _latestManifest);
 
                 // Revit n'est pas toujours une app WPF "classique" avec MainWindow valide.
                 // On attache la fenêtre au handle natif principal pour garantir l'affichage au premier plan.
@@ -203,9 +174,6 @@ namespace Page
 
                 SaveState(_state);
 
-                if (prompt.Result == UpdatePromptResult.UpdateNow)
-                    OpenDownloadPage();
-
                 return true;
             }
             catch
@@ -213,18 +181,6 @@ namespace Page
                 return false;
             }
         }
-        private static void OpenDownloadPage()
-        {
-            try
-            {
-                Process.Start(new ProcessStartInfo(DownloadUrl) { UseShellExecute = true });
-            }
-            catch
-            {
-                // no-op
-            }
-        }
-
         private static string StatePath => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "BIMaestro",

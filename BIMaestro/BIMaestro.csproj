@@ -286,6 +286,7 @@
       <DependentUpon>RevitGameWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="commands\page de mise à jour en direct\UpdateNotificationManager.cs" />
+    <Compile Include="commands\page de mise à jour en direct\DirectUpdateService.cs" />
     <Compile Include="commands\page de mise à jour en direct\ButtonUpdateNote.cs" />
     <Compile Include="commands\page de mise à jour en direct\ButtonUpdateNotesCatalog.cs" />
     <Compile Include="commands\page de mise à jour en direct\ButtonUpdateNotesManager.cs" />
@@ -913,6 +914,13 @@
     <EmbeddedResource Include="Resources\OLD\roue ruban.png" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\BIMaestro.Updater\BIMaestro.Updater.csproj">
+      <Project>{A5780F61-B49A-43D0-9A07-46262917CDAA}</Project>
+      <Name>BIMaestro.Updater</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
     <EmbeddedResource Include="Resources\OLD\snake.png" />
   </ItemGroup>
   <ItemGroup>
@@ -987,4 +995,9 @@
     <Content Include="Themes\BIMaestro_Charte_Graphique.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Target Name="CopyUpdaterToOutput" AfterTargets="Build">
+    <Copy SourceFiles="..\BIMaestro.Updater\bin\$(Configuration)\BIMaestro.Updater.exe"
+          DestinationFolder="$(OutputPath)"
+          Condition="Exists('..\BIMaestro.Updater\bin\$(Configuration)\BIMaestro.Updater.exe')" />
+  </Target>
 </Project>
