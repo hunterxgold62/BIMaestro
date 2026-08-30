@@ -84,6 +84,8 @@ namespace BIMaestro.VideoGames
                     Category = SafeText(() => element.Category?.Name),
                     TypeName = GetTypeName(document, element),
                     IsPipeCurve = element is MEPCurve,
+                    IsPipeFitting = element.Category?.Id.GetIdValue() ==
+                        (int)BuiltInCategory.OST_PipeFitting,
                     IsPipeJunction = IsPipeJunction(element, connectors),
                     IsVisible = visibleElementKeys.Contains(elementKey)
                 };
@@ -512,47 +514,6 @@ namespace BIMaestro.VideoGames
             string searchable = (data.Name + " " + data.TypeName + " " +
                 SafeText(() => (element as FamilyInstance)?.Symbol?.FamilyName))
                 .ToLowerInvariant();
-            bool checkValve = connectorCount == 2 && ContainsAny(
-                searchable + " " + partType.ToLowerInvariant(),
-                "clapet", "anti-retour", "anti retour", "check valve",
-                "non-return", "non return", "nonreturn", " nrv");
-            if (checkValve)
-            {
-                int entry = data.ConnectorIndices.Where(index =>
-                        index >= 0 && index < graph.Connectors.Count &&
-                        string.Equals(
-                            graph.Connectors[index].FlowDirection,
-                            "In",
-                            StringComparison.OrdinalIgnoreCase))
-                    .DefaultIfEmpty(-1)
-                    .First();
-                int exit = data.ConnectorIndices.Where(index =>
-                        index >= 0 && index < graph.Connectors.Count &&
-                        string.Equals(
-                            graph.Connectors[index].FlowDirection,
-                            "Out",
-                            StringComparison.OrdinalIgnoreCase))
-                    .DefaultIfEmpty(-1)
-                    .First();
-                bool hasDirection = entry >= 0 && exit >= 0 && entry != exit;
-                return new GameMepValveData
-                {
-                    ElementKey = data.Key,
-                    Kind = GameMepFlowControlKind.CheckValve,
-                    Confidence = hasDirection
-                        ? GameMepConfidence.High
-                        : GameMepConfidence.Medium,
-                    DetectionReason = hasDirection
-                        ? "clapet anti-retour, sens lu dans les connecteurs Revit"
-                        : "clapet anti-retour, sens à confirmer",
-                    IsEnabledAsValve = true,
-                    InitiallyEnabledAsValve = true,
-                    EntryConnectorIndex = entry,
-                    ExitConnectorIndex = exit,
-                    InitiallyEntryConnectorIndex = entry,
-                    InitiallyExitConnectorIndex = exit
-                };
-            }
             if (ContainsAny(
                 searchable,
                 "vanne", "valve", "robinet", "papillon", "opercule",
@@ -562,7 +523,10 @@ namespace BIMaestro.VideoGames
                 reasons.Add("nom de famille/type");
             }
 
-            if (score < 2)
+            // Un simple accessoire à deux connecteurs reste un raccord
+            // traversant. Seuls les éléments portant un indice explicite de
+            // vanne entrent dans le modèle des organes commandables.
+            if (score < 5)
                 return null;
 
             GameMepConfidence confidence = score >= 7
@@ -601,6 +565,9 @@ namespace BIMaestro.VideoGames
             GameMepElementData data,
             IList<Connector> connectors)
         {
+            if (!GameMepBoundaryPolicy.CanHostBoundary(data))
+                return null;
+
             bool mechanicalEquipment = element.Category?.Id.GetIdValue() ==
                 (int)BuiltInCategory.OST_MechanicalEquipment;
             if (!mechanicalEquipment)

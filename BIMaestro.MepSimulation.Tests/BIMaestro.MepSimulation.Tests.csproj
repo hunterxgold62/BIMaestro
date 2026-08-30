@@ -48,6 +48,9 @@
     <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameMepNetworkTrace.cs">
       <Link>GameMepNetworkTrace.cs</Link>
     </Compile>
+    <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameMepReplayStore.cs">
+      <Link>GameMepReplayStore.cs</Link>
+    </Compile>
     <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameMepDiagnostics.cs">
       <Link>GameMepDiagnostics.cs</Link>
     </Compile>

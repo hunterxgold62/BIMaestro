@@ -11,19 +11,30 @@ namespace BIMaestro.VideoGames
     {
         private static int _assertions;
 
-        private static int Main()
+        private static int Main(string[] args)
         {
             try
             {
+                if (args.Length >= 2 && args.Length <= 3 &&
+                    string.Equals(args[0], "--replay", StringComparison.OrdinalIgnoreCase))
+                {
+                    long inspectedElementId = 0;
+                    if (args.Length == 3)
+                        long.TryParse(args[2], out inspectedElementId);
+                    return ReplayExportedGraph(args[1], inspectedElementId);
+                }
                 StraightValveCutsOnlyPath();
                 TeeSuppliesBothBranches();
                 SmallInletFeedsLargeHeaderWithoutReversingIt();
                 SmallDnCannotSplitAContinuousReturnHeader();
+                SmallDnKeepsTwoPortFittingsAlignedWithHeader();
                 NativePipeTapUsesDiameterRule();
                 TwoSmallReturnsMergeIntoLargeCollector();
                 ReducerAfterEqualTeeProvidesEffectiveCollectorDn();
                 CollectorMergeSurvivesDownstreamTee();
                 PumpOutletAnchorsLocalDnMerge();
+                NativePumpPortsImposeAspirationAndDischarge();
+                NativePumpSuctionOverridesSmallDnTeeInference();
                 LargeSupplyStillDistributesToTwoSmallerBranches();
                 PumpBranchesKeepTheirEstablishedDirection();
                 ExplicitSmallOutletPreventsMergeInference();
@@ -31,13 +42,15 @@ namespace BIMaestro.VideoGames
                 LocalOverrideDoesNotDisableNeighboringDnMerge();
                 DnMergeInferenceSkipsRejoinedBypass();
                 BalancedBypassAtOneNodeRemainsStagnant();
+                HydraulicPotentialEliminatesIsolatedLoopReversal();
+                TwoPortFittingFollowsAuthoritativeAdjacentPaths();
+                TwoPortPipeAccessoryFollowsAuthoritativeAdjacentPaths();
+                TeePortsFollowTheirAdjacentPipes();
+                CollinearTeeChainKeepsOneHeaderDirection();
                 LoopBypassesClosedValve();
                 SecondSourceMaintainsSupply();
                 DisconnectedBranchIsIsolated();
                 ThreeWayValveCutsEveryOutlet();
-                CheckValveAllowsForwardFlow();
-                CheckValveBlocksReverseFlow();
-                ReversedCheckValveAllowsTheOppositeDirection();
                 MissingDirectionsDoNotBreakReachability();
                 DirectedPipeSourceSuppliesOnlyChosenSide();
                 ArrivalAndReturnStabilizeDirection();
@@ -58,8 +71,9 @@ namespace BIMaestro.VideoGames
                 LocalDirectionOverrideDoesNotReorientNeighbors();
                 DirectionExplanationNamesSourceAndReturn();
                 DirectionExplanationListsAlternativeSourcesDeterministically();
+                PipeFittingCannotBecomeHydraulicSource();
+                DirectionExplanationUsesCurrentRevitElementIdentity();
                 DirectionExplanationReportsAlternativeLoop();
-                DirectionExplanationReportsCheckValveLimit();
                 DirectionExplanationReportsClosedValveLimit();
                 DirectionExplanationMarksManualCorrection();
                 HistoryRestoresEveryScenarioMutation();
@@ -75,11 +89,9 @@ namespace BIMaestro.VideoGames
                 NetworkTraceExposesAndSelectsTeeBranches();
                 NetworkTraceBranchSelectionSurvivesRejoinedLoop();
                 NetworkTraceKeepsBypassAroundClosedValve();
-                NetworkTraceRespectsCheckValveDirection();
                 NetworkTraceHonorsHiddenSystems();
                 NetworkTraceStaysFastOnLargeGraph();
                 DiagnosticsClassifyCriticalDirectionConflict();
-                DiagnosticsDetectCheckValveWithoutDirection();
                 DiagnosticsDetectAmbiguousFlowControl();
                 DiagnosticsDetectUnknownPassThroughComponent();
                 DiagnosticsDetectDisconnectedElement();
@@ -89,10 +101,12 @@ namespace BIMaestro.VideoGames
                 DiagnosticsReportInvalidSavedSettings();
                 NetworkWithoutSourceStaysUnknown();
                 EmptyGraphDoesNotFail();
+                ReplaySnapshotRoundTripPreservesGraphAndCalculation();
                 ScenarioRoundTripRestoresSourcesAndValves();
                 NamedScenariosCanBeSavedLoadedAndDeleted();
                 ResetRemovesPersistedScenario();
                 ChangedNetworkSkipsInvalidDirection();
+                ChangedNetworkSkipsLegacyPipeFittingSource();
                 ScenarioFilesAreIsolatedByModel();
                 UnsavedModelPersistsOnlyInCurrentSession();
                 SelectionIndexChoosesNearestPreciseTriangle();
@@ -421,7 +435,9 @@ namespace BIMaestro.VideoGames
         {
             GraphFixture fixture = new GraphFixture();
             fixture.AddElement("far-left", 2);
+            fixture.AddElement("left-elbow", 2);
             fixture.AddElement("crossing", 4);
+            fixture.AddElement("left-reducer", 2);
             fixture.AddElement("left-main", 2);
             fixture.AddElement("junction", 3);
             fixture.AddElement("right-main", 2);
@@ -434,8 +450,10 @@ namespace BIMaestro.VideoGames
 
             // Le DN300 de gauche continue hors de la zone modélisée. Son bout
             // libre est l'amont aspiré et traverse d'abord un autre croisement.
-            fixture.Connect("far-left", 1, "crossing", 1);
-            fixture.Connect("crossing", 0, "left-main", 0);
+            fixture.Connect("far-left", 1, "left-elbow", 0);
+            fixture.Connect("left-elbow", 1, "crossing", 1);
+            fixture.Connect("crossing", 0, "left-reducer", 0);
+            fixture.Connect("left-reducer", 1, "left-main", 0);
             fixture.Connect("crossing", 2, "cross-side-a", 0);
             fixture.Connect("crossing", 3, "cross-side-b", 0);
             fixture.Connect("left-main", 1, "junction", 0);
@@ -457,6 +475,8 @@ namespace BIMaestro.VideoGames
             fixture.AddJunctionPaths("junction");
             fixture.AddJunctionPaths("crossing");
             fixture.SetPathLength("far-left", 8.0);
+            fixture.SetPathLength("left-elbow", 2.0);
+            fixture.SetPathLength("left-reducer", 2.0);
             fixture.SetPathLength("left-main", 8.0);
             fixture.SetPathLength("right-main", 8.0);
             fixture.SetPathLength("small-branch", 6.0);
@@ -487,6 +507,9 @@ namespace BIMaestro.VideoGames
                 "Opening or closing the DN 200 valve must never change the DN 300 header direction.");
             Assert(fixture.Path("far-left").FlowForward == closedFarDirection,
                 "The stable DN 300 direction must propagate beyond the next crossing.");
+            Assert(fixture.Path("left-elbow").FlowForward &&
+                fixture.Path("left-reducer").FlowForward,
+                "Two-port pipe fittings must stay aligned with the protected DN 300 header.");
             Assert(!fixture.JunctionPath("crossing", 0).FlowForward &&
                 fixture.JunctionPath("crossing", 1).FlowForward,
                 "The two aligned DN 300 ports of the crossing must follow the propagated backbone direction.");
@@ -501,8 +524,124 @@ namespace BIMaestro.VideoGames
                 "At the tee, the left DN 300 and DN 200 must enter while the right DN 300 remains the only outlet.");
             AssertRenderableFlow(fixture, "left-main");
             AssertRenderableFlow(fixture, "far-left");
+            AssertRenderableFlow(fixture, "left-elbow");
+            AssertRenderableFlow(fixture, "left-reducer");
             AssertRenderableFlow(fixture, "right-main");
             AssertRenderableFlow(fixture, "small-branch");
+        }
+
+        private static void SmallDnKeepsTwoPortFittingsAlignedWithHeader()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("far-left", 2);
+            fixture.AddElement("elbow", 2);
+            fixture.AddElement("reducer", 2);
+            fixture.AddElement("left-main", 2);
+            fixture.AddElement("junction", 3);
+            fixture.AddElement("right-main", 2);
+            fixture.AddElement("right-outlet", 1);
+            fixture.AddElement("small-inlet", 1, source: true);
+            fixture.AddElement("small-valve", 2, valve: true);
+            fixture.AddElement("small-branch", 2);
+
+            fixture.Connect("far-left", 1, "elbow", 0);
+            fixture.Connect("elbow", 1, "reducer", 0);
+            fixture.Connect("reducer", 1, "left-main", 0);
+            fixture.Connect("left-main", 1, "junction", 0);
+            fixture.Connect("junction", 1, "right-main", 0);
+            fixture.Connect("right-main", 1, "right-outlet", 0);
+            fixture.Connect("small-inlet", 0, "small-valve", 0);
+            fixture.Connect("small-valve", 1, "small-branch", 0);
+            fixture.Connect("small-branch", 1, "junction", 2);
+            fixture.AddBoundary("right-outlet", GameMepBoundaryKind.Outlet);
+            fixture.SetPortDiameter("junction", 0, 300.0);
+            fixture.SetPortDiameter("junction", 1, 300.0);
+            fixture.SetPortDiameter("junction", 2, 200.0);
+            fixture.SetPipeDiameter("far-left", 300.0);
+            fixture.SetPipeDiameter("left-main", 300.0);
+            fixture.SetPipeDiameter("right-main", 300.0);
+            fixture.SetPipeDiameter("small-branch", 200.0);
+            fixture.AddJunctionPaths("junction");
+            foreach (string key in new[]
+            {
+                "far-left", "elbow", "reducer", "left-main",
+                "right-main", "small-branch"
+            })
+            {
+                fixture.SetPathLength(key, 6.0);
+            }
+
+            fixture.CloseValve("small-valve");
+            fixture.Calculate();
+            fixture.Graph.FindValve("small-valve")!.IsClosed = false;
+            fixture.Calculate();
+
+            foreach (string key in new[]
+            {
+                "far-left", "elbow", "reducer", "left-main", "right-main"
+            })
+            {
+                Assert(fixture.Path(key).FlowForward,
+                    "A two-port fitting on the protected DN 300 header must keep the same continuous direction: " + key);
+                AssertRenderableFlow(fixture, key);
+            }
+        }
+
+        private static int ReplayExportedGraph(
+            string filePath,
+            long inspectedElementId)
+        {
+            GameMepReplaySnapshot snapshot = GameMepReplayStore.Load(filePath);
+            GameMepReplayResult result = GameMepReplayStore.Replay(snapshot);
+            Console.WriteLine("Cas MEP : " + snapshot.DocumentLabel);
+            Console.WriteLine(
+                snapshot.Graph.Elements.Count + " éléments, " +
+                snapshot.Graph.Connectors.Count + " connecteurs, " +
+                result.PathCount + " chemins.");
+            Console.WriteLine(
+                result.ReversedPathCount + " sens modifiés par le rejeu, " +
+                result.StateChangeCount + " états modifiés.");
+            Console.WriteLine(
+                "Ruptures de continuité visibles : " +
+                result.CapturedVisibleDiscontinuityCount + " avant, " +
+                result.ReplayedVisibleDiscontinuityCount + " après.");
+            foreach (string discontinuity in result.ReplayedVisibleDiscontinuities)
+                Console.WriteLine("  rupture restante : " + discontinuity);
+            if (inspectedElementId > 0)
+            {
+                GameMepElementData? inspected = snapshot.Graph.FindElement(
+                    inspectedElementId);
+                Console.WriteLine(
+                    "Inspection " + inspectedElementId + " : " +
+                    (inspected?.Name ?? "introuvable"));
+                if (inspected != null)
+                {
+                    foreach (GameMepPathData path in inspected.Paths)
+                    {
+                        Console.WriteLine(
+                            "  " + path.StartConnector + " -> " +
+                            path.EndConnector + ", sens=" +
+                            (path.FlowForward ? "avant" : "arrière") +
+                            ", circulation=" + path.HasCirculation +
+                            ", raison=" + path.DirectionReason);
+                    }
+                }
+            }
+            foreach (GameMepReplayDifference difference in
+                result.Differences.Take(200))
+            {
+                Console.WriteLine(
+                    "- " + difference.ElementName + " [" + difference.ElementId +
+                    "] chemin " + difference.PathOrdinal + " : " +
+                    difference.CapturedState + " -> " + difference.ReplayedState);
+            }
+            if (result.Differences.Count > 200)
+            {
+                Console.WriteLine(
+                    "... " + (result.Differences.Count - 200) +
+                    " différences supplémentaires.");
+            }
+            return 0;
         }
 
         private static void TwoSmallReturnsMergeIntoLargeCollector()
@@ -744,6 +883,80 @@ namespace BIMaestro.VideoGames
             AssertRenderableFlow(fixture, "small-a");
             AssertRenderableFlow(fixture, "small-b");
             AssertRenderableFlow(fixture, "collector");
+        }
+
+        private static void NativePumpPortsImposeAspirationAndDischarge()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("source", 1, source: true);
+            fixture.AddElement("suction", 2);
+            fixture.AddElement("pump", 2);
+            fixture.AddElement("discharge", 2);
+            fixture.AddElement("outlet", 1);
+            fixture.Connect("source", 0, "suction", 0);
+            fixture.Connect("suction", 1, "pump", 0);
+            fixture.Connect("pump", 1, "discharge", 0);
+            fixture.Connect("discharge", 1, "outlet", 0);
+            fixture.AddBoundary("outlet", GameMepBoundaryKind.Outlet);
+            fixture.SetElementIdentity("pump", "Pompe primaire", "Pompe primaire");
+            fixture.SetConnectorFlowDirection("pump", 0, "In");
+            fixture.SetConnectorFlowDirection("pump", 1, "Out");
+            fixture.SetPathLength("suction", 5.0);
+            fixture.SetPathLength("pump", 2.0);
+            fixture.SetPathLength("discharge", 5.0);
+
+            fixture.Calculate();
+
+            Assert(fixture.Path("pump").FlowForward &&
+                fixture.Path("pump").DirectionReason.IndexOf(
+                    "Sens natif de la pompe", StringComparison.Ordinal) >= 0,
+                "Native Revit In/Out pump ports must impose aspiration then discharge.");
+            Assert(fixture.Path("suction").FlowForward &&
+                fixture.Path("discharge").FlowForward,
+                "The pipe before a native pump must be aspirated and the pipe after it discharged.");
+        }
+
+        private static void NativePumpSuctionOverridesSmallDnTeeInference()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("source", 1, source: true);
+            fixture.AddElement("header-a", 2);
+            fixture.AddElement("header-b", 2);
+            fixture.AddElement("junction", 3);
+            fixture.AddElement("suction", 2);
+            fixture.AddElement("pump", 2);
+            fixture.AddElement("discharge", 2);
+            fixture.AddElement("outlet", 1);
+            fixture.Connect("source", 0, "header-a", 0);
+            fixture.Connect("header-a", 1, "junction", 0);
+            fixture.Connect("header-b", 0, "junction", 1);
+            fixture.Connect("junction", 2, "suction", 0);
+            fixture.Connect("suction", 1, "pump", 0);
+            fixture.Connect("pump", 1, "discharge", 0);
+            fixture.Connect("discharge", 1, "outlet", 0);
+            fixture.AddBoundary("outlet", GameMepBoundaryKind.Outlet);
+            fixture.SetElementIdentity("pump", "Pompe primaire", "Pompe primaire");
+            fixture.SetConnectorFlowDirection("pump", 0, "In");
+            fixture.SetConnectorFlowDirection("pump", 1, "Out");
+            fixture.SetElementClassification("junction", "ReturnHydronic");
+            fixture.SetPortDiameter("junction", 0, 300.0);
+            fixture.SetPortDiameter("junction", 1, 300.0);
+            fixture.SetPortDiameter("junction", 2, 200.0);
+            fixture.AddJunctionPaths("junction");
+            foreach (string key in new[]
+            {
+                "header-a", "header-b", "suction", "pump", "discharge"
+            })
+            {
+                fixture.SetPathLength(key, 5.0);
+            }
+
+            fixture.Calculate();
+
+            Assert(!fixture.JunctionPath("junction", 2).FlowForward &&
+                fixture.Path("suction").FlowForward &&
+                fixture.Path("pump").FlowForward,
+                "A ReturnHydronic tee before a pump must flow from its center toward the native In port.");
         }
 
         private static void PumpBranchesKeepTheirEstablishedDirection()
@@ -988,6 +1201,190 @@ namespace BIMaestro.VideoGames
                 "A bypass tied to the same hydraulic node must remain stagnant.");
         }
 
+        private static void HydraulicPotentialEliminatesIsolatedLoopReversal()
+        {
+            GraphFixture fixture = new GraphFixture();
+            for (int index = 0; index < 7; index++)
+                fixture.AddElement("node-" + index, 1, source: index == 0);
+
+            AddPipe("pipe-01", 0, 1);
+            AddPipe("pipe-04", 0, 4);
+            AddPipe("pipe-06", 0, 6);
+            AddPipe("pipe-12", 1, 2);
+            AddPipe("pipe-15", 1, 5);
+            AddPipe("pipe-23", 2, 3);
+            AddPipe("pipe-35", 3, 5);
+            AddPipe("pipe-46", 4, 6);
+            AddPipe("pipe-45", 4, 5);
+            fixture.AddBoundary("node-1", GameMepBoundaryKind.Outlet);
+            fixture.AddBoundary("node-6", GameMepBoundaryKind.Outlet);
+
+            fixture.Calculate();
+
+            Assert(fixture.Path("pipe-35").HasCirculation &&
+                !fixture.Path("pipe-35").FlowForward,
+                "A loop segment must follow the final hydraulic potential instead of reversing locally because of nearest-boundary distances.");
+            AssertRenderableFlow(fixture, "pipe-35");
+
+            void AddPipe(string key, int startNode, int endNode)
+            {
+                fixture.AddElement(key, 2);
+                fixture.Connect("node-" + startNode, 0, key, 0);
+                fixture.Connect(key, 1, "node-" + endNode, 0);
+                fixture.SetPathLength(key, 6.0);
+            }
+        }
+
+        private static void TeePortsFollowTheirAdjacentPipes()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("source", 1, source: true);
+            fixture.AddElement("before", 2);
+            fixture.AddElement("tee", 3);
+            fixture.AddElement("after-1", 2);
+            fixture.AddElement("after-2", 2);
+            fixture.AddElement("after-3", 2);
+            fixture.AddElement("return", 1);
+            fixture.AddElement("short-side-outlet", 1);
+
+            fixture.Connect("source", 0, "before", 0);
+            fixture.Connect("before", 1, "tee", 0);
+            fixture.Connect("tee", 1, "after-1", 0);
+            fixture.Connect("after-1", 1, "after-2", 0);
+            fixture.Connect("after-2", 1, "after-3", 0);
+            fixture.Connect("after-3", 1, "return", 0);
+            fixture.Connect("tee", 2, "short-side-outlet", 0);
+            fixture.AddBoundary("return", GameMepBoundaryKind.Outlet);
+            fixture.SetPortDirection("tee", 0, 0.0, -1.0, 0.0);
+            fixture.SetPortDirection("tee", 1, 0.0, 1.0, 0.0);
+            fixture.SetPortDirection("tee", 2, 1.0, 0.0, 0.0);
+            fixture.AddJunctionPaths("tee");
+
+            fixture.Calculate();
+
+            Assert(fixture.Path("before").FlowForward &&
+                fixture.Path("after-1").FlowForward &&
+                fixture.Path("after-2").FlowForward &&
+                fixture.Path("after-3").FlowForward &&
+                fixture.JunctionPath("tee", 0).FlowForward &&
+                !fixture.JunctionPath("tee", 1).FlowForward &&
+                fixture.JunctionPath("tee", 1).DirectionReason.IndexOf(
+                    "géométrique", StringComparison.OrdinalIgnoreCase) >= 0,
+                "Each main tee port must keep the same local flow direction as its adjacent pipe, even when a short side outlet skews the virtual-center potential.");
+        }
+
+        private static void CollinearTeeChainKeepsOneHeaderDirection()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("source", 1, source: true);
+            fixture.AddElement("before", 2);
+            fixture.AddElement("lower-tee", 3);
+            fixture.AddElement("between-tees", 2);
+            fixture.AddElement("upper-tee", 3);
+            fixture.AddElement("after", 2);
+            fixture.AddElement("return", 1);
+            fixture.AddElement("lower-side", 1);
+            fixture.AddElement("upper-side", 1);
+
+            fixture.Connect("source", 0, "before", 0);
+            fixture.Connect("before", 1, "lower-tee", 0);
+            fixture.Connect("lower-tee", 1, "between-tees", 1);
+            fixture.Connect("between-tees", 0, "upper-tee", 0);
+            fixture.Connect("upper-tee", 1, "after", 0);
+            fixture.Connect("after", 1, "return", 0);
+            fixture.Connect("lower-tee", 2, "lower-side", 0);
+            fixture.Connect("upper-tee", 2, "upper-side", 0);
+            fixture.AddBoundary("return", GameMepBoundaryKind.Outlet);
+            foreach (string tee in new[] { "lower-tee", "upper-tee" })
+            {
+                fixture.SetPortDirection(tee, 0, 0.0, -1.0, 0.0);
+                fixture.SetPortDirection(tee, 1, 0.0, 1.0, 0.0);
+                fixture.SetPortDirection(tee, 2, 1.0, 0.0, 0.0);
+                fixture.AddJunctionPaths(tee);
+            }
+
+            fixture.Calculate();
+
+            Assert(fixture.Path("before").FlowForward &&
+                !fixture.Path("between-tees").FlowForward &&
+                fixture.Path("after").FlowForward &&
+                fixture.JunctionPath("lower-tee", 0).FlowForward &&
+                !fixture.JunctionPath("lower-tee", 1).FlowForward &&
+                fixture.JunctionPath("upper-tee", 0).FlowForward &&
+                !fixture.JunctionPath("upper-tee", 1).FlowForward,
+                "Two collinear tees must preserve one continuous header direction regardless of each pipe's Revit endpoint order.");
+        }
+
+        private static void TwoPortFittingFollowsAuthoritativeAdjacentPaths()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("outlet", 1);
+            fixture.AddElement("left-pipe", 2);
+            fixture.AddElement("fitting-a", 2);
+            fixture.AddElement("fitting-b", 2);
+            fixture.AddElement("right-pipe", 2);
+            fixture.AddElement("inlet", 1, source: true);
+            fixture.Connect("outlet", 0, "left-pipe", 0);
+            fixture.Connect("left-pipe", 1, "fitting-a", 0);
+            fixture.Connect("fitting-a", 1, "fitting-b", 0);
+            fixture.Connect("fitting-b", 1, "right-pipe", 0);
+            fixture.Connect("right-pipe", 1, "inlet", 0);
+            fixture.AddBoundary("outlet", GameMepBoundaryKind.Outlet);
+            fixture.SetDirectionConstraint("left-pipe", 0, 1);
+            fixture.SetDirectionConstraint("right-pipe", 0, 1);
+            fixture.MarkPipeFitting("fitting-a");
+            fixture.MarkPipeFitting("fitting-b");
+            fixture.SetPathLength("left-pipe", 6.0);
+            fixture.SetPathLength("fitting-a", 2.0);
+            fixture.SetPathLength("fitting-b", 2.0);
+            fixture.SetPathLength("right-pipe", 6.0);
+
+            fixture.Calculate();
+
+            Assert(fixture.Path("left-pipe").FlowForward &&
+                fixture.Path("fitting-a").FlowForward &&
+                fixture.Path("fitting-b").FlowForward &&
+                fixture.Path("right-pipe").FlowForward,
+                "A chain of two-port pipe fittings must follow agreeing authoritative neighboring paths.");
+            AssertRenderableFlow(fixture, "fitting-a");
+            AssertRenderableFlow(fixture, "fitting-b");
+        }
+
+        private static void TwoPortPipeAccessoryFollowsAuthoritativeAdjacentPaths()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("outlet", 1);
+            fixture.AddElement("left-pipe", 2);
+            fixture.AddElement("flange", 2);
+            fixture.AddElement("open-valve", 2, valve: true);
+            fixture.AddElement("right-pipe", 2);
+            fixture.AddElement("inlet", 1, source: true);
+            fixture.Connect("outlet", 0, "left-pipe", 0);
+            fixture.Connect("left-pipe", 1, "flange", 0);
+            fixture.Connect("flange", 1, "open-valve", 0);
+            fixture.Connect("open-valve", 1, "right-pipe", 0);
+            fixture.Connect("right-pipe", 1, "inlet", 0);
+            fixture.AddBoundary("outlet", GameMepBoundaryKind.Outlet);
+            fixture.SetDirectionConstraint("left-pipe", 0, 1);
+            fixture.SetDirectionConstraint("right-pipe", 0, 1);
+            fixture.SetElementCategory("flange", "Accessoire de canalisation");
+            fixture.SetElementCategory("open-valve", "Accessoire de canalisation");
+            fixture.SetPathLength("left-pipe", 6.0);
+            fixture.SetPathLength("flange", 1.0);
+            fixture.SetPathLength("open-valve", 2.0);
+            fixture.SetPathLength("right-pipe", 6.0);
+
+            fixture.Calculate();
+
+            Assert(fixture.Path("left-pipe").FlowForward &&
+                fixture.Path("flange").FlowForward &&
+                fixture.Path("open-valve").FlowForward &&
+                fixture.Path("right-pipe").FlowForward,
+                "Open two-port pipe accessories must not reverse an established pipe direction.");
+            AssertRenderableFlow(fixture, "flange");
+            AssertRenderableFlow(fixture, "open-valve");
+        }
+
         private static void LoopBypassesClosedValve()
         {
             GraphFixture fixture = new GraphFixture();
@@ -1045,49 +1442,6 @@ namespace BIMaestro.VideoGames
             fixture.Calculate();
             AssertState(fixture, "a", GameMepFlowState.Isolated);
             AssertState(fixture, "b", GameMepFlowState.Isolated);
-        }
-
-        private static void CheckValveAllowsForwardFlow()
-        {
-            GraphFixture fixture = new GraphFixture();
-            fixture.AddElement("source", 1, source: true);
-            fixture.AddElement("check", 2, checkValve: true);
-            fixture.AddElement("terminal", 1);
-            fixture.Connect("source", 0, "check", 0);
-            fixture.Connect("check", 1, "terminal", 0);
-
-            fixture.Calculate();
-
-            AssertState(fixture, "terminal", GameMepFlowState.Supplied);
-        }
-
-        private static void CheckValveBlocksReverseFlow()
-        {
-            GraphFixture fixture = new GraphFixture();
-            fixture.AddElement("terminal", 1);
-            fixture.AddElement("check", 2, checkValve: true);
-            fixture.AddElement("source", 1, source: true);
-            fixture.Connect("terminal", 0, "check", 0);
-            fixture.Connect("check", 1, "source", 0);
-
-            fixture.Calculate();
-
-            AssertState(fixture, "terminal", GameMepFlowState.Isolated);
-        }
-
-        private static void ReversedCheckValveAllowsTheOppositeDirection()
-        {
-            GraphFixture fixture = new GraphFixture();
-            fixture.AddElement("terminal", 1);
-            fixture.AddElement("check", 2, checkValve: true);
-            fixture.AddElement("source", 1, source: true);
-            fixture.Connect("terminal", 0, "check", 0);
-            fixture.Connect("check", 1, "source", 0);
-            fixture.ReverseCheckValve("check");
-
-            fixture.Calculate();
-
-            AssertState(fixture, "terminal", GameMepFlowState.Supplied);
         }
 
         private static void MissingDirectionsDoNotBreakReachability()
@@ -1617,6 +1971,42 @@ namespace BIMaestro.VideoGames
                 "Alternative sources must remain stable when internal collections are reordered.");
         }
 
+        private static void PipeFittingCannotBecomeHydraulicSource()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("CML_Acier Té", 3, source: true);
+            fixture.MarkPipeFitting("CML_Acier Té");
+            fixture.AddJunctionPaths("CML_Acier Té");
+            fixture.AddElement("pipe", 2);
+            fixture.Connect("CML_Acier Té", 0, "pipe", 0);
+
+            fixture.Calculate();
+
+            Assert(fixture.Graph.FindElement("pipe")!.FlowState ==
+                    GameMepFlowState.Unknown &&
+                string.IsNullOrWhiteSpace(
+                    fixture.Path("pipe").DirectionExplanation.PrimarySourceName),
+                "A tee or other pipe fitting present in the source collection must be ignored by both the hydraulic calculation and its explanation.");
+        }
+
+        private static void DirectionExplanationUsesCurrentRevitElementIdentity()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("source", 1, source: true);
+            fixture.AddElement("pipe", 2);
+            fixture.Connect("source", 0, "pipe", 0);
+            GameMepElementData sourceElement = fixture.Graph.FindElement("source")!;
+            sourceElement.Name = "Arrivée chaufferie";
+            sourceElement.ElementId = 4242;
+            fixture.Graph.Sources.Single().Name = "CML_Acier Té";
+
+            fixture.Calculate();
+
+            Assert(fixture.Path("pipe").DirectionExplanation.PrimarySourceName ==
+                    "Arrivée chaufferie (ID Revit 4242)",
+                "A source explanation must use the current Revit element name and id, never a stale saved family name.");
+        }
+
         private static void DirectionExplanationReportsAlternativeLoop()
         {
             GraphFixture fixture = new GraphFixture();
@@ -1636,25 +2026,6 @@ namespace BIMaestro.VideoGames
 
             Assert(fixture.Path("target").DirectionExplanation.HasAlternativeRoute,
                 "A loop or bypass must be reported as an alternative route.");
-        }
-
-        private static void DirectionExplanationReportsCheckValveLimit()
-        {
-            GraphFixture fixture = new GraphFixture();
-            fixture.AddElement("source", 1, source: true);
-            fixture.AddElement("check", 2, checkValve: true);
-            fixture.AddElement("pipe", 2);
-            fixture.AddElement("return", 1);
-            fixture.Connect("source", 0, "check", 0);
-            fixture.Connect("check", 1, "pipe", 0);
-            fixture.Connect("pipe", 1, "return", 0);
-            fixture.AddBoundary("return", GameMepBoundaryKind.Outlet);
-
-            fixture.Calculate();
-
-            Assert(fixture.Path("pipe").DirectionExplanation.LimitingControls
-                .Any(item => item.IndexOf("Clapet", StringComparison.OrdinalIgnoreCase) >= 0),
-                "A check valve crossed by the upstream path must be named.");
         }
 
         private static void DirectionExplanationReportsClosedValveLimit()
@@ -1699,7 +2070,6 @@ namespace BIMaestro.VideoGames
             fixture.AddElement("arrival", 1, source: true);
             fixture.AddElement("boundary", 2);
             fixture.AddElement("valve", 2, valve: true);
-            fixture.AddElement("check", 2, checkValve: true);
             fixture.AddElement("pump", 2);
             fixture.SetDirectedSource("boundary", 0, 1);
             GameMepSourceData arrival = fixture.Graph.Sources.First(item =>
@@ -1707,8 +2077,6 @@ namespace BIMaestro.VideoGames
             GameMepSourceData boundary = fixture.Graph.Sources.First(item =>
                 item.ElementKey == "boundary");
             GameMepValveData valve = fixture.Graph.FindValve("valve")!;
-            GameMepValveData check = fixture.Graph.FindValve("check")!;
-            int originalCheckEntry = check.EntryConnectorIndex;
             var history = new GameMepScenarioHistory();
 
             Assert(history.Execute(fixture.Graph, "source inactive",
@@ -1725,16 +2093,6 @@ namespace BIMaestro.VideoGames
                 valve.IsClosed = true;
                 valve.WasManuallyOverridden = true;
             }), "A valve action must be recorded.");
-            Assert(history.Execute(fixture.Graph, "check reversed", () =>
-            {
-                int entry = check.EntryConnectorIndex;
-                check.EntryConnectorIndex = check.ExitConnectorIndex;
-                check.ExitConnectorIndex = entry;
-                check.WasManuallyOverridden = true;
-            }), "A check-valve reversal must be recorded.");
-            Assert(history.Execute(fixture.Graph, "check ignored",
-                () => check.IsEnabledAsValve = false),
-                "A check-valve classification change must be recorded.");
             Assert(history.Execute(fixture.Graph, "local direction", () =>
                 fixture.SetDirectionConstraint("boundary", 1, 0)),
                 "A local direction correction must be recorded.");
@@ -1753,9 +2111,9 @@ namespace BIMaestro.VideoGames
                     WasManuallyOverridden = true
                 })), "Adding a manual source must be recorded.");
 
-            Assert(history.UndoCount == 8 && !history.CanRedo,
+            Assert(history.UndoCount == 6 && !history.CanRedo,
                 "Every functional mutation must create one command.");
-            for (int index = 0; index < 8; index++)
+            for (int index = 0; index < 6; index++)
                 Assert(history.TryUndo(fixture.Graph, false, out _),
                     "Every command in the chain must be undoable.");
             arrival = fixture.Graph.Sources.First(item => item.ElementKey == "arrival");
@@ -1763,14 +2121,13 @@ namespace BIMaestro.VideoGames
             Assert(arrival.IsActive && boundary.EntryConnectorIndex <
                 boundary.ExitConnectorIndex,
                 "Undo must restore source activation and direction.");
-            Assert(!valve.IsClosed && check.IsEnabledAsValve &&
-                check.EntryConnectorIndex == originalCheckEntry,
-                "Undo must restore valve and check-valve states.");
+            Assert(!valve.IsClosed,
+                "Undo must restore the valve state.");
             Assert(fixture.Graph.DirectionConstraints.Count == 0 &&
                 fixture.Graph.Sources.All(item => item.Name != "manual source"),
                 "Undo must remove added constraints and sources.");
 
-            for (int index = 0; index < 8; index++)
+            for (int index = 0; index < 6; index++)
                 Assert(history.TryRedo(fixture.Graph, false, out _),
                     "Every undone command must be redoable.");
             Assert(fixture.Graph.Sources.Any(item => item.Name == "manual source") &&
@@ -2165,31 +2522,6 @@ namespace BIMaestro.VideoGames
                 "A selected loop branch must keep its parallel sibling attenuated.");
         }
 
-        private static void NetworkTraceRespectsCheckValveDirection()
-        {
-            GraphFixture fixture = new GraphFixture();
-            fixture.AddElement("source", 1, source: true);
-            fixture.AddElement("check", 2, checkValve: true);
-            fixture.AddElement("pipe", 2);
-            fixture.AddElement("return", 1);
-            fixture.Connect("source", 0, "check", 0);
-            fixture.Connect("check", 1, "pipe", 0);
-            fixture.Connect("pipe", 1, "return", 0);
-            fixture.AddBoundary("return", GameMepBoundaryKind.Outlet);
-            fixture.Calculate();
-            Assert(GameMepNetworkTracer.Build(
-                    fixture.Graph, "source", GameMepTraceMode.Downstream)
-                .ElementKeys.Contains("pipe"),
-                "A forward check valve must allow downstream tracing.");
-
-            fixture.ReverseCheckValve("check");
-            fixture.Calculate();
-            Assert(!GameMepNetworkTracer.Build(
-                    fixture.Graph, "source", GameMepTraceMode.Downstream)
-                .ElementKeys.Contains("pipe"),
-                "A reversed check valve must stop downstream tracing.");
-        }
-
         private static void NetworkTraceHonorsHiddenSystems()
         {
             GraphFixture fixture = new GraphFixture();
@@ -2264,23 +2596,6 @@ namespace BIMaestro.VideoGames
                     item.Severity == GameMepDiagnosticSeverity.Critical &&
                     item.ElementKey == "pipe"),
                 "A contradictory direction must create a localized critical diagnostic.");
-        }
-
-        private static void DiagnosticsDetectCheckValveWithoutDirection()
-        {
-            GraphFixture fixture = new GraphFixture();
-            fixture.AddElement("source", 1, source: true);
-            fixture.AddElement("check", 2, checkValve: true);
-            fixture.ClearCheckValveDirection("check");
-            fixture.Connect("source", 0, "check", 0);
-
-            fixture.Calculate();
-
-            Assert(fixture.Graph.Diagnostics.Any(item =>
-                    item.Kind == GameMepDiagnosticKind.CheckValveDirectionMissing &&
-                    item.Severity == GameMepDiagnosticSeverity.Warning &&
-                    item.ElementKey == "check"),
-                "An undefined check-valve orientation must be a localized warning, not an incorrect-direction claim.");
         }
 
         private static void DiagnosticsDetectAmbiguousFlowControl()
@@ -2415,6 +2730,75 @@ namespace BIMaestro.VideoGames
                 "An empty Revit model must produce an empty, valid graph.");
         }
 
+        private static void ReplaySnapshotRoundTripPreservesGraphAndCalculation()
+        {
+            string directory = CreateTestDirectory();
+            try
+            {
+                Directory.CreateDirectory(directory);
+                string filePath = Path.Combine(directory, "tee.bimaestro-mep.json");
+                var fixture = new GraphFixture();
+                fixture.Graph.DocumentTitle = "Maquette hydraulique";
+                fixture.Graph.ScenarioModelKey = "FILE|C:/secret/project.rvt";
+                fixture.Graph.ScenarioCanPersist = true;
+                fixture.AddElement("source", 2, source: true);
+                fixture.AddElement("pipe-in", 2);
+                fixture.AddElement("tee", 3);
+                fixture.MarkPipeFitting("tee");
+                fixture.AddJunctionPaths("tee");
+                fixture.AddElement("pipe-main", 2);
+                fixture.AddElement("pipe-branch", 2);
+                fixture.Connect("source", 1, "pipe-in", 0);
+                fixture.Connect("pipe-in", 1, "tee", 0);
+                fixture.Connect("tee", 1, "pipe-main", 0);
+                fixture.Connect("tee", 2, "pipe-branch", 0);
+                fixture.SetPathLength("source", 1.0);
+                fixture.SetPathLength("pipe-in", 4.0);
+                fixture.SetPathLength("pipe-main", 6.0);
+                fixture.SetPathLength("pipe-branch", 2.0);
+                fixture.SetPipeDiameter("pipe-in", 0.6);
+                fixture.SetPipeDiameter("pipe-main", 0.6);
+                fixture.SetPipeDiameter("pipe-branch", 0.2);
+                fixture.Graph.Elements[0].PersistentId = "revit-unique-id";
+                fixture.Graph.Connectors[0].PersistentKey = "revit-connector-id";
+                new GameMepSimulationEngine(fixture.Graph).Recalculate();
+
+                GameMepReplayStore.Save(fixture.Graph, filePath);
+                GameMepReplaySnapshot loaded = GameMepReplayStore.Load(filePath);
+                GameMepReplayResult replayed = GameMepReplayStore.Replay(loaded);
+
+                Assert(loaded.Graph.Elements.Count == fixture.Graph.Elements.Count,
+                    "Replay export must preserve every MEP element.");
+                Assert(loaded.Graph.Connectors.Count == fixture.Graph.Connectors.Count,
+                    "Replay export must preserve every connector.");
+                Assert(loaded.Graph.Connections.Count == fixture.Graph.Connections.Count,
+                    "Replay export must preserve every graph connection.");
+                Assert(loaded.CapturedPathStates.Count ==
+                        fixture.Graph.Elements.Sum(element => element.Paths.Count),
+                    "Replay export must preserve the captured direction of every path.");
+                Assert(loaded.Graph.ScenarioModelKey.Length == 0 &&
+                    !loaded.Graph.ScenarioCanPersist,
+                    "Replay export must not expose the local Revit model path.");
+                Assert(loaded.Graph.Elements.All(element =>
+                        string.IsNullOrEmpty(element.PersistentId)) &&
+                    loaded.Graph.Connectors.All(connector =>
+                        string.IsNullOrEmpty(connector.PersistentKey)),
+                    "Replay export must remove persistent Revit identifiers.");
+                Assert(replayed.PathCount == fixture.Graph.Elements.Sum(element =>
+                        element.Paths.Count),
+                    "Replay must execute every exported path.");
+                Assert(replayed.StateChangeCount == 0,
+                    "An unchanged engine must reproduce the captured graph exactly.");
+                Assert(replayed.CapturedVisibleDiscontinuityCount == 0 &&
+                    replayed.ReplayedVisibleDiscontinuityCount == 0,
+                    "An unchanged tee graph must keep visible paths continuous.");
+            }
+            finally
+            {
+                DeleteTestDirectory(directory);
+            }
+        }
+
         private static void ScenarioRoundTripRestoresSourcesAndValves()
         {
             string directory = CreateTestDirectory();
@@ -2426,7 +2810,6 @@ namespace BIMaestro.VideoGames
                 saved.AddElement("automatic-old", "uid-auto", "auto-port");
                 saved.AddElement("valve-a-old", "uid-valve-a", "va-0", "va-1");
                 saved.AddElement("valve-b-old", "uid-valve-b", "vb-0", "vb-1");
-                saved.AddElement("check-old", "uid-check", "check-in", "check-out");
                 saved.AddElement("pump-old", "uid-pump", "pump-in", "pump-out");
                 saved.AddSource("source-a-old", true, true, 0, 1);
                 saved.AddSource("source-b-old", true, true, 1, 0,
@@ -2434,8 +2817,6 @@ namespace BIMaestro.VideoGames
                 saved.AddSource("automatic-old", false, false, -1, -1, initiallyActive: true);
                 saved.AddValve("valve-a-old", true, true, initiallyEnabled: true);
                 saved.AddValve("valve-b-old", false, false, initiallyEnabled: true);
-                saved.AddValve("check-old", true, false, true,
-                    GameMepFlowControlKind.CheckValve, 1, 0);
                 saved.AddDirectionConstraint("pump-old", 0, 1);
 
                 Assert(GameMepScenarioStore.SaveNow(saved.Graph, directory),
@@ -2453,20 +2834,17 @@ namespace BIMaestro.VideoGames
                 restored.AddElement("automatic-new", "uid-auto", "auto-port");
                 restored.AddElement("valve-a-new", "uid-valve-a", "va-0", "va-1");
                 restored.AddElement("valve-b-new", "uid-valve-b", "vb-0", "vb-1");
-                restored.AddElement("check-new", "uid-check", "check-in", "check-out");
                 restored.AddElement("pump-new", "uid-pump", "pump-in", "pump-out");
                 restored.AddSource("automatic-new", true, false, -1, -1, initiallyActive: true);
                 restored.AddValve("valve-a-new", true, false, initiallyEnabled: true);
                 restored.AddValve("valve-b-new", true, false, initiallyEnabled: true);
-                restored.AddValve("check-new", true, false, true,
-                    GameMepFlowControlKind.CheckValve, 0, 1);
 
                 GameMepScenarioRestoreResult result =
                     GameMepScenarioStore.Restore(restored.Graph, directory);
                 Assert(result.Error.Length == 0, "A valid scenario must restore without error.");
                 Assert(result.RestoredSources == 3, "Three source states must be restored.");
-                Assert(result.RestoredValves == 3,
-                    "Two valves and one check valve must be restored.");
+                Assert(result.RestoredValves == 2,
+                    "Two valve states must be restored.");
                 Assert(result.RestoredDirectionConstraints == 1,
                     "The pump direction constraint must be restored.");
 
@@ -2500,13 +2878,6 @@ namespace BIMaestro.VideoGames
                     "A closed valve must remain closed.");
                 Assert(!restored.Graph.FindValve("valve-b-new")!.IsEnabledAsValve,
                     "A manually rejected valve must stay rejected.");
-                GameMepValveData restoredCheck = restored.Graph.FindValve("check-new")!;
-                Assert(restoredCheck.Kind == GameMepFlowControlKind.CheckValve &&
-                    restored.Graph.Connectors[restoredCheck.EntryConnectorIndex]
-                        .PersistentKey == "check-out" &&
-                    restored.Graph.Connectors[restoredCheck.ExitConnectorIndex]
-                        .PersistentKey == "check-in",
-                    "The corrected check-valve direction must survive connector reindexing.");
             }
             finally
             {
@@ -2600,6 +2971,35 @@ namespace BIMaestro.VideoGames
                     "A source whose connector disappeared must be reported as skipped.");
                 Assert(changed.Graph.Sources.Count == 0,
                     "An invalid directed source must not become bidirectional.");
+            }
+            finally
+            {
+                DeleteTestDirectory(directory);
+            }
+        }
+
+        private static void ChangedNetworkSkipsLegacyPipeFittingSource()
+        {
+            string directory = CreateTestDirectory();
+            try
+            {
+                var saved = new PersistenceFixture("CENTRAL|SERVER/LEGACY-FITTING.RVT");
+                saved.AddElement("old-boundary", "uid-legacy-fitting", "p0", "p1", "p2");
+                saved.AddSource("old-boundary", true, true, -1, -1);
+                GameMepScenarioStore.SaveNow(saved.Graph, directory);
+
+                var restored = new PersistenceFixture("CENTRAL|SERVER/LEGACY-FITTING.RVT");
+                restored.AddElement("CML_Acier Té", "uid-legacy-fitting", "p0", "p1", "p2");
+                restored.Graph.FindElement("CML_Acier Té")!.IsPipeFitting = true;
+                restored.Graph.FindElement("CML_Acier Té")!.IsPipeJunction = true;
+
+                GameMepScenarioRestoreResult result =
+                    GameMepScenarioStore.Restore(restored.Graph, directory);
+
+                Assert(result.SkippedEntries == 1 &&
+                    result.RestoredSources == 0 &&
+                    restored.Graph.Sources.Count == 0,
+                    "A legacy scenario must never restore a tee as a hydraulic source.");
             }
             finally
             {
@@ -2820,8 +3220,7 @@ namespace BIMaestro.VideoGames
                 string key,
                 int connectorCount,
                 bool source = false,
-                bool valve = false,
-                bool checkValve = false)
+                bool valve = false)
             {
                 var element = new GameMepElementData
                 {
@@ -2852,7 +3251,7 @@ namespace BIMaestro.VideoGames
                             ConnectorA = element.ConnectorIndices[first],
                             ConnectorB = element.ConnectorIndices[second],
                             IsInternal = true,
-                            IsValveGateCandidate = valve || checkValve,
+                            IsValveGateCandidate = valve,
                             ElementKey = key
                         });
                     }
@@ -2870,22 +3269,16 @@ namespace BIMaestro.VideoGames
                         IsActive = true
                     });
                 }
-                if (valve || checkValve)
+                if (valve)
                 {
                     Graph.Valves.Add(new GameMepValveData
                     {
                         ElementKey = key,
-                        Kind = checkValve
-                            ? GameMepFlowControlKind.CheckValve
-                            : GameMepFlowControlKind.IsolationValve,
+                        Kind = GameMepFlowControlKind.IsolationValve,
                         IsEnabledAsValve = true,
                         Confidence = GameMepConfidence.High,
-                        EntryConnectorIndex = checkValve
-                            ? element.ConnectorIndices[0]
-                            : -1,
-                        ExitConnectorIndex = checkValve
-                            ? element.ConnectorIndices[1]
-                            : -1
+                        EntryConnectorIndex = -1,
+                        ExitConnectorIndex = -1
                     });
                 }
                 if (connectorCount == 2)
@@ -2948,6 +3341,40 @@ namespace BIMaestro.VideoGames
                 }
             }
 
+            public void MarkPipeFitting(string key)
+            {
+                _elements[key].IsPipeFitting = true;
+            }
+
+            public void SetElementCategory(string key, string category)
+            {
+                _elements[key].Category = category;
+            }
+
+            public void SetElementClassification(string key, string classification)
+            {
+                _elements[key].Classification = classification;
+            }
+
+            public void SetElementIdentity(
+                string key,
+                string name,
+                string typeName)
+            {
+                _elements[key].Name = name;
+                _elements[key].TypeName = typeName;
+            }
+
+            public void SetConnectorFlowDirection(
+                string key,
+                int port,
+                string direction)
+            {
+                GameMepElementData element = _elements[key];
+                Graph.Connectors[element.ConnectorIndices[port]].FlowDirection =
+                    direction;
+            }
+
             public void AddJunctionPaths(string key)
             {
                 GameMepElementData element = _elements[key];
@@ -2993,21 +3420,6 @@ namespace BIMaestro.VideoGames
             public void CloseValve(string key)
             {
                 Graph.FindValve(key)!.IsClosed = true;
-            }
-
-            public void ReverseCheckValve(string key)
-            {
-                GameMepValveData checkValve = Graph.FindValve(key)!;
-                int entry = checkValve.EntryConnectorIndex;
-                checkValve.EntryConnectorIndex = checkValve.ExitConnectorIndex;
-                checkValve.ExitConnectorIndex = entry;
-            }
-
-            public void ClearCheckValveDirection(string key)
-            {
-                GameMepValveData checkValve = Graph.FindValve(key)!;
-                checkValve.EntryConnectorIndex = -1;
-                checkValve.ExitConnectorIndex = -1;
             }
 
             public void AddFlowControlCandidate(
@@ -3270,28 +3682,19 @@ namespace BIMaestro.VideoGames
                 string runtimeKey,
                 bool enabled,
                 bool closed,
-                bool initiallyEnabled,
-                GameMepFlowControlKind kind =
-                    GameMepFlowControlKind.IsolationValve,
-                int entryPort = -1,
-                int exitPort = -1)
+                bool initiallyEnabled)
             {
-                GameMepElementData element = _elements[runtimeKey];
                 Graph.Valves.Add(new GameMepValveData
                 {
                     ElementKey = runtimeKey,
-                    Kind = kind,
+                    Kind = GameMepFlowControlKind.IsolationValve,
                     IsEnabledAsValve = enabled,
                     InitiallyEnabledAsValve = initiallyEnabled,
                     IsClosed = closed,
                     WasManuallyOverridden = true,
                     Confidence = GameMepConfidence.High,
-                    EntryConnectorIndex = entryPort >= 0
-                        ? element.ConnectorIndices[entryPort]
-                        : -1,
-                    ExitConnectorIndex = exitPort >= 0
-                        ? element.ConnectorIndices[exitPort]
-                        : -1
+                    EntryConnectorIndex = -1,
+                    ExitConnectorIndex = -1
                 });
                 Graph.RebuildIndexes();
             }

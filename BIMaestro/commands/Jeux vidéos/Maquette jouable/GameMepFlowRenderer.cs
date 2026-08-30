@@ -913,49 +913,6 @@ namespace BIMaestro.VideoGames
                         colors);
                 }
 
-                if (item.Valve.Kind == GameMepFlowControlKind.CheckValve &&
-                    item.Valve.HasExplicitDirection &&
-                    item.Valve.EntryConnectorIndex < _graph.Connectors.Count &&
-                    item.Valve.ExitConnectorIndex < _graph.Connectors.Count)
-                {
-                    Vector3D flowDirection =
-                        _graph.Connectors[item.Valve.ExitConnectorIndex].Position -
-                        _graph.Connectors[item.Valve.EntryConnectorIndex].Position;
-                    if (flowDirection.LengthSquared > 1e-8)
-                    {
-                        flowDirection.Normalize();
-                        Vector3D arrowSide = Vector3D.CrossProduct(flowDirection, view);
-                        if (arrowSide.LengthSquared < 1e-8)
-                            arrowSide = right;
-                        else
-                            arrowSide.Normalize();
-                        Point3D tail = item.Center - flowDirection * (radius * 0.68);
-                        Point3D tip = item.Center + flowDirection * (radius * 0.68);
-                        Point3D wingBase = tip - flowDirection * (radius * 0.48);
-                        AppendMarkerSegment(
-                            tail,
-                            tip,
-                            color,
-                            positions,
-                            indices,
-                            colors);
-                        AppendMarkerSegment(
-                            tip,
-                            wingBase + arrowSide * (radius * 0.32),
-                            color,
-                            positions,
-                            indices,
-                            colors);
-                        AppendMarkerSegment(
-                            tip,
-                            wingBase - arrowSide * (radius * 0.32),
-                            color,
-                            positions,
-                            indices,
-                            colors);
-                    }
-                }
-
                 if (item.Valve.IsClosed)
                 {
                     double crossRadius = radius * 0.72;
@@ -1005,12 +962,6 @@ namespace BIMaestro.VideoGames
             }
             if (valve.IsClosed)
                 return new SharpDX.Color4(1.0f, 0.08f, 0.05f, 1.0f);
-            if (valve.Kind == GameMepFlowControlKind.CheckValve)
-            {
-                return valve.HasExplicitDirection
-                    ? new SharpDX.Color4(0.72f, 0.30f, 1.0f, 1.0f)
-                    : new SharpDX.Color4(1.0f, 0.66f, 0.10f, 1.0f);
-            }
             if (valve.Confidence == GameMepConfidence.Low &&
                 !valve.WasManuallyOverridden)
             {

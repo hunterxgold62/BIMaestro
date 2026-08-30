@@ -272,6 +272,7 @@
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepDiagnostics.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepFlowRenderer.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepNetworkTrace.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepReplayStore.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepScenarioStore.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepScenarioHistory.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepUiModels.cs" />

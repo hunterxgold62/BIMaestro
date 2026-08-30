@@ -28,15 +28,29 @@ namespace BIMaestro.VideoGames
             List<int>[] adjacency = BuildAdjacency(graph);
             List<Traversal> inlets = graph.Sources
                 .Where(item => item.IsActive &&
-                    item.BoundaryKind == GameMepBoundaryKind.Inlet)
+                    item.BoundaryKind == GameMepBoundaryKind.Inlet &&
+                    GameMepBoundaryPolicy.IsUsable(
+                        graph.FindElement(item.ElementKey), item))
+                .GroupBy(item => item.ElementKey, StringComparer.Ordinal)
+                .Select(group => group
+                    .OrderByDescending(item => item.HasExplicitDirection)
+                    .ThenByDescending(item => item.WasManuallyOverridden)
+                    .First())
                 .OrderBy(item => SourceStableKey(graph, item), StringComparer.Ordinal)
-                .Select(item => Traverse(graph, adjacency, item, false))
+                .Select(item => Traverse(graph, adjacency, item))
                 .ToList();
             List<Traversal> outlets = graph.Sources
                 .Where(item => item.IsActive &&
-                    item.BoundaryKind == GameMepBoundaryKind.Outlet)
+                    item.BoundaryKind == GameMepBoundaryKind.Outlet &&
+                    GameMepBoundaryPolicy.IsUsable(
+                        graph.FindElement(item.ElementKey), item))
+                .GroupBy(item => item.ElementKey, StringComparer.Ordinal)
+                .Select(group => group
+                    .OrderByDescending(item => item.HasExplicitDirection)
+                    .ThenByDescending(item => item.WasManuallyOverridden)
+                    .First())
                 .OrderBy(item => SourceStableKey(graph, item), StringComparer.Ordinal)
-                .Select(item => Traverse(graph, adjacency, item, true))
+                .Select(item => Traverse(graph, adjacency, item))
                 .ToList();
 
             foreach (GameMepElementData element in graph.Elements
@@ -125,13 +139,6 @@ namespace BIMaestro.VideoGames
                 return GameMepDirectionReliability.Manual;
             if (path.DirectionState != GameMepDirectionState.Resolved)
                 return GameMepDirectionReliability.Ambiguous;
-            GameMepValveData? valve = graph.FindValve(path.ElementKey);
-            if (valve != null && valve.IsEnabledAsValve &&
-                valve.Kind == GameMepFlowControlKind.CheckValve &&
-                valve.HasExplicitDirection)
-            {
-                return GameMepDirectionReliability.Reliable;
-            }
             return GameMepDirectionReliability.Inferred;
         }
 
@@ -149,6 +156,8 @@ namespace BIMaestro.VideoGames
             if (graph.Sources.Any(item =>
                 item.IsActive && item.HasExplicitDirection &&
                 (item.IsUserCreated || item.WasManuallyOverridden) &&
+                GameMepBoundaryPolicy.IsUsable(
+                    graph.FindElement(item.ElementKey), item) &&
                 string.Equals(item.ElementKey, path.ElementKey,
                     StringComparison.Ordinal)))
             {
@@ -162,8 +171,7 @@ namespace BIMaestro.VideoGames
         private static Traversal Traverse(
             GameMepGraphData graph,
             IList<int>[] adjacency,
-            GameMepSourceData boundary,
-            bool reverseCheckValves)
+            GameMepSourceData boundary)
         {
             int count = graph.Connectors.Count;
             var traversal = new Traversal
@@ -215,7 +223,7 @@ namespace BIMaestro.VideoGames
                         : edge.ConnectorA;
                     if (!GameMepSystemTraversalPolicy.CanTraverse(graph, edge) ||
                         (externalStops.Contains(current) && !edge.IsInternal) ||
-                        IsBlocked(graph, edge, current, next, reverseCheckValves))
+                        IsBlocked(graph, edge))
                     {
                         continue;
                     }
@@ -275,27 +283,14 @@ namespace BIMaestro.VideoGames
 
         private static bool IsBlocked(
             GameMepGraphData graph,
-            GameMepConnectionData edge,
-            int current,
-            int next,
-            bool reverseCheckValve)
+            GameMepConnectionData edge)
         {
             if (!edge.IsInternal || !edge.IsValveGateCandidate)
                 return false;
             GameMepValveData? valve = graph.FindValve(edge.ElementKey);
             if (valve == null || !valve.IsEnabledAsValve)
                 return false;
-            if (valve.Kind == GameMepFlowControlKind.IsolationValve)
-                return valve.IsClosed;
-            if (!valve.HasExplicitDirection)
-                return false;
-            int allowedStart = reverseCheckValve
-                ? valve.ExitConnectorIndex
-                : valve.EntryConnectorIndex;
-            int allowedEnd = reverseCheckValve
-                ? valve.EntryConnectorIndex
-                : valve.ExitConnectorIndex;
-            return current != allowedStart || next != allowedEnd;
+            return valve.IsClosed;
         }
 
         private static void AppendUpstreamPath(
@@ -422,10 +417,8 @@ namespace BIMaestro.VideoGames
             string name = element == null || string.IsNullOrWhiteSpace(element.Name)
                 ? valve.ElementKey
                 : element.Name;
-            string label = valve.Kind == GameMepFlowControlKind.CheckValve
-                ? "Clapet : " + name +
-                    (valve.HasExplicitDirection ? string.Empty : " (orientation à définir)")
-                : "Vanne " + (valve.IsClosed ? "fermée : " : "ouverte : ") + name;
+            string label = "Vanne " +
+                (valve.IsClosed ? "fermée : " : "ouverte : ") + name;
             if (!result.LimitingControls.Contains(label))
                 result.LimitingControls.Add(label);
         }
@@ -452,12 +445,19 @@ namespace BIMaestro.VideoGames
             GameMepGraphData graph,
             GameMepSourceData source)
         {
-            if (!string.IsNullOrWhiteSpace(source.Name))
-                return source.Name;
             GameMepElementData? element = graph.FindElement(source.ElementKey);
-            return element == null || string.IsNullOrWhiteSpace(element.Name)
+            if (element != null)
+            {
+                string currentName = string.IsNullOrWhiteSpace(element.Name)
+                    ? source.ElementKey
+                    : element.Name;
+                return element.ElementId > 0
+                    ? currentName + " (ID Revit " + element.ElementId + ")"
+                    : currentName;
+            }
+            return string.IsNullOrWhiteSpace(source.Name)
                 ? source.ElementKey
-                : element.Name;
+                : source.Name;
         }
 
         private static string SourceStableKey(

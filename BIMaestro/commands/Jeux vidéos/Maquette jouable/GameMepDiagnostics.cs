@@ -16,7 +16,6 @@ namespace BIMaestro.VideoGames
     internal enum GameMepDiagnosticKind
     {
         DirectionConflict,
-        CheckValveDirectionMissing,
         AmbiguousFlowControl,
         UnknownPassThroughComponent,
         BranchWithoutSource,
@@ -175,19 +174,6 @@ namespace BIMaestro.VideoGames
                 GameMepElementData? element = graph.FindElement(valve.ElementKey);
                 if (element == null)
                     continue;
-                if (valve.IsEnabledAsValve &&
-                    valve.Kind == GameMepFlowControlKind.CheckValve &&
-                    !valve.HasExplicitDirection)
-                {
-                    graph.Diagnostics.Add(CreateElementDiagnostic(
-                        graph,
-                        element,
-                        GameMepDiagnosticKind.CheckValveDirectionMissing,
-                        GameMepDiagnosticSeverity.Warning,
-                        "Orientation du clapet à définir",
-                        "Ce clapet n'est pas considéré comme incorrect : son sens n'a simplement pas encore été indiqué ou déduit avec une confiance suffisante.",
-                        "check-direction|" + element.Key));
-                }
                 if (valve.Confidence == GameMepConfidence.High ||
                     valve.WasManuallyOverridden)
                 {
@@ -202,9 +188,7 @@ namespace BIMaestro.VideoGames
                     detailedOnly
                         ? GameMepDiagnosticSeverity.Information
                         : GameMepDiagnosticSeverity.Warning,
-                    valve.Kind == GameMepFlowControlKind.CheckValve
-                        ? "Clapet incertain"
-                        : "Vanne ou accessoire ambigu",
+                    "Vanne ou accessoire ambigu",
                     "La classification automatique est " +
                         ToConfidenceText(valve.Confidence) +
                         ". Une validation manuelle est recommandée.",
@@ -225,7 +209,8 @@ namespace BIMaestro.VideoGames
                     continue;
                 }
                 bool boundary = graph.Sources.Any(source =>
-                    string.Equals(source.ElementKey, element.Key, StringComparison.Ordinal));
+                    string.Equals(source.ElementKey, element.Key, StringComparison.Ordinal) &&
+                    GameMepBoundaryPolicy.IsUsable(element, source));
                 graph.Diagnostics.Add(CreateElementDiagnostic(
                     graph,
                     element,
@@ -247,7 +232,9 @@ namespace BIMaestro.VideoGames
             var activeSourceElements = new HashSet<string>(
                 graph.Sources.Where(source =>
                         source.IsActive &&
-                        source.BoundaryKind == GameMepBoundaryKind.Inlet)
+                        source.BoundaryKind == GameMepBoundaryKind.Inlet &&
+                        GameMepBoundaryPolicy.IsUsable(
+                            graph.FindElement(source.ElementKey), source))
                     .Select(source => source.ElementKey),
                 StringComparer.Ordinal);
             foreach (ComponentInfo component in components)
@@ -527,6 +514,7 @@ namespace BIMaestro.VideoGames
                 return true;
             return graph.Sources.Any(source =>
                 string.Equals(source.ElementKey, element.Key, StringComparison.Ordinal) &&
+                GameMepBoundaryPolicy.IsUsable(element, source) &&
                 (!source.HasExplicitDirection ||
                  source.EntryConnectorIndex == connector.Index ||
                  source.ExitConnectorIndex == connector.Index));
@@ -537,9 +525,10 @@ namespace BIMaestro.VideoGames
             GameMepElementData element)
         {
             if (element.IsPipeCurve || element.ConnectorIndices.Count < 2 ||
-                graph.FindValve(element.Key) != null ||
-                graph.Sources.Any(source =>
-                    string.Equals(source.ElementKey, element.Key, StringComparison.Ordinal)))
+                 graph.FindValve(element.Key) != null ||
+                 graph.Sources.Any(source =>
+                    string.Equals(source.ElementKey, element.Key, StringComparison.Ordinal) &&
+                    GameMepBoundaryPolicy.IsUsable(element, source)))
             {
                 return false;
             }

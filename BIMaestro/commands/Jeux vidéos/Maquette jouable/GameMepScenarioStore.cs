@@ -367,7 +367,8 @@ namespace BIMaestro.VideoGames
                 .GroupBy(element => element.Key, StringComparer.Ordinal)
                 .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
 
-            foreach (GameMepValveData valve in graph.Valves)
+            foreach (GameMepValveData valve in graph.Valves.Where(item =>
+                item.Kind == GameMepFlowControlKind.IsolationValve))
             {
                 bool differsFromInitial =
                     valve.IsEnabledAsValve != valve.InitiallyEnabledAsValve;
@@ -416,7 +417,8 @@ namespace BIMaestro.VideoGames
                 if (!elementsByKey.TryGetValue(
                         source.ElementKey,
                         out GameMepElementData element) ||
-                    string.IsNullOrWhiteSpace(element.PersistentId))
+                    string.IsNullOrWhiteSpace(element.PersistentId) ||
+                    !GameMepBoundaryPolicy.IsUsable(element, source))
                 {
                     continue;
                 }
@@ -424,7 +426,9 @@ namespace BIMaestro.VideoGames
                 snapshot.Sources.Add(new GameMepScenarioSourceState
                 {
                     ElementPersistentId = element.PersistentId,
-                    Name = source.Name ?? string.Empty,
+                    Name = string.IsNullOrWhiteSpace(element.Name)
+                        ? source.Name ?? string.Empty
+                        : element.Name,
                     IsActive = source.IsActive,
                     IsUserCreated = source.IsUserCreated,
                     BoundaryKind = source.BoundaryKind,
@@ -496,6 +500,11 @@ namespace BIMaestro.VideoGames
             foreach (GameMepScenarioValveState state in snapshot.Valves ??
                 new List<GameMepScenarioValveState>())
             {
+                if (state.Kind != GameMepFlowControlKind.IsolationValve)
+                {
+                    result.SkippedEntries++;
+                    continue;
+                }
                 if (!elementsByPersistentId.TryGetValue(
                         state.ElementPersistentId ?? string.Empty,
                         out GameMepElementData element))
@@ -503,7 +512,6 @@ namespace BIMaestro.VideoGames
                     result.SkippedEntries++;
                     continue;
                 }
-
                 GameMepValveData? valve = graph.FindValve(element.Key);
                 if (valve == null)
                 {
@@ -545,6 +553,14 @@ namespace BIMaestro.VideoGames
                     result.SkippedEntries++;
                     continue;
                 }
+                if (!GameMepBoundaryPolicy.CanHostBoundary(element))
+                {
+                    // Les anciennes versions autorisaient accidentellement les
+                    // tés, coudes et réductions comme sources. Ces frontières
+                    // fantômes ne doivent jamais être restaurées.
+                    result.SkippedEntries++;
+                    continue;
+                }
 
                 bool hasStoredDirection =
                     !string.IsNullOrWhiteSpace(state.EntryConnectorPersistentKey) ||
@@ -575,9 +591,9 @@ namespace BIMaestro.VideoGames
                     {
                         ElementKey = element.Key,
                         SystemKey = element.SystemKey,
-                        Name = string.IsNullOrWhiteSpace(state.Name)
-                            ? element.Name
-                            : state.Name,
+                        Name = string.IsNullOrWhiteSpace(element.Name)
+                            ? state.Name
+                            : element.Name,
                         Confidence = hasStoredDirection
                             ? GameMepConfidence.High
                             : GameMepConfidence.Low,
@@ -589,6 +605,10 @@ namespace BIMaestro.VideoGames
                 }
 
                 source.IsActive = state.IsActive;
+                source.SystemKey = element.SystemKey;
+                source.Name = string.IsNullOrWhiteSpace(element.Name)
+                    ? state.Name
+                    : element.Name;
                 source.IsUserCreated = state.IsUserCreated;
                 source.BoundaryKind = state.BoundaryKind;
                 source.WasManuallyOverridden = true;

@@ -159,6 +159,7 @@ namespace BIMaestro.VideoGames
             GameMepSourceData? source = graph.Sources
                 .Where(item => item.IsActive &&
                     item.BoundaryKind == GameMepBoundaryKind.Inlet &&
+                    GameMepBoundaryPolicy.IsUsable(sourceElement, item) &&
                     string.Equals(item.ElementKey, sourceKey, StringComparison.Ordinal))
                 .OrderBy(item => SourceStableKey(item), StringComparer.Ordinal)
                 .FirstOrDefault();
@@ -412,23 +413,8 @@ namespace BIMaestro.VideoGames
                 GameMepValveData? control = graph.FindValve(edge.ElementKey);
                 if (control != null && control.IsEnabledAsValve)
                 {
-                    if (control.Kind == GameMepFlowControlKind.IsolationValve &&
-                        control.IsClosed)
+                    if (control.IsClosed)
                     {
-                        continue;
-                    }
-                    if (control.Kind == GameMepFlowControlKind.CheckValve &&
-                        control.HasExplicitDirection)
-                    {
-                        if (MatchesEdge(edge,
-                                control.EntryConnectorIndex,
-                                control.ExitConnectorIndex))
-                        {
-                            AddArc(result,
-                                control.EntryConnectorIndex,
-                                control.ExitConnectorIndex,
-                                edgeIndex);
-                        }
                         continue;
                     }
                 }

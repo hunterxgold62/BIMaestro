@@ -2056,6 +2056,8 @@ namespace BIMaestro.VideoGames
         {
             _mepSourceItems.Clear();
             foreach (GameMepSourceData source in _scene.MepGraph.Sources
+                .Where(source => GameMepBoundaryPolicy.IsUsable(
+                    _scene.MepGraph.FindElement(source.ElementKey), source))
                 .OrderBy(source => source.Name, StringComparer.CurrentCultureIgnoreCase))
             {
                 _mepSourceItems.Add(new GameMepSourceItem(
@@ -2084,7 +2086,6 @@ namespace BIMaestro.VideoGames
             {
                 new GameMepDiagnosticFilterOption(UiLanguage.T("Tous les types", "All Types")),
                 new GameMepDiagnosticFilterOption(UiLanguage.T("Conflits de sens", "Direction Conflicts"), GameMepDiagnosticKind.DirectionConflict),
-                new GameMepDiagnosticFilterOption(UiLanguage.T("Clapets sans sens", "Check Valves Without Direction"), GameMepDiagnosticKind.CheckValveDirectionMissing),
                 new GameMepDiagnosticFilterOption(UiLanguage.T("Vannes et accessoires ambigus", "Ambiguous Valves and Fittings"), GameMepDiagnosticKind.AmbiguousFlowControl),
                 new GameMepDiagnosticFilterOption(UiLanguage.T("Composants non classés", "Unclassified Components"), GameMepDiagnosticKind.UnknownPassThroughComponent),
                 new GameMepDiagnosticFilterOption(UiLanguage.T("Branches sans source", "Branches Without Source"), GameMepDiagnosticKind.BranchWithoutSource),
@@ -2368,7 +2369,9 @@ namespace BIMaestro.VideoGames
                 !_mepRecalculationRunning;
             int activeSources = graph.Sources.Count(source =>
                 source.IsActive &&
-                source.BoundaryKind == GameMepBoundaryKind.Inlet);
+                source.BoundaryKind == GameMepBoundaryKind.Inlet &&
+                GameMepBoundaryPolicy.IsUsable(
+                    graph.FindElement(source.ElementKey), source));
             MepFlowToggleButton.Content = _mepFlowEnabled
                 ? UiLanguage.T("Flux  •  actifs", "Flow  •  active")
                 : UiLanguage.T("Flux  •  arrêtés", "Flow  •  stopped");
@@ -2386,23 +2389,20 @@ namespace BIMaestro.VideoGames
                 ? activeBrush
                 : inactiveBrush;
             int enabledIsolationValves = graph.Valves.Count(valve =>
-                valve.IsEnabledAsValve &&
-                valve.Kind == GameMepFlowControlKind.IsolationValve);
-            int enabledCheckValves = graph.Valves.Count(valve =>
-                valve.IsEnabledAsValve &&
-                valve.Kind == GameMepFlowControlKind.CheckValve);
+                valve.IsEnabledAsValve);
             MepStatsText.Text = graph.HasData
                 ? graph.Systems.Count.ToString("N0") + UiLanguage.T(" systèmes  •  ", " systems  •  ") +
                     graph.Elements.Count.ToString("N0") + UiLanguage.T(" éléments  •  ", " elements  •  ") +
-                    enabledIsolationValves.ToString("N0") + UiLanguage.T(" vannes  •  ", " valves  •  ") +
-                    enabledCheckValves.ToString("N0") + UiLanguage.T(" clapets", " check valves")
+                    enabledIsolationValves.ToString("N0") + UiLanguage.T(" vannes", " valves")
                 : !string.IsNullOrWhiteSpace(graph.ExtractionError)
                     ? UiLanguage.T("Analyse MEP indisponible pour cette maquette", "MEP Analysis Unavailable for This Model")
                     : UiLanguage.T("Aucun réseau de canalisation détecté", "No Pipe Network Detected");
 
             int activeReturns = graph.Sources.Count(source =>
                 source.IsActive &&
-                source.BoundaryKind == GameMepBoundaryKind.Outlet);
+                source.BoundaryKind == GameMepBoundaryKind.Outlet &&
+                GameMepBoundaryPolicy.IsUsable(
+                    graph.FindElement(source.ElementKey), source));
             MepArrivalSummaryText.Text = activeSources.ToString("N0") +
                 (activeSources == 1 ? UiLanguage.T(" active", " active") : UiLanguage.T(" actives", " active"));
             MepReturnSummaryText.Text = activeReturns.ToString("N0") +
@@ -2530,7 +2530,9 @@ namespace BIMaestro.VideoGames
                 _scene.MepGraph.Elements.Count + " élément(s), " +
                 _scene.MepGraph.Elements.Sum(element => element.Paths.Count) +
                 " chemin(s), " +
-                _scene.MepGraph.Sources.Count(source => source.IsActive) +
+                _scene.MepGraph.Sources.Count(source => source.IsActive &&
+                    GameMepBoundaryPolicy.IsUsable(
+                        _scene.MepGraph.FindElement(source.ElementKey), source)) +
                 " source(s) active(s)");
             if (!_scene.MepGraph.HasData ||
                 !_scene.MepGraph.Valves.Any(valve => valve.IsEnabledAsValve))
@@ -2651,6 +2653,13 @@ namespace BIMaestro.VideoGames
                 (sender as FrameworkElement)?.DataContext as GameMepSourceItem;
             if (item == null)
                 return;
+            GameMepElementData? sourceElement =
+                _scene.MepGraph.FindElement(item.Data.ElementKey);
+            if (!GameMepBoundaryPolicy.IsUsable(sourceElement, item.Data))
+            {
+                ShowToast("Un raccord de canalisation ne peut pas être une source de fluide");
+                return;
+            }
             bool activate = !item.Data.IsActive;
             ExecuteMepScenarioMutation(
                 activate ? "Activer une source" : "Désactiver une source",
@@ -2682,8 +2691,8 @@ namespace BIMaestro.VideoGames
         private void MepResetValvesButton_Click(object sender, RoutedEventArgs e)
         {
             ExecuteMepScenarioMutation(
-                "Réinitialiser les vannes et clapets",
-                "Vannes et clapets remis à leur état initial",
+                "Réinitialiser les vannes",
+                "Vannes remises à leur état initial",
                 () => GameMepScenarioReset.ResetValvesToInitial(
                     _scene.MepGraph.Valves));
         }
@@ -2768,71 +2777,20 @@ namespace BIMaestro.VideoGames
                 return;
 
             bool enable = !valve.IsEnabledAsValve;
-            string actionLabel = valve.Kind == GameMepFlowControlKind.CheckValve
-                ? (enable ? "Activer un clapet" : "Ignorer un clapet")
-                : (enable ? "Classer comme vanne" : "Refuser comme vanne");
+            string actionLabel = enable
+                ? "Classer comme vanne"
+                : "Refuser comme vanne";
             ExecuteMepScenarioMutation(
                 actionLabel,
                 enable
-                ? (valve.Kind == GameMepFlowControlKind.CheckValve
-                    ? "Le clapet anti-retour est actif"
-                    : "L'accessoire est maintenant traité comme une vanne")
-                : (valve.Kind == GameMepFlowControlKind.CheckValve
-                    ? "Le clapet anti-retour est ignoré"
-                    : "L'accessoire n'est plus traité comme une vanne"),
+                    ? "L'accessoire est maintenant traité comme une vanne"
+                    : "L'accessoire n'est plus traité comme une vanne",
                 () =>
                 {
                     valve.IsEnabledAsValve = enable;
                     valve.WasManuallyOverridden = true;
                     if (!enable)
                         valve.IsClosed = false;
-                });
-        }
-
-        private void CheckValveDirectionButton_Click(
-            object sender,
-            RoutedEventArgs e)
-        {
-            if (_mepRecalculationRunning)
-                return;
-            string key = (sender as FrameworkElement)?.Tag as string ?? string.Empty;
-            GameMepValveData? valve = _scene.MepGraph.FindValve(key);
-            GameMepElementData? element = _scene.MepGraph.FindElement(key);
-            GameMepPathData? path = element?.Paths.FirstOrDefault(candidate =>
-                candidate.StartConnector >= 0 &&
-                candidate.EndConnector >= 0 &&
-                candidate.StartConnector != candidate.EndConnector);
-            if (valve == null || path == null ||
-                valve.Kind != GameMepFlowControlKind.CheckValve)
-            {
-                return;
-            }
-
-            ExecuteMepScenarioMutation(
-                valve.HasExplicitDirection
-                    ? "Inverser un clapet"
-                    : "Définir le sens d'un clapet",
-                "Sens du clapet anti-retour mis à jour",
-                () =>
-                {
-                    if (valve.HasExplicitDirection)
-                    {
-                        int previousEntry = valve.EntryConnectorIndex;
-                        valve.EntryConnectorIndex = valve.ExitConnectorIndex;
-                        valve.ExitConnectorIndex = previousEntry;
-                    }
-                    else
-                    {
-                        valve.EntryConnectorIndex = path.FlowForward
-                            ? path.StartConnector
-                            : path.EndConnector;
-                        valve.ExitConnectorIndex = path.FlowForward
-                            ? path.EndConnector
-                            : path.StartConnector;
-                    }
-                    valve.IsEnabledAsValve = true;
-                    valve.IsClosed = false;
-                    valve.WasManuallyOverridden = true;
                 });
         }
 
@@ -2847,6 +2805,11 @@ namespace BIMaestro.VideoGames
             GameMepElementData? element = _scene.MepGraph.FindElement(key);
             if (element == null)
                 return;
+            if (!GameMepBoundaryPolicy.CanHostBoundary(element))
+            {
+                ShowToast("Un raccord de canalisation ne peut pas être une source de fluide");
+                return;
+            }
 
             GameMepSourceData? source = _scene.MepGraph.Sources.FirstOrDefault(
                 candidate => string.Equals(
@@ -3142,6 +3105,11 @@ namespace BIMaestro.VideoGames
             if (element == null || path == null)
             {
                 ShowToast("Le sens de cette canalisation ne peut pas être déterminé");
+                return;
+            }
+            if (!GameMepBoundaryPolicy.CanHostBoundary(element))
+            {
+                ShowToast("Un raccord de canalisation ne peut pas définir une arrivée ou un retour");
                 return;
             }
 
@@ -3552,6 +3520,51 @@ namespace BIMaestro.VideoGames
             MepRedoButton.ToolTip = _mepScenarioHistory.CanRedo
                 ? UiLanguage.T("Rétablir : ", "Redo: ") + _mepScenarioHistory.RedoLabel
                 : UiLanguage.T("Aucune action à rétablir", "No Action to Redo");
+            if (MepExportReplayButton != null)
+            {
+                MepExportReplayButton.IsEnabled =
+                    _scene.MepGraph.HasData && !_mepRecalculationRunning;
+            }
+        }
+
+        private void MepExportReplayButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            if (_mepRecalculationRunning)
+            {
+                ShowToast("Attendez la fin du calcul MEP avant l'export");
+                return;
+            }
+            if (!_scene.MepGraph.HasData)
+            {
+                ShowToast("Aucun graphe MEP à exporter");
+                return;
+            }
+
+            try
+            {
+                var dialog = new Microsoft.Win32.SaveFileDialog
+                {
+                    Title = "Exporter un cas de diagnostic MEP",
+                    FileName = GameMepReplayStore.CreateSuggestedFileName(
+                        _scene.MepGraph),
+                    DefaultExt = ".json",
+                    AddExtension = true,
+                    Filter = "Cas BIMaestro MEP (*.bimaestro-mep.json)|" +
+                        "*.bimaestro-mep.json|Fichier JSON (*.json)|*.json"
+                };
+                if (dialog.ShowDialog(this) != true)
+                    return;
+
+                GameMepReplayStore.Save(_scene.MepGraph, dialog.FileName);
+                ShowToast("Cas MEP exporté : " + dialog.FileName);
+            }
+            catch (Exception exception)
+            {
+                Debug.WriteLine("Export du cas MEP impossible : " + exception);
+                ShowToast("Export MEP impossible : " + exception.Message);
+            }
         }
 
         private async void RecalculateMepAsync(
@@ -4039,7 +4052,8 @@ namespace BIMaestro.VideoGames
                 bool supportsDirection =
                     mepElement.IsPipeCurve &&
                     mepElement.ConnectorIndices.Count == 2 &&
-                    directionalPath != null;
+                    directionalPath != null &&
+                    GameMepBoundaryPolicy.CanHostBoundary(mepElement);
                 SourceDirectionVisibility = supportsDirection
                     ? Visibility.Visible
                     : Visibility.Collapsed;
@@ -4053,7 +4067,10 @@ namespace BIMaestro.VideoGames
                 ConstraintDirectionVisibility = supportsConstraint
                     ? Visibility.Visible
                     : Visibility.Collapsed;
-                SourceActionVisibility = source != null || !supportsDirection
+                bool supportsBoundary =
+                    GameMepBoundaryPolicy.CanHostBoundary(mepElement);
+                SourceActionVisibility = supportsBoundary &&
+                    (source != null || !supportsDirection)
                     ? Visibility.Visible
                     : Visibility.Collapsed;
                 SourceActionText = source == null
@@ -4115,28 +4132,10 @@ namespace BIMaestro.VideoGames
                 }
 
                 ValveOverrideVisibility = Visibility.Visible;
-                bool isCheckValve =
-                    valve.Kind == GameMepFlowControlKind.CheckValve;
-                if (isCheckValve)
-                    ReverseDirectionVisibility = Visibility.Collapsed;
-                ValveActionVisibility = valve.IsEnabledAsValve && !isCheckValve
+                ValveActionVisibility = valve.IsEnabledAsValve
                     ? Visibility.Visible
                     : Visibility.Collapsed;
-                CheckValveDirectionVisibility = valve.IsEnabledAsValve &&
-                    isCheckValve && directionalPath != null
-                        ? Visibility.Visible
-                        : Visibility.Collapsed;
-                ValveText = isCheckValve
-                    ? (valve.IsEnabledAsValve
-                        ? "Clapet anti-retour  •  confiance " +
-                            ToFrenchConfidence(valve.Confidence) +
-                            "\nPassage autorisé : " +
-                            (valve.HasExplicitDirection
-                                ? "sens indiqué par la flèche violette"
-                                : "sens à confirmer") +
-                            "\nDétection : " + valve.DetectionReason
-                        : "Clapet anti-retour ignoré")
-                    : valve.IsEnabledAsValve
+                ValveText = valve.IsEnabledAsValve
                     ? "Vanne " + (valve.IsClosed ? "fermée" : "ouverte") +
                         "  •  confiance " + ToFrenchConfidence(valve.Confidence) +
                         "\nAmont : " + ToFrenchFlowState(valve.UpstreamState) +
@@ -4147,18 +4146,9 @@ namespace BIMaestro.VideoGames
                 ValveActionText = valve.IsClosed
                     ? "Ouvrir la vanne"
                     : "Fermer la vanne";
-                CheckValveDirectionActionText = isCheckValve
-                    ? (valve.HasExplicitDirection
-                        ? "Inverser le sens du clapet"
-                        : "Valider le sens affiché")
-                    : string.Empty;
-                ValveOverrideActionText = isCheckValve
-                    ? (valve.IsEnabledAsValve
-                        ? "Ignorer ce clapet"
-                        : "Activer ce clapet")
-                    : (valve.IsEnabledAsValve
+                ValveOverrideActionText = valve.IsEnabledAsValve
                         ? "Ne plus traiter comme vanne"
-                        : "Marquer comme vanne");
+                        : "Marquer comme vanne";
             }
 
             public GameElementData Element { get; }
@@ -4195,10 +4185,8 @@ namespace BIMaestro.VideoGames
             public string ValveText { get; } = string.Empty;
             public string ValveActionText { get; } = string.Empty;
             public string ValveOverrideActionText { get; } = string.Empty;
-            public string CheckValveDirectionActionText { get; } = string.Empty;
             public Visibility ValveActionVisibility { get; } = Visibility.Collapsed;
             public Visibility ValveOverrideVisibility { get; } = Visibility.Collapsed;
-            public Visibility CheckValveDirectionVisibility { get; } = Visibility.Collapsed;
             public string SourceActionText { get; } = string.Empty;
             public Visibility SourceActionVisibility { get; } = Visibility.Collapsed;
             public Visibility SourceRemoveVisibility { get; } = Visibility.Collapsed;

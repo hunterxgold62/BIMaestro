@@ -66,8 +66,7 @@ namespace BIMaestro.VideoGames
 
     internal enum GameMepFlowControlKind
     {
-        IsolationValve,
-        CheckValve
+        IsolationValve
     }
 
     internal sealed class GameMepConnectorData
@@ -193,6 +192,7 @@ namespace BIMaestro.VideoGames
         public string Classification { get; set; } = string.Empty;
         public bool IsVisible { get; set; }
         public bool IsPipeCurve { get; set; }
+        public bool IsPipeFitting { get; set; }
         /// <summary>
         /// Vrai uniquement pour un raccord de canalisation multi-voies
         /// (té, piquage, culotte ou croix). Un équipement à plusieurs ports ne
@@ -252,6 +252,79 @@ namespace BIMaestro.VideoGames
             EntryConnectorIndex >= 0 &&
             ExitConnectorIndex >= 0 &&
             EntryConnectorIndex != ExitConnectorIndex;
+    }
+
+    /// <summary>
+    /// Règles communes aux arrivées et retours hydrauliques. Un raccord fait
+    /// circuler ou répartit le fluide : il ne peut jamais créer une frontière
+    /// hydraulique, même si un ancien scénario contient encore cette entrée.
+    /// </summary>
+    internal static class GameMepBoundaryPolicy
+    {
+        public static bool CanHostBoundary(GameMepElementData? element)
+        {
+            return element != null &&
+                element.ConnectorIndices.Count > 0 &&
+                !element.IsPipeFitting &&
+                !element.IsPipeJunction;
+        }
+
+        public static bool IsUsable(
+            GameMepElementData? element,
+            GameMepSourceData? boundary)
+        {
+            if (!CanHostBoundary(element) || boundary == null)
+                return false;
+            if (!boundary.HasExplicitDirection)
+                return true;
+            return element!.ConnectorIndices.Contains(boundary.EntryConnectorIndex) &&
+                element.ConnectorIndices.Contains(boundary.ExitConnectorIndex);
+        }
+    }
+
+    internal static class GameMepEquipmentDirectionPolicy
+    {
+        public static bool TryGetNativePumpDirection(
+            GameMepGraphData graph,
+            GameMepElementData? element,
+            out int entryConnector,
+            out int exitConnector)
+        {
+            entryConnector = -1;
+            exitConnector = -1;
+            if (graph == null || element == null ||
+                element.ConnectorIndices.Count != 2 || !IsPumpLike(element))
+            {
+                return false;
+            }
+
+            foreach (int connectorIndex in element.ConnectorIndices)
+            {
+                if (connectorIndex < 0 || connectorIndex >= graph.Connectors.Count)
+                    return false;
+                string direction = graph.Connectors[connectorIndex].FlowDirection ??
+                    string.Empty;
+                if (string.Equals(direction, "In", StringComparison.OrdinalIgnoreCase))
+                    entryConnector = connectorIndex;
+                else if (string.Equals(
+                    direction, "Out", StringComparison.OrdinalIgnoreCase))
+                {
+                    exitConnector = connectorIndex;
+                }
+            }
+            return entryConnector >= 0 && exitConnector >= 0 &&
+                entryConnector != exitConnector;
+        }
+
+        private static bool IsPumpLike(GameMepElementData element)
+        {
+            string identity = (element.Name ?? string.Empty) + " " +
+                (element.TypeName ?? string.Empty);
+            return identity.IndexOf("pompe", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                identity.IndexOf("pump", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                identity.IndexOf(
+                    "circulateur", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
     }
 
     internal sealed class GameMepDirectionConstraintData
@@ -456,7 +529,7 @@ namespace BIMaestro.VideoGames
             // faisant circuler le même fluide. La contrainte de pression créée
             // explicitement par l'utilisateur constitue l'autorisation de
             // franchir cette frontière, uniquement entre ses deux connecteurs.
-            return graph.DirectionConstraints.Any(constraint =>
+            if (graph.DirectionConstraints.Any(constraint =>
                 constraint.IsActive &&
                 constraint.HasExplicitDirection &&
                 constraint.Scope ==
@@ -468,7 +541,18 @@ namespace BIMaestro.VideoGames
                 MatchesPair(
                     edge,
                     constraint.EntryConnectorIndex,
-                    constraint.ExitConnectorIndex));
+                    constraint.ExitConnectorIndex)))
+            {
+                return true;
+            }
+
+            return owner != null &&
+                GameMepEquipmentDirectionPolicy.TryGetNativePumpDirection(
+                    graph,
+                    owner,
+                    out int nativeEntry,
+                    out int nativeExit) &&
+                MatchesPair(edge, nativeEntry, nativeExit);
         }
 
         private static bool HaveSameFunctionalType(
@@ -520,6 +604,10 @@ namespace BIMaestro.VideoGames
 
     internal sealed class GameMepSimulationEngine
     {
+        private const string TwoPortFittingContinuityReason =
+            "Continuité avec les canalisations autour du composant à deux ports";
+        private const string PipeJunctionContinuityReason =
+            "Continuité avec les canalisations autour du té";
         private readonly GameMepGraphData _graph;
         private List<int>[]? _adjacentEdges;
 
@@ -543,7 +631,7 @@ namespace BIMaestro.VideoGames
                 .Where(item => item.IsActive))
             {
                 GameMepElementData? element = _graph.FindElement(boundary.ElementKey);
-                if (element == null)
+                if (!GameMepBoundaryPolicy.IsUsable(element, boundary))
                     continue;
 
                 // Une arrivée alimente son système depuis l'amont. Un retour
@@ -576,13 +664,11 @@ namespace BIMaestro.VideoGames
             int[] supplyDistance = ComputeDistances(
                 inletSeeds,
                 inletExternalStops,
-                new Dictionary<int, string>(),
-                false);
+                new Dictionary<int, string>());
             int[] returnDistance = ComputeDistances(
                 outletSeeds,
                 outletExternalStops,
-                new Dictionary<int, string>(),
-                true);
+                new Dictionary<int, string>());
             var activeBoundaryDistance = new int[count];
             for (int index = 0; index < count; index++)
             {
@@ -601,6 +687,8 @@ namespace BIMaestro.VideoGames
             var highInternalStops = new Dictionary<int, string>();
             var lowSeeds = new List<int>(outletSeeds);
             var lowInternalStops = new Dictionary<int, string>();
+            var pumpSuctionSeeds = new List<int>();
+            var pumpSuctionInternalStops = new Dictionary<int, string>();
             foreach (GameMepDirectionConstraintData constraint in
                 _graph.DirectionConstraints.Where(item =>
                     item.IsActive && item.HasExplicitDirection &&
@@ -620,19 +708,47 @@ namespace BIMaestro.VideoGames
                     lowSeeds.Add(constraint.EntryConnectorIndex);
                     lowInternalStops[constraint.EntryConnectorIndex] =
                         constraint.ElementKey;
+                    pumpSuctionSeeds.Add(constraint.EntryConnectorIndex);
+                    pumpSuctionInternalStops[constraint.EntryConnectorIndex] =
+                        constraint.ElementKey;
                 }
+            }
+            foreach (GameMepElementData pump in _graph.Elements)
+            {
+                bool hasManualPumpDirection = _graph.DirectionConstraints.Any(item =>
+                    item.IsActive && item.HasExplicitDirection &&
+                    item.Scope ==
+                        GameMepDirectionConstraintScope.EquipmentPressureRise &&
+                    string.Equals(item.ElementKey, pump.Key, StringComparison.Ordinal));
+                if (hasManualPumpDirection ||
+                    !GameMepEquipmentDirectionPolicy.TryGetNativePumpDirection(
+                        _graph,
+                        pump,
+                        out int nativeEntry,
+                        out int nativeExit))
+                {
+                    continue;
+                }
+                highSeeds.Add(nativeExit);
+                highInternalStops[nativeExit] = pump.Key;
+                lowSeeds.Add(nativeEntry);
+                lowInternalStops[nativeEntry] = pump.Key;
+                pumpSuctionSeeds.Add(nativeEntry);
+                pumpSuctionInternalStops[nativeEntry] = pump.Key;
             }
 
             int[] highDistance = ComputeDistances(
                 highSeeds,
                 inletExternalStops,
-                highInternalStops,
-                false);
+                highInternalStops);
             int[] lowDistance = ComputeDistances(
                 lowSeeds,
                 outletExternalStops,
-                lowInternalStops,
-                true);
+                lowInternalStops);
+            int[] pumpSuctionDistance = ComputeDistances(
+                pumpSuctionSeeds,
+                new HashSet<int>(),
+                pumpSuctionInternalStops);
 
             bool hasAnyBoundary = activeBoundarySystems.Count > 0;
             foreach (GameMepElementData element in _graph.Elements)
@@ -692,7 +808,8 @@ namespace BIMaestro.VideoGames
                 new HashSet<int>(inletExternalStops.Concat(outletExternalStops)),
                 returnDistance,
                 highDistance,
-                lowDistance);
+                lowDistance,
+                pumpSuctionDistance);
             UpdateValveStates(activeBoundarySystems, activeBoundaryDistance);
             GameMepDirectionExplanationBuilder.Refresh(_graph);
             GameMepDiagnosticAnalyzer.Refresh(_graph);
@@ -721,8 +838,7 @@ namespace BIMaestro.VideoGames
         private int[] ComputeDistances(
             IEnumerable<int> seeds,
             ISet<int> externalStops,
-            IDictionary<int, string> internalStops,
-            bool reverseCheckValveDirection)
+            IDictionary<int, string> internalStops)
         {
             int count = _graph.Connectors.Count;
             var distance = Enumerable.Repeat(-1, count).ToArray();
@@ -745,11 +861,7 @@ namespace BIMaestro.VideoGames
                         ? edge.ConnectorB
                         : edge.ConnectorA;
                     if (!IsSystemCompatibleEdge(edge) ||
-                        IsBlockedByFlowControl(
-                            edge,
-                            current,
-                            next,
-                            reverseCheckValveDirection) ||
+                        IsBlockedByFlowControl(edge) ||
                         (externalStops.Contains(current) && !edge.IsInternal) ||
                         (internalStops.TryGetValue(current, out string elementKey) &&
                          edge.IsInternal &&
@@ -771,20 +883,6 @@ namespace BIMaestro.VideoGames
             out bool forward,
             out string reason)
         {
-            GameMepValveData? checkValve = _graph.FindValve(path.ElementKey);
-            if (checkValve != null &&
-                checkValve.IsEnabledAsValve &&
-                checkValve.Kind == GameMepFlowControlKind.CheckValve &&
-                checkValve.HasExplicitDirection &&
-                TryMatchDirection(
-                    path,
-                    checkValve.EntryConnectorIndex,
-                    checkValve.ExitConnectorIndex,
-                    out forward))
-            {
-                reason = "Sens imposé par le clapet anti-retour";
-                return true;
-            }
             foreach (GameMepDirectionConstraintData constraint in
                 _graph.DirectionConstraints.Where(item =>
                     item.IsActive && item.HasExplicitDirection &&
@@ -800,6 +898,8 @@ namespace BIMaestro.VideoGames
             }
             foreach (GameMepSourceData boundary in _graph.Sources.Where(item =>
                 item.IsActive && item.HasExplicitDirection &&
+                GameMepBoundaryPolicy.IsUsable(
+                    _graph.FindElement(item.ElementKey), item) &&
                 string.Equals(item.ElementKey, path.ElementKey, StringComparison.Ordinal)))
             {
                 if (TryMatchDirection(path, boundary.EntryConnectorIndex,
@@ -824,6 +924,22 @@ namespace BIMaestro.VideoGames
                     reason = "Sens imposé par la pompe ou l'équipement";
                     return true;
                 }
+            }
+            GameMepElementData? owner = _graph.FindElement(path.ElementKey);
+            bool hasManualPumpDirection = _graph.DirectionConstraints.Any(item =>
+                item.IsActive && item.HasExplicitDirection &&
+                item.Scope == GameMepDirectionConstraintScope.EquipmentPressureRise &&
+                string.Equals(item.ElementKey, path.ElementKey, StringComparison.Ordinal));
+            if (!hasManualPumpDirection &&
+                GameMepEquipmentDirectionPolicy.TryGetNativePumpDirection(
+                    _graph,
+                    owner,
+                    out int nativeEntry,
+                    out int nativeExit) &&
+                TryMatchDirection(path, nativeEntry, nativeExit, out forward))
+            {
+                reason = "Sens natif de la pompe : aspiration puis refoulement";
+                return true;
             }
             forward = path.FlowForward;
             reason = string.Empty;
@@ -942,7 +1058,8 @@ namespace BIMaestro.VideoGames
             ISet<int> externalStops,
             int[] declaredReturnDistance,
             int[] highDistance,
-            int[] lowDistance)
+            int[] lowDistance,
+            int[] pumpSuctionDistance)
         {
             int connectorCount = _graph.Connectors.Count;
             var inletSeeds = new HashSet<int>(inletSeedValues.Where(index =>
@@ -1041,6 +1158,7 @@ namespace BIMaestro.VideoGames
                 .Select(item => item.ElementKey),
                 StringComparer.Ordinal);
             var inletAnchorSeeds = new HashSet<int>(explicitInletSeeds);
+            var pumpSuctionAnchorSeeds = new HashSet<int>();
             foreach (GameMepDirectionConstraintData constraint in
                 _graph.DirectionConstraints.Where(item => item.IsActive &&
                     item.HasExplicitDirection &&
@@ -1054,14 +1172,32 @@ namespace BIMaestro.VideoGames
                     // bras local, sans être transformée en source globale.
                     inletAnchorSeeds.Add(constraint.ExitConnectorIndex);
                 }
+                if (constraint.EntryConnectorIndex >= 0 &&
+                    constraint.EntryConnectorIndex < connectorCount)
+                {
+                    pumpSuctionAnchorSeeds.Add(constraint.EntryConnectorIndex);
+                }
             }
-            foreach (GameMepValveData valve in _graph.Valves.Where(item =>
-                item.IsEnabledAsValve &&
-                item.Kind == GameMepFlowControlKind.CheckValve))
+            foreach (GameMepElementData pump in _graph.Elements)
             {
-                restrictedArmElementKeys.Add(valve.ElementKey);
+                bool hasManualPumpDirection = _graph.DirectionConstraints.Any(item =>
+                    item.IsActive && item.HasExplicitDirection &&
+                    item.Scope ==
+                        GameMepDirectionConstraintScope.EquipmentPressureRise &&
+                    string.Equals(item.ElementKey, pump.Key, StringComparison.Ordinal));
+                if (hasManualPumpDirection ||
+                    !GameMepEquipmentDirectionPolicy.TryGetNativePumpDirection(
+                        _graph,
+                        pump,
+                        out int nativeEntry,
+                        out int nativeExit))
+                {
+                    continue;
+                }
+                restrictedArmElementKeys.Add(pump.Key);
+                pumpSuctionAnchorSeeds.Add(nativeEntry);
+                inletAnchorSeeds.Add(nativeExit);
             }
-
             var junctionArms = new Dictionary<
                 string,
                 Dictionary<int, HashSet<int>>>(StringComparer.Ordinal);
@@ -1137,6 +1273,10 @@ namespace BIMaestro.VideoGames
             var diameterHeaderElementDirections = new Dictionary<string, bool>(
                 StringComparer.Ordinal);
             var diameterJunctionPortDirections = new Dictionary<int, bool>();
+            var diameterProtectedJunctionPorts = new HashSet<int>();
+            var geometricHeaderContinuityElementKeys = new HashSet<string>(
+                StringComparer.Ordinal);
+            var geometricProtectedJunctionPorts = new HashSet<int>();
             var inferredInletCandidates = new HashSet<int>();
             foreach (string junctionKey in junctionPortWeights.Keys.OrderBy(
                 key => key, StringComparer.Ordinal))
@@ -1180,6 +1320,13 @@ namespace BIMaestro.VideoGames
                 if (armsOverlap)
                     continue;
 
+                // Sur un retour hydraulique, le sens est fixé par l'aspiration
+                // des pompes. Une variation de DN reste une information de
+                // section et ne doit jamais transformer un bras en arrivée.
+                // La continuité géométrique des tés est traitée juste après.
+                if (IsReturnHydronic(junction))
+                    continue;
+
                 if (junction.ConnectorIndices.Count != 3 ||
                     simpleArms.Values.Any(simple => !simple) ||
                     junction.ConnectorIndices.Any(index => index < 0 ||
@@ -1200,6 +1347,25 @@ namespace BIMaestro.VideoGames
                     continue;
                 }
 
+                int[] pumpSuctionPorts = IsReturnHydronic(junction)
+                    ? ports.Where(port => IsStrictlyCloserToBoundary(
+                        port,
+                        ports.Where(other => other != port),
+                        pumpSuctionDistance)).ToArray()
+                    : Array.Empty<int>();
+                if (pumpSuctionPorts.Length == 1)
+                {
+                    int suctionPort = pumpSuctionPorts[0];
+                    diameterActivatedJunctionKeys.Add(junctionKey);
+                    diameterJunctionPortDirections[suctionPort] = false;
+                    diameterProtectedJunctionPorts.Add(suctionPort);
+                    AddArmPipeElements(
+                        arms[suctionPort], diameterInfluencedElementKeys);
+                    AddArmPipeElements(
+                        arms[suctionPort], diameterForcedElementKeys);
+                    diameterForcedJunctionPorts.Add(suctionPort);
+                }
+
                 bool hasUniqueSmallPort =
                     largestArea / secondArea < significantAreaRatio &&
                     secondArea / smallestArea >= significantAreaRatio;
@@ -1212,10 +1378,17 @@ namespace BIMaestro.VideoGames
                     int smallPort = orderedPorts[2];
                     int[] largePorts = orderedPorts.Take(2).ToArray();
                     HashSet<int> smallArm = arms[smallPort];
+                    bool returnNetwork = IsReturnHydronic(junction);
+                    bool smallReachesPumpSuction = returnNetwork &&
+                        (smallArm.Overlaps(pumpSuctionAnchorSeeds) ||
+                         IsStrictlyCloserToBoundary(
+                             smallPort, largePorts, pumpSuctionDistance));
                     bool smallHasInlet = smallArm.Overlaps(inletAnchorSeeds) ||
                         IsStrictlyCloserToBoundary(
                             smallPort, largePorts, highDistance);
-                    bool smallHasOutlet = smallArm.Overlaps(explicitOutletSeeds);
+                    bool smallHasOutlet =
+                        smallArm.Overlaps(explicitOutletSeeds) ||
+                        smallReachesPumpSuction;
                     bool smallIsActiveInlet = smallHasInlet && !smallHasOutlet;
 
                     Dictionary<int, bool>? headerDirections = null;
@@ -1262,6 +1435,7 @@ namespace BIMaestro.VideoGames
                                 diameterHeaderContinuityElementKeys);
                             diameterJunctionPortDirections[headerPort] =
                                 headerDirections[headerPort];
+                            diameterProtectedJunctionPorts.Add(headerPort);
                             AddHeaderArmDirections(
                                 headerPort,
                                 arms[headerPort],
@@ -1270,7 +1444,8 @@ namespace BIMaestro.VideoGames
                             ExtendHeaderBackbone(
                                 junctionKey,
                                 headerPort,
-                                headerDirections[headerPort]);
+                                headerDirections[headerPort],
+                                geometricContinuity: false);
                         }
                     }
                     if (smallIsActiveInlet)
@@ -1279,6 +1454,18 @@ namespace BIMaestro.VideoGames
                         AddArmPipeElements(
                             smallArm, diameterInfluencedElementKeys);
                         diameterJunctionPortDirections[smallPort] = true;
+                        diameterProtectedJunctionPorts.Add(smallPort);
+                    }
+                    else if (smallReachesPumpSuction)
+                    {
+                        // Sur un retour hydraulique, le petit bras raccordé à
+                        // l'entrée In d'une pompe est aspiré depuis le centre du
+                        // té. Le DN ne doit jamais le convertir en arrivée.
+                        diameterActivatedJunctionKeys.Add(junctionKey);
+                        AddArmPipeElements(
+                            smallArm, diameterInfluencedElementKeys);
+                        diameterJunctionPortDirections[smallPort] = false;
+                        diameterProtectedJunctionPorts.Add(smallPort);
                     }
                     continue;
                 }
@@ -1291,6 +1478,8 @@ namespace BIMaestro.VideoGames
 
                 int largePort = orderedPorts[0];
                 int[] smallPorts = orderedPorts.Skip(1).ToArray();
+                if (smallPorts.Any(diameterProtectedJunctionPorts.Contains))
+                    continue;
                 HashSet<int> largeArm = arms[largePort];
                 bool largeHasOutlet = largeArm.Overlaps(explicitOutletSeeds) ||
                     IsStrictlyCloserToBoundary(
@@ -1326,8 +1515,12 @@ namespace BIMaestro.VideoGames
                 {
                     diameterActivatedJunctionKeys.Add(junctionKey);
                     diameterJunctionPortDirections[largePort] = false;
+                    diameterProtectedJunctionPorts.Add(largePort);
                     foreach (int smallPort in smallPorts)
+                    {
                         diameterJunctionPortDirections[smallPort] = true;
+                        diameterProtectedJunctionPorts.Add(smallPort);
+                    }
                     foreach (HashSet<int> arm in arms.Values)
                     {
                         AddArmPipeElements(
@@ -1344,6 +1537,94 @@ namespace BIMaestro.VideoGames
                             diameterForcedJunctionPorts.Add(arm.Key);
                         }
                     }
+                }
+            }
+
+            // Un té standard possède deux ports opposés qui forment le
+            // collecteur et un troisième port latéral. Même à DN identiques,
+            // une branche courte ou un équipement voisin ne doit jamais
+            // retourner le tronçon compris entre deux tés. La géométrie Revit
+            // est ici plus fiable que la moyenne du centre virtuel.
+            foreach (string junctionKey in candidateJunctionPortAreas.Keys.OrderBy(
+                key => key, StringComparer.Ordinal))
+            {
+                GameMepElementData? junction = _graph.FindElement(junctionKey);
+                if (junction == null || junction.ConnectorIndices.Count != 3 ||
+                    !junctionArms.TryGetValue(junctionKey,
+                        out Dictionary<int, HashSet<int>> arms) ||
+                    !junctionSimpleArms.TryGetValue(junctionKey,
+                        out Dictionary<int, bool> simpleArms) ||
+                    simpleArms.Values.Any(simple => !simple) ||
+                    !TrySelectCollinearHeaderPorts(junction, out int[] headerPorts) ||
+                    headerPorts.All(diameterProtectedJunctionPorts.Contains))
+                {
+                    continue;
+                }
+
+                Dictionary<int, bool>? headerDirections = null;
+                if (IsReturnHydronic(junction) &&
+                    TryBuildHeaderDirectionsFromBoundary(
+                        headerPorts,
+                        pumpSuctionDistance,
+                        out Dictionary<int, bool> pumpSuctionDirections))
+                {
+                    headerDirections = pumpSuctionDirections;
+                }
+                else if (TryBuildHeaderDirectionsFromBoundary(
+                        headerPorts,
+                        declaredReturnDistance,
+                        out Dictionary<int, bool> returnDirections))
+                {
+                    headerDirections = returnDirections;
+                }
+                else if (TryBuildHeaderDirectionsFromInlet(
+                        headerPorts,
+                        highDistance,
+                        out Dictionary<int, bool> inletDirections))
+                {
+                    headerDirections = inletDirections;
+                }
+                else if (TryReadResolvedHeaderDirections(
+                        junction,
+                        headerPorts,
+                        arms,
+                        out Dictionary<int, bool> resolvedDirections))
+                {
+                    headerDirections = resolvedDirections;
+                }
+                if (headerDirections == null ||
+                    headerPorts.Any(port =>
+                        diameterProtectedJunctionPorts.Contains(port) &&
+                        diameterJunctionPortDirections.TryGetValue(
+                            port, out bool existing) &&
+                        existing != headerDirections[port]))
+                {
+                    continue;
+                }
+
+                diameterActivatedJunctionKeys.Add(junctionKey);
+                foreach (int headerPort in headerPorts)
+                {
+                    bool towardCenter = headerDirections[headerPort];
+                    diameterJunctionPortDirections[headerPort] = towardCenter;
+                    diameterProtectedJunctionPorts.Add(headerPort);
+                    geometricProtectedJunctionPorts.Add(headerPort);
+                    AddArmPipeElements(
+                        arms[headerPort],
+                        diameterHeaderContinuityElementKeys);
+                    AddArmPipeElements(
+                        arms[headerPort],
+                        geometricHeaderContinuityElementKeys);
+                    AddHeaderArmDirections(
+                        headerPort,
+                        arms[headerPort],
+                        towardCenter,
+                        diameterHeaderElementDirections);
+                    ExtendHeaderBackbone(
+                        junctionKey,
+                        headerPort,
+                        towardCenter,
+                        geometricContinuity: true);
                 }
             }
 
@@ -1692,9 +1973,14 @@ namespace BIMaestro.VideoGames
                             path.FlowForward = headerForward;
                             path.DirectionState =
                                 GameMepDirectionState.Resolved;
-                            path.DirectionReason =
-                                "Continuité du gros DN vers le retour aspiré";
-                            _graph.DiameterDirectedPathCount++;
+                            bool geometricContinuity =
+                                geometricHeaderContinuityElementKeys.Contains(
+                                    path.ElementKey);
+                            path.DirectionReason = geometricContinuity
+                                ? "Continuité géométrique du collecteur à travers les tés"
+                                : "Continuité du gros DN vers le retour aspiré";
+                            if (!geometricContinuity)
+                                _graph.DiameterDirectedPathCount++;
                         }
                     }
                     if (path.HasCirculation && path.EndConnector >= 0 &&
@@ -1721,9 +2007,16 @@ namespace BIMaestro.VideoGames
                         path.HasCirculation = true;
                         path.FlowForward = junctionForward;
                         path.DirectionState = GameMepDirectionState.Resolved;
-                        path.DirectionReason = junctionForward
-                            ? "Piquage vers le collecteur (continuité du gros DN)"
-                            : "Sortie du collecteur (continuité du gros DN)";
+                        bool geometricContinuity =
+                            geometricProtectedJunctionPorts.Contains(
+                                path.StartConnector);
+                        path.DirectionReason = geometricContinuity
+                            ? (junctionForward
+                                ? "Entrée du collecteur (continuité géométrique au té)"
+                                : "Sortie du collecteur (continuité géométrique au té)")
+                            : (junctionForward
+                                ? "Piquage vers le collecteur (continuité du gros DN)"
+                                : "Sortie du collecteur (continuité du gros DN)");
                     }
                     else if (path.HasCirculation && path.EndConnector < 0 &&
                         element.IsPipeJunction &&
@@ -1747,6 +2040,40 @@ namespace BIMaestro.VideoGames
                                 : "Sortie du collecteur (sections/DN comparés)")
                             : "Sens déduit au centre de la jonction";
                     }
+
+                    bool hasProtectedHeaderDirection =
+                        path.EndConnector >= 0 &&
+                        diameterHeaderContinuityElementKeys.Contains(
+                            path.ElementKey) &&
+                        diameterHeaderElementDirections.ContainsKey(
+                            path.ElementKey);
+                    bool hasProtectedJunctionDirection =
+                        path.EndConnector < 0 && element.IsPipeJunction &&
+                        diameterActivatedJunctionKeys.Contains(element.Key) &&
+                        diameterProtectedJunctionPorts.Contains(
+                            path.StartConnector);
+                    if (path.HasCirculation &&
+                        !hasProtectedHeaderDirection &&
+                        !hasProtectedJunctionDirection &&
+                        !TryGetImposedDirection(path, out _, out _))
+                    {
+                        // Le calcul initial utilise les frontières les plus
+                        // proches. Dans une boucle ou avec plusieurs retours,
+                        // cette approximation peut créer une inversion isolée.
+                        // Le potentiel relaxé représente le réseau complet : il
+                        // devient donc l'autorité finale pour les flèches libres.
+                        bool potentialForward = difference > 0.0;
+                        if (path.DirectionState !=
+                                GameMepDirectionState.Resolved ||
+                            path.FlowForward != potentialForward)
+                        {
+                            path.FlowForward = potentialForward;
+                            path.DirectionState =
+                                GameMepDirectionState.Resolved;
+                            path.DirectionReason =
+                                "Gradient hydraulique final entre arrivée et retour";
+                        }
+                    }
                     if (!path.HasCirculation)
                     {
                         path.DirectionReason =
@@ -1758,6 +2085,9 @@ namespace BIMaestro.VideoGames
                     // les chemins classiques conservent le comportement historique.
                 }
             }
+
+            AlignTwoPortPipeFittings();
+            AlignPipeJunctions();
 
             void AddArmPipeElements(
                 IEnumerable<int> connectors,
@@ -1854,7 +2184,8 @@ namespace BIMaestro.VideoGames
             void ExtendHeaderBackbone(
                 string initialJunctionKey,
                 int initialPort,
-                bool portFlowsTowardCenter)
+                bool portFlowsTowardCenter,
+                bool geometricContinuity)
             {
                 string currentJunctionKey = initialJunctionKey;
                 int currentPort = initialPort;
@@ -1923,6 +2254,13 @@ namespace BIMaestro.VideoGames
                         incomingDirection;
                     diameterJunctionPortDirections[continuationPort] =
                         portFlowsTowardCenter;
+                    diameterProtectedJunctionPorts.Add(incomingPort);
+                    diameterProtectedJunctionPorts.Add(continuationPort);
+                    if (geometricContinuity)
+                    {
+                        geometricProtectedJunctionPorts.Add(incomingPort);
+                        geometricProtectedJunctionPorts.Add(continuationPort);
+                    }
                     foreach (int sidePort in nextJunction.ConnectorIndices.Where(
                         port => port != incomingPort &&
                             port != continuationPort))
@@ -1942,6 +2280,12 @@ namespace BIMaestro.VideoGames
                     AddArmPipeElements(
                         continuationArm,
                         diameterHeaderContinuityElementKeys);
+                    if (geometricContinuity)
+                    {
+                        AddArmPipeElements(
+                            continuationArm,
+                            geometricHeaderContinuityElementKeys);
+                    }
                     AddHeaderArmDirections(
                         continuationPort,
                         continuationArm,
@@ -1951,6 +2295,43 @@ namespace BIMaestro.VideoGames
                     currentJunctionKey = terminalKey;
                     currentPort = continuationPort;
                 }
+            }
+
+            bool TrySelectCollinearHeaderPorts(
+                GameMepElementData junction,
+                out int[] ports)
+            {
+                ports = Array.Empty<int>();
+                int[] candidates = junction.ConnectorIndices.Where(index =>
+                        index >= 0 && index < connectorCount &&
+                        _graph.Connectors[index].HasDirection)
+                    .Distinct().ToArray();
+                if (candidates.Length != 3)
+                    return false;
+
+                var pairs = new List<Tuple<int, int, double>>();
+                for (int first = 0; first < candidates.Length; first++)
+                {
+                    for (int second = first + 1; second < candidates.Length; second++)
+                    {
+                        pairs.Add(Tuple.Create(
+                            candidates[first],
+                            candidates[second],
+                            Vector3D.DotProduct(
+                                _graph.Connectors[candidates[first]].Direction,
+                                _graph.Connectors[candidates[second]].Direction)));
+                    }
+                }
+                Tuple<int, int, double>[] ordered = pairs
+                    .OrderBy(pair => pair.Item3)
+                    .ToArray();
+                if (ordered.Length < 2 || ordered[0].Item3 > -0.75 ||
+                    ordered[1].Item3 - ordered[0].Item3 < 0.2)
+                {
+                    return false;
+                }
+                ports = new[] { ordered[0].Item1, ordered[0].Item2 };
+                return true;
             }
 
             int SelectBackboneContinuation(
@@ -2018,6 +2399,25 @@ namespace BIMaestro.VideoGames
                 directions[largePorts[0]] =
                     distances[largePorts[0]] > distances[largePorts[1]];
                 directions[largePorts[1]] = !directions[largePorts[0]];
+                return true;
+            }
+
+            static bool TryBuildHeaderDirectionsFromInlet(
+                int[] headerPorts,
+                int[] distances,
+                out Dictionary<int, bool> directions)
+            {
+                directions = new Dictionary<int, bool>();
+                if (headerPorts.Length != 2 ||
+                    headerPorts.Any(port => port < 0 ||
+                        port >= distances.Length || distances[port] < 0) ||
+                    distances[headerPorts[0]] == distances[headerPorts[1]])
+                {
+                    return false;
+                }
+                directions[headerPorts[0]] =
+                    distances[headerPorts[0]] < distances[headerPorts[1]];
+                directions[headerPorts[1]] = !directions[headerPorts[0]];
                 return true;
             }
 
@@ -2241,6 +2641,21 @@ namespace BIMaestro.VideoGames
                 valve.Kind == GameMepFlowControlKind.IsolationValve;
         }
 
+        private bool IsReturnHydronic(GameMepElementData element)
+        {
+            string classification = element.Classification ?? string.Empty;
+            if (classification.IndexOf(
+                    "ReturnHydronic",
+                    StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return true;
+            }
+            GameMepSystemData? system = _graph.FindSystem(element.SystemKey);
+            return (system?.Classification ?? string.Empty).IndexOf(
+                "ReturnHydronic",
+                StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
         private static bool IsStrictlyCloserToBoundary(
             int candidate,
             IEnumerable<int> otherPorts,
@@ -2365,7 +2780,7 @@ namespace BIMaestro.VideoGames
                         owner.Key, junction.Key, StringComparison.Ordinal) &&
                     restrictedElementKeys.Contains(owner.Key))
                 {
-                    // Une pompe ou un clapet est une frontière directionnelle,
+                    // Une pompe est une frontière directionnelle,
                     // pas une raison d'invalider tout le bras. L'analyse locale
                     // s'arrête ici et TryGetImposedDirection garde la priorité.
                     continue;
@@ -2429,6 +2844,235 @@ namespace BIMaestro.VideoGames
             return simple;
         }
 
+        private void AlignTwoPortPipeFittings()
+        {
+            if (_adjacentEdges == null)
+                return;
+
+            GameMepElementData[] fittings = _graph.Elements.Where(
+                    IsPassiveTwoPortComponent)
+                .ToArray();
+            for (int pass = 0; pass < fittings.Length; pass++)
+            {
+                bool changed = false;
+                foreach (GameMepElementData fitting in fittings)
+                {
+                    GameMepPathData? path = fitting.Paths.FirstOrDefault(item =>
+                        item.EndConnector >= 0 &&
+                        fitting.ConnectorIndices.Contains(item.StartConnector) &&
+                        fitting.ConnectorIndices.Contains(item.EndConnector));
+                    if (path == null ||
+                        path.FlowState != GameMepFlowState.Supplied ||
+                        IsClosedIsolationValve(path.ElementKey) ||
+                        TryGetImposedDirection(path, out _, out _))
+                    {
+                        continue;
+                    }
+
+                    bool hasStart = TryReadExternalFlowTowardFitting(
+                        path.StartConnector,
+                        fitting.Key,
+                        out bool startFlowsTowardFitting,
+                        out bool startIsAuthoritative);
+                    bool hasEnd = TryReadExternalFlowTowardFitting(
+                        path.EndConnector,
+                        fitting.Key,
+                        out bool endFlowsTowardFitting,
+                        out bool endIsAuthoritative);
+
+                    bool hasAuthoritativeStart = hasStart &&
+                        startIsAuthoritative;
+                    bool hasAuthoritativeEnd = hasEnd && endIsAuthoritative;
+                    if (!hasAuthoritativeStart && !hasAuthoritativeEnd)
+                        continue;
+
+                    bool forwardFromStart = startFlowsTowardFitting;
+                    bool forwardFromEnd = !endFlowsTowardFitting;
+                    if (hasAuthoritativeStart && hasAuthoritativeEnd &&
+                        forwardFromStart != forwardFromEnd)
+                    {
+                        continue;
+                    }
+
+                    bool forward = hasAuthoritativeStart
+                        ? forwardFromStart
+                        : forwardFromEnd;
+                    if (path.FlowForward != forward ||
+                        path.DirectionState != GameMepDirectionState.Resolved ||
+                        !string.Equals(path.DirectionReason,
+                            TwoPortFittingContinuityReason,
+                            StringComparison.Ordinal))
+                    {
+                        changed = true;
+                    }
+
+                    path.FlowForward = forward;
+                    path.HasCirculation = true;
+                    path.DirectionState = GameMepDirectionState.Resolved;
+                    path.DirectionReason = TwoPortFittingContinuityReason;
+                }
+                if (!changed)
+                    break;
+            }
+        }
+
+        private void AlignPipeJunctions()
+        {
+            if (_adjacentEdges == null)
+                return;
+
+            foreach (GameMepElementData junction in _graph.Elements.Where(item =>
+                item.IsPipeJunction && item.ConnectorIndices.Count >= 3))
+            {
+                foreach (GameMepPathData path in junction.Paths)
+                {
+                    if (path.FlowState != GameMepFlowState.Supplied ||
+                        IsClosedIsolationValve(path.ElementKey) ||
+                        TryGetImposedDirection(path, out _, out _))
+                    {
+                        continue;
+                    }
+
+                    bool hasStart = TryReadExternalFlowTowardFitting(
+                        path.StartConnector,
+                        junction.Key,
+                        out bool startFlowsTowardJunction,
+                        out bool startIsAuthoritative);
+                    if (path.EndConnector < 0)
+                    {
+                        if (!hasStart || !startIsAuthoritative)
+                            continue;
+                        bool changed = path.FlowForward !=
+                                startFlowsTowardJunction ||
+                            path.DirectionState != GameMepDirectionState.Resolved;
+                        path.FlowForward = startFlowsTowardJunction;
+                        path.HasCirculation = true;
+                        path.DirectionState = GameMepDirectionState.Resolved;
+                        if (changed)
+                            path.DirectionReason = PipeJunctionContinuityReason;
+                        continue;
+                    }
+
+                    bool hasEnd = TryReadExternalFlowTowardFitting(
+                        path.EndConnector,
+                        junction.Key,
+                        out bool endFlowsTowardJunction,
+                        out bool endIsAuthoritative);
+                    bool authoritativeStart = hasStart && startIsAuthoritative;
+                    bool authoritativeEnd = hasEnd && endIsAuthoritative;
+                    if (!authoritativeStart && !authoritativeEnd)
+                        continue;
+
+                    bool forwardFromStart = startFlowsTowardJunction;
+                    bool forwardFromEnd = !endFlowsTowardJunction;
+                    if (authoritativeStart && authoritativeEnd &&
+                        forwardFromStart != forwardFromEnd)
+                    {
+                        continue;
+                    }
+                    bool forward = authoritativeStart
+                        ? forwardFromStart
+                        : forwardFromEnd;
+                    bool directionChanged = path.FlowForward != forward ||
+                        path.DirectionState != GameMepDirectionState.Resolved;
+                    path.FlowForward = forward;
+                    path.HasCirculation = true;
+                    path.DirectionState = GameMepDirectionState.Resolved;
+                    if (directionChanged)
+                        path.DirectionReason = PipeJunctionContinuityReason;
+                }
+            }
+        }
+
+        private bool TryReadExternalFlowTowardFitting(
+            int fittingConnector,
+            string fittingKey,
+            out bool flowsTowardFitting,
+            out bool isAuthoritative)
+        {
+            flowsTowardFitting = false;
+            isAuthoritative = false;
+            if (_adjacentEdges == null || fittingConnector < 0 ||
+                fittingConnector >= _adjacentEdges.Length)
+            {
+                return false;
+            }
+
+            bool found = false;
+            foreach (int edgeIndex in _adjacentEdges[fittingConnector])
+            {
+                GameMepConnectionData edge = _graph.Connections[edgeIndex];
+                if (edge.IsInternal || string.Equals(
+                        edge.ElementKey, fittingKey, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                int neighborConnector = edge.ConnectorA == fittingConnector
+                    ? edge.ConnectorB
+                    : edge.ConnectorA;
+                if (neighborConnector < 0 ||
+                    neighborConnector >= _graph.Connectors.Count)
+                {
+                    continue;
+                }
+
+                GameMepElementData? neighbor = _graph.FindElement(
+                    _graph.Connectors[neighborConnector].ElementKey);
+                IEnumerable<GameMepPathData> neighborPaths = neighbor?.Paths ??
+                    Enumerable.Empty<GameMepPathData>();
+                foreach (GameMepPathData neighborPath in neighborPaths.Where(item =>
+                    item.HasCirculation &&
+                    item.DirectionState == GameMepDirectionState.Resolved &&
+                    (item.StartConnector == neighborConnector ||
+                     item.EndConnector == neighborConnector)))
+                {
+                    bool current = neighborPath.StartConnector ==
+                            neighborConnector
+                        ? !neighborPath.FlowForward
+                        : neighborPath.FlowForward;
+                    if (found && flowsTowardFitting != current)
+                        return false;
+                    flowsTowardFitting = current;
+                    isAuthoritative |= !IsPassiveTwoPortComponent(neighbor) ||
+                        TryGetImposedDirection(neighborPath, out _, out _) ||
+                        string.Equals(
+                            neighborPath.DirectionReason,
+                            TwoPortFittingContinuityReason,
+                            StringComparison.Ordinal);
+                    found = true;
+                }
+            }
+            return found;
+        }
+
+        private static bool IsPassiveTwoPortComponent(
+            GameMepElementData? element)
+        {
+            if (element == null || element.IsPipeJunction ||
+                element.ConnectorIndices.Count != 2 ||
+                element.Paths.Count != 1)
+            {
+                return false;
+            }
+
+            // Revit classe les coudes/réductions comme raccords, mais les
+            // brides, manchons et vannes comme accessoires de canalisation.
+            // Hydrauliquement, lorsqu'ils sont ouverts et sans sens imposé,
+            // tous sont des composants passifs à deux ports : ils doivent
+            // prolonger le sens des canalisations, jamais le retourner.
+            if (element.IsPipeFitting)
+                return true;
+            string category = element.Category ?? string.Empty;
+            bool isPipeAccessory = category.IndexOf(
+                    "Accessoire de canalisation",
+                    StringComparison.OrdinalIgnoreCase) >= 0 ||
+                category.IndexOf(
+                    "Pipe Accessor",
+                    StringComparison.OrdinalIgnoreCase) >= 0;
+            return isPipeAccessory;
+        }
+
         private bool IsClosedIsolationValve(string elementKey)
         {
             GameMepValveData? valve = _graph.FindValve(elementKey);
@@ -2487,7 +3131,7 @@ namespace BIMaestro.VideoGames
                 if (!source.IsActive)
                     continue;
                 GameMepElementData? sourceElement = _graph.FindElement(source.ElementKey);
-                if (sourceElement == null)
+                if (!GameMepBoundaryPolicy.IsUsable(sourceElement, source))
                     continue;
 
                 activeSourceSystems.Add(source.SystemKey ?? string.Empty);
@@ -2528,7 +3172,7 @@ namespace BIMaestro.VideoGames
                         ? edge.ConnectorB
                         : edge.ConnectorA;
                     if (!IsSystemCompatibleEdge(edge) ||
-                        IsBlockedByFlowControl(edge, current, next, false))
+                        IsBlockedByFlowControl(edge))
                         continue;
                     // Le connecteur d'entrée représente la limite de la
                     // maquette. On entre dans le tuyau par sa liaison interne,
@@ -2660,29 +3304,14 @@ namespace BIMaestro.VideoGames
             return GameMepSystemTraversalPolicy.CanTraverse(_graph, edge);
         }
 
-        private bool IsBlockedByFlowControl(
-            GameMepConnectionData edge,
-            int current,
-            int next,
-            bool reverseCheckValveDirection)
+        private bool IsBlockedByFlowControl(GameMepConnectionData edge)
         {
             if (!edge.IsInternal || !edge.IsValveGateCandidate)
                 return false;
             GameMepValveData? valve = _graph.FindValve(edge.ElementKey);
             if (valve == null || !valve.IsEnabledAsValve)
                 return false;
-            if (valve.Kind == GameMepFlowControlKind.IsolationValve)
-                return valve.IsClosed;
-            if (!valve.HasExplicitDirection)
-                return false;
-
-            int allowedStart = reverseCheckValveDirection
-                ? valve.ExitConnectorIndex
-                : valve.EntryConnectorIndex;
-            int allowedEnd = reverseCheckValveDirection
-                ? valve.EntryConnectorIndex
-                : valve.ExitConnectorIndex;
-            return current != allowedStart || next != allowedEnd;
+            return valve.IsClosed;
         }
     }
 }
