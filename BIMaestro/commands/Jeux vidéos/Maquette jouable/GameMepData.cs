@@ -608,6 +608,10 @@ namespace BIMaestro.VideoGames
             "Continuité avec les canalisations autour du composant à deux ports";
         private const string PipeJunctionContinuityReason =
             "Continuité avec les canalisations autour du té";
+        private const string NativePumpSuctionContinuityReason =
+            "Aspiration propagée depuis le port d'entrée de la pompe";
+        private const string NativePumpDischargeContinuityReason =
+            "Refoulement propagé depuis le port de sortie de la pompe";
         private readonly GameMepGraphData _graph;
         private List<int>[]? _adjacentEdges;
 
@@ -2088,6 +2092,7 @@ namespace BIMaestro.VideoGames
 
             AlignTwoPortPipeFittings();
             AlignPipeJunctions();
+            AlignNativePumpBranches();
 
             void AddArmPipeElements(
                 IEnumerable<int> connectors,
@@ -2982,6 +2987,248 @@ namespace BIMaestro.VideoGames
                         path.DirectionReason = PipeJunctionContinuityReason;
                 }
             }
+        }
+
+        private void AlignNativePumpBranches()
+        {
+            if (_adjacentEdges == null)
+                return;
+
+            foreach (GameMepElementData pump in _graph.Elements)
+            {
+                if (!GameMepEquipmentDirectionPolicy.TryGetNativePumpDirection(
+                        _graph, pump, out int entryConnector,
+                        out int exitConnector))
+                {
+                    continue;
+                }
+
+                PropagateNativePumpPort(
+                    pump.Key, entryConnector, isSuction: true);
+                PropagateNativePumpPort(
+                    pump.Key, exitConnector, isSuction: false);
+                PropagateNativePumpDischargeNetwork(
+                    pump.Key, exitConnector);
+            }
+        }
+
+        private void PropagateNativePumpDischargeNetwork(
+            string pumpKey,
+            int exitConnector)
+        {
+            var pending = new Queue<KeyValuePair<int, string>>();
+            pending.Enqueue(new KeyValuePair<int, string>(
+                exitConnector, pumpKey));
+            var visitedElements = new HashSet<string>(StringComparer.Ordinal)
+            {
+                pumpKey
+            };
+
+            while (pending.Count > 0)
+            {
+                KeyValuePair<int, string> step = pending.Dequeue();
+                if (!TryGetSingleExternalNeighbor(
+                        step.Key, step.Value, out int neighborConnector) ||
+                    neighborConnector < 0 ||
+                    neighborConnector >= _graph.Connectors.Count)
+                {
+                    continue;
+                }
+
+                GameMepElementData? neighbor = _graph.FindElement(
+                    _graph.Connectors[neighborConnector].ElementKey);
+                if (neighbor == null || !visitedElements.Add(neighbor.Key))
+                    continue;
+
+                // Une autre pompe est une nouvelle frontière de pression. Le
+                // refoulement courant ne doit jamais la traverser à rebours.
+                if (GameMepEquipmentDirectionPolicy.TryGetNativePumpDirection(
+                        _graph, neighbor, out _, out _))
+                {
+                    continue;
+                }
+
+                if (neighbor.IsPipeJunction &&
+                    neighbor.ConnectorIndices.Count >= 3)
+                {
+                    foreach (GameMepPathData junctionPath in neighbor.Paths)
+                    {
+                        if (junctionPath.EndConnector >= 0 ||
+                            junctionPath.FlowState != GameMepFlowState.Supplied ||
+                            !junctionPath.HasCirculation ||
+                            TryGetImposedDirection(junctionPath, out _, out _))
+                        {
+                            continue;
+                        }
+
+                        bool isArrivalPort = junctionPath.StartConnector ==
+                            neighborConnector;
+                        junctionPath.FlowForward = isArrivalPort;
+                        junctionPath.DirectionState =
+                            GameMepDirectionState.Resolved;
+                        junctionPath.DirectionReason =
+                            NativePumpDischargeContinuityReason;
+
+                        if (!isArrivalPort)
+                        {
+                            pending.Enqueue(new KeyValuePair<int, string>(
+                                junctionPath.StartConnector,
+                                neighbor.Key));
+                        }
+                    }
+                    continue;
+                }
+
+                bool canPropagate = neighbor.IsPipeCurve ||
+                    IsPassiveTwoPortComponent(neighbor);
+                GameMepPathData? path = neighbor.Paths.FirstOrDefault(item =>
+                    item.EndConnector >= 0 &&
+                    (item.StartConnector == neighborConnector ||
+                     item.EndConnector == neighborConnector));
+                if (!canPropagate || path == null ||
+                    path.FlowState != GameMepFlowState.Supplied ||
+                    !path.HasCirculation ||
+                    IsClosedIsolationValve(neighbor.Key) ||
+                    TryGetImposedDirection(path, out _, out _))
+                {
+                    continue;
+                }
+
+                bool nearPumpIsStart =
+                    path.StartConnector == neighborConnector;
+                path.FlowForward = nearPumpIsStart;
+                path.DirectionState = GameMepDirectionState.Resolved;
+                path.DirectionReason = NativePumpDischargeContinuityReason;
+                int farConnector = nearPumpIsStart
+                    ? path.EndConnector
+                    : path.StartConnector;
+                pending.Enqueue(new KeyValuePair<int, string>(
+                    farConnector, neighbor.Key));
+            }
+        }
+
+        private void PropagateNativePumpPort(
+            string pumpKey,
+            int pumpConnector,
+            bool isSuction)
+        {
+            if (_adjacentEdges == null || pumpConnector < 0 ||
+                pumpConnector >= _graph.Connectors.Count)
+            {
+                return;
+            }
+
+            string reason = isSuction
+                ? NativePumpSuctionContinuityReason
+                : NativePumpDischargeContinuityReason;
+            int currentConnector = pumpConnector;
+            string currentElementKey = pumpKey;
+            var visitedElements = new HashSet<string>(StringComparer.Ordinal)
+            {
+                pumpKey
+            };
+
+            while (TryGetSingleExternalNeighbor(
+                currentConnector,
+                currentElementKey,
+                out int neighborConnector))
+            {
+                if (neighborConnector < 0 ||
+                    neighborConnector >= _graph.Connectors.Count)
+                {
+                    return;
+                }
+
+                GameMepElementData? neighbor = _graph.FindElement(
+                    _graph.Connectors[neighborConnector].ElementKey);
+                if (neighbor == null || !visitedElements.Add(neighbor.Key))
+                    return;
+
+                if (neighbor.IsPipeJunction &&
+                    neighbor.ConnectorIndices.Count >= 3)
+                {
+                    GameMepPathData? junctionPath = neighbor.Paths.FirstOrDefault(
+                        item => item.StartConnector == neighborConnector &&
+                            item.EndConnector < 0);
+                    if (junctionPath == null ||
+                        junctionPath.FlowState != GameMepFlowState.Supplied ||
+                        !junctionPath.HasCirculation ||
+                        TryGetImposedDirection(junctionPath, out _, out _))
+                    {
+                        return;
+                    }
+
+                    // Sur l'aspiration, le fluide quitte le centre du té vers
+                    // la pompe. Au refoulement, il entre dans le té depuis la
+                    // pompe. La propagation s'arrête à ce premier embranchement.
+                    junctionPath.FlowForward = !isSuction;
+                    junctionPath.DirectionState =
+                        GameMepDirectionState.Resolved;
+                    junctionPath.DirectionReason = reason;
+                    return;
+                }
+
+                bool canPropagate = neighbor.IsPipeCurve ||
+                    IsPassiveTwoPortComponent(neighbor);
+                GameMepPathData? path = neighbor.Paths.FirstOrDefault(item =>
+                    item.EndConnector >= 0 &&
+                    (item.StartConnector == neighborConnector ||
+                     item.EndConnector == neighborConnector));
+                if (!canPropagate || path == null ||
+                    path.FlowState != GameMepFlowState.Supplied ||
+                    !path.HasCirculation ||
+                    IsClosedIsolationValve(neighbor.Key) ||
+                    TryGetImposedDirection(path, out _, out _))
+                {
+                    return;
+                }
+
+                bool nearPumpIsStart =
+                    path.StartConnector == neighborConnector;
+                path.FlowForward = isSuction
+                    ? !nearPumpIsStart
+                    : nearPumpIsStart;
+                path.DirectionState = GameMepDirectionState.Resolved;
+                path.DirectionReason = reason;
+
+                currentConnector = nearPumpIsStart
+                    ? path.EndConnector
+                    : path.StartConnector;
+                currentElementKey = neighbor.Key;
+            }
+        }
+
+        private bool TryGetSingleExternalNeighbor(
+            int connector,
+            string ownerKey,
+            out int neighborConnector)
+        {
+            neighborConnector = -1;
+            if (_adjacentEdges == null || connector < 0 ||
+                connector >= _adjacentEdges.Length)
+            {
+                return false;
+            }
+
+            foreach (int edgeIndex in _adjacentEdges[connector])
+            {
+                GameMepConnectionData edge = _graph.Connections[edgeIndex];
+                if (edge.IsInternal || string.Equals(
+                        edge.ElementKey, ownerKey, StringComparison.Ordinal) ||
+                    !IsSystemCompatibleEdge(edge) ||
+                    IsBlockedByFlowControl(edge))
+                {
+                    continue;
+                }
+
+                int candidate = edge.ConnectorA == connector
+                    ? edge.ConnectorB
+                    : edge.ConnectorA;
+                if (neighborConnector >= 0 && candidate != neighborConnector)
+                    return false;
+                neighborConnector = candidate;
+            }
+            return neighborConnector >= 0;
         }
 
         private bool TryReadExternalFlowTowardFitting(

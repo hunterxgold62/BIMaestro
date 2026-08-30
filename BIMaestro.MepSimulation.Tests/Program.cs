@@ -35,6 +35,7 @@ namespace BIMaestro.VideoGames
                 PumpOutletAnchorsLocalDnMerge();
                 NativePumpPortsImposeAspirationAndDischarge();
                 NativePumpSuctionOverridesSmallDnTeeInference();
+                NativePumpSuctionCrossesPassiveChainToFirstTee();
                 LargeSupplyStillDistributesToTwoSmallerBranches();
                 PumpBranchesKeepTheirEstablishedDirection();
                 ExplicitSmallOutletPreventsMergeInference();
@@ -957,6 +958,51 @@ namespace BIMaestro.VideoGames
                 fixture.Path("suction").FlowForward &&
                 fixture.Path("pump").FlowForward,
                 "A ReturnHydronic tee before a pump must flow from its center toward the native In port.");
+        }
+
+        private static void NativePumpSuctionCrossesPassiveChainToFirstTee()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("source", 1, source: true);
+            fixture.AddElement("header", 2);
+            fixture.AddElement("junction", 3);
+            fixture.AddElement("suction", 2);
+            fixture.AddElement("flange", 2);
+            fixture.AddElement("pump", 2);
+            fixture.AddElement("discharge", 2);
+            fixture.AddElement("outlet", 1);
+            fixture.Connect("source", 0, "header", 0);
+            fixture.Connect("header", 1, "junction", 0);
+            fixture.Connect("junction", 2, "suction", 1);
+            fixture.Connect("suction", 0, "flange", 1);
+            fixture.Connect("flange", 0, "pump", 0);
+            fixture.Connect("pump", 1, "discharge", 0);
+            fixture.Connect("discharge", 1, "outlet", 0);
+            fixture.AddBoundary("outlet", GameMepBoundaryKind.Outlet);
+            fixture.SetElementIdentity("pump", "Pompe primaire", "Pompe primaire");
+            fixture.SetConnectorFlowDirection("pump", 0, "In");
+            fixture.SetConnectorFlowDirection("pump", 1, "Out");
+            fixture.SetPipeDiameter("suction", 200.0);
+            fixture.SetElementCategory(
+                "flange", "Accessoire de canalisation");
+            fixture.AddJunctionPaths("junction");
+            foreach (string key in new[]
+            {
+                "header", "suction", "flange", "pump", "discharge"
+            })
+            {
+                fixture.SetPathLength(key, 5.0);
+            }
+
+            fixture.Calculate();
+
+            Assert(!fixture.Path("suction").FlowForward &&
+                !fixture.Path("flange").FlowForward &&
+                !fixture.JunctionPath("junction", 2).FlowForward,
+                "Native pump suction must cross pipes and passive accessories up to the first tee.");
+            Assert(fixture.Path("suction").DirectionReason.IndexOf(
+                    "Aspiration propagée", StringComparison.Ordinal) >= 0,
+                "The suction pipe must explain that its direction comes from the native pump inlet.");
         }
 
         private static void PumpBranchesKeepTheirEstablishedDirection()
