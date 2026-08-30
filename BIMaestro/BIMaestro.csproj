@@ -317,6 +317,9 @@
     <Compile Include="commands\vue en survol\ViewHoverPreviewService.cs" />
     <Compile Include="commands\vue en survol\ViewHoverPreviewBatchService.cs" />
     <Compile Include="commands\vue en survol\ViewThumbnailBatchCommand.cs" />
+    <Compile Include="commands\vue en survol\ViewDeckHost.cs" />
+    <Compile Include="commands\vue en survol\ViewDeckService.cs" />
+    <Compile Include="commands\vue en survol\ViewDeckPreviewCache.cs" />
     <Compile Include="commands\vue en survol\ViewThumbnailBatchWindow.xaml.cs">
       <DependentUpon>ViewThumbnailBatchWindow.xaml</DependentUpon>
     </Compile>

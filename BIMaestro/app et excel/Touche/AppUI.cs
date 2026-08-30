@@ -170,7 +170,7 @@ public class AppUI : IExternalApplication
 
            new RibbonPanelDefinition("Couleur et information", new List<RibbonItemDefinition>
             {
-                new RibbonItemDefinition("Changement de couleur", "Couleurs", panel => AddSplitButton(panel, "Changement de couleur", "Couleurs", assemblyPath, new List<(string, string, string, string, string)>
+                new RibbonItemDefinition("Changement de couleur", "Couleurs et onglets", panel => AddColorAndDeckButtons(panel, assemblyPath, new List<(string, string, string, string, string)>
                 {
                     ("Couleur de projet", "Couleurs", "Couleur.ToggleCombinedColoringCommand", "Couleur oui non.png","Clic : ouvre la personnalisation des couleurs. Double-clic : active ou désactive les panneaux colorés."),
                     ("Couleur de maquette", "Couleur reset", "Couleur.ResetTabItemRandomColorsCommand", "reset.png","Réinitialise les couleurs appliquées"),
@@ -363,6 +363,29 @@ public class AppUI : IExternalApplication
                 paintSplit.buttons,
                 null,
                 null);
+        }
+    }
+
+    private static void AddColorAndDeckButtons(
+        RibbonPanel panel,
+        string assemblyPath,
+        List<(string buttonName, string buttonText, string className, string resourceImageName, string toolTip)> colorButtons)
+    {
+        const string id = "ViewDeckToggle";
+        const string command = "BIMaestro.ViewHover.ToggleViewDeckCommand";
+        RegisterButtonDefinition(id, "Onglets : OFF", command, "Miniature.png");
+        var toggle = CreatePushButtonData(id, "Onglets : OFF", assemblyPath, command, "Miniature.png",
+            "Affiche ou masque les miniatures des vues ouvertes du document actif.\r\nCliquez sur une miniature pour activer la vue. Désactivé au démarrage de Revit.");
+        var stacked = panel.AddStackedItems(
+            new SplitButtonData("Changement de couleur", UiLanguage.T("Couleurs")), toggle);
+        if (stacked == null) return;
+        if (stacked.Count > 0 && stacked[0] is SplitButton colors)
+            ConfigureSplitButton(colors, assemblyPath, colorButtons, null, null);
+        if (stacked.Count > 1 && stacked[1] is PushButton button)
+        {
+            RegisterButtonInstance(id, button);
+            RegisterButtonCommandId(id, TryGetCommandId(button));
+            BIMaestro.ViewHover.ViewDeckService.UpdateButton();
         }
     }
 

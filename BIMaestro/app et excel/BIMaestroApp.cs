@@ -159,6 +159,7 @@ public class BIMaestroApp : IExternalApplication
     {
         try
         {
+            BIMaestro.ViewHover.ViewDeckService.Shutdown();
             try { Telemetry.FlushAsync().GetAwaiter().GetResult(); }
             catch { }
             finally { Telemetry.Shutdown(); }
@@ -186,6 +187,7 @@ public class BIMaestroApp : IExternalApplication
             Analyse.ElementHistoryTracker.ProcessDeferredPrime(_uiApp.ActiveUIDocument?.Document);
             RefreshProjectBrowserActiveViewWhenNeeded();
             BIMaestro.ViewHover.ViewHoverPreviewService.ProcessPending(_uiApp);
+            BIMaestro.ViewHover.ViewDeckService.ProcessIdling(_uiApp);
 
             if (!Couleur.ColoringStateManager.IsColoringActive)
             {
