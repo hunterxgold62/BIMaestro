@@ -25,11 +25,30 @@ namespace Page
         public Version Version { get; set; }
     }
 
+    internal sealed class UpdateInstallResult
+    {
+        [JsonProperty("version")]
+        public string Version { get; set; }
+
+        [JsonProperty("success")]
+        public bool Success { get; set; }
+
+        [JsonProperty("exitCode")]
+        public int ExitCode { get; set; }
+
+        [JsonProperty("reason")]
+        public string Reason { get; set; }
+
+        [JsonProperty("timestampUtc")]
+        public DateTime TimestampUtc { get; set; }
+    }
+
     internal static class DirectUpdateService
     {
         // Ce fichier JSON doit etre publie avec les nouvelles versions.
         internal const string ManifestUrl = "https://www.bimaestro.fr/update.json";
         private const long MaximumInstallerBytes = 500L * 1024L * 1024L;
+        private static readonly TimeSpan DownloadLockTimeout = TimeSpan.FromMinutes(12);
 
         internal static async Task<UpdateManifest> FetchManifestAsync(CancellationToken cancellationToken = default)
         {
@@ -51,6 +70,39 @@ namespace Page
         {
             ValidateManifest(manifest);
 
+            using (FileStream downloadLock = await AcquireDownloadLockAsync(cancellationToken))
+            {
+                await DownloadAndScheduleUnderLockAsync(manifest, progress, cancellationToken);
+            }
+            TryDeleteFile(DownloadLockPath);
+        }
+
+        internal static UpdateInstallResult LoadLastInstallResult()
+        {
+            try
+            {
+                if (!File.Exists(InstallResultPath)) return null;
+                string json = File.ReadAllText(InstallResultPath);
+                return JsonConvert.DeserializeObject<UpdateInstallResult>(json);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        internal static void DeleteLastInstallResult()
+        {
+            try { if (File.Exists(InstallResultPath)) File.Delete(InstallResultPath); }
+            catch { }
+        }
+
+        private static async Task DownloadAndScheduleUnderLockAsync(
+            UpdateManifest manifest,
+            IProgress<int> progress,
+            CancellationToken cancellationToken)
+        {
+
             string updateDirectory = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "BIMaestro",
@@ -60,9 +112,27 @@ namespace Page
 
             string installerPath = Path.Combine(updateDirectory, "BIMaestroInstaller.exe");
             string partialPath = installerPath + ".download";
+            string scheduledPath = Path.Combine(updateDirectory, "install.scheduled");
 
             try
             {
+                if (File.Exists(installerPath))
+                {
+                    try
+                    {
+                        VerifySha256(installerPath, manifest.Sha256);
+                        progress?.Report(100);
+                        if (!IsUpdaterStillScheduled(scheduledPath))
+                            ScheduleUpdater(installerPath, scheduledPath);
+                        return;
+                    }
+                    catch (InvalidDataException)
+                    {
+                        TryDeleteFile(installerPath);
+                        TryDeleteFile(scheduledPath);
+                    }
+                }
+
                 using (var http = CreateHttpClient(TimeSpan.FromMinutes(10)))
                 using (var response = await http.GetAsync(manifest.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
                 {
@@ -94,13 +164,49 @@ namespace Page
                 if (File.Exists(installerPath)) File.Delete(installerPath);
                 File.Move(partialPath, installerPath);
                 progress?.Report(100);
-                StartUpdater(installerPath);
+                ScheduleUpdater(installerPath, scheduledPath);
             }
             finally
             {
-                try { if (File.Exists(partialPath)) File.Delete(partialPath); }
-                catch { }
+                TryDeleteFile(partialPath);
             }
+        }
+
+        private static string InstallResultPath => Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "BIMaestro",
+            "Updates",
+            "last-result.json");
+
+        private static string DownloadLockPath => Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "BIMaestro",
+            "Updates",
+            "download.lock");
+
+        private static async Task<FileStream> AcquireDownloadLockAsync(CancellationToken cancellationToken)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(DownloadLockPath));
+            DateTime deadline = DateTime.UtcNow + DownloadLockTimeout;
+
+            while (DateTime.UtcNow < deadline)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    return new FileStream(
+                        DownloadLockPath,
+                        FileMode.OpenOrCreate,
+                        FileAccess.ReadWrite,
+                        FileShare.None);
+                }
+                catch (IOException)
+                {
+                    await Task.Delay(250, cancellationToken);
+                }
+            }
+
+            throw new TimeoutException("Une autre instance de Revit telecharge deja la mise a jour.");
         }
 
         private static HttpClient CreateHttpClient(TimeSpan timeout)
@@ -141,7 +247,42 @@ namespace Page
         private static string NormalizeHash(string value) =>
             (value ?? string.Empty).Replace(" ", string.Empty).Replace("-", string.Empty).Trim();
 
-        private static void StartUpdater(string installerPath)
+        private static void ScheduleUpdater(string installerPath, string scheduledPath)
+        {
+            TryDeleteFile(scheduledPath);
+            Process updater = StartUpdater(installerPath);
+            try
+            {
+                File.WriteAllText(scheduledPath, updater.Id.ToString());
+            }
+            catch
+            {
+                // L'assistant est deja demarre. L'absence du marqueur ne doit pas annuler l'installation.
+            }
+        }
+
+        private static bool IsUpdaterStillScheduled(string scheduledPath)
+        {
+            try
+            {
+                if (!File.Exists(scheduledPath)) return false;
+                if (!int.TryParse(File.ReadAllText(scheduledPath).Trim(), out int processId))
+                {
+                    TryDeleteFile(scheduledPath);
+                    return false;
+                }
+
+                using (var process = Process.GetProcessById(processId))
+                    return !process.HasExited;
+            }
+            catch
+            {
+                TryDeleteFile(scheduledPath);
+                return false;
+            }
+        }
+
+        private static Process StartUpdater(string installerPath)
         {
             string assemblyDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string bundledUpdater = Path.Combine(assemblyDirectory, "BIMaestro.Updater.exe");
@@ -160,8 +301,16 @@ namespace Page
                 WindowStyle = ProcessWindowStyle.Hidden
             };
 
-            if (Process.Start(startInfo) == null)
+            Process process = Process.Start(startInfo);
+            if (process == null)
                 throw new InvalidOperationException("Impossible de demarrer l'assistant de mise a jour.");
+            return process;
+        }
+
+        private static void TryDeleteFile(string path)
+        {
+            try { if (File.Exists(path)) File.Delete(path); }
+            catch { }
         }
 
         private static string Quote(string value) => "\"" + value.Replace("\"", "\\\"") + "\"";

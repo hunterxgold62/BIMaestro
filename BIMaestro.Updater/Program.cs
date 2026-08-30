@@ -12,13 +12,26 @@ namespace BIMaestro.Updater
         private static int Main(string[] args)
         {
             string ownPath = Process.GetCurrentProcess().MainModule.FileName;
+            string installerPath = args.Length > 0 ? args[0] : null;
+            int exitCode = 1;
+            string reason = "unexpected_error";
             try
             {
                 if (args.Length < 2 || !File.Exists(args[0]) || !int.TryParse(args[1], out int parentPid))
-                    return 2;
+                {
+                    exitCode = 2;
+                    reason = "invalid_arguments";
+                    return exitCode;
+                }
 
                 WaitForProcess(parentPid);
-                if (!WaitForAllRevitProcesses()) return 4;
+                if (!WaitForAllRevitProcesses())
+                {
+                    exitCode = 4;
+                    reason = "revit_wait_timeout";
+                    TryDeleteScheduledMarker(installerPath);
+                    return exitCode;
+                }
 
                 var installer = Process.Start(new ProcessStartInfo
                 {
@@ -28,17 +41,29 @@ namespace BIMaestro.Updater
                     WorkingDirectory = Path.GetDirectoryName(args[0])
                 });
                 installer?.WaitForExit();
-                int exitCode = installer?.ExitCode ?? 3;
+                exitCode = installer?.ExitCode ?? 3;
                 if (exitCode == 0)
+                {
+                    reason = "success";
                     CleanupInstalledAndOlderUpdates(args[0]);
+                }
+                else
+                {
+                    reason = "installer_exit_code";
+                    TryDeleteScheduledMarker(installerPath);
+                }
                 return exitCode;
             }
             catch
             {
-                return 1;
+                exitCode = 1;
+                reason = "unexpected_error";
+                TryDeleteScheduledMarker(installerPath);
+                return exitCode;
             }
             finally
             {
+                WriteInstallResult(installerPath, exitCode, reason);
                 TryDeleteSelfLater(ownPath);
             }
         }
@@ -121,6 +146,56 @@ namespace BIMaestro.Updater
             }
             catch { }
         }
+
+        private static void TryDeleteScheduledMarker(string installerPath)
+        {
+            try
+            {
+                string directory = Path.GetDirectoryName(Path.GetFullPath(installerPath));
+                string marker = Path.Combine(directory, "install.scheduled");
+                if (File.Exists(marker)) File.Delete(marker);
+            }
+            catch { }
+        }
+
+        private static void WriteInstallResult(string installerPath, int exitCode, string reason)
+        {
+            try
+            {
+                string version = "unknown";
+                if (!string.IsNullOrWhiteSpace(installerPath))
+                {
+                    string directory = Path.GetDirectoryName(Path.GetFullPath(installerPath));
+                    string candidate = Path.GetFileName(directory);
+                    if (Version.TryParse(candidate, out Version parsedVersion))
+                        version = parsedVersion.ToString();
+                }
+
+                string updatesDirectory = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "BIMaestro",
+                    "Updates");
+                Directory.CreateDirectory(updatesDirectory);
+
+                string resultPath = Path.Combine(updatesDirectory, "last-result.json");
+                string temporaryPath = resultPath + ".tmp";
+                string json = "{" +
+                    "\"version\":\"" + JsonEscape(version) + "\"," +
+                    "\"success\":" + (exitCode == 0 ? "true" : "false") + "," +
+                    "\"exitCode\":" + exitCode + "," +
+                    "\"reason\":\"" + JsonEscape(reason) + "\"," +
+                    "\"timestampUtc\":\"" + DateTime.UtcNow.ToString("O") + "\"" +
+                    "}";
+
+                File.WriteAllText(temporaryPath, json);
+                if (File.Exists(resultPath)) File.Delete(resultPath);
+                File.Move(temporaryPath, resultPath);
+            }
+            catch { }
+        }
+
+        private static string JsonEscape(string value) =>
+            (value ?? string.Empty).Replace("\\", "\\\\").Replace("\"", "\\\"");
 
         private static void TryDeleteSelfLater(string path)
         {

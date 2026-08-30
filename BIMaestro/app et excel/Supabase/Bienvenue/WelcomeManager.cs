@@ -165,11 +165,12 @@ namespace BIMaestro.Welcome
                 WelcomeStorage.Save(_state);
             }
 
+            bool windowShown = false;
             try
             {
                 var win = new WelcomeWindow();
 
-                // ✅ Owner Revit sans dépendance Autodesk.Windows
+                // Fenêtre possédée par Revit : elle reste devant Revit sans bloquer son utilisation.
                 var hwnd = RevitWindowHandle.GetRevitMainWindowHandle();
                 if (hwnd != IntPtr.Zero)
                 {
@@ -177,57 +178,72 @@ namespace BIMaestro.Welcome
                     helper.Owner = hwnd;
                 }
 
-                win.ShowDialog();
-
-                lock (_sync)
+                win.Closed += (_, __) =>
                 {
-                    _state.LastWelcomePromptVersion = CurrentPluginVersion;
-                    WelcomeStorage.Save(_state);
-
-                    if (win.ResultAction == WelcomeResultAction.OpenGuide)
+                    try
                     {
-                        // Option : on considère le welcome terminé pour éviter qu’il revienne.
-                        // L’opt-in restera accessible via Paramètres.
-                        _state.WelcomeShown = true;
-                        WelcomeStorage.Save(_state);
-
-                        _shouldShow = false;
-                        PostGuideCommand();
-                        return;
+                        HandleWelcomeClosed(win);
                     }
-
-                    if (win.ResultAction == WelcomeResultAction.OptIn)
+                    finally
                     {
-                        _state.EmailOptIn = true;
-                        _state.Email = win.Email;
-                        _state.FirstName = win.FirstName;
-                        _state.LastName = win.LastName;
-                        _state.OptInUtc = DateTime.UtcNow;
-                        _state.ProfilePending = true;
-
-                        _state.WelcomeShown = true;
-                        WelcomeStorage.Save(_state);
-
-                        TryUpsertProfileNoThrow();
+                        Interlocked.Exchange(ref _showing, 0);
                     }
-                    else if (win.ResultAction == WelcomeResultAction.Snooze)
-                    {
-                        _state.SnoozeUntilUtc = DateTime.UtcNow + SnoozeDuration;
-                        WelcomeStorage.Save(_state);
-                    }
-                    else if (win.ResultAction == WelcomeResultAction.Dismiss)
-                    {
-                        _state.HardDismissed = true;
-                        WelcomeStorage.Save(_state);
-                    }
+                };
 
-                    _shouldShow = false;
-                }
+                _shouldShow = false;
+                win.Show();
+                windowShown = true;
             }
             finally
             {
-                Interlocked.Exchange(ref _showing, 0);
+                if (!windowShown)
+                    Interlocked.Exchange(ref _showing, 0);
             }
+        }
+
+        private static void HandleWelcomeClosed(WelcomeWindow win)
+        {
+            bool openGuide = false;
+            bool syncProfile = false;
+
+            lock (_sync)
+            {
+                _state ??= WelcomeStorage.LoadOrCreate();
+
+                if (win.ResultAction == WelcomeResultAction.OpenGuide)
+                {
+                    _state.WelcomeShown = true;
+                    _state.LastWelcomePromptVersion = CurrentPluginVersion;
+                    openGuide = true;
+                }
+                else if (win.ResultAction == WelcomeResultAction.OptIn)
+                {
+                    _state.EmailOptIn = true;
+                    _state.Email = win.Email;
+                    _state.FirstName = win.FirstName;
+                    _state.LastName = win.LastName;
+                    _state.OptInUtc = DateTime.UtcNow;
+                    _state.ProfilePending = true;
+                    _state.WelcomeShown = true;
+                    _state.LastWelcomePromptVersion = CurrentPluginVersion;
+                    syncProfile = true;
+                }
+                else if (win.ResultAction == WelcomeResultAction.Snooze)
+                {
+                    _state.SnoozeUntilUtc = DateTime.UtcNow + SnoozeDuration;
+                }
+                else if (win.ResultAction == WelcomeResultAction.Dismiss)
+                {
+                    _state.HardDismissed = true;
+                    _state.LastWelcomePromptVersion = CurrentPluginVersion;
+                }
+
+                WelcomeStorage.Save(_state);
+                _shouldShow = false;
+            }
+
+            if (syncProfile) TryUpsertProfileNoThrow();
+            if (openGuide) PostGuideCommand();
         }
 
         private static void PostGuideCommand()
@@ -300,6 +316,8 @@ namespace BIMaestro.Welcome
         {
             if (state == null) return true;
             if (!string.IsNullOrWhiteSpace(state.Email)) return false;
+            if (state.HardDismissed) return false;
+            if (state.SnoozeUntilUtc.HasValue && state.SnoozeUntilUtc.Value > DateTime.UtcNow) return false;
 
             return !string.Equals(
                 NormalizeValue(state.LastWelcomePromptVersion),

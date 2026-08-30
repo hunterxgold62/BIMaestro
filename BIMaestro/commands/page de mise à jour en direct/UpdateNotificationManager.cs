@@ -24,10 +24,12 @@ namespace Page
         private static bool _shouldPrompt;
         private static bool _promptShown;
         private static bool _passiveSignalApplied;
+        private static bool _installResultShown;
 
         private static Version _currentVersion = new Version(0, 0, 0);
         private static Version _latestVersion;
         private static UpdateManifest _latestManifest;
+        private static UpdateInstallResult _pendingInstallResult;
 
         private static UpdateNotifierState _state;
 
@@ -42,6 +44,11 @@ namespace Page
 
                 _state = LoadState();
                 _currentVersion = ParseVersion(BIMaestroApp.PluginVersion) ?? new Version(0, 0, 0);
+                _pendingInstallResult = DirectUpdateService.LoadLastInstallResult();
+                if (_pendingInstallResult != null
+                    && _state.LastHandledInstallResultUtc.HasValue
+                    && _state.LastHandledInstallResultUtc.Value >= _pendingInstallResult.TimestampUtc)
+                    _pendingInstallResult = null;
 
                 app.Idling += App_Idling;
             }
@@ -53,6 +60,12 @@ namespace Page
         {
             if (sender is UIApplication uiapp)
                 AppUI.SetUiApplication(uiapp);
+
+            if (!_installResultShown && _pendingInstallResult != null)
+            {
+                ShowInstallResult();
+                return;
+            }
 
             if (!_checkCompleted) return;
 
@@ -109,6 +122,52 @@ namespace Page
         {
             if (string.IsNullOrWhiteSpace(input)) return null;
             return Version.TryParse(input.Trim(), out Version version) ? version : null;
+        }
+
+        private static void ShowInstallResult()
+        {
+            try
+            {
+                string version = string.IsNullOrWhiteSpace(_pendingInstallResult.Version)
+                    ? "?"
+                    : _pendingInstallResult.Version;
+
+                string message;
+                if (_pendingInstallResult.Success)
+                {
+                    message = UiLanguage.T(
+                        $"BIMaestro a été mis à jour avec succès vers la version {version}.",
+                        $"BIMaestro was successfully updated to version {version}.");
+                }
+                else if (string.Equals(_pendingInstallResult.Reason, "revit_wait_timeout", StringComparison.Ordinal))
+                {
+                    message = UiLanguage.T(
+                        $"La mise à jour BIMaestro {version} n'a pas été installée car Revit est resté ouvert. Elle vous sera proposée à nouveau.",
+                        $"BIMaestro update {version} was not installed because Revit remained open. It will be offered again.");
+                }
+                else
+                {
+                    message = UiLanguage.T(
+                        $"La mise à jour BIMaestro {version} n'a pas pu être installée (code {_pendingInstallResult.ExitCode}). Elle vous sera proposée à nouveau.",
+                        $"BIMaestro update {version} could not be installed (code {_pendingInstallResult.ExitCode}). It will be offered again.");
+                }
+
+                TaskDialog.Show(
+                    UiLanguage.T("BIMaestro - Mise à jour", "BIMaestro - Update"),
+                    message);
+
+                _state.LastHandledInstallResultUtc = _pendingInstallResult.TimestampUtc;
+                SaveState(_state);
+                DirectUpdateService.DeleteLastInstallResult();
+            }
+            catch
+            {
+                // Une erreur d'affichage ne doit jamais bloquer le démarrage de Revit.
+            }
+            finally
+            {
+                _installResultShown = true;
+            }
         }
 
         private static void ApplyPassiveSignal()
@@ -227,6 +286,7 @@ namespace Page
             public DateTime? LastPromptUtc { get; set; }
             public DateTime? SuppressUntilUtc { get; set; }
             public string SuppressReason { get; set; }
+            public DateTime? LastHandledInstallResultUtc { get; set; }
         }
     }
 }

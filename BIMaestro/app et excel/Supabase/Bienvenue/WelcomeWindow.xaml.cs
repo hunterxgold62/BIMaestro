@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Reflection;
 using System.Text.RegularExpressions;
@@ -59,22 +60,25 @@ namespace BIMaestro.Welcome
             }
 
             ResultAction = WelcomeResultAction.OptIn;
-            DialogResult = true;
             Close();
         }
 
         private void Later_Click(object sender, RoutedEventArgs e)
         {
             ResultAction = WelcomeResultAction.Snooze;
-            DialogResult = false;
             Close();
         }
 
         private void NoThanks_Click(object sender, RoutedEventArgs e)
         {
             ResultAction = WelcomeResultAction.Dismiss;
-            DialogResult = false;
             Close();
+        }
+
+        private void Window_Closing(object sender, CancelEventArgs e)
+        {
+            if (ResultAction == WelcomeResultAction.None)
+                ResultAction = WelcomeResultAction.Snooze;
         }
 
         private static bool IsValidEmail(string email) =>
