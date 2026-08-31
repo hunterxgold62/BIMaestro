@@ -214,7 +214,22 @@ BIMaestro est prévu pour Revit 2022 à 2027. L'installateur officiel prépare l
 
 ### Mise à jour et désinstallation
 
-Les mises à jour et la désinstallation suivent le même parcours officiel, avec une version propre et prête à utiliser.
+BIMaestro signale les nouvelles versions au démarrage et dans le bouton **Note**.
+Le bouton **Télécharger** ouvre la [page officielle de téléchargement](https://www.bimaestro.fr/telechargement)
+dans le navigateur. Téléchargez l'installateur, fermez toutes les fenêtres Revit,
+puis lancez vous-même l'installation.
+
+Le composant `BIMaestro.Updater.exe` et l'installation automatique après fermeture
+de Revit ont été retirés. Aucun assistant de mise à jour n'est compilé ou distribué.
+Les deux scripts d'installation excluent explicitement ses anciens fichiers et
+retirent la copie éventuellement présente dans leur dossier d'installation.
+La notification continue à lire la version de `update.json` ; les champs de
+téléchargement des anciens manifestes ne sont plus utilisés par le plugin.
+
+Ce retrait supprime la dépendance au composant signalé par HP Wolf Security ;
+il ne garantit pas l'acceptation de l'installateur par tous les antivirus.
+Les anciens installateurs déjà publiés ne sont pas modifiés : il faut reconstruire
+et publier un nouvel installateur pour distribuer ce changement.
 
 ## Code source et contribution
 

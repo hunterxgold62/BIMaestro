@@ -402,43 +402,27 @@ namespace Page
         }
 
 
-        private async void UpdateNow_Click(object sender, RoutedEventArgs e)
+        private void UpdateNow_Click(object sender, RoutedEventArgs e)
         {
-            LoadingPanel.Visibility = Visibility.Visible;
+            MessageBox.Show(
+                UiLanguage.T(
+                    "Téléchargez la nouvelle version sur le site officiel, puis fermez toutes les fenêtres Revit et lancez l'installateur.",
+                    "Download the new version from the official website, then close all Revit windows and run the installer."),
+                "BIMaestro",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             try
             {
-                UpdateManifest manifest = await DirectUpdateService.FetchManifestAsync();
-                Version current = ParseVersion(GetCurrentVersionString()) ?? new Version(0, 0, 0);
-                if (manifest.Version <= current)
-                {
-                    MessageBox.Show(
-                        UiLanguage.T("BIMaestro est déjà à jour.", "BIMaestro is already up to date."),
-                        "BIMaestro",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
-                    return;
-                }
-
-                await DirectUpdateService.DownloadAndScheduleAsync(manifest, null);
-                MessageBox.Show(
-                    UiLanguage.T(
-                        "La mise à jour est téléchargée. Elle s'installera automatiquement après la fermeture de toutes les fenêtres Revit.",
-                        "The update has been downloaded. It will install automatically after all Revit windows are closed."),
-                    "BIMaestro",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                UpdateCheckService.OpenDownloadPage();
             }
             catch (Exception ex)
             {
                 MessageBox.Show(
-                    UiLanguage.T("Impossible de télécharger la mise à jour : ", "Unable to download the update: ") + ex.Message,
+                    UiLanguage.T("Impossible d'ouvrir la page de téléchargement : ", "Unable to open the download page: ") + ex.Message +
+                    "\n\n" + UpdateCheckService.DownloadPageUrl,
                     "BIMaestro",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
-            }
-            finally
-            {
-                LoadingPanel.Visibility = Visibility.Collapsed;
             }
         }
 

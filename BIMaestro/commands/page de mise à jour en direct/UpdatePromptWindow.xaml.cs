@@ -13,67 +13,41 @@ namespace Page
     {
         Close,
         Later,
-        UpdateNow
+        DownloadPageOpened
     }
 
     public partial class UpdatePromptWindow : Window
     {
         public bool MuteToday => MuteTodayCheck.IsChecked == true;
         internal UpdatePromptResult Result { get; private set; } = UpdatePromptResult.Close;
-        private readonly UpdateManifest _manifest;
-
-        internal UpdatePromptWindow(string latestVersion, string currentVersion, UpdateManifest manifest)
+        internal UpdatePromptWindow(string latestVersion, string currentVersion)
         {
             InitializeComponent();
-            _manifest = manifest;
 
             TitleText.Text = UiLanguage.T("Nouvelle version BIMaestro : v", "New BIMaestro Version: v") + latestVersion;
             ContentText.Text = UiLanguage.T("Version installée : v", "Installed Version: v") + currentVersion +
-                UiLanguage.T("\n\nVoulez-vous télécharger la mise à jour maintenant ? Elle sera installée automatiquement après la fermeture de Revit.",
-                    "\n\nWould you like to download the update now? It will install automatically after Revit closes.");
+                UiLanguage.T("\n\nTéléchargez la nouvelle version sur le site officiel, puis fermez toutes les fenêtres Revit et lancez l'installateur.",
+                    "\n\nDownload the new version from the official website, then close all Revit windows and run the installer.");
 
             TryAttachEmbeddedGif(GifImage, "BIMaestro.Resources.OLD.Mickey.gif");
         }
 
-        private async void UpdateButton_Click(object sender, RoutedEventArgs e)
+        private void UpdateButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_manifest == null) return;
-
-            UpdateButton.IsEnabled = false;
-            LaterButton.IsEnabled = false;
-            MuteTodayCheck.IsEnabled = false;
-            DownloadPanel.Visibility = Visibility.Visible;
-
             try
             {
-                var progress = new Progress<int>(value =>
-                {
-                    DownloadProgress.Value = value;
-                    DownloadStatus.Text = UiLanguage.T($"Téléchargement… {value}%", $"Downloading… {value}%");
-                });
-                await DirectUpdateService.DownloadAndScheduleAsync(_manifest, progress);
-                Result = UpdatePromptResult.UpdateNow;
-                MessageBox.Show(
-                    UiLanguage.T(
-                        "La mise à jour est téléchargée. Elle s'installera automatiquement après la fermeture de toutes les fenêtres Revit.",
-                        "The update has been downloaded. It will install automatically after all Revit windows are closed."),
-                    "BIMaestro",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                UpdateCheckService.OpenDownloadPage();
+                Result = UpdatePromptResult.DownloadPageOpened;
                 DialogResult = true;
-                Close();
             }
             catch (Exception ex)
             {
-                DownloadStatus.Text = UiLanguage.T("Échec du téléchargement.", "Download failed.");
                 MessageBox.Show(
-                    UiLanguage.T("Impossible de télécharger la mise à jour : ", "Unable to download the update: ") + ex.Message,
+                    UiLanguage.T("Impossible d'ouvrir la page de téléchargement : ", "Unable to open the download page: ") + ex.Message +
+                    "\n\n" + UpdateCheckService.DownloadPageUrl,
                     "BIMaestro",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
-                UpdateButton.IsEnabled = true;
-                LaterButton.IsEnabled = true;
-                MuteTodayCheck.IsEnabled = true;
             }
         }
 

@@ -24,7 +24,13 @@ SolidCompression=yes
 Source: "bin\Release\*.*"; \
   DestDir: "{localappdata}\BIMaestro\Bin"; \
   Flags: ignoreversion recursesubdirs createallsubdirs; \
-  Excludes: "*.pdb,BIMaestro - Copie.dll"
+  Excludes: "*.pdb,BIMaestro - Copie.dll,BIMaestro.Updater.*"
+
+[InstallDelete]
+; Retirer l'ancien assistant lors d'une mise a jour manuelle.
+Type: files; Name: "{app}\BIMaestro.Updater.exe"
+Type: files; Name: "{app}\BIMaestro.Updater.exe.config"
+Type: files; Name: "{app}\BIMaestro.Updater.pdb"
 
 [Code]
 // -----------------------------------------------------------------

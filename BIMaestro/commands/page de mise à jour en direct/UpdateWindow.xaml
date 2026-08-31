@@ -100,8 +100,8 @@
                 </Button>
 
                 <Button Grid.Column="2" Click="UpdateNow_Click" Margin="0,0,6,0"
-                        Style="{StaticResource HeaderBtn}" ToolTip="Mettre à jour">
-                    <TextBlock Text="Mettre à jour"/>
+                        Style="{StaticResource HeaderBtn}" ToolTip="Télécharger sur le site officiel, puis installer après avoir fermé Revit">
+                    <TextBlock Text="Télécharger"/>
                 </Button>
 
                 <Button Grid.Column="3" Click="Close_Click" Margin="0,0,10,0"

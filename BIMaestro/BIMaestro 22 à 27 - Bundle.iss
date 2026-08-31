@@ -53,7 +53,7 @@ Name: "french"; MessagesFile: "compiler:Languages\French.isl"
 ; DLL principale et dépendances. Les symboles de débogage ne sont pas distribués.
 Source: "bin\Release\*.*"; DestDir: "{app}\Contents"; \
   Flags: ignoreversion recursesubdirs createallsubdirs; \
-  Excludes: "*.pdb,BIMaestro - Copie.dll"
+  Excludes: "*.pdb,BIMaestro - Copie.dll,BIMaestro.Updater.*"
 
 ; Ressources publiques du paquet Autodesk.
 Source: "Resources\OLD\BIMaestro.png"; DestDir: "{app}\Contents"; \
@@ -66,6 +66,12 @@ Source: "Marketplace\PolitiqueConfidentialite.html"; DestDir: "{app}\Contents"; 
   DestName: "PolitiqueConfidentialite.html"; Flags: ignoreversion
 Source: "..\LICENSE.txt"; DestDir: "{app}\Contents"; \
   DestName: "LICENSE.txt"; Flags: ignoreversion
+
+[InstallDelete]
+; Retirer l'ancien assistant lors d'une mise a jour manuelle du bundle.
+Type: files; Name: "{app}\Contents\BIMaestro.Updater.exe"
+Type: files; Name: "{app}\Contents\BIMaestro.Updater.exe.config"
+Type: files; Name: "{app}\Contents\BIMaestro.Updater.pdb"
 
 [Code]
 const
