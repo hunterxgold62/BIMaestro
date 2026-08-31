@@ -375,7 +375,7 @@ public class AppUI : IExternalApplication
         const string command = "BIMaestro.ViewHover.ToggleViewDeckCommand";
         RegisterButtonDefinition(id, "Onglets : OFF", command, "Miniature.png");
         var toggle = CreatePushButtonData(id, "Onglets : OFF", assemblyPath, command, "Miniature.png",
-            "Affiche ou masque les miniatures des vues ouvertes du document actif.\r\nCliquez sur une miniature pour activer la vue. Désactivé au démarrage de Revit.");
+            "ON : miniatures dans les onglets. OFF : onglets compacts.\r\nDans les deux modes, survolez un onglet 0,5 seconde pour afficher l'aperçu agrandi. Les miniatures intégrées sont désactivées au démarrage.");
         var stacked = panel.AddStackedItems(
             new SplitButtonData("Changement de couleur", UiLanguage.T("Couleurs")), toggle);
         if (stacked == null) return;

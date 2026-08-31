@@ -317,9 +317,15 @@
     <Compile Include="commands\vue en survol\ViewHoverPreviewService.cs" />
     <Compile Include="commands\vue en survol\ViewHoverPreviewBatchService.cs" />
     <Compile Include="commands\vue en survol\ViewThumbnailBatchCommand.cs" />
-    <Compile Include="commands\vue en survol\ViewDeckHost.cs" />
+    <Compile Include="commands\vue en survol\ViewDeckTabDecorator.cs" />
+    <Compile Include="commands\vue en survol\ViewDeckChangeJournal.cs" />
+    <Compile Include="commands\vue en survol\ViewDeckChangeService.cs" />
+    <Compile Include="commands\vue en survol\ViewDeckHoverPreview.cs" />
+    <Compile Include="commands\vue en survol\ViewDeckTabPresentation.cs" />
+    <Compile Include="commands\vue en survol\ViewDeckTabIdentity.cs" />
     <Compile Include="commands\vue en survol\ViewDeckService.cs" />
     <Compile Include="commands\vue en survol\ViewDeckPreviewCache.cs" />
+    <Compile Include="commands\vue en survol\ViewDeckPreviewMemory.cs" />
     <Compile Include="commands\vue en survol\ViewThumbnailBatchWindow.xaml.cs">
       <DependentUpon>ViewThumbnailBatchWindow.xaml</DependentUpon>
     </Compile>

@@ -267,6 +267,7 @@ public class BIMaestroApp : IExternalApplication
             BIMaestro.ViewHover.ViewHoverPreviewService.TrackActivatedView(
                 args.Document,
                 args.CurrentActiveView);
+            BIMaestro.ViewHover.ViewDeckChangeService.Activate(args.Document, args.CurrentActiveView);
             _pendingProjectBrowserViewRefreshes = 3;
             _nextProjectBrowserViewRefreshUtc =
                 DateTime.UtcNow.AddMilliseconds(80);
@@ -326,6 +327,7 @@ public class BIMaestroApp : IExternalApplication
         {
             var doc = args.GetDocument();
             var selectedIds = args.GetSelectedElements();
+            BIMaestro.ViewHover.ViewDeckChangeService.CaptureSelection(doc, selectedIds);
             Analyse.ElementHistoryTracker.CaptureSelectedElementDetails(doc, selectedIds);
             Analyse.ElementHistoryHoverInfoService.OnSelectionChanged(
                 doc,
@@ -395,6 +397,12 @@ public class BIMaestroApp : IExternalApplication
     private void OnDocumentChangedSafe(object sender, DocumentChangedEventArgs e)
     {
         Document document = null;
+        try
+        {
+            document = e.GetDocument();
+            BIMaestro.ViewHover.ViewDeckChangeService.Track(document, e);
+        }
+        catch (Exception ex) { AppendLog("ViewDeck change tracking: " + ex); }
         try
         {
             document = e.GetDocument();

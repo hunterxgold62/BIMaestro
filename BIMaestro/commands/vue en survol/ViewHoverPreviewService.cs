@@ -605,7 +605,7 @@ namespace BIMaestro.ViewHover
                 HLRandWFViewsFileType = ImageFileType.PNG,
                 ShadowViewsFileType = ImageFileType.PNG,
                 ZoomType = ZoomFitType.FitToPage,
-                PixelSize = 360,
+                PixelSize = 720,
                 FitDirection = FitDirectionType.Horizontal,
                 ImageResolution = ImageResolution.DPI_72
             };
@@ -627,18 +627,8 @@ namespace BIMaestro.ViewHover
                 return false;
             }
 
-            File.Copy(generated, targetPath, true);
-            if (!string.Equals(
-                    generated,
-                    targetPath,
-                    StringComparison.OrdinalIgnoreCase) &&
-                generated.StartsWith(
-                    directory + Path.DirectorySeparatorChar,
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                try { File.Delete(generated); }
-                catch { }
-            }
+            // Keep the previous PNG intact until a valid new image is ready.
+            ViewDeckCachedImage.PublishGeneratedImage(generated, targetPath);
 
             return File.Exists(targetPath);
         }

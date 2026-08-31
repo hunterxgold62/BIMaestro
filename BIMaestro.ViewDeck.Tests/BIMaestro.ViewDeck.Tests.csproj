@@ -20,8 +20,23 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
-    <Compile Include="..\BIMaestro\commands\vue en survol\ViewDeckHost.cs">
-      <Link>ViewDeckHost.cs</Link>
+    <Compile Include="..\BIMaestro\commands\vue en survol\ViewDeckChangeJournal.cs">
+      <Link>ViewDeckChangeJournal.cs</Link>
+    </Compile>
+    <Compile Include="..\BIMaestro\commands\vue en survol\ViewDeckTabPresentation.cs">
+      <Link>ViewDeckTabPresentation.cs</Link>
+    </Compile>
+    <Compile Include="..\BIMaestro\commands\vue en survol\ViewDeckHoverPreview.cs">
+      <Link>ViewDeckHoverPreview.cs</Link>
+    </Compile>
+    <Compile Include="..\BIMaestro\commands\vue en survol\ViewDeckPreviewMemory.cs">
+      <Link>ViewDeckPreviewMemory.cs</Link>
+    </Compile>
+    <Compile Include="..\BIMaestro\commands\vue en survol\ViewDeckTabDecorator.cs">
+      <Link>ViewDeckTabDecorator.cs</Link>
+    </Compile>
+    <Compile Include="..\BIMaestro\commands\vue en survol\ViewDeckTabIdentity.cs">
+      <Link>ViewDeckTabIdentity.cs</Link>
     </Compile>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
