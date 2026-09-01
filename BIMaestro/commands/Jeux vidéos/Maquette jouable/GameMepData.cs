@@ -284,7 +284,7 @@ namespace BIMaestro.VideoGames
 
     internal static class GameMepEquipmentDirectionPolicy
     {
-        public static bool TryGetNativePumpDirection(
+        public static bool TryGetNativeFlowDirection(
             GameMepGraphData graph,
             GameMepElementData? element,
             out int entryConnector,
@@ -293,7 +293,8 @@ namespace BIMaestro.VideoGames
             entryConnector = -1;
             exitConnector = -1;
             if (graph == null || element == null ||
-                element.ConnectorIndices.Count != 2 || !IsPumpLike(element))
+                element.ConnectorIndices.Count != 2 ||
+                element.IsPipeJunction)
             {
                 return false;
             }
@@ -314,6 +315,22 @@ namespace BIMaestro.VideoGames
             }
             return entryConnector >= 0 && exitConnector >= 0 &&
                 entryConnector != exitConnector;
+        }
+
+        public static bool TryGetNativePumpDirection(
+            GameMepGraphData graph,
+            GameMepElementData? element,
+            out int entryConnector,
+            out int exitConnector)
+        {
+            entryConnector = -1;
+            exitConnector = -1;
+            return element != null && IsPumpLike(element) &&
+                TryGetNativeFlowDirection(
+                    graph,
+                    element,
+                    out entryConnector,
+                    out exitConnector);
         }
 
         private static bool IsPumpLike(GameMepElementData element)
@@ -525,10 +542,10 @@ namespace BIMaestro.VideoGames
                 return true;
             }
 
-            // Une pompe peut séparer deux instances de système Revit tout en
-            // faisant circuler le même fluide. La contrainte de pression créée
-            // explicitement par l'utilisateur constitue l'autorisation de
-            // franchir cette frontière, uniquement entre ses deux connecteurs.
+            // Un équipement directionnel peut séparer deux instances de
+            // système Revit tout en faisant circuler le même fluide. Une
+            // contrainte explicite autorise aussi cette traversée, uniquement
+            // entre les deux connecteurs concernés.
             if (graph.DirectionConstraints.Any(constraint =>
                 constraint.IsActive &&
                 constraint.HasExplicitDirection &&
@@ -547,7 +564,7 @@ namespace BIMaestro.VideoGames
             }
 
             return owner != null &&
-                GameMepEquipmentDirectionPolicy.TryGetNativePumpDirection(
+                GameMepEquipmentDirectionPolicy.TryGetNativeFlowDirection(
                     graph,
                     owner,
                     out int nativeEntry,
@@ -612,6 +629,8 @@ namespace BIMaestro.VideoGames
             "Aspiration propagée depuis le port d'entrée de la pompe";
         private const string NativePumpDischargeContinuityReason =
             "Refoulement propagé depuis le port de sortie de la pompe";
+        private const string DirectionalNetworkConsensusReason =
+            "Consensus des sens In/Out à travers les branches parallèles";
         private readonly GameMepGraphData _graph;
         private List<int>[]? _adjacentEdges;
 
@@ -930,11 +949,11 @@ namespace BIMaestro.VideoGames
                 }
             }
             GameMepElementData? owner = _graph.FindElement(path.ElementKey);
-            bool hasManualPumpDirection = _graph.DirectionConstraints.Any(item =>
+            bool hasManualEquipmentDirection = _graph.DirectionConstraints.Any(item =>
                 item.IsActive && item.HasExplicitDirection &&
                 item.Scope == GameMepDirectionConstraintScope.EquipmentPressureRise &&
                 string.Equals(item.ElementKey, path.ElementKey, StringComparison.Ordinal));
-            if (!hasManualPumpDirection &&
+            if (!hasManualEquipmentDirection &&
                 GameMepEquipmentDirectionPolicy.TryGetNativePumpDirection(
                     _graph,
                     owner,
@@ -2092,7 +2111,7 @@ namespace BIMaestro.VideoGames
 
             AlignTwoPortPipeFittings();
             AlignPipeJunctions();
-            AlignNativePumpBranches();
+            AlignNativeDirectionalBranches();
 
             void AddArmPipeElements(
                 IEnumerable<int> connectors,
@@ -2989,143 +3008,80 @@ namespace BIMaestro.VideoGames
             }
         }
 
-        private void AlignNativePumpBranches()
+        private void AlignNativeDirectionalBranches()
         {
             if (_adjacentEdges == null)
                 return;
 
-            foreach (GameMepElementData pump in _graph.Elements)
+            var downstreamAnchors = new List<Tuple<string, int>>();
+            var locallyProtectedPaths = new HashSet<GameMepPathData>();
+            foreach (GameMepElementData equipment in _graph.Elements)
             {
-                if (!GameMepEquipmentDirectionPolicy.TryGetNativePumpDirection(
-                        _graph, pump, out int entryConnector,
+                bool hasManualDirection = _graph.DirectionConstraints.Any(item =>
+                    item.IsActive && item.HasExplicitDirection &&
+                    item.Scope ==
+                        GameMepDirectionConstraintScope.EquipmentPressureRise &&
+                    string.Equals(
+                        item.ElementKey,
+                        equipment.Key,
+                        StringComparison.Ordinal));
+                if (hasManualDirection ||
+                    !GameMepEquipmentDirectionPolicy.TryGetNativeFlowDirection(
+                        _graph, equipment, out int entryConnector,
                         out int exitConnector))
                 {
                     continue;
                 }
 
-                PropagateNativePumpPort(
-                    pump.Key, entryConnector, isSuction: true);
-                PropagateNativePumpPort(
-                    pump.Key, exitConnector, isSuction: false);
-                PropagateNativePumpDischargeNetwork(
-                    pump.Key, exitConnector);
+                bool isPump =
+                    GameMepEquipmentDirectionPolicy.TryGetNativePumpDirection(
+                        _graph, equipment, out _, out _);
+                PropagateNativeFlowPort(
+                    equipment.Key,
+                    entryConnector,
+                    towardEquipment: true,
+                    NativePumpSuctionContinuityReason,
+                    applyDirection: isPump,
+                    locallyProtectedPaths);
+                PropagateNativeFlowPort(
+                    equipment.Key,
+                    exitConnector,
+                    towardEquipment: false,
+                    NativePumpDischargeContinuityReason,
+                    applyDirection: isPump,
+                    locallyProtectedPaths);
+                if (isPump)
+                {
+                    downstreamAnchors.Add(Tuple.Create(
+                        equipment.Key,
+                        exitConnector));
+                }
             }
+
+            ApplyDirectionalNetworkConsensus(
+                downstreamAnchors,
+                locallyProtectedPaths);
         }
 
-        private void PropagateNativePumpDischargeNetwork(
-            string pumpKey,
-            int exitConnector)
+        private void PropagateNativeFlowPort(
+            string equipmentKey,
+            int equipmentConnector,
+            bool towardEquipment,
+            string reason,
+            bool applyDirection,
+            ISet<GameMepPathData> locallyProtectedPaths)
         {
-            var pending = new Queue<KeyValuePair<int, string>>();
-            pending.Enqueue(new KeyValuePair<int, string>(
-                exitConnector, pumpKey));
-            var visitedElements = new HashSet<string>(StringComparer.Ordinal)
-            {
-                pumpKey
-            };
-
-            while (pending.Count > 0)
-            {
-                KeyValuePair<int, string> step = pending.Dequeue();
-                if (!TryGetSingleExternalNeighbor(
-                        step.Key, step.Value, out int neighborConnector) ||
-                    neighborConnector < 0 ||
-                    neighborConnector >= _graph.Connectors.Count)
-                {
-                    continue;
-                }
-
-                GameMepElementData? neighbor = _graph.FindElement(
-                    _graph.Connectors[neighborConnector].ElementKey);
-                if (neighbor == null || !visitedElements.Add(neighbor.Key))
-                    continue;
-
-                // Une autre pompe est une nouvelle frontière de pression. Le
-                // refoulement courant ne doit jamais la traverser à rebours.
-                if (GameMepEquipmentDirectionPolicy.TryGetNativePumpDirection(
-                        _graph, neighbor, out _, out _))
-                {
-                    continue;
-                }
-
-                if (neighbor.IsPipeJunction &&
-                    neighbor.ConnectorIndices.Count >= 3)
-                {
-                    foreach (GameMepPathData junctionPath in neighbor.Paths)
-                    {
-                        if (junctionPath.EndConnector >= 0 ||
-                            junctionPath.FlowState != GameMepFlowState.Supplied ||
-                            !junctionPath.HasCirculation ||
-                            TryGetImposedDirection(junctionPath, out _, out _))
-                        {
-                            continue;
-                        }
-
-                        bool isArrivalPort = junctionPath.StartConnector ==
-                            neighborConnector;
-                        junctionPath.FlowForward = isArrivalPort;
-                        junctionPath.DirectionState =
-                            GameMepDirectionState.Resolved;
-                        junctionPath.DirectionReason =
-                            NativePumpDischargeContinuityReason;
-
-                        if (!isArrivalPort)
-                        {
-                            pending.Enqueue(new KeyValuePair<int, string>(
-                                junctionPath.StartConnector,
-                                neighbor.Key));
-                        }
-                    }
-                    continue;
-                }
-
-                bool canPropagate = neighbor.IsPipeCurve ||
-                    IsPassiveTwoPortComponent(neighbor);
-                GameMepPathData? path = neighbor.Paths.FirstOrDefault(item =>
-                    item.EndConnector >= 0 &&
-                    (item.StartConnector == neighborConnector ||
-                     item.EndConnector == neighborConnector));
-                if (!canPropagate || path == null ||
-                    path.FlowState != GameMepFlowState.Supplied ||
-                    !path.HasCirculation ||
-                    IsClosedIsolationValve(neighbor.Key) ||
-                    TryGetImposedDirection(path, out _, out _))
-                {
-                    continue;
-                }
-
-                bool nearPumpIsStart =
-                    path.StartConnector == neighborConnector;
-                path.FlowForward = nearPumpIsStart;
-                path.DirectionState = GameMepDirectionState.Resolved;
-                path.DirectionReason = NativePumpDischargeContinuityReason;
-                int farConnector = nearPumpIsStart
-                    ? path.EndConnector
-                    : path.StartConnector;
-                pending.Enqueue(new KeyValuePair<int, string>(
-                    farConnector, neighbor.Key));
-            }
-        }
-
-        private void PropagateNativePumpPort(
-            string pumpKey,
-            int pumpConnector,
-            bool isSuction)
-        {
-            if (_adjacentEdges == null || pumpConnector < 0 ||
-                pumpConnector >= _graph.Connectors.Count)
+            if (_adjacentEdges == null || equipmentConnector < 0 ||
+                equipmentConnector >= _graph.Connectors.Count)
             {
                 return;
             }
 
-            string reason = isSuction
-                ? NativePumpSuctionContinuityReason
-                : NativePumpDischargeContinuityReason;
-            int currentConnector = pumpConnector;
-            string currentElementKey = pumpKey;
+            int currentConnector = equipmentConnector;
+            string currentElementKey = equipmentKey;
             var visitedElements = new HashSet<string>(StringComparer.Ordinal)
             {
-                pumpKey
+                equipmentKey
             };
 
             while (TryGetSingleExternalNeighbor(
@@ -3158,13 +3114,17 @@ namespace BIMaestro.VideoGames
                         return;
                     }
 
-                    // Sur l'aspiration, le fluide quitte le centre du té vers
-                    // la pompe. Au refoulement, il entre dans le té depuis la
-                    // pompe. La propagation s'arrête à ce premier embranchement.
-                    junctionPath.FlowForward = !isSuction;
-                    junctionPath.DirectionState =
-                        GameMepDirectionState.Resolved;
-                    junctionPath.DirectionReason = reason;
+                    // Vers le port In, le fluide quitte le centre du té vers
+                    // l'équipement. Depuis le port Out, il entre dans le té.
+                    // Cette décision locale reste protégée du consensus global.
+                    if (applyDirection)
+                    {
+                        junctionPath.FlowForward = !towardEquipment;
+                        junctionPath.DirectionState =
+                            GameMepDirectionState.Resolved;
+                        junctionPath.DirectionReason = reason;
+                    }
+                    locallyProtectedPaths.Add(junctionPath);
                     return;
                 }
 
@@ -3183,19 +3143,156 @@ namespace BIMaestro.VideoGames
                     return;
                 }
 
-                bool nearPumpIsStart =
+                bool nearEquipmentIsStart =
                     path.StartConnector == neighborConnector;
-                path.FlowForward = isSuction
-                    ? !nearPumpIsStart
-                    : nearPumpIsStart;
-                path.DirectionState = GameMepDirectionState.Resolved;
-                path.DirectionReason = reason;
+                if (applyDirection)
+                {
+                    path.FlowForward = towardEquipment
+                        ? !nearEquipmentIsStart
+                        : nearEquipmentIsStart;
+                    path.DirectionState = GameMepDirectionState.Resolved;
+                    path.DirectionReason = reason;
+                }
+                locallyProtectedPaths.Add(path);
 
-                currentConnector = nearPumpIsStart
+                currentConnector = nearEquipmentIsStart
                     ? path.EndConnector
                     : path.StartConnector;
                 currentElementKey = neighbor.Key;
             }
+        }
+
+        private void ApplyDirectionalNetworkConsensus(
+            IEnumerable<Tuple<string, int>> downstreamAnchors,
+            ISet<GameMepPathData> locallyProtectedPaths)
+        {
+            var votes = new Dictionary<GameMepPathData, int>();
+            foreach (Tuple<string, int> anchor in downstreamAnchors)
+            {
+                CollectDirectionalNetworkVotes(
+                    anchor.Item1,
+                    anchor.Item2,
+                    votes);
+            }
+
+            foreach (KeyValuePair<GameMepPathData, int> vote in votes)
+            {
+                GameMepPathData path = vote.Key;
+                if (vote.Value == 0 || locallyProtectedPaths.Contains(path) ||
+                    path.FlowState != GameMepFlowState.Supplied ||
+                    !path.HasCirculation ||
+                    TryGetImposedDirection(path, out _, out _))
+                {
+                    continue;
+                }
+
+                bool forward = vote.Value > 0;
+                path.FlowForward = forward;
+                path.DirectionState = GameMepDirectionState.Resolved;
+                path.DirectionReason = DirectionalNetworkConsensusReason;
+            }
+        }
+
+        private void CollectDirectionalNetworkVotes(
+            string equipmentKey,
+            int exitConnector,
+            IDictionary<GameMepPathData, int> votes)
+        {
+            var pending = new Queue<KeyValuePair<int, string>>();
+            pending.Enqueue(new KeyValuePair<int, string>(
+                exitConnector, equipmentKey));
+            var visitedElements = new HashSet<string>(StringComparer.Ordinal)
+            {
+                equipmentKey
+            };
+
+            while (pending.Count > 0)
+            {
+                KeyValuePair<int, string> step = pending.Dequeue();
+                if (!TryGetSingleExternalNeighbor(
+                        step.Key, step.Value, out int neighborConnector) ||
+                    neighborConnector < 0 ||
+                    neighborConnector >= _graph.Connectors.Count)
+                {
+                    continue;
+                }
+
+                GameMepElementData? neighbor = _graph.FindElement(
+                    _graph.Connectors[neighborConnector].ElementKey);
+                if (neighbor == null || !visitedElements.Add(neighbor.Key))
+                    continue;
+
+                // Un autre composant In/Out est une nouvelle autorité locale.
+                // Le vote courant s'arrête à son corps sans le traverser.
+                if (GameMepEquipmentDirectionPolicy.TryGetNativeFlowDirection(
+                        _graph, neighbor, out _, out _))
+                {
+                    continue;
+                }
+
+                if (neighbor.IsPipeJunction &&
+                    neighbor.ConnectorIndices.Count >= 3)
+                {
+                    foreach (GameMepPathData junctionPath in neighbor.Paths)
+                    {
+                        if (junctionPath.EndConnector >= 0 ||
+                            junctionPath.FlowState != GameMepFlowState.Supplied ||
+                            !junctionPath.HasCirculation ||
+                            TryGetImposedDirection(junctionPath, out _, out _))
+                        {
+                            continue;
+                        }
+
+                        bool isArrivalPort = junctionPath.StartConnector ==
+                            neighborConnector;
+                        AddDirectionVote(
+                            votes,
+                            junctionPath,
+                            isArrivalPort);
+                        if (!isArrivalPort)
+                        {
+                            pending.Enqueue(new KeyValuePair<int, string>(
+                                junctionPath.StartConnector,
+                                neighbor.Key));
+                        }
+                    }
+                    continue;
+                }
+
+                bool canPropagate = neighbor.IsPipeCurve ||
+                    IsPassiveTwoPortComponent(neighbor);
+                GameMepPathData? path = neighbor.Paths.FirstOrDefault(item =>
+                    item.EndConnector >= 0 &&
+                    (item.StartConnector == neighborConnector ||
+                     item.EndConnector == neighborConnector));
+                if (!canPropagate || path == null ||
+                    path.FlowState != GameMepFlowState.Supplied ||
+                    !path.HasCirculation ||
+                    IsClosedIsolationValve(neighbor.Key) ||
+                    TryGetImposedDirection(path, out _, out _))
+                {
+                    continue;
+                }
+
+                bool nearEquipmentIsStart =
+                    path.StartConnector == neighborConnector;
+                AddDirectionVote(votes, path, nearEquipmentIsStart);
+                int farConnector = nearEquipmentIsStart
+                    ? path.EndConnector
+                    : path.StartConnector;
+                pending.Enqueue(new KeyValuePair<int, string>(
+                    farConnector,
+                    neighbor.Key));
+            }
+        }
+
+        private static void AddDirectionVote(
+            IDictionary<GameMepPathData, int> votes,
+            GameMepPathData path,
+            bool forward)
+        {
+            votes.TryGetValue(path, out int current);
+            votes[path] = current + (forward ? 1 : -1);
         }
 
         private bool TryGetSingleExternalNeighbor(

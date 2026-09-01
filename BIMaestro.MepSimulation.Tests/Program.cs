@@ -36,6 +36,8 @@ namespace BIMaestro.VideoGames
                 NativePumpPortsImposeAspirationAndDischarge();
                 NativePumpSuctionOverridesSmallDnTeeInference();
                 NativePumpSuctionCrossesPassiveChainToFirstTee();
+                ParallelNativePumpDischargesDoNotReverseEachOther();
+                DirectionalEquipmentProtectsItsBranchFromAnotherSplit();
                 LargeSupplyStillDistributesToTwoSmallerBranches();
                 PumpBranchesKeepTheirEstablishedDirection();
                 ExplicitSmallOutletPreventsMergeInference();
@@ -911,7 +913,9 @@ namespace BIMaestro.VideoGames
             Assert(fixture.Path("pump").FlowForward &&
                 fixture.Path("pump").DirectionReason.IndexOf(
                     "Sens natif de la pompe", StringComparison.Ordinal) >= 0,
-                "Native Revit In/Out pump ports must impose aspiration then discharge.");
+                "Native Revit In/Out pump ports must impose aspiration then discharge. " +
+                "Actual: forward=" + fixture.Path("pump").FlowForward +
+                ", reason=" + fixture.Path("pump").DirectionReason);
             Assert(fixture.Path("suction").FlowForward &&
                 fixture.Path("discharge").FlowForward,
                 "The pipe before a native pump must be aspirated and the pipe after it discharged.");
@@ -1003,6 +1007,136 @@ namespace BIMaestro.VideoGames
             Assert(fixture.Path("suction").DirectionReason.IndexOf(
                     "Aspiration propagée", StringComparison.Ordinal) >= 0,
                 "The suction pipe must explain that its direction comes from the native pump inlet.");
+        }
+
+        private static void ParallelNativePumpDischargesDoNotReverseEachOther()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("source-a", 1, source: true);
+            fixture.AddElement("pump-a", 2);
+            fixture.AddElement("discharge-a", 2);
+            fixture.AddElement("source-b", 1, source: true);
+            fixture.AddElement("pump-b", 2);
+            fixture.AddElement("discharge-b", 2);
+            fixture.AddElement("junction-a", 3);
+            fixture.AddElement("collector", 2);
+            fixture.AddElement("source-c", 1, source: true);
+            fixture.AddElement("pump-c", 2);
+            fixture.AddElement("discharge-c", 2);
+            fixture.AddElement("junction-b", 3);
+            fixture.AddElement("outlet-pipe", 2);
+            fixture.AddElement("outlet", 1);
+
+            fixture.Connect("source-a", 0, "pump-a", 0);
+            fixture.Connect("pump-a", 1, "discharge-a", 0);
+            fixture.Connect("discharge-a", 1, "junction-a", 0);
+            fixture.Connect("source-b", 0, "pump-b", 0);
+            fixture.Connect("pump-b", 1, "discharge-b", 0);
+            fixture.Connect("discharge-b", 1, "junction-a", 1);
+            fixture.Connect("junction-a", 2, "collector", 0);
+            fixture.Connect("collector", 1, "junction-b", 0);
+            fixture.Connect("source-c", 0, "pump-c", 0);
+            fixture.Connect("pump-c", 1, "discharge-c", 0);
+            fixture.Connect("discharge-c", 1, "junction-b", 1);
+            fixture.Connect("junction-b", 2, "outlet-pipe", 0);
+            fixture.Connect("outlet-pipe", 1, "outlet", 0);
+            fixture.AddBoundary("outlet", GameMepBoundaryKind.Outlet);
+
+            foreach (string pump in new[] { "pump-a", "pump-b", "pump-c" })
+            {
+                fixture.SetElementIdentity(pump, "Pompe réseaux", "Pompe réseaux");
+                fixture.SetConnectorFlowDirection(pump, 0, "In");
+                fixture.SetConnectorFlowDirection(pump, 1, "Out");
+                fixture.SetPathLength(pump, 2.0);
+            }
+            foreach (string path in new[]
+            {
+                "discharge-a", "discharge-b", "collector",
+                "discharge-c", "outlet-pipe"
+            })
+            {
+                fixture.SetPathLength(path, 5.0);
+            }
+            fixture.AddJunctionPaths("junction-a");
+            fixture.AddJunctionPaths("junction-b");
+            fixture.SetElementClassification("junction-a", "ReturnHydronic");
+            fixture.SetElementClassification("junction-b", "ReturnHydronic");
+            fixture.SetPortDirection("junction-a", 0, -1.0, 0.0, 0.0);
+            fixture.SetPortDirection("junction-a", 1, 0.0, 1.0, 0.0);
+            fixture.SetPortDirection("junction-a", 2, 1.0, 0.0, 0.0);
+            fixture.SetPortDirection("junction-b", 0, -1.0, 0.0, 0.0);
+            fixture.SetPortDirection("junction-b", 1, 0.0, 1.0, 0.0);
+            fixture.SetPortDirection("junction-b", 2, 1.0, 0.0, 0.0);
+
+            fixture.Calculate();
+
+            foreach (string discharge in new[]
+            {
+                "discharge-a", "discharge-b", "discharge-c"
+            })
+            {
+                Assert(fixture.Path(discharge).FlowForward,
+                    "Each native pump discharge must keep flowing away from its own Out port: " +
+                    discharge);
+                AssertRenderableFlow(fixture, discharge);
+            }
+            Assert(fixture.Path("collector").FlowForward &&
+                fixture.Path("outlet-pipe").FlowForward,
+                "Parallel pump branches must still merge toward the declared outlet.");
+            Assert(fixture.Path("collector").DirectionReason.IndexOf(
+                    "Consensus", StringComparison.OrdinalIgnoreCase) >= 0,
+                "The shared header must be decided collectively instead of by the last pump visited.");
+        }
+
+        private static void DirectionalEquipmentProtectsItsBranchFromAnotherSplit()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("pump-source", 1, source: true);
+            fixture.AddElement("pump", 2);
+            fixture.AddElement("pump-branch", 2);
+            fixture.AddElement("equipment-source", 1, source: true);
+            fixture.AddElement("directional-equipment", 2);
+            fixture.AddElement("protected-branch", 2);
+            fixture.AddElement("junction", 3);
+            fixture.AddElement("outlet-pipe", 2);
+            fixture.AddElement("outlet", 1);
+
+            fixture.Connect("pump-source", 0, "pump", 0);
+            fixture.Connect("pump", 1, "pump-branch", 0);
+            fixture.Connect("pump-branch", 1, "junction", 0);
+            fixture.Connect("equipment-source", 0, "directional-equipment", 0);
+            fixture.Connect("directional-equipment", 1, "protected-branch", 0);
+            fixture.Connect("protected-branch", 1, "junction", 1);
+            fixture.Connect("junction", 2, "outlet-pipe", 0);
+            fixture.Connect("outlet-pipe", 1, "outlet", 0);
+            fixture.AddBoundary("outlet", GameMepBoundaryKind.Outlet);
+
+            fixture.SetElementIdentity("pump", "Pompe primaire", "Pompe primaire");
+            fixture.SetConnectorFlowDirection("pump", 0, "In");
+            fixture.SetConnectorFlowDirection("pump", 1, "Out");
+            fixture.SetElementIdentity(
+                "directional-equipment", "Équipement directionnel", "Équipement directionnel");
+            fixture.SetConnectorFlowDirection("directional-equipment", 0, "In");
+            fixture.SetConnectorFlowDirection("directional-equipment", 1, "Out");
+            fixture.AddJunctionPaths("junction");
+            foreach (string path in new[]
+            {
+                "pump", "pump-branch", "directional-equipment",
+                "protected-branch", "outlet-pipe"
+            })
+            {
+                fixture.SetPathLength(path, 5.0);
+            }
+
+            fixture.Calculate();
+
+            Assert(fixture.Path("pump-branch").FlowForward,
+                "The pump branch must enter the common junction.");
+            Assert(fixture.Path("protected-branch").FlowForward,
+                "A non-pump In/Out equipment branch must not be reversed by another split.");
+            Assert(fixture.Path("directional-equipment").FlowForward &&
+                fixture.Path("outlet-pipe").FlowForward,
+                "Both independent inlets must continue toward the shared outlet.");
         }
 
         private static void PumpBranchesKeepTheirEstablishedDirection()
