@@ -15,6 +15,23 @@ namespace BIMaestro.VideoGames
         {
             try
             {
+                if ((args.Length == 4 || args.Length == 5) &&
+                    string.Equals(args[0], "--toggle-replay", StringComparison.OrdinalIgnoreCase))
+                {
+                    long elementId = 0;
+                    if (!long.TryParse(args[2], out elementId))
+                        throw new ArgumentException("Identifiant de vanne invalide.");
+                    bool close = string.Equals(
+                        args[3], "close", StringComparison.OrdinalIgnoreCase);
+                    if (!close && !string.Equals(
+                            args[3], "open", StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new ArgumentException("État attendu : open ou close.");
+                    }
+                    string baseline = args.Length == 5 ? args[4] : "current";
+                    return ToggleAndReplayExportedGraph(
+                        args[1], elementId, close, baseline);
+                }
                 if (args.Length >= 2 && args.Length <= 3 &&
                     string.Equals(args[0], "--replay", StringComparison.OrdinalIgnoreCase))
                 {
@@ -37,6 +54,8 @@ namespace BIMaestro.VideoGames
                 NativePumpSuctionOverridesSmallDnTeeInference();
                 NativePumpSuctionCrossesPassiveChainToFirstTee();
                 ParallelNativePumpDischargesDoNotReverseEachOther();
+                ConflictingPumpVotesDoNotUsePumpCountAsFlowRate();
+                OpeningValvePreservesEstablishedPumpConsensus();
                 DirectionalEquipmentProtectsItsBranchFromAnotherSplit();
                 LargeSupplyStillDistributesToTwoSmallerBranches();
                 PumpBranchesKeepTheirEstablishedDirection();
@@ -48,6 +67,7 @@ namespace BIMaestro.VideoGames
                 HydraulicPotentialEliminatesIsolatedLoopReversal();
                 TwoPortFittingFollowsAuthoritativeAdjacentPaths();
                 TwoPortPipeAccessoryFollowsAuthoritativeAdjacentPaths();
+                PassiveContinuityCannotCrossDirectedBoundaryStop();
                 TeePortsFollowTheirAdjacentPipes();
                 CollinearTeeChainKeepsOneHeaderDirection();
                 LoopBypassesClosedValve();
@@ -65,6 +85,7 @@ namespace BIMaestro.VideoGames
                 PipeJunctionBridgesPhysicallyConnectedRevitSystems();
                 PumpConstraintBridgesDifferentRevitSystems();
                 ReturnOnlySystemFlowsTowardDeclaredOutlet();
+                ClosedValveCannotCreateImplicitReturnInlet();
                 ClosedValveDeadEndStaysPressurizedWithoutCirculation();
                 UnmarkedOpenEndKeepsCirculation();
                 EqualOpposingArrivalsStayAmbiguous();
@@ -647,6 +668,137 @@ namespace BIMaestro.VideoGames
             return 0;
         }
 
+        private static int ToggleAndReplayExportedGraph(
+            string filePath,
+            long valveElementId,
+            bool close,
+            string baseline)
+        {
+            GameMepReplaySnapshot snapshot = GameMepReplayStore.Load(filePath);
+            if (!string.Equals(baseline, "current", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(baseline, "all-open", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(baseline, "all-closed", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(baseline, "warm-all-open", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException(
+                    "État initial attendu : current, all-open, all-closed " +
+                    "ou warm-all-open.");
+            }
+            if (string.Equals(baseline, "all-open", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(baseline, "all-closed", StringComparison.OrdinalIgnoreCase))
+            {
+                bool initiallyClosed = string.Equals(
+                    baseline, "all-closed", StringComparison.OrdinalIgnoreCase);
+                foreach (GameMepValveData currentValve in snapshot.Graph.Valves.Where(
+                    item => item.IsEnabledAsValve &&
+                        item.Kind == GameMepFlowControlKind.IsolationValve))
+                {
+                    currentValve.IsClosed = initiallyClosed;
+                }
+            }
+            var engine = new GameMepSimulationEngine(snapshot.Graph);
+            engine.Recalculate();
+            if (string.Equals(
+                    baseline, "warm-all-open", StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (GameMepValveData closedValve in snapshot.Graph.Valves.Where(
+                    item => item.IsEnabledAsValve &&
+                        item.Kind == GameMepFlowControlKind.IsolationValve &&
+                        item.IsClosed).ToArray())
+                {
+                    closedValve.IsClosed = false;
+                    engine.Recalculate();
+                }
+            }
+
+            var before = new Dictionary<Tuple<string, int>, GameMepReplayPathState>();
+            foreach (GameMepElementData element in snapshot.Graph.Elements)
+            {
+                for (int ordinal = 0; ordinal < element.Paths.Count; ordinal++)
+                {
+                    GameMepPathData path = element.Paths[ordinal];
+                    before[Tuple.Create(element.Key, ordinal)] =
+                        new GameMepReplayPathState
+                        {
+                            ElementKey = element.Key,
+                            PathOrdinal = ordinal,
+                            FlowState = path.FlowState,
+                            HasCirculation = path.HasCirculation,
+                            FlowForward = path.FlowForward,
+                            DirectionState = path.DirectionState,
+                            DirectionReason = path.DirectionReason
+                        };
+                }
+            }
+
+            GameMepElementData? target = snapshot.Graph.FindElement(valveElementId);
+            GameMepValveData? valve = target == null
+                ? null
+                : snapshot.Graph.FindValve(target.Key);
+            if (target == null || valve == null)
+                throw new InvalidOperationException("Vanne introuvable : " + valveElementId);
+
+            valve.IsClosed = close;
+            valve.WasManuallyOverridden = true;
+            engine.Recalculate();
+
+            int started = 0;
+            int stopped = 0;
+            int reversed = 0;
+            var reversalReasons = new Dictionary<string, int>(StringComparer.Ordinal);
+            Console.WriteLine(
+                (close ? "Fermeture " : "Ouverture ") + valveElementId +
+                " : " + target.Name);
+            foreach (GameMepElementData element in snapshot.Graph.Elements)
+            {
+                for (int ordinal = 0; ordinal < element.Paths.Count; ordinal++)
+                {
+                    GameMepPathData path = element.Paths[ordinal];
+                    if (!before.TryGetValue(
+                            Tuple.Create(element.Key, ordinal),
+                            out GameMepReplayPathState previous))
+                    {
+                        continue;
+                    }
+
+                    bool starts = !previous.HasCirculation && path.HasCirculation;
+                    bool stops = previous.HasCirculation && !path.HasCirculation;
+                    bool reverses = previous.HasCirculation && path.HasCirculation &&
+                        previous.FlowForward != path.FlowForward;
+                    if (!starts && !stops && !reverses)
+                        continue;
+
+                    if (starts)
+                        started++;
+                    if (stops)
+                        stopped++;
+                    if (reverses)
+                    {
+                        reversed++;
+                        string reason = path.DirectionReason ?? string.Empty;
+                        reversalReasons[reason] = reversalReasons.TryGetValue(
+                            reason, out int count) ? count + 1 : 1;
+                    }
+                    Console.WriteLine(
+                        "  " + element.ElementId + " " + element.Name +
+                        " chemin " + ordinal + " : " +
+                        (starts ? "démarre" : stops ? "s'arrête" : "s'inverse") +
+                        ", avant=" + previous.DirectionReason +
+                        ", après=" + path.DirectionReason);
+                }
+            }
+            Console.WriteLine(
+                "Bilan : " + started + " démarrages, " + stopped +
+                " arrêts, " + reversed + " inversions.");
+            foreach (KeyValuePair<string, int> reason in reversalReasons
+                .OrderByDescending(item => item.Value)
+                .ThenBy(item => item.Key, StringComparer.Ordinal))
+            {
+                Console.WriteLine("  " + reason.Value + " x " + reason.Key);
+            }
+            return 0;
+        }
+
         private static void TwoSmallReturnsMergeIntoLargeCollector()
         {
             GraphFixture fixture = new GraphFixture();
@@ -1084,8 +1236,139 @@ namespace BIMaestro.VideoGames
                 fixture.Path("outlet-pipe").FlowForward,
                 "Parallel pump branches must still merge toward the declared outlet.");
             Assert(fixture.Path("collector").DirectionReason.IndexOf(
-                    "Consensus", StringComparison.OrdinalIgnoreCase) >= 0,
-                "The shared header must be decided collectively instead of by the last pump visited.");
+                    "Consensus", StringComparison.OrdinalIgnoreCase) < 0,
+                "A downstream pump must not vote backward through an upstream " +
+                "collector; the arrival-to-return gradient remains authoritative.");
+        }
+
+        private static void ConflictingPumpVotesDoNotUsePumpCountAsFlowRate()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("left-source", 1, source: true);
+            fixture.AddElement("left-pump", 2);
+            fixture.AddElement("left-junction", 3);
+            fixture.AddElement("left-open-end", 1, source: true);
+            fixture.AddElement("shared-header", 2);
+            fixture.AddElement("right-junction", 4);
+            fixture.AddElement("right-source-a", 1, source: true);
+            fixture.AddElement("right-pump-a", 2);
+            fixture.AddElement("right-source-b", 1, source: true);
+            fixture.AddElement("right-pump-b", 2);
+            fixture.AddElement("outlet-pipe", 2);
+            fixture.AddElement("outlet", 1);
+
+            fixture.Connect("left-source", 0, "left-pump", 0);
+            fixture.Connect("left-pump", 1, "left-junction", 0);
+            fixture.Connect("left-junction", 1, "shared-header", 0);
+            fixture.Connect("left-junction", 2, "left-open-end", 0);
+            fixture.Connect("shared-header", 1, "right-junction", 0);
+            fixture.Connect("right-source-a", 0, "right-pump-a", 0);
+            fixture.Connect("right-pump-a", 1, "right-junction", 1);
+            fixture.Connect("right-source-b", 0, "right-pump-b", 0);
+            fixture.Connect("right-pump-b", 1, "right-junction", 2);
+            fixture.Connect("right-junction", 3, "outlet-pipe", 0);
+            fixture.Connect("outlet-pipe", 1, "outlet", 0);
+            fixture.AddBoundary("outlet", GameMepBoundaryKind.Outlet);
+            fixture.AddJunctionPaths("left-junction");
+            fixture.AddJunctionPaths("right-junction");
+
+            foreach (string pump in new[]
+            {
+                "left-pump", "right-pump-a", "right-pump-b"
+            })
+            {
+                fixture.SetElementIdentity(pump, "Pompe réseau", "Pompe réseau");
+                fixture.SetConnectorFlowDirection(pump, 0, "In");
+                fixture.SetConnectorFlowDirection(pump, 1, "Out");
+                fixture.SetPathLength(pump, 2.0);
+            }
+            fixture.SetPathLength("shared-header", 8.0);
+            fixture.SetPathLength("outlet-pipe", 6.0);
+
+            fixture.Calculate();
+
+            Assert(fixture.Path("shared-header").FlowForward,
+                "Two opposing pump votes must not outweigh the actual " +
+                "arrival-to-return direction on a shared header.");
+            AssertRenderableFlow(fixture, "shared-header");
+            Assert(fixture.Path("shared-header").DirectionReason.IndexOf(
+                    "Consensus", StringComparison.OrdinalIgnoreCase) < 0,
+                "A header receiving pump votes from both directions must keep " +
+                "its hydraulic gradient instead of applying a pump majority.");
+            Assert(fixture.Path("outlet-pipe").FlowForward,
+                "Every pump branch must still merge toward the declared outlet.");
+        }
+
+        private static void OpeningValvePreservesEstablishedPumpConsensus()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("left-source", 1, source: true);
+            fixture.AddElement("header-a", 2);
+            fixture.AddElement("flange", 2);
+            fixture.AddElement("header-b", 2);
+            fixture.AddElement("junction", 3);
+            fixture.AddElement("pump-source", 1, source: true);
+            fixture.AddElement("pump", 2);
+            fixture.AddElement("outlet", 1);
+            fixture.AddElement("state-valve", 2, valve: true);
+
+            fixture.Connect("left-source", 0, "header-a", 0);
+            fixture.Connect("header-a", 1, "flange", 0);
+            fixture.Connect("flange", 1, "header-b", 0);
+            fixture.Connect("header-b", 1, "junction", 0);
+            fixture.Connect("pump-source", 0, "pump", 0);
+            fixture.Connect("pump", 1, "junction", 1);
+            fixture.Connect("junction", 2, "outlet", 0);
+            fixture.AddBoundary("outlet", GameMepBoundaryKind.Outlet);
+            fixture.AddJunctionPaths("junction");
+            fixture.SetElementIdentity("pump", "Pompe réseau", "Pompe réseau");
+            fixture.SetConnectorFlowDirection("pump", 0, "In");
+            fixture.SetConnectorFlowDirection("pump", 1, "Out");
+            fixture.SetElementCategory(
+                "flange", "Accessoire de canalisation");
+            foreach (string path in new[]
+            {
+                "header-a", "flange", "header-b", "pump"
+            })
+            {
+                fixture.SetPathLength(path, 5.0);
+            }
+            fixture.CloseValve("state-valve");
+            fixture.Graph.RebuildIndexes();
+            var engine = new GameMepSimulationEngine(fixture.Graph);
+            engine.Recalculate();
+
+            // Représente le sens du collecteur déjà affiché avant l'ouverture.
+            // La pompe branchée à droite vote dans l'autre sens, mais une
+            // branche qui vient de s'ouvrir ne doit pas retourner l'existant.
+            foreach (string header in new[] { "header-a", "header-b" })
+            {
+                GameMepPathData path = fixture.Path(header);
+                path.FlowForward = true;
+                path.HasCirculation = true;
+                path.FlowState = GameMepFlowState.Supplied;
+                path.DirectionState = GameMepDirectionState.Resolved;
+                path.DirectionReason =
+                    "Consensus des sens In/Out à travers les branches parallèles";
+            }
+            fixture.Path("flange").FlowForward = true;
+            fixture.Path("flange").HasCirculation = true;
+            fixture.Path("flange").FlowState = GameMepFlowState.Supplied;
+            fixture.Path("flange").DirectionState =
+                GameMepDirectionState.Resolved;
+            fixture.Path("flange").DirectionReason =
+                "Continuité avec les canalisations autour du composant à deux ports";
+
+            fixture.Graph.FindValve("state-valve")!.IsClosed = false;
+            engine.Recalculate();
+
+            Assert(fixture.Path("header-a").FlowForward &&
+                fixture.Path("header-b").FlowForward,
+                "Opening a valve must not let a newly available pump branch " +
+                "reverse an established circulating header.");
+            Assert(fixture.Path("flange").FlowForward,
+                "Passive accessories must be realigned after the stable pump " +
+                "consensus is restored.");
         }
 
         private static void DirectionalEquipmentProtectsItsBranchFromAnotherSplit()
@@ -1565,6 +1848,41 @@ namespace BIMaestro.VideoGames
             AssertRenderableFlow(fixture, "open-valve");
         }
 
+        private static void PassiveContinuityCannotCrossDirectedBoundaryStop()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("branch-inlet", 1, source: true);
+            fixture.AddElement("branch-pipe", 2);
+            fixture.AddElement("open-valve", 2, valve: true);
+            fixture.AddElement("directed-inlet", 2, source: true);
+            fixture.AddElement("main-pipe", 2);
+            fixture.AddElement("declared-return", 1);
+
+            fixture.Connect("branch-inlet", 0, "branch-pipe", 0);
+            fixture.Connect("branch-pipe", 1, "open-valve", 0);
+            fixture.Connect("open-valve", 1, "directed-inlet", 0);
+            fixture.Connect("directed-inlet", 1, "main-pipe", 0);
+            fixture.Connect("main-pipe", 1, "declared-return", 0);
+            fixture.SetDirectedSource("directed-inlet", 0, 1);
+            fixture.AddBoundary("declared-return", GameMepBoundaryKind.Outlet);
+            fixture.SetElementCategory(
+                "open-valve", "Accessoire de canalisation");
+            fixture.SetPathLength("branch-pipe", 5.0);
+            fixture.SetPathLength("open-valve", 1.0);
+            fixture.SetPathLength("directed-inlet", 2.0);
+            fixture.SetPathLength("main-pipe", 5.0);
+
+            fixture.Calculate();
+
+            AssertRenderableFlow(fixture, "directed-inlet");
+            AssertRenderableFlow(fixture, "main-pipe");
+            AssertState(fixture, "branch-pipe", GameMepFlowState.Supplied);
+            Assert(!fixture.Path("branch-pipe").HasCirculation &&
+                !fixture.Path("open-valve").HasCirculation,
+                "Passive continuity must not reactivate a supplied but hydraulically " +
+                "excluded branch across an explicit boundary stop.");
+        }
+
         private static void LoopBypassesClosedValve()
         {
             GraphFixture fixture = new GraphFixture();
@@ -1922,6 +2240,41 @@ namespace BIMaestro.VideoGames
                 !fixture.Path("return-valve").HasCirculation &&
                 !fixture.Path("near-return").HasCirculation,
                 "A closed valve must make both sides stagnant when it cuts the only return path.");
+        }
+
+        private static void ClosedValveCannotCreateImplicitReturnInlet()
+        {
+            GraphFixture fixture = new GraphFixture();
+            fixture.AddElement("arrival", 1, source: true);
+            fixture.AddElement("supply", 2);
+            fixture.AddElement("valve", 2, valve: true);
+            fixture.AddElement("return-tee", 3);
+            fixture.AddElement("return-pipe", 2);
+            fixture.AddElement("declared-return", 1);
+            fixture.AddElement("open-return-leg", 2);
+
+            fixture.Connect("arrival", 0, "supply", 0);
+            fixture.Connect("supply", 1, "valve", 0);
+            fixture.Connect("valve", 1, "return-tee", 0);
+            fixture.Connect("return-tee", 1, "return-pipe", 0);
+            fixture.Connect("return-pipe", 1, "declared-return", 0);
+            fixture.Connect("return-tee", 2, "open-return-leg", 0);
+            fixture.AddJunctionPaths("return-tee");
+            fixture.AddBoundary("declared-return", GameMepBoundaryKind.Outlet);
+            fixture.SetPathLength("supply", 5.0);
+            fixture.SetPathLength("return-pipe", 5.0);
+            fixture.SetPathLength("open-return-leg", 5.0);
+            fixture.CloseValve("valve");
+
+            fixture.Calculate();
+
+            AssertState(fixture, "return-pipe", GameMepFlowState.Supplied);
+            Assert(!fixture.Path("return-pipe").HasCirculation &&
+                !fixture.Path("open-return-leg").HasCirculation &&
+                fixture.Graph.FindElement("return-tee")!.Paths.All(path =>
+                    !path.HasCirculation),
+                "A return component isolated from an explicit inlet by a closed " +
+                "valve must not turn its remaining open ends into hidden inlets.");
         }
 
         private static void ClosedValveDeadEndStaysPressurizedWithoutCirculation()

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
 using Autodesk.Revit.DB;
@@ -33,6 +34,7 @@ namespace BIMaestro.VideoGames
 
         private Color _currentColor = Color.FromRgb(190, 195, 202);
         private double _currentOpacity = 1.0;
+        private int _nextWebElementIndex;
 
         public RevitGameExportContext(Document document)
         {
@@ -50,6 +52,7 @@ namespace BIMaestro.VideoGames
             _doors.Clear();
             _elements.Clear();
             _visibleElements.Clear();
+            _nextWebElementIndex = 0;
             _transforms.Push(Transform.Identity);
             _documents.Push(_rootDocument);
             return true;
@@ -94,6 +97,7 @@ namespace BIMaestro.VideoGames
                 Element element = document.GetElement(elementId);
                 string elementKey = CreateElementKey(document, elementId);
                 elementData = CreateElementData(document, element, elementKey);
+                elementData.WebElementIndex = _nextWebElementIndex++;
                 if (element?.Category != null)
                 {
                     int categoryId = element.Category.Id.GetIdValue();
@@ -284,6 +288,7 @@ namespace BIMaestro.VideoGames
             {
                 mesh.Positions.Add(point);
                 mesh.VertexColors.Add(vertexColor);
+                mesh.ElementIndices.Add(elementData?.WebElementIndex ?? -1);
             }
 
             if (hasPointNormals && revitNormals != null)
@@ -450,7 +455,45 @@ namespace BIMaestro.VideoGames
                 catch { }
             }
 
+            AddWebProperty(data, "Catégorie", data.Category);
+            AddWebProperty(data, "Type", data.TypeName);
+            AddWebProperty(data, "Niveau", data.LevelName);
+            foreach (Parameter parameter in element.Parameters)
+            {
+                string name = SafeText(() => parameter.Definition?.Name);
+                if (!IsAllowedWebParameter(name))
+                    continue;
+                string value = SafeText(() => parameter.AsValueString());
+                if (string.IsNullOrWhiteSpace(value))
+                    value = SafeText(() => parameter.AsString());
+                AddWebProperty(data, name, value);
+            }
+
             return data;
+        }
+
+        private static void AddWebProperty(
+            GameElementData data,
+            string name,
+            string value)
+        {
+            if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(value))
+                data.WebProperties[name.Trim()] = value.Trim();
+        }
+
+        private static bool IsAllowedWebParameter(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return false;
+            string normalized = name.ToLowerInvariant();
+            string[] allowed =
+            {
+                "diam", "débit", "debit", "flow", "pression", "pressure",
+                "système", "system", "fabricant", "manufacturer", "matériau",
+                "materiau", "material", "repère", "repere", "mark", "comment",
+                "taille", "size", "classification"
+            };
+            return allowed.Any(candidate => normalized.Contains(candidate));
         }
 
         private static string SafeText(Func<string?> getter)
@@ -547,6 +590,7 @@ namespace BIMaestro.VideoGames
             scene.NormalizeCoordinates(
                 new Point3D(eye.X, eye.Y, eye.Z),
                 new Vector3D(forward.X, forward.Y, forward.Z));
+            GameMepWebPackage.PrepareStaticAssets(scene);
 
             return scene;
         }

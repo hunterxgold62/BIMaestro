@@ -54,6 +54,8 @@
     <SignAssembly>true</SignAssembly>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
     <PackageReference Include="CloudinaryDotNet">
       <Version>1.26.2</Version>
     </PackageReference>
@@ -273,6 +275,11 @@
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepFlowRenderer.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepNetworkTrace.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepReplayStore.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepWebPackage.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepPublishClient.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepShareWindow.xaml.cs">
+      <DependentUpon>GameMepShareWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepScenarioStore.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepScenarioHistory.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepUiModels.cs" />
@@ -694,6 +701,10 @@
     <Page Include="commands\Jeux vidéos\Maquette jouable\RevitGameWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\Jeux vidéos\Maquette jouable\GameMepShareWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="commands\menu contextuel\CommandSelectionWindow.xaml">
       <Generator>MSBuild:Compile</Generator>

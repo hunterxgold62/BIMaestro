@@ -21,6 +21,9 @@ namespace BIMaestro.VideoGames
         public string TypeName { get; set; } = string.Empty;
         public string LevelName { get; set; } = string.Empty;
         public string DocumentTitle { get; set; } = string.Empty;
+        public int WebElementIndex { get; set; } = -1;
+        public IDictionary<string, string> WebProperties { get; } =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         /// <summary>
         /// Lorsqu'un objet n'est qu'une enveloppe (calorifuge), le clic est
         /// redirigé vers son élément Revit porteur.
@@ -86,6 +89,7 @@ namespace BIMaestro.VideoGames
         public Point3DCollection Positions { get; } = new Point3DCollection();
         public Int32Collection Indices { get; } = new Int32Collection();
         public IList<Color> VertexColors { get; } = new List<Color>();
+        public IList<int> ElementIndices { get; } = new List<int>();
         public Vector3DCollection VertexNormals { get; } = new Vector3DCollection();
         public bool IsTransparent { get; set; }
         public bool HasCompleteNormals { get; set; } = true;
@@ -352,6 +356,8 @@ namespace BIMaestro.VideoGames
         public IList<GameElementData> Elements { get; } = new List<GameElementData>();
         public IList<GameTriangle> Triangles { get; } = new List<GameTriangle>();
         public GameMepGraphData MepGraph { get; set; } = new GameMepGraphData();
+        public byte[] WebModelGlb { get; set; } = Array.Empty<byte>();
+        public string WebPropertiesJson { get; set; } = "[]";
 
         public string ViewName { get; set; } = string.Empty;
         public int VisibleElementCount { get; set; }

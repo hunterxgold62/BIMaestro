@@ -3525,6 +3525,24 @@ namespace BIMaestro.VideoGames
                 MepExportReplayButton.IsEnabled =
                     _scene.MepGraph.HasData && !_mepRecalculationRunning;
             }
+            if (MepShareWebButton != null)
+            {
+                MepShareWebButton.IsEnabled =
+                    _scene.MepGraph.HasData &&
+                    _scene.WebModelGlb.Length > 0 &&
+                    !_mepRecalculationRunning;
+            }
+        }
+
+        private void MepShareWebButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_mepRecalculationRunning || !_scene.MepGraph.HasData)
+            {
+                ShowToast("La maquette MEP n'est pas encore prête à être partagée");
+                return;
+            }
+            var window = new GameMepShareWindow(_scene) { Owner = this };
+            window.ShowDialog();
         }
 
         private void MepExportReplayButton_Click(

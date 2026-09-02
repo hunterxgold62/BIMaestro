@@ -1,0 +1,76 @@
+<Window x:Class="BIMaestro.VideoGames.GameMepShareWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Partager la maquette MEP"
+        Width="570" Height="650" MinWidth="520" MinHeight="580"
+        WindowStartupLocation="CenterOwner"
+        Background="#FF0E171C" Foreground="#FFE9F0F2"
+        FontFamily="Segoe UI">
+    <Window.Resources>
+        <Style TargetType="Button">
+            <Setter Property="Padding" Value="13,8"/><Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="Background" Value="#FF1B3037"/><Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#FF34515A"/><Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="#FF132229"/><Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#FF34515A"/><Setter Property="Padding" Value="9"/>
+        </Style>
+    </Window.Resources>
+    <Grid Margin="26">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <StackPanel>
+            <TextBlock Text="PARTAGE WEB BIMaestro" Foreground="#FF52D9D3" FontWeight="SemiBold" FontSize="11"/>
+            <TextBlock Text="Publier cette vue MEP" FontSize="25" FontWeight="SemiBold" Margin="0,6,0,4"/>
+            <TextBlock Text="Un instantané privé de la vue 3D sera envoyé. Le fichier Revit ne quitte jamais votre poste."
+                       Foreground="#FF92A5AD" TextWrapping="Wrap"/>
+        </StackPanel>
+        <StackPanel Grid.Row="1" Margin="0,22,0,0">
+            <TextBlock Text="Nom de la publication" FontSize="11" Foreground="#FFAFC0C6" Margin="0,0,0,6"/>
+            <TextBox x:Name="PublicationNameTextBox" MaxLength="120"/>
+        </StackPanel>
+        <Grid Grid.Row="2" Margin="0,18,0,0">
+            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
+            <Border Background="#FF132229" BorderBrush="#FF263A42" BorderThickness="1" Padding="12" Margin="0,0,7,0">
+                <StackPanel><TextBlock Text="EXPIRATION" Foreground="#FF718991" FontSize="10"/><TextBlock Text="30 jours · révocable" Margin="0,4,0,0"/></StackPanel>
+            </Border>
+            <Border Grid.Column="1" Background="#FF132229" BorderBrush="#FF263A42" BorderThickness="1" Padding="12" Margin="7,0,0,0">
+                <StackPanel>
+                    <TextBlock Text="DONNÉES AUTORISÉES" Foreground="#FF718991" FontSize="10"/>
+                    <TextBlock x:Name="AuthorizedParametersText" Text="Paramètres MEP contrôlés" Margin="0,4,0,0" TextTrimming="CharacterEllipsis" ToolTipService.ShowDuration="30000"/>
+                    <TextBlock x:Name="EstimatedSizeText" Foreground="#FF8FA4AD" FontSize="10" Margin="0,3,0,0"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+        <Border Grid.Row="3" Background="#FF241F16" BorderBrush="#FF66512C" BorderThickness="1" Padding="12" Margin="0,16,0,0">
+            <TextBlock Foreground="#FFFFD48A" TextWrapping="Wrap" Text="Attention : toute personne possédant un lien peut le retransmettre jusqu’à son expiration ou sa révocation."/>
+        </Border>
+        <StackPanel Grid.Row="4" Margin="0,18,0,0">
+            <ProgressBar x:Name="PublishProgressBar" Height="5" Minimum="0" Maximum="100" Value="0" Foreground="#FF45D6D1"/>
+            <TextBlock x:Name="StatusText" Text="Prêt à publier" Foreground="#FF8FA4AD" Margin="0,7,0,0"/>
+        </StackPanel>
+        <StackPanel Grid.Row="5" Margin="0,18,0,0">
+            <Border x:Name="LinksPanel" Visibility="Collapsed" Background="#FF111E24" BorderBrush="#FF2B444D" BorderThickness="1" Padding="14">
+                <StackPanel>
+                    <TextBlock Text="LIENS ACTIFS" Foreground="#FF52D9D3" FontSize="10" FontWeight="SemiBold"/>
+                    <TextBlock Text="Consultation" Margin="0,12,0,4" Foreground="#FFAFC0C6"/>
+                    <DockPanel><Button DockPanel.Dock="Right" Content="Copier" Click="CopyViewerButton_Click"/><TextBox x:Name="ViewerUrlTextBox" IsReadOnly="True"/></DockPanel>
+                    <TextBlock Text="Édition collaborative" Margin="0,12,0,4" Foreground="#FFAFC0C6"/>
+                    <DockPanel><Button DockPanel.Dock="Right" Content="Copier" Click="CopyEditorButton_Click"/><TextBox x:Name="EditorUrlTextBox" IsReadOnly="True"/></DockPanel>
+                    <WrapPanel Margin="0,16,0,0">
+                        <Button Content="Prolonger de 30 jours" Click="ExtendButton_Click"/>
+                        <Button Content="Révoquer" Foreground="#FFFF928A" Click="RevokeButton_Click"/>
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+        <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <Button Content="Fermer" Click="CloseButton_Click"/>
+            <Button x:Name="PublishButton" Content="Partager sur le web" Background="#FF45D6D1" Foreground="#FF071315" FontWeight="SemiBold" Margin="0" Click="PublishButton_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

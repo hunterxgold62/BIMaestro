@@ -55,6 +55,7 @@ node_modules/
 /tmp/
 
 # Supabase local secrets
+supabase/.temp/
 supabase/functions/.env
 supabase/functions/.env.*
 !supabase/functions/.env.example

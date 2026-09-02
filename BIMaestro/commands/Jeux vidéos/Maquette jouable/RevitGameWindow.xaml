@@ -566,6 +566,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     <TextBlock x:Name="MepDiagnosticsText"
                                Style="{StaticResource HudCaption}"
@@ -619,6 +620,16 @@
                             Margin="0,7,0,0"
                             ToolTip="Exporte uniquement le graphe MEP nécessaire pour reproduire le calcul hors Revit"
                             Click="MepExportReplayButton_Click"/>
+                    <Button x:Name="MepShareWebButton"
+                            Grid.Row="4"
+                            Style="{StaticResource GlassButton}"
+                            Content="Partager sur le web"
+                            HorizontalAlignment="Stretch"
+                            Padding="8,7"
+                            Margin="0,7,0,0"
+                            Background="#FF165C60"
+                            ToolTip="Publie un instantané privé sur viewer.bimaestro.fr"
+                            Click="MepShareWebButton_Click"/>
                 </Grid>
             </Grid>
         </Border>

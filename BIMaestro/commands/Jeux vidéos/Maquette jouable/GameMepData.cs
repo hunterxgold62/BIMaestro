@@ -633,6 +633,7 @@ namespace BIMaestro.VideoGames
             "Consensus des sens In/Out à travers les branches parallèles";
         private readonly GameMepGraphData _graph;
         private List<int>[]? _adjacentEdges;
+        private Dictionary<string, bool>? _previousValveClosedStates;
 
         public GameMepSimulationEngine(GameMepGraphData graph)
         {
@@ -643,6 +644,16 @@ namespace BIMaestro.VideoGames
         {
             var stopwatch = Stopwatch.StartNew();
             EnsureAdjacency();
+            bool preserveEstablishedCirculation =
+                IsOpeningValvesWithoutClosingOthers();
+            var establishedCirculatingDirections = preserveEstablishedCirculation
+                ? _graph.Elements
+                    .SelectMany(element => element.Paths)
+                    .Where(path => path.FlowState == GameMepFlowState.Supplied &&
+                        path.HasCirculation &&
+                        path.DirectionState == GameMepDirectionState.Resolved)
+                    .ToDictionary(path => path, path => path.FlowForward)
+                : new Dictionary<GameMepPathData, bool>();
             int count = _graph.Connectors.Count;
             var activeBoundarySystems = new HashSet<string>(StringComparer.Ordinal);
             var inletSeeds = new List<int>();
@@ -832,12 +843,48 @@ namespace BIMaestro.VideoGames
                 returnDistance,
                 highDistance,
                 lowDistance,
-                pumpSuctionDistance);
+                pumpSuctionDistance,
+                establishedCirculatingDirections);
             UpdateValveStates(activeBoundarySystems, activeBoundaryDistance);
             GameMepDirectionExplanationBuilder.Refresh(_graph);
             GameMepDiagnosticAnalyzer.Refresh(_graph);
+            RememberValveStates();
             stopwatch.Stop();
             _graph.LastCalculationMilliseconds = stopwatch.Elapsed.TotalMilliseconds;
+        }
+
+        private bool IsOpeningValvesWithoutClosingOthers()
+        {
+            if (_previousValveClosedStates == null)
+                return false;
+
+            bool opened = false;
+            foreach (GameMepValveData valve in _graph.Valves.Where(item =>
+                item.IsEnabledAsValve &&
+                item.Kind == GameMepFlowControlKind.IsolationValve))
+            {
+                if (!_previousValveClosedStates.TryGetValue(
+                        valve.ElementKey, out bool wasClosed) ||
+                    wasClosed == valve.IsClosed)
+                {
+                    continue;
+                }
+                if (!wasClosed && valve.IsClosed)
+                    return false;
+                opened = true;
+            }
+            return opened;
+        }
+
+        private void RememberValveStates()
+        {
+            _previousValveClosedStates = _graph.Valves
+                .Where(valve => valve.IsEnabledAsValve &&
+                    valve.Kind == GameMepFlowControlKind.IsolationValve)
+                .ToDictionary(
+                    valve => valve.ElementKey,
+                    valve => valve.IsClosed,
+                    StringComparer.Ordinal);
         }
 
         private void AddBoundarySeeds(
@@ -1082,7 +1129,9 @@ namespace BIMaestro.VideoGames
             int[] declaredReturnDistance,
             int[] highDistance,
             int[] lowDistance,
-            int[] pumpSuctionDistance)
+            int[] pumpSuctionDistance,
+            IReadOnlyDictionary<GameMepPathData, bool>
+                establishedCirculatingDirections)
         {
             int connectorCount = _graph.Connectors.Count;
             var inletSeeds = new HashSet<int>(inletSeedValues.Where(index =>
@@ -1732,6 +1781,40 @@ namespace BIMaestro.VideoGames
                 componentIndex++;
             }
 
+            // Une sortie déclarée peut normalement animer un système Revit de
+            // retour autonome en utilisant ses extrémités ouvertes comme entrées.
+            // En revanche, si ce composant sans arrivée vient d'être séparé par
+            // une vanne d'un côté qui possède encore une vraie arrivée, ces
+            // extrémités ne sont pas des consommateurs : ce sont les restes d'un
+            // circuit isolé. Elles doivent donc rester stagnantes.
+            var componentIsolatedByClosedValve =
+                new bool[componentIndex];
+            foreach (GameMepValveData valve in _graph.Valves.Where(item =>
+                item.IsEnabledAsValve && item.IsClosed &&
+                item.Kind == GameMepFlowControlKind.IsolationValve))
+            {
+                GameMepElementData? valveElement =
+                    _graph.FindElement(valve.ElementKey);
+                if (valveElement == null)
+                    continue;
+                int[] sides = valveElement.ConnectorIndices.Where(index =>
+                        index >= 0 && index < connectorCount)
+                    .Select(index => component[index])
+                    .Where(id => id >= 0)
+                    .Distinct()
+                    .ToArray();
+                if (sides.Length < 2 ||
+                    !sides.Any(id => componentHasInlet[id]))
+                {
+                    continue;
+                }
+                foreach (int side in sides.Where(id =>
+                    !componentHasInlet[id]))
+                {
+                    componentIsolatedByClosedValve[side] = true;
+                }
+            }
+
             // Dans un système Revit de retour distinct, les extrémités
             // ouvertes jouent le rôle des points d'entrée implicites et le
             // retour choisi reste la sortie. On obtient ainsi un vrai trajet
@@ -1740,6 +1823,7 @@ namespace BIMaestro.VideoGames
             {
                 int id = component[index];
                 if (id < 0 || !componentIsReturnOnly[id] ||
+                    componentIsolatedByClosedValve[id] ||
                     explicitOutletSeeds.Contains(index) ||
                     !outletSeeds.Contains(index))
                 {
@@ -1755,7 +1839,7 @@ namespace BIMaestro.VideoGames
                 if (index < 0 || index >= connectorCount)
                     return false;
                 int id = component[index];
-                return id >= 0 &&
+                return id >= 0 && !componentIsolatedByClosedValve[id] &&
                     ((componentHasInlet[id] && componentHasOutlet[id]) ||
                      componentHasExplicitOutlet[id]);
             }
@@ -1941,6 +2025,8 @@ namespace BIMaestro.VideoGames
                 }
             }
 
+            var hydraulicallyRetainedPaths =
+                new HashSet<GameMepPathData>();
             foreach (GameMepElementData element in _graph.Elements)
             {
                 foreach (GameMepPathData path in element.Paths)
@@ -1978,6 +2064,7 @@ namespace BIMaestro.VideoGames
                         continue;
                     }
 
+                    hydraulicallyRetainedPaths.Add(path);
                     path.HasCirculation = Math.Abs(difference) > 1e-5;
                     if (path.EndConnector >= 0 &&
                         diameterHeaderContinuityElementKeys.Contains(
@@ -2109,9 +2196,47 @@ namespace BIMaestro.VideoGames
                 }
             }
 
-            AlignTwoPortPipeFittings();
-            AlignPipeJunctions();
-            AlignNativeDirectionalBranches();
+            AlignTwoPortPipeFittings(hydraulicallyRetainedPaths);
+            AlignPipeJunctions(hydraulicallyRetainedPaths);
+            AlignNativeDirectionalBranches(establishedCirculatingDirections);
+            if (establishedCirculatingDirections.Count > 0)
+            {
+                foreach (KeyValuePair<GameMepPathData, bool> established in
+                    establishedCirculatingDirections)
+                {
+                    GameMepPathData path = established.Key;
+                    if (path.FlowState != GameMepFlowState.Supplied ||
+                        TryGetImposedDirection(path, out _, out _))
+                    {
+                        continue;
+                    }
+
+                    bool changed = !path.HasCirculation ||
+                        path.DirectionState != GameMepDirectionState.Resolved ||
+                        path.FlowForward != established.Value;
+                    path.HasCirculation = true;
+                    path.FlowForward = established.Value;
+                    path.DirectionState = GameMepDirectionState.Resolved;
+                    hydraulicallyRetainedPaths.Add(path);
+                    if (changed)
+                    {
+                        path.DirectionReason =
+                            "Sens existant conservé lors de l'ouverture d'une vanne";
+                    }
+                }
+
+                var lockedPaths = new HashSet<GameMepPathData>(
+                    establishedCirculatingDirections.Keys);
+                // Le sens existant est restauré en dernier. Les accessoires et
+                // chemins de té nouvellement actifs s'alignent ensuite dessus,
+                // sans pouvoir retourner une portion qui circulait déjà.
+                AlignTwoPortPipeFittings(
+                    hydraulicallyRetainedPaths,
+                    lockedPaths);
+                AlignPipeJunctions(
+                    hydraulicallyRetainedPaths,
+                    lockedPaths);
+            }
 
             void AddArmPipeElements(
                 IEnumerable<int> connectors,
@@ -2868,7 +2993,9 @@ namespace BIMaestro.VideoGames
             return simple;
         }
 
-        private void AlignTwoPortPipeFittings()
+        private void AlignTwoPortPipeFittings(
+            ISet<GameMepPathData> hydraulicallyRetainedPaths,
+            ISet<GameMepPathData>? directionLockedPaths = null)
         {
             if (_adjacentEdges == null)
                 return;
@@ -2887,6 +3014,8 @@ namespace BIMaestro.VideoGames
                         fitting.ConnectorIndices.Contains(item.EndConnector));
                     if (path == null ||
                         path.FlowState != GameMepFlowState.Supplied ||
+                        !hydraulicallyRetainedPaths.Contains(path) ||
+                        directionLockedPaths?.Contains(path) == true ||
                         IsClosedIsolationValve(path.ElementKey) ||
                         TryGetImposedDirection(path, out _, out _))
                     {
@@ -2940,7 +3069,9 @@ namespace BIMaestro.VideoGames
             }
         }
 
-        private void AlignPipeJunctions()
+        private void AlignPipeJunctions(
+            ISet<GameMepPathData> hydraulicallyRetainedPaths,
+            ISet<GameMepPathData>? directionLockedPaths = null)
         {
             if (_adjacentEdges == null)
                 return;
@@ -2951,6 +3082,8 @@ namespace BIMaestro.VideoGames
                 foreach (GameMepPathData path in junction.Paths)
                 {
                     if (path.FlowState != GameMepFlowState.Supplied ||
+                        !hydraulicallyRetainedPaths.Contains(path) ||
+                        directionLockedPaths?.Contains(path) == true ||
                         IsClosedIsolationValve(path.ElementKey) ||
                         TryGetImposedDirection(path, out _, out _))
                     {
@@ -3008,7 +3141,9 @@ namespace BIMaestro.VideoGames
             }
         }
 
-        private void AlignNativeDirectionalBranches()
+        private void AlignNativeDirectionalBranches(
+            IReadOnlyDictionary<GameMepPathData, bool>
+                establishedCirculatingDirections)
         {
             if (_adjacentEdges == null)
                 return;
@@ -3060,7 +3195,8 @@ namespace BIMaestro.VideoGames
 
             ApplyDirectionalNetworkConsensus(
                 downstreamAnchors,
-                locallyProtectedPaths);
+                locallyProtectedPaths,
+                establishedCirculatingDirections);
         }
 
         private void PropagateNativeFlowPort(
@@ -3164,21 +3300,26 @@ namespace BIMaestro.VideoGames
 
         private void ApplyDirectionalNetworkConsensus(
             IEnumerable<Tuple<string, int>> downstreamAnchors,
-            ISet<GameMepPathData> locallyProtectedPaths)
+            ISet<GameMepPathData> locallyProtectedPaths,
+            IReadOnlyDictionary<GameMepPathData, bool>
+                establishedCirculatingDirections)
         {
             var votes = new Dictionary<GameMepPathData, int>();
+            var conflictingVotes = new HashSet<GameMepPathData>();
             foreach (Tuple<string, int> anchor in downstreamAnchors)
             {
                 CollectDirectionalNetworkVotes(
                     anchor.Item1,
                     anchor.Item2,
-                    votes);
+                    votes,
+                    conflictingVotes);
             }
 
             foreach (KeyValuePair<GameMepPathData, int> vote in votes)
             {
                 GameMepPathData path = vote.Key;
-                if (vote.Value == 0 || locallyProtectedPaths.Contains(path) ||
+                if (vote.Value == 0 || conflictingVotes.Contains(path) ||
+                    locallyProtectedPaths.Contains(path) ||
                     path.FlowState != GameMepFlowState.Supplied ||
                     !path.HasCirculation ||
                     TryGetImposedDirection(path, out _, out _))
@@ -3186,7 +3327,10 @@ namespace BIMaestro.VideoGames
                     continue;
                 }
 
-                bool forward = vote.Value > 0;
+                bool forward = establishedCirculatingDirections.TryGetValue(
+                    path, out bool rememberedForward)
+                        ? rememberedForward
+                        : vote.Value > 0;
                 path.FlowForward = forward;
                 path.DirectionState = GameMepDirectionState.Resolved;
                 path.DirectionReason = DirectionalNetworkConsensusReason;
@@ -3196,7 +3340,8 @@ namespace BIMaestro.VideoGames
         private void CollectDirectionalNetworkVotes(
             string equipmentKey,
             int exitConnector,
-            IDictionary<GameMepPathData, int> votes)
+            IDictionary<GameMepPathData, int> votes,
+            ISet<GameMepPathData> conflictingVotes)
         {
             var pending = new Queue<KeyValuePair<int, string>>();
             pending.Enqueue(new KeyValuePair<int, string>(
@@ -3247,6 +3392,7 @@ namespace BIMaestro.VideoGames
                             neighborConnector;
                         AddDirectionVote(
                             votes,
+                            conflictingVotes,
                             junctionPath,
                             isArrivalPort);
                         if (!isArrivalPort)
@@ -3276,7 +3422,11 @@ namespace BIMaestro.VideoGames
 
                 bool nearEquipmentIsStart =
                     path.StartConnector == neighborConnector;
-                AddDirectionVote(votes, path, nearEquipmentIsStart);
+                AddDirectionVote(
+                    votes,
+                    conflictingVotes,
+                    path,
+                    nearEquipmentIsStart);
                 int farConnector = nearEquipmentIsStart
                     ? path.EndConnector
                     : path.StartConnector;
@@ -3288,11 +3438,15 @@ namespace BIMaestro.VideoGames
 
         private static void AddDirectionVote(
             IDictionary<GameMepPathData, int> votes,
+            ISet<GameMepPathData> conflictingVotes,
             GameMepPathData path,
             bool forward)
         {
             votes.TryGetValue(path, out int current);
-            votes[path] = current + (forward ? 1 : -1);
+            int direction = forward ? 1 : -1;
+            if (current != 0 && Math.Sign(current) != direction)
+                conflictingVotes.Add(path);
+            votes[path] = current + direction;
         }
 
         private bool TryGetSingleExternalNeighbor(

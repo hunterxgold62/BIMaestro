@@ -19,3 +19,8 @@ verify_jwt = true
 
 [functions.refres_les_donn-es_d-analyse]
 verify_jwt = true
+
+[functions.mep-share]
+# Les invités utilisent un jeton opaque BIMaestro et non un JWT Supabase.
+# La fonction vérifie elle-même les jetons de partage et de licence.
+verify_jwt = false

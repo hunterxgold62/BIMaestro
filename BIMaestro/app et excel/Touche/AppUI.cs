@@ -175,6 +175,7 @@ public class AppUI : IExternalApplication
                     ("Couleur de projet", "Couleurs", "Couleur.ToggleCombinedColoringCommand", "Couleur oui non.png","Clic : ouvre la personnalisation des couleurs. Double-clic : active ou désactive les panneaux colorés."),
                     ("Couleur de maquette", "Couleur reset", "Couleur.ResetTabItemRandomColorsCommand", "reset.png","Réinitialise les couleurs appliquées"),
                     ("papa Noël", "papa\nNoël", "Couleur.PapanoelCommand", "papa noel.png","Fait apparaître des couleurs comme des guirlandes\nDouble clic pour revenir à la normale.\n\nAttention désactiver <couleur Oui/Non> avant activation."),
+                    ("ViewDeckToggle", "Onglets : OFF", "BIMaestro.ViewHover.ToggleViewDeckCommand", "Miniature.png", "ON : miniatures dans les onglets. OFF : onglets compacts.\r\nDans les deux modes, survolez un onglet 0,5 seconde pour afficher l'aperçu agrandi. Les miniatures intégrées sont désactivées au démarrage."),
                     ("BIMaestro_Exemple", "Exemple", "Page.GuideCommand", "Exemple.png", "Page d'information sur le plugin"),
                 })),
 
@@ -371,22 +372,13 @@ public class AppUI : IExternalApplication
         string assemblyPath,
         List<(string buttonName, string buttonText, string className, string resourceImageName, string toolTip)> colorButtons)
     {
-        const string id = "ViewDeckToggle";
-        const string command = "BIMaestro.ViewHover.ToggleViewDeckCommand";
-        RegisterButtonDefinition(id, "Onglets : OFF", command, "Miniature.png");
-        var toggle = CreatePushButtonData(id, "Onglets : OFF", assemblyPath, command, "Miniature.png",
-            "ON : miniatures dans les onglets. OFF : onglets compacts.\r\nDans les deux modes, survolez un onglet 0,5 seconde pour afficher l'aperçu agrandi. Les miniatures intégrées sont désactivées au démarrage.");
-        var stacked = panel.AddStackedItems(
-            new SplitButtonData("Changement de couleur", UiLanguage.T("Couleurs")), toggle);
-        if (stacked == null) return;
-        if (stacked.Count > 0 && stacked[0] is SplitButton colors)
-            ConfigureSplitButton(colors, assemblyPath, colorButtons, null, null);
-        if (stacked.Count > 1 && stacked[1] is PushButton button)
-        {
-            RegisterButtonInstance(id, button);
-            RegisterButtonCommandId(id, TryGetCommandId(button));
-            BIMaestro.ViewHover.ViewDeckService.UpdateButton();
-        }
+        AddSplitButton(
+            panel,
+            "Changement de couleur",
+            "Couleurs",
+            assemblyPath,
+            colorButtons);
+        BIMaestro.ViewHover.ViewDeckService.UpdateButton();
     }
 
     private static void AddStackedPushButtons(
