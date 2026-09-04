@@ -7,6 +7,7 @@
         public string Label { get; set; }
         public string ButtonId { get; set; }
         public string CommandClass { get; set; }
+        public bool IsPinned { get; set; }
 
         public bool HasFamily => !string.IsNullOrWhiteSpace(FamilyPath);
         public bool HasAction => HasFamily

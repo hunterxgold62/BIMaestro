@@ -32,8 +32,7 @@ namespace Visualisation
 
                 // 2) Récupération des matériaux de base et de peinture
                 var baseMaterialsIds = elem.GetMaterialIds(false);
-                var allMaterialsIds = elem.GetMaterialIds(true);
-                var paintedMaterialIds = allMaterialsIds.Except(baseMaterialsIds);
+                var paintedMaterialIds = elem.GetMaterialIds(true);
 
                 // 3) Création des listes de Material
                 List<Material> objectMaterials = baseMaterialsIds

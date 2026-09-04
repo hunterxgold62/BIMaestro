@@ -133,11 +133,13 @@ public class BIMaestroApp : IExternalApplication
             // --- Ruban ---
             AppUI.CreateRibbonUI(application);
             Page.SecretGifShortcutManager.Initialize();
+            BIMaestro.UI.RadialGlobalHotkeyService.Initialize();
 
             // "//" à rajouté pour retiré le message de bienvenue 
             BIMaestro.Welcome.WelcomeManager.Initialize(application);
             BIMaestro.Welcome.WelcomeManager.TrySyncPendingProfile(LicenseJwt);
             Page.UpdateNotificationManager.Initialize(application);
+            Page.SupportPromptManager.Initialize(application);
 
        
          return Result.Succeeded;
@@ -165,6 +167,7 @@ public class BIMaestroApp : IExternalApplication
             finally { Telemetry.Shutdown(); }
 
             Page.SecretGifShortcutManager.Shutdown();
+            BIMaestro.UI.RadialGlobalHotkeyService.Shutdown();
             Analyse.ElementHistoryTracker.Stop();
             ExcelLogger.Shutdown();
             WpfApp?.Shutdown();
@@ -184,6 +187,7 @@ public class BIMaestroApp : IExternalApplication
             if (_uiApp == null) return;
 
             Page.SecretGifShortcutManager.PollKeyboardState();
+            BIMaestro.UI.RadialGlobalHotkeyService.ProcessPending(_uiApp);
             Analyse.ElementHistoryTracker.ProcessDeferredPrime(_uiApp.ActiveUIDocument?.Document);
             RefreshProjectBrowserActiveViewWhenNeeded();
             BIMaestro.ViewHover.ViewHoverPreviewService.ProcessPending(_uiApp);

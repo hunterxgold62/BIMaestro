@@ -251,6 +251,12 @@
     <Compile Include="app et excel\Touche\AppUI.cs" />
     <Compile Include="app et excel\Supabase\ApiKeys.cs" />
     <Compile Include="app et excel\Touche\roue gta des touches\ButtonRecentManager.cs" />
+    <Compile Include="app et excel\Touche\roue gta des touches\RadialButtonPickerWindow.xaml.cs">
+      <DependentUpon>RadialButtonPickerWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="app et excel\Touche\roue gta des touches\RadialButtonsPreferences.cs" />
+    <Compile Include="app et excel\Touche\roue gta des touches\RadialButtonsService.cs" />
+    <Compile Include="app et excel\Touche\roue gta des touches\RadialGlobalHotkeyService.cs" />
     <Compile Include="app et excel\Touche\roue gta des touches\RadialMenuButtonsCommand.cs" />
     <Compile Include="app et excel\Touche\roue gta des touches\RibbonButtonImageCache.cs" />
     <Compile Include="app et excel\Touche\roue gta des touches\RibbonButtonInfo.cs" />
@@ -348,9 +354,14 @@
     <Compile Include="app et excel\BIMaestroApp.cs" />
     <Compile Include="app et excel\Supabase\BaseTrackedCommand.cs" />
     <Compile Include="app et excel\Supabase\LicenseManager.cs" />
+    <Compile Include="app et excel\Supabase\ProfilePayload.cs" />
     <Compile Include="app et excel\Supabase\NetSupport.cs" />
     <Compile Include="app et excel\Supabase\Paths.cs" />
     <Compile Include="app et excel\Supabase\Telemetry.cs" />
+    <Compile Include="commands\page de mise à jour en direct\SupportPromptManager.cs" />
+    <Compile Include="commands\page de mise à jour en direct\SupportPromptWindow.xaml.cs">
+      <DependentUpon>SupportPromptWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="app et excel\temps revit\ShowTimeDashboard.cs" />
     <Compile Include="app et excel\temps revit\TimeSeriesDashboardWindow.xaml.cs">
       <DependentUpon>TimeSeriesDashboardWindow.xaml</DependentUpon>
@@ -459,6 +470,7 @@
     <Compile Include="commands\Dossier famille\roue de gta\RadialPlaceFamilyHandler.cs" />
     <Compile Include="commands\Dossier famille\roue de gta\RevitIdleRunner.cs" />
     <Compile Include="commands\ElementIdExtensions.cs" />
+    <Compile Include="commands\Couleurs réseaux\PipeSystemColorsCommand.cs" />
     <Compile Include="commands\export de nomenclature\ExportScheduleAddinObfuscation.cs" />
     <Compile Include="commands\export dwg\ExportSheetsCommand.cs" />
     <Compile Include="commands\export dwg\ExportSheetsWindow.xaml.cs">
@@ -702,6 +714,10 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <Page Include="app et excel\Touche\roue gta des touches\RadialButtonPickerWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
     <Page Include="commands\Jeux vidéos\Maquette jouable\GameMepShareWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -715,6 +731,10 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Include="commands\page de mise à jour en direct\UpdatePromptWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="commands\page de mise à jour en direct\SupportPromptWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

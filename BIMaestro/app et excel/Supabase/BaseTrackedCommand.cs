@@ -86,6 +86,7 @@ namespace Licensing
                 if (res == Result.Succeeded)
                 {
                     ButtonRecentManager.RegisterUse(trackedButtonLabel, GetType().FullName);
+                    SupportPromptManager.RegisterSuccessfulUse(ButtonId);
                 }
                 return res;
             }

@@ -8,6 +8,7 @@ using System.Net.NetworkInformation;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
+using BIMaestro.Localization;
 
 namespace Licensing
 {
@@ -186,14 +187,13 @@ namespace Licensing
             client.DefaultRequestHeaders.Remove("Authorization");
             client.DefaultRequestHeaders.Add("Authorization", $"Bearer {jwtLicenseToken}");
 
-            var body = new
-            {
-                install_id = installId,
-                email = normalizedEmail,
-                first_name = normalizedFirstName,
-                last_name = normalizedLastName,
-                machine_id_hash = machineIdHash
-            };
+            var body = ProfilePayload.Create(
+                installId,
+                normalizedEmail,
+                normalizedFirstName,
+                normalizedLastName,
+                machineIdHash,
+                UiLanguage.CurrentLanguageCode);
 
             var json = Newtonsoft.Json.JsonConvert.SerializeObject(body);
             using var content = new StringContent(json, Encoding.UTF8, "application/json");

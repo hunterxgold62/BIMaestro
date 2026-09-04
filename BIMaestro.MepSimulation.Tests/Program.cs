@@ -119,6 +119,7 @@ namespace BIMaestro.VideoGames
                 DiagnosticsDetectAmbiguousFlowControl();
                 DiagnosticsDetectUnknownPassThroughComponent();
                 DiagnosticsDetectDisconnectedElement();
+                WebReplaySnapshotPreservesElementPersistentIds();
                 DiagnosticsGroupOpenConnectorsInSmartMode();
                 DiagnosticsDetectBranchWithoutSource();
                 DiagnosticsDetectIncompatibleSystems();
@@ -3330,6 +3331,29 @@ namespace BIMaestro.VideoGames
             {
                 DeleteTestDirectory(directory);
             }
+        }
+
+        private static void WebReplaySnapshotPreservesElementPersistentIds()
+        {
+            var fixture = new GraphFixture();
+            fixture.AddElement("valve", 2, valve: true);
+            fixture.Graph.FindElement("valve")!.PersistentId = "revit-unique-id";
+            fixture.Graph.Connectors[0].PersistentKey = "revit-connector-id";
+            fixture.Graph.ScenarioModelKey = "FILE|C:/secret/project.rvt";
+
+            GameMepReplaySnapshot snapshot = GameMepReplayStore.Capture(
+                fixture.Graph,
+                preserveElementPersistentIds: true);
+
+            Assert(snapshot.Graph.FindElement("valve")?.PersistentId ==
+                    "revit-unique-id",
+                "Web replay export must preserve the Revit element identifier used by collaborative commands.");
+            Assert(snapshot.Graph.Connectors.All(connector =>
+                    string.IsNullOrEmpty(connector.PersistentKey)),
+                "Web replay export must still remove connector identifiers that are not required by the viewer.");
+            Assert(snapshot.Graph.ScenarioModelKey.Length == 0 &&
+                    !snapshot.Graph.ScenarioCanPersist,
+                "Web replay export must still remove the local Revit model identity.");
         }
 
         private static void ScenarioRoundTripRestoresSourcesAndValves()

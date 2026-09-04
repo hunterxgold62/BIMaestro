@@ -23,8 +23,8 @@ const allowedOrigins = new Set([
   "https://bimaestro-mep-viewer.hunterxgold.chatgpt.site",
   "http://localhost:3000",
 ]);
-const maxPackageBytes = 25 * 1024 * 1024;
-const maxViewerStorageBytes = 700 * 1024 * 1024;
+const maxPackageBytes = 50 * 1024 * 1024;
+const maxViewerStorageBytes = 850 * 1024 * 1024;
 
 class HttpError extends Error {
   constructor(public status: number, message: string) { super(message); }
@@ -68,7 +68,7 @@ function cleanName(value: unknown, fallback = "Maquette MEP"): string {
   return cleaned ? cleaned.slice(0, 120) : fallback;
 }
 
-async function licenseIdentity(req: Request): Promise<{ licenseHash: string }> {
+async function licenseIdentity(req: Request): Promise<{ licenseHash: string; licenseKey: string; userName: string }> {
   const authorization = req.headers.get("authorization") ?? "";
   if (!authorization.startsWith("Bearer ")) throw new HttpError(401, "Licence requise");
   let payload: any;
@@ -77,7 +77,17 @@ async function licenseIdentity(req: Request): Promise<{ licenseHash: string }> {
   const licenseKey = typeof payload?.license_key === "string" ? payload.license_key.trim() : "";
   const machineId = typeof payload?.machine_id === "string" ? payload.machine_id.trim() : "";
   if (!licenseKey || !machineId) throw new HttpError(401, "Licence requise");
-  return { licenseHash: await sha256(licenseKey) };
+  const { data: profile } = await admin.from("license_profiles")
+    .select("first_name, last_name, email")
+    .eq("license_key", licenseKey)
+    .order("last_seen_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const fullName = [profile?.first_name, profile?.last_name]
+    .filter((part) => typeof part === "string" && part.trim())
+    .join(" ").trim();
+  const userName = fullName || (typeof profile?.email === "string" && profile.email.trim()) || "Utilisateur BIMaestro";
+  return { licenseHash: await sha256(licenseKey), licenseKey, userName: cleanName(userName, "Utilisateur BIMaestro") };
 }
 
 async function shareAccess(token: unknown) {
@@ -85,18 +95,16 @@ async function shareAccess(token: unknown) {
     throw new HttpError(401, "Lien de partage invalide");
   }
   const tokenHash = await sha256(token);
-  const { data, error } = await admin.from("mep_publication_tokens")
-    .select("access_role, revoked_at, mep_publications!inner(id, name, slug, active_revision, expires_at, revoked_at)")
-    .eq("token_hash", tokenHash).maybeSingle();
+  const { data, error } = await admin.from("mep_publications")
+    .select("id, name, slug, active_revision, expires_at, revoked_at, viewer_token_hash, editor_token_hash")
+    .or(`viewer_token_hash.eq.${tokenHash},editor_token_hash.eq.${tokenHash}`)
+    .maybeSingle();
   if (error || !data) throw new HttpError(404, "Partage introuvable");
-  const publication = Array.isArray(data.mep_publications)
-    ? data.mep_publications[0]
-    : data.mep_publications;
-  if (!publication || data.revoked_at || publication.revoked_at ||
-      new Date(publication.expires_at).getTime() <= Date.now()) {
+  if (data.revoked_at || new Date(data.expires_at).getTime() <= Date.now()) {
     throw new HttpError(410, "Ce partage a expiré ou a été révoqué");
   }
-  return { tokenHash, role: data.access_role as "viewer" | "editor", publication };
+  const role = data.editor_token_hash === tokenHash ? "editor" : "viewer";
+  return { tokenHash, role: role as "viewer" | "editor", publication: data };
 }
 
 async function publicationOwned(publicationId: string, ownerHash: string) {
@@ -112,11 +120,33 @@ async function cleanupExpiredPublications() {
     .or(`expires_at.lt.${now},revoked_at.not.is.null`).limit(50);
   const ids = (expired ?? []).map((item) => item.id);
   if (!ids.length) return;
-  const { data: revisions } = await admin.from("mep_publication_revisions")
+  const { data: revisions } = await admin.from("mep_exports")
     .select("storage_path").in("publication_id", ids);
   const paths = (revisions ?? []).map((item) => item.storage_path);
   if (paths.length) await admin.storage.from("mep-publications").remove(paths);
   await admin.from("mep_publications").delete().in("id", ids);
+}
+
+async function cleanupSupersededExports(publicationId: string, activeRevision: number) {
+  const { data: superseded, error: listError } = await admin.from("mep_exports")
+    .select("storage_path")
+    .eq("publication_id", publicationId)
+    .lt("revision", activeRevision);
+  if (listError || !superseded?.length) {
+    if (listError) console.error("mep-share superseded export lookup", listError);
+    return;
+  }
+  const paths = superseded.map((item) => item.storage_path);
+  const { error: storageError } = await admin.storage.from("mep-publications").remove(paths);
+  if (storageError) {
+    console.error("mep-share superseded storage cleanup", storageError);
+    return;
+  }
+  const { error: deleteError } = await admin.from("mep_exports")
+    .delete()
+    .eq("publication_id", publicationId)
+    .lt("revision", activeRevision);
+  if (deleteError) console.error("mep-share superseded export cleanup", deleteError);
 }
 
 async function startPublication(req: Request, body: any) {
@@ -145,21 +175,22 @@ async function startPublication(req: Request, body: any) {
     editorToken = randomToken();
     const slug = randomToken(9).toLowerCase();
     const expiresAt = new Date(Date.now() + 30 * 86400000).toISOString();
+    const viewerTokenHash = await sha256(viewerToken);
+    const editorTokenHash = await sha256(editorToken);
+    const editorLink = `https://viewer.bimaestro.fr/#/share/${editorToken}`;
     const { data, error } = await admin.from("mep_publications").insert({
       owner_license_hash: identity.licenseHash,
+      license_key: identity.licenseKey,
       model_key_hash: modelKeyHash,
       slug,
       name: cleanName(body.name),
       expires_at: expiresAt,
+      viewer_token_hash: viewerTokenHash,
+      editor_token_hash: editorTokenHash,
+      editor_link: editorLink,
     }).select("*").single();
     if (error) throw new HttpError(500, error.message);
     publication = data;
-    const { error: tokenError } = await admin.from("mep_publication_tokens").insert([
-      { publication_id: publication.id, token_hash: await sha256(viewerToken), access_role: "viewer" },
-      { publication_id: publication.id, token_hash: await sha256(editorToken), access_role: "editor" },
-    ]);
-    if (tokenError) throw new HttpError(500, tokenError.message);
-    await admin.from("mep_scenarios").insert({ publication_id: publication.id });
   }
 
   const revision = Number(publication.active_revision) + 1;
@@ -170,14 +201,19 @@ async function startPublication(req: Request, body: any) {
   // A failed upload may leave an inactive draft. Retrying the same publication
   // safely replaces that draft without touching the active immutable revision.
   await admin.storage.from("mep-publications").remove([storagePath]);
-  await admin.from("mep_publication_revisions").delete()
+  await admin.from("mep_exports").delete()
     .eq("publication_id", publication.id).eq("revision", revision);
-  const { error: revisionError } = await admin.from("mep_publication_revisions").insert({
+  const { error: revisionError } = await admin.from("mep_exports").insert({
     publication_id: publication.id,
     revision,
+    user_name: identity.userName,
+    license_key: identity.licenseKey,
+    model_name: cleanName(body.name, publication.name),
     storage_path: storagePath,
     package_sha256: packageSha256,
     package_bytes: packageBytes,
+    editor_link: publication.editor_link,
+    export_date: new Date().toISOString(),
     manifest: typeof body.manifest === "object" && body.manifest ? body.manifest : {},
     valve_ids: valveIds,
   });
@@ -213,33 +249,34 @@ async function completePublication(req: Request, body: any) {
     .select("id").maybeSingle();
   if (error || !activated) throw new HttpError(409, "Une autre publication a déjà été activée");
 
-  const { data: activeRevision } = await admin.from("mep_publication_revisions")
+  const { data: activeRevision } = await admin.from("mep_exports")
     .select("valve_ids").eq("publication_id", publication.id).eq("revision", revision).single();
   const compatible = new Set<string>(activeRevision?.valve_ids ?? []);
-  const { data: scenario } = await admin.from("mep_scenarios").select("state")
-    .eq("publication_id", publication.id).single();
-  const previousValves = ((scenario?.state as any)?.valves ?? {}) as Record<string, boolean>;
+  const previousValves = ((publication.scenario_state as any)?.valves ?? {}) as Record<string, boolean>;
   const valves = Object.fromEntries(Object.entries(previousValves).filter(([id]) => compatible.has(id)));
   const removedValveIds = Object.keys(previousValves).filter((id) => !compatible.has(id));
-  await admin.from("mep_scenarios").update({
-    state: { ...(scenario?.state ?? {}), valves },
-    updated_at: new Date().toISOString(),
-  }).eq("publication_id", publication.id);
+  await admin.from("mep_publications").update({
+    scenario_state: { ...(publication.scenario_state ?? {}), valves },
+    scenario_updated_at: new Date().toISOString(),
+  }).eq("id", publication.id);
+  await cleanupSupersededExports(publication.id, revision);
   return { publicationId: publication.id, revision, active: true, removedValveIds };
 }
 
 async function resolveShare(body: any) {
   const access = await shareAccess(body.token);
   if (access.publication.active_revision <= 0) throw new HttpError(409, "Publication incomplète");
-  const { data: revision, error } = await admin.from("mep_publication_revisions")
-    .select("storage_path, manifest, package_bytes, created_at")
+  const { data: revision, error } = await admin.from("mep_exports")
+    .select("storage_path, manifest, package_bytes, export_date")
     .eq("publication_id", access.publication.id)
     .eq("revision", access.publication.active_revision).single();
   if (error) throw new HttpError(500, error.message);
   const { data: signed, error: signedError } = await admin.storage
     .from("mep-publications").createSignedUrl(revision.storage_path, 900);
   if (signedError || !signed) throw new HttpError(500, signedError?.message ?? "Fichier indisponible");
+  await cleanupSupersededExports(access.publication.id, access.publication.active_revision);
   const { error: budgetError } = await admin.rpc("reserve_mep_viewer_usage", {
+    p_publication_id: access.publication.id,
     p_kind: "download", p_amount: Number(revision.package_bytes),
   });
   if (budgetError) {
@@ -248,11 +285,18 @@ async function resolveShare(body: any) {
     }
     throw new HttpError(500, "Contrôle du quota indisponible");
   }
-  const { data: scenario } = await admin.from("mep_scenarios").select("revision, state, updated_by, updated_at")
-    .eq("publication_id", access.publication.id).single();
-  const { data: events } = await admin.from("mep_scenario_events")
-    .select("scenario_revision, participant_name, target_id, previous_value, next_value, created_at")
-    .eq("publication_id", access.publication.id).order("scenario_revision", { ascending: false }).limit(20);
+  const { data: collaborative } = await admin.from("mep_publications")
+    .select("scenario_revision, scenario_state, scenario_updated_by, scenario_updated_at, scenario_events")
+    .eq("id", access.publication.id).single();
+  const scenario = {
+    revision: collaborative?.scenario_revision ?? 0,
+    state: collaborative?.scenario_state ?? { valves: {} },
+    updated_by: collaborative?.scenario_updated_by ?? "Publication Revit",
+    updated_at: collaborative?.scenario_updated_at ?? revision.export_date,
+  };
+  const events = Array.isArray(collaborative?.scenario_events)
+    ? collaborative.scenario_events.slice(-20).reverse()
+    : [];
   const now = Math.floor(Date.now() / 1000);
   const realtimeToken = await create({ alg: "HS256", typ: "JWT" }, {
     iss: "supabase", aud: "authenticated", role: "authenticated",
@@ -277,12 +321,17 @@ async function mutateScenario(body: any) {
   if (access.role !== "editor") throw new HttpError(403, "Lien en lecture seule");
   const targetId = typeof body.targetId === "string" ? body.targetId.slice(0, 300) : "";
   const expectedRevision = Number(body.expectedRevision);
-  const nextValue = body.closed;
+  const commandKind = body.commandKind === "source" ? "source" : "valve";
+  const nextValue = body.value ?? body.closed;
   const operationId = String(body.operationId ?? "");
-  if (!targetId || typeof nextValue !== "boolean" || !Number.isSafeInteger(expectedRevision) ||
+  const validValue = commandKind === "valve"
+    ? typeof nextValue === "boolean"
+    : nextValue === "inlet" || nextValue === "outlet" || nextValue === "none";
+  if (!targetId || !validValue || !Number.isSafeInteger(expectedRevision) ||
       !/^[0-9a-f-]{36}$/i.test(operationId)) throw new HttpError(400, "Commande invalide");
   const participantName = cleanName(body.participantName, "Invité").slice(0, 40);
   const { error: realtimeBudgetError } = await admin.rpc("reserve_mep_viewer_usage", {
+    p_publication_id: access.publication.id,
     p_kind: "scenario", p_amount: 1,
   });
   if (realtimeBudgetError) {
@@ -291,9 +340,10 @@ async function mutateScenario(body: any) {
     }
     throw new HttpError(500, "Contrôle du quota indisponible");
   }
-  const { data: result, error } = await admin.rpc("apply_mep_scenario_command", {
+  const { data: result, error } = await admin.rpc("apply_mep_scenario_edit", {
     p_publication_id: access.publication.id,
     p_operation_id: operationId,
+    p_command_kind: commandKind,
     p_target_id: targetId,
     p_expected_revision: expectedRevision,
     p_next_value: nextValue,
@@ -329,8 +379,7 @@ async function managePublication(req: Request, body: any) {
   if (body.command === "revoke") {
     const now = new Date().toISOString();
     await admin.from("mep_publications").update({ revoked_at: now, updated_at: now }).eq("id", publication.id);
-    await admin.from("mep_publication_tokens").update({ revoked_at: now }).eq("publication_id", publication.id);
-    const { data: revisions } = await admin.from("mep_publication_revisions")
+    const { data: revisions } = await admin.from("mep_exports")
       .select("storage_path").eq("publication_id", publication.id);
     const paths = (revisions ?? []).map((item) => item.storage_path);
     if (paths.length) await admin.storage.from("mep-publications").remove(paths);

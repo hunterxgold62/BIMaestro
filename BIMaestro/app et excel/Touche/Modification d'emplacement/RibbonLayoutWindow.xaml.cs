@@ -7,8 +7,10 @@ using System.Linq;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Navigation;
+using System.Windows.Input;
 using BIMaestro.Welcome;
 using BIMaestro.Localization;
+using BIMaestro.UI;
 
 namespace BIMaestro.RibbonLayout
 {
@@ -21,6 +23,8 @@ namespace BIMaestro.RibbonLayout
         private string _firstName = string.Empty;
         private string _lastName = string.Empty;
         private UiLanguageOption _selectedLanguage;
+        private RadialHotkeyPreference _radialHotkey;
+        private string _radialHotkeyText;
 
         public RibbonLayoutWindow(IEnumerable<RibbonPanelDefinition> definitions, RibbonLayoutConfig layout)
         {
@@ -35,6 +39,8 @@ namespace BIMaestro.RibbonLayout
             LastName = _welcomeState.LastName ?? string.Empty;
             LanguageOptions = UiLanguage.Options;
             SelectedLanguage = LanguageOptions.First(option => option.Value == UiLanguage.Choice);
+            _radialHotkey = RadialButtonsPreferencesManager.Load().Hotkey;
+            _radialHotkeyText = FormatHotkey(_radialHotkey);
 
             DataContext = this;
             SelectedPanel = Panels.FirstOrDefault();
@@ -98,6 +104,16 @@ namespace BIMaestro.RibbonLayout
                 if (_lastName == value) return;
                 _lastName = value;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LastName)));
+            }
+        }
+
+        public string RadialHotkeyText
+        {
+            get => string.IsNullOrWhiteSpace(_radialHotkeyText) ? "Aucun raccourci" : _radialHotkeyText;
+            private set
+            {
+                _radialHotkeyText = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RadialHotkeyText)));
             }
         }
 
@@ -175,6 +191,20 @@ namespace BIMaestro.RibbonLayout
 
         private void Save(object sender, RoutedEventArgs e)
         {
+            var previousPreferences = RadialButtonsPreferencesManager.Load();
+            if (!RadialGlobalHotkeyService.TryRegister(_radialHotkey, out string hotkeyError))
+            {
+                RadialGlobalHotkeyService.TryRegister(previousPreferences.Hotkey, out _);
+                MessageBox.Show(hotkeyError, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            previousPreferences.Hotkey = _radialHotkey;
+            if (!RadialButtonsPreferencesManager.Save(previousPreferences))
+            {
+                MessageBox.Show("Impossible d’enregistrer le raccourci Rosace Boutons.", "BIMaestro",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
             bool languageChanged = SelectedLanguage != null &&
                 SelectedLanguage.Value != UiLanguage.Choice;
             bool languageSaved = true;
@@ -211,6 +241,57 @@ namespace BIMaestro.RibbonLayout
         {
             DialogResult = false;
             Close();
+        }
+
+        private void RadialHotkeyBox_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            e.Handled = true;
+            Key key = e.Key == Key.System ? e.SystemKey : e.Key;
+            if (key == Key.Delete || key == Key.Back)
+            {
+                SetRadialHotkey(null);
+                return;
+            }
+            if (key == Key.LeftCtrl || key == Key.RightCtrl || key == Key.LeftAlt || key == Key.RightAlt ||
+                key == Key.LeftShift || key == Key.RightShift || key == Key.LWin || key == Key.RWin) return;
+
+            ModifierKeys modifiers = Keyboard.Modifiers;
+            int nativeModifiers = 0;
+            if ((modifiers & ModifierKeys.Alt) != 0) nativeModifiers |= 0x0001;
+            if ((modifiers & ModifierKeys.Control) != 0) nativeModifiers |= 0x0002;
+            if ((modifiers & ModifierKeys.Shift) != 0) nativeModifiers |= 0x0004;
+            if ((modifiers & ModifierKeys.Windows) != 0) nativeModifiers |= 0x0008;
+            if (nativeModifiers == 0)
+            {
+                MessageBox.Show("Ajoutez Ctrl, Alt, Maj ou Windows à la touche choisie.", "BIMaestro",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            SetRadialHotkey(new RadialHotkeyPreference
+            {
+                Modifiers = nativeModifiers,
+                VirtualKey = KeyInterop.VirtualKeyFromKey(key)
+            });
+        }
+
+        private void ClearRadialHotkey_Click(object sender, RoutedEventArgs e) => SetRadialHotkey(null);
+
+        private void SetRadialHotkey(RadialHotkeyPreference hotkey)
+        {
+            _radialHotkey = hotkey;
+            RadialHotkeyText = FormatHotkey(hotkey);
+        }
+
+        private static string FormatHotkey(RadialHotkeyPreference hotkey)
+        {
+            if (hotkey == null) return "Aucun raccourci";
+            var parts = new List<string>();
+            if ((hotkey.Modifiers & 0x0002) != 0) parts.Add("Ctrl");
+            if ((hotkey.Modifiers & 0x0001) != 0) parts.Add("Alt");
+            if ((hotkey.Modifiers & 0x0004) != 0) parts.Add("Maj");
+            if ((hotkey.Modifiers & 0x0008) != 0) parts.Add("Windows");
+            parts.Add(KeyInterop.KeyFromVirtualKey(hotkey.VirtualKey).ToString());
+            return string.Join(" + ", parts);
         }
 
         private void SaveWelcomeProfile()

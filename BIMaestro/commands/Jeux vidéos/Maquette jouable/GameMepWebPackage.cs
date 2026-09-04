@@ -6,6 +6,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Windows.Media;
 using System.Windows.Media.Media3D;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
@@ -28,8 +29,51 @@ namespace BIMaestro.VideoGames
             {
                 Formatting = Formatting.Indented,
                 NullValueHandling = NullValueHandling.Ignore,
-                ContractResolver = new CamelCasePropertyNamesContractResolver()
+                ContractResolver = new CamelCasePropertyNamesContractResolver(),
+                Converters = { new WebColorJsonConverter() }
             };
+
+        /// <summary>
+        /// WPF Color peut être écrit par Json.NET sous la forme "sc#..." ou
+        /// "#AARRGGBB" selon le runtime. Ces formats ne sont pas des couleurs CSS
+        /// fiables. Le package web transporte donc toujours des octets RGBA explicites.
+        /// </summary>
+        private sealed class WebColorJsonConverter : JsonConverter
+        {
+            public override bool CanRead => false;
+
+            public override bool CanConvert(Type objectType)
+            {
+                return objectType == typeof(Color);
+            }
+
+            public override void WriteJson(
+                JsonWriter writer,
+                object? value,
+                JsonSerializer serializer)
+            {
+                Color color = value is Color typed ? typed : Colors.Transparent;
+                writer.WriteStartObject();
+                writer.WritePropertyName("r");
+                writer.WriteValue(color.R);
+                writer.WritePropertyName("g");
+                writer.WriteValue(color.G);
+                writer.WritePropertyName("b");
+                writer.WriteValue(color.B);
+                writer.WritePropertyName("a");
+                writer.WriteValue(color.A);
+                writer.WriteEndObject();
+            }
+
+            public override object ReadJson(
+                JsonReader reader,
+                Type objectType,
+                object? existingValue,
+                JsonSerializer serializer)
+            {
+                throw new NotSupportedException();
+            }
+        }
 
         public static void PrepareStaticAssets(GameSceneData scene)
         {
@@ -67,13 +111,16 @@ namespace BIMaestro.VideoGames
 
             byte[] model = scene.WebModelGlb;
             byte[] mep = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(
-                GameMepReplayStore.Capture(scene.MepGraph), JsonSettings));
+                GameMepReplayStore.Capture(
+                    scene.MepGraph,
+                    preserveElementPersistentIds: true),
+                JsonSettings));
             byte[] properties = Encoding.UTF8.GetBytes(scene.WebPropertiesJson ?? "[]");
             byte[] viewer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(
                 new
                 {
                     spawn = ToWebPoint(scene.SpawnFootPosition),
-                    eyeHeight = 5.80,
+                    eyeHeight = 5.28,
                     initialYaw = scene.InitialYawRadians,
                     doors = scene.Doors.Select(door => new
                     {
@@ -139,9 +186,12 @@ namespace BIMaestro.VideoGames
                     .Where(valve => valve.IsEnabledAsValve)
                     .Select(valve => scene.MepGraph.FindElement(valve.ElementKey))
                     .Where(element => element != null)
-                    .Select(element => string.IsNullOrWhiteSpace(element!.PersistentId)
-                        ? element.Key
-                        : element.PersistentId)
+                    .SelectMany(element => new[]
+                    {
+                        element!.Key,
+                        element.PersistentId
+                    })
+                    .Where(identifier => !string.IsNullOrWhiteSpace(identifier))
                     .Distinct(StringComparer.Ordinal)
                     .ToList()
             };
@@ -178,7 +228,16 @@ namespace BIMaestro.VideoGames
             {
                 GameMeshData mesh = entry.Item1;
                 int position = WriteVectors(writer, binary, mesh.Positions, bufferViews, accessors, true);
-                int normal = WriteVectors(writer, binary, mesh.VertexNormals, bufferViews, accessors, false);
+                // Le viewport natif recalcule déjà les normales absentes dans
+                // GameGpuSceneBuilder. L'export web doit appliquer exactement
+                // le même garde-fou, sinon les faces concernées reçoivent toutes
+                // UnitZ et la maquette apparaît comme un bloc de couleur uniforme.
+                IEnumerable<Vector3D> webNormals =
+                    mesh.HasCompleteNormals &&
+                    mesh.VertexNormals.Count == mesh.Positions.Count
+                        ? mesh.VertexNormals
+                        : ComputeWebNormals(mesh);
+                int normal = WriteVectors(writer, binary, webNormals, bufferViews, accessors, false);
                 int color = WriteColors(writer, binary, mesh, bufferViews, accessors);
                 int element = WriteElements(writer, binary, mesh, bufferViews, accessors);
                 int indices = WriteIndices(writer, binary, mesh, bufferViews, accessors);
@@ -305,6 +364,47 @@ namespace BIMaestro.VideoGames
             int view = views.Count; views.Add(new { buffer = 0, byteOffset = offset, byteLength = mesh.Positions.Count * 4, target = 34962 });
             int accessor = accessors.Count; accessors.Add(new { bufferView = view, componentType = 5121, normalized = true, count = mesh.Positions.Count, type = "VEC4" });
             return accessor;
+        }
+
+        private static IEnumerable<Vector3D> ComputeWebNormals(GameMeshData mesh)
+        {
+            var accumulated = new Vector3D[mesh.Positions.Count];
+            for (int index = 0; index + 2 < mesh.Indices.Count; index += 3)
+            {
+                int indexA = mesh.Indices[index];
+                int indexB = mesh.Indices[index + 1];
+                int indexC = mesh.Indices[index + 2];
+                if (indexA < 0 || indexB < 0 || indexC < 0 ||
+                    indexA >= mesh.Positions.Count ||
+                    indexB >= mesh.Positions.Count ||
+                    indexC >= mesh.Positions.Count)
+                {
+                    continue;
+                }
+
+                Vector3D edgeA = mesh.Positions[indexB] - mesh.Positions[indexA];
+                Vector3D edgeB = mesh.Positions[indexC] - mesh.Positions[indexA];
+                Vector3D normal = Vector3D.CrossProduct(edgeA, edgeB);
+                if (normal.LengthSquared < 1e-18)
+                    continue;
+
+                // Comme dans GameGpuSceneBuilder, la normale de face non
+                // normalisée pondère naturellement le résultat par sa surface.
+                accumulated[indexA] += normal;
+                accumulated[indexB] += normal;
+                accumulated[indexC] += normal;
+            }
+
+            for (int index = 0; index < accumulated.Length; index++)
+            {
+                Vector3D normal = accumulated[index];
+                if (normal.LengthSquared < 1e-18)
+                    normal = new Vector3D(0, 0, 1);
+                else
+                    normal.Normalize();
+                accumulated[index] = normal;
+            }
+            return accumulated;
         }
 
         private static int WriteElements(BinaryWriter writer, MemoryStream stream, GameMeshData mesh, IList<object> views, IList<object> accessors)

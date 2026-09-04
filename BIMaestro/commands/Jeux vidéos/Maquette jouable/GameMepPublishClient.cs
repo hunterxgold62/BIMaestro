@@ -54,7 +54,7 @@ namespace BIMaestro.VideoGames
                 () => GameMepWebPackage.Build(scene, name), cancellationToken);
             if (package.Bytes.LongLength > 25L * 1024L * 1024L)
                 throw new InvalidOperationException(
-                    "Cette maquette dépasse la limite gratuite de 25 Mo. " +
+                    "Cette maquette dépasse la limite gratuite de 50 Mo. " +
                     "Réduisez la vue ou sa boîte de coupe avant de la partager.");
             GameMepShareState state = Load(scene.MepGraph);
             string modelKey = string.IsNullOrWhiteSpace(scene.MepGraph.ScenarioModelKey)

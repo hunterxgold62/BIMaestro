@@ -53,6 +53,11 @@ namespace BIMaestro.Localization
             }
         }
 
+        /// <summary>
+        /// Code de la langue effectivement utilisée par l'interface BIMaestro.
+        /// </summary>
+        public static string CurrentLanguageCode => IsEnglish ? "en" : "fr";
+
         public static IReadOnlyList<UiLanguageOption> Options => new[]
         {
             new UiLanguageOption(UiLanguageChoice.Automatic, T("Automatique (langue de Revit)", "Automatic (Revit language)")),

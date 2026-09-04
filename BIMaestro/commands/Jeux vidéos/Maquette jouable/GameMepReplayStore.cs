@@ -70,7 +70,9 @@ namespace BIMaestro.VideoGames
                 ObjectCreationHandling = ObjectCreationHandling.Auto
             };
 
-        public static GameMepReplaySnapshot Capture(GameMepGraphData graph)
+        public static GameMepReplaySnapshot Capture(
+            GameMepGraphData graph,
+            bool preserveElementPersistentIds = false)
         {
             if (graph == null)
                 throw new ArgumentNullException(nameof(graph));
@@ -83,7 +85,7 @@ namespace BIMaestro.VideoGames
                 Graph = CloneGraph(graph)
             };
             CapturePathStates(graph, snapshot.CapturedPathStates);
-            Sanitize(snapshot.Graph);
+            Sanitize(snapshot.Graph, preserveElementPersistentIds);
             PrepareGraph(snapshot.Graph);
             return snapshot;
         }
@@ -333,13 +335,18 @@ namespace BIMaestro.VideoGames
                 (state.HasCirculation ? "circulation" : "stagnant");
         }
 
-        private static void Sanitize(GameMepGraphData graph)
+        private static void Sanitize(
+            GameMepGraphData graph,
+            bool preserveElementPersistentIds)
         {
             graph.ScenarioModelKey = string.Empty;
             graph.ScenarioCanPersist = false;
             graph.ScenarioPersistenceError = string.Empty;
-            foreach (GameMepElementData element in graph.Elements)
-                element.PersistentId = string.Empty;
+            if (!preserveElementPersistentIds)
+            {
+                foreach (GameMepElementData element in graph.Elements)
+                    element.PersistentId = string.Empty;
+            }
             foreach (GameMepConnectorData connector in graph.Connectors)
                 connector.PersistentKey = string.Empty;
         }

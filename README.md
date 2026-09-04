@@ -142,7 +142,7 @@ Le ruban est organisé en panneaux métier. Les noms ci-dessous correspondent au
 - **Snake** et **Flappy Bird** : petits jeux intégrés.
 - **Option** : configure le ruban BIMaestro et les paramètres utilisateur.
 - **Contact** : ouvre le contact de l'auteur pour retours, bugs ou idées.
-- **Rosace Boutons** : affiche une rosace des 16 derniers boutons BIMaestro utilisés.
+- **Rosace Boutons** : affiche 16 favoris et boutons récents personnalisables par clic droit. Un raccourci global optionnel, configurable dans **Options > Rosace**, permet aussi de l’ouvrir depuis une nomenclature.
 
 ## Index IA et mots-clés
 

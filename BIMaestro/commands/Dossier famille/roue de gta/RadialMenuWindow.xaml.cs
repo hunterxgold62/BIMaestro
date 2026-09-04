@@ -19,6 +19,10 @@ namespace BIMaestro.UI
         // ======== Events externes ========
         public event Action<bool, int, RadialItem> Completed;
         public event Action<RadialItem> ReloadRequested; // clic droit → "Recharger"
+        public event Action<int> ConfigureButtonRequested;
+        public event Action<int> RemovePinnedButtonRequested;
+        public event Action ResetButtonsRequested;
+        public Func<int, bool> IsButtonPinned { get; set; }
 
         // ======== Données / pagination ========
         private List<RadialItem> _items; // multiples de 8 (complétés dynamiquement)
@@ -69,6 +73,7 @@ namespace BIMaestro.UI
         // ======== Sécurité fermeture / état ========
         private DateTime _canCloseAfter = DateTime.MaxValue;
         private bool _closing;
+        private bool _dismissalSuspended;
 
         // ======== Molette : anti-saut multi-pages ========
         private DateTime _lastWheelSwitch = DateTime.MinValue;
@@ -184,7 +189,7 @@ namespace BIMaestro.UI
 
         private void OnClickOutsideCaptured(object sender, MouseButtonEventArgs e)
         {
-            if (_closing) return;
+            if (_closing || _dismissalSuspended) return;
             if (DateTime.UtcNow < _canCloseAfter) return;
             e.Handled = true;
             SafeComplete(false, -1, null);
@@ -192,14 +197,14 @@ namespace BIMaestro.UI
 
         private void App_Deactivated(object? sender, EventArgs e)
         {
-            if (_closing) return;
+            if (_closing || _dismissalSuspended) return;
             if (DateTime.UtcNow < _canCloseAfter) return;
             SafeComplete(false, -1, null);
         }
 
         private void Window_Deactivated(object? sender, EventArgs e)
         {
-            if (_closing) return;
+            if (_closing || _dismissalSuspended) return;
             if (DateTime.UtcNow < _canCloseAfter) return;
             SafeComplete(false, -1, null);
         }
@@ -396,19 +401,58 @@ namespace BIMaestro.UI
 
         private ContextMenu BuildContextMenu(int idx)
         {
-            if (ReloadRequested == null) return null;
+            if (ReloadRequested == null && ConfigureButtonRequested == null) return null;
 
             var cm = new ContextMenu();
-            var mi = new MenuItem { Header = "Recharger la dernière version" };
-            mi.Click += (s, e) =>
+            if (ReloadRequested != null)
             {
-                var item = _currentPageItems[idx];
-                if (item == null || !item.HasFamily) return;
+                var mi = new MenuItem { Header = "Recharger la dernière version" };
+                mi.Click += (s, e) =>
+                {
+                    var item = _currentPageItems[idx];
+                    if (item == null || !item.HasFamily) return;
 
-                try { ReloadRequested?.Invoke(item); } catch { }
-                SafeComplete(false, -1, null); // on ferme après action
-            };
-            cm.Items.Add(mi);
+                    try { ReloadRequested?.Invoke(item); } catch { }
+                    SafeComplete(false, -1, null);
+                };
+                cm.Items.Add(mi);
+            }
+
+            if (ConfigureButtonRequested != null)
+            {
+                // Un ContextMenu WPF vit dans une fenêtre Popup distincte. Sans
+                // cette suspension, l'événement Deactivated ferme la rosace avant
+                // même que le clic sur « Choisir » ne soit traité.
+                cm.Opened += (s, e) => BeginModalInteraction();
+                cm.Closed += (s, e) => Dispatcher.BeginInvoke(
+                    DispatcherPriority.ContextIdle,
+                    new Action(() => EndModalInteraction()));
+
+                var choose = new MenuItem { Header = UiLanguage.T("Choisir un bouton…", "Choose a button…") };
+                choose.Click += (s, e) =>
+                {
+                    int globalIndex = _pageIndex * PAGE_SIZE + idx;
+                    try { ConfigureButtonRequested?.Invoke(globalIndex); } catch { }
+                };
+                cm.Items.Add(choose);
+
+                var remove = new MenuItem
+                {
+                    Header = UiLanguage.T("Retirer le bouton fixé", "Remove pinned button"),
+                    IsEnabled = false
+                };
+                remove.Click += (s, e) =>
+                {
+                    int globalIndex = _pageIndex * PAGE_SIZE + idx;
+                    try { RemovePinnedButtonRequested?.Invoke(globalIndex); } catch { }
+                };
+                cm.Items.Add(remove);
+                cm.Opened += (s, e) =>
+                {
+                    try { remove.IsEnabled = IsButtonPinned?.Invoke(_pageIndex * PAGE_SIZE + idx) == true; }
+                    catch { remove.IsEnabled = false; }
+                };
+            }
             return cm;
         }
 
@@ -458,6 +502,10 @@ namespace BIMaestro.UI
                 var src = LoadImage(item?.ImagePath);
                 img.Source = src;
                 _iconBorders[i].Opacity = (item == null || !item.HasAction) ? 0.2 : 1.0;
+                _iconBorders[i].ToolTip = item == null || !item.HasAction ? null : item.Label;
+                _iconBorders[i].BorderBrush = Brushes.Transparent;
+                _iconBorders[i].BorderThickness = new Thickness(0);
+                _iconBorders[i].Padding = new Thickness(0);
 
                 var tr = (ScaleTransform)_iconBorders[i].RenderTransform;
                 tr.ScaleX = tr.ScaleY = 1.0;
@@ -524,10 +572,45 @@ namespace BIMaestro.UI
             _items = items ?? new List<RadialItem>();
             NormalizeItems();
 
-            _pageIndex = 0;
-            LoadPage(0);
+            int page = Math.Max(0, Math.Min(_pageIndex, PageCount - 1));
+            LoadPage(page);
             UpdatePageLabel();
             UpdateHoverFromMouse();
+        }
+
+        public void ReplaceItem(int globalIndex, RadialItem item)
+        {
+            if (globalIndex < 0 || globalIndex >= _items.Count) return;
+            _items[globalIndex] = item ?? new RadialItem();
+
+            if (globalIndex / PAGE_SIZE == _pageIndex)
+            {
+                LoadPage(_pageIndex);
+                UpdatePageLabel();
+                UpdateHoverFromMouse();
+            }
+        }
+
+        public void BeginModalInteraction()
+        {
+            _dismissalSuspended = true;
+            try { _idleTimer?.Stop(); } catch { }
+            try { if (Mouse.Captured == RootCanvas) Mouse.Capture(null); } catch { }
+        }
+
+        public void EndModalInteraction()
+        {
+            if (_closing) return;
+            _dismissalSuspended = false;
+            _canCloseAfter = DateTime.UtcNow.AddMilliseconds(250);
+            try
+            {
+                Activate();
+                Focus();
+                Mouse.Capture(RootCanvas, CaptureMode.SubTree);
+            }
+            catch { }
+            if (AutoCloseEnabled) ResetIdleTimer();
         }
 
         private void NormalizeItems()
@@ -568,7 +651,7 @@ namespace BIMaestro.UI
         private ContextMenu BuildCenterContextMenu()
         {
             var provider = _collectionOptionsProvider;
-            if (provider == null && !_collectionModeActive) return null;
+            if (provider == null && !_collectionModeActive && ResetButtonsRequested == null) return null;
 
             var cm = new ContextMenu();
 
@@ -612,6 +695,21 @@ namespace BIMaestro.UI
                     try { _collectionClearCallback?.Invoke(); } catch { }
                 };
                 cm.Items.Add(cancelItem);
+            }
+
+            if (ResetButtonsRequested != null)
+            {
+                cm.Opened += (s, e) => BeginModalInteraction();
+                cm.Closed += (s, e) => Dispatcher.BeginInvoke(
+                    DispatcherPriority.ContextIdle,
+                    new Action(() => EndModalInteraction()));
+
+                var resetItem = new MenuItem { Header = UiLanguage.T("Réinitialiser la rosace", "Reset radial menu") };
+                resetItem.Click += (s, e) =>
+                {
+                    try { ResetButtonsRequested?.Invoke(); } catch { }
+                };
+                cm.Items.Add(resetItem);
             }
 
             return cm;

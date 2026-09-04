@@ -41,6 +41,7 @@ public class AppUI : IExternalApplication
                 new RibbonItemDefinition("OpenSheetFromViewButton", "Ouvrir la vue du Plan", panel => AddPushButton(panel, "OpenSheetFromViewButton", " Ouvrir \nla vue", assemblyPath, "Visualisation.OpenSheetFromView", "Ouvrir la vue.png", "Passe rapidement de la vue active à la feuille associée (et inversement).\r\nPermet aussi d'ouvrir une vue directement depuis un viewport sélectionné sur une feuille.")),
                 new RibbonItemDefinition("Export Nomenclature", "Export Nomenclature", panel => AddPushButton(panel, "Export Nomenclature", "Export de\nNomenclature", assemblyPath, "Visualisation.ExportScheduleCommand", "Export de Nomenclature.png", "Exporte les nomenclatures Revit sélectionnées en fichier Excel ou PDF.")),
                 new RibbonItemDefinition("Sélection d'objet", "Sélection d'objet", panel => AddPushButton(panel, "Sélection d'objet", "Sélection\nd'objet", assemblyPath, "Visualisation.SelectSimilarCommand", "Sélection d'objet.png", "Sélectionne des éléments similaires dans le projet")),
+                new RibbonItemDefinition("PipeSystemColors", "Couleurs réseaux", panel => AddPushButton(panel, "PipeSystemColors", "Couleurs\nréseaux", assemblyPath, "Visualisation.PipeSystemColorsCommand", "Couleur.png", "Colore les canalisations et raccords selon les couleurs des types de systèmes de canalisation.")),
                 new RibbonItemDefinition("Boutons de Visualisation", "Boutons de Visualisation", panel => AddStackedVisualizationButtons(
             panel,
             assemblyPath,
@@ -192,7 +193,7 @@ public class AppUI : IExternalApplication
                     {
                         ("CustomizeRibbon", "Option", "BIMaestro.RibbonLayout.RibbonLayoutCommand", "Option.png", "Configurer le ruban BIMaestro et les paramètres utilisateur."),
                         ("ContactCommand", "Contact", "Page.ContactCommand", "Information (2).png", "Ouvre le LinkedIn de Paul Lemert pour envoyer un retour, signaler un bouton qui bloque ou proposer une idée."),
-                        ("RadialMenuButtonsCommand", "Rosace\nBoutons", "BIMaestro.UI.RadialMenuButtonsCommand", "Option.png", "Rosace des 16 derniers boutons BIMaestro utilisés.")
+                        ("RadialMenuButtonsCommand", "Rosace\nBoutons", "BIMaestro.UI.RadialMenuButtonsCommand", "Option.png", "Rosace personnalisable de 16 favoris et boutons BIMaestro récents.")
                     })
                 )),
 
@@ -773,6 +774,51 @@ public class AppUI : IExternalApplication
         ribbonButtonRegistry.TryGetValue(buttonId, out var info);
         return info;
     }
+
+    public static RevitCommandId ResolveRibbonCommandId(RibbonButtonInfo info)
+    {
+        if (info == null) return null;
+        if (info.CommandId != null) return info.CommandId;
+
+        var panelNames = ribbonPanels
+            .Where(panel => panel != null && !string.IsNullOrWhiteSpace(panel.Name))
+            .Select(panel => panel.Name)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var parentNames = ribbonButtonOrder
+            .Concat(new[]
+            {
+                "GetPaintedMaterialsButton", "Bride auto", "Dynamo auto",
+                "Qui a fait ça ?", "Temps par projet", "FamilyBrowser",
+                "Familytraduction", "Export d'unité", "Changement de couleur",
+                "JeuxSplit", "CustomizeRibbon"
+            })
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        foreach (string panelName in panelNames)
+        {
+            var direct = TryLookupRibbonCommandId(
+                $"CustomCtrl_%CustomCtrl_%BIMaestro%{panelName}%{info.Id}");
+            if (direct != null) return info.CommandId = direct;
+
+            foreach (string parentName in parentNames)
+            {
+                var nested = TryLookupRibbonCommandId(
+                    $"CustomCtrl_%CustomCtrl_%CustomCtrl_%BIMaestro%{panelName}%{parentName}%{info.Id}");
+                if (nested != null) return info.CommandId = nested;
+            }
+        }
+
+        return null;
+    }
+
+    private static RevitCommandId TryLookupRibbonCommandId(string name)
+    {
+        try { return RevitCommandId.LookupCommandId(name); }
+        catch { return null; }
+    }
     public static void SetUiApplication(UIApplication uiapp)
     {
         UiApplication = uiapp;
@@ -854,6 +900,20 @@ public class AppUI : IExternalApplication
         if (button == null) return null;
         try
         {
+            // Revit conserve l'identifiant complet du contrôle (celui visible dans
+            // le journal) derrière cette méthode non publique. C'est la source la
+            // plus fiable pour PostCommand, notamment pour les split buttons.
+            var getId = button.GetType().GetMethod(
+                "getId",
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.NonPublic);
+            if (getId?.Invoke(button, null) is string ribbonId &&
+                !string.IsNullOrWhiteSpace(ribbonId))
+            {
+                var resolved = TryLookupRibbonCommandId(ribbonId);
+                if (resolved != null) return resolved;
+            }
+
             var props = button.GetType().GetProperties(
                 System.Reflection.BindingFlags.Instance
                 | System.Reflection.BindingFlags.Public

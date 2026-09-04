@@ -192,6 +192,25 @@
                     </Grid>
                 </TabItem>
 
+                <TabItem Header="Rosace">
+                    <StackPanel Margin="22,20">
+                        <TextBlock Style="{StaticResource H2}" Text="Raccourci Rosace Boutons"/>
+                        <TextBlock Style="{StaticResource Hint}" Margin="0,6,0,14" TextWrapping="Wrap"
+                                   Text="Ce raccourci BIMaestro fonctionne aussi lorsque le curseur est placé dans une cellule de nomenclature. Il n’est actif que lorsque Revit est au premier plan."/>
+                        <TextBlock Style="{StaticResource Label}" Text="Raccourci global (optionnel)"/>
+                        <TextBox x:Name="RadialHotkeyBox" Width="280" Height="36" HorizontalAlignment="Left"
+                                 IsReadOnly="True" Text="{Binding RadialHotkeyText}"
+                                 PreviewKeyDown="RadialHotkeyBox_PreviewKeyDown"
+                                 ToolTip="Cliquez ici puis appuyez sur une combinaison contenant Ctrl, Alt, Maj ou Windows."/>
+                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                            <Button Style="{StaticResource SecondaryButton}" Content="Supprimer le raccourci"
+                                    Click="ClearRadialHotkey_Click"/>
+                        </StackPanel>
+                        <TextBlock Style="{StaticResource Hint}" Margin="0,14,0,0" TextWrapping="Wrap"
+                                   Text="Cliquez dans le champ puis saisissez la combinaison souhaitée. Une touche modificatrice est obligatoire afin d’éviter les ouvertures accidentelles."/>
+                    </StackPanel>
+                </TabItem>
+
                 <TabItem Header="Général" Margin="12,0,-12,0">
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <StackPanel Margin="12">
