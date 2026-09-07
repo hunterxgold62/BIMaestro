@@ -52,7 +52,7 @@ namespace BIMaestro.VideoGames
                 { Message = "Création du paquet web…", Percentage = 0.08 });
             GameMepWebPackageResult package = await Task.Run(
                 () => GameMepWebPackage.Build(scene, name), cancellationToken);
-            if (package.Bytes.LongLength > 25L * 1024L * 1024L)
+            if (package.Bytes.LongLength > 50L * 1024L * 1024L)
                 throw new InvalidOperationException(
                     "Cette maquette dépasse la limite gratuite de 50 Mo. " +
                     "Réduisez la vue ou sa boîte de coupe avant de la partager.");

@@ -631,6 +631,8 @@ namespace BIMaestro.VideoGames
             "Refoulement propagé depuis le port de sortie de la pompe";
         private const string DirectionalNetworkConsensusReason =
             "Consensus des sens In/Out à travers les branches parallèles";
+        private const string SuppliedManifoldBranchReason =
+            "Distribution depuis un collecteur alimenté vers la branche";
         private readonly GameMepGraphData _graph;
         private List<int>[]? _adjacentEdges;
         private Dictionary<string, bool>? _previousValveClosedStates;
@@ -1350,6 +1352,78 @@ namespace BIMaestro.VideoGames
                 StringComparer.Ordinal);
             var geometricProtectedJunctionPorts = new HashSet<int>();
             var inferredInletCandidates = new HashSet<int>();
+            var suppliedManifoldBranchDirections =
+                new Dictionary<GameMepPathData, bool>();
+
+            // Un bras latéral reliant deux tés d'un collecteur forme une boucle
+            // topologique avec les autres branches parallèles. Le potentiel
+            // relaxé peut alors choisir localement le chemin inverse, même si
+            // l'onde partie de l'arrivée a déjà donné un sens non ambigu. Pour
+            // ces seuls bras té-à-té, mémoriser ce sens avant le calcul final.
+            // Les deux ports colinéaires restent le collecteur ; le troisième
+            // est la branche distribuée. Une pompe ou une correction manuelle
+            // conserve toujours sa priorité plus loin dans le solveur.
+            foreach (string junctionKey in candidateJunctionPortAreas.Keys.OrderBy(
+                key => key, StringComparer.Ordinal))
+            {
+                GameMepElementData? junction = _graph.FindElement(junctionKey);
+                if (junction == null || IsReturnHydronic(junction) ||
+                    junction.ConnectorIndices.Count != 3 ||
+                    !junctionArms.TryGetValue(junctionKey,
+                        out Dictionary<int, HashSet<int>> manifoldArms) ||
+                    !junctionTerminalJunctions.TryGetValue(junctionKey,
+                        out Dictionary<int, string> terminalJunctions) ||
+                    !TrySelectCollinearHeaderPorts(junction, out int[] headerPorts))
+                {
+                    continue;
+                }
+
+                int sidePort = junction.ConnectorIndices.FirstOrDefault(
+                    port => !headerPorts.Contains(port));
+                if (sidePort < 0 ||
+                    !terminalJunctions.TryGetValue(sidePort,
+                        out string terminalJunctionKey) ||
+                    string.IsNullOrWhiteSpace(terminalJunctionKey) ||
+                    !manifoldArms.TryGetValue(sidePort,
+                        out HashSet<int> sideArm))
+                {
+                    continue;
+                }
+
+                foreach (GameMepPathData branchPath in sideArm
+                    .Where(index => index >= 0 && index < connectorCount)
+                    .Select(index => _graph.FindElement(
+                        _graph.Connectors[index].ElementKey))
+                    .Where(item => item?.IsPipeCurve == true &&
+                        !item.IsPipeJunction)
+                    .Cast<GameMepElementData>()
+                    .SelectMany(item => item.Paths)
+                    .Where(item => item.EndConnector >= 0)
+                    .Distinct())
+                {
+                    int start = branchPath.StartConnector;
+                    int end = branchPath.EndConnector;
+                    if (start < 0 || start >= highDistance.Length ||
+                        end < 0 || end >= highDistance.Length ||
+                        highDistance[start] < 0 || highDistance[end] < 0 ||
+                        highDistance[start] == highDistance[end])
+                    {
+                        continue;
+                    }
+
+                    bool forward = highDistance[start] < highDistance[end];
+                    if (suppliedManifoldBranchDirections.TryGetValue(
+                            branchPath, out bool existing) && existing != forward)
+                    {
+                        // Deux collecteurs donnent des votes opposés : ne rien
+                        // verrouiller et laisser les règles habituelles trancher.
+                        suppliedManifoldBranchDirections.Remove(branchPath);
+                        continue;
+                    }
+                    suppliedManifoldBranchDirections[branchPath] = forward;
+                }
+            }
+
             foreach (string junctionKey in junctionPortWeights.Keys.OrderBy(
                 key => key, StringComparer.Ordinal))
             {
@@ -2162,9 +2236,23 @@ namespace BIMaestro.VideoGames
                         diameterActivatedJunctionKeys.Contains(element.Key) &&
                         diameterProtectedJunctionPorts.Contains(
                             path.StartConnector);
+                    bool manifoldForward = path.FlowForward;
+                    bool hasSuppliedManifoldBranchDirection =
+                        path.EndConnector >= 0 &&
+                        suppliedManifoldBranchDirections.TryGetValue(
+                            path, out manifoldForward);
+                    if (path.HasCirculation &&
+                        hasSuppliedManifoldBranchDirection &&
+                        !TryGetImposedDirection(path, out _, out _))
+                    {
+                        path.FlowForward = manifoldForward;
+                        path.DirectionState = GameMepDirectionState.Resolved;
+                        path.DirectionReason = SuppliedManifoldBranchReason;
+                    }
                     if (path.HasCirculation &&
                         !hasProtectedHeaderDirection &&
                         !hasProtectedJunctionDirection &&
+                        !hasSuppliedManifoldBranchDirection &&
                         !TryGetImposedDirection(path, out _, out _))
                     {
                         // Le calcul initial utilise les frontières les plus

@@ -43,6 +43,7 @@
                     <TextBlock Text="DONNÉES AUTORISÉES" Foreground="#FF718991" FontSize="10"/>
                     <TextBlock x:Name="AuthorizedParametersText" Text="Paramètres MEP contrôlés" Margin="0,4,0,0" TextTrimming="CharacterEllipsis" ToolTipService.ShowDuration="30000"/>
                     <TextBlock x:Name="EstimatedSizeText" Foreground="#FF8FA4AD" FontSize="10" Margin="0,3,0,0"/>
+                    <TextBlock x:Name="EstimatedSizeDetailsText" Foreground="#FF718991" FontSize="10" Margin="0,5,0,0" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
         </Grid>

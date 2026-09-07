@@ -1,8 +1,10 @@
 using System;
 using System.Diagnostics;
+using System.IO;
+using System.IO.Compression;
 using System.Linq;
-using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 
 namespace BIMaestro.VideoGames
@@ -12,6 +14,8 @@ namespace BIMaestro.VideoGames
         private readonly GameSceneData _scene;
         private GameMepShareState _state;
         private CancellationTokenSource? _cancellation;
+        private readonly CancellationTokenSource _sizeCalculationCancellation =
+            new CancellationTokenSource();
 
         internal GameMepShareWindow(GameSceneData scene)
         {
@@ -29,10 +33,56 @@ namespace BIMaestro.VideoGames
             AuthorizedParametersText.ToolTip = names.Length == 0
                 ? "Seules les informations techniques minimales du graphe seront publiées."
                 : string.Join(", ", names);
-            long estimatedBytes = (scene.WebModelGlb?.LongLength ?? 0L) +
-                Encoding.UTF8.GetByteCount(scene.WebPropertiesJson ?? "[]");
-            EstimatedSizeText.Text = "Taille estimée : " + FormatBytes(estimatedBytes);
+            EstimatedSizeText.Text = "Calcul de la taille compressée…";
             ShowState();
+            CalculateCompressedSizeAsync();
+        }
+
+        private async void CalculateCompressedSizeAsync()
+        {
+            try
+            {
+                string publicationName = PublicationNameTextBox.Text.Trim();
+                GameMepWebPackageResult package = await Task.Run(
+                    () => GameMepWebPackage.Build(_scene, publicationName),
+                    _sizeCalculationCancellation.Token);
+                if (!_sizeCalculationCancellation.IsCancellationRequested)
+                {
+                    EstimatedSizeText.Text = "Taille réelle compressée : " +
+                        FormatBytes(package.Bytes.LongLength) + " / 50 Mo";
+                    using var stream = new MemoryStream(package.Bytes, writable: false);
+                    using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+                    EstimatedSizeDetailsText.Text = string.Join("\n",
+                        archive.Entries
+                            .OrderByDescending(entry => entry.CompressedLength)
+                            .Select(entry => FriendlyFileName(entry.FullName) + " : " +
+                                FormatBytes(entry.CompressedLength)));
+                }
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception exception)
+            {
+                Debug.WriteLine("Calcul de taille du partage MEP impossible : " + exception);
+                if (!_sizeCalculationCancellation.IsCancellationRequested)
+                {
+                    EstimatedSizeText.Text = "Taille compressée indisponible";
+                    EstimatedSizeDetailsText.Text = string.Empty;
+                }
+            }
+        }
+
+        private static string FriendlyFileName(string fileName)
+        {
+            switch (fileName.ToLowerInvariant())
+            {
+                case "model.glb": return "Géométrie 3D";
+                case "properties.json": return "Propriétés des éléments";
+                case "mep.json": return "Graphe et flux MEP";
+                case "viewer.json": return "Navigation et portes";
+                case "manifest.json": return "Informations du paquet";
+                case "thumbnail.webp": return "Miniature";
+                default: return fileName;
+            }
         }
 
         private static string FormatBytes(long bytes)
@@ -136,6 +186,8 @@ namespace BIMaestro.VideoGames
 
         protected override void OnClosed(EventArgs e)
         {
+            _sizeCalculationCancellation.Cancel();
+            _sizeCalculationCancellation.Dispose();
             _cancellation?.Cancel();
             _cancellation?.Dispose();
             base.OnClosed(e);
