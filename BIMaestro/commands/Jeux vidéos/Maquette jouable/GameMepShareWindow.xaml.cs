@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
@@ -52,11 +53,14 @@ namespace BIMaestro.VideoGames
                         FormatBytes(package.Bytes.LongLength) + " / 50 Mo";
                     using var stream = new MemoryStream(package.Bytes, writable: false);
                     using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
-                    EstimatedSizeDetailsText.Text = string.Join("\n",
+                    string fileDetails = string.Join("\n",
                         archive.Entries
                             .OrderByDescending(entry => entry.CompressedLength)
                             .Select(entry => FriendlyFileName(entry.FullName) + " : " +
                                 FormatBytes(entry.CompressedLength)));
+                    long compressedGeometryBytes = archive.GetEntry("model.glb")?.CompressedLength ?? 0L;
+                    EstimatedSizeDetailsText.Text = fileDetails +
+                        BuildGeometryDetails(compressedGeometryBytes);
                 }
             }
             catch (OperationCanceledException) { }
@@ -83,6 +87,75 @@ namespace BIMaestro.VideoGames
                 case "thumbnail.webp": return "Miniature";
                 default: return fileName;
             }
+        }
+
+        private string BuildGeometryDetails(long compressedGeometryBytes)
+        {
+            var bytesByElementIndex = new Dictionary<int, long>();
+            IEnumerable<GameMeshData> meshes = _scene.Meshes.Concat(
+                _scene.Doors.SelectMany(door =>
+                    new[] { door.OpaqueMesh, door.TransparentMesh }));
+            foreach (GameMeshData mesh in meshes)
+            {
+                for (int vertex = 0; vertex < mesh.Positions.Count; vertex++)
+                {
+                    int elementIndex = vertex < mesh.ElementIndices.Count
+                        ? mesh.ElementIndices[vertex]
+                        : -1;
+                    AddGeometryBytes(bytesByElementIndex, elementIndex, 32L);
+                }
+                foreach (int vertex in mesh.Indices)
+                {
+                    int elementIndex = vertex >= 0 && vertex < mesh.ElementIndices.Count
+                        ? mesh.ElementIndices[vertex]
+                        : -1;
+                    AddGeometryBytes(bytesByElementIndex, elementIndex, 4L);
+                }
+            }
+
+            long rawGeometryBytes = bytesByElementIndex.Values.Sum();
+            if (rawGeometryBytes <= 0 || compressedGeometryBytes <= 0)
+                return string.Empty;
+            double compressedRatio = compressedGeometryBytes / (double)rawGeometryBytes;
+            var elementsByIndex = _scene.Elements
+                .Where(element => element.WebElementIndex >= 0)
+                .ToDictionary(element => element.WebElementIndex);
+            var rankedElements = bytesByElementIndex
+                .Where(pair => elementsByIndex.ContainsKey(pair.Key))
+                .Select(pair => new
+                {
+                    Element = elementsByIndex[pair.Key],
+                    Bytes = Math.Max(1L, (long)Math.Round(pair.Value * compressedRatio)),
+                    Triangles = pair.Value / 108L
+                })
+                .OrderByDescending(item => item.Bytes)
+                .ToArray();
+            var categories = rankedElements
+                .GroupBy(item => string.IsNullOrWhiteSpace(item.Element.Category)
+                    ? "Sans catégorie"
+                    : item.Element.Category)
+                .Select(group => new { Name = group.Key, Bytes = group.Sum(item => item.Bytes) })
+                .OrderByDescending(item => item.Bytes)
+                .Take(5);
+            string categoryDetails = string.Join("\n", categories.Select((item, index) =>
+                (index + 1) + ". " + item.Name + " ≈ " + FormatBytes(item.Bytes)));
+            string elementDetails = string.Join("\n", rankedElements.Take(5).Select((item, index) =>
+                (index + 1) + ". #" + item.Element.ElementId + " · " +
+                (string.IsNullOrWhiteSpace(item.Element.Name) ? item.Element.TypeName : item.Element.Name) +
+                " ≈ " + FormatBytes(item.Bytes)));
+            return "\n\nGÉOMÉTRIE — CATÉGORIES LES PLUS LOURDES (≈)\n" +
+                categoryDetails + "\n\nÉLÉMENTS LES PLUS LOURDS (≈)\n" + elementDetails;
+        }
+
+        private static void AddGeometryBytes(
+            IDictionary<int, long> bytesByElementIndex,
+            int elementIndex,
+            long bytes)
+        {
+            if (elementIndex < 0) return;
+            long current;
+            bytesByElementIndex.TryGetValue(elementIndex, out current);
+            bytesByElementIndex[elementIndex] = current + bytes;
         }
 
         private static string FormatBytes(long bytes)

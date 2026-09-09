@@ -1,0 +1,10 @@
+import { readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+import ts from '../../../viewer-web/node_modules/typescript/lib/typescript.js';
+const source = readFileSync(new URL('./markup.ts', import.meta.url), 'utf8');
+const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext } });
+const { validateMarkup } = await import('data:text/javascript;base64,' + Buffer.from(outputText).toString('base64'));
+const mark = { id: '12345678-1234-1234-1234-123456789012', kind: 'reservation', elementKey: 'wall-1', elementName: 'Mur', position: [10, 20, 30], normal: [0, 0, 1], text: '', widthCm: 60, heightCm: 40, depthCm: 30, modelRevision: 1 };
+assert.equal(validateMarkup(mark).widthCm, 60);
+for (const patch of [{ widthCm: -1 }, { widthCm: NaN }, { depthCm: 1001 }, { position: [1, 2, Infinity] }, { normal: [0, 0, 0] }, { kind: 'note', text: '  ' }, { text: 'a'.repeat(2001) }, { modelRevision: 0 }]) assert.throws(() => validateMarkup({ ...mark, ...patch }));
+console.log('Markup validation: 9 checks passed');

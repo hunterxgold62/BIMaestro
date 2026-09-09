@@ -1,3 +1,4 @@
+import { validateMarkup } from "./markup.ts";
 import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { create, verify } from "https://deno.land/x/djwt@v2.4/mod.ts";
@@ -356,8 +357,13 @@ async function mutateScenario(body: any) {
   }
   const updated = result?.scenario;
   if (!updated) throw new HttpError(500, "Scénario indisponible");
+  await broadcastScenario(access.publication.id, updated);
+  return { scenario: updated, replayed: result?.replayed === true };
+}
+
+async function broadcastScenario(publicationId: string, updated: unknown) {
   try {
-    const channel = admin.channel(`mep:${access.publication.id}`, { config: { private: true } });
+    const channel = admin.channel(`mep:${publicationId}`, { config: { private: true } });
     await new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error("Realtime timeout")), 4000);
       channel.subscribe((status) => {
@@ -370,7 +376,46 @@ async function mutateScenario(body: any) {
     await channel.send({ type: "broadcast", event: "scenario", payload: updated });
     await admin.removeChannel(channel);
   } catch { /* Le client se resynchronise aussi après chaque commande. */ }
-  return { scenario: updated, replayed: result?.replayed === true };
+}
+
+async function currentScenario(publicationId: string) {
+  const { data, error } = await admin.from("mep_publications")
+    .select("scenario_revision, scenario_state, scenario_updated_by, scenario_updated_at")
+    .eq("id", publicationId).single();
+  if (error || !data) throw new HttpError(500, "Annotations indisponibles");
+  return { revision: data.scenario_revision, state: data.scenario_state,
+    updated_by: data.scenario_updated_by, updated_at: data.scenario_updated_at };
+}
+
+async function mutateMarkup(body: any) {
+  const access = await shareAccess(body.token);
+  if (access.role !== "editor") throw new HttpError(403, "Lien en lecture seule");
+  let mark;
+  try { mark = validateMarkup(body.markup); }
+  catch { throw new HttpError(400, "Annotation ou dimensions invalides"); }
+  if (mark.modelRevision !== access.publication.active_revision) throw new HttpError(409, "La maquette a changé. Rechargez le partage.");
+  const { error: budgetError } = await admin.rpc("reserve_mep_viewer_usage", {
+    p_publication_id: access.publication.id, p_kind: "scenario", p_amount: 1,
+  });
+  if (budgetError) throw new HttpError(429, "Budget collaboratif indisponible");
+  // Compare-and-swap preserves concurrent edits, including existing valve/source edits.
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const current = await currentScenario(access.publication.id);
+    const markups = { ...(current.state?.markups ?? {}) };
+    if (body.remove === true) delete markups[mark.id];
+    else markups[mark.id] = mark;
+    if (Object.keys(markups).length > 500) throw new HttpError(400, "Limite de 500 annotations atteinte");
+    const updated = { revision: current.revision + 1, state: { ...current.state, markups }, updated_by: "Invité web", updated_at: new Date().toISOString() };
+    const { data, error } = await admin.from("mep_publications").update({
+      scenario_revision: updated.revision, scenario_state: updated.state,
+      scenario_updated_by: updated.updated_by, scenario_updated_at: updated.updated_at,
+    }).eq("id", access.publication.id).eq("scenario_revision", current.revision)
+      .eq("active_revision", mark.modelRevision).is("revoked_at", null)
+      .gt("expires_at", updated.updated_at).select("id").maybeSingle();
+    if (error) throw new HttpError(500, "Enregistrement impossible");
+    if (data) { await broadcastScenario(access.publication.id, updated); return { scenario: updated }; }
+  }
+  throw new HttpError(409, "La maquette a changé. Réessayez ou rechargez le partage.");
 }
 
 async function managePublication(req: Request, body: any) {
@@ -406,6 +451,8 @@ serve(async (req) => {
       case "publish-complete": result = await completePublication(req, body); break;
       case "resolve": result = await resolveShare(body); break;
       case "scenario": result = await mutateScenario(body); break;
+      case "markup": result = await mutateMarkup(body); break;
+      case "state": { const access = await shareAccess(body.token); result = { scenario: await currentScenario(access.publication.id) }; break; }
       case "manage": result = await managePublication(req, body); break;
       default: throw new HttpError(400, "Action inconnue");
     }
