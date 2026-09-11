@@ -8,3 +8,7 @@ const mark = { id: '12345678-1234-1234-1234-123456789012', kind: 'reservation', 
 assert.equal(validateMarkup(mark).widthCm, 60);
 for (const patch of [{ widthCm: -1 }, { widthCm: NaN }, { depthCm: 1001 }, { position: [1, 2, Infinity] }, { normal: [0, 0, 0] }, { kind: 'note', text: '  ' }, { text: 'a'.repeat(2001) }, { modelRevision: 0 }]) assert.throws(() => validateMarkup({ ...mark, ...patch }));
 console.log('Markup validation: 9 checks passed');
+assert.deepEqual(validateMarkup({ ...mark, stableKey: 'doc|uid', anchorCenter: [1, 2, 3], anchorSize: [4, 5, 6] }).anchorCenter, [1, 2, 3]);
+assert.throws(() => validateMarkup({ ...mark, anchorCenter: [NaN, 2, 3] }));
+assert.throws(() => validateMarkup({ ...mark, anchorSize: [-1, 2, 3] }));
+console.log('Persistent anchor validation passed');

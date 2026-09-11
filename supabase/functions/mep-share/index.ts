@@ -1,3 +1,4 @@
+import { validateAssets, exportPaths, type Asset } from "./assets.ts";
 import { validateMarkup } from "./markup.ts";
 import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
@@ -115,6 +116,14 @@ async function publicationOwned(publicationId: string, ownerHash: string) {
   return data;
 }
 
+async function removeAssets(paths: string[]) {
+  for (let offset = 0; offset < paths.length; offset += 500) {
+    const { error } = await admin.storage.from("mep-publications").remove(paths.slice(offset, offset + 500));
+    if (error) return { error };
+  }
+  return { error: null };
+}
+
 async function cleanupExpiredPublications() {
   const now = new Date().toISOString();
   const { data: expired } = await admin.from("mep_publications").select("id")
@@ -122,23 +131,23 @@ async function cleanupExpiredPublications() {
   const ids = (expired ?? []).map((item) => item.id);
   if (!ids.length) return;
   const { data: revisions } = await admin.from("mep_exports")
-    .select("storage_path").in("publication_id", ids);
-  const paths = (revisions ?? []).map((item) => item.storage_path);
-  if (paths.length) await admin.storage.from("mep-publications").remove(paths);
+    .select("storage_path, manifest").in("publication_id", ids);
+  const paths = (revisions ?? []).flatMap((item) => exportPaths(item));
+  if (paths.length) { const { error } = await removeAssets(paths); if (error) return; }
   await admin.from("mep_publications").delete().in("id", ids);
 }
 
 async function cleanupSupersededExports(publicationId: string, activeRevision: number) {
   const { data: superseded, error: listError } = await admin.from("mep_exports")
-    .select("storage_path")
+    .select("storage_path, manifest")
     .eq("publication_id", publicationId)
     .lt("revision", activeRevision);
   if (listError || !superseded?.length) {
     if (listError) console.error("mep-share superseded export lookup", listError);
     return;
   }
-  const paths = superseded.map((item) => item.storage_path);
-  const { error: storageError } = await admin.storage.from("mep-publications").remove(paths);
+  const paths = superseded.flatMap((item) => exportPaths(item));
+  const { error: storageError } = await removeAssets(paths);
   if (storageError) {
     console.error("mep-share superseded storage cleanup", storageError);
     return;
@@ -153,8 +162,10 @@ async function cleanupSupersededExports(publicationId: string, activeRevision: n
 async function startPublication(req: Request, body: any) {
   const identity = await licenseIdentity(req);
   const packageBytes = Number(body.packageBytes);
+  let assets: Asset[] | null;
+  try { assets = validateAssets(body.assets, packageBytes); } catch { throw new HttpError(400, "Liste de fichiers invalide"); }
   const packageSha256 = String(body.packageSha256 ?? "").toLowerCase();
-  if (!Number.isSafeInteger(packageBytes) || packageBytes <= 0 || packageBytes > maxPackageBytes) {
+  if (!Number.isSafeInteger(packageBytes) || packageBytes <= 0 || packageBytes > (assets ? 512 * 1024 * 1024 : maxPackageBytes)) {
     throw new HttpError(413, "Taille de paquet invalide");
   }
   if (!/^[0-9a-f]{64}$/.test(packageSha256)) throw new HttpError(400, "Empreinte SHA-256 invalide");
@@ -195,13 +206,14 @@ async function startPublication(req: Request, body: any) {
   }
 
   const revision = Number(publication.active_revision) + 1;
-  const storagePath = `${publication.id}/${revision}.bimaestro-mep.zip`;
+  const storagePath = assets ? `${publication.id}/${revision}/index.zip` : `${publication.id}/${revision}.bimaestro-mep.zip`;
   const valveIds = Array.isArray(body.valveIds)
     ? [...new Set(body.valveIds.filter((item: unknown) => typeof item === "string").map((item: string) => item.slice(0, 300)))].slice(0, 50000)
     : [];
   // A failed upload may leave an inactive draft. Retrying the same publication
   // safely replaces that draft without touching the active immutable revision.
-  await admin.storage.from("mep-publications").remove([storagePath]);
+  const { data: draft } = await admin.from("mep_exports").select("storage_path, manifest").eq("publication_id", publication.id).eq("revision", revision).maybeSingle();
+  if (draft) { const { error } = await removeAssets(exportPaths(draft)); if (error) throw new HttpError(500, "Nettoyage du transfert précédent impossible"); }
   await admin.from("mep_exports").delete()
     .eq("publication_id", publication.id).eq("revision", revision);
   const { error: revisionError } = await admin.from("mep_exports").insert({
@@ -215,7 +227,7 @@ async function startPublication(req: Request, body: any) {
     package_bytes: packageBytes,
     editor_link: publication.editor_link,
     export_date: new Date().toISOString(),
-    manifest: typeof body.manifest === "object" && body.manifest ? body.manifest : {},
+    manifest: { ...(typeof body.manifest === "object" && body.manifest ? body.manifest : {}), ...(assets ? { assets } : {}) },
     valve_ids: valveIds,
   });
   if (revisionError) throw new HttpError(409, revisionError.message);
@@ -238,11 +250,18 @@ async function completePublication(req: Request, body: any) {
   const identity = await licenseIdentity(req);
   const publication = await publicationOwned(String(body.publicationId ?? ""), identity.licenseHash);
   const revision = Number(body.revision);
-  const { data: stored } = await admin.storage.from("mep-publications")
-    .list(publication.id, { search: `${revision}.bimaestro-mep.zip`, limit: 2 });
-  if (!stored?.some((item) => item.name === `${revision}.bimaestro-mep.zip`)) {
-    throw new HttpError(409, "Le paquet n'a pas encore été transféré");
+  const { data: candidate } = await admin.from("mep_exports").select("storage_path, manifest, package_bytes").eq("publication_id", publication.id).eq("revision", revision).single();
+  if (!candidate) throw new HttpError(404, "Révision introuvable");
+  const assets = candidate.manifest?.assets as Asset[] | undefined;
+  const expected = assets || [{ name: `${revision}.bimaestro-mep.zip`, bytes: Number(candidate.package_bytes) }];
+  if (Number(publication.active_revision) === revision) return { publicationId: publication.id, revision, active: true, removedValveIds: [] };
+  const { data: verified, error: verificationError } = await admin.rpc("verify_mep_export_files", { p_publication_id: publication.id, p_revision: revision });
+  if (verificationError) {
+    console.error("mep verification", { code: verificationError.code, message: verificationError.message });
+    throw new HttpError(503, "Vérification temporairement indisponible. Les fichiers envoyés sont conservés.");
   }
+  if (!verified || verified.expected !== expected.length || verified.valid !== expected.length || Number(verified.bytes) !== Number(candidate.package_bytes))
+    throw new HttpError(409, "Des zones sont absentes ou incomplètes. Relancez la publication.");
   const { data: activated, error } = await admin.from("mep_publications").update({
     active_revision: revision,
     updated_at: new Date().toISOString(),
@@ -253,13 +272,22 @@ async function completePublication(req: Request, body: any) {
   const { data: activeRevision } = await admin.from("mep_exports")
     .select("valve_ids").eq("publication_id", publication.id).eq("revision", revision).single();
   const compatible = new Set<string>(activeRevision?.valve_ids ?? []);
-  const previousValves = ((publication.scenario_state as any)?.valves ?? {}) as Record<string, boolean>;
-  const valves = Object.fromEntries(Object.entries(previousValves).filter(([id]) => compatible.has(id)));
-  const removedValveIds = Object.keys(previousValves).filter((id) => !compatible.has(id));
-  await admin.from("mep_publications").update({
-    scenario_state: { ...(publication.scenario_state ?? {}), valves },
-    scenario_updated_at: new Date().toISOString(),
-  }).eq("id", publication.id);
+  let removedValveIds: string[] = [];
+  // Read the current scenario after activation. An old snapshot would erase
+  // annotations saved by another participant during the upload.
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const current = await currentScenario(publication.id);
+    const previousValves = (current.state?.valves ?? {}) as Record<string, boolean>;
+    const valves = Object.fromEntries(Object.entries(previousValves).filter(([id]) => compatible.has(id)));
+    removedValveIds = Object.keys(previousValves).filter(id => !compatible.has(id));
+    const { data: pruned, error: pruneError } = await admin.from("mep_publications").update({
+      scenario_state: { ...current.state, valves }, scenario_revision: current.revision + 1,
+      scenario_updated_at: new Date().toISOString(),
+    }).eq("id", publication.id).eq("scenario_revision", current.revision).select("id").maybeSingle();
+    if (pruneError) throw new HttpError(500, "Synchronisation du scénario impossible");
+    if (pruned) break;
+    if (attempt === 3) throw new HttpError(409, "Le scénario est en cours de modification. Rechargez le partage.");
+  }
   await cleanupSupersededExports(publication.id, revision);
   return { publicationId: publication.id, revision, active: true, removedValveIds };
 }
@@ -278,7 +306,7 @@ async function resolveShare(body: any) {
   await cleanupSupersededExports(access.publication.id, access.publication.active_revision);
   const { error: budgetError } = await admin.rpc("reserve_mep_viewer_usage", {
     p_publication_id: access.publication.id,
-    p_kind: "download", p_amount: Number(revision.package_bytes),
+    p_kind: "download", p_amount: Number(revision.manifest?.assets?.find((asset: Asset) => asset.name === "index.zip")?.bytes ?? revision.package_bytes),
   });
   if (budgetError) {
     if (budgetError.message.includes("VIEWER_EGRESS_LIMIT")) {
@@ -315,6 +343,46 @@ async function resolveShare(body: any) {
     events: events ?? [],
     realtimeToken,
   };
+}
+
+async function publishAsset(req: Request, body: any) {
+  const identity = await licenseIdentity(req);
+  const publication = await publicationOwned(String(body.publicationId ?? ""), identity.licenseHash);
+  if (Number(body.revision) !== Number(publication.active_revision) + 1) throw new HttpError(409, "Révision déjà active ou remplacée");
+  const { data: revision } = await admin.from("mep_exports").select("storage_path, manifest").eq("publication_id", publication.id).eq("revision", body.revision).single();
+  const names: string[] = Array.isArray(body.names) ? body.names : [body.name];
+  if (!names.length || names.length > 32 || names.some(name => typeof name !== "string") || new Set(names).size !== names.length) throw new HttpError(400, "Lot invalide");
+  const declared = new Set((revision?.manifest?.assets || []).map((asset: Asset) => asset.name));
+  if (names.some(name => !declared.has(name))) throw new HttpError(404, "Zone introuvable");
+  const uploads: { name: string; uploadUrl: string }[] = [];
+  for (let offset = 0; offset < names.length; offset += 8) {
+    uploads.push(...await Promise.all(names.slice(offset, offset + 8).map(async name => {
+      const path = revision.storage_path.replace(/index\.zip$/, name);
+      const { data, error } = await admin.storage.from("mep-publications").createSignedUploadUrl(path);
+      if (error || !data) throw new HttpError(503, "Transfert temporairement indisponible");
+      return { name, uploadUrl: data.signedUrl };
+    })));
+  }
+  return Array.isArray(body.names) ? { uploads } : { uploadUrl: uploads[0].uploadUrl };
+}
+
+async function tileUrl(body: any) {
+  const access = await shareAccess(body.token);
+  if (body.revision !== access.publication.active_revision) throw new HttpError(409, "La maquette a changé. Rechargez le partage.");
+  const { data: revision } = await admin.from("mep_exports").select("storage_path, manifest").eq("publication_id", access.publication.id).eq("revision", body.revision).single();
+  const names: string[] = Array.isArray(body.names) ? body.names : [body.name];
+  if (!names.length || names.length > 24 || new Set(names).size !== names.length || names.some(name => typeof name !== "string")) throw new HttpError(400, "Lot de zones invalide");
+  const declared = new Map<string, Asset>((revision?.manifest?.assets || []).filter((item: Asset) => item.name !== "index.zip").map((item: Asset) => [item.name, item]));
+  if (names.some(name => !declared.has(name))) throw new HttpError(404, "Zone introuvable");
+  const assets = names.map(name => declared.get(name)!);
+  const { error: budgetError } = await admin.rpc("reserve_mep_viewer_usage", { p_publication_id: access.publication.id, p_kind: "download", p_amount: assets.reduce((sum, asset) => sum + asset.bytes, 0) });
+  if (budgetError) throw new HttpError(429, "Budget de téléchargement atteint");
+  const paths = assets.map(asset => revision.storage_path.replace(/index\.zip$/, asset.name));
+  const { data, error } = await admin.storage.from("mep-publications").createSignedUrls(paths, 300);
+  if (error || !data || data.some(item => item.error || !item.signedUrl)) throw new HttpError(503, "Zone temporairement indisponible");
+  const urls = new Map(data.map(item => [item.path, item.signedUrl]));
+  const tiles = assets.map((asset, index) => ({ name: asset.name, url: urls.get(paths[index]), bytes: asset.bytes, sha256: asset.sha256 }));
+  return Array.isArray(body.names) ? { tiles } : tiles[0];
 }
 
 async function mutateScenario(body: any) {
@@ -425,9 +493,9 @@ async function managePublication(req: Request, body: any) {
     const now = new Date().toISOString();
     await admin.from("mep_publications").update({ revoked_at: now, updated_at: now }).eq("id", publication.id);
     const { data: revisions } = await admin.from("mep_exports")
-      .select("storage_path").eq("publication_id", publication.id);
-    const paths = (revisions ?? []).map((item) => item.storage_path);
-    if (paths.length) await admin.storage.from("mep-publications").remove(paths);
+      .select("storage_path, manifest").eq("publication_id", publication.id);
+    const paths = (revisions ?? []).flatMap((item) => exportPaths(item));
+    if (paths.length) { const { error } = await removeAssets(paths); if (error) throw new HttpError(500, "Nettoyage du partage impossible"); }
     await admin.from("mep_publications").delete().eq("id", publication.id);
     return { revoked: true };
   }
@@ -447,6 +515,8 @@ serve(async (req) => {
     const body = await req.json();
     let result: unknown;
     switch (body.action) {
+      case "publish-asset": result = await publishAsset(req, body); break;
+      case "tile": result = await tileUrl(body); break;
       case "publish-start": result = await startPublication(req, body); break;
       case "publish-complete": result = await completePublication(req, body); break;
       case "resolve": result = await resolveShare(body); break;

@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BIMaestro.MepSimulation.Tes
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BIMaestro.ProfilePayload.Tests", "BIMaestro.ProfilePayload.Tests\BIMaestro.ProfilePayload.Tests.csproj", "{7ED5E149-AD3C-47E6-B82C-B6EE68035351}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BIMaestro.Navisworks", "BIMaestro.Navisworks\BIMaestro.Navisworks.csproj", "{16D826C7-2E5C-4F1C-9D03-808E46715AF3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -16,6 +18,9 @@ Global
 		Release2024|Any CPU = Release2024|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{16D826C7-2E5C-4F1C-9D03-808E46715AF3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{16D826C7-2E5C-4F1C-9D03-808E46715AF3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{16D826C7-2E5C-4F1C-9D03-808E46715AF3}.Release2024|Any CPU.ActiveCfg = Release|Any CPU
 		{578511FF-FF86-4ED0-ACA1-2E4C5B7EFAAC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{578511FF-FF86-4ED0-ACA1-2E4C5B7EFAAC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{578511FF-FF86-4ED0-ACA1-2E4C5B7EFAAC}.Release|Any CPU.ActiveCfg = Release|Any CPU

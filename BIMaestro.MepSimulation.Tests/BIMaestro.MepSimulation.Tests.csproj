@@ -29,6 +29,7 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.IO.Compression" />
     <Reference Include="PresentationCore" />
     <Reference Include="WindowsBase" />
   </ItemGroup>
@@ -39,6 +40,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
+    <Compile Include="WebExportTests.cs" />
+    <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameMepWebPackage.cs" />
     <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameMepData.cs">
       <Link>GameMepData.cs</Link>
     </Compile>

@@ -1,0 +1,14 @@
+import { readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+import ts from '../../../viewer-web/node_modules/typescript/lib/typescript.js';
+const source = readFileSync(new URL('./assets.ts', import.meta.url), 'utf8');
+const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext } });
+const { validateAssets, exportPaths } = await import('data:text/javascript;base64,' + Buffer.from(outputText).toString('base64'));
+const assets = [{ name: 'index.zip', bytes: 100, sha256: 'a'.repeat(64) }, { name: 'tile-00000.glb.gz', bytes: 200, sha256: 'b'.repeat(64) }];
+assert.equal(validateAssets(undefined, 100), null);
+assert.deepEqual(validateAssets(assets, 300), assets);
+assert.throws(() => validateAssets(assets, 299));
+for (const patch of [{ name: '../index.zip' }, { name: 'index.zip' }, { bytes: -1 }, { bytes: 49 * 1024 * 1024 }, { sha256: 'invalid' }]) assert.throws(() => validateAssets([assets[0], { ...assets[1], ...patch }], 300));
+assert.deepEqual(exportPaths({ storage_path: 'id/1/index.zip', manifest: { assets } }), ['id/1/index.zip', 'id/1/tile-00000.glb.gz']);
+assert.deepEqual(exportPaths({ storage_path: 'id/1.bimaestro-mep.zip' }), ['id/1.bimaestro-mep.zip']);
+console.log('Progressive assets: validation and legacy cleanup passed');

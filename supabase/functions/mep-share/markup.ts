@@ -9,7 +9,12 @@ export function validateMarkup(value: unknown) {
     !['widthCm', 'heightCm', 'depthCm'].every(key => typeof mark[key] === 'number' && Number.isFinite(mark[key]) && mark[key] >= 1 && mark[key] <= 1000)) {
     throw new Error('Annotation ou dimensions invalides');
   }
+  if ((mark.stableKey !== undefined && (typeof mark.stableKey !== 'string' || mark.stableKey.length > 1000)) ||
+    (mark.anchorCenter !== undefined && !vector(mark.anchorCenter)) ||
+    (mark.anchorSize !== undefined && (!vector(mark.anchorSize) || mark.anchorSize.some((n: number) => n < 0))))
+    throw new Error('Rattachement invalide');
   return { id: mark.id, kind: mark.kind, elementKey: mark.elementKey, elementName: mark.elementName,
+    stableKey: mark.stableKey, anchorCenter: mark.anchorCenter, anchorSize: mark.anchorSize,
     position: mark.position, normal: mark.normal, text: mark.text.trim(), widthCm: mark.widthCm,
     heightCm: mark.heightCm, depthCm: mark.depthCm, modelRevision: mark.modelRevision };
 }

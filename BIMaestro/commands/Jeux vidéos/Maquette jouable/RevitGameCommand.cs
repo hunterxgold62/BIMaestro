@@ -87,8 +87,9 @@ namespace BIMaestro.VideoGames
                 _window = null;
             }
 
-            _window = new RevitGameWindow(scene);
-            _window.Closed += (sender, args) => _window = null;
+            var importer = new GameReservationImport();
+            _window = new RevitGameWindow(scene, importer.PickFile);
+            _window.Closed += (sender, args) => { importer.Dispose(); _window = null; };
 
             try
             {

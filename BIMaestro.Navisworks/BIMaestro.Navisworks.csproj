@@ -1,0 +1,49 @@
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" />
+  <PropertyGroup>
+    <Configuration Condition="'$(Configuration)' == ''">Debug</Configuration>
+    <Platform Condition="'$(Platform)' == ''">AnyCPU</Platform>
+    <ProjectGuid>{16D826C7-2E5C-4F1C-9D03-808E46715AF3}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <RootNamespace>BIMaestro.Navisworks</RootNamespace>
+    <AssemblyName>BIMaestro.Navisworks</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>7.3</LangVersion>
+    <Deterministic>true</Deterministic>
+    <NavisworksYear Condition="'$(NavisworksYear)' == ''">2025</NavisworksYear>
+    <NavisworksInstallDir Condition="'$(NavisworksInstallDir)' == ''">C:\Program Files\Autodesk\Navisworks Manage $(NavisworksYear)</NavisworksInstallDir>
+    <OutputPath>bin\$(Configuration)\$(NavisworksYear)\</OutputPath>
+    <IntermediateOutputPath>obj\$(Configuration)\$(NavisworksYear)\</IntermediateOutputPath>
+    <DebugType>pdbonly</DebugType>
+    <Optimize Condition="'$(Configuration)' != 'Debug'">true</Optimize>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="Autodesk.Navisworks.Api">
+      <HintPath>$(NavisworksInstallDir)\Autodesk.Navisworks.Api.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Compile Include="Commands\ModifyLinksCommand.cs" />
+    <Compile Include="Services\ReferencePath.cs" />
+    <Compile Include="Services\LinkService.cs" />
+    <Compile Include="UI\ModifyLinksWindow.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Content Include="UI\BIMaestroRibbon.xaml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Target Name="CheckNavisworksSdk" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(NavisworksInstallDir)\Autodesk.Navisworks.Api.dll')" Text="API Navisworks introuvable. Définir NavisworksInstallDir et NavisworksYear. Le projet Revit peut être compilé indépendamment." />
+  </Target>
+  <Target Name="CopyLocalizedRibbon" AfterTargets="Build">
+    <!-- Navisworks resolves RibbonLayout in the current culture, then en-US. -->
+    <Copy SourceFiles="UI\BIMaestroRibbon.xaml" DestinationFiles="$(OutputPath)fr-FR\BIMaestroRibbon.xaml" />
+    <Copy SourceFiles="UI\BIMaestroRibbon.xaml" DestinationFiles="$(OutputPath)en-US\BIMaestroRibbon.xaml" />
+  </Target>
+</Project>

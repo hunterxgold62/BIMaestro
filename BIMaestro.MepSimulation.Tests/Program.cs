@@ -40,6 +40,7 @@ namespace BIMaestro.VideoGames
                         long.TryParse(args[2], out inspectedElementId);
                     return ReplayExportedGraph(args[1], inspectedElementId);
                 }
+                WebExportTests.Run();
                 StraightValveCutsOnlyPath();
                 TeeSuppliesBothBranches();
                 SmallInletFeedsLargeHeaderWithoutReversingIt();

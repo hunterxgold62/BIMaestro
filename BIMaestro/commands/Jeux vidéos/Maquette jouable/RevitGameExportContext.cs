@@ -39,6 +39,7 @@ namespace BIMaestro.VideoGames
         public RevitGameExportContext(Document document)
         {
             _rootDocument = document ?? throw new ArgumentNullException(nameof(document));
+            _scene.SourceDocumentId = SafeText(() => document.ProjectInformation.UniqueId);
         }
 
         public GameSceneData Scene => _scene;
@@ -404,6 +405,7 @@ namespace BIMaestro.VideoGames
             var data = new GameElementData
             {
                 Key = key,
+                StableKey = SafeText(() => document.ProjectInformation.UniqueId) + "|" + SafeText(() => element?.UniqueId),
                 ElementId = element?.Id.GetIdLongValue() ?? 0L,
                 Name = SafeText(() => element?.Name),
                 Category = SafeText(() => element?.Category?.Name),

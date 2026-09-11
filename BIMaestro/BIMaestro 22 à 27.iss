@@ -19,6 +19,7 @@ Compression=lzma
 SolidCompression=yes
 
 [Files]
+#include "..\Installer\Navisworks.Files.iss"
 ; Version de test : le module de base compilé avec l'API Revit 2023 est utilisé
 ; pour toutes les versions de Revit ciblées.
 Source: "bin\Release\*.*"; \

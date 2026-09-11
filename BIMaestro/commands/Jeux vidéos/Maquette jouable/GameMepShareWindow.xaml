@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Partager la maquette MEP"
-        Width="650" Height="760" MinWidth="560" MinHeight="650"
+        Width="850" Height="760" MinWidth="650" MinHeight="650"
         WindowStartupLocation="CenterOwner"
         Background="#FF0E171C" Foreground="#FFE9F0F2"
         FontFamily="Segoe UI">
@@ -17,10 +17,11 @@
             <Setter Property="BorderBrush" Value="#FF34515A"/><Setter Property="Padding" Value="9"/>
         </Style>
     </Window.Resources>
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
     <Grid Margin="26">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <StackPanel>
@@ -36,14 +37,21 @@
         <Grid Grid.Row="2" Margin="0,18,0,0">
             <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
             <Border Background="#FF132229" BorderBrush="#FF263A42" BorderThickness="1" Padding="12" Margin="0,0,7,0">
-                <StackPanel><TextBlock Text="EXPIRATION" Foreground="#FF718991" FontSize="10"/><TextBlock Text="30 jours · révocable" Margin="0,4,0,0"/></StackPanel>
+                <StackPanel>
+                    <TextBlock Text="EXPIRATION" Foreground="#FF718991" FontSize="10"/>
+                    <TextBlock Text="30 jours · révocable" Margin="0,4,0,14"/>
+                    <TextBlock Text="ALLÈGEMENT WEB" Foreground="#FF52D9D3" FontSize="11"/>
+                    <TextBlock x:Name="OptimizationText" Text="Analyse des éléments et calcul du gain en arrière-plan…" TextWrapping="Wrap" Margin="0,8,0,12"/>
+                    <Button x:Name="LightenButton" Content="Alléger les détails" IsEnabled="False" Click="LightenButton_Click" Margin="0,0,0,10"/>
+                    <TextBlock Text="Portes et garde-corps : détails approximés à environ 1 cm. Murs et réseaux conservés. Seul l’export web change ; le modèle Revit reste intact." TextWrapping="Wrap" Foreground="#FF92A5AD" FontSize="11"/>
+                </StackPanel>
             </Border>
             <Border Grid.Column="1" Background="#FF132229" BorderBrush="#FF263A42" BorderThickness="1" Padding="12" Margin="7,0,0,0">
                 <StackPanel>
                     <TextBlock Text="DONNÉES AUTORISÉES" Foreground="#FF718991" FontSize="10"/>
                     <TextBlock x:Name="AuthorizedParametersText" Text="Paramètres MEP contrôlés" Margin="0,4,0,0" TextTrimming="CharacterEllipsis" ToolTipService.ShowDuration="30000"/>
                     <TextBlock x:Name="EstimatedSizeText" Foreground="#FF8FA4AD" FontSize="10" Margin="0,3,0,0"/>
-                    <ScrollViewer MaxHeight="260" VerticalScrollBarVisibility="Auto" Margin="0,5,0,0">
+                    <ScrollViewer MaxHeight="210" VerticalScrollBarVisibility="Auto" Margin="0,5,0,0">
                         <TextBlock x:Name="EstimatedSizeDetailsText" Foreground="#FF8FA4AD" FontSize="10" TextWrapping="Wrap"/>
                     </ScrollViewer>
                 </StackPanel>
@@ -76,4 +84,5 @@
             <Button x:Name="PublishButton" Content="Partager sur le web" Background="#FF45D6D1" Foreground="#FF071315" FontWeight="SemiBold" Margin="0" Click="PublishButton_Click"/>
         </StackPanel>
     </Grid>
+    </ScrollViewer>
 </Window>

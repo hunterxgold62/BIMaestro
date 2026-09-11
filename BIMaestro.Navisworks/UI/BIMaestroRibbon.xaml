@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RibbonControl xmlns="clr-namespace:Autodesk.Windows;assembly=AdWindows"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:local="clr-namespace:Autodesk.Navisworks.Gui.Roamer.AIRLook;assembly=navisworks.gui.roamer"
+ x:Uid="BIMA_RIBBON">
+  <RibbonTab Id="BIMA_TAB" Title="BIMaestro" KeyTip="BM">
+    <RibbonPanel x:Uid="BIMA_PANEL">
+      <RibbonPanelSource x:Uid="BIMA_PANEL_SOURCE" Title="BIMaestro">
+        <local:NWRibbonButton x:Uid="BIMA_LINK_BUTTON" Id="BIMA_MODIFY_LINKS"
+          Text="Modifier les liens" ShowText="True" Size="Large" KeyTip="ML" />
+      </RibbonPanelSource>
+    </RibbonPanel>
+  </RibbonTab>
+</RibbonControl>

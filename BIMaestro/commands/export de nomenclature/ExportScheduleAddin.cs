@@ -8,6 +8,8 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Globalization;
+using System.Text.RegularExpressions;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -264,17 +266,70 @@ namespace Visualisation
             int headerRowCount = Math.Min(headerRows.Count, rows.Count);
             bool shouldMergeTitle = ShouldMergeHeaderTitle(headerRows, columnCount);
             object[,] values = new object[rows.Count, columnCount];
+            string[,] numberFormats = new string[rows.Count, columnCount];
 
             for (int r = 0; r < rows.Count; r++)
             {
                 string[] row = rows[r];
                 for (int c = 0; c < columnCount; c++)
                 {
-                    values[r, c] = c < row.Length ? row[c] : string.Empty;
+                    string text = c < row.Length ? row[c] : string.Empty;
+                    string numberFormat = null;
+                    object value = r < headerRowCount ? text : ToExcelCellValue(text, out numberFormat);
+                    numberFormats[r, c] = numberFormat;
+                    // L'apostrophe Excel protège les textes contre la conversion
+                    // automatique en nombre, date ou formule (elle reste invisible).
+                    values[r, c] = value is string literal && literal.Length > 0
+                        ? "'" + literal
+                        : value;
                 }
             }
 
-            return new ScheduleExportContent(values, rows.Count, columnCount, headerRowCount, shouldMergeTitle);
+            return new ScheduleExportContent(values, numberFormats, rows.Count, columnCount, headerRowCount, shouldMergeTitle);
+        }
+
+        private static object ToExcelCellValue(string text, out string numberFormat)
+        {
+            numberFormat = null;
+            if (string.IsNullOrWhiteSpace(text)) return text ?? string.Empty;
+
+            string normalized = text.Trim().Replace('\u00a0', ' ').Replace('\u202f', ' ');
+            // Les unités métriques restent visibles, mais ne font plus partie
+            // de la valeur : Excel peut ainsi additionner les longueurs.
+            Match unitMatch = Regex.Match(normalized,
+                @"^(?<number>.+?)(?<space> *)(?<unit>(?:mm|cm|dm|km|m)(?:²|³|2|3|\^2|\^3)?)$");
+            string unit = null;
+            string unitSpacing = null;
+            if (unitMatch.Success)
+            {
+                normalized = unitMatch.Groups["number"].Value;
+                unit = unitMatch.Groups["unit"].Value;
+                unitSpacing = unitMatch.Groups["space"].Value;
+            }
+            // Accepter uniquement un nombre complet : ne pas altérer les repères,
+            // dates ou codes contenant des zéros initiaux.
+            if (!Regex.IsMatch(normalized, @"^[+-]?(?:0|[1-9][0-9]*|[1-9][0-9]{0,2}(?: [0-9]{3})+)(?:[.,][0-9]+)?$"))
+                return text;
+
+            normalized = normalized.Replace(" ", "").Replace(',', '.');
+            // Excel ne conserve que 15 chiffres significatifs.
+            string digits = normalized.TrimStart('+', '-').Replace(".", "").TrimStart('0');
+            if (digits.Length > 15) return text;
+
+            if (double.TryParse(normalized, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint,
+                CultureInfo.InvariantCulture, out double value) && !double.IsNaN(value) && !double.IsInfinity(value))
+            {
+                if (unit != null)
+                {
+                    int decimalPoint = normalized.IndexOf('.');
+                    int decimals = decimalPoint < 0 ? 0 : normalized.Length - decimalPoint - 1;
+                    numberFormat = "0" + (decimals > 0 ? "." + new string('0', decimals) : "")
+                        + "\"" + unitSpacing + unit + "\"";
+                }
+                return value;
+            }
+
+            return text;
         }
 
         private static Excel.Range WriteScheduleToWorksheet(
@@ -290,9 +345,20 @@ namespace Visualisation
             Excel.Range fullRange = ws.Range[
                 ws.Cells[firstRow, 1],
                 ws.Cells[firstRow + content.RowCount - 1, content.ColumnCount]];
+            fullRange.NumberFormat = "General";
             fullRange.Value2 = content.RowCount == 1 && content.ColumnCount == 1
                 ? content.Values[0, 0]
                 : content.Values;
+            for (int r = 0; r < content.RowCount; r++)
+            {
+                for (int c = 0; c < content.ColumnCount; c++)
+                {
+                    if (content.NumberFormats[r, c] == null) continue;
+                    Excel.Range cell = (Excel.Range)ws.Cells[firstRow + r, c + 1];
+                    try { cell.NumberFormat = content.NumberFormats[r, c]; }
+                    finally { ComUtils.Release(cell); }
+                }
+            }
             fullRange.Columns.AutoFit();
             fullRange.Rows.AutoFit();
 
@@ -609,12 +675,14 @@ namespace Visualisation
         {
             public ScheduleExportContent(
                 object[,] values,
+                string[,] numberFormats,
                 int rowCount,
                 int columnCount,
                 int headerRowCount,
                 bool shouldMergeTitleRow)
             {
                 Values = values;
+                NumberFormats = numberFormats;
                 RowCount = rowCount;
                 ColumnCount = columnCount;
                 HeaderRowCount = headerRowCount;
@@ -622,6 +690,7 @@ namespace Visualisation
             }
 
             public object[,] Values { get; }
+            public string[,] NumberFormats { get; }
             public int RowCount { get; }
             public int ColumnCount { get; }
             public int HeaderRowCount { get; }

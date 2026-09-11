@@ -5,6 +5,17 @@ using System.Windows.Media.Media3D;
 
 namespace BIMaestro.VideoGames
 {
+    internal sealed class GameMepWebAsset
+    {
+        public string Name { get; set; } = "";
+        [Newtonsoft.Json.JsonIgnore] public byte[] Bytes { get; set; } = Array.Empty<byte>();
+        public long Size => Bytes.LongLength;
+        public string Sha256 { get; set; } = "";
+        public long DecodedBytes { get; set; }
+        public double[] Bounds { get; set; } = Array.Empty<double>();
+        public int[] Elements { get; set; } = Array.Empty<int>();
+    }
+
     internal sealed class GameElementData
     {
         private double _minX = double.MaxValue;
@@ -15,6 +26,7 @@ namespace BIMaestro.VideoGames
         private double _maxZ = double.MinValue;
 
         public string Key { get; set; } = string.Empty;
+        public string StableKey { get; set; } = string.Empty;
         public long ElementId { get; set; }
         public string Name { get; set; } = string.Empty;
         public string Category { get; set; } = string.Empty;
@@ -86,6 +98,7 @@ namespace BIMaestro.VideoGames
 
     internal sealed class GameMeshData
     {
+        public string WebTileName { get; set; } = string.Empty;
         public Point3DCollection Positions { get; } = new Point3DCollection();
         public Int32Collection Indices { get; } = new Int32Collection();
         public IList<Color> VertexColors { get; } = new List<Color>();
@@ -351,11 +364,21 @@ namespace BIMaestro.VideoGames
 
     internal sealed class GameSceneData
     {
+        public string SourceDocumentId { get; set; } = string.Empty;
+        public Vector3D SourceOrigin { get; private set; }
         public IList<GameMeshData> Meshes { get; } = new List<GameMeshData>();
         public IList<GameDoorData> Doors { get; } = new List<GameDoorData>();
         public IList<GameElementData> Elements { get; } = new List<GameElementData>();
         public IList<GameTriangle> Triangles { get; } = new List<GameTriangle>();
         public GameMepGraphData MepGraph { get; set; } = new GameMepGraphData();
+        public IList<GameMepWebAsset> WebTiles { get; private set; } = new List<GameMepWebAsset>();
+        internal GameSceneData CopyForWebExport()
+        {
+            var copy = (GameSceneData)MemberwiseClone();
+            copy.WebTiles = new List<GameMepWebAsset>(WebTiles);
+            return copy;
+        }
+        public byte[] WebOverviewGlb { get; set; } = Array.Empty<byte>();
         public byte[] WebModelGlb { get; set; } = Array.Empty<byte>();
         public string WebPropertiesJson { get; set; } = "[]";
 
@@ -405,6 +428,7 @@ namespace BIMaestro.VideoGames
                 -((minX + maxX) * 0.5),
                 -((minY + maxY) * 0.5),
                 -minZ);
+            SourceOrigin = -offset;
 
             foreach (GameMeshData mesh in Meshes)
             {

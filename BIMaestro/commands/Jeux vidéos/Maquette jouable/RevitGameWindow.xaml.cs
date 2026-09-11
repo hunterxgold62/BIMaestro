@@ -128,8 +128,12 @@ namespace BIMaestro.VideoGames
         private string _directionPickerElementKey = string.Empty;
         private GameMepBoundaryKind? _directionPickerBoundaryKind;
 
-        internal RevitGameWindow(GameSceneData scene)
+        private readonly Action? _importReservations;
+        private void ImportReservations_Click(object sender, RoutedEventArgs e) => _importReservations?.Invoke();
+
+        internal RevitGameWindow(GameSceneData scene, Action? importReservations = null)
         {
+            _importReservations = importReservations;
             _scene = scene ?? throw new ArgumentNullException(nameof(scene));
 
             InitializeComponent();
@@ -3529,7 +3533,7 @@ namespace BIMaestro.VideoGames
             {
                 MepShareWebButton.IsEnabled =
                     _scene.MepGraph.HasData &&
-                    _scene.WebModelGlb.Length > 0 &&
+                    (_scene.WebTiles.Count > 0 || _scene.WebModelGlb.Length > 0) &&
                     !_mepRecalculationRunning;
             }
         }

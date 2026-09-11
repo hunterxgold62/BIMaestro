@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ApplicationPackage SchemaVersion="1.0" AutodeskProduct="Navisworks" ProductType="Application"
+ Name="BIMaestro.Navisworks" AppVersion="1.0.0" Description="Modifier les liens du NWF"
+ Author="Paul Lemert" ProductCode="{47364D5C-00D9-4E83-92C8-E6E11643DCC2}"
+ UpgradeCode="{9D07B7B0-5BC2-4684-982C-3954182D0308}">
+  <CompanyDetails Name="BIMaestro" Url="https://www.bimaestro.fr/" />
+  <Components Description="BIMaestro pour Navisworks 2025">
+    <RuntimeRequirements OS="Win64" Platform="NAVMAN|NAVSIM" SeriesMin="Nw22" SeriesMax="Nw22" />
+    <ComponentEntry AppName="BIMaestro.Navisworks" AppType="ManagedPlugin" Version="1.0.0"
+      ModuleName="./Contents/2025/BIMaestro.Navisworks.dll" />
+  </Components>
+  <Components Description="BIMaestro pour Navisworks 2027">
+    <RuntimeRequirements OS="Win64" Platform="NAVMAN|NAVSIM" SeriesMin="Nw24" SeriesMax="Nw24" />
+    <ComponentEntry AppName="BIMaestro.Navisworks" AppType="ManagedPlugin" Version="1.0.0"
+      ModuleName="./Contents/2027/BIMaestro.Navisworks.dll" />
+  </Components>
+</ApplicationPackage>

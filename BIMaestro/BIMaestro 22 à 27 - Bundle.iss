@@ -50,6 +50,7 @@ RestartApplications=no
 Name: "french"; MessagesFile: "compiler:Languages\French.isl"
 
 [Files]
+#include "..\Installer\Navisworks.Files.iss"
 ; DLL principale et dépendances. Les symboles de débogage ne sont pas distribués.
 Source: "bin\Release\*.*"; DestDir: "{app}\Contents"; \
   Flags: ignoreversion recursesubdirs createallsubdirs; \

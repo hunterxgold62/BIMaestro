@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
-using System.IO.Compression;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,6 +12,11 @@ namespace BIMaestro.VideoGames
     {
         private readonly GameSceneData _scene;
         private GameMepShareState _state;
+        private GameSceneData? _lighterScene;
+        private GameMepWebPackage.ExportAnalysis? _analysis;
+        private bool _useLighter, _busy, _analyzing = true;
+        private long _originalSize, _lighterSize;
+        private GameSceneData ExportScene => _useLighter && _lighterScene != null ? _lighterScene : _scene;
         private CancellationTokenSource? _cancellation;
         private readonly CancellationTokenSource _sizeCalculationCancellation =
             new CancellationTokenSource();
@@ -36,87 +39,62 @@ namespace BIMaestro.VideoGames
                 : string.Join(", ", names);
             EstimatedSizeText.Text = "Calcul de la taille compressée…";
             ShowState();
-            CalculateCompressedSizeAsync();
+            AnalyzeAsync();
         }
 
-        private async void CalculateCompressedSizeAsync()
+        private async void AnalyzeAsync()
         {
+            var token = _sizeCalculationCancellation.Token;
+            string name = PublicationNameTextBox.Text.Trim();
             try
             {
-                string publicationName = PublicationNameTextBox.Text.Trim();
-                GameMepWebPackageResult package = await Task.Run(
-                    () => GameMepWebPackage.Build(_scene, publicationName),
-                    _sizeCalculationCancellation.Token);
-                if (!_sizeCalculationCancellation.IsCancellationRequested)
-                {
-                    EstimatedSizeText.Text = "Taille réelle compressée : " +
-                        FormatBytes(package.Bytes.LongLength) + " / 50 Mo";
-                    using var stream = new MemoryStream(package.Bytes, writable: false);
-                    using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
-                    string fileDetails = string.Join("\n",
-                        archive.Entries
-                            .OrderByDescending(entry => entry.CompressedLength)
-                            .Select(entry => FriendlyFileName(entry.FullName) + " : " +
-                                FormatBytes(entry.CompressedLength)));
-                    long compressedGeometryBytes = archive.GetEntry("model.glb")?.CompressedLength ?? 0L;
-                    EstimatedSizeDetailsText.Text = fileDetails +
-                        BuildGeometryDetails(compressedGeometryBytes);
-                }
+                var analysis = await Task.Run(() => GameMepWebPackage.AnalyzeExport(_scene, token), token);
+                var sizes = await Task.Run(() => {
+                    token.ThrowIfCancellationRequested();
+                    var original = GameMepWebPackage.Build(_scene, name);
+                    var lighter = GameMepWebPackage.Build(analysis.LighterScene, name);
+                    return new[] { original.Bytes.LongLength + original.Assets.Sum(x => x.Size), lighter.Bytes.LongLength + lighter.Assets.Sum(x => x.Size) };
+                }, token);
+                if (token.IsCancellationRequested) return;
+                _analysis = analysis; _lighterScene = analysis.LighterScene;
+                _originalSize = sizes[0]; _lighterSize = sizes[1];
+                RefreshAnalysis();
             }
             catch (OperationCanceledException) { }
             catch (Exception exception)
             {
-                Debug.WriteLine("Calcul de taille du partage MEP impossible : " + exception);
-                if (!_sizeCalculationCancellation.IsCancellationRequested)
-                {
-                    EstimatedSizeText.Text = "Taille compressée indisponible";
-                    EstimatedSizeDetailsText.Text = string.Empty;
+                Debug.WriteLine(exception);
+                if (!token.IsCancellationRequested) {
+                    EstimatedSizeText.Text = "Analyse indisponible";
+                    OptimizationText.Text = "L’export original reste disponible. " + exception.Message;
                 }
             }
+            finally { if (!token.IsCancellationRequested) { _analyzing = false; SetBusy(_busy); } }
         }
 
-        private static string FriendlyFileName(string fileName)
+        private void RefreshAnalysis()
         {
-            switch (fileName.ToLowerInvariant())
-            {
-                case "model.glb": return "Géométrie 3D";
-                case "properties.json": return "Propriétés des éléments";
-                case "mep.json": return "Graphe et flux MEP";
-                case "viewer.json": return "Navigation et portes";
-                case "manifest.json": return "Informations du paquet";
-                case "thumbnail.webp": return "Miniature";
-                default: return fileName;
-            }
+            EstimatedSizeText.Text = "Taille compressée : " + FormatBytes(_useLighter ? _lighterSize : _originalSize) + " / 512 Mo";
+            long gain = Math.Max(0, _originalSize - _lighterSize);
+            OptimizationText.Text = gain > 0
+                ? FormatBytes(_originalSize) + " → " + FormatBytes(_lighterSize) + "\nGain calculé : " + FormatBytes(gain) + " (" + (100.0 * gain / _originalSize).ToString("0.0") + " %)"
+                : "Aucun gain utile détecté pour les portes et garde-corps de cette vue.";
+            LightenButton.Content = _useLighter ? "Revenir aux détails d’origine" : "Alléger les détails";
+            EstimatedSizeDetailsText.Text = "Géométrie 3D : " + FormatBytes(ExportScene.WebTiles.Sum(x => x.Size)) +
+                " (" + ExportScene.WebTiles.Count + " fichiers)\n" + BuildGeometryDetails();
         }
 
-        private string BuildGeometryDetails(long compressedGeometryBytes)
+        private void LightenButton_Click(object sender, RoutedEventArgs e)
         {
-            var bytesByElementIndex = new Dictionary<int, long>();
-            IEnumerable<GameMeshData> meshes = _scene.Meshes.Concat(
-                _scene.Doors.SelectMany(door =>
-                    new[] { door.OpaqueMesh, door.TransparentMesh }));
-            foreach (GameMeshData mesh in meshes)
-            {
-                for (int vertex = 0; vertex < mesh.Positions.Count; vertex++)
-                {
-                    int elementIndex = vertex < mesh.ElementIndices.Count
-                        ? mesh.ElementIndices[vertex]
-                        : -1;
-                    AddGeometryBytes(bytesByElementIndex, elementIndex, 32L);
-                }
-                foreach (int vertex in mesh.Indices)
-                {
-                    int elementIndex = vertex >= 0 && vertex < mesh.ElementIndices.Count
-                        ? mesh.ElementIndices[vertex]
-                        : -1;
-                    AddGeometryBytes(bytesByElementIndex, elementIndex, 4L);
-                }
-            }
+            _useLighter = !_useLighter;
+            RefreshAnalysis();
+            StatusText.Text = _useLighter ? "Détails allégés pour la prochaine publication." : "Géométrie d’origine pour la prochaine publication.";
+        }
 
-            long rawGeometryBytes = bytesByElementIndex.Values.Sum();
-            if (rawGeometryBytes <= 0 || compressedGeometryBytes <= 0)
-                return string.Empty;
-            double compressedRatio = compressedGeometryBytes / (double)rawGeometryBytes;
+        private string BuildGeometryDetails()
+        {
+            if (_analysis == null) return string.Empty;
+            var bytesByElementIndex = _analysis.EstimatedBytes;
             var elementsByIndex = _scene.Elements
                 .Where(element => element.WebElementIndex >= 0)
                 .ToDictionary(element => element.WebElementIndex);
@@ -125,8 +103,8 @@ namespace BIMaestro.VideoGames
                 .Select(pair => new
                 {
                     Element = elementsByIndex[pair.Key],
-                    Bytes = Math.Max(1L, (long)Math.Round(pair.Value * compressedRatio)),
-                    Triangles = pair.Value / 108L
+                    Bytes = pair.Value,
+                    Triangles = _analysis.Triangles.TryGetValue(pair.Key, out long triangles) ? triangles : 0
                 })
                 .OrderByDescending(item => item.Bytes)
                 .ToArray();
@@ -139,23 +117,18 @@ namespace BIMaestro.VideoGames
                 .Take(5);
             string categoryDetails = string.Join("\n", categories.Select((item, index) =>
                 (index + 1) + ". " + item.Name + " ≈ " + FormatBytes(item.Bytes)));
-            string elementDetails = string.Join("\n", rankedElements.Take(5).Select((item, index) =>
+            string elementDetails = string.Join("\n", rankedElements.Take(10).Select((item, index) =>
                 (index + 1) + ". #" + item.Element.ElementId + " · " +
                 (string.IsNullOrWhiteSpace(item.Element.Name) ? item.Element.TypeName : item.Element.Name) +
-                " ≈ " + FormatBytes(item.Bytes)));
-            return "\n\nGÉOMÉTRIE — CATÉGORIES LES PLUS LOURDES (≈)\n" +
-                categoryDetails + "\n\nÉLÉMENTS LES PLUS LOURDS (≈)\n" + elementDetails;
-        }
-
-        private static void AddGeometryBytes(
-            IDictionary<int, long> bytesByElementIndex,
-            int elementIndex,
-            long bytes)
-        {
-            if (elementIndex < 0) return;
-            long current;
-            bytesByElementIndex.TryGetValue(elementIndex, out current);
-            bytesByElementIndex[elementIndex] = current + bytes;
+                " · " + item.Element.DocumentTitle + " ≈ " + FormatBytes(item.Bytes) +
+                " · " + item.Triangles.ToString("N0") + " triangles"));
+            string typeDetails = string.Join("\n", rankedElements
+                .GroupBy(item => item.Element.Category + " · " + item.Element.TypeName)
+                .Select(group => new { Name = group.Key, Bytes = group.Sum(item => item.Bytes), Count = group.Count() })
+                .OrderByDescending(item => item.Bytes).Take(5)
+                .Select(item => item.Name + " (" + item.Count + ") ≈ " + FormatBytes(item.Bytes)));
+            return "\nDIAGNOSTIC DE L’EXPORT D’ORIGINE\nPoids par élément estimé ; nombre de triangles mesuré.\n\nCATÉGORIES LES PLUS LOURDES\n" +
+                categoryDetails + "\n\nTYPES LES PLUS LOURDS\n" + typeDetails + "\n\nÉLÉMENTS LES PLUS LOURDS\n" + elementDetails;
         }
 
         private static string FormatBytes(long bytes)
@@ -181,7 +154,7 @@ namespace BIMaestro.VideoGames
             try
             {
                 _state = await GameMepPublishClient.PublishAsync(
-                    _scene, PublicationNameTextBox.Text.Trim(), progress,
+                    ExportScene, PublicationNameTextBox.Text.Trim(), progress,
                     _cancellation.Token);
                 ShowState();
                 StatusText.Text = "Révision " + _state.Revision +
@@ -242,6 +215,8 @@ namespace BIMaestro.VideoGames
 
         private void SetBusy(bool busy)
         {
+            _busy = busy;
+            LightenButton.IsEnabled = !busy && !_analyzing && _lighterSize < _originalSize;
             PublishButton.IsEnabled = !busy;
             PublicationNameTextBox.IsEnabled = !busy;
         }

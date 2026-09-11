@@ -620,6 +620,9 @@
                             Margin="0,7,0,0"
                             ToolTip="Exporte uniquement le graphe MEP nécessaire pour reproduire le calcul hors Revit"
                             Click="MepExportReplayButton_Click"/>
+                    <Button Content="Importer les réservations web" Margin="0,6,0,0" Padding="10,6"
+                            ToolTip="Récupère le fichier de réservations exporté depuis le site sous forme de volumes Revit, sans doublons."
+                            Click="ImportReservations_Click"/>
                     <Button x:Name="MepShareWebButton"
                             Grid.Row="4"
                             Style="{StaticResource GlassButton}"
