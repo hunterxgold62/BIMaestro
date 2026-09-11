@@ -567,6 +567,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     <TextBlock x:Name="MepDiagnosticsText"
                                Style="{StaticResource HudCaption}"
@@ -620,11 +621,14 @@
                             Margin="0,7,0,0"
                             ToolTip="Exporte uniquement le graphe MEP nécessaire pour reproduire le calcul hors Revit"
                             Click="MepExportReplayButton_Click"/>
-                    <Button Content="Importer les réservations web" Margin="0,6,0,0" Padding="10,6"
+                    <Button Grid.Row="4"
+                            Content="Importer les réservations web"
+                            Margin="0,6,0,0"
+                            Padding="10,6"
                             ToolTip="Récupère le fichier de réservations exporté depuis le site sous forme de volumes Revit, sans doublons."
                             Click="ImportReservations_Click"/>
                     <Button x:Name="MepShareWebButton"
-                            Grid.Row="4"
+                            Grid.Row="5"
                             Style="{StaticResource GlassButton}"
                             Content="Partager sur le web"
                             HorizontalAlignment="Stretch"
@@ -632,6 +636,7 @@
                             Margin="0,7,0,0"
                             Background="#FF165C60"
                             ToolTip="Publie un instantané privé sur viewer.bimaestro.fr"
+                            ToolTipService.ShowOnDisabled="True"
                             Click="MepShareWebButton_Click"/>
                 </Grid>
             </Grid>

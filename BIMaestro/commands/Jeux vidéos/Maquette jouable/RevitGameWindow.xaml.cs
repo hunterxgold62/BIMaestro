@@ -3531,10 +3531,27 @@ namespace BIMaestro.VideoGames
             }
             if (MepShareWebButton != null)
             {
+                bool hasWebGeometry =
+                    _scene.WebTiles.Count > 0 || _scene.WebModelGlb.Length > 0;
                 MepShareWebButton.IsEnabled =
                     _scene.MepGraph.HasData &&
-                    (_scene.WebTiles.Count > 0 || _scene.WebModelGlb.Length > 0) &&
+                    hasWebGeometry &&
                     !_mepRecalculationRunning;
+                MepShareWebButton.ToolTip = _mepRecalculationRunning
+                    ? UiLanguage.T(
+                        "Partage disponible après la fin du calcul MEP.",
+                        "Sharing Will Be Available After the MEP Calculation Finishes.")
+                    : !_scene.MepGraph.HasData
+                        ? UiLanguage.T(
+                            "Partage indisponible : aucun réseau de canalisation avec des connecteurs MEP exploitables n'a été détecté dans le document actif.",
+                            "Sharing Unavailable: No Pipe Network With Usable MEP Connectors Was Detected in the Active Document.")
+                        : !hasWebGeometry
+                            ? UiLanguage.T(
+                                "Partage indisponible : aucune géométrie 3D compatible avec le viewer web n'a été générée.",
+                                "Sharing Unavailable: No 3D Geometry Compatible With the Web Viewer Was Generated.")
+                            : UiLanguage.T(
+                                "Publie un instantané privé sur viewer.bimaestro.fr.",
+                                "Publish a Private Snapshot to viewer.bimaestro.fr.");
             }
         }
 
