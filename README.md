@@ -89,7 +89,7 @@ Le ruban est organisé en panneaux métier. Les noms ci-dessous correspondent au
 - **Sélection d'objet** : sélectionne des éléments similaires dans le projet.
 - **Face 3D** : réoriente une vue 3D active à partir d'une face sélectionnée.
 - **DWG Exp.** : exporte plusieurs vues ou feuilles en DWG avec une logique de nommage automatique.
-- **Peinture** : liste les matériaux appliqués à un élément, y compris les matériaux peints.
+- **Peinture** : identifie la peinture de la zone exacte cliquée, y compris sur une face scindée, puis affiche la composition complète du mur.
 
 ### Modification
 

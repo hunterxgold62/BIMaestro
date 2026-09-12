@@ -451,6 +451,7 @@ namespace BIMaestro.Localization
                 ["Permet de réorienter une vue 3D active en fonction de la géométrie d'une face sélectionnée."] = "Reorients the active 3D view from the geometry of a selected face.",
                 ["Exporte automatiquement plusieurs vues ou feuilles en DWG, en nommant chaque fichier selon le projet et la vue comme pour les PDF."] = "Exports multiple views or sheets to DWG and names each file from the project and view, like PDF exports.",
                 ["Liste les matériaux (y compris peinture) appliqués à un élément."] = "Lists materials, including paint, applied to an element.",
+                ["Identifie la peinture de la zone exacte cliquée et affiche la composition complète du mur."] = "Identifies the paint on the exact clicked area and displays the wall's complete composition.",
                 ["Crée des réservations automatiques"] = "Automatically creates openings.",
                 ["Ajoute automatiquement des brides aux extrémités sélectionnées"] = "Automatically adds flanges to selected ends.",
                 ["Permet de choisir la bride par défaut"] = "Lets you choose the default flange.",

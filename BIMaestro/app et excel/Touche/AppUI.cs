@@ -53,7 +53,7 @@ public class AppUI : IExternalApplication
             ("GetPaintedMaterialsButton", "Peinture", new List<(string, string, string, string, string)>
             {
                 ("GetPaintedMaterialsButton", "Peinture", "Visualisation.GetPaintedMaterialsCommand", "Peinture.png",
-                    "Liste les matériaux (y compris peinture) appliqués à un élément."),
+                    "Identifie la peinture de la zone exacte cliquée et affiche la composition complète du mur."),
                 ("ReorientViewButton", "Face 3D", "Visualisation.ReorientViewCommand", "Face 3D.png",
                     "Permet de réorienter une vue 3D active en fonction de la géométrie d'une face sélectionnée.")
             })
