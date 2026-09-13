@@ -1,5 +1,6 @@
 import { validateAssets, exportPaths, type Asset } from "./assets.ts";
 import { validateMarkup } from "./markup.ts";
+import { validateAnalysis } from "./analysis.ts";
 import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { create, verify } from "https://deno.land/x/djwt@v2.4/mod.ts";
@@ -486,6 +487,31 @@ async function mutateMarkup(body: any) {
   throw new HttpError(409, "La maquette a changé. Réessayez ou rechargez le partage.");
 }
 
+async function mutateAnalysis(body: any) {
+  const access = await shareAccess(body.token);
+  if (access.role !== "editor") throw new HttpError(403, "Lien en lecture seule");
+  let patch;
+  try { patch = validateAnalysis(body.settings); } catch (error) { throw new HttpError(400, String(error)); }
+  if (!Number.isSafeInteger(body.expectedRevision) || body.modelRevision !== access.publication.active_revision)
+    throw new HttpError(409, "La maquette a changé. Rechargez le partage.");
+  const current = await currentScenario(access.publication.id);
+  if (current.revision !== body.expectedRevision) throw new HttpError(409, "Le scénario a changé. Attendez sa synchronisation puis réessayez.");
+  const analysis = { ...(current.state?.analysis || {}), ...patch,
+    endpoints: { ...(current.state?.analysis?.endpoints || {}), ...(patch.endpoints || {}) } };
+  if (Object.keys(analysis.endpoints).length > 1000) throw new HttpError(400, "Limite de 1000 extrémités qualifiées atteinte");
+  const { error: budgetError } = await admin.rpc("reserve_mep_viewer_usage", { p_publication_id: access.publication.id, p_kind: "scenario", p_amount: 1 });
+  if (budgetError) throw new HttpError(429, "Budget collaboratif indisponible");
+  const updated = { revision: current.revision + 1, state: { ...current.state, analysis }, updated_by: "Invité web", updated_at: new Date().toISOString() };
+  const { data, error } = await admin.from("mep_publications").update({ scenario_revision: updated.revision, scenario_state: updated.state,
+    scenario_updated_by: updated.updated_by, scenario_updated_at: updated.updated_at })
+    .eq("id", access.publication.id).eq("scenario_revision", current.revision).eq("active_revision", body.modelRevision)
+    .is("revoked_at", null).gt("expires_at", updated.updated_at).select("id").maybeSingle();
+  if (error) throw new HttpError(500, "Enregistrement des hypothèses impossible");
+  if (!data) throw new HttpError(409, "Le scénario a changé. Rechargez le partage.");
+  await broadcastScenario(access.publication.id, updated);
+  return { scenario: updated };
+}
+
 async function managePublication(req: Request, body: any) {
   const identity = await licenseIdentity(req);
   const publication = await publicationOwned(String(body.publicationId ?? ""), identity.licenseHash);
@@ -522,6 +548,7 @@ serve(async (req) => {
       case "resolve": result = await resolveShare(body); break;
       case "scenario": result = await mutateScenario(body); break;
       case "markup": result = await mutateMarkup(body); break;
+      case "analysis": result = await mutateAnalysis(body); break;
       case "state": { const access = await shareAccess(body.token); result = { scenario: await currentScenario(access.publication.id) }; break; }
       case "manage": result = await managePublication(req, body); break;
       default: throw new HttpError(400, "Action inconnue");

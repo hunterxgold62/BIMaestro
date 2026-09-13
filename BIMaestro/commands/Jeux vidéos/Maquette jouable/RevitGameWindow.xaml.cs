@@ -2365,6 +2365,7 @@ namespace BIMaestro.VideoGames
 
         private void UpdateMepUi()
         {
+            _refreshMepImpact?.Invoke();
             GameMepGraphData graph = _scene.MepGraph;
             MepFlowToggleButton.IsEnabled = graph.HasData && !_mepRecalculationRunning;
             MepValveMarkersToggleButton.IsEnabled =
@@ -2687,6 +2688,9 @@ namespace BIMaestro.VideoGames
                     GameMepScenarioReset.ResetSourcesAndDirections(
                         _scene.MepGraph,
                         element => true);
+                    _scene.MepGraph.AllowImplicitTerminals = true;
+                    foreach (var connector in _scene.MepGraph.Connectors)
+                        connector.EndpointRole = GameMepEndpointRole.Unknown;
                 });
             foreach (GameMepSystemData system in _scene.MepGraph.Systems)
                 system.IsVisible = true;
@@ -3989,7 +3993,7 @@ namespace BIMaestro.VideoGames
                 string flowStateText = mepElement.FlowState == GameMepFlowState.Supplied &&
                     representativePath != null && !representativePath.HasCirculation
                         ? "sous pression, fluide stagnant"
-                        : ToFrenchFlowState(mepElement.FlowState);
+                        : GameMepImpactAnalyzer.StateLabel(mepElement);
                 FlowText = "État : " + flowStateText +
                     (representativePath == null
                         ? string.Empty
@@ -4307,7 +4311,7 @@ namespace BIMaestro.VideoGames
                 switch (reliability)
                 {
                     case GameMepDirectionReliability.Reliable:
-                        return UiLanguage.T("FIABLE", "RELIABLE");
+                        return UiLanguage.T("COHÉRENT AVEC LES RÈGLES", "CONSISTENT WITH RULES");
                     case GameMepDirectionReliability.Inferred:
                         return UiLanguage.T("DÉDUIT", "INFERRED");
                     case GameMepDirectionReliability.Manual:
@@ -4337,7 +4341,7 @@ namespace BIMaestro.VideoGames
             {
                 switch (state)
                 {
-                    case GameMepFlowState.Supplied: return "alimenté";
+                    case GameMepFlowState.Supplied: return "relié à une arrivée ou un retour";
                     case GameMepFlowState.Isolated: return "isolé";
                     default: return "indéterminé (source manquante)";
                 }

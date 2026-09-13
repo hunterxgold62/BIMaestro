@@ -11,10 +11,80 @@ namespace BIMaestro.VideoGames
     {
         private static int _assertions;
 
+        private static void MilestonesOneAndTwo()
+        {
+            var fixture = new GraphFixture();
+            fixture.AddElement("source", 1, source: true);
+            fixture.AddElement("pipe", 2);
+            fixture.AddElement("valve", 2, valve: true);
+            fixture.AddElement("terminal", 1);
+            fixture.Connect("source", 0, "pipe", 0);
+            fixture.Connect("pipe", 1, "valve", 0);
+            fixture.Connect("valve", 1, "terminal", 0);
+            var graph = fixture.Graph;
+            graph.RebuildIndexes();
+            var engine = new GameMepSimulationEngine(graph);
+            engine.Recalculate();
+            GameMepParity.ExportUiFixture(graph);
+            Assert(graph.ImpactReport.Comparable && graph.ImpactReport.Items.Count == 0, "Initial impact reference must be comparable and empty.");
+            fixture.CloseValve("valve"); engine.Recalculate();
+            Assert(!fixture.Path("pipe").HasCirculation, "Closing the only outlet must stop indicative circulation upstream.");
+            Assert(graph.FindElement("pipe").ConnectedToInlet, "Upstream remains connected to the inlet, without a pressure claim.");
+            Assert(!graph.FindElement("terminal").ConnectedToInlet, "Terminal loses inlet connectivity.");
+            Assert(graph.ImpactReport.Items.Any(i => i.ElementKey == "terminal" && i.LimitingValveKeys.Contains("valve")), "Report identifies the closed valve on the reference route.");
+            Assert(graph.FindValve("valve").DownstreamState != GameMepFlowState.Supplied, "Valve downstream state is refreshed.");
+            Assert(graph.ImpactReport.AlternativeCount == 0, "The upstream face of the closed valve is not a bypass around itself.");
+            string first = Newtonsoft.Json.JsonConvert.SerializeObject(GameMepParity.Summary(graph));
+            fixture.Graph.FindValve("valve").IsClosed = false; engine.Recalculate();
+            fixture.CloseValve("valve"); engine.Recalculate();
+            Assert(first == Newtonsoft.Json.JsonConvert.SerializeObject(GameMepParity.Summary(graph)), "Equivalent final scenarios must have identical states and reports.");
+            graph.FindValve("valve").IsClosed = false;
+            graph.AllowImplicitTerminals = false; engine.Recalculate();
+            Assert(!fixture.Path("pipe").HasCirculation, "Explicit boundary mode must not invent a terminal.");
+            int terminalPort = graph.FindElement("terminal").ConnectorIndices[0];
+            graph.Connectors[terminalPort].EndpointRole = GameMepEndpointRole.Terminal; engine.Recalculate();
+            Assert(fixture.Path("pipe").HasCirculation, "A declared terminal permits indicative circulation.");
+            graph.Connectors[terminalPort].EndpointRole = GameMepEndpointRole.Capped; engine.Recalculate();
+            Assert(!fixture.Path("pipe").HasCirculation, "A capped endpoint does not become an implicit outlet.");
+            var history = new GameMepScenarioHistory();
+            history.Execute(graph, "endpoint", () => { graph.AllowImplicitTerminals = true; graph.Connectors[terminalPort].EndpointRole = GameMepEndpointRole.ExportLimit; }, false);
+            Assert(history.TryUndo(graph, false, out _) && !graph.AllowImplicitTerminals && graph.Connectors[terminalPort].EndpointRole == GameMepEndpointRole.Capped, "Undo restores boundary assumptions.");
+            var multi = new GraphFixture();
+            multi.AddElement("inlet", 1, source: true); multi.AddElement("equipment", 3); multi.AddElement("end", 1);
+            multi.Connect("inlet", 0, "equipment", 0); multi.Connect("equipment", 1, "end", 0);
+            multi.Graph.FindElement("equipment").RequiresPassageValidation = true;
+            new GameMepSimulationEngine(multi.Graph).Recalculate();
+            Assert(!multi.Graph.FindElement("end").ConnectedToInlet, "Unknown internal channels must not connect all equipment ports.");
+            Assert(multi.Graph.Diagnostics.Any(d => d.Key == "passages|equipment"), "Unknown passages have a locatable diagnostic.");
+            multi.SetConnectorFlowDirection("equipment", 0, "In");
+            multi.SetConnectorFlowDirection("equipment", 1, "Out");
+            new GameMepSimulationEngine(multi.Graph).Recalculate();
+            Assert(multi.Graph.FindElement("end").ConnectedToInlet, "A unique connected In/Out pair remains traversable despite unused auxiliary ports.");
+            Assert(!multi.Graph.FindElement("equipment").Paths.Any(p => p.StartConnector == multi.Graph.FindElement("equipment").ConnectorIndices[2] && p.HasCirculation), "An auxiliary port is not a new consumer.");
+        }
+
         private static int Main(string[] args)
         {
             try
             {
+                if (args.Length == 2 && args[0] == "--export-parity") GameMepParity.OutputPath = args[1];
+                if (args.Length == 2 && args[0] == "--verify-crousty")
+                {
+                    var graph = GameMepReplayStore.Load(args[1]).Graph;
+                    GameMepParity.OutputPath = "tmp/mep-real-parity.json"; GameMepParity.IncludeLargeGraphs = true;
+                    var engine = new GameMepSimulationEngine(graph); engine.Recalculate();
+                    Assert(graph.FindElement(827886).Paths.Single().HasCirculation, "The filter outlet must circulate with its bypass closed.");
+                    Assert(graph.FindElement(849383).Paths.Single().HasCirculation && !graph.FindElement(849383).Paths.Single().FlowForward, "The pump discharge header must flow away from its capped end.");
+                    var filter = graph.FindElement(810046);
+                    Assert(GameMepEquipmentDirectionPolicy.TryGetNativeFlowDirection(graph, filter, out int inlet, out int outlet) && inlet == 64 && outlet == 65, "Only the two connected native filter ports define the main passage.");
+                    Assert(filter.Paths.Where(p => p.StartConnector != 64 && p.StartConnector != 65).All(p => !p.HasCirculation), "Unused filter ports must not become circulating outlets.");
+                    Assert(graph.Connectors[719].EndpointRole == GameMepEndpointRole.Capped, "The dished end is a cap, not an implicit consumer.");
+                    var first = Newtonsoft.Json.JsonConvert.SerializeObject(GameMepParity.Summary(graph));
+                    var bypass = graph.FindValve(graph.FindElement(828068).Key); bypass.IsClosed = false; engine.Recalculate();
+                    bypass.IsClosed = true; engine.Recalculate();
+                    Assert(first == Newtonsoft.Json.JsonConvert.SerializeObject(GameMepParity.Summary(graph)), "Reopening and closing the bypass reproduces the same result.");
+                    GameMepParity.Save(); Console.WriteLine("Real model: 6 regression assertions passed."); return 0;
+                }
                 if ((args.Length == 4 || args.Length == 5) &&
                     string.Equals(args[0], "--toggle-replay", StringComparison.OrdinalIgnoreCase))
                 {
@@ -41,6 +111,7 @@ namespace BIMaestro.VideoGames
                     return ReplayExportedGraph(args[1], inspectedElementId);
                 }
                 WebExportTests.Run();
+                MilestonesOneAndTwo();
                 StraightValveCutsOnlyPath();
                 TeeSuppliesBothBranches();
                 SmallInletFeedsLargeHeaderWithoutReversingIt();
@@ -145,6 +216,7 @@ namespace BIMaestro.VideoGames
                 SupportedGroundRejectsIsolatedBump();
                 SupportedGroundPreservesSlopeHeight();
                 SupportedGroundRequiresSeveralContactPoints();
+                GameMepParity.Save();
                 Console.WriteLine("MEP graph regression tests: " + _assertions + " assertions passed.");
                 return 0;
             }
@@ -1364,13 +1436,16 @@ namespace BIMaestro.VideoGames
             fixture.Graph.FindValve("state-valve")!.IsClosed = false;
             engine.Recalculate();
 
-            Assert(fixture.Path("header-a").FlowForward &&
-                fixture.Path("header-b").FlowForward,
-                "Opening a valve must not let a newly available pump branch " +
-                "reverse an established circulating header.");
-            Assert(fixture.Path("flange").FlowForward,
-                "Passive accessories must be realigned after the stable pump " +
-                "consensus is restored.");
+            var clean = GameMepReplayStore.Capture(fixture.Graph).Graph;
+            new GameMepSimulationEngine(clean).Recalculate();
+            foreach (string key in new[] { "header-a", "header-b", "flange" })
+            {
+                var expected = clean.FindElement(key)!.Paths[0];
+                Assert(fixture.Path(key).FlowForward == expected.FlowForward &&
+                    fixture.Path(key).DirectionState == expected.DirectionState &&
+                    fixture.Path(key).HasCirculation == expected.HasCirculation,
+                    "Opening a valve must reproduce a fresh calculation, ignoring stale displayed pump consensus: " + key);
+            }
         }
 
         private static void DirectionalEquipmentProtectsItsBranchFromAnotherSplit()
@@ -3349,9 +3424,10 @@ namespace BIMaestro.VideoGames
             Assert(snapshot.Graph.FindElement("valve")?.PersistentId ==
                     "revit-unique-id",
                 "Web replay export must preserve the Revit element identifier used by collaborative commands.");
-            Assert(snapshot.Graph.Connectors.All(connector =>
-                    string.IsNullOrEmpty(connector.PersistentKey)),
-                "Web replay export must still remove connector identifiers that are not required by the viewer.");
+            Assert(snapshot.Graph.Connectors[0].PersistentKey == "revit-connector-id",
+                "Web replay export must preserve connector identities for shared endpoint qualifications.");
+            Assert(GameMepReplayStore.Capture(fixture.Graph).Graph.Connectors.All(c => string.IsNullOrEmpty(c.PersistentKey)),
+                "Diagnostic exports still remove persistent connector identities by default.");
             Assert(snapshot.Graph.ScenarioModelKey.Length == 0 &&
                     !snapshot.Graph.ScenarioCanPersist,
                 "Web replay export must still remove the local Revit model identity.");

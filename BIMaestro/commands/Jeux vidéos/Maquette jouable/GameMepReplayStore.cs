@@ -347,8 +347,9 @@ namespace BIMaestro.VideoGames
                 foreach (GameMepElementData element in graph.Elements)
                     element.PersistentId = string.Empty;
             }
-            foreach (GameMepConnectorData connector in graph.Connectors)
-                connector.PersistentKey = string.Empty;
+            if (!preserveElementPersistentIds)
+                foreach (GameMepConnectorData connector in graph.Connectors)
+                    connector.PersistentKey = string.Empty;
         }
 
         private static void PrepareGraph(GameMepGraphData graph)

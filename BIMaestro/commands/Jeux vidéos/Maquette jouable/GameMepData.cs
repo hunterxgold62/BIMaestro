@@ -69,6 +69,8 @@ namespace BIMaestro.VideoGames
         IsolationValve
     }
 
+    internal enum GameMepEndpointRole { Unknown, Terminal, Return, ExportLimit, Capped }
+
     internal sealed class GameMepConnectorData
     {
         public int Index { get; set; }
@@ -81,6 +83,7 @@ namespace BIMaestro.VideoGames
         public bool HasDirection { get; set; }
         public bool IsConnected { get; set; }
         public string FlowDirection { get; set; } = string.Empty;
+        public GameMepEndpointRole EndpointRole { get; set; }
         /// <summary>
         /// Section du connecteur en unités internes Revit (pieds carrés).
         /// Elle sert uniquement à pondérer les jonctions multi-voies : un petit
@@ -122,6 +125,8 @@ namespace BIMaestro.VideoGames
         /// </summary>
         public bool HasCirculation { get; set; } = true;
         public bool FlowForward { get; set; } = true;
+        public bool ConnectedToInlet { get; set; }
+        public bool ConnectedToReturn { get; set; }
         public GameMepDirectionState DirectionState { get; set; }
         public string DirectionReason { get; set; } = string.Empty;
         public GameMepDirectionExplanationData DirectionExplanation { get; set; } =
@@ -199,6 +204,9 @@ namespace BIMaestro.VideoGames
         /// doit pas être assimilé à un nœud de mélange hydraulique.
         /// </summary>
         public bool IsPipeJunction { get; set; }
+        public bool RequiresPassageValidation { get; set; }
+        public bool ConnectedToInlet { get; set; }
+        public bool ConnectedToReturn { get; set; }
         public IList<int> ConnectorIndices { get; } = new List<int>();
         public IList<GameMepPathData> Paths { get; } = new List<GameMepPathData>();
         public GameMepFlowState FlowState { get; set; }
@@ -293,13 +301,15 @@ namespace BIMaestro.VideoGames
             entryConnector = -1;
             exitConnector = -1;
             if (graph == null || element == null ||
-                element.ConnectorIndices.Count != 2 ||
                 element.IsPipeJunction)
             {
                 return false;
             }
 
-            foreach (int connectorIndex in element.ConnectorIndices)
+            var candidates = element.ConnectorIndices.Count == 2 ? element.ConnectorIndices.ToList() :
+                element.ConnectorIndices.Where(i => i >= 0 && i < graph.Connectors.Count && graph.Connectors[i].IsConnected).ToList();
+            if (candidates.Count != 2) return false;
+            foreach (int connectorIndex in candidates)
             {
                 if (connectorIndex < 0 || connectorIndex >= graph.Connectors.Count)
                     return false;
@@ -415,6 +425,10 @@ namespace BIMaestro.VideoGames
         public IDictionary<string, Dictionary<int, bool>> StableHeaderDirections { get; } =
             new Dictionary<string, Dictionary<int, bool>>(StringComparer.Ordinal);
         public int OpenConnectorCount { get; set; }
+        public bool AllowImplicitTerminals { get; set; } = true;
+        public string EngineVersion { get; set; } = string.Empty;
+        public GameMepAnalysisReference AnalysisReference { get; set; }
+        public GameMepImpactReport ImpactReport { get; set; }
         public int UncertainValveCount => Valves.Count(v =>
             v.Confidence == GameMepConfidence.Low && !v.WasManuallyOverridden);
         public int DirectionConflictCount => Elements
@@ -509,6 +523,14 @@ namespace BIMaestro.VideoGames
                 string.Empty;
             string second = graph.Connectors[edge.ConnectorB].SystemKey ??
                 string.Empty;
+            if (edge.IsInternal && graph.FindElement(edge.ElementKey)?.RequiresPassageValidation == true)
+            {
+                // Only an explicit pair may cross an unresolved multichannel component.
+                return graph.DirectionConstraints.Any(c => c.IsActive && c.HasExplicitDirection &&
+                    c.ElementKey == edge.ElementKey && MatchesPair(edge, c.EntryConnectorIndex, c.ExitConnectorIndex)) ||
+                    (GameMepEquipmentDirectionPolicy.TryGetNativeFlowDirection(graph, graph.FindElement(edge.ElementKey), out int entry, out int exit) &&
+                    MatchesPair(edge, entry, exit));
+            }
             if (string.Equals(first, second, StringComparison.Ordinal) ||
                 IsUnassigned(first) || IsUnassigned(second))
             {
@@ -641,13 +663,42 @@ namespace BIMaestro.VideoGames
         {
             _graph = graph ?? throw new ArgumentNullException(nameof(graph));
         }
+        private static void ReplaceOrder<T>(IList<T> target, IEnumerable<T> ordered)
+        {
+            var items = ordered.ToArray();
+            for (int i = 0; i < items.Length; i++) target[i] = items[i];
+        }
 
         public void Recalculate()
         {
             var stopwatch = Stopwatch.StartNew();
+            // Canonical traversal order also fixes tie-breaking in large networks.
+            // Connector indices are identities and must never be reordered.
+            ReplaceOrder(_graph.Elements, _graph.Elements.OrderBy(e => e.Key, StringComparer.Ordinal));
+            ReplaceOrder(_graph.Connections, _graph.Connections.OrderBy(e => e.ConnectorA).ThenBy(e => e.ConnectorB).ThenBy(e => e.ElementKey, StringComparer.Ordinal).ThenBy(e => e.IsInternal));
+            ReplaceOrder(_graph.Sources, _graph.Sources.OrderBy(s => s.ElementKey, StringComparer.Ordinal).ThenBy(s => s.BoundaryKind));
+            ReplaceOrder(_graph.Valves, _graph.Valves.OrderBy(v => v.ElementKey, StringComparer.Ordinal));
+            // Results are functions of the current graph and explicit scenario,
+            // never of exported directions or the sequence of previous clicks.
+            _graph.StableHeaderDirections.Clear();
+            foreach (var element in _graph.Elements.Where(e => e.ConnectorIndices.Count == 1))
+            {
+                var text = (element.Name + " " + element.TypeName).ToLowerInvariant();
+                if (text.Contains("fond bomb") || text.Contains("bouchon") || System.Text.RegularExpressions.Regex.IsMatch(text, @"\b(cap|plug)\b"))
+                {
+                    var connector = _graph.Connectors[element.ConnectorIndices[0]];
+                    if (connector.EndpointRole == GameMepEndpointRole.Unknown) connector.EndpointRole = GameMepEndpointRole.Capped;
+                }
+            }
+            foreach (var path in _graph.Elements.SelectMany(item => item.Paths))
+            {
+                path.FlowForward = true;
+                path.HasCirculation = false;
+                path.DirectionState = GameMepDirectionState.Unknown;
+                path.DirectionReason = string.Empty;
+            }
             EnsureAdjacency();
-            bool preserveEstablishedCirculation =
-                IsOpeningValvesWithoutClosingOthers();
+            bool preserveEstablishedCirculation = false;
             var establishedCirculatingDirections = preserveEstablishedCirculation
                 ? _graph.Elements
                     .SelectMany(element => element.Paths)
@@ -789,6 +840,8 @@ namespace BIMaestro.VideoGames
             bool hasAnyBoundary = activeBoundarySystems.Count > 0;
             foreach (GameMepElementData element in _graph.Elements)
             {
+                element.ConnectedToInlet = element.ConnectorIndices.Any(index => index >= 0 && index < count && supplyDistance[index] >= 0);
+                element.ConnectedToReturn = element.ConnectorIndices.Any(index => index >= 0 && index < count && returnDistance[index] >= 0);
                 bool supplied = element.ConnectorIndices.Any(index =>
                     index >= 0 && index < activeBoundaryDistance.Length &&
                     activeBoundaryDistance[index] >= 0);
@@ -803,6 +856,8 @@ namespace BIMaestro.VideoGames
 
                 foreach (GameMepPathData path in element.Paths)
                 {
+                    path.ConnectedToInlet = element.ConnectedToInlet;
+                    path.ConnectedToReturn = element.ConnectedToReturn;
                     path.FlowState = element.FlowState;
                     if (TryGetImposedDirection(path, out bool imposedForward,
                             out string imposedReason))
@@ -850,6 +905,11 @@ namespace BIMaestro.VideoGames
             UpdateValveStates(activeBoundarySystems, activeBoundaryDistance);
             GameMepDirectionExplanationBuilder.Refresh(_graph);
             GameMepDiagnosticAnalyzer.Refresh(_graph);
+            _graph.EngineVersion = GameMepImpactAnalyzer.EngineVersion;
+            GameMepImpactAnalyzer.Refresh(_graph);
+#if MEP_PARITY
+            GameMepParity.Record(_graph);
+#endif
             RememberValveStates();
             stopwatch.Stop();
             _graph.LastCalculationMilliseconds = stopwatch.Elapsed.TotalMilliseconds;
@@ -1198,7 +1258,10 @@ namespace BIMaestro.VideoGames
             }
             for (int index = 0; index < connectorCount; index++)
             {
-                if (!inletSeeds.Contains(index) && topologyDegree[index] <= 1 &&
+                GameMepEndpointRole role = _graph.Connectors[index].EndpointRole;
+                bool permittedTerminal = role == GameMepEndpointRole.Terminal || role == GameMepEndpointRole.Return ||
+                    (_graph.AllowImplicitTerminals && role == GameMepEndpointRole.Unknown);
+                if (permittedTerminal && !inletSeeds.Contains(index) && topologyDegree[index] <= 1 &&
                     !closedValveConnectors.Contains(index))
                 {
                     outletSeeds.Add(index);
@@ -1232,6 +1295,7 @@ namespace BIMaestro.VideoGames
                 .Select(item => item.ElementKey),
                 StringComparer.Ordinal);
             var inletAnchorSeeds = new HashSet<int>(explicitInletSeeds);
+            var pumpDischargeAnchorSeeds = new HashSet<int>();
             var pumpSuctionAnchorSeeds = new HashSet<int>();
             foreach (GameMepDirectionConstraintData constraint in
                 _graph.DirectionConstraints.Where(item => item.IsActive &&
@@ -1244,7 +1308,7 @@ namespace BIMaestro.VideoGames
                 {
                     // La sortie d'une pompe est un ancrage amont fiable pour le
                     // bras local, sans être transformée en source globale.
-                    inletAnchorSeeds.Add(constraint.ExitConnectorIndex);
+                    inletAnchorSeeds.Add(constraint.ExitConnectorIndex); pumpDischargeAnchorSeeds.Add(constraint.ExitConnectorIndex);
                 }
                 if (constraint.EntryConnectorIndex >= 0 &&
                     constraint.EntryConnectorIndex < connectorCount)
@@ -1270,7 +1334,7 @@ namespace BIMaestro.VideoGames
                 }
                 restrictedArmElementKeys.Add(pump.Key);
                 pumpSuctionAnchorSeeds.Add(nativeEntry);
-                inletAnchorSeeds.Add(nativeExit);
+                inletAnchorSeeds.Add(nativeExit); pumpDischargeAnchorSeeds.Add(nativeExit);
             }
             var junctionArms = new Dictionary<
                 string,
@@ -1537,7 +1601,8 @@ namespace BIMaestro.VideoGames
                         smallReachesPumpSuction;
                     bool smallIsActiveInlet = smallHasInlet && !smallHasOutlet;
 
-                    Dictionary<int, bool>? headerDirections = null;
+
+                Dictionary<int, bool>? headerDirections = null;
                     if (!smallIsActiveInlet && TryReadResolvedHeaderDirections(
                             junction, largePorts, arms,
                             out Dictionary<int, bool> stable))
@@ -1707,8 +1772,14 @@ namespace BIMaestro.VideoGames
                     continue;
                 }
 
+                if (arms.Values.Any(arm => arm.Any(pumpDischargeAnchorSeeds.Contains))) continue;
                 Dictionary<int, bool>? headerDirections = null;
-                if (IsReturnHydronic(junction) &&
+                if (arms.Values.Any(arm => arm.Any(inletAnchorSeeds.Contains)) &&
+                    TryBuildHeaderDirectionsFromBoundary(headerPorts, declaredReturnDistance, out var dischargeReturnDirections))
+                {
+                    headerDirections = dischargeReturnDirections;
+                }
+                else if (IsReturnHydronic(junction) &&
                     TryBuildHeaderDirectionsFromBoundary(
                         headerPorts,
                         pumpSuctionDistance,
@@ -1805,9 +1876,8 @@ namespace BIMaestro.VideoGames
             {
                 foreach (GameMepPathData path in _graph.Elements.SelectMany(item => item.Paths))
                 {
-                    path.HasCirculation =
-                        path.FlowState == GameMepFlowState.Supplied &&
-                        path.DirectionState == GameMepDirectionState.Resolved;
+                    path.HasCirculation = false;
+                    path.DirectionReason = "Circulation non établie : limites du réseau insuffisantes";
                 }
                 return;
             }
@@ -2134,7 +2204,7 @@ namespace BIMaestro.VideoGames
                         path.HasCirculation = false;
                         if (path.FlowState == GameMepFlowState.Supplied)
                             path.DirectionReason =
-                                "Sous pression, stagnation devant une vanne fermée";
+                                "Relié à une arrivée, circulation non établie devant une vanne fermée";
                         continue;
                     }
 
@@ -2269,7 +2339,7 @@ namespace BIMaestro.VideoGames
                             path.DirectionState =
                                 GameMepDirectionState.Resolved;
                             path.DirectionReason =
-                                "Gradient hydraulique final entre arrivée et retour";
+                                "Gradient indicatif entre arrivée et retour";
                         }
                     }
                     if (!path.HasCirculation)
@@ -2476,6 +2546,8 @@ namespace BIMaestro.VideoGames
                     }
 
                     bool incomingDirection = !portFlowsTowardCenter;
+                    if (geometricContinuity && nextArms.Values.Any(arm => arm.Any(pumpDischargeAnchorSeeds.Contains)))
+                        return;
                     if ((diameterJunctionPortDirections.TryGetValue(
                                 incomingPort, out bool existingIncoming) &&
                             existingIncoming != incomingDirection) ||
@@ -3285,6 +3357,32 @@ namespace BIMaestro.VideoGames
                 downstreamAnchors,
                 locallyProtectedPaths,
                 establishedCirculatingDirections);
+            // A junction cannot consume flow. When all known active arms enter
+            // (or leave), its only remaining active arm must leave (or enter).
+            // Only native, locally propagated directions participate: a relaxed
+            // potential or a majority of pumps is not an authoritative vote.
+            for (int pass = 0; pass < _graph.Elements.Count; pass++)
+            {
+                bool changed = false;
+                foreach (var junction in _graph.Elements.Where(e => e.IsPipeJunction).OrderBy(e => e.Key, StringComparer.Ordinal))
+                {
+                    var active = junction.Paths.Where(p => p.EndConnector < 0 && p.HasCirculation).ToList();
+                    var known = active.Where(p => locallyProtectedPaths.Contains(p) &&
+                        (p.DirectionReason == NativePumpSuctionContinuityReason || p.DirectionReason == NativePumpDischargeContinuityReason ||
+                        p.DirectionReason == "Continuité des branches raccordées aux ports In/Out : unique passage restant au té")).ToList();
+                    var remaining = active.Except(known).ToList();
+                    if (known.Count == 0 || remaining.Count != 1 || known.Select(p => p.FlowForward).Distinct().Count() != 1) continue;
+                    var path = remaining[0];
+                    if (TryGetImposedDirection(path, out _, out _)) continue;
+                    path.FlowForward = !known[0].FlowForward;
+                    path.DirectionState = GameMepDirectionState.Resolved;
+                    path.DirectionReason = "Continuité des branches raccordées aux ports In/Out : unique passage restant au té";
+                    locallyProtectedPaths.Add(path); changed = true;
+                    PropagateNativeFlowPort(junction.Key, path.StartConnector, path.FlowForward,
+                        path.DirectionReason, true, locallyProtectedPaths);
+                }
+                if (!changed) break;
+            }
         }
 
         private void PropagateNativeFlowPort(

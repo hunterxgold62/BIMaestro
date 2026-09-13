@@ -166,6 +166,8 @@ namespace BIMaestro.VideoGames
                     graph);
                 if (valve != null)
                     graph.Valves.Add(valve);
+                elementData.RequiresPassageValidation = connectors.Count > 2 &&
+                    !elementData.IsPipeJunction && !elementData.IsPipeCurve;
 
                 BuildPaths(element, elementData, graph);
                 BuildInternalConnections(elementData, valve, graph);
@@ -535,6 +537,13 @@ namespace BIMaestro.VideoGames
                     ? GameMepConfidence.Medium
                     : GameMepConfidence.Low;
             bool enabledAsValve = confidence != GameMepConfidence.Low;
+            if (connectorCount > 2 || ContainsAny(searchable + " " + partType.ToLowerInvariant(),
+                "soupape", "clapet", "check", "relief", "regulat", "régulat", "3-way", "three-way"))
+            {
+                confidence = GameMepConfidence.Low;
+                enabledAsValve = false;
+                reasons.Add("organe spécialisé : comportement d'isolement non validé");
+            }
             return new GameMepValveData
             {
                 ElementKey = data.Key,

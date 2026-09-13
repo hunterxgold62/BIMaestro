@@ -72,6 +72,16 @@ namespace BIMaestro.VideoGames
 
             AddDirectionConflicts(graph);
             AddFlowControlDiagnostics(graph);
+            foreach (var element in graph.Elements.Where(e => e.RequiresPassageValidation))
+            {
+                bool nativePair = GameMepEquipmentDirectionPolicy.TryGetNativeFlowDirection(graph, element, out int entry, out int exit);
+                graph.Diagnostics.Add(CreateElementDiagnostic(graph, element,
+                    GameMepDiagnosticKind.UnknownPassThroughComponent, nativePair ? GameMepDiagnosticSeverity.Information : GameMepDiagnosticSeverity.Warning,
+                    nativePair ? "Passage principal In/Out reconnu" : "Passages internes à qualifier",
+                    nativePair ? "Les deux seuls ports raccordés définissent le passage In/Out " + entry + " → " + exit + ". Les ports annexes non raccordés ne créent aucun passage supplémentaire." :
+                        "Équipement multivoie : seuls les couples de connecteurs explicitement imposés sont traversables. Vérifier les circuits internes dans la famille Revit.",
+                    "passages|" + element.Key));
+            }
             AddDisconnectedElements(graph);
             AddBranchWithoutSource(graph, components);
             AddOpenConnectors(graph, components, componentByElement);

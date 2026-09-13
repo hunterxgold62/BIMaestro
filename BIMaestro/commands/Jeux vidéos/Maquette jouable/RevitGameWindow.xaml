@@ -301,6 +301,8 @@
                 <StackPanel x:Name="MepNetworkContentPanel"
                             Grid.Row="2"
                             Visibility="Collapsed">
+                        <Button Content="Analyser les coupures / comparer" Style="{StaticResource GlassButton}" Margin="0,3,0,8" Click="MepImpactButton_Click"/>
+                        <TextBlock Text="Flux indicatifs — aucun débit ni pression calculés" Style="{StaticResource HudCaption}" TextWrapping="Wrap" Margin="0,0,0,8"/>
                         <TextBlock Text="SCÉNARIOS"
                                    Style="{StaticResource SectionLabel}"
                                    Margin="0,3,0,6"/>
@@ -446,7 +448,7 @@
                         <Border Height="1" Background="#557B91AA" Margin="0,10"/>
                         <TextBlock Text="LÉGENDE"
                                    Style="{StaticResource SectionLabel}"/>
-                        <TextBlock Text="Flux lumineux : alimenté  •  Gris : isolé  •  Ambre : indéterminé&#x0a;Vannes : anneau vert ouverte  •  croix rouge fermée  •  ambre incertaine  •  blanc sélectionnée"
+                        <TextBlock Text="Flux lumineux : connexion établie  •  Gris : isolé  •  Ambre : indéterminé&#x0a;Vannes : anneau vert ouverte  •  croix rouge fermée  •  ambre incertaine  •  blanc sélectionnée"
                                    Style="{StaticResource HudCaption}"
                                    TextWrapping="Wrap"
                                    Margin="0,5,0,0"/>

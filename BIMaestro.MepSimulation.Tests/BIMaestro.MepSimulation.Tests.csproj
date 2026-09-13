@@ -13,6 +13,7 @@
     <LangVersion>9.0</LangVersion>
     <Nullable>annotations</Nullable>
     <Deterministic>true</Deterministic>
+    <DefineConstants>MEP_PARITY</DefineConstants>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <OutputPath>bin\Debug\</OutputPath>
@@ -40,6 +41,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
+    <Compile Include="GameMepParity.cs" />
+    <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameMepImpact.cs" />
+    <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameMepCalculation.cs" />
     <Compile Include="WebExportTests.cs" />
     <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameMepWebPackage.cs" />
     <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameMepData.cs">

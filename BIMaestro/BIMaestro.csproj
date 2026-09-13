@@ -276,6 +276,9 @@
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameCollisionWorld.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameGpuSceneBuilder.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepData.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepImpact.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepCalculation.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\RevitGameWindow.MepImpact.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepDirectionExplanation.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepDiagnostics.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepFlowRenderer.cs" />

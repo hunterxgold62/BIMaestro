@@ -170,6 +170,8 @@ namespace BIMaestro.VideoGames
 
     internal sealed class GameMepScenarioMemoryState
     {
+        public bool AllowImplicitTerminals { get; set; }
+        public Dictionary<int, GameMepEndpointRole> Endpoints { get; set; } = new Dictionary<int, GameMepEndpointRole>();
         public IList<GameMepValveMemoryState> Valves { get; } =
             new List<GameMepValveMemoryState>();
         public IList<GameMepSourceMemoryState> Sources { get; } =
@@ -180,7 +182,8 @@ namespace BIMaestro.VideoGames
         public static GameMepScenarioMemoryState Capture(GameMepGraphData graph)
         {
             if (graph == null) throw new ArgumentNullException(nameof(graph));
-            var state = new GameMepScenarioMemoryState();
+            var state = new GameMepScenarioMemoryState { AllowImplicitTerminals = graph.AllowImplicitTerminals,
+                Endpoints = graph.Connectors.ToDictionary(c => c.Index, c => c.EndpointRole) };
             foreach (GameMepValveData valve in graph.Valves)
             {
                 state.Valves.Add(new GameMepValveMemoryState
@@ -233,6 +236,9 @@ namespace BIMaestro.VideoGames
         public void ApplyTo(GameMepGraphData graph)
         {
             if (graph == null) throw new ArgumentNullException(nameof(graph));
+            graph.AllowImplicitTerminals = AllowImplicitTerminals;
+            foreach (var connector in graph.Connectors)
+                if (Endpoints.TryGetValue(connector.Index, out var role)) connector.EndpointRole = role;
             var valveStates = Valves
                 .GroupBy(item => item.ElementKey, StringComparer.Ordinal)
                 .ToDictionary(group => group.Key, group => group.First(),
@@ -293,7 +299,8 @@ namespace BIMaestro.VideoGames
 
         public bool IsEquivalentTo(GameMepScenarioMemoryState other)
         {
-            if (other == null || Valves.Count != other.Valves.Count ||
+            if (other == null || AllowImplicitTerminals != other.AllowImplicitTerminals || Endpoints.Count != other.Endpoints.Count ||
+                Endpoints.Any(pair => !other.Endpoints.TryGetValue(pair.Key, out var role) || pair.Value != role) || Valves.Count != other.Valves.Count ||
                 Sources.Count != other.Sources.Count ||
                 DirectionConstraints.Count != other.DirectionConstraints.Count)
             {

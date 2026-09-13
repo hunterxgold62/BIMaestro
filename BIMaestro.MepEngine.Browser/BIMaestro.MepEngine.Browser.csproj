@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>annotations</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <PublishTrimmed>false</PublishTrimmed>
+    <WasmBuildNative>false</WasmBuildNative>
+    <OverrideHtmlAssetPlaceholders>false</OverrideHtmlAssetPlaceholders>
+    <StaticWebAssetBasePath>mep-engine</StaticWebAssetBasePath>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="9.0.5" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <Compile Include="../BIMaestro/commands/Jeux vidéos/Maquette jouable/GameMepData.cs" Link="Core/GameMepData.cs" />
+    <Compile Include="../BIMaestro/commands/Jeux vidéos/Maquette jouable/GameMepImpact.cs" Link="Core/GameMepImpact.cs" />
+    <Compile Include="../BIMaestro/commands/Jeux vidéos/Maquette jouable/GameMepCalculation.cs" Link="Core/GameMepCalculation.cs" />
+    <Compile Include="../BIMaestro/commands/Jeux vidéos/Maquette jouable/GameMepDirectionExplanation.cs" Link="Core/GameMepDirectionExplanation.cs" />
+    <Compile Include="../BIMaestro/commands/Jeux vidéos/Maquette jouable/GameMepDiagnostics.cs" Link="Core/GameMepDiagnostics.cs" />
+  </ItemGroup>
+</Project>

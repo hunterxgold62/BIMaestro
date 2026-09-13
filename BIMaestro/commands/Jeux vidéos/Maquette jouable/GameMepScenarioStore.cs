@@ -27,6 +27,8 @@ namespace BIMaestro.VideoGames
         public string DocumentTitle { get; set; } = string.Empty;
         public DateTime SavedUtc { get; set; }
         public string ScenarioName { get; set; } = string.Empty;
+        public bool AllowImplicitTerminals { get; set; } = true;
+        public IDictionary<string, GameMepEndpointRole> Endpoints { get; set; } = new Dictionary<string, GameMepEndpointRole>();
         public IList<GameMepScenarioValveState> Valves { get; set; } =
             new List<GameMepScenarioValveState>();
         public IList<GameMepScenarioSourceState> Sources { get; set; } =
@@ -45,7 +47,7 @@ namespace BIMaestro.VideoGames
 
         [JsonIgnore]
         public bool HasUserState =>
-            Valves.Count > 0 || Sources.Count > 0 || DirectionConstraints.Count > 0;
+            Valves.Count > 0 || Sources.Count > 0 || DirectionConstraints.Count > 0 || !AllowImplicitTerminals || Endpoints.Count > 0;
     }
 
     internal sealed class GameMepNamedScenarioInfo
@@ -89,7 +91,7 @@ namespace BIMaestro.VideoGames
 
     internal static class GameMepScenarioStore
     {
-        private const int CurrentSchemaVersion = 4;
+        private const int CurrentSchemaVersion = 5;
         private static readonly object StorageLock = new object();
         private static readonly Dictionary<string, GameMepScenarioSnapshot>
             SessionScenarios =
@@ -354,6 +356,9 @@ namespace BIMaestro.VideoGames
             var snapshot = new GameMepScenarioSnapshot
             {
                 SchemaVersion = CurrentSchemaVersion,
+                AllowImplicitTerminals = graph.AllowImplicitTerminals,
+                Endpoints = graph.Connectors.Where(c => c.EndpointRole != GameMepEndpointRole.Unknown && !string.IsNullOrEmpty(c.PersistentKey))
+                    .GroupBy(c => c.PersistentKey).ToDictionary(g => g.Key, g => g.First().EndpointRole),
                 ModelKey = graph.ScenarioModelKey ?? string.Empty,
                 ModelKeyHash = ComputeModelKeyHash(graph.ScenarioModelKey),
                 DocumentTitle = graph.DocumentTitle ?? string.Empty,
@@ -496,6 +501,14 @@ namespace BIMaestro.VideoGames
                 .Where(element => !string.IsNullOrWhiteSpace(element.PersistentId))
                 .GroupBy(element => element.PersistentId, StringComparer.Ordinal)
                 .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+
+            graph.AllowImplicitTerminals = snapshot.AllowImplicitTerminals;
+            var endpointKeys = new HashSet<string>(graph.Connectors.Select(c => c.PersistentKey));
+            foreach (var saved in snapshot.Endpoints ?? new Dictionary<string, GameMepEndpointRole>())
+                if (!endpointKeys.Contains(saved.Key)) result.SkippedEntries++;
+            foreach (var connector in graph.Connectors)
+                connector.EndpointRole = snapshot.Endpoints != null && snapshot.Endpoints.TryGetValue(connector.PersistentKey, out var role)
+                    && Enum.IsDefined(typeof(GameMepEndpointRole), role) ? role : GameMepEndpointRole.Unknown;
 
             foreach (GameMepScenarioValveState state in snapshot.Valves ??
                 new List<GameMepScenarioValveState>())
