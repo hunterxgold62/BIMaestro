@@ -1727,7 +1727,7 @@ namespace Couleur
             string script = @"
 (()=>{
   const key='__bimaestroProjectBrowserTheme';
-  const version=24;
+  const version=25;
   const theme={
     appearanceEnabled:__BIMAESTRO_BROWSER_APPEARANCE_ENABLED__,
     activeParentEnabled:__BIMAESTRO_ACTIVE_PARENT_ENABLED__,
@@ -1814,6 +1814,7 @@ namespace Couleur
       badgeStyle=document.createElement('style');
       badgeStyle.id='bimaestro-project-browser-badges';
       badgeStyle.textContent=`
+__BIMAESTRO_ATMOSPHERE_CSS__
         @keyframes bimaestroBubbleDrift{
           0%{
             background-position:
@@ -2872,6 +2873,7 @@ namespace Couleur
   window[key].paint();
 })()";
             return script
+                .Replace("__BIMAESTRO_ATMOSPHERE_CSS__", BrowserAtmosphere.Css(settings))
                 .Replace(
                     "__BIMAESTRO_BROWSER_APPEARANCE_ENABLED__",
                     settings.IsEnabled ? "true" : "false")
@@ -2957,6 +2959,9 @@ namespace Couleur
 
         private static string GetBrowserBackgroundMode(string mode)
         {
+            if (mode == "Verre dépoli") return "frosted";
+            if (mode == "Plan d'architecte") return "blueprint";
+            if (mode == "Encre dans l'eau") return "ink";
             if (string.Equals(
                     mode,
                     "Bulles pastel",

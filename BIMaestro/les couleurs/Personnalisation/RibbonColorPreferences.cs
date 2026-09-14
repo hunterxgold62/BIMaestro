@@ -1766,6 +1766,18 @@ namespace Couleur
     {
         private bool _isEnabled;
         private string _backgroundMode;
+        private double _backgroundIntensity = 60;
+        private bool _backgroundAnimated = true;
+        public double BackgroundIntensity
+        {
+            get => _backgroundIntensity;
+            set => SetField(ref _backgroundIntensity, double.IsNaN(value) || double.IsInfinity(value) ? 60 : Math.Max(0, Math.Min(100, value)));
+        }
+        public bool BackgroundAnimated
+        {
+            get => _backgroundAnimated;
+            set => SetField(ref _backgroundAnimated, value);
+        }
         private Color _backgroundColor;
         private Color _textColor;
         private Color _accentColor;
@@ -1968,6 +1980,8 @@ namespace Couleur
                         settings.IsEnabled =
                             saved.Value<bool?>("Activer") ??
                             settings.IsEnabled;
+                        settings.BackgroundIntensity = saved.Value<double?>("IntensiteFond") ?? 60;
+                        settings.BackgroundAnimated = saved.Value<bool?>("AnimerFond") ?? true;
                         settings.BackgroundMode = NormalizeMode(
                             saved.Value<string>("ModeFond"));
                         settings.IsSheetViewSearchEnabled =
@@ -2083,6 +2097,8 @@ namespace Couleur
                 {
                     ["Activer"] = normalized.IsEnabled,
                     ["ModeFond"] = normalized.BackgroundMode,
+                    ["IntensiteFond"] = normalized.BackgroundIntensity,
+                    ["AnimerFond"] = normalized.BackgroundAnimated,
                     ["Fond"] = ToHex(normalized.BackgroundColor),
                     ["Texte"] = ToHex(normalized.TextColor),
                     ["Accent"] = ToHex(normalized.AccentColor),
@@ -2132,6 +2148,8 @@ namespace Couleur
             {
                 IsEnabled = source.IsEnabled,
                 BackgroundMode = NormalizeMode(source.BackgroundMode),
+                BackgroundIntensity = source.BackgroundIntensity,
+                BackgroundAnimated = source.BackgroundAnimated,
                 BackgroundColor = source.BackgroundColor,
                 TextColor = source.TextColor,
                 AccentColor = source.AccentColor,
@@ -2179,6 +2197,7 @@ namespace Couleur
             string[] supportedModes =
             {
                 "Uni",
+                "Verre dépoli", "Plan d'architecte", "Encre dans l'eau",
                 "Bulles pastel",
                 "Vagues pastel",
                 "Rubans fluides",
@@ -2353,6 +2372,8 @@ namespace Couleur
             {
                 ["Activer"] = settings.IsEnabled,
                 ["ModeFond"] = settings.BackgroundMode,
+                ["IntensiteFond"] = settings.BackgroundIntensity,
+                ["AnimerFond"] = settings.BackgroundAnimated,
                 ["Fond"] = ProjectBrowserColorPreferences.ToHex(
                     settings.BackgroundColor),
                 ["Texte"] = ProjectBrowserColorPreferences.ToHex(
@@ -2400,6 +2421,8 @@ namespace Couleur
         {
             ProjectBrowserColorSettings settings =
                 ProjectBrowserColorPreferences.GetDefaults();
+            settings.BackgroundIntensity = saved.Value<double?>("IntensiteFond") ?? 60;
+            settings.BackgroundAnimated = saved.Value<bool?>("AnimerFond") ?? true;
             settings.IsEnabled =
                 saved.Value<bool?>("Activer") ?? settings.IsEnabled;
             settings.BackgroundMode =

@@ -68,7 +68,48 @@ namespace Couleur
 
         public ObservableCollection<PanelColorItem> PanelColors { get; }
 
-        public BrowserIconSettings BrowserIcons { get; } = ProjectBrowserIcons.Load();
+        public BrowserIconSettings BrowserIcons { get; private set; } = ProjectBrowserIcons.Load();
+        private string _packStatus = "Partagez un fichier contenant les couleurs du ruban, l’arborescence et les icônes, y compris vos images importées.";
+        public string PackStatus { get => _packStatus; private set { _packStatus = value; OnPropertyChanged(); } }
+
+        private void ExportPack_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new Microsoft.Win32.SaveFileDialog { Title = "Exporter un pack d’apparence",
+                Filter = "Pack BIMaestro|*.bimaestro-style.json", FileName = "Mon pack.bimaestro-style.json", AddExtension = true };
+            if (dialog.ShowDialog(this) != true) return;
+            try
+            {
+                AppearancePackFile.Export(dialog.FileName, new AppearancePack {
+                    RibbonEnabled = AreColoredPanelsEnabled, FullPanels = UseFullPanelColoring,
+                    Ribbon = PanelColors.ToDictionary(item => item.PanelName, item => item.CreateScheme()),
+                    Browser = BrowserPreferences, Icons = BrowserIcons
+                });
+                PackStatus = "Pack exporté : " + System.IO.Path.GetFileName(dialog.FileName) + ". Vous pouvez transmettre ce fichier à votre équipe.";
+            }
+            catch (System.Exception ex) { MessageBox.Show(this, ex.Message, "Export du pack", MessageBoxButton.OK, MessageBoxImage.Error); }
+        }
+
+        private void ImportPack_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new Microsoft.Win32.OpenFileDialog { Title = "Importer un pack d’apparence",
+                Filter = "Pack BIMaestro|*.bimaestro-style.json|Fichier JSON|*.json", CheckFileExists = true };
+            if (dialog.ShowDialog(this) != true) return;
+            try
+            {
+                var pack = AppearancePackFile.Import(dialog.FileName);
+                foreach (var item in PanelColors)
+                    if (pack.Ribbon.TryGetValue(item.PanelName, out var scheme)) item.ApplyScheme(scheme);
+                AreColoredPanelsEnabled = pack.RibbonEnabled;
+                UseFullPanelColoring = pack.FullPanels;
+                BrowserPreferences = pack.Browser;
+                BrowserIcons = pack.Icons;
+                _browserIconAssets = null;
+                OnPropertyChanged(nameof(BrowserIcons));
+                OnPropertyChanged(nameof(BrowserIconAssets));
+                PackStatus = "Pack chargé : " + System.IO.Path.GetFileName(dialog.FileName) + ". Vérifiez les onglets puis cliquez sur Enregistrer pour l’appliquer, ou Annuler pour abandonner.";
+            }
+            catch (System.Exception ex) { MessageBox.Show(this, ex.Message, "Import du pack", MessageBoxButton.OK, MessageBoxImage.Error); }
+        }
         private ObservableCollection<BrowserIconAsset> _browserIconAssets;
         public ObservableCollection<BrowserIconAsset> BrowserIconAssets => _browserIconAssets ??
             (_browserIconAssets = new ObservableCollection<BrowserIconAsset>(ProjectBrowserIcons.Assets(BrowserIcons)));
@@ -181,6 +222,9 @@ namespace Couleur
             new[]
             {
                 new LocalizedOption("Uni", "Solid"),
+                new LocalizedOption("Verre dépoli", "Frosted Glass"),
+                new LocalizedOption("Plan d'architecte", "Blueprint"),
+                new LocalizedOption("Encre dans l'eau", "Ink in Water"),
                 new LocalizedOption("Bulles pastel", "Pastel Bubbles"),
                 new LocalizedOption("Vagues pastel", "Pastel Waves"),
                 new LocalizedOption("Rubans fluides", "Flowing Ribbons"),
@@ -279,6 +323,10 @@ namespace Couleur
                 NotifyBrowserPreviewChanged();
             }
         }
+
+        public Visibility BrowserAtmosphereVisibility => BrowserAtmosphere.IsSupported(BrowserPreferences?.BackgroundMode)
+            ? Visibility.Visible : Visibility.Collapsed;
+        public Brush BrowserAtmospherePreview => BrowserAtmosphere.Preview(BrowserPreferences);
 
         public Brush BrowserPreviewBackgroundBrush =>
             new SolidColorBrush(
@@ -432,6 +480,12 @@ namespace Couleur
             object sender,
             PropertyChangedEventArgs e)
         {
+            if (e.PropertyName == nameof(ProjectBrowserColorSettings.BackgroundMode) && BrowserAtmosphere.IsSupported(BrowserPreferences.BackgroundMode))
+            {
+                bool blueprint = BrowserPreferences.BackgroundMode == "Plan d'architecte";
+                BrowserPreferences.BackgroundColor = blueprint ? Color.FromRgb(17, 37, 63) : Color.FromRgb(246, 248, 252);
+                BrowserPreferences.TextColor = blueprint ? Color.FromRgb(226, 239, 252) : Color.FromRgb(36, 49, 66);
+            }
             if (!_isUpdatingBrowserColoringMode)
             {
                 OnPropertyChanged(nameof(BrowserColoringMode));
@@ -722,6 +776,8 @@ namespace Couleur
 
         private void NotifyBrowserPreviewChanged()
         {
+            OnPropertyChanged(nameof(BrowserAtmosphereVisibility));
+            OnPropertyChanged(nameof(BrowserAtmospherePreview));
             OnPropertyChanged(nameof(BrowserPreviewBackgroundBrush));
             OnPropertyChanged(nameof(BrowserPreviewTextBrush));
             OnPropertyChanged(nameof(BrowserPreviewAccentBrush));

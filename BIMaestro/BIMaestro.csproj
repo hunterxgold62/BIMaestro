@@ -55,6 +55,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="les couleurs\Personnalisation\ProjectBrowserIcons.cs" />
+    <Compile Include="les couleurs\Personnalisation\AppearancePack.cs" />
+    <Compile Include="les couleurs\Personnalisation\BrowserAtmosphere.cs" />
     <EmbeddedResource Include="Resources\BrowserIcons\*.png" />
     <EmbeddedResource Include="Resources\BrowserIcons\browser-icons.js" />
     <Reference Include="System.IO.Compression" />
