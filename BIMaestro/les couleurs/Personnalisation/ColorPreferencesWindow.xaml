@@ -1044,7 +1044,63 @@
                             </StackPanel>
                         </Border>
 
-                        <Border Grid.Row="5"
+                        <Border Grid.Row="5" Margin="0,14,0,0" Padding="16"
+                                Background="{DynamicResource Surface.Subtle}"
+                                BorderBrush="{DynamicResource Border}" BorderThickness="1" CornerRadius="10">
+                            <StackPanel>
+                                <TextBlock FontSize="14" FontWeight="SemiBold" Text="Icônes devant les noms"
+                                           Foreground="{DynamicResource Text.Primary}"/>
+                                <TextBlock Margin="0,6,0,10" Style="{StaticResource Hint}" TextWrapping="Wrap"
+                                           Text="Revit 2024 à 2027 · Choisissez une image et indiquez le nom exact du groupe ou de la vue. Les noms du projet restent inchangés. La première règle correspondante est utilisée, sans distinction majuscules/minuscules."/>
+                                <CheckBox Content="Afficher mes icônes (indépendamment des couleurs)"
+                                          IsChecked="{Binding BrowserIcons.Enabled, Mode=TwoWay}"/>
+                                <Expander Margin="0,10,0,0" Header="Choisir les images et les noms" IsExpanded="False">
+                                    <StackPanel Margin="0,10,0,0">
+                                        <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap"
+                                                   Text="10 images créées par IA sont incluses. Symboles simples, affichés à 18 px. Vous pouvez aussi importer une image ; privilégiez un PNG transparent avec un seul symbole."/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,10,0,10">
+                                            <Button Content="+ Ajouter un nom" Style="{StaticResource SecondaryButton}"
+                                                    Click="AddBrowserIconRule_Click"/>
+                                            <Button Content="Importer une image…" Margin="8,0,0,0"
+                                                    Style="{StaticResource SecondaryButton}" Click="ImportBrowserIcon_Click"/>
+                                        </StackPanel>
+                                        <ItemsControl ItemsSource="{Binding BrowserIcons.Rules}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,0,0,6">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="220"/>
+                                                            <ColumnDefinition Width="40"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Height="32"
+                                                                 ToolTip="Nom exact du groupe ou de la vue" Margin="0,0,8,0"/>
+                                                        <ComboBox Grid.Column="1" Height="32"
+                                                                  ItemsSource="{Binding DataContext.BrowserIconAssets, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                  SelectedValuePath="Id" SelectedValue="{Binding IconId, UpdateSourceTrigger=PropertyChanged}">
+                                                            <ComboBox.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <StackPanel Orientation="Horizontal">
+                                                                        <Image Source="{Binding Preview}" Width="18" Height="18" Margin="0,0,8,0"/>
+                                                                        <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                                                                    </StackPanel>
+                                                                </DataTemplate>
+                                                            </ComboBox.ItemTemplate>
+                                                        </ComboBox>
+                                                        <Button Grid.Column="2" Content="×" Margin="6,0,0,0"
+                                                                ToolTip="Supprimer cette règle" Click="RemoveBrowserIconRule_Click"/>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <TextBlock Margin="0,6,0,0" Style="{StaticResource Hint}" TextWrapping="Wrap"
+                                                   Text="Cliquez sur Enregistrer pour appliquer. Ces réglages sont locaux à BIMaestro et indépendants des profils de couleurs."/>
+                                    </StackPanel>
+                                </Expander>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Row="6"
                                 Margin="0,14,0,0"
                                 Padding="16"
                                 Background="{DynamicResource Surface.Subtle}"

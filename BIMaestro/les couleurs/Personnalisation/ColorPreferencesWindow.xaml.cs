@@ -68,6 +68,56 @@ namespace Couleur
 
         public ObservableCollection<PanelColorItem> PanelColors { get; }
 
+        public BrowserIconSettings BrowserIcons { get; } = ProjectBrowserIcons.Load();
+        private ObservableCollection<BrowserIconAsset> _browserIconAssets;
+        public ObservableCollection<BrowserIconAsset> BrowserIconAssets => _browserIconAssets ??
+            (_browserIconAssets = new ObservableCollection<BrowserIconAsset>(ProjectBrowserIcons.Assets(BrowserIcons)));
+
+        private void AddBrowserIconRule_Click(object sender, RoutedEventArgs e)
+        {
+            BrowserIcons.Rules.Add(new BrowserIconRule());
+        }
+
+        private void RemoveBrowserIconRule_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement element && element.DataContext is BrowserIconRule rule)
+                BrowserIcons.Rules.Remove(rule);
+        }
+
+        private void ImportBrowserIcon_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "Importer une icône simple (PNG conseillé)",
+                Filter = "Images|*.png;*.jpg;*.jpeg;*.bmp",
+                CheckFileExists = true
+            };
+            if (dialog.ShowDialog(this) != true) return;
+            try
+            {
+                if (new System.IO.FileInfo(dialog.FileName).Length > 10 * 1024 * 1024)
+                    throw new System.InvalidOperationException("Choisissez une image de moins de 10 Mo.");
+                using (var stream = System.IO.File.OpenRead(dialog.FileName))
+                {
+                    var asset = new BrowserIconAsset
+                    {
+                        Id = System.Guid.NewGuid().ToString("N"),
+                        Name = System.IO.Path.GetFileNameWithoutExtension(dialog.FileName),
+                        Data = ProjectBrowserIcons.EncodeImage(stream)
+                    };
+                    // Initialize the catalog before adding the new custom asset.
+                    var catalog = BrowserIconAssets;
+                    BrowserIcons.CustomAssets.Add(asset);
+                    catalog.Add(asset);
+                }
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show(this, "Impossible de lire cette image.\n" + ex.Message,
+                    "Icônes", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
         public ObservableCollection<BrowserCategorySuggestion>
             BrowserCategorySuggestions { get; } =
                 new ObservableCollection<BrowserCategorySuggestion>();
@@ -716,6 +766,10 @@ namespace Couleur
 
         private void ResetDefaultsButton_Click(object sender, RoutedEventArgs e)
         {
+            BrowserIcons.Enabled = false;
+            BrowserIcons.Rules.Clear();
+            foreach (var rule in ProjectBrowserIcons.Defaults().Rules)
+                BrowserIcons.Rules.Add(rule);
             Dictionary<string, RibbonPanelColorScheme> defaults =
                 RibbonColorPreferences.GetDefaults();
 
@@ -739,6 +793,8 @@ namespace Couleur
             reset.IsActiveViewParentHighlightEnabled = false;
             reset.BackgroundMode = "Uni";
             BrowserPreferences = reset;
+            BrowserIcons.Enabled = false;
+            ProjectBrowserIcons.Save(BrowserIcons);
             ProjectBrowserColorPreferences.Save(reset);
             ProjectBrowserColoring.Reset();
             ProjectBrowserColoring.Apply(_mainWindowHandle);
@@ -775,6 +831,7 @@ namespace Couleur
 
         private void SaveCurrentColors()
         {
+            ProjectBrowserIcons.Save(BrowserIcons);
             ColoringStateManager.SetColoringActive(
                 AreColoredPanelsEnabled);
             ColoringStateManager.SetFullMode(

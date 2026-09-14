@@ -54,6 +54,9 @@
     <SignAssembly>true</SignAssembly>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="les couleurs\Personnalisation\ProjectBrowserIcons.cs" />
+    <EmbeddedResource Include="Resources\BrowserIcons\*.png" />
+    <EmbeddedResource Include="Resources\BrowserIcons\browser-icons.js" />
     <Reference Include="System.IO.Compression" />
     <Reference Include="System.IO.Compression.FileSystem" />
     <PackageReference Include="CloudinaryDotNet">

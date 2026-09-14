@@ -1052,6 +1052,7 @@ namespace Couleur
         {
             if (_chromiumBrowser != null)
             {
+                ExecuteBrowserScript(_chromiumBrowser, ProjectBrowserIcons.DisposeScript);
                 ExecuteBrowserScript(
                     _chromiumBrowser,
                     "if(window.__bimaestroProjectBrowserTheme){" +
@@ -1640,6 +1641,7 @@ namespace Couleur
 
                 _chromiumBrowser = browser;
                 _browserInjectionSucceeded = true;
+                ExecuteBrowserScript(browser, ProjectBrowserIcons.CreateScript(_revitVersion));
                 EnsureViewHoverPreviewScript(browser);
                 if (!ReferenceEquals(_viewHoverPreviewBrowser, browser))
                 {
