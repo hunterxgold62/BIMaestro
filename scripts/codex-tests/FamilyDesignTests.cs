@@ -16,10 +16,15 @@ internal static class FamilyDesignTests
         {
             var hosted = (JObject)fixture.DeepClone(); hosted["category"] = category;
             hosted["place_at_origin"] = false;
+            hosted["host_opening"] = JObject.Parse("{ min_xz:[{offset_mm:0,terms:[]},{offset_mm:0,terms:[]}], max_xz:[{offset_mm:1000,terms:[]},{offset_mm:1500,terms:[]}] }");
             if (CodexFamilyDesign.Parse(hosted).Hosting != "wall") throw new Exception("Doors/windows must default to wall hosting");
+            if (CodexFamilyDesign.Parse(hosted).HostOpening.Max[0].Offset != 1000) throw new Exception("Fixed host opening lost its dimensions");
+            Reject(hosted, x => x.Remove("host_opening"), "fixed window/door without cut");
+            Reject(hosted, x => x["host_opening"]["min_xz"][0]["offset_mm"] = 1100, "fixed inverted opening");
+            Reject(hosted, x => x["host_opening"]["min_xz"][0]["terms"] = JArray.Parse("[{parameter:'Width',factor:1}]"), "fixed opening with parameter reference");
             hosted["hosting"] = "auto";
             if (CodexFamilyDesign.Parse(hosted).Hosting != "wall") throw new Exception("Auto wall hosting failed");
-            hosted["hosting"] = "free";
+            hosted["hosting"] = "free"; hosted["host_opening"] = JValue.CreateNull();
             if (CodexFamilyDesign.Parse(hosted).Hosting != "free") throw new Exception("Explicit free hosting ignored");
         }
         var floor = (JObject)fixture.DeepClone(); floor["hosting"] = "floor"; floor["place_at_origin"] = false;

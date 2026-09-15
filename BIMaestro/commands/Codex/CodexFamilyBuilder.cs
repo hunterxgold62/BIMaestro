@@ -22,7 +22,7 @@ namespace BIMaestro.Codex
         internal static readonly string OutputRoot = Path.Combine(CodexClient.DataDirectory, "Families");
 
         // Called exclusively from the bridge's ExternalEvent. The source project is never saved.
-        internal static CodexFamilyArtifact Create(UIApplication app, Document source, CodexFamilyDesign design, bool validateOnly = false, CodexParametricDesign parametric = null)
+        internal static CodexFamilyArtifact Create(UIApplication app, Document source, CodexFamilyDesign design, bool validateOnly = false, CodexParametricDesign parametric = null, bool testHostPlacement = false)
         {
             if (!validateOnly && design.Load && (source == null || source.IsFamilyDocument || source.IsReadOnly || source.IsModifiable))
                 throw new InvalidOperationException("Le chargement nécessite un projet actif modifiable, hors d'une autre commande.");
@@ -47,6 +47,7 @@ namespace BIMaestro.Codex
                 var bounds = new Bounds();
                 var createdElements = new List<Element>();
                 CodexParametricBuilder parametricBuilder = null;
+                CodexHostOpeningBuilder hostOpening = null;
                 View3D preview;
                 var previewViews = new List<View3D>();
                 using (var transaction = new Transaction(family, "BIMaestro — famille depuis description"))
@@ -68,7 +69,7 @@ namespace BIMaestro.Codex
                         stage = "matériau « " + spec.Name + " »";
                         var material = (Material)family.GetElement(Material.Create(family, "BIMaestro " + SafeName(spec.Name)));
                         material.Color = new Color(spec.Rgb[0], spec.Rgb[1], spec.Rgb[2]); material.Transparency = spec.Transparency;
-                        var parameter = manager.AddParameter("Matériau — " + SafeName(spec.Name), GroupTypeId.Materials, SpecTypeId.Reference.Material, false);
+                        var parameter = CodexParameterBuilder.NewInternal(manager, "Matériau — " + SafeName(spec.Name), GroupTypeId.Materials, SpecTypeId.Reference.Material, false);
                         manager.Set(parameter, material.Id); materials[spec.Name] = parameter;
                     }
                     if (parametric != null)
@@ -110,6 +111,10 @@ namespace BIMaestro.Codex
                         catch (Exception ex) { throw new InvalidOperationException("Pièce « " + part.Name + " » : " + ex.Message, ex); }
                         finally { baseSolid?.Dispose(); }
                     }
+                    stage = "ouverture du mur hôte";
+                    hostOpening = parametricBuilder?.HostOpening;
+                    if (parametric == null && design.HostOpening != null)
+                        hostOpening = new CodexHostOpeningBuilder(family, design.HostOpening, new Dictionary<string, double>());
                     // Calculated reference dimensions, explicitly not driving parameters.
                     stage = "contrôle des encombrements";
                     family.Regenerate();
@@ -145,9 +150,11 @@ namespace BIMaestro.Codex
                 }
                 stage = "tests de variation des paramètres";
                 object[] flexTests = parametricBuilder?.Flex() ?? new object[0];
+                hostOpening?.Check(parametric?.Initial ?? new Dictionary<string, double>());
+                object hostPlacementTest = testHostPlacement && hostOpening != null ? hostOpening.VerifyProjectPlacement(parametric?.TestCases() ?? new[] { new Dictionary<string, double>() }) : null;
                 if (validateOnly) return new CodexFamilyArtifact { Report = new {
                     validated = true, saved = false, loaded = false, solidCount = parametric?.SolidCount ?? design.SolidCount,
-                    revit_version = app.Application.VersionNumber, flex_tests = flexTests,
+                    revit_version = app.Application.VersionNumber, flex_tests = flexTests, host_opening = hostOpening?.Report(), host_placement_test = hostPlacementTest,
                     parameters = parametric?.Registry == null ? null : CodexFamilyTools.Read(family), connectors = parametricBuilder?.ConnectorReports(),
                     dimensions_mm = new[] { Mm(bounds.Max.X - bounds.Min.X), Mm(bounds.Max.Y - bounds.Min.Y), Mm(bounds.Max.Z - bounds.Min.Z) },
                     warnings = warnings.ToArray(), next = "Validation native terminée pour les cas demandés. Appeler " + (parametric == null ? "revit_create_family" : "revit_create_parametric_family") + " avec la même description pour enregistrer." } };
@@ -219,6 +226,7 @@ namespace BIMaestro.Codex
                     parameters = parametric?.Registry == null ? null : CodexFamilyTools.Read(family),
                     connectors = parametricBuilder?.ConnectorReports(),
                     hosting = parametric?.Hosting ?? design.Hosting,
+                    host_opening = hostOpening?.Report(),
                     flex_tests = flexTests,
                     assumptions = design.Assumptions, warnings = warnings.Distinct().Take(40).ToArray(), loadedFamilyId = loadedId, placedInstanceId = placedId,
                     undo = "Ctrl+Z annule le chargement/placement dans le projet ; le fichier RFA reste sur disque."
@@ -278,7 +286,7 @@ namespace BIMaestro.Codex
         }
         private static void AddReferenceDimension(FamilyManager manager, string name, double value)
         {
-            var parameter = manager.AddParameter(name, GroupTypeId.Geometry, SpecTypeId.Length, false);
+            var parameter = CodexParameterBuilder.NewInternal(manager, name, GroupTypeId.Geometry, SpecTypeId.Length, false);
             manager.SetFormula(parameter, Mm(value).ToString("0.######", System.Globalization.CultureInfo.InvariantCulture) + " mm");
         }
         private static View3D CreatePreview(Document doc, Bounds bounds, string name = "BIMaestro - Aperçu", XYZ direction = null)

@@ -87,6 +87,7 @@ namespace BIMaestro.Codex
             if (source?["connectors"] != null) keys.Add("connectors");
             if (source?["symbolic_outlines"] != null) keys.Add("symbolic_outlines");
             if (source?["hosting"] != null) keys.Add("hosting");
+            if (source?["host_opening"] != null) keys.Add("host_opening");
             if (source?["arrays"] != null) keys.Add("arrays");
             if (source?["angles"] != null) keys.Add("angles");
             CodexFamilyDesign.Keys(source, keys.ToArray());
@@ -96,11 +97,12 @@ namespace BIMaestro.Codex
             var metadata = (JObject)source.DeepClone(); metadata.Remove("parameters"); metadata.Remove("arrays"); metadata.Remove("angles"); metadata.Remove("family_options");
             metadata.Remove("connectors");
             metadata.Remove("symbolic_outlines");
+            metadata.Remove("host_opening");
             metadata["target_dimensions_mm"] = new JArray(0, 0, 0);
             metadata["parts"] = new JArray(new JObject { ["name"] = "Metadata", ["material"] = CodexFamilyDesign.String(firstMaterial, "name", 70),
                 ["geometry"] = new JObject { ["kind"] = "box", ["size_mm"] = new JArray(1, 1, 1), ["position_mm"] = new JArray(0, 0, 0), ["rotation_deg"] = new JArray(0, 0, 0), ["profile_mm"] = new JArray() },
                 ["cuts"] = new JArray(), ["repeat_count"] = 1, ["repeat_step_mm"] = new JArray(0, 0, 0) });
-            var design = new CodexParametricDesign { Metadata = CodexFamilyDesign.Parse(metadata), Registry = CodexFamilyParameters.Parse(source) };
+            var design = new CodexParametricDesign { Metadata = CodexFamilyDesign.Parse(metadata, false), Registry = CodexFamilyParameters.Parse(source) };
             design.Metadata.Parts.Clear(); design.Metadata.Source = (JObject)source.DeepClone();
             design.Hosting = design.Metadata.Hosting;
             var lengthTokens = design.Registry == null ? CodexFamilyDesign.Items(source, "parameters", 1, 8) : new JArray(design.Registry.Lengths.Select(p => new JObject {
@@ -183,7 +185,8 @@ namespace BIMaestro.Codex
                     design.Arrays.Add(array);
                 }
             if (design.Parts.Count + design.Arrays.Count == 0) throw new InvalidOperationException("La famille doit contenir au moins une pièce ou un réseau.");
-            var used = design.Parts.SelectMany(p => p.Expressions).Concat(design.Arrays.SelectMany(a => a.Expressions)).SelectMany(e => e.Terms.Keys).ToHashSet();
+            design.Metadata.HostOpening = FamilyHostOpeningSpec.Parse(source, design.Hosting, design.Metadata.Category, names);
+            var used = design.Parts.SelectMany(p => p.Expressions).Concat(design.Arrays.SelectMany(a => a.Expressions)).Concat(design.Metadata.HostOpening?.Expressions ?? Enumerable.Empty<LengthExpression>()).SelectMany(e => e.Terms.Keys).ToHashSet();
             if (design.Registry == null && source["connectors"] == null && design.Parameters.Any(p => !used.Contains(p.Name))) throw new InvalidOperationException("Chaque paramètre doit piloter au moins une coordonnée de géométrie.");
             if (design.Registry == null && design.Angles.Any(p => !design.Arrays.Any(a => a.AngleParameter == p.Name))) throw new InvalidOperationException("Chaque angle doit piloter la rotation d'un réseau.");
             if (design.Registry != null)
@@ -211,6 +214,7 @@ namespace BIMaestro.Codex
         }
         internal void ValidateAt(Dictionary<string, double> values)
         {
+            Metadata?.HostOpening?.Validate(values, Initial);
             if (Angles.Any(a => values[a.Name] < 1 || values[a.Name] > 89)) throw new InvalidOperationException("Angle hors de la plage de 1 à 89 degrés.");
             foreach (var array in Arrays)
             {

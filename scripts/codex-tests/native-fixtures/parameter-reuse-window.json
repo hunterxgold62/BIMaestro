@@ -1,0 +1,157 @@
+{
+  "name": "Fenetre_test_baie_mur",
+  "category": "window",
+  "hosting": "wall",
+  "host_opening": {
+    "min_xz": [
+      {
+        "offset_mm": 0,
+        "terms": [
+          {
+            "parameter": "largeur",
+            "factor": -0.5
+          }
+        ]
+      },
+      {
+        "offset_mm": 200,
+        "terms": []
+      }
+    ],
+    "max_xz": [
+      {
+        "offset_mm": 0,
+        "terms": [
+          {
+            "parameter": "largeur",
+            "factor": 0.5
+          }
+        ]
+      },
+      {
+        "offset_mm": 200,
+        "terms": [
+          {
+            "parameter": "hauteur",
+            "factor": 1
+          }
+        ]
+      }
+    ]
+  },
+  "assumptions": [],
+  "materials": [
+    {
+      "name": "Cadre",
+      "rgb": [
+        80,
+        80,
+        80
+      ],
+      "transparency": 0
+    }
+  ],
+  "parameters": [
+    {
+      "name": "largeur",
+      "value_mm": 1000,
+      "test_value_mm": 1400
+    },
+    {
+      "name": "hauteur",
+      "value_mm": 1200,
+      "test_value_mm": 1500
+    }
+  ],
+  "parts": [
+    {
+      "name": "Dormant",
+      "material": "Cadre",
+      "axis": "y",
+      "openings": [
+        {
+          "minimum_uv": [
+            {
+              "offset_mm": 50,
+              "terms": [
+                {
+                  "parameter": "largeur",
+                  "factor": -0.5
+                }
+              ]
+            },
+            {
+              "offset_mm": 250,
+              "terms": []
+            }
+          ],
+          "maximum_uv": [
+            {
+              "offset_mm": -50,
+              "terms": [
+                {
+                  "parameter": "largeur",
+                  "factor": 0.5
+                }
+              ]
+            },
+            {
+              "offset_mm": 150,
+              "terms": [
+                {
+                  "parameter": "hauteur",
+                  "factor": 1
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "minimum": [
+        {
+          "offset_mm": 0,
+          "terms": [
+            {
+              "parameter": "largeur",
+              "factor": -0.5
+            }
+          ]
+        },
+        {
+          "offset_mm": -50,
+          "terms": []
+        },
+        {
+          "offset_mm": 200,
+          "terms": []
+        }
+      ],
+      "maximum": [
+        {
+          "offset_mm": 0,
+          "terms": [
+            {
+              "parameter": "largeur",
+              "factor": 0.5
+            }
+          ]
+        },
+        {
+          "offset_mm": 50,
+          "terms": []
+        },
+        {
+          "offset_mm": 200,
+          "terms": [
+            {
+              "parameter": "hauteur",
+              "factor": 1
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "load_into_project": false,
+  "place_at_origin": false
+}

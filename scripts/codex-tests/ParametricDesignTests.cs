@@ -1,4 +1,4 @@
-using BIMaestro.Codex;
+﻿using BIMaestro.Codex;
 using Newtonsoft.Json.Linq;
 using System;
 using System.IO;
@@ -8,6 +8,20 @@ internal static class ParametricDesignTests
 {
     internal static void Run()
     {
+        var window = JObject.Parse(File.ReadAllText("scripts/codex-tests/native-fixtures/host-opening-window.json"));
+        var windowDesign = CodexParametricDesign.Parse(window);
+        var resized = windowDesign.Initial; resized["Largeur"] = 1400; resized["Hauteur"] = 1500;
+        windowDesign.ValidateAt(resized);
+        if (windowDesign.Metadata.HostOpening.Max[0].Value(resized) != 700 || windowDesign.Metadata.HostOpening.Max[1].Value(resized) != 1700)
+            throw new Exception("Host opening does not follow window dimensions");
+        Reject(window, x => x.Remove("host_opening"), "window missing host opening");
+        Reject(window, x => x["host_opening"] = JValue.CreateNull(), "window null host opening");
+        Reject(window, x => x["hosting"] = "floor", "wall opening on floor host");
+        Reject(window, x => x["host_opening"]["max_xz"][0]["terms"][0]["parameter"] = "Unknown", "unknown opening parameter");
+        Reject(window, x => x["host_opening"]["max_xz"][0] = x["host_opening"]["min_xz"][0].DeepClone(), "zero opening width");
+        Reject(window, x => x["host_opening"]["max_xz"][0]["terms"][0]["factor"] = -1, "inverted opening");
+        Reject(window, x => { x["host_opening"]["max_xz"][0]["offset_mm"] = 650; x["host_opening"]["max_xz"][0]["terms"][0]["factor"] = -0.5; }, "opening crossing origin on flex");
+        Console.WriteLine("PASS: window host opening, width/height flex and invalid host/contour rejection");
         var source = JObject.Parse(File.ReadAllText("scripts/codex-tests/parametric-diffuser.design.json"));
         var design = CodexParametricDesign.Parse(source);
         var wide = design.Initial; wide["Largeur"] = 800;

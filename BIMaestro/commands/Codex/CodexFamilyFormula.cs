@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -109,6 +109,10 @@ namespace BIMaestro.Codex
                 default: throw new InvalidOperationException("Opérateur inconnu : " + Op);
             }
         }
+        // Preserve quoted text and replace whole parameter identifiers only.
+        internal static string RewriteParameterNames(string formula, IDictionary<string, string> names) =>
+            Regex.Replace(formula, "\"(?:[^\"]|\"\")*\"|[A-Za-z][A-Za-z0-9_]*", m => names.TryGetValue(m.Value, out var actual) ? actual : m.Value);
+
         internal string Revit()
         {
             if (Name != null) return Name;

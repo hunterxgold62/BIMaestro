@@ -11,6 +11,7 @@ namespace BIMaestro.Codex
     {
         internal string Name, Category;
         internal string Hosting = "free";
+        internal FamilyHostOpeningSpec HostOpening;
         internal JObject Source;
         internal readonly List<FamilyMaterial> Materials = new List<FamilyMaterial>();
         internal readonly List<FamilyPart> Parts = new List<FamilyPart>();
@@ -37,6 +38,7 @@ namespace BIMaestro.Codex
             {
                 ["name"] = Text(90), ["category"] = Enum("generic", "electrical", "mechanical", "furniture", "plumbing", "air_terminal", "lighting", "door", "window"),
                 ["hosting"] = HostingSchema(),
+                ["host_opening"] = FamilyHostOpeningSpec.Schema(),
                 ["target_dimensions_mm"] = new JObject { ["type"] = "array", ["minItems"] = 3, ["maxItems"] = 3, ["items"] = Number(0, 100000), ["description"] = "Encombrements extérieurs demandés [X,Y,Z], en mm ; 0 pour une cote inconnue. Le constructeur refuse une différence supérieure à 0,5 % (minimum 1 mm) sur une cote non nulle." },
                 ["assumptions"] = Array(Text(400), 0, 20),
                 ["materials"] = Array(Object(new JObject { ["name"] = Text(70), ["rgb"] = new JObject { ["type"] = "array", ["items"] = new JObject { ["type"] = "integer", ["minimum"] = 0, ["maximum"] = 255 }, ["minItems"] = 3, ["maxItems"] = 3 }, ["transparency"] = new JObject { ["type"] = "integer", ["minimum"] = 0, ["maximum"] = 90 } }), 1, 32),
@@ -60,7 +62,7 @@ namespace BIMaestro.Codex
             tool["name"] = "revit_create_project_shapes";
             tool["description"] = "Crée une composition libre directement dans le PROJET : solides DirectShape, matériaux, rotations, profils et lofts, évidements, répétitions. Ce ne sont ni des murs natifs ni des familles RFA, pas de limites de pièces ni de connecteurs. Une transaction, un Ctrl+Z. Géométrie décrite autour d'une origine locale puis placée avec project_origin_mm (coordonnées INTERNES Revit obtenues par lecture) et project_rotation_deg autour de Z. Ne remplace aucun élément existant.";
             var properties = (JObject)tool["inputSchema"]["properties"];
-            properties.Remove("hosting"); properties.Remove("load_into_project"); properties.Remove("place_at_origin");
+            properties.Remove("host_opening"); properties.Remove("hosting"); properties.Remove("load_into_project"); properties.Remove("place_at_origin");
             properties["project_origin_mm"] = new JObject { ["type"] = "array", ["minItems"] = 3, ["maxItems"] = 3, ["items"] = Number(-10000000, 10000000) };
             properties["project_rotation_deg"] = Number(-360, 360);
             tool["inputSchema"]["required"] = new JArray(properties.Properties().Select(p => p.Name));
@@ -74,7 +76,7 @@ namespace BIMaestro.Codex
 
         internal static JObject HostingSchema() => new JObject {
             ["type"] = "string", ["enum"] = new JArray("auto", "free", "face", "wall", "floor", "ceiling", "work_plane"),
-            ["description"] = "Choisir selon l'usage : wall pour un composant fixé à un mur, floor pour un composant hébergé sur sol, ceiling pour plafond, face pour une face quelconque, work_plane pour plan de travail, free pour indépendant. auto choisit wall pour category=door/window, free sinon. Une porte doit utiliser category=door et une fenêtre category=window, jamais generic sauf demande explicite. Les familles hébergées exigent place_at_origin=false ; choisir l'hôte dans le projet après chargement. L'hébergement ne garantit pas une découpe du mur par la géométrie créée." };
+            ["description"] = "Choisir selon l'usage : wall pour un composant fixé à un mur, floor pour un composant hébergé sur sol, ceiling pour plafond, face pour une face quelconque, work_plane pour plan de travail, free pour indépendant. auto choisit wall pour category=door/window, free sinon. Une porte doit utiliser category=door et une fenêtre category=window, jamais generic sauf demande explicite. Les familles hébergées exigent place_at_origin=false ; choisir l'hôte dans le projet après chargement. Pour une porte/fenêtre murale, fournir host_opening pour percer réellement le mur ; les évidements des pièces ne coupent pas l'hôte." };
 
         internal static string ResolveHosting(JObject value, string category, bool place)
         {
@@ -87,10 +89,11 @@ namespace BIMaestro.Codex
             return hosting;
         }
 
-        internal static CodexFamilyDesign Parse(JObject value)
+        internal static CodexFamilyDesign Parse(JObject value, bool parseHostOpening = true)
         {
             var keys = new List<string> { "name", "category", "target_dimensions_mm", "assumptions", "materials", "parts", "load_into_project", "place_at_origin" };
             if (value?["hosting"] != null) keys.Add("hosting");
+            if (value?["host_opening"] != null) keys.Add("host_opening");
             Keys(value, keys.ToArray());
             var design = new CodexFamilyDesign { Name = String(value, "name", 90), Category = String(value, "category", 20), Source = (JObject)value.DeepClone() };
             if (!new[] { "generic", "electrical", "mechanical", "furniture", "plumbing", "air_terminal", "lighting", "door", "window" }.Contains(design.Category)) throw new InvalidOperationException("Catégorie de famille non prise en charge.");
@@ -99,6 +102,11 @@ namespace BIMaestro.Codex
             design.Load = value.Value<bool>("load_into_project"); design.Place = value.Value<bool>("place_at_origin");
             if (design.Place && !design.Load) throw new InvalidOperationException("Le placement exige le chargement dans le projet.");
             design.Hosting = ResolveHosting(value, design.Category, design.Place);
+            if (parseHostOpening)
+            {
+                design.HostOpening = FamilyHostOpeningSpec.Parse(value, design.Hosting, design.Category, new HashSet<string>());
+                design.HostOpening?.Validate(new Dictionary<string, double>(), new Dictionary<string, double>());
+            }
             design.Assumptions = Items(value, "assumptions", 0, 20).Select(v => ValidString(v, "hypothèse", 400)).ToArray();
             foreach (var token in Items(value, "materials", 1, 32))
             {

@@ -1,4 +1,4 @@
-using Autodesk.Revit.DB;
+﻿using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Newtonsoft.Json.Linq;
 using System;
@@ -32,7 +32,7 @@ namespace BIMaestro.Codex
                         var source = JObject.Parse(reader.ReadToEnd());
                         source["load_into_project"] = false; source["place_at_origin"] = false;
                         var design = CodexParametricDesign.Parse(source);
-                        var artifact = CodexFamilyBuilder.Create(app, null, design.Metadata, true, design);
+                        var artifact = CodexFamilyBuilder.Create(app, null, design.Metadata, true, design, testHostPlacement: true);
                         results.Add(new { scenario = name, passed = true, seconds = watch.Elapsed.TotalSeconds, report = artifact.Report }); passed++;
                     }
                 }
@@ -44,7 +44,7 @@ namespace BIMaestro.Codex
             string directory = Path.Combine(CodexClient.DataDirectory, "Validation"); Directory.CreateDirectory(directory);
             string path = Path.Combine(directory, "Revit-" + app.Application.VersionNumber + "-" + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss") + ".json");
             File.WriteAllText(path, Newtonsoft.Json.JsonConvert.SerializeObject(report, Newtonsoft.Json.Formatting.Indented));
-            return new { report_path = path, validation = report, next = "Ces tests portent sur les familles temporaires. Le chargement, les occurrences et les vues en projet restent des contrôles séparés." };
+            return new { report_path = path, validation = report, next = "Ces tests portent sur les familles temporaires. Les scénarios host_opening vérifient aussi le chargement, le placement et la découpe après variation dans un projet temporaire non enregistré ; les vues en projet restent un contrôle séparé." };
         }
     }
 }

@@ -1,4 +1,4 @@
-using Autodesk.Revit.DB;
+﻿using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Structure;
 using System;
 using System.Collections.Generic;
@@ -51,7 +51,7 @@ namespace BIMaestro.Codex
                         transaction.SetFailureHandlingOptions(transaction.GetFailureHandlingOptions().SetFailuresPreprocessor(new CodexFamilyBuilder.Failures(failures)).SetClearAfterRollback(true));
                         var manager = child.FamilyManager;
                         if (manager.CurrentType == null) manager.NewType("Standard");
-                        var material = manager.AddParameter("Materiau", GroupTypeId.Materials, SpecTypeId.Reference.Material, false);
+                        var material = CodexParameterBuilder.GetOrAdd(manager, "Materiau", GroupTypeId.Materials, SpecTypeId.Reference.Material, false);
                         if (spec.RotationAxis < 0)
                         {
                             builder = new CodexParametricBuilder(child, childDesign);
@@ -69,8 +69,8 @@ namespace BIMaestro.Codex
                         transaction.Start();
                         var manager = child.FamilyManager;
                         foreach (var name in SizeNames.Concat(new[] { "Materiau", "Inclinaison" }))
-                        { var p = manager.get_Parameter(name); if (p != null) manager.MakeInstance(p); }
-                        var visible = manager.AddParameter("BIM_Visible", GroupTypeId.Visibility, SpecTypeId.Boolean.YesNo, true);
+                        { var p = CodexParameterBuilder.FindExisting(manager, name); if (p != null) manager.MakeInstance(p); }
+                        var visible = CodexParameterBuilder.GetOrAdd(manager, "BIM_Visible", GroupTypeId.Visibility, SpecTypeId.Boolean.YesNo, true);
                         manager.Set(visible, 1);
                         var display = design.Registry?.Displays.FirstOrDefault(d => d.Component == spec.Name);
                         foreach (var form in new FilteredElementCollector(child).OfClass(typeof(GenericForm)).Cast<GenericForm>())
@@ -108,21 +108,22 @@ namespace BIMaestro.Codex
                 if (spec.AngleParameter != null) constraints.AssociateAngle(first.LookupParameter("Inclinaison"), spec.AngleParameter);
                 manager.AssociateElementParameterToFamilyParameter(first.LookupParameter("Materiau"), material);
                 bool countInstance = spec.Span.Terms.Keys.Concat(spec.Pitch.Terms.Keys).Concat(new[] { spec.QuantityParameter }).Any(constraints.IsInstance);
-                var count = manager.AddParameter(spec.CountParameter, GroupTypeId.Geometry, SpecTypeId.Int.Integer, countInstance);
-                manager.SetFormula(count, spec.CountFormula);
-                manager.SetDescription(count, "Nombre demandé. Pour 0/1, la représentation conditionnelle compatible Revit 2023 conserve des solides cachés.");
+                var count = CodexParameterBuilder.GetOrAdd(manager, spec.CountParameter, GroupTypeId.Geometry, SpecTypeId.Int.Integer, countInstance);
+                constraints.RegisterDriver(spec.CountParameter, count);
+                manager.SetFormula(count, constraints.NativeFormula(spec.CountFormula));
+                CodexParameterBuilder.Describe(manager, count, "Nombre demandé. Pour 0/1, la représentation conditionnelle compatible Revit 2023 conserve des solides cachés.");
                 FamilyParameter nativeCount = count;
                 if (spec.SmallCounts)
                 {
-                    nativeCount = manager.AddParameter("BIM_Reseau_" + spec.CountParameter, GroupTypeId.Constraints, SpecTypeId.Int.Integer, countInstance);
-                    manager.SetFormula(nativeCount, "if(" + spec.CountParameter + " < 2, 2, " + spec.CountParameter + ")");
+                    nativeCount = CodexParameterBuilder.NewInternal(manager, "BIM_Reseau_" + spec.CountParameter, GroupTypeId.Constraints, SpecTypeId.Int.Integer, countInstance);
+                    manager.SetFormula(nativeCount, constraints.NativeFormula("if(" + spec.CountParameter + " < 2, 2, " + spec.CountParameter + ")"));
                     string visible = constraints.VisibilityParameter(spec.Name);
                     bool visibleInstance = countInstance || (!string.IsNullOrEmpty(visible) && constraints.IsInstance(visible));
-                    var groupVisible = manager.AddParameter("BIM_Groupe_" + spec.CountParameter, GroupTypeId.Visibility, SpecTypeId.Boolean.YesNo, visibleInstance);
-                    var singleVisible = manager.AddParameter("BIM_Unique_" + spec.CountParameter, GroupTypeId.Visibility, SpecTypeId.Boolean.YesNo, visibleInstance);
+                    var groupVisible = CodexParameterBuilder.NewInternal(manager, "BIM_Groupe_" + spec.CountParameter, GroupTypeId.Visibility, SpecTypeId.Boolean.YesNo, visibleInstance);
+                    var singleVisible = CodexParameterBuilder.NewInternal(manager, "BIM_Unique_" + spec.CountParameter, GroupTypeId.Visibility, SpecTypeId.Boolean.YesNo, visibleInstance);
                     string groupFormula = spec.CountParameter + " > 1", singleFormula = spec.CountParameter + " = 1";
                     if (!string.IsNullOrEmpty(visible)) { groupFormula = "and(" + visible + ", " + groupFormula + ")"; singleFormula = "and(" + visible + ", " + singleFormula + ")"; }
-                    manager.SetFormula(groupVisible, groupFormula); manager.SetFormula(singleVisible, singleFormula);
+                    manager.SetFormula(groupVisible, constraints.NativeFormula(groupFormula)); manager.SetFormula(singleVisible, constraints.NativeFormula(singleFormula));
                     manager.AssociateElementParameterToFamilyParameter(first.LookupParameter("BIM_Visible"), groupVisible);
                     single = doc.FamilyCreate.NewFamilyInstance(position, symbol, StructuralType.NonStructural);
                     for (int axis = 0; axis < 3; axis++) constraints.AssociateLength(single.LookupParameter(SizeNames[axis]), LengthExpression.Combine(spec.Max[axis], spec.Min[axis], -1));

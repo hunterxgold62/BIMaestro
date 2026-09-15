@@ -1,4 +1,4 @@
-param([ValidateSet('2023','2024')][string]$RevitVersion = '2023', [ValidatePattern('^[a-zA-Z0-9-]*$')][string]$RunName = '')
+﻿param([ValidateSet('2023','2024')][string]$RevitVersion = '2023', [ValidatePattern('^[a-zA-Z0-9-]*$')][string]$RunName = '', [string]$FixtureFilter = '*.json')
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $runFolder = $RevitVersion
@@ -7,7 +7,7 @@ $output = Join-Path $repo ('tmp/codex-native-validation/' + $runFolder)
 New-Item -ItemType Directory -Path $output -Force | Out-Null
 $api = 'C:/Program Files/Autodesk/Revit ' + $RevitVersion
 $sources = Get-ChildItem (Join-Path $repo 'BIMaestro/commands/Codex') -Filter '*.cs' | Where-Object { $_.Name -notin @('CodexWindow.cs','CodexCommand.cs','CodexImageAttachment.cs') } | ForEach-Object FullName
-$resources = Get-ChildItem (Join-Path $PSScriptRoot 'native-fixtures') -Filter '*.json' | ForEach-Object { '/resource:' + $_.FullName + ',BIMaestro.CodexTests.' + $_.Name }
+$resources = @(Get-ChildItem (Join-Path $PSScriptRoot 'native-fixtures') -Filter $FixtureFilter | ForEach-Object { '/resource:' + $_.FullName + ',BIMaestro.CodexTests.' + $_.Name })
 $assembly = Join-Path $output 'BIMaestro.Codex.NativeValidation.dll'
 $json = Join-Path $repo 'BIMaestro/bin/Release/Newtonsoft.Json.dll'
 & 'C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/Roslyn/csc.exe' /nologo /langversion:9 /target:library "/out:$assembly" "/reference:$api/RevitAPI.dll" "/reference:$api/RevitAPIUI.dll" "/reference:$json" @resources @sources (Join-Path $PSScriptRoot 'NativeValidationApp.cs')

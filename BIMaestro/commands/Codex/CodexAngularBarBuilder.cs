@@ -1,4 +1,4 @@
-using Autodesk.Revit.DB;
+﻿using Autodesk.Revit.DB;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -35,10 +35,10 @@ namespace BIMaestro.Codex
                 var origin = doc.FamilyCreate.NewReferencePlane(start, end, cut, a == 2 ? byAxis[1] : byAxis[2]);
                 origin.Name = "BIM_Origine_" + "XYZ"[a]; origin.Pinned = true;
                 origin.get_Parameter(BuiltInParameter.ELEM_IS_REFERENCE).Set((int)FamilyInstanceReferenceType.StrongReference);
-                sizes[a] = manager.AddParameter("Dimension" + "XYZ"[a], GroupTypeId.Geometry, SpecTypeId.Length, false);
+                sizes[a] = CodexParameterBuilder.GetOrAdd(manager, "Dimension" + "XYZ"[a], GroupTypeId.Geometry, SpecTypeId.Length, false);
                 manager.Set(sizes[a], size[a] / 304.8);
             }
-            angle = manager.AddParameter("Inclinaison", GroupTypeId.Geometry, SpecTypeId.Angle, false);
+            angle = CodexParameterBuilder.GetOrAdd(manager, "Inclinaison", GroupTypeId.Geometry, SpecTypeId.Angle, false);
             manager.Set(angle, degrees * Math.PI / 180);
             int u = (axis + 1) % 3, vAxis = (axis + 2) % 3;
             var rotate = Transform.CreateRotation(Basis(axis), degrees * Math.PI / 180);
@@ -81,9 +81,9 @@ namespace BIMaestro.Codex
                 {
                     double coordinate = points[i].DotProduct(Basis(axes[a]));
                     var target = CoordinatePlane(byAxis[axis], axes[a], coordinate, "BIM_Sommet_" + i + "_" + a);
-                    var driver = manager.AddParameter("BIM_Position_" + i + "_" + a, GroupTypeId.Constraints, SpecTypeId.Length, true);
+                    var driver = CodexParameterBuilder.NewInternal(manager, "BIM_Position_" + i + "_" + a, GroupTypeId.Constraints, SpecTypeId.Length, true);
                     manager.Set(driver, datumMm / 304.8 + coordinate);
-                    manager.SetFormula(driver, "200000 mm + (" + formulas[i][a] + ")");
+                    manager.SetFormula(driver, CodexParameterBuilder.NativeFormula("200000 mm + (" + formulas[i][a] + ")", new Dictionary<string, FamilyParameter> { ["DimensionX"] = sizes[0], ["DimensionY"] = sizes[1], ["DimensionZ"] = sizes[2], ["Inclinaison"] = angle }));
                     doc.Regenerate();
                     var refs = new ReferenceArray(); refs.Append(datums[a].GetReference()); refs.Append(target.GetReference());
                     var offset = Basis(axes[1 - a]) * (3 + i * 0.1);

@@ -1,8 +1,10 @@
-<Project>
+﻿<Project>
   <ItemGroup>
     <Compile Include="commands\Codex\CodexClient.cs" />
     <Compile Include="commands\Codex\CodexShapeBatch.cs" />
     <Compile Include="commands\Codex\CodexFamilyDesign.cs" />
+    <Compile Include="commands\Codex\CodexHostOpeningDesign.cs" />
+    <Compile Include="commands\Codex\CodexHostOpeningBuilder.cs" />
     <Compile Include="commands\Codex\CodexFamilyBuilder.cs" />
     <Compile Include="commands\Codex\CodexParametricDesign.cs" />
     <Compile Include="commands\Codex\CodexFamilyFormula.cs" />

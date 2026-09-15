@@ -1,4 +1,4 @@
-using BIMaestro.Codex;
+﻿using BIMaestro.Codex;
 using Newtonsoft.Json.Linq;
 using System;
 using System.IO;
@@ -28,6 +28,13 @@ internal static class FamilyParameterTests
     }
     internal static void Run()
     {
+        var aliases = new System.Collections.Generic.Dictionary<string, string> { ["hauteur"] = "Hauteur", ["longueur"] = "Longueur" };
+        string rewritten = FamilyFormula.RewriteParameterNames("if(hauteur > 10 mm, longueur + hauteur, hauteur_totale)", aliases);
+        if (rewritten != "if(Hauteur > 10 mm, Longueur + Hauteur, hauteur_totale)") throw new Exception("Parameter aliases must replace whole identifiers");
+        if (FamilyFormula.RewriteParameterNames("if(hauteur > 1 mm, \"hauteur longueur\", \"longueur\")", aliases) != "if(Hauteur > 1 mm, \"hauteur longueur\", \"longueur\")") throw new Exception("Aliases must preserve quoted text");
+        var nested = new CodexParametricDesign();
+        nested.ValidateAt(new System.Collections.Generic.Dictionary<string, double>());
+        Console.WriteLine("PASS: native parameter alias formulas, preserved text, nested family without metadata");
         var source = Fixture(); var design = CodexParametricDesign.Parse(source); var registry = design.Registry;
         if (registry == null || registry.Types.Count != 2 || registry.Find("Largeur").Instance != true) throw new Exception("Missing type/instance contract");
         var tests = registry.Cases().ToArray();

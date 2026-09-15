@@ -1,4 +1,4 @@
-using Autodesk.Revit.DB;
+﻿using Autodesk.Revit.DB;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -21,6 +21,7 @@ namespace BIMaestro.Codex
         private CodexParameterBuilder registryBuilder;
         private CodexConnectorBuilder connectorBuilder;
         private CodexSymbolicBuilder symbolicBuilder;
+        internal CodexHostOpeningBuilder HostOpening { get; private set; }
 
         internal CodexParametricBuilder(Document doc, CodexParametricDesign design)
         {
@@ -44,8 +45,8 @@ namespace BIMaestro.Codex
             for (int a = 0; a < 3; a++) { origins[a] = NewPlane(a, 0, "BIM_Origine_" + "XYZ"[a]); origins[a].Pinned = true; }
             foreach (var parameter in design.Parameters)
             {
-                var native = registryBuilder != null ? drivers[parameter.Name] : manager.AddParameter(parameter.Name, GroupTypeId.Geometry, SpecTypeId.Length, false);
-                if (registryBuilder == null) { manager.Set(native, Feet(parameter.Value)); drivers.Add(parameter.Name, native); manager.SetDescription(native, "Réglage de la famille, en millimètres."); }
+                var native = registryBuilder != null ? drivers[parameter.Name] : CodexParameterBuilder.GetOrAdd(manager, parameter.Name, GroupTypeId.Geometry, SpecTypeId.Length, false);
+                if (registryBuilder == null) { manager.Set(native, Feet(parameter.Value)); RegisterDriver(parameter.Name, native); CodexParameterBuilder.Describe(manager, native, "Réglage de la famille, en millimètres."); }
                 // A user-facing dimension labeled by the actual driving parameter.
                 int axis = Enumerable.Range(0, 3).OrderByDescending(a => design.Parts.Count(p => p.Min[a].Terms.ContainsKey(parameter.Name) || p.Max[a].Terms.ContainsKey(parameter.Name))).First();
                 var end = NewPlane(axis, Feet(parameter.Value), "BIM_Repere_" + parameter.Name);
@@ -104,9 +105,9 @@ namespace BIMaestro.Codex
             foreach (var parameter in design.Angles)
             {
                 if (registryBuilder != null) continue;
-                var native = manager.AddParameter(parameter.Name, GroupTypeId.Geometry, SpecTypeId.Angle, false);
-                manager.Set(native, parameter.Value * Math.PI / 180); drivers.Add(parameter.Name, native);
-                manager.SetDescription(native, "Inclinaison des éléments répétés, en degrés. Plage testée : 1 à 89 degrés.");
+                var native = CodexParameterBuilder.GetOrAdd(manager, parameter.Name, GroupTypeId.Geometry, SpecTypeId.Angle, false);
+                manager.Set(native, parameter.Value * Math.PI / 180); RegisterDriver(parameter.Name, native);
+                CodexParameterBuilder.Describe(manager, native, "Inclinaison des éléments répétés, en degrés. Plage testée : 1 à 89 degrés.");
             }
             foreach (var spec in design.Arrays)
             {
@@ -115,6 +116,7 @@ namespace BIMaestro.Codex
             }
             connectorBuilder = new CodexConnectorBuilder(doc, design, extrusions, this);
             symbolicBuilder = new CodexSymbolicBuilder(doc, design, this);
+            if (design.Metadata?.HostOpening != null) HostOpening = new CodexHostOpeningBuilder(doc, design.Metadata.HostOpening, design.Initial, this);
             doc.Regenerate(); Check(design.Initial);
             return extrusions.Cast<Element>().Concat(arrays.SelectMany(a => a.AllInstances()).Cast<Element>()).ToList();
         }
@@ -135,10 +137,16 @@ namespace BIMaestro.Codex
             if (expression.Offset == 0 && expression.Terms.Count == 1 && expression.Terms.First().Value == 1) return drivers[expression.Terms.First().Key];
             string formula = expression.Formula();
             if (calculatedLengths.TryGetValue(formula, out var existing)) return existing;
-            var parameter = manager.AddParameter("BIM_Calcul_" + (++sequence), GroupTypeId.Constraints, SpecTypeId.Length, expression.Terms.Keys.Any(IsInstance));
-            manager.SetFormula(parameter, formula);
+            var parameter = CodexParameterBuilder.NewInternal(manager, "BIM_Calcul_" + (++sequence), GroupTypeId.Constraints, SpecTypeId.Length, expression.Terms.Keys.Any(IsInstance));
+            manager.SetFormula(parameter, NativeFormula(formula));
             manager.SetDescription(parameter, "Calcul interne partagé : " + formula + ". Modifier les réglages de la famille plutôt que cette formule.");
             calculatedLengths.Add(formula, parameter); return parameter;
+        }
+        internal string NativeFormula(string formula) => CodexParameterBuilder.NativeFormula(formula, drivers);
+        internal void RegisterDriver(string name, FamilyParameter parameter)
+        {
+            if (drivers.Values.Any(p => p.Id == parameter.Id)) throw new InvalidOperationException("Deux réglages désignent le même paramètre natif : " + name);
+            drivers.Add(name, parameter);
         }
         internal object[] ArrayReports(Dictionary<string, double> values) => arrays.Select(a => a.Report(values)).ToArray();
         internal int InternalLengthCount => calculatedLengths.Count;
@@ -224,6 +232,7 @@ namespace BIMaestro.Codex
             design.ValidateAt(values);
             connectorBuilder?.Check(values);
             symbolicBuilder?.Check(values);
+            HostOpening?.Check(values);
             foreach (var array in arrays) array.Check(values);
             for (int i = 0; i < extrusions.Count; i++)
             {

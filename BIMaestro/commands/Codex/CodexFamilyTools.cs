@@ -25,18 +25,19 @@ namespace BIMaestro.Codex
         }
         internal static object Capabilities(string version) => new {
             family_engine = "BIMaestro V1", revit_version = version,
-            implemented = new { typed_parameters = true, formulas = true, instance_parameters = true, named_types = true,
+            implemented = new { typed_parameters = true, existing_template_parameter_reuse = true, case_insensitive_parameter_matching = true, shared_parameter_reuse_by_guid = true, formulas = true, instance_parameters = true, named_types = true,
                 shared_parameters_explicit_guid = true, conditional_visibility = true, coarse_medium_fine = true, view_direction_visibility = true,
-                rectangular_extrusions = true, polygonal_parametric_profiles = true, rectangular_openings = true, nested_rectangular_arrays = true, visible_array_count_range = new[] { 0, 200 },
+                rectangular_extrusions = true, polygonal_parametric_profiles = true, rectangular_openings = true, native_wall_host_openings = true, parametric_wall_host_openings = true, nested_rectangular_arrays = true, visible_array_count_range = new[] { 0, 200 },
                 hosting_templates = new[] { "auto", "free", "face", "wall", "floor", "ceiling", "work_plane" },
                 small_counts = "V1 : visibilité conditionnelle, géométries cachées conservées pour compatibilité Revit 2023+.",
                 symbolic_parametric_rectangles = true, face_centered_mep_connectors = true, native_validation_without_save = true,
                 array_angle_range_degrees = new[] { 1, 89 }, live_parameter_inspection = true, batch_parameter_edit = true },
             native_validation = "Essais de variation pendant chaque création. Pas de certification générale de toutes les combinaisons par la seule compilation.",
-            limitations = new[] { "Extrusions selon X/Y/Z : profils rectangulaires ou polygonaux droits pilotés par leurs sommets ; barres arrays inclinables de 1 à 89 degrés.", "Les pièces cachées doivent rester géométriquement valides.",
+            limitations = new[] { "Extrusions selon X/Y/Z : profils rectangulaires ou polygonaux droits pilotés par leurs sommets ; barres arrays inclinables de 1 à 89 degrés.", "Les pièces cachées doivent rester géométriquement valides.", "Les paramètres existants compatibles sont réutilisés sans distinction de majuscules. Pour un paramètre partagé existant, fournir son GUID. Un conflit de type, de formule ou de portée non convertible exige un autre nom ; ne pas réessayer le même nom.",
                 "Connecteurs au centre d'une face d'une pièce pleine, avec section paramétrique. Les réglages électriques de puissance/tension ne sont pas exposés.",
                 "Pas encore de profils courbes, lofts, balayages ou révolutions paramétriques, de réseaux radiaux/2D ni de composants adaptatifs à points.",
                 "Les comptes 0/1 portent sur les éléments visibles, avec géométries cachées conservées ; ce ne sont pas des réseaux natifs de zéro ou un membre.",
+                "host_opening crée une baie rectangulaire native dans un mur droit parallèle à X du gabarit, avec contrôle du volume découpé et des variations. Autres hôtes et contours courbes non pris en charge. Les anciennes familles doivent être recréées pour ajouter cette baie.",
                 "Les gabarits hébergés exigent place_at_origin=false : le choix de l'hôte et le placement se font ensuite dans le projet.",
                 "La géométrie détaillée FreeForm reste fixe : nouvelle version nécessaire pour la reconstruire avec des contraintes." } };
         internal static object Read(Document doc)

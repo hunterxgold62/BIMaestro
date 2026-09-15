@@ -1,4 +1,4 @@
-using Autodesk.Revit.DB;
+﻿using Autodesk.Revit.DB;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -17,15 +17,58 @@ namespace BIMaestro.Codex
             var manager = doc.FamilyManager;
             foreach (var p in spec.Parameters)
             {
-                var native = string.IsNullOrEmpty(p.SharedGuid) ? manager.AddParameter(p.Name, Group(p.Group), DataType(p.Kind), p.Instance) : AddShared(p);
-                manager.SetDescription(native, p.Description); Parameters.Add(p.Name, native);
+                var native = string.IsNullOrEmpty(p.SharedGuid) ? GetOrAdd(manager, p.Name, Group(p.Group), DataType(p.Kind), p.Instance) : AddShared(p);
+                if (Parameters.Values.Any(v => v.Id == native.Id)) throw new InvalidOperationException("Deux réglages désignent le même paramètre du gabarit : " + p.Name);
+                Describe(manager, native, p.Description); Parameters.Add(p.Name, native);
             }
             var initial = spec.Initial;
             foreach (var p in spec.Parameters) Set(Parameters[p.Name], initial[p.Name]);
-            foreach (var p in spec.Parameters.Where(p => p.Formula != null)) manager.SetFormula(Parameters[p.Name], p.Formula.Revit());
+            foreach (var p in spec.Parameters.Where(p => p.Formula != null)) manager.SetFormula(Parameters[p.Name], NativeFormula(p.Formula.Revit(), Parameters));
             if (!string.Equals(manager.CurrentType.Name, spec.Types[0].Name, StringComparison.Ordinal))
                 manager.RenameCurrentType(spec.Types[0].Name);
         }
+        internal static FamilyParameter GetOrAdd(FamilyManager manager, string name, ForgeTypeId group, ForgeTypeId kind, bool instance)
+        {
+            var existing = FindExisting(manager, name);
+            if (existing == null) return manager.AddParameter(name, group, kind, instance);
+            ValidateExisting(existing, kind, name);
+            if (existing.IsShared) throw new InvalidOperationException("Le paramètre « " + existing.Definition.Name + " » est partagé. Réutiliser son shared_guid=" + existing.GUID + " dans family_options, ou choisir un autre nom.");
+            SetScope(manager, existing, instance);
+            return existing;
+        }
+        internal static FamilyParameter FindExisting(FamilyManager manager, string name)
+        {
+            var matches = manager.Parameters.Cast<FamilyParameter>().Where(p => SameName(p.Definition.Name, name)).ToArray();
+            if (matches.Length > 1) throw new InvalidOperationException("Plusieurs paramètres correspondent à « " + name + " ». Le gabarit doit être désambiguïsé avant création.");
+            return matches.SingleOrDefault();
+        }
+        internal static bool SameName(string a, string b) => string.Equals(a?.Trim(), b?.Trim(), StringComparison.OrdinalIgnoreCase);
+        private static void ValidateExisting(FamilyParameter existing, ForgeTypeId kind, string requested)
+        {
+            if (existing.Definition.GetDataType() != kind || existing.IsReadOnly || existing.IsReporting || !string.IsNullOrEmpty(existing.Formula))
+                throw new InvalidOperationException("Paramètre existant « " + existing.Definition.Name + " » demandé comme « " + requested + " » : type incompatible, lecture seule, cote de rapport ou formule existante. Choisir un nom distinct ; le paramètre du gabarit est conservé.");
+        }
+        private static void SetScope(FamilyManager manager, FamilyParameter existing, bool instance)
+        {
+            if (existing.IsInstance != instance)
+            {
+                try { if (instance) manager.MakeInstance(existing); else manager.MakeType(existing); }
+                catch (Exception ex) { throw new InvalidOperationException("Le paramètre « " + existing.Definition.Name + " » ne peut pas devenir " + (instance ? "d'occurrence" : "de type") + ". Conserver sa portée ou choisir un autre nom.", ex); }
+            }
+        }
+        internal static FamilyParameter NewInternal(FamilyManager manager, string name, ForgeTypeId group, ForgeTypeId kind, bool instance)
+        {
+            string candidate = name; int suffix = 1;
+            while (manager.Parameters.Cast<FamilyParameter>().Any(p => SameName(p.Definition.Name, candidate))) candidate = name + "_" + (++suffix);
+            return manager.AddParameter(candidate, group, kind, instance);
+        }
+        internal static void Describe(FamilyManager manager, FamilyParameter parameter, string description)
+        {
+            if (parameter.Id.IntegerValue > 0 && !parameter.IsShared) manager.SetDescription(parameter, description);
+        }
+        internal static string NativeFormula(string formula, IDictionary<string, FamilyParameter> bindings) =>
+            FamilyFormula.RewriteParameterNames(formula, bindings.ToDictionary(p => p.Key, p => p.Value.Definition.Name));
+
         internal static ForgeTypeId DataType(string kind)
         {
             switch (kind)
@@ -42,6 +85,17 @@ namespace BIMaestro.Codex
         private static ForgeTypeId Group(string name) => name == "visibility" ? GroupTypeId.Visibility : name == "constraints" ? GroupTypeId.Constraints : name == "identity" ? GroupTypeId.IdentityData : name == "data" ? GroupTypeId.Data : GroupTypeId.Geometry;
         private FamilyParameter AddShared(FamilyParameterSpec p)
         {
+            var manager = doc.FamilyManager;
+            var guid = Guid.Parse(p.SharedGuid);
+            var existing = manager.Parameters.Cast<FamilyParameter>().FirstOrDefault(v => v.IsShared && v.GUID == guid);
+            var byName = FindExisting(manager, p.Name);
+            if (existing != null)
+            {
+                if (byName != null && byName.Id != existing.Id) throw new InvalidOperationException("Le nom « " + p.Name + " » et son GUID désignent deux paramètres différents.");
+                ValidateExisting(existing, DataType(p.Kind), p.Name); SetScope(manager, existing, p.Instance);
+                return existing;
+            }
+            if (byName != null) throw new InvalidOperationException("Le nom « " + p.Name + " » existe avec une autre identité. Ne pas remplacer son GUID : utiliser son identité existante ou choisir un nom distinct.");
             // GUID is explicit in the user's contract; never invent an identity for an existing enterprise parameter.
             string previous = doc.Application.SharedParametersFilename;
             string temporary = Path.Combine(Path.GetTempPath(), "BIMaestro-parameters-" + Guid.NewGuid().ToString("N") + ".txt");
