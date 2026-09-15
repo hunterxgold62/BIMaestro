@@ -165,6 +165,8 @@ namespace BIMaestro.Codex
         private object Run(UIApplication app, string tool, JObject args)
         {
             if (tool == "revit_capabilities") { RequireKeys(args); return CodexFamilyTools.Capabilities(app.Application.VersionNumber); }
+            if (tool == "revit_family_contract") { RequireKeys(args); return new { schema = CodexParametricDesign.Tool()["inputSchema"],
+                note = "Coordonnées [X,Y,Z], expressions {offset_mm:25,terms:[]} ou {offset_mm:-25,terms:[{parameter:Largeur,factor:1}]}. family_options.parameters utilise kind, instance et group=geometry/constraints/visibility/identity/data. types.values est une liste {parameter,value}. Respecter les champs du schéma ; pas de dimensions inventées." }; }
             if (tool == "revit_test_family_engine")
             {
                 RequireKeys(args);

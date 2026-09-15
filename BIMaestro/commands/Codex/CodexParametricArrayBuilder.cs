@@ -13,6 +13,7 @@ namespace BIMaestro.Codex
         private readonly Document doc;
         private readonly ParametricArray spec;
         private readonly FamilySymbol symbol;
+        private readonly ElementId symbolId;
         private readonly LinearArray array;
         private readonly FamilyInstance single;
         private readonly CodexParametricBuilder constraints;
@@ -92,7 +93,8 @@ namespace BIMaestro.Codex
         internal CodexParametricArrayBuilder(Document doc, ParametricArray spec, FamilySymbol symbol, Dictionary<string, double> initial,
             FamilyParameter material, CodexParametricBuilder constraints)
         {
-            this.doc = doc; this.spec = spec; this.symbol = symbol; this.constraints = constraints;
+            this.doc = doc; this.spec = spec; this.symbol = symbol; symbolId = symbol.Id; this.constraints = constraints;
+            string stage = "préparation";
             try
             {
                 symbol.Family.Name = "BIMaestro_Barre_" + CodexFamilyBuilder.SafeName(spec.Name) + "_" + Guid.NewGuid().ToString("N").Substring(0, 6);
@@ -128,36 +130,44 @@ namespace BIMaestro.Codex
                     manager.AssociateElementParameterToFamilyParameter(single.LookupParameter("Materiau"), material);
                     manager.AssociateElementParameterToFamilyParameter(single.LookupParameter("BIM_Visible"), singleVisible);
                     doc.Regenerate();
-                    for (int axis = 0; axis < 3; axis++) Lock(single, axis, spec.Min[axis], constraints);
+                    for (int axis = 0; axis < 3; axis++) Lock(() => single, axis, spec.Min[axis], constraints);
                 }
                 else constraints.AssociateVisibility(first.LookupParameter("BIM_Visible"), spec.Name);
                 doc.Regenerate();
+                stage = "création du réseau";
                 array = LinearArray.Create(doc, constraints.DimensionView(spec.Axis), first.Id, Math.Max(2, spec.Count(initial)), Basis(spec.Axis) * (spec.Pitch.Value(initial) / 304.8), ArrayAnchorMember.Second);
                 array.Label = nativeCount;
                 doc.Regenerate();
                 var members = Members().OrderBy(p => ((LocationPoint)p.Location).Point.DotProduct(Basis(spec.Axis))).ToArray();
                 if (members.Length != Math.Max(2, spec.Count(initial))) throw new InvalidOperationException("Nombre de barres natives inattendu.");
-                for (int axis = 0; axis < 3; axis++) Lock(members[0], axis, spec.Min[axis], constraints);
+                stage = "ancrage du premier membre";
+                for (int axis = 0; axis < 3; axis++) Lock(() => OrderedMembers()[0], axis, spec.Min[axis], constraints);
                 // The second member is the native anchor. Its offset drives the pitch,
                 // while the integer label adds/removes subsequent members automatically.
-                Lock(members[1], spec.Axis, LengthExpression.Combine(spec.Min[spec.Axis], spec.Pitch), constraints);
+                stage = "ancrage du pas";
+                // Both anchors must follow transverse movements (e.g. -Largeur/2).
+                // Leaving the second anchor free on those axes lets the array skew.
+                for (int axis = 0; axis < 3; axis++)
+                    Lock(() => OrderedMembers()[1], axis, axis == spec.Axis ? LengthExpression.Combine(spec.Min[axis], spec.Pitch) : spec.Min[axis], constraints);
                 doc.Regenerate();
+                stage = "vérification";
                 Check(initial);
             }
-            catch (Exception ex) { throw new InvalidOperationException("Réseau « " + spec.Name + " » : " + ex.Message, ex); }
+            catch (Exception ex) { throw new InvalidOperationException("Réseau « " + spec.Name + " », " + stage + " : " + ex.Message, ex); }
         }
-        private void Lock(FamilyInstance member, int axis, LengthExpression coordinate, CodexParametricBuilder constraints)
+        private FamilyInstance[] OrderedMembers() => Members().OrderBy(p => ((LocationPoint)p.Location).Point.DotProduct(Basis(spec.Axis))).ToArray();
+        private void Lock(Func<FamilyInstance> resolveMember, int axis, LengthExpression coordinate, CodexParametricBuilder constraints)
         {
             var plane = constraints.PlaneAt(axis, coordinate);
             doc.Regenerate();
-            var reference = member.GetReferenceByName("BIM_Origine_" + "XYZ"[axis]);
+            var reference = resolveMember().GetReferenceByName("BIM_Origine_" + "XYZ"[axis]);
             if (reference == null) throw new InvalidOperationException("Repère de la barre imbriquée inaccessible.");
             doc.FamilyCreate.NewAlignment(constraints.DimensionView(axis), plane.GetReference(), reference);
         }
         internal FamilyInstance[] Members()
         {
             return array.GetOriginalMemberIds().Concat(array.GetCopiedMemberIds()).SelectMany(id => Instances(doc.GetElement(id)))
-                .Where(i => i.Symbol.Id.Equals(symbol.Id)).GroupBy(i => i.Id).Select(g => g.First()).ToArray();
+                .Where(i => i.Symbol.Id.Equals(symbolId)).GroupBy(i => i.Id).Select(g => g.First()).ToArray();
         }
         internal IEnumerable<FamilyInstance> AllInstances() => Members().Concat(single == null ? new FamilyInstance[0] : new[] { single });
         private IEnumerable<FamilyInstance> Instances(Element element)
@@ -170,6 +180,7 @@ namespace BIMaestro.Codex
             count = spec.Count(values), native_array_count = array.NumMembers, visible_count = constraints.Visible(spec.Name, values) ? spec.Count(values) : 0,
             physical_instances = array.NumMembers + (single == null ? 0 : 1),
             small_count_mode = spec.SmallCounts ? "Visibilité conditionnelle compatible 2023+ ; les géométries cachées restent présentes." : null,
+            hidden_member_checks = "Paramètres, position et visibilité contrôlés. Revit ne renvoie pas les solides masqués ; volumes et orientations sont mesurés pour les membres visibles.",
             expected_count = spec.Count(values), pitch_mm = spec.Pitch.Value(values), span_mm = spec.Span.Value(values),
             rotation_axis = spec.RotationAxis < 0 ? null : "xyz"[spec.RotationAxis].ToString(), angle_parameter = spec.AngleParameter, angle_deg = spec.Angle(values) };
 
@@ -180,15 +191,28 @@ namespace BIMaestro.Codex
             var members = networkMembers.Concat(single == null ? new FamilyInstance[0] : new[] { single }).ToArray();
             for (int index = 0; index < members.Length; index++)
             {
+                bool isSingle = single != null && members[index].Id.Equals(single.Id);
+                bool expectedVisible = constraints.Visible(spec.Name, values) && (!spec.SmallCounts || (isSingle ? spec.Count(values) == 1 : spec.Count(values) > 1));
+                if (members[index].LookupParameter("BIM_Visible").AsInteger() != (expectedVisible ? 1 : 0)) throw new InvalidOperationException("Visibilité du réseau incorrecte : " + spec.Name);
+                var location = ((LocationPoint)members[index].Location).Point;
+                for (int a = 0; a < 3; a++)
+                {
+                    double size = members[index].LookupParameter(SizeNames[a]).AsDouble() * 304.8;
+                    double coordinate = spec.Min[a].Value(values) + (a == spec.Axis && !isSingle ? index * spec.Pitch.Value(values) : 0);
+                    if (Math.Abs(size - (spec.Max[a].Value(values) - spec.Min[a].Value(values))) > 0.5 || Math.Abs(location.DotProduct(Basis(a)) * 304.8 - coordinate) > 0.5)
+                        throw new InvalidOperationException("Dimensions ou position native incorrectes : " + spec.Name + ", membre " + (index + 1) + ", axe " + "XYZ"[a] +
+                            ", dimension " + size.ToString("G8") + " / attendue " + (spec.Max[a].Value(values) - spec.Min[a].Value(values)).ToString("G8") +
+                            ", position " + (location.DotProduct(Basis(a)) * 304.8).ToString("G8") + " / attendue " + coordinate.ToString("G8") + " mm.");
+                }
+                if (spec.RotationAxis >= 0 && Math.Abs(members[index].LookupParameter("Inclinaison").AsDouble() * 180 / Math.PI - spec.Angle(values)) > 1e-6)
+                    throw new InvalidOperationException("Angle natif incorrect : " + spec.Name);
+                if (!expectedVisible) continue;
                 var box = SolidBounds(members[index]);
                 if (box == null) throw new InvalidOperationException("Encombrement de barre absent.");
                 var points = Enumerable.Range(0, 8).Select(c => box.Transform.OfPoint(new XYZ((c & 1) == 0 ? box.Min.X : box.Max.X,
                     (c & 2) == 0 ? box.Min.Y : box.Max.Y, (c & 4) == 0 ? box.Min.Z : box.Max.Z))).ToArray();
                 double volume = 1;
-                bool isSingle = single != null && members[index].Id.Equals(single.Id);
                 var expected = spec.Corners(values, isSingle ? 0 : index);
-                bool expectedVisible = constraints.Visible(spec.Name, values) && (!spec.SmallCounts || (isSingle ? spec.Count(values) == 1 : spec.Count(values) > 1));
-                if (members[index].LookupParameter("BIM_Visible").AsInteger() != (expectedVisible ? 1 : 0)) throw new InvalidOperationException("Visibilité du réseau incorrecte : " + spec.Name);
                 for (int axis = 0; axis < 3; axis++)
                 {
                     double min = expected.Min(p => p[axis]), max = expected.Max(p => p[axis]);

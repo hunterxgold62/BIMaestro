@@ -12,6 +12,7 @@ namespace BIMaestro.Codex
             ["inputSchema"] = new JObject { ["type"] = "object", ["properties"] = properties, ["required"] = new JArray(properties.Properties().Select(p => p.Name)), ["additionalProperties"] = false } };
         internal static IEnumerable<JObject> Definitions()
         {
+            yield return Tool("revit_family_contract", "Lit le schéma JSON complet du moteur paramétrique. Consulter avant la première description paramétrique et après toute erreur de format ; corriger toute la description en une passe. Aucune lecture du modèle.", new JObject());
             yield return Tool("revit_test_family_engine", "Exécute les scénarios de validation V1 intégrés dans des familles temporaires : paramètres et seuils, types, répétitions 0/1 par visibilité, angles, ouvertures, connecteurs et contours 2D. Ne modifie pas le projet, ne sauvegarde aucune famille, écrit seulement un rapport local. Peut prendre plusieurs minutes ; utiliser pour une vérification demandée du moteur.", new JObject());
             yield return Tool("revit_capabilities", "Lit les capacités et limites réelles de la passerelle et la version de Revit. Appeler avant de concevoir une famille ou d'annoncer une limitation. Distingue code implémenté et validation native.", new JObject());
             yield return Tool("revit_family_parameters", "Lit les paramètres réels de la famille ouverte : valeurs du type courant, formules, portée type/occurrence, GUID partagés et types nommés. Reflète les modifications manuelles, contrairement au descriptif enregistré.", new JObject());
@@ -45,7 +46,7 @@ namespace BIMaestro.Codex
             return new { current_type = type?.Name, types = manager.Types.Cast<FamilyType>().Take(64).Select(t => t.Name).ToArray(),
                 parameters = manager.Parameters.Cast<FamilyParameter>().OrderBy(p => p.Definition.Name.StartsWith("BIM_", StringComparison.Ordinal) ? 1 : 0).Take(150).Select(p => new {
                     name = p.Definition.Name, kind = Kind(p), instance = p.IsInstance, formula = Trim(p.Formula, 2000),
-                    editable = !p.IsReadOnly && !p.IsDeterminedByFormula && Kind(p) != "unsupported",
+                    editable = !p.IsReadOnly && !p.IsDeterminedByFormula && string.IsNullOrEmpty(p.Formula) && Kind(p) != "unsupported",
                     shared_guid = p.IsShared ? p.GUID.ToString() : null, value = Value(type, p) }).ToArray() };
         }
         private static string Kind(FamilyParameter p)
@@ -86,7 +87,7 @@ namespace BIMaestro.Codex
             {
                 var item = token as JObject; CodexFamilyDesign.Keys(item, "name", "value");
                 var parameter = manager.get_Parameter(CodexFamilyDesign.String(item, "name", 100));
-                if (parameter == null || parameter.IsReadOnly || parameter.IsDeterminedByFormula || Kind(parameter) == "unsupported") throw new InvalidOperationException("Paramètre absent, calculé ou non modifiable : " + item["name"]);
+                if (parameter == null || parameter.IsReadOnly || parameter.IsDeterminedByFormula || !string.IsNullOrEmpty(parameter.Formula) || Kind(parameter) == "unsupported") throw new InvalidOperationException("Paramètre absent, calculé ou non modifiable : " + item["name"]);
                 if (values.ContainsKey(parameter)) throw new InvalidOperationException("Paramètre dupliqué dans le lot.");
                 var spec = new FamilyParameterSpec { Name = parameter.Definition.Name, Kind = Kind(parameter) }; var value = spec.Read(item["value"]);
                 if (spec.Kind == "angle" && (value.Number < 1 || value.Number > 89)) throw new InvalidOperationException("Angles pris en charge : 1 à 89 degrés.");

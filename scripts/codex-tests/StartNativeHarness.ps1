@@ -1,7 +1,9 @@
-param([ValidateSet('2023','2024')][string]$RevitVersion = '2023')
+param([ValidateSet('2023','2024')][string]$RevitVersion = '2023', [ValidatePattern('^[a-zA-Z0-9-]*$')][string]$RunName = '')
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
-$output = Join-Path $repo ('tmp/codex-native-validation/' + $RevitVersion)
+$runFolder = $RevitVersion
+if ($RunName) { $runFolder += '-' + $RunName }
+$output = Join-Path $repo ('tmp/codex-native-validation/' + $runFolder)
 $source = Join-Path $output 'BIMaestro.NativeValidation.addin'
 $registration = Join-Path $env:APPDATA ('Autodesk/Revit/Addins/' + $RevitVersion + '/BIMaestro.NativeValidation.addin')
 if (!(Test-Path -LiteralPath $source)) { throw 'Compiler le banc avant de le lancer.' }

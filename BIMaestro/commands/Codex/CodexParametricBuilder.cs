@@ -67,7 +67,7 @@ namespace BIMaestro.Codex
                         profile.Append(Rectangle(part.Axis, min[part.Axis], Feet(hole.Min[0].Value(design.Initial)), Feet(hole.Min[1].Value(design.Initial)),
                             Feet(hole.Max[0].Value(design.Initial)), Feet(hole.Max[1].Value(design.Initial)), true));
                     // Associative work plane: movement of the minimum plane moves the sketch.
-                    var workPlane = SketchPlane.Create(doc, PlaneAt(part.Axis, part.Min[part.Axis]).GetReference());
+                    var workPlane = SketchPlane.Create(doc, PlaneAt(part.Axis, part.Min[part.Axis]).Id);
                     var extrusion = doc.FamilyCreate.NewExtrusion(true, profile, workPlane, max[part.Axis] - min[part.Axis]);
                     AssociateLength(extrusion.get_Parameter(BuiltInParameter.EXTRUSION_END_PARAM), LengthExpression.Combine(part.Max[part.Axis], part.Min[part.Axis], -1));
                     manager.AssociateElementParameterToFamilyParameter(extrusion.get_Parameter(BuiltInParameter.MATERIAL_ID_PARAM), materials[part.Material]);

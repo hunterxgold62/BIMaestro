@@ -100,6 +100,21 @@ internal static class FamilyParameterTests
         File.WriteAllText("tmp/codex-tests/parametric-v1-polygon.design.json", polygon.ToString());
         File.WriteAllText("tmp/codex-tests/parametric-v1.design.json", source.ToString());
         Console.WriteLine("PASS: V1 typed formulas, type/instance, named types, yes/no visibility, exact thresholds, text, units and graph validation");
+        foreach (var file in Directory.GetFiles("scripts/codex-tests/diagnostic-fixtures", "*.json"))
+        {
+            var original = JObject.Parse(File.ReadAllText(file)); var before = original.ToString();
+            var replay = CodexParametricDesign.Parse(original);
+            if (original.ToString() != before) throw new Exception("Input normalization mutated diagnostic");
+            var normalized = CodexParametricInput.Normalize(original);
+            if (!JToken.DeepEquals(normalized, CodexParametricInput.Normalize(normalized))) throw new Exception("Normalization is not idempotent");
+            if (replay.Metadata.Load || replay.Metadata.Place) throw new Exception("Normalization elevated project permissions");
+            if (replay.Parts.Count != 5 || replay.Arrays.Count != 1 || replay.Initial["Largeur"] != 600 || replay.Initial["Hauteur"] != 800)
+                throw new Exception("Diagnostic replay changed requested geometry");
+            if (Math.Abs(replay.Initial["Pas_ventelles"] - (50 + 82 / Math.Sqrt(2))) > 1e-6) throw new Exception("Diagnostic formula changed");
+            Console.WriteLine("PASS: replay recorded format failure " + Path.GetFileName(file));
+        }
+        Reject(source, s => { s["family_options"]["parameters"][0]["scope"] = "type"; }, "contradictory scope");
+        Reject(source, s => { s["family_options"]["parameters"].Last["value"] = null; s["family_options"]["parameters"].Last["formula"] = ""; }, "missing free value");
     }
     private static void Reject(JObject original, Action<JObject> change, string name)
     {

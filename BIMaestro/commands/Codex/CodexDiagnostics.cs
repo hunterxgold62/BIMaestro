@@ -3,6 +3,7 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.IO;
 using System.Text;
+using System.Reflection;
 
 namespace BIMaestro.Codex
 {
@@ -16,7 +17,9 @@ namespace BIMaestro.Codex
                 string directory = Path.Combine(CodexClient.DataDirectory, "Diagnostics");
                 Directory.CreateDirectory(directory);
                 string path = Path.Combine(directory, DateTime.UtcNow.ToString("yyyyMMdd_HHmmss") + "_" + Guid.NewGuid().ToString("N") + ".json");
+                var assembly = Assembly.GetExecutingAssembly();
                 File.WriteAllText(path, JsonConvert.SerializeObject(new { utc = DateTime.UtcNow, tool,
+                    build_id = assembly.ManifestModule.ModuleVersionId, runtime = Environment.Version.ToString(),
                     arguments, error = error.ToString() }, Formatting.Indented), new UTF8Encoding(false));
                 return path;
             }

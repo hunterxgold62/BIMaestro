@@ -142,11 +142,11 @@ namespace BIMaestro.Codex
             if (value == null) throw new InvalidOperationException("Objet JSON attendu.");
             var missing = keys.Where(k => value[k] == null).ToArray();
             var unknown = value.Properties().Select(p => p.Name).Where(n => !keys.Contains(n)).ToArray();
-            if (missing.Length > 0 || unknown.Length > 0) throw new InvalidOperationException("Structure invalide. Champs manquants : " + string.Join(", ", missing) + ". Champs inconnus : " + string.Join(", ", unknown) + ".");
+            if (missing.Length > 0 || unknown.Length > 0) throw new InvalidOperationException("Structure invalide à $" + (value.Path.Length == 0 ? "" : "." + value.Path) + ". Champs manquants : " + string.Join(", ", missing) + ". Champs inconnus : " + string.Join(", ", unknown) + ".");
         }
         internal static JArray Items(JObject value, string name, int min, int max)
         {
-            if (!(value[name] is JArray items) || items.Count < min || items.Count > max) throw new InvalidOperationException("Liste invalide : " + name);
+            if (!(value[name] is JArray items) || items.Count < min || items.Count > max) throw new InvalidOperationException("Liste invalide : " + (value.Path.Length == 0 ? name : value.Path + "." + name) + " ; tableau JSON de " + min + " à " + max + " éléments attendu.");
             return items;
         }
         internal static string String(JObject value, string name, int max) => ValidString(value[name], name, max);

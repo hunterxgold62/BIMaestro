@@ -36,10 +36,10 @@ namespace BIMaestro.Codex
                         results.Add(new { scenario = name, passed = true, seconds = watch.Elapsed.TotalSeconds, report = artifact.Report }); passed++;
                     }
                 }
-                catch (Exception ex) { results.Add(new { scenario = name, passed = false, seconds = watch.Elapsed.TotalSeconds, error = ex.Message }); }
+                catch (Exception ex) { results.Add(new { scenario = name, passed = false, seconds = watch.Elapsed.TotalSeconds, error = ex.Message, details = ex.ToString() }); }
                 progress?.Invoke("Terminé : " + name);
             }
-            var report = new { revit_version = app.Application.VersionNumber, assembly_version = assembly.GetName().Version.ToString(),
+            var report = new { revit_version = app.Application.VersionNumber, assembly_version = assembly.GetName().Version.ToString(), build_id = assembly.ManifestModule.ModuleVersionId,
                 utc = DateTime.UtcNow, passed, total = names.Length, saved_families = false, project_modified = false, results };
             string directory = Path.Combine(CodexClient.DataDirectory, "Validation"); Directory.CreateDirectory(directory);
             string path = Path.Combine(directory, "Revit-" + app.Application.VersionNumber + "-" + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss") + ".json");

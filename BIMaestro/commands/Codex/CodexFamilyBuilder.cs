@@ -117,10 +117,13 @@ namespace BIMaestro.Codex
                     // of a rotated solid's local box can overestimate a cylinder or sphere.
                     foreach (var element in createdElements)
                     {
+                        if (parametric != null && element is FamilyInstance && element.LookupParameter("BIM_Visible")?.AsInteger() == 0) continue;
                         var box = parametric != null && element is FamilyInstance ? CodexParametricArrayBuilder.SolidBounds(element) : element.get_BoundingBox(null);
                         if (box == null) throw new InvalidOperationException("Encombrement introuvable pour la pièce " + element.Id);
                         bounds.Include(box);
                     }
+                    if (parametric != null && bounds.Min.X == double.MaxValue)
+                    { bounds.Min = XYZ.Zero; bounds.Max = XYZ.Zero; warnings.Add("Aucune barre visible dans le type initial ; encombrement visible nul."); }
                     design.CheckDimensions(new[] { Mm(bounds.Max.X - bounds.Min.X), Mm(bounds.Max.Y - bounds.Min.Y), Mm(bounds.Max.Z - bounds.Min.Z) });
                     if (parametric == null)
                     {

@@ -82,6 +82,7 @@ namespace BIMaestro.Codex
 
         internal static CodexParametricDesign Parse(JObject source)
         {
+            source = CodexParametricInput.Normalize(source);
             var keys = new List<string> { "name", "category", "assumptions", "materials", "parameters", "parts", "load_into_project", "place_at_origin" };
             if (source?["family_options"] != null) keys.Add("family_options");
             if (source?["connectors"] != null) keys.Add("connectors");

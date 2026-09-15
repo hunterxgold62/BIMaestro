@@ -1,7 +1,9 @@
-param([ValidateSet('2023','2024')][string]$RevitVersion = '2023')
+param([ValidateSet('2023','2024')][string]$RevitVersion = '2023', [ValidatePattern('^[a-zA-Z0-9-]*$')][string]$RunName = '')
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
-$output = Join-Path $repo ('tmp/codex-native-validation/' + $RevitVersion)
+$runFolder = $RevitVersion
+if ($RunName) { $runFolder += '-' + $RunName }
+$output = Join-Path $repo ('tmp/codex-native-validation/' + $runFolder)
 New-Item -ItemType Directory -Path $output -Force | Out-Null
 $api = 'C:/Program Files/Autodesk/Revit ' + $RevitVersion
 $sources = Get-ChildItem (Join-Path $repo 'BIMaestro/commands/Codex') -Filter '*.cs' | Where-Object { $_.Name -notin @('CodexWindow.cs','CodexCommand.cs','CodexImageAttachment.cs') } | ForEach-Object FullName

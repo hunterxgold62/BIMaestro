@@ -1,0 +1,340 @@
+{
+  "name": "Grille_ventilation_600x800_LOD100_300",
+  "category": "air_terminal",
+  "hosting": "free",
+  "load_into_project": false,
+  "place_at_origin": false,
+  "assumptions": [
+    "Largeur horizontale X 600 mm, hauteur Z 800 mm, profondeur Y 100 mm.",
+    "Vide entre ventelles mesuré verticalement en façade, hors projection des lames inclinées.",
+    "Cadre aluminium de 25 mm en façade, lames plates de corde 80 mm et épaisseur 2 mm ; finition aluminium gris.",
+    "Angle autour de X, mesuré depuis l'horizontale ; valeur initiale 45 degrés.",
+    "LOD 100 en détail faible ; géométrie de grille LOD 300 en moyen et élevé, sans fixations ni connecteur."
+  ],
+  "materials": [
+    {
+      "name": "Aluminium gris",
+      "rgb": [
+        160,
+        165,
+        170
+      ],
+      "transparency": 0
+    }
+  ],
+  "parameters": [
+    {
+      "name": "Largeur",
+      "value_mm": 600,
+      "test_value_mm": 750
+    },
+    {
+      "name": "Hauteur",
+      "value_mm": 800,
+      "test_value_mm": 1000
+    },
+    {
+      "name": "Vide_ventelles",
+      "value_mm": 50,
+      "test_value_mm": 35
+    }
+  ],
+  "angles": [
+    {
+      "name": "Inclinaison",
+      "value_deg": 45,
+      "test_value_deg": 30
+    }
+  ],
+  "family_options": {
+    "parameters": [
+      {
+        "name": "Largeur",
+        "kind": "length",
+        "instance": false,
+        "value": 600,
+        "test_values": [],
+        "formula": "",
+        "group": "geometry",
+        "description": "",
+        "shared_guid": ""
+      },
+      {
+        "name": "Hauteur",
+        "kind": "length",
+        "instance": false,
+        "value": 800,
+        "test_values": [],
+        "formula": "",
+        "group": "geometry",
+        "description": "",
+        "shared_guid": ""
+      },
+      {
+        "name": "Vide_ventelles",
+        "kind": "length",
+        "instance": false,
+        "value": 50,
+        "test_values": [
+          49,
+          50,
+          51,
+          35
+        ],
+        "formula": "",
+        "group": "geometry",
+        "description": "Vide vertical libre entre deux ventelles en façade",
+        "shared_guid": ""
+      },
+      {
+        "name": "Projection_lame",
+        "kind": "length",
+        "instance": false,
+        "value": 100,
+        "test_values": [],
+        "formula": "80 mm * sin(Inclinaison) + 2 mm * cos(Inclinaison)",
+        "group": "geometry",
+        "description": "",
+        "shared_guid": ""
+      },
+      {
+        "name": "Pas_ventelles",
+        "kind": "length",
+        "instance": false,
+        "value": 100,
+        "test_values": [],
+        "formula": "Vide_ventelles + Projection_lame",
+        "group": "geometry",
+        "description": "",
+        "shared_guid": ""
+      }
+    ],
+    "types": [
+      {
+        "name": "600 x 800",
+        "values": [
+          {
+            "name": "Largeur",
+            "value": 600
+          },
+          {
+            "name": "Hauteur",
+            "value": 800
+          },
+          {
+            "name": "Vide_ventelles",
+            "value": 50
+          },
+          {
+            "name": "Inclinaison",
+            "value": 45
+          }
+        ]
+      }
+    ],
+    "representations": [
+      {
+        "component": "Volume_LOD100",
+        "coarse": true,
+        "medium": false,
+        "fine": false
+      },
+      {
+        "component": "Cadre_gauche",
+        "coarse": false,
+        "medium": true,
+        "fine": true
+      },
+      {
+        "component": "Cadre_droit",
+        "coarse": false,
+        "medium": true,
+        "fine": true
+      },
+      {
+        "component": "Cadre_bas",
+        "coarse": false,
+        "medium": true,
+        "fine": true
+      },
+      {
+        "component": "Cadre_haut",
+        "coarse": false,
+        "medium": true,
+        "fine": true
+      },
+      {
+        "component": "Ventelles",
+        "coarse": false,
+        "medium": true,
+        "fine": true
+      }
+    ]
+  },
+  "parts": [
+    {
+      "name": "Volume_LOD100",
+      "axis": "z",
+      "material": "Aluminium gris",
+      "minimum": [
+        0,
+        0,
+        0
+      ],
+      "maximum": [
+        {
+          "parameter": "Largeur",
+          "factor": 1,
+          "offset_mm": 0
+        },
+        100,
+        {
+          "parameter": "Hauteur",
+          "factor": 1,
+          "offset_mm": 0
+        }
+      ],
+      "openings": [],
+      "profile_uv": []
+    },
+    {
+      "name": "Cadre_gauche",
+      "axis": "z",
+      "material": "Aluminium gris",
+      "minimum": [
+        0,
+        0,
+        0
+      ],
+      "maximum": [
+        25,
+        100,
+        {
+          "parameter": "Hauteur",
+          "factor": 1,
+          "offset_mm": 0
+        }
+      ],
+      "openings": [],
+      "profile_uv": []
+    },
+    {
+      "name": "Cadre_droit",
+      "axis": "z",
+      "material": "Aluminium gris",
+      "minimum": [
+        {
+          "parameter": "Largeur",
+          "factor": 1,
+          "offset_mm": -25
+        },
+        0,
+        0
+      ],
+      "maximum": [
+        {
+          "parameter": "Largeur",
+          "factor": 1,
+          "offset_mm": 0
+        },
+        100,
+        {
+          "parameter": "Hauteur",
+          "factor": 1,
+          "offset_mm": 0
+        }
+      ],
+      "openings": [],
+      "profile_uv": []
+    },
+    {
+      "name": "Cadre_bas",
+      "axis": "z",
+      "material": "Aluminium gris",
+      "minimum": [
+        25,
+        0,
+        0
+      ],
+      "maximum": [
+        {
+          "parameter": "Largeur",
+          "factor": 1,
+          "offset_mm": -25
+        },
+        100,
+        25
+      ],
+      "openings": [],
+      "profile_uv": []
+    },
+    {
+      "name": "Cadre_haut",
+      "axis": "z",
+      "material": "Aluminium gris",
+      "minimum": [
+        25,
+        0,
+        {
+          "parameter": "Hauteur",
+          "factor": 1,
+          "offset_mm": -25
+        }
+      ],
+      "maximum": [
+        {
+          "parameter": "Largeur",
+          "factor": 1,
+          "offset_mm": -25
+        },
+        100,
+        {
+          "parameter": "Hauteur",
+          "factor": 1,
+          "offset_mm": 0
+        }
+      ],
+      "openings": [],
+      "profile_uv": []
+    }
+  ],
+  "arrays": [
+    {
+      "name": "Ventelles",
+      "axis": "z",
+      "material": "Aluminium gris",
+      "minimum": [
+        25,
+        20,
+        25
+      ],
+      "maximum": [
+        {
+          "parameter": "Largeur",
+          "factor": 1,
+          "offset_mm": -25
+        },
+        100,
+        27
+      ],
+      "span": {
+        "parameter": "Hauteur",
+        "factor": 1,
+        "offset_mm": -50
+      },
+      "pitch": {
+        "parameter": "Pas_ventelles",
+        "factor": 1,
+        "offset_mm": 0
+      },
+      "count_parameter": "Nombre_ventelles",
+      "quantity_parameter": "",
+      "rotation": {
+        "axis": "x",
+        "angle_parameter": "Inclinaison"
+      }
+    }
+  ],
+  "connectors": [],
+  "symbolic_outlines": []
+}

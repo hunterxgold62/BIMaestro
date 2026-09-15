@@ -25,7 +25,9 @@ Les cotes internes sont mutualisées lorsque leurs expressions sont identiques. 
 
 ## Vérification
 
-État au 15 septembre 2026 : les builds complets 2023/2024 réussissent et 103 contrôles automatisés passent, dont le protocole avec le Codex officiel et les rendus WPF. Le lancement isolé de Revit 2023 s'est arrêté sur `TaskDialog_Security_Unsigned_File_Loading` avant l'entrée dans le banc : aucun scénario natif ne doit être déclaré réussi sur cette base. La validation native et la compatibilité 2025+ restent ouvertes.
+État au 15 septembre 2026, après correction des diagnostics : les builds complets 2023/2024 réussissent et 114 contrôles automatisés passent, dont les neuf demandes réelles initialement rejetées, le protocole avec le Codex officiel et les rendus WPF. Le banc natif Revit 2023 passe **7 scénarios sur 7**, avec leurs variations, dans le rapport `Revit-2023-20260915-131954.json` : réseaux inclinés et centrés, connecteurs/contours 2D, grille 600 × 800 issue des diagnostics, profil polygonal, ouvertures rectangulaires, répétitions 0/1 et visibilités/types. Le premier rapport ne passait que 1 scénario sur 6 ; il est remplacé par ce nouvel état. La validation native 2025+ et les contrôles en projet restent ouverts.
+
+Corrections associées : utilisation de l'identifiant du plan de référence pour créer le plan de travail ; absence de renommage d'un type vers son propre nom ; sommets des lames inclinées pilotés par formules trigonométriques ; résolution fraîche des membres après régénération ; ancrage des deux premiers membres sur les trois axes pour éviter le décalage des réseaux centrés. Pour les membres masqués, Revit ne renvoie pas les solides : les valeurs, positions et visibilités sont contrôlées, tandis que les volumes et orientations sont mesurés pour les membres visibles. Les rapports distinguent ces contrôles.
 
 `scripts/codex-tests/Run.ps1 -RealCodex` vérifie hors Revit le contrat, les formules, les refus de données invalides, le protocole app-server et le panneau WPF. Le test app-server n'envoie pas de demande à un modèle.
 

@@ -5,9 +5,9 @@ using System.Linq;
 
 namespace BIMaestro.Codex
 {
-    // A rectangular sketch with two labeled side lengths, three locked right angles,
-    // one fixed corner and one driving angular dimension. The extrusion length is
-    // the third size. The nested family's placement references remain orthogonal.
+    // Drive the sketch vertices with native trigonometric length formulas. Adding
+    // locked right angles to an already rectangular sketch overconstrains Revit.
+    // The public angle and dimensions remain editable without the add-in.
     internal sealed class CodexAngularBarBuilder
     {
         private readonly Document doc;
@@ -63,20 +63,46 @@ namespace BIMaestro.Codex
             doc.FamilyCreate.NewAlignment(byAxis[axis], baseU.GeometryCurve.Reference, pivot);
             doc.FamilyCreate.NewAlignment(byAxis[axis], baseV.GeometryCurve.Reference, pivot);
 
-            var widthRefs = new ReferenceArray(); widthRefs.Append(edges[3].GeometryCurve.Reference); widthRefs.Append(edges[1].GeometryCurve.Reference);
-            var heightRefs = new ReferenceArray(); heightRefs.Append(edges[0].GeometryCurve.Reference); heightRefs.Append(edges[2].GeometryCurve.Reference);
-            doc.FamilyCreate.NewLinearDimension(byAxis[axis], Line.CreateBound(-dv, du * width - dv), widthRefs).FamilyLabel = sizes[u];
-            doc.FamilyCreate.NewLinearDimension(byAxis[axis], Line.CreateBound(-du, dv * height - du), heightRefs).FamilyLabel = sizes[vAxis];
+            string w = "Dimension" + "XYZ"[u], h = "Dimension" + "XYZ"[vAxis];
+            var formulas = new[] { new[] { "0 mm", "0 mm" },
+                new[] { w + " * cos(Inclinaison)", w + " * sin(Inclinaison)" },
+                new[] { w + " * cos(Inclinaison) - " + h + " * sin(Inclinaison)", w + " * sin(Inclinaison) + " + h + " * cos(Inclinaison)" },
+                new[] { "-" + h + " * sin(Inclinaison)", h + " * cos(Inclinaison)" } };
+            // A fixed datum outside the permitted 100 m dimensions keeps labeled
+            // lengths positive even when a rotated corner crosses local zero.
+            const double datumMm = 200000;
+            var axes = new[] { u, vAxis };
+            var datums = axes.Select(a => CoordinatePlane(byAxis[axis], a, -datumMm / 304.8, "BIM_Datum_" + "XYZ"[a])).ToArray();
+            foreach (var datum in datums) datum.Pinned = true;
             for (int i = 1; i <= 3; i++)
             {
-                var first = (points[i - 1] - points[i]).Normalize();
-                var second = (points[(i + 1) % 4] - points[i]).Normalize();
-                using (var arc = Arc.Create(points[i] + first, points[i] + second, points[i] + (first + second).Normalize()))
-                    doc.FamilyCreate.NewAngularDimension(byAxis[axis], arc, edges[i - 1].GeometryCurve.Reference, edges[i].GeometryCurve.Reference).IsLocked = true;
+                int endpoint = edges[i].GeometryCurve.GetEndPoint(0).DistanceTo(points[i]) < 1e-6 ? 0 : 1;
+                for (int a = 0; a < 2; a++)
+                {
+                    double coordinate = points[i].DotProduct(Basis(axes[a]));
+                    var target = CoordinatePlane(byAxis[axis], axes[a], coordinate, "BIM_Sommet_" + i + "_" + a);
+                    var driver = manager.AddParameter("BIM_Position_" + i + "_" + a, GroupTypeId.Constraints, SpecTypeId.Length, true);
+                    manager.Set(driver, datumMm / 304.8 + coordinate);
+                    manager.SetFormula(driver, "200000 mm + (" + formulas[i][a] + ")");
+                    doc.Regenerate();
+                    var refs = new ReferenceArray(); refs.Append(datums[a].GetReference()); refs.Append(target.GetReference());
+                    var offset = Basis(axes[1 - a]) * (3 + i * 0.1);
+                    using (var dimensionLine = Line.CreateBound(offset - Basis(axes[a]) * (datumMm / 304.8), offset + Basis(axes[a]) * coordinate))
+                        doc.FamilyCreate.NewLinearDimension(byAxis[axis], dimensionLine, refs).FamilyLabel = driver;
+                    var guide = doc.FamilyCreate.NewModelCurve(Line.CreateBound(points[i] - Basis(axes[1 - a]) * 2, points[i] + Basis(axes[1 - a]) * 2), workPlane);
+                    guide.ChangeToReferenceLine(); doc.Regenerate();
+                    doc.FamilyCreate.NewAlignment(byAxis[axis], target.GetReference(), guide.GeometryCurve.Reference);
+                    doc.FamilyCreate.NewAlignment(byAxis[axis], guide.GeometryCurve.Reference, edges[i].GeometryCurve.GetEndPointReference(endpoint));
+                }
             }
-            using (var arc = Arc.Create(Basis(u), du, (Basis(u) + du).Normalize()))
-                doc.FamilyCreate.NewAngularDimension(byAxis[axis], arc, baseU.GeometryCurve.Reference, edges[0].GeometryCurve.Reference).FamilyLabel = angle;
             doc.Regenerate(); Check(size, degrees);
+        }
+        private ReferencePlane CoordinatePlane(View view, int coordinateAxis, double coordinate, string name)
+        {
+            int other = Enumerable.Range(0, 3).Single(a => a != axis && a != coordinateAxis);
+            var center = Basis(coordinateAxis) * coordinate;
+            var plane = doc.FamilyCreate.NewReferencePlane(center - Basis(other) * 2, center + Basis(other) * 2, Basis(axis), view);
+            plane.Name = name; return plane;
         }
         private ModelCurve ReferenceLine(SketchPlane plane, XYZ direction)
         {

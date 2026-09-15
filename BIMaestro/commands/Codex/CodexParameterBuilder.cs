@@ -23,7 +23,8 @@ namespace BIMaestro.Codex
             var initial = spec.Initial;
             foreach (var p in spec.Parameters) Set(Parameters[p.Name], initial[p.Name]);
             foreach (var p in spec.Parameters.Where(p => p.Formula != null)) manager.SetFormula(Parameters[p.Name], p.Formula.Revit());
-            manager.RenameCurrentType(spec.Types[0].Name);
+            if (!string.Equals(manager.CurrentType.Name, spec.Types[0].Name, StringComparison.Ordinal))
+                manager.RenameCurrentType(spec.Types[0].Name);
         }
         internal static ForgeTypeId DataType(string kind)
         {
