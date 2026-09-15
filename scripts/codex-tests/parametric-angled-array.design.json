@@ -1,0 +1,243 @@
+{
+  "name": "Grille_reseau_inclinable",
+  "category": "mechanical",
+  "assumptions": [
+    "Inclinaison autour de X, au coin minimum de chaque barre. Dimensions des barres avant rotation.",
+    "Marge supplémentaire de 10 mm en Y pour le débattement. Exemple natif à vérifier dans Revit."
+  ],
+  "materials": [
+    {
+      "name": "Blanc",
+      "rgb": [
+        240,
+        240,
+        235
+      ],
+      "transparency": 0
+    }
+  ],
+  "parameters": [
+    {
+      "name": "Largeur",
+      "value_mm": 600,
+      "test_value_mm": 800
+    },
+    {
+      "name": "LongueurUtile",
+      "value_mm": 500,
+      "test_value_mm": 600
+    },
+    {
+      "name": "Pas",
+      "value_mm": 50,
+      "test_value_mm": 40
+    },
+    {
+      "name": "EpaisseurBarre",
+      "value_mm": 4,
+      "test_value_mm": 6
+    }
+  ],
+  "parts": [
+    {
+      "name": "Cadre",
+      "material": "Blanc",
+      "axis": "z",
+      "minimum": [
+        {
+          "offset_mm": -20,
+          "terms": [
+            {
+              "parameter": "Largeur",
+              "factor": -0.5
+            }
+          ]
+        },
+        {
+          "offset_mm": -20,
+          "terms": [
+            {
+              "parameter": "LongueurUtile",
+              "factor": -0.5
+            }
+          ]
+        },
+        {
+          "offset_mm": 0,
+          "terms": []
+        }
+      ],
+      "maximum": [
+        {
+          "offset_mm": 20,
+          "terms": [
+            {
+              "parameter": "Largeur",
+              "factor": 0.5
+            }
+          ]
+        },
+        {
+          "offset_mm": 20,
+          "terms": [
+            {
+              "parameter": "LongueurUtile",
+              "factor": 0.5
+            }
+          ]
+        },
+        {
+          "offset_mm": 20,
+          "terms": []
+        }
+      ],
+      "openings": [
+        {
+          "minimum_uv": [
+            {
+              "offset_mm": 0,
+              "terms": [
+                {
+                  "parameter": "Largeur",
+                  "factor": -0.5
+                }
+              ]
+            },
+            {
+              "offset_mm": 0,
+              "terms": [
+                {
+                  "parameter": "LongueurUtile",
+                  "factor": -0.5
+                }
+              ]
+            }
+          ],
+          "maximum_uv": [
+            {
+              "offset_mm": 0,
+              "terms": [
+                {
+                  "parameter": "Largeur",
+                  "factor": 0.5
+                }
+              ]
+            },
+            {
+              "offset_mm": 0,
+              "terms": [
+                {
+                  "parameter": "LongueurUtile",
+                  "factor": 0.5
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "arrays": [
+    {
+      "name": "Barres",
+      "material": "Blanc",
+      "count_parameter": "NombreBarres",
+      "axis": "y",
+      "minimum": [
+        {
+          "offset_mm": 0,
+          "terms": [
+            {
+              "parameter": "Largeur",
+              "factor": -0.5
+            }
+          ]
+        },
+        {
+          "offset_mm": 10,
+          "terms": [
+            {
+              "parameter": "LongueurUtile",
+              "factor": -0.5
+            },
+            {
+              "parameter": "Pas",
+              "factor": 0.5
+            },
+            {
+              "parameter": "EpaisseurBarre",
+              "factor": -0.5
+            }
+          ]
+        },
+        {
+          "offset_mm": 0,
+          "terms": []
+        }
+      ],
+      "maximum": [
+        {
+          "offset_mm": 0,
+          "terms": [
+            {
+              "parameter": "Largeur",
+              "factor": 0.5
+            }
+          ]
+        },
+        {
+          "offset_mm": 10,
+          "terms": [
+            {
+              "parameter": "LongueurUtile",
+              "factor": -0.5
+            },
+            {
+              "parameter": "Pas",
+              "factor": 0.5
+            },
+            {
+              "parameter": "EpaisseurBarre",
+              "factor": 0.5
+            }
+          ]
+        },
+        {
+          "offset_mm": 20,
+          "terms": []
+        }
+      ],
+      "span": {
+        "offset_mm": 0,
+        "terms": [
+          {
+            "parameter": "LongueurUtile",
+            "factor": 1
+          }
+        ]
+      },
+      "pitch": {
+        "offset_mm": 0,
+        "terms": [
+          {
+            "parameter": "Pas",
+            "factor": 1
+          }
+        ]
+      },
+      "rotation": {
+        "angle_parameter": "Inclinaison",
+        "axis": "x"
+      }
+    }
+  ],
+  "load_into_project": false,
+  "place_at_origin": false,
+  "angles": [
+    {
+      "name": "Inclinaison",
+      "test_value_deg": 60,
+      "value_deg": 30
+    }
+  ]
+}

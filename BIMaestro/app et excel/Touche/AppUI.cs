@@ -111,13 +111,16 @@ public class AppUI : IExternalApplication
                     ("dynamo réglage", "Auto dynamo\nréglage", "Modification.ConfigureDynamoButtonCommand", "paramétre.png","Configure les paramètres Dynamo"),
                 })),
                 new RibbonItemDefinition("GestionExcelCmd", "Gestion Excel", panel => AddPushButton(panel, "GestionExcelCmd", "Gestion\nExcel", assemblyPath, "ScheduleIO.ScheduleExcelIOCommand", "Gestion Excel.png", "Exporter ou importer une nomenclature au format Excel")),
-                new RibbonItemDefinition("PhaseQuickEditButton", "Phases rapides", panel => AddPushButton(panel, "PhaseQuickEditButton", "Phases\nrapides", assemblyPath, "Modification.PhaseQuickEditCommand", "paramétre.png", "Modifie rapidement la phase de creation et la phase de demolition des objets selectionnes.")),
                 //new RibbonItemDefinition("SafeMoveButton", "Déplacement protégé", panel => AddPushButton(panel, "SafeMoveButton", "Déplacement\nprotégé", assemblyPath, "Modification.SafeMoveCommand", "Déplacement protégé.png", "Déplace précisément les objets entre deux points sans les dissocier ni les recréer.\r\nAnnule intégralement l'opération si Revit détecte une contrainte ou un risque pour une étiquette ou une cotation.")),
-                new RibbonItemDefinition("ModificationQuickTools", "Outils rapides", panel => AddStackedPushButtons(
+                new RibbonItemDefinition("ModificationQuickTools", "Outils rapides", panel => AddStackedModificationButtons(
                         panel,
                         assemblyPath,
                         ("Surcharges vues", "Surcharges", "Modification.OverrideColorCommand", "Couleur.png", "Applique ou réinitialise rapidement la demi-teinte, la transparence ou le masquage des éléments sélectionnés dans les vues choisies. Si une feuille est sélectionnée, BIMaestro applique l’action aux vues placées sur cette feuille."),
-                        ("ElementRenamerButton", "Organisateur", "Modification.RenameElementsCommand", "Organisateur.png", "Renomme les éléments sélectionnés avec préfixes, suffixes et numérotation.\r\nSur une feuille, numérote les fenêtres de vue de haut en bas puis de gauche à droite.\r\nTrie aussi les éléments par niveau/emplacement et peut réinitialiser le paramètre texte ciblé."),
+                        ("OrganisateurSplit", "Organisateur", new List<(string, string, string, string, string)>
+                        {
+                            ("ElementRenamerButton", "Organisateur", "Modification.RenameElementsCommand", "Organisateur.png", "Renomme les éléments sélectionnés avec préfixes, suffixes et numérotation.\r\nSur une feuille, numérote les fenêtres de vue de haut en bas puis de gauche à droite.\r\nTrie aussi les éléments par niveau/emplacement et peut réinitialiser le paramètre texte ciblé."),
+                            ("PhaseQuickEditButton", "Phases", "Modification.PhaseQuickEditCommand", "paramétre.png", "Modifie rapidement la phase de création et la phase de démolition des objets sélectionnés.")
+                        }),
                         ("Purge du plan", "Purge", "Modification.CombinedCleanupCommand", "Purge.png", "Supprime les vues non placées, les familles et les nomenclatures inutilisées afin d'alléger le projet.\r\nUne fenêtre permet de choisir précisément les éléments à purger avant exécution.\r\n")
                     )),
              }),
@@ -125,9 +128,12 @@ public class AppUI : IExternalApplication
             new RibbonPanelDefinition("Outils IA", new List<RibbonItemDefinition>
             {
                 new RibbonItemDefinition("CodexChat", "Codex", panel => AddPushButton(panel, "CodexChat", "Codex", assemblyPath, "BIMaestro.Codex.CodexCommand", "Chatbot + élémet.png", "Ouvre le tchat Codex avec votre compte ChatGPT et le choix du modèle. Lecture du contexte sur demande ; modifications de famille après validation. Bêta.")),
-                new RibbonItemDefinition("GPTBotWindowButton", "Chatbot + élément", panel => AddPushButton(panel, "GPTBotWindowButton", "Chatbot\n+ élément", assemblyPath, "IA.GPTBotWindowCommand", "Chatbot + élémet.png", "Ouvre un assistant IA conversationnel connecté à votre contexte Revit.\r\nAnalyse les éléments sélectionnés et répond selon le profil choisi (Basique, Revit, BIM Manager).")),
-                new RibbonItemDefinition("TextCorrectionButton", "Correction de texte IA", panel => AddPushButton(panel, "TextCorrectionButton", "Correction \nde texte IA", assemblyPath, "IA.TextCorrectionCommand", "Correction de texte IA (2).png", "Corrige et reformule les textes Revit sélectionnés avec l'IA.\r\nPropose plusieurs styles et laisse valider, modifier ou ignorer chaque suggestion.")),
-                new RibbonItemDefinition("ScanText", "Audit texte IA", panel => AddPushButton(panel, "ScanText", "Audit texte\nIA", assemblyPath, "ScanTextRevit.SelectViewsCommand", "Audit texte IA.png", "Analyse les textes des vues/feuilles sélectionnées pour détecter les fautes d'orthographe, de grammaire et de ponctuation. \r\n\r\nPourquoi ce bouton est utile :\r\n- évite les oublis avant envoi client,\r\n- classe les anomalies par gravité (Mineur / Erreur),\r\n- propose des corrections détaillées ligne par ligne.\r\n\r\nConseil : sélectionne seulement les vues/feuilles à contrôler pour accélérer l'analyse.")),
+                new RibbonItemDefinition("IAQuickTools", "Outils IA rapides", panel => AddStackedPushButtons(
+                    panel,
+                    assemblyPath,
+                    ("GPTBotWindowButton", "Chat él.", "IA.GPTBotWindowCommand", "Chatbot + élémet.png", "Ouvre un assistant IA conversationnel connecté à votre contexte Revit.\r\nAnalyse les éléments sélectionnés et répond selon le profil choisi (Basique, Revit, BIM Manager)."),
+                    ("TextCorrectionButton", "Corr. IA", "IA.TextCorrectionCommand", "Correction de texte IA (2).png", "Corrige et reformule les textes Revit sélectionnés avec l'IA.\r\nPropose plusieurs styles et laisse valider, modifier ou ignorer chaque suggestion."),
+                    ("ScanText", "Audit IA", "ScanTextRevit.SelectViewsCommand", "Audit texte IA.png", "Analyse les textes des vues/feuilles sélectionnées pour détecter les fautes d'orthographe, de grammaire et de ponctuation. \r\n\r\nPourquoi ce bouton est utile :\r\n- évite les oublis avant envoi client,\r\n- classe les anomalies par gravité (Mineur / Erreur),\r\n- propose des corrections détaillées ligne par ligne.\r\n\r\nConseil : sélectionne seulement les vues/feuilles à contrôler pour accélérer l'analyse."))),
                 new RibbonItemDefinition("RealisticViewImage", "Rendu plan IA", panel => AddPushButton(panel, "RealisticViewImage", "Rendu\nplan IA", assemblyPath, "IA.RealisticViewImageCommand", "rendu plan IA.png", "Génère un rendu réaliste à partir d'une vue Plan/Coupe/3D via gpt-image-2.\r\n\r\nCe que fait le bouton :\r\n- conserve le cadrage et la géométrie de la vue source,\r\n- optimise l'image avant envoi ,\r\n- crée une variante visuelle rapide pour présentation client.\r\n\r\nConseil : lancez-le sur une vue propre (annotations masquées) pour obtenir un résultat plus lisible."))            }),
            new RibbonPanelDefinition("Analyse", new List<RibbonItemDefinition>
             {
@@ -382,6 +388,40 @@ public class AppUI : IExternalApplication
             assemblyPath,
             colorButtons);
         BIMaestro.ViewHover.ViewDeckService.UpdateButton();
+    }
+
+    private static void AddStackedModificationButtons(
+        RibbonPanel panel,
+        string assemblyPath,
+        (string buttonName, string buttonText, string className, string resourceImageName, string toolTip) surchargeButton,
+        (string splitButtonName, string splitButtonText, List<(string buttonName, string buttonText, string className, string resourceImageName, string toolTip)> buttons) organiserSplit,
+        (string buttonName, string buttonText, string className, string resourceImageName, string toolTip) purgeButton)
+    {
+        RegisterButtonDefinition(surchargeButton.buttonName, surchargeButton.buttonText, surchargeButton.className, surchargeButton.resourceImageName);
+        RegisterButtonDefinition(purgeButton.buttonName, purgeButton.buttonText, purgeButton.className, purgeButton.resourceImageName);
+
+        var surchargeData = CreatePushButtonData(surchargeButton.buttonName, surchargeButton.buttonText, assemblyPath, surchargeButton.className, surchargeButton.resourceImageName, surchargeButton.toolTip);
+        var organiserData = new SplitButtonData(organiserSplit.splitButtonName, UiLanguage.T(organiserSplit.splitButtonText));
+        var purgeData = CreatePushButtonData(purgeButton.buttonName, purgeButton.buttonText, assemblyPath, purgeButton.className, purgeButton.resourceImageName, purgeButton.toolTip);
+
+        var stacked = panel.AddStackedItems(surchargeData, organiserData, purgeData);
+        if (stacked == null) return;
+
+        if (stacked.Count > 0 && stacked[0] is PushButton surcharge)
+        {
+            RegisterButtonInstance(surchargeButton.buttonName, surcharge);
+            RegisterButtonCommandId(surchargeButton.buttonName, TryGetCommandId(surcharge));
+        }
+        if (stacked.Count > 1 && stacked[1] is SplitButton organiser)
+        {
+            ConfigureSplitButton(organiser, assemblyPath, organiserSplit.buttons, null, null,
+                keepDefaultCurrentButton: true, fixedDisplayText: organiserSplit.splitButtonText);
+        }
+        if (stacked.Count > 2 && stacked[2] is PushButton purge)
+        {
+            RegisterButtonInstance(purgeButton.buttonName, purge);
+            RegisterButtonCommandId(purgeButton.buttonName, TryGetCommandId(purge));
+        }
     }
 
     private static void AddStackedPushButtons(

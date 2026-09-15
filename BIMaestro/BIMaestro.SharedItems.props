@@ -1,0 +1,1026 @@
+<Project>
+  <ItemGroup>
+    <Compile Include="commands\Codex\CodexClient.cs" />
+    <Compile Include="commands\Codex\CodexShapeBatch.cs" />
+    <Compile Include="commands\Codex\CodexFamilyDesign.cs" />
+    <Compile Include="commands\Codex\CodexFamilyBuilder.cs" />
+    <Compile Include="commands\Codex\CodexParametricDesign.cs" />
+    <Compile Include="commands\Codex\CodexFamilyFormula.cs" />
+    <Compile Include="commands\Codex\CodexFamilyParameters.cs" />
+    <Compile Include="commands\Codex\CodexParameterBuilder.cs" />
+    <Compile Include="commands\Codex\CodexFamilyTools.cs" />
+    <Compile Include="commands\Codex\CodexConnectorDesign.cs" />
+    <Compile Include="commands\Codex\CodexConnectorBuilder.cs" />
+    <Compile Include="commands\Codex\CodexSymbolicDesign.cs" />
+    <Compile Include="commands\Codex\CodexSymbolicBuilder.cs" />
+    <Compile Include="commands\Codex\CodexNativeValidation.cs" />
+    <Compile Include="commands\Codex\CodexProfileDesign.cs" />
+    <Compile Include="commands\Codex\CodexProfileBuilder.cs" />
+    <EmbeddedResource Include="..\scripts\codex-tests\native-fixtures\*.json">
+      <LogicalName>BIMaestro.CodexTests.%(Filename).json</LogicalName>
+    </EmbeddedResource>
+    <Compile Include="commands\Codex\CodexParametricBuilder.cs" />
+    <Compile Include="commands\Codex\CodexParametricArrayBuilder.cs" />
+    <Compile Include="commands\Codex\CodexAngularBarBuilder.cs" />
+    <Compile Include="commands\Codex\CodexSelectionGeometry.cs" />
+    <Compile Include="commands\Codex\CodexProjectBuilder.cs" />
+    <Compile Include="commands\Codex\CodexDiagnostics.cs" />
+    <Compile Include="commands\Codex\CodexImageAttachment.cs" />
+    <Compile Include="commands\Codex\CodexCommand.cs" />
+    <Compile Include="commands\Codex\CodexRevitBridge.cs" />
+    <Compile Include="commands\Codex\CodexWindow.cs" />
+    <Compile Include="les couleurs\Personnalisation\ProjectBrowserIcons.cs" />
+    <Compile Include="les couleurs\Personnalisation\AppearancePack.cs" />
+    <Compile Include="les couleurs\Personnalisation\BrowserAtmosphere.cs" />
+    <EmbeddedResource Include="Resources\BrowserIcons\*.png" />
+    <EmbeddedResource Include="Resources\BrowserIcons\browser-icons.js" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+    <PackageReference Include="CloudinaryDotNet">
+      <Version>1.26.2</Version>
+    </PackageReference>
+    <PackageReference Include="CommonServiceLocator">
+      <Version>2.0.7</Version>
+    </PackageReference>
+    <PackageReference Include="HelixToolkit.Wpf">
+      <Version>2.27.3</Version>
+    </PackageReference>
+    <PackageReference Include="HelixToolkit.Wpf.SharpDX">
+      <Version>2.27.3</Version>
+    </PackageReference>
+    <PackageReference Include="Markdown.Xaml">
+      <Version>1.0.0</Version>
+    </PackageReference>
+    <PackageReference Include="Microsoft-WindowsAPICodePack-Core">
+      <Version>1.1.5</Version>
+    </PackageReference>
+    <PackageReference Include="Microsoft-WindowsAPICodePack-Shell">
+      <Version>1.1.5</Version>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Azure.Amqp">
+      <Version>2.7.0</Version>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces">
+      <Version>9.0.8</Version>
+    </PackageReference>
+    <PackageReference Include="Microsoft.AspNet.WebApi.Client">
+      <Version>6.0.0</Version>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json">
+      <Version>8.0.0</Version>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.FileProviders.Physical">
+      <Version>8.0.0</Version>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Web.WebView2">
+      <Version>1.0.3485.44</Version>
+    </PackageReference>
+    <PackageReference Include="Newtonsoft.Json">
+      <Version>13.0.3</Version>
+    </PackageReference>
+    <PackageReference Include="Newtonsoft.Json.Bson">
+      <Version>1.0.2</Version>
+    </PackageReference>
+    <PackageReference Include="NLog">
+      <Version>6.0.3</Version>
+    </PackageReference>
+    <PackageReference Include="NPOI">
+      <Version>2.7.4</Version>
+    </PackageReference>
+    <PackageReference Include="OxyPlot.Core">
+      <Version>2.2.0</Version>
+    </PackageReference>
+    <PackageReference Include="OxyPlot.Wpf">
+      <Version>2.2.0</Version>
+    </PackageReference>
+    <PackageReference Include="Portable.BouncyCastle">
+      <Version>1.9.0</Version>
+    </PackageReference>
+    <PackageReference Include="System.IO">
+      <Version>4.3.0</Version>
+    </PackageReference>
+    <PackageReference Include="System.IO.FileSystem.Primitives">
+      <Version>4.0.1</Version>
+    </PackageReference>
+    <PackageReference Include="System.Net.Http">
+      <Version>4.3.4</Version>
+    </PackageReference>
+    <PackageReference Include="System.Net.Http.Json">
+      <Version>9.0.8</Version>
+    </PackageReference>
+    <PackageReference Include="System.Runtime">
+      <Version>4.3.1</Version>
+    </PackageReference>
+    <PackageReference Include="System.Runtime.InteropServices.RuntimeInformation">
+      <Version>4.3.0</Version>
+    </PackageReference>
+    <PackageReference Include="System.Security.Cryptography.Algorithms">
+      <Version>4.3.1</Version>
+    </PackageReference>
+    <PackageReference Include="System.Security.Cryptography.Encoding">
+      <Version>4.3.0</Version>
+    </PackageReference>
+    <PackageReference Include="System.Security.Cryptography.Pkcs">
+      <Version>8.0.0</Version>
+    </PackageReference>
+    <PackageReference Include="System.Security.Cryptography.Primitives">
+      <Version>4.3.0</Version>
+    </PackageReference>
+    <PackageReference Include="System.Security.Cryptography.X509Certificates">
+      <Version>4.3.2</Version>
+    </PackageReference>
+    <PackageReference Include="System.Text.Encoding.CodePages">
+      <Version>8.0.0</Version>
+    </PackageReference>
+    <PackageReference Include="System.Text.Json">
+      <Version>9.0.8</Version>
+    </PackageReference>
+    <PackageReference Include="System.Text.RegularExpressions">
+      <Version>4.3.1</Version>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="DynamoCoreWpf, Version=2.18.1.5096, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>$(DynamoForRevitDir)\DynamoCoreWpf.dll</HintPath>
+      <Private>False</Private>
+      <EmbedInteropTypes>False</EmbedInteropTypes>
+    </Reference>
+    <Reference Include="DynamoManipulation">
+      <HintPath>$(DynamoForRevitDir)\DynamoManipulation.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="DynamoRevitDS, Version=2.16.4.13894, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>$(DynamoForRevitDir)\Revit\DynamoRevitDS.dll</HintPath>
+      <Private>False</Private>
+      <EmbedInteropTypes>False</EmbedInteropTypes>
+    </Reference>
+    <Reference Include="DynamoRevitVersionSelector">
+      <HintPath>$(DynamoForRevitDir)\Revit\DynamoRevitVersionSelector.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Microsoft.Build.Engine" />
+    <Reference Include="Microsoft.VisualBasic" />
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+    <Reference Include="RevitAPI">
+      <HintPath>$(RevitInstallDir)\RevitAPI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="RevitAPIUI">
+      <HintPath>$(RevitInstallDir)\RevitAPIUI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="RevitServices">
+      <HintPath>$(DynamoForRevitDir)\Revit\RevitServices.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Activities" />
+    <Reference Include="System.Activities.Presentation" />
+    <Reference Include="System.ComponentModel.Composition" />
+    <Reference Include="System.ComponentModel.DataAnnotations" />
+    <Reference Include="System.configuration" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Numerics" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.Security" />
+    <Reference Include="System.Threading.Tasks" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Windows.Forms.DataVisualization">
+      <Private>False</Private>
+      <EmbedInteropTypes>False</EmbedInteropTypes>
+    </Reference>
+    <Reference Include="System.Xaml" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+    <Reference Include="WindowsBase" />
+    <Reference Include="WindowsFormsIntegration" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="commands\MEP Booster\MepBoosterService.cs" />
+    <Compile Include="commands\MEP Booster\MepBoosterGeometry.cs" />
+    <Compile Include="commands\MEP Booster\MepBoosterKinematics.cs" />
+    <Compile Include="commands\MEP Booster\MepBoosterOrientation.cs" />
+    <Compile Include="commands\MEP Booster\MepBoosterWindow.cs" />
+    <Compile Include="Controls\SimpleColorPicker.xaml.cs">
+      <DependentUpon>SimpleColorPicker.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Localization\UiLanguage.cs" />
+    <Compile Include="animation touche\chargement et salto\StuntSpinner.xaml.cs">
+      <DependentUpon>StuntSpinner.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="animation touche\oui-non mignion\EyeToggleSwitch.xaml.cs">
+      <DependentUpon>EyeToggleSwitch.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="animation touche\touche poubelle\AnimatedMenuIcon.xaml.cs">
+      <DependentUpon>AnimatedMenuIcon.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="animation touche\Fantome oui-non\fantome.xaml.cs">
+      <DependentUpon>fantome.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="app et excel\Supabase\Bienvenue\LicenseSession.cs" />
+    <Compile Include="app et excel\Supabase\Bienvenue\WelcomeManager.cs" />
+    <Compile Include="app et excel\Supabase\Bienvenue\WelcomeResultAction.cs" />
+    <Compile Include="app et excel\Supabase\Bienvenue\WelcomeState.cs" />
+    <Compile Include="app et excel\Supabase\Bienvenue\WelcomeStorage.cs" />
+    <Compile Include="app et excel\Supabase\Bienvenue\WelcomeWindow.xaml.cs">
+      <DependentUpon>WelcomeWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="app et excel\Supabase\IssueReporter.cs" />
+    <Compile Include="app et excel\Touche\AppUI.cs" />
+    <Compile Include="app et excel\Supabase\ApiKeys.cs" />
+    <Compile Include="app et excel\Supabase\AiQuotaWindow.cs" />
+    <Compile Include="app et excel\Touche\roue gta des touches\ButtonRecentManager.cs" />
+    <Compile Include="app et excel\Touche\roue gta des touches\RadialButtonPickerWindow.xaml.cs">
+      <DependentUpon>RadialButtonPickerWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="app et excel\Touche\roue gta des touches\RadialButtonsPreferences.cs" />
+    <Compile Include="app et excel\Touche\roue gta des touches\RadialButtonsService.cs" />
+    <Compile Include="app et excel\Touche\roue gta des touches\RadialGlobalHotkeyService.cs" />
+    <Compile Include="app et excel\Touche\roue gta des touches\RadialMenuButtonsCommand.cs" />
+    <Compile Include="app et excel\Touche\roue gta des touches\RibbonButtonImageCache.cs" />
+    <Compile Include="app et excel\Touche\roue gta des touches\RibbonButtonInfo.cs" />
+    <Compile Include="commands\Jeux\flapy bird\FlappyBirdCommand.cs" />
+    <Compile Include="commands\Jeux\flapy bird\FlappyBirdWindow.xaml.cs">
+      <DependentUpon>FlappyBirdWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\Jeux\snake\snake.cs" />
+    <Compile Include="commands\Jeux\snake\SnakeLeaderboardClient.cs" />
+    <Compile Include="commands\Jeux\snake\SnakeLeaderboardModels.cs" />
+    <Compile Include="commands\Jeux\snake\SnakeLeaderboardWindow.xaml.cs">
+      <DependentUpon>SnakeLeaderboardWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\Jeux\snake\SnakeWindow.xaml.cs">
+      <DependentUpon>SnakeWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameCollisionWorld.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameGpuSceneBuilder.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepData.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepImpact.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepCalculation.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\RevitGameWindow.MepImpact.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameSectionPlane.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\RevitGameWindow.Section.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepDirectionExplanation.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepDiagnostics.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepFlowRenderer.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepNetworkTrace.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepReplayStore.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepWebPackage.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepPublishClient.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepShareWindow.xaml.cs">
+      <DependentUpon>GameMepShareWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepScenarioStore.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepScenarioHistory.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepUiModels.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameRuntimeDiagnostics.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameSceneData.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameSelectionIndex.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\RevitGameCommand.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameReservationImport.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\RevitGameCompatibility.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\RevitGameExportContext.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\RevitGameMepExtractor.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\RevitGameWindow.xaml.cs">
+      <DependentUpon>RevitGameWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\page de mise à jour en direct\UpdateNotificationManager.cs" />
+    <Compile Include="commands\page de mise à jour en direct\UpdateCheckService.cs" />
+    <Compile Include="commands\page de mise à jour en direct\ButtonUpdateNote.cs" />
+    <Compile Include="commands\page de mise à jour en direct\ButtonUpdateNotesCatalog.cs" />
+    <Compile Include="commands\page de mise à jour en direct\ButtonUpdateNotesManager.cs" />
+    <Compile Include="commands\page de mise à jour en direct\ButtonUpdateNotesWindow.xaml.cs">
+      <DependentUpon>ButtonUpdateNotesWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\page de mise à jour en direct\UpdatePromptWindow.xaml.cs">
+      <DependentUpon>UpdatePromptWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\page de mise à jour en direct\SecretGifShortcutManager.cs" />
+    <Compile Include="commands\page de mise à jour en direct\SecretEffectWindow.cs" />
+    <Compile Include="commands\page de mise à jour en direct\SecretGifWindow.xaml.cs">
+      <DependentUpon>SecretGifWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\page de mise à jour en direct\ContactCommand.cs" />
+    <Compile Include="commands\paramétre partagé en famillle\ConvertSharedToFamilyParametersCommand.cs" />
+    <Compile Include="commands\Réservation auto\résa auto v3\ReservationAutoV3Command.cs" />
+    <Compile Include="commands\Réservation auto\résa auto v3\ReservationAutoV3Config.cs" />
+    <Compile Include="commands\Réservation auto\résa auto v3\ReservationV3Window.xaml.cs">
+      <DependentUpon>ReservationV3Window.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\Suivi maquette collaboratif\CollaborativeModelTracker.cs" />
+    <Compile Include="commands\Suivi maquette collaboratif\CollaborativeModelTrackerStore.cs" />
+    <Compile Include="commands\Suivi maquette collaboratif\CollaborativeModelTrackerWindow.xaml.cs">
+      <DependentUpon>CollaborativeModelTrackerWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\vue en survol\ViewHoverPreviewService.cs" />
+    <Compile Include="commands\vue en survol\ViewHoverPreviewBatchService.cs" />
+    <Compile Include="commands\vue en survol\ViewThumbnailBatchCommand.cs" />
+    <Compile Include="commands\vue en survol\ViewDeckTabDecorator.cs" />
+    <Compile Include="commands\vue en survol\ViewDeckChangeJournal.cs" />
+    <Compile Include="commands\vue en survol\ViewDeckChangeService.cs" />
+    <Compile Include="commands\vue en survol\ViewDeckHoverPreview.cs" />
+    <Compile Include="commands\vue en survol\ViewDeckTabPresentation.cs" />
+    <Compile Include="commands\vue en survol\ViewDeckTabIdentity.cs" />
+    <Compile Include="commands\vue en survol\ViewDeckService.cs" />
+    <Compile Include="commands\vue en survol\ViewDeckPreviewCache.cs" />
+    <Compile Include="commands\vue en survol\ViewDeckPreviewMemory.cs" />
+    <Compile Include="commands\vue en survol\ViewThumbnailBatchWindow.xaml.cs">
+      <DependentUpon>ViewThumbnailBatchWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\qui est le coupable\ElementHistoryTracker.cs" />
+    <Compile Include="commands\qui est le coupable\information au survol d%27un objet\LatestElementHistoryIndex.cs" />
+    <Compile Include="commands\qui est le coupable\information au survol d%27un objet\ElementHistoryHoverInfoService.cs" />
+    <Compile Include="commands\qui est le coupable\information au survol d%27un objet\ElementHistoryHoverToggleCommand.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryWindow.xaml.cs">
+      <DependentUpon>ElementHistoryWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Themes\ThemeManager.cs" />
+    <None Include="app et excel\Touche\copie touche.cs" />
+    <Compile Include="app et excel\BIMaestroApp.cs" />
+    <Compile Include="app et excel\Supabase\BaseTrackedCommand.cs" />
+    <Compile Include="app et excel\Supabase\LicenseManager.cs" />
+    <Compile Include="app et excel\Supabase\ProfilePayload.cs" />
+    <Compile Include="app et excel\Supabase\NetSupport.cs" />
+    <Compile Include="app et excel\Supabase\Paths.cs" />
+    <Compile Include="app et excel\Supabase\Telemetry.cs" />
+    <Compile Include="commands\page de mise à jour en direct\SupportPromptManager.cs" />
+    <Compile Include="commands\page de mise à jour en direct\SupportPromptWindow.xaml.cs">
+      <DependentUpon>SupportPromptWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="app et excel\temps revit\ShowTimeDashboard.cs" />
+    <Compile Include="app et excel\temps revit\TimeSeriesDashboardWindow.xaml.cs">
+      <DependentUpon>TimeSeriesDashboardWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="app et excel\Touche\Modification d%27emplacement\RibbonLayoutCommand.cs" />
+    <Compile Include="app et excel\Touche\Modification d%27emplacement\RibbonLayoutConfigManager.cs" />
+    <Compile Include="app et excel\Touche\Modification d%27emplacement\RibbonLayoutModels.cs" />
+    <Compile Include="app et excel\Touche\Modification d%27emplacement\RibbonLayoutWindow.xaml.cs">
+      <DependentUpon>RibbonLayoutWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\analyse erreur maquette 3D\SmartCheckState.cs" />
+    <Compile Include="commands\analyse erreur maquette 3D\SmartExternalHandler.cs" />
+    <Compile Include="commands\analyse erreur maquette 3D\SmartCheck.Types.cs" />
+    <Compile Include="commands\analyse erreur maquette 3D\SmartClashCommand.cs" />
+    <Compile Include="commands\analyse erreur maquette 3D\SmartCheckWindow.xaml.cs">
+      <DependentUpon>SmartCheckWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\AnalysePoids\CommandAnalysePoids.cs" />
+    <Compile Include="commands\AnalysePoids\AnalysePoids.xaml.cs">
+      <DependentUpon>AnalysePoids.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\AnalysePoids\EditFamilyRequestHandler.cs" />
+    <Compile Include="commands\AnalysePoids\ProgressWindow.xaml.cs">
+      <DependentUpon>ProgressWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\bride auto\AddFlangesAtEnds.cs" />
+    <Compile Include="commands\bride auto\PickDefaultFlangeWindow.xaml.cs">
+      <DependentUpon>PickDefaultFlangeWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\bride auto\RemoveFlangesReconnect.cs" />
+    <Compile Include="commands\Calcul des canalisations\canalisation V2\PipeNetworkOverviewWindow.xaml.cs">
+      <DependentUpon>PipeNetworkOverviewWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\Calcul des canalisations\canalisation V2\PipeNetworkSummary.cs" />
+    <Compile Include="commands\Calcul des canalisations\canalisation V2\PipeSelectionFilterV2.ExcelNpoi.cs" />
+    <Compile Include="commands\Calcul des canalisations\canalisation V2\PipeSelectionFilterV2.cs" />
+    <Compile Include="commands\Calcul des canalisations\canalisation V2\PipeSystemSelectionWindowV2.xaml.cs">
+      <DependentUpon>PipeSystemSelectionWindowV2.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\changement de texte par IA\CorrectionWindow123.xaml.cs">
+      <DependentUpon>CorrectionWindow123.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\changement de texte par IA\Preferences.cs" />
+    <Compile Include="commands\changement de texte par IA\TextCorrectionCommand.cs" />
+    <Compile Include="commands\image réaliste IA\RealisticViewImageCommand.cs" />
+    <Compile Include="commands\changer de couleur de ligne\ColorPicker.xaml.cs">
+      <DependentUpon>ColorPicker.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\changer de couleur de ligne\OverrideColorCommand.cs" />
+    <Compile Include="commands\phase rapide\PhaseQuickEditCommand.cs" />
+    <Compile Include="commands\phase rapide\PhaseQuickEditWindow.xaml.cs">
+      <DependentUpon>PhaseQuickEditWindow.xaml</DependentUpon>
+    </Compile>
+    <None Include="commands\changer de couleur de ligne\ResetOverridesCommand.cs" />
+    <Compile Include="commands\correction automatique\AiGrammarCache.cs" />
+    <Compile Include="commands\correction automatique\AiGrammarChecker.cs" />
+    <Compile Include="commands\correction automatique\CorrectionItem.cs" />
+    <Compile Include="commands\correction automatique\CorrectionResultWindow.xaml.cs">
+      <DependentUpon>CorrectionResultWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\correction automatique\ScannedTextItem.cs" />
+    <Compile Include="commands\correction automatique\SelectViewsCommand.cs" />
+    <Compile Include="commands\correction automatique\ScanService.cs" />
+    <Compile Include="commands\correction automatique\SelectViewsWindow.xaml.cs">
+      <DependentUpon>SelectViewsWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\Dossier famille\Collections.cs" />
+    <Compile Include="commands\Dossier famille\FamilyBrowserCommand.cs" />
+    <Compile Include="commands\Dossier famille\FamilyBrowserPlugin.xaml.cs">
+      <DependentUpon>FamilyBrowserPlugin.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\Dossier famille\FamilyIndexService.cs" />
+    <Compile Include="commands\Dossier famille\FamilySearchMetadata.cs" />
+    <Compile Include="commands\Dossier famille\FamilySearchReviewWindow.xaml.cs">
+      <DependentUpon>FamilySearchReviewWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\Dossier famille\FamilyMetadataProvider.cs" />
+    <Compile Include="commands\Dossier famille\FamilyLoadOption.cs" />
+    <Compile Include="commands\Dossier famille\FamilyUsageManager.cs" />
+    <Compile Include="commands\Dossier famille\Photo auto\GeneratePreviewlmagesHandler.cs" />
+    <Compile Include="commands\Dossier famille\image native de revit\ThumbnailCache.cs" />
+    <Compile Include="commands\Dossier famille\ImageResolver.cs" />
+    <Compile Include="commands\Dossier famille\LoadCollectionHandler.cs" />
+    <Compile Include="commands\Dossier famille\LoadFamilyHandler.cs" />
+    <Compile Include="commands\Dossier famille\orbit 3D\FamilyMeshExtractor.cs" />
+    <Compile Include="commands\Dossier famille\orbit 3D\FamilyPreviewBridge.cs" />
+    <Compile Include="commands\Dossier famille\roue de gta\RadialMenuCollectionStateStore.cs" />
+    <Compile Include="commands\Dossier famille\orbit 3D\MeshData.cs" />
+    <Compile Include="commands\Dossier famille\orbit 3D\Family3DPreviewWindow.xaml.cs">
+      <DependentUpon>Family3DPreviewWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\Dossier famille\orbit 3D\PreviewExportContext.cs" />
+    <Compile Include="commands\Dossier famille\ReloadFamilyHandler.cs" />
+    <Compile Include="commands\Dossier famille\image native de revit\ShellThumbnailProvider.cs" />
+    <Compile Include="commands\Dossier famille\RevitPreviewProvider.cs" />
+    <Compile Include="commands\Dossier famille\roue de gta\CatalogImageResolver.cs" />
+    <Compile Include="commands\Dossier famille\roue de gta\FamilyRecentManager.cs" />
+    <Compile Include="commands\Dossier famille\roue de gta\ImageDiscovery.cs" />
+    <Compile Include="commands\Dossier famille\roue de gta\OwnerWindowHelper.cs" />
+    <Compile Include="commands\Dossier famille\roue de gta\RadialItem.cs" />
+    <Compile Include="commands\Dossier famille\roue de gta\RadialMenuCommand.cs" />
+    <Compile Include="commands\Dossier famille\roue de gta\RadialMenuWindow.xaml.cs">
+      <DependentUpon>RadialMenuWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\Dossier famille\roue de gta\RadialPathsConfig.cs" />
+    <Compile Include="commands\Dossier famille\roue de gta\RadialPlaceFamilyHandler.cs" />
+    <Compile Include="commands\Dossier famille\roue de gta\RevitIdleRunner.cs" />
+    <Compile Include="commands\ElementIdExtensions.cs" />
+    <Compile Include="commands\Couleurs réseaux\PipeSystemColorsCommand.cs" />
+    <Compile Include="commands\export de nomenclature\ExportScheduleAddinObfuscation.cs" />
+    <Compile Include="commands\export dwg\ExportSheetsCommand.cs" />
+    <Compile Include="commands\export dwg\ExportSheetsWindow.xaml.cs">
+      <DependentUpon>ExportSheetsWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\page de mise à jour en direct\MiseAJourCommand.cs" />
+    <Compile Include="commands\page de mise à jour en direct\Page d%27explication projet\GuideCommand.cs" />
+    <Compile Include="commands\page de mise à jour en direct\UpdateWindow.xaml.cs">
+      <DependentUpon>UpdateWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\purge\CleanupWindow.xaml.cs">
+      <DependentUpon>CleanupWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\purge\CombinedCleanupCommand.cs" />
+    <Compile Include="commands\purge\DeleteUnplacedViewsCommand.cs" />
+    <Compile Include="commands\purge\DeleteUnusedFamiliesCommand.cs" />
+    <Compile Include="commands\purge\DeleteUnusedSchedulesCommand.cs" />
+    <Compile Include="commands\purge\sup de famille forte.cs" />
+    <Compile Include="commands\réseau auto entre canalisation\ConnectPipesCommand.cs" />
+    <Compile Include="commands\Sélection d%27objet unique\SelectSimilarCommand.cs" />
+    <Compile Include="commands\traduction paramètre famille et vue_feuille\TraduireVuesFamilleOpenAl.cs" />
+    <Compile Include="commands\unité de famille\ExportProjectUnitsCommand.cs" />
+    <Compile Include="commands\unité de famille\UpdateProjectUnitsCommand.cs" />
+    <Compile Include="commands\export import excel\ScheduleExcelIO.cs" />
+    <None Include="Test\roue de gta\RevitIdleRunner.cs" />
+    <None Include="Test\roue de gta\ImageDiscovery.cs" />
+    <None Include="Test\roue de gta\OwnerWindowHelper.cs" />
+    <None Include="Test\roue de gta\RadialMenuCommand.cs" />
+    <None Include="Test\roue de gta\RadialMenuWindow.xaml.cs">
+      <DependentUpon>RadialMenuWindow.xaml</DependentUpon>
+    </None>
+    <None Include="Test\2024 to 2023\ExportFamilyToJson.cs" />
+    <None Include="Test\2024 to 2023\FamilyExchangeModel.cs" />
+    <None Include="Test\2024 to 2023\ImportFamilyFromJson.cs" />
+    <None Include="Test\automatisation de tuyaux\SelectionHelper.cs" />
+    <None Include="Test\automatisation de tuyaux\test avec coude qui marche moyen\ConnectPipes.cs" />
+    <None Include="Test\automatisation de tuyaux\V3 avec évitement des obstacles\AutoCanalisationSettingsCommand.cs" />
+    <None Include="Test\automatisation de tuyaux\V3 avec évitement des obstacles\ConnectTwoPipesAvoidObstacles.cs" />
+    <None Include="Test\Clé d%27accés\ApiLicenseValidator.cs" />
+    <None Include="Test\Clé d%27accés\Clé d%27accés.cs" />
+    <None Include="Test\Clé d%27accés\Clés d%27accés.xaml.cs">
+      <DependentUpon>Clés d%27accés.xaml</DependentUpon>
+    </None>
+    <Compile Include="commands\Dynamo\dynamo.cs" />
+    <Compile Include="commands\Dynamo\ConfigureDynamoWindow.xaml.cs">
+      <DependentUpon>ConfigureDynamoWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\export de nomenclature\ExportScheduleAddin.cs" />
+    <Compile Include="commands\GPT classique\GPTBotWindowCommand.cs" />
+    <Compile Include="commands\menu contextuel\CommandMenuContextuel.cs" />
+    <Compile Include="commands\menu contextuel\ExternalEventHandlerGeneric.cs" />
+    <Compile Include="commands\menu contextuel\CommandSelectionWindow.xaml.cs">
+      <DependentUpon>CommandSelectionWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\menu contextuel\MenuContextuel.xaml.cs">
+      <DependentUpon>MenuContextuel.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\menu contextuel\NativeMethods.cs" />
+    <Compile Include="commands\première commande\sélection d%27élément\FamilyItem.cs" />
+    <Compile Include="commands\première commande\sélection d%27élément\FamilySelectionWindow.xaml.cs">
+      <DependentUpon>FamilySelectionWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\première commande\sélection d%27élément\HighlightWallsCommand.cs" />
+    <Compile Include="commands\Purge de paramètre de famille\ParameterSelection.cs" />
+    <Compile Include="commands\Purge de paramètre de famille\PurgeParametersCommand.cs" />
+    <Compile Include="commands\Purge de paramètre de famille\ParameterSelectionWindow.xaml.cs">
+      <DependentUpon>ParameterSelectionWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\traduction paramètre famille et vue_feuille\TraduireParametresFamilleOpenAI.cs" />
+    <Compile Include="commands\GPT classique\messagemodel.cs" />
+    <Compile Include="commands\GPT classique\ProfileSelectionWindow.xaml.cs">
+      <DependentUpon>ProfileSelectionWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="commands\GPT classique\test des élément\Elementinfo.cs" />
+    <Compile Include="commands\GPT classique\test des élément\ElementUtilities.cs" />
+    <Compile Include="commands\GPT classique\test des élément\SelectElementsCommand.cs" />
+    <Compile Include="commands\première commande\CountWindowsCommand.cs" />
+    <Compile Include="commands\quelle peinture\GetPaintedMaterial.cs" />
+    <Compile Include="commands\Ouverture de vue sur plan\Plan dans vue.cs" />
+    <Compile Include="commands\qui est le coupable\MainCommand.cs" />
+    <Compile Include="commands\renuméroté élément\RenameElementsCommand.cs" />
+    <Compile Include="commands\Vision 3D\vue sur face 3D.cs" />
+    <Compile Include="app et excel\temps revit\ExcelLogger.cs" />
+    <Compile Include="commands\GPT classique\GPTbot.xaml.cs">
+      <DependentUpon>GPTbot.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="les couleurs\Changement auto des couleurs\Bouton de reset tabitem.cs" />
+    <Compile Include="les couleurs\Changement auto des couleurs\ColoringStateManager.cs" />
+    <Compile Include="les couleurs\Personnalisation\ColorPreferencesWindow.xaml.cs">
+      <DependentUpon>ColorPreferencesWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="les couleurs\Personnalisation\CustomizeRibbonColorsCommand.cs" />
+    <Compile Include="les couleurs\Personnalisation\RevitColorPreferencesWindow.xaml.cs">
+      <DependentUpon>RevitColorPreferencesWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="les couleurs\Personnalisation\RevitRibbonCustomization.cs" />
+    <Compile Include="les couleurs\Personnalisation\RibbonColorPresetCatalog.cs" />
+    <Compile Include="les couleurs\Personnalisation\RibbonColorPreferences.cs" />
+    <None Include="Test\dwg to revit\ImportDwgWallsCommand.cs" />
+    <None Include="Test\popup\CommandStickmanAnimation.cs" />
+    <None Include="Test\popup\StickmanAnimationWindow.xaml.cs">
+      <DependentUpon>StickmanAnimationWindow.xaml</DependentUpon>
+    </None>
+    <None Include="Test\popup\troll\CommandHearts.cs" />
+    <None Include="Test\popup\troll\TrollWindow.xaml.cs">
+      <DependentUpon>TrollWindow.xaml</DependentUpon>
+    </None>
+    <None Include="Test\racourci clavier\LoadShortcutsCommand.cs" />
+    <None Include="Test\wtf photo\RandomImageWindow.cs" />
+    <Compile Include="les couleurs\Changement auto des couleurs\Couleur fond d%27images papanoel.cs" />
+    <None Include="les couleurs\ancien fonctionnement\Changement de la barre uniquement.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="commands\renuméroté élément\ElementRenameWindow.xaml.cs">
+      <DependentUpon>ElementRenameWindow.xaml</DependentUpon>
+    </Compile>
+    <Page Include="Controls\SimpleColorPicker.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="les couleurs\Personnalisation\ColorPreferencesWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="les couleurs\Personnalisation\RevitColorPreferencesWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="animation touche\chargement et salto\StuntSpinner.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="animation touche\oui-non mignion\EyeToggleSwitch.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="animation touche\touche poubelle\AnimatedMenuIcon.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="animation touche\Fantome oui-non\fantome.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="app et excel\Supabase\Bienvenue\WelcomeWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="app et excel\temps revit\TimeSeriesDashboardWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="app et excel\Touche\Modification d%27emplacement\RibbonLayoutWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="commands\analyse erreur maquette 3D\SmartCheckWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="commands\AnalysePoids\AnalysePoids.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\AnalysePoids\ProgressWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\bride auto\PickDefaultFlangeWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="commands\Calcul des canalisations\canalisation V2\PipeNetworkOverviewWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="commands\Calcul des canalisations\canalisation V2\PipeSystemSelectionWindowV2.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\changement de texte par IA\CorrectionWindow123.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="commands\changer de couleur de ligne\ColorPicker.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\phase rapide\PhaseQuickEditWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\vue en survol\ViewThumbnailBatchWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\correction automatique\CorrectionResultWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\correction automatique\SelectViewsWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\Dossier famille\FamilyBrowserPlugin.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\Dossier famille\orbit 3D\Family3DPreviewWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="commands\Dossier famille\roue de gta\RadialMenuWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\Dynamo\ConfigureDynamoWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\export dwg\ExportSheetsWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\GPT classique\ProfileSelectionWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\Jeux\flapy bird\FlappyBirdWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\Jeux\snake\SnakeLeaderboardWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\Jeux\snake\SnakeWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\Jeux vidéos\Maquette jouable\RevitGameWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="app et excel\Touche\roue gta des touches\RadialButtonPickerWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\Jeux vidéos\Maquette jouable\GameMepShareWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="commands\menu contextuel\CommandSelectionWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\menu contextuel\MenuContextuel.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\page de mise à jour en direct\UpdatePromptWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="commands\page de mise à jour en direct\SupportPromptWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="commands\Dossier famille\FamilySearchReviewWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\page de mise à jour en direct\SecretGifWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="commands\page de mise à jour en direct\ButtonUpdateNotesWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="commands\page de mise à jour en direct\UpdateWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\première commande\sélection d%27élément\FamilySelectionWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\Purge de paramètre de famille\ParameterSelectionWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\purge\CleanupWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="commands\renuméroté élément\ElementRenameWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="commands\GPT classique\GPTbot.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <None Include="Test\Clé d%27accés\Clés d%27accés.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Test\popup\StickmanAnimationWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Test\popup\troll\TrollWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Test\roue de gta\RadialMenuWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </None>
+    <Page Include="commands\Réservation auto\résa auto v3\ReservationV3Window.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="commands\Suivi maquette collaboratif\CollaborativeModelTrackerWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="commands\qui est le coupable\ElementHistoryWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Themes\BIMaestroTheme.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\Purge famille32x32.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\Calcule de poid1.png" />
+    <EmbeddedResource Include="Resources\OLD\Image IA.png" />
+    <EmbeddedResource Include="Resources\OLD\Pallette de couleur anexe .png" />
+    <EmbeddedResource Include="Resources\OLD\Peinture et matériaux.png" />
+    <EmbeddedResource Include="Resources\OLD\Pour paramètre de famille1.png" />
+    <EmbeddedResource Include="Resources\OLD\Qui à fait ça.png" />
+    <EmbeddedResource Include="Resources\OLD\safeimagekit-doc.png" />
+    <EmbeddedResource Include="Resources\OLD\Safeimagekit-resized-img %281%29.png" />
+    <EmbeddedResource Include="Resources\OLD\Safeimagekit-resized-img %284%29.png" />
+    <EmbeddedResource Include="Resources\OLD\Safeimagekit-resized-img %285%29.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\Canalisation.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\Canalisation V2 %282%29.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\maison famille %281%29.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\Père Noël.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\bouton lumière.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\Element 3D.png" />
+    <EmbeddedResource Include="Resources\OLD\safeimagekit-correction de texte IA.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\mini-AutocanalisationV2.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\safeimagekit-Information.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\safeimagekit-Texte maj.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\safeimagekit-bouton reset4.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\Dynamo.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\safeimagekit-Réservation.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\safeimagekit-qfdfsf.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\menu contextuel.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\wtf bouton.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\attention bouton.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <COMReference Include="Microsoft.Office.Core">
+      <Guid>{2DF8D04C-5BFA-101B-BDE5-00AA0044DE52}</Guid>
+      <VersionMajor>2</VersionMajor>
+      <VersionMinor>8</VersionMinor>
+      <Lcid>0</Lcid>
+      <WrapperTool>primary</WrapperTool>
+      <Isolated>False</Isolated>
+      <EmbedInteropTypes>True</EmbedInteropTypes>
+    </COMReference>
+    <COMReference Include="Microsoft.Office.Interop.Excel">
+      <Guid>{00020813-0000-0000-C000-000000000046}</Guid>
+      <VersionMajor>1</VersionMajor>
+      <VersionMinor>9</VersionMinor>
+      <Lcid>0</Lcid>
+      <WrapperTool>primary</WrapperTool>
+      <Isolated>False</Isolated>
+      <EmbedInteropTypes>True</EmbedInteropTypes>
+    </COMReference>
+    <COMReference Include="VBIDE">
+      <Guid>{0002E157-0000-0000-C000-000000000046}</Guid>
+      <VersionMajor>5</VersionMajor>
+      <VersionMinor>3</VersionMinor>
+      <Lcid>0</Lcid>
+      <WrapperTool>primary</WrapperTool>
+      <Isolated>False</Isolated>
+      <EmbedInteropTypes>True</EmbedInteropTypes>
+    </COMReference>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\rvt to excel et pdf.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\réglage.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\dynamo 3.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\dynamo 4.png" />
+    <EmbeddedResource Include="Resources\OLD\dynamo 5.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\dynamo 1.png" />
+    <EmbeddedResource Include="Resources\OLD\dynamo 2.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\export DWG.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\Organisateur d%27éléments.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\export import Excel.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\purge.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\import unité.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\export unité.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\Sélection d%27élément.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\bride auto.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\analyse de temps.png" />
+    <EmbeddedResource Include="Resources\OLD\cana auto.png" />
+    <EmbeddedResource Include="Resources\OLD\correction 3D.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\vide.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\bride suppresion.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\roue ruban.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\snake.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\BIMaestro.png" />
+  </ItemGroup>
+  <ItemGroup>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\OLD\résa cercle.png" />
+    <EmbeddedResource Include="Resources\OLD\Flappy bird-1.png" />
+    <EmbeddedResource Include="Resources\OLD\Mickey.gif" />
+    <EmbeddedResource Include="Resources\OLD\Collaboration.png" />
+    <EmbeddedResource Include="Resources\OLD\Convertir paramètres1.png" />
+    <EmbeddedResource Include="Resources\Gif\Canalisation.gif" />
+    <EmbeddedResource Include="Resources\Gif\mur_11260681.gif" />
+    <EmbeddedResource Include="Resources\Gif\Circulaire.gif" />
+    <EmbeddedResource Include="Resources\Gif\Sol.gif" />
+    <EmbeddedResource Include="Resources\Gif\porte.gif" />
+    <EmbeddedResource Include="Resources\Gif\Rectangulaire.gif" />
+    <EmbeddedResource Include="Resources\Gif\Fenetre.gif" />
+    <EmbeddedResource Include="Resources\Gif\Autre.gif" />
+    <EmbeddedResource Include="Resources\Gif\Gaine.gif" />
+    <EmbeddedResource Include="Resources\OLD\rendu plan IA.png" />
+    <EmbeddedResource Include="Resources\Analyse de poid.png" />
+    <EmbeddedResource Include="Resources\Audit texte IA.png" />
+    <EmbeddedResource Include="Resources\Bride auto %282%29.png" />
+    <EmbeddedResource Include="Resources\Calcul de canalisation.png" />
+    <EmbeddedResource Include="Resources\Chatbot + élémet.png" />
+    <EmbeddedResource Include="Resources\Clash 3D.png" />
+    <EmbeddedResource Include="Resources\Convertir paramètres %282%29.png" />
+    <EmbeddedResource Include="Resources\Correction de texte IA %282%29.png" />
+    <EmbeddedResource Include="Resources\Couleur oui non.png" />
+    <EmbeddedResource Include="Resources\DWG Exp..png" />
+    <EmbeddedResource Include="Resources\Exemple.png" />
+    <EmbeddedResource Include="Resources\Export de Nomenclature.png" />
+    <EmbeddedResource Include="Resources\Face 3D.png" />
+    <EmbeddedResource Include="Resources\Gestion Excel.png" />
+    <EmbeddedResource Include="Resources\Import unités.png" />
+    <EmbeddedResource Include="Resources\Miniature.png" />
+    <EmbeddedResource Include="Resources\Option.png" />
+    <EmbeddedResource Include="Resources\Organisateur.png" />
+    <EmbeddedResource Include="Resources\Ouvrir la vue.png" />
+    <EmbeddedResource Include="Resources\Peinture.png" />
+    <EmbeddedResource Include="Resources\Purge.png" />
+    <EmbeddedResource Include="Resources\qui à fait ça %282%29.png" />
+    <EmbeddedResource Include="Resources\rendu plan IA.png" />
+    <EmbeddedResource Include="Resources\Suppression de brides.png" />
+    <EmbeddedResource Include="Resources\Sélection d%27objet.png" />
+    <EmbeddedResource Include="Resources\Sélection d%27éléments.png" />
+    <EmbeddedResource Include="Resources\Tard IA.png" />
+    <EmbeddedResource Include="Resources\Temps par projet.png" />
+    <EmbeddedResource Include="Resources\Unités.png" />
+    <EmbeddedResource Include="Resources\Couleur.png" />
+    <EmbeddedResource Include="Resources\Dynamo 1 %282%29.png" />
+    <EmbeddedResource Include="Resources\Dynamo 2 %282%29.png" />
+    <EmbeddedResource Include="Resources\Dynamo 3 %282%29.png" />
+    <EmbeddedResource Include="Resources\Dynamo 4 %282%29.png" />
+    <EmbeddedResource Include="Resources\Dynamo 5 %282%29.png" />
+    <EmbeddedResource Include="Resources\suivie maquette.png" />
+    <EmbeddedResource Include="Resources\flappy bird.png" />
+    <EmbeddedResource Include="Resources\papa noel.png" />
+    <EmbeddedResource Include="Resources\reset.png" />
+    <EmbeddedResource Include="Resources\snake.png" />
+    <EmbeddedResource Include="Resources\Information %282%29.png" />
+    <EmbeddedResource Include="Resources\Purge famille2.png" />
+    <EmbeddedResource Include="Resources\Famille.png" />
+    <EmbeddedResource Include="Resources\Auto réservation.png" />
+    <EmbeddedResource Include="Resources\paramétre.png" />
+    <EmbeddedResource Include="Resources\Purge famille.png" />
+    <EmbeddedResource Include="Resources\Déplacement protégé.png" />
+    <EmbeddedResource Include="Resources\3D.jpg" />
+    <EmbeddedResource Include="Resources\Maquette MEP v2.png" />
+    <EmbeddedResource Include="Resources\MEP Booster vanne rotation.png" />
+    <EmbeddedResource Include="Resources\MEP Booster vanne rotation OFF.png" />
+    <Content Include="Themes\BIMaestro_Charte_Graphique.txt" />
+  </ItemGroup>
+</Project>

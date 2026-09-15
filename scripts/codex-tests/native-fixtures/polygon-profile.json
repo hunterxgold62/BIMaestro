@@ -1,0 +1,266 @@
+{
+  "name": "Gousset paramétrique",
+  "category": "mechanical",
+  "assumptions": [
+    "Exemple de construction paramétrique de cadres rectangulaires : largeur et profondeur indépendantes. Les ailettes obliques et les vis ne sont pas représentées dans cet exemple.",
+    "Géométrie native à tester dans Revit ; les valeurs de test sont 800 mm, 700 mm et 8 mm."
+  ],
+  "materials": [
+    {
+      "name": "Blanc",
+      "rgb": [
+        230,
+        230,
+        224
+      ],
+      "transparency": 0
+    }
+  ],
+  "parameters": [
+    {
+      "name": "Largeur",
+      "value_mm": 600,
+      "test_value_mm": 800
+    },
+    {
+      "name": "Profondeur",
+      "value_mm": 600,
+      "test_value_mm": 700
+    },
+    {
+      "name": "Epaisseur",
+      "value_mm": 5,
+      "test_value_mm": 8
+    }
+  ],
+  "parts": [
+    {
+      "name": "Cadre",
+      "material": "Blanc",
+      "axis": "z",
+      "minimum": [
+        {
+          "offset_mm": 0,
+          "terms": [
+            {
+              "parameter": "Largeur",
+              "factor": -0.5
+            }
+          ]
+        },
+        {
+          "offset_mm": 0,
+          "terms": [
+            {
+              "parameter": "Profondeur",
+              "factor": -0.5
+            }
+          ]
+        },
+        {
+          "offset_mm": 0,
+          "terms": []
+        }
+      ],
+      "maximum": [
+        {
+          "offset_mm": 0,
+          "terms": [
+            {
+              "parameter": "Largeur",
+              "factor": 0.5
+            }
+          ]
+        },
+        {
+          "offset_mm": 0,
+          "terms": [
+            {
+              "parameter": "Profondeur",
+              "factor": 0.5
+            }
+          ]
+        },
+        {
+          "offset_mm": 0,
+          "terms": [
+            {
+              "parameter": "Epaisseur",
+              "factor": 1
+            }
+          ]
+        }
+      ],
+      "openings": [],
+      "profile_uv": [
+        [
+          {
+            "offset_mm": 0,
+            "terms": [
+              {
+                "parameter": "Largeur",
+                "factor": -0.5
+              }
+            ]
+          },
+          {
+            "offset_mm": 0,
+            "terms": [
+              {
+                "parameter": "Profondeur",
+                "factor": -0.5
+              }
+            ]
+          }
+        ],
+        [
+          {
+            "offset_mm": 0,
+            "terms": [
+              {
+                "parameter": "Largeur",
+                "factor": 0.5
+              }
+            ]
+          },
+          {
+            "offset_mm": 0,
+            "terms": [
+              {
+                "parameter": "Profondeur",
+                "factor": -0.5
+              }
+            ]
+          }
+        ],
+        [
+          {
+            "offset_mm": 0,
+            "terms": [
+              {
+                "parameter": "Largeur",
+                "factor": 0.5
+              }
+            ]
+          },
+          {
+            "offset_mm": 0,
+            "terms": [
+              {
+                "parameter": "Profondeur",
+                "factor": 0.5
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  ],
+  "load_into_project": false,
+  "place_at_origin": false,
+  "family_options": {
+    "parameters": [
+      {
+        "name": "Largeur",
+        "kind": "length",
+        "instance": true,
+        "value": 600,
+        "test_values": [
+          999,
+          1000,
+          1001,
+          1200
+        ],
+        "formula": "",
+        "group": "geometry",
+        "description": "Paramètre témoin",
+        "shared_guid": ""
+      },
+      {
+        "name": "OptionFixations",
+        "kind": "yesno",
+        "instance": true,
+        "value": true,
+        "test_values": [
+          false
+        ],
+        "formula": "",
+        "group": "visibility",
+        "description": "Paramètre témoin",
+        "shared_guid": ""
+      },
+      {
+        "name": "AfficherRenfort",
+        "kind": "yesno",
+        "instance": true,
+        "value": false,
+        "test_values": [],
+        "formula": "Largeur > 1000 mm",
+        "group": "visibility",
+        "description": "Paramètre témoin",
+        "shared_guid": ""
+      },
+      {
+        "name": "AfficherFixations",
+        "kind": "yesno",
+        "instance": true,
+        "value": true,
+        "test_values": [],
+        "formula": "and(OptionFixations, Largeur >= 600 mm)",
+        "group": "visibility",
+        "description": "Paramètre témoin",
+        "shared_guid": ""
+      },
+      {
+        "name": "Rapport",
+        "kind": "number",
+        "instance": true,
+        "value": 1,
+        "test_values": [],
+        "formula": "Largeur / 600 mm",
+        "group": "geometry",
+        "description": "Paramètre témoin",
+        "shared_guid": ""
+      },
+      {
+        "name": "Libelle",
+        "kind": "text",
+        "instance": true,
+        "value": "Standard",
+        "test_values": [],
+        "formula": "if(AfficherRenfort, \"Avec renfort\", \"Sans renfort\")",
+        "group": "geometry",
+        "description": "Paramètre témoin",
+        "shared_guid": ""
+      }
+    ],
+    "types": [
+      {
+        "name": "600",
+        "values": []
+      },
+      {
+        "name": "1200",
+        "values": [
+          {
+            "parameter": "Largeur",
+            "value": 1200
+          }
+        ]
+      }
+    ],
+    "representations": [
+      {
+        "component": "Cadre",
+        "visible_parameter": "AfficherFixations",
+        "subcategory": "Fixations",
+        "coarse": false,
+        "medium": false,
+        "fine": true,
+        "plan": true,
+        "front_back": true,
+        "left_right": true
+      }
+    ]
+  }
+}

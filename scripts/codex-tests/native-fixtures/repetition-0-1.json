@@ -1,0 +1,255 @@
+{
+  "name": "Grille_reseau_parametrique",
+  "category": "mechanical",
+  "assumptions": [
+    "LongueurUtile désigne l'ouverture intérieure, hors cadre de 20 mm.",
+    "Les barres sont centrées dans chaque tranche de pas ; le reste est laissé en fin de réseau.",
+    "Exemple de réseau natif à vérifier dans Revit. Pas de lames inclinées ni de connecteurs."
+  ],
+  "materials": [
+    {
+      "name": "Blanc",
+      "rgb": [
+        240,
+        240,
+        235
+      ],
+      "transparency": 0
+    }
+  ],
+  "parameters": [
+    {
+      "name": "Largeur",
+      "value_mm": 600,
+      "test_value_mm": 800
+    },
+    {
+      "name": "LongueurUtile",
+      "value_mm": 500,
+      "test_value_mm": 600
+    },
+    {
+      "name": "Pas",
+      "value_mm": 50,
+      "test_value_mm": 40
+    },
+    {
+      "name": "EpaisseurBarre",
+      "value_mm": 4,
+      "test_value_mm": 6
+    }
+  ],
+  "parts": [
+    {
+      "name": "Cadre",
+      "material": "Blanc",
+      "axis": "z",
+      "minimum": [
+        {
+          "offset_mm": -20,
+          "terms": [
+            {
+              "parameter": "Largeur",
+              "factor": -0.5
+            }
+          ]
+        },
+        {
+          "offset_mm": -20,
+          "terms": [
+            {
+              "parameter": "LongueurUtile",
+              "factor": -0.5
+            }
+          ]
+        },
+        {
+          "offset_mm": 0,
+          "terms": []
+        }
+      ],
+      "maximum": [
+        {
+          "offset_mm": 20,
+          "terms": [
+            {
+              "parameter": "Largeur",
+              "factor": 0.5
+            }
+          ]
+        },
+        {
+          "offset_mm": 20,
+          "terms": [
+            {
+              "parameter": "LongueurUtile",
+              "factor": 0.5
+            }
+          ]
+        },
+        {
+          "offset_mm": 20,
+          "terms": []
+        }
+      ],
+      "openings": [
+        {
+          "minimum_uv": [
+            {
+              "offset_mm": 0,
+              "terms": [
+                {
+                  "parameter": "Largeur",
+                  "factor": -0.5
+                }
+              ]
+            },
+            {
+              "offset_mm": 0,
+              "terms": [
+                {
+                  "parameter": "LongueurUtile",
+                  "factor": -0.5
+                }
+              ]
+            }
+          ],
+          "maximum_uv": [
+            {
+              "offset_mm": 0,
+              "terms": [
+                {
+                  "parameter": "Largeur",
+                  "factor": 0.5
+                }
+              ]
+            },
+            {
+              "offset_mm": 0,
+              "terms": [
+                {
+                  "parameter": "LongueurUtile",
+                  "factor": 0.5
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "arrays": [
+    {
+      "name": "Barres",
+      "material": "Blanc",
+      "count_parameter": "NombreBarres",
+      "axis": "y",
+      "minimum": [
+        {
+          "offset_mm": 0,
+          "terms": [
+            {
+              "parameter": "Largeur",
+              "factor": -0.5
+            }
+          ]
+        },
+        {
+          "offset_mm": 0,
+          "terms": [
+            {
+              "parameter": "LongueurUtile",
+              "factor": -0.5
+            },
+            {
+              "parameter": "Pas",
+              "factor": 0.5
+            },
+            {
+              "parameter": "EpaisseurBarre",
+              "factor": -0.5
+            }
+          ]
+        },
+        {
+          "offset_mm": 0,
+          "terms": []
+        }
+      ],
+      "maximum": [
+        {
+          "offset_mm": 0,
+          "terms": [
+            {
+              "parameter": "Largeur",
+              "factor": 0.5
+            }
+          ]
+        },
+        {
+          "offset_mm": 0,
+          "terms": [
+            {
+              "parameter": "LongueurUtile",
+              "factor": -0.5
+            },
+            {
+              "parameter": "Pas",
+              "factor": 0.5
+            },
+            {
+              "parameter": "EpaisseurBarre",
+              "factor": 0.5
+            }
+          ]
+        },
+        {
+          "offset_mm": 20,
+          "terms": []
+        }
+      ],
+      "span": {
+        "offset_mm": 0,
+        "terms": [
+          {
+            "parameter": "LongueurUtile",
+            "factor": 1
+          }
+        ]
+      },
+      "pitch": {
+        "offset_mm": 0,
+        "terms": [
+          {
+            "parameter": "Pas",
+            "factor": 1
+          }
+        ]
+      },
+      "quantity_parameter": "Quantite"
+    }
+  ],
+  "load_into_project": false,
+  "place_at_origin": false,
+  "family_options": {
+    "parameters": [
+      {
+        "name": "Quantite",
+        "kind": "integer",
+        "instance": true,
+        "value": 1,
+        "test_values": [
+          0,
+          2,
+          10
+        ],
+        "formula": "",
+        "group": "geometry",
+        "description": "Paramètre témoin",
+        "shared_guid": ""
+      }
+    ],
+    "types": [],
+    "representations": []
+  }
+}

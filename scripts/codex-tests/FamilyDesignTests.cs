@@ -45,6 +45,24 @@ internal static class FamilyDesignTests
         var sphere = (JObject)fixture.DeepClone(); sphere["parts"][0]["geometry"]["kind"] = "sphere"; sphere["parts"][0]["geometry"]["size_mm"] = new JArray(50, 0, 0);
         CodexFamilyDesign.Parse(sphere);
         Console.WriteLine("PASS: seven supported primitive types and schema");
+        var diffuser = JObject.Parse(File.ReadAllText("scripts/codex-tests/diffuser.design.json"));
+        var parsedDiffuser = CodexFamilyDesign.Parse(diffuser);
+        if (parsedDiffuser.Parts.Count(p => p.Geometry.Kind == "loft") != 7 || parsedDiffuser.Parts[0].Cuts.Count != 5)
+            throw new Exception("Diffuser should have seven sloped hollow vanes and real frame openings");
+        Reject(diffuser, x => ((JObject)x["parts"][2]["geometry"]).Remove("sections_mm"), "loft missing sections");
+        Reject(diffuser, x => x["parts"][2]["geometry"]["sections_mm"][0][1][2] = 5, "nonplanar loft section");
+        Reject(diffuser, x => x["parts"][2]["geometry"]["sections_mm"][1] = x["parts"][2]["geometry"]["sections_mm"][0].DeepClone(), "coincident loft planes");
+        Reject(diffuser, x => ((JArray)x["parts"][2]["geometry"]["sections_mm"][1]).RemoveAt(0), "loft vertex count mismatch");
+        Reject(diffuser, x => x["parts"][0]["geometry"]["sections_mm"] = x["parts"][2]["geometry"]["sections_mm"].DeepClone(), "loft sections on a box");
+        var project = (JObject)diffuser.DeepClone(); project.Remove("load_into_project"); project.Remove("place_at_origin");
+        project["project_origin_mm"] = new JArray(150000, 200000, 7000); project["project_rotation_deg"] = 35;
+        var composition = CodexFamilyDesign.ParseProject(project, out var origin, out var rotation);
+        if (origin[0] != 150000 || rotation != 35 || composition.Load) throw new Exception("Project placement lost");
+        project["load_into_project"] = true;
+        try { CodexFamilyDesign.ParseProject(project, out origin, out rotation); throw new Exception("Unexpected project field accepted"); }
+        catch (InvalidOperationException) { }
+        if (CodexFamilyDesign.ProjectTool()["inputSchema"]["properties"]["project_origin_mm"] == null) throw new Exception("Missing project tool origin");
+        Console.WriteLine("PASS: hollow diffuser lofts, legacy geometry compatibility and project placement validation");
     }
     private static void Reject(JObject original, Action<JObject> mutate, string name)
     {

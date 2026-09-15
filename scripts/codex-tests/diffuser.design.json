@@ -1,0 +1,1367 @@
+{
+  "name": "Diffuseur_600x600_ailettes_inclinees",
+  "category": "mechanical",
+  "target_dimensions_mm": [
+    600,
+    600,
+    0
+  ],
+  "assumptions": [
+    "Cas de test inspiré de la photo : cotes de face 600 x 600 mm connues ; profondeur, épaisseurs et nombre exact d'ailettes à confirmer.",
+    "Tôles de 2 à 5 mm approximées, ouvertures traversantes réelles. Géométrie native non encore vérifiée dans Revit.",
+    "Pas de connecteur MEP, dos et raccordement non représentés."
+  ],
+  "materials": [
+    {
+      "name": "Peinture blanche",
+      "rgb": [
+        225,
+        224,
+        214
+      ],
+      "transparency": 0
+    },
+    {
+      "name": "Aluminium",
+      "rgb": [
+        165,
+        169,
+        170
+      ],
+      "transparency": 0
+    },
+    {
+      "name": "Vis",
+      "rgb": [
+        95,
+        98,
+        100
+      ],
+      "transparency": 0
+    }
+  ],
+  "parts": [
+    {
+      "name": "Cadre extérieur et quatre fentes traversantes",
+      "material": "Peinture blanche",
+      "geometry": {
+        "kind": "box",
+        "size_mm": [
+          600,
+          600,
+          5
+        ],
+        "position_mm": [
+          -300,
+          -300,
+          0
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "profile_mm": []
+      },
+      "cuts": [
+        {
+          "kind": "box",
+          "size_mm": [
+            448,
+            448,
+            9
+          ],
+          "position_mm": [
+            -224,
+            -224,
+            -2
+          ],
+          "rotation_deg": [
+            0,
+            0,
+            0
+          ],
+          "profile_mm": []
+        },
+        {
+          "kind": "box",
+          "size_mm": [
+            450,
+            22,
+            9
+          ],
+          "position_mm": [
+            -225,
+            -277,
+            -2
+          ],
+          "rotation_deg": [
+            0,
+            0,
+            0
+          ],
+          "profile_mm": []
+        },
+        {
+          "kind": "box",
+          "size_mm": [
+            450,
+            22,
+            9
+          ],
+          "position_mm": [
+            -225,
+            255,
+            -2
+          ],
+          "rotation_deg": [
+            0,
+            0,
+            0
+          ],
+          "profile_mm": []
+        },
+        {
+          "kind": "box",
+          "size_mm": [
+            22,
+            450,
+            9
+          ],
+          "position_mm": [
+            -277,
+            -225,
+            -2
+          ],
+          "rotation_deg": [
+            0,
+            0,
+            0
+          ],
+          "profile_mm": []
+        },
+        {
+          "kind": "box",
+          "size_mm": [
+            22,
+            450,
+            9
+          ],
+          "position_mm": [
+            255,
+            -225,
+            -2
+          ],
+          "rotation_deg": [
+            0,
+            0,
+            0
+          ],
+          "profile_mm": []
+        }
+      ],
+      "repeat_count": 1,
+      "repeat_step_mm": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Plastron ajouré",
+      "material": "Peinture blanche",
+      "geometry": {
+        "kind": "box",
+        "size_mm": [
+          500,
+          500,
+          3
+        ],
+        "position_mm": [
+          -250,
+          -250,
+          5
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "profile_mm": []
+      },
+      "cuts": [
+        {
+          "kind": "box",
+          "size_mm": [
+            404,
+            404,
+            7
+          ],
+          "position_mm": [
+            -202,
+            -202,
+            3
+          ],
+          "rotation_deg": [
+            0,
+            0,
+            0
+          ],
+          "profile_mm": []
+        }
+      ],
+      "repeat_count": 1,
+      "repeat_step_mm": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Ailette inclinée 1",
+      "material": "Aluminium",
+      "geometry": {
+        "kind": "loft",
+        "size_mm": [
+          0,
+          0,
+          0
+        ],
+        "position_mm": [
+          0,
+          0,
+          0
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "profile_mm": [],
+        "sections_mm": [
+          [
+            [
+              -198,
+              -198,
+              8
+            ],
+            [
+              198,
+              -198,
+              8
+            ],
+            [
+              198,
+              198,
+              8
+            ],
+            [
+              -198,
+              198,
+              8
+            ]
+          ],
+          [
+            [
+              -184,
+              -184,
+              18
+            ],
+            [
+              184,
+              -184,
+              18
+            ],
+            [
+              184,
+              184,
+              18
+            ],
+            [
+              -184,
+              184,
+              18
+            ]
+          ]
+        ]
+      },
+      "cuts": [
+        {
+          "kind": "loft",
+          "size_mm": [
+            0,
+            0,
+            0
+          ],
+          "position_mm": [
+            0,
+            0,
+            0
+          ],
+          "rotation_deg": [
+            0,
+            0,
+            0
+          ],
+          "profile_mm": [],
+          "sections_mm": [
+            [
+              [
+                -197.4,
+                -197.4,
+                7
+              ],
+              [
+                197.4,
+                -197.4,
+                7
+              ],
+              [
+                197.4,
+                197.4,
+                7
+              ],
+              [
+                -197.4,
+                197.4,
+                7
+              ]
+            ],
+            [
+              [
+                -180.6,
+                -180.6,
+                19
+              ],
+              [
+                180.6,
+                -180.6,
+                19
+              ],
+              [
+                180.6,
+                180.6,
+                19
+              ],
+              [
+                -180.6,
+                180.6,
+                19
+              ]
+            ]
+          ]
+        }
+      ],
+      "repeat_count": 1,
+      "repeat_step_mm": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Ailette inclinée 2",
+      "material": "Aluminium",
+      "geometry": {
+        "kind": "loft",
+        "size_mm": [
+          0,
+          0,
+          0
+        ],
+        "position_mm": [
+          0,
+          0,
+          0
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "profile_mm": [],
+        "sections_mm": [
+          [
+            [
+              -174,
+              -174,
+              16
+            ],
+            [
+              174,
+              -174,
+              16
+            ],
+            [
+              174,
+              174,
+              16
+            ],
+            [
+              -174,
+              174,
+              16
+            ]
+          ],
+          [
+            [
+              -160,
+              -160,
+              26
+            ],
+            [
+              160,
+              -160,
+              26
+            ],
+            [
+              160,
+              160,
+              26
+            ],
+            [
+              -160,
+              160,
+              26
+            ]
+          ]
+        ]
+      },
+      "cuts": [
+        {
+          "kind": "loft",
+          "size_mm": [
+            0,
+            0,
+            0
+          ],
+          "position_mm": [
+            0,
+            0,
+            0
+          ],
+          "rotation_deg": [
+            0,
+            0,
+            0
+          ],
+          "profile_mm": [],
+          "sections_mm": [
+            [
+              [
+                -173.4,
+                -173.4,
+                15
+              ],
+              [
+                173.4,
+                -173.4,
+                15
+              ],
+              [
+                173.4,
+                173.4,
+                15
+              ],
+              [
+                -173.4,
+                173.4,
+                15
+              ]
+            ],
+            [
+              [
+                -156.6,
+                -156.6,
+                27
+              ],
+              [
+                156.6,
+                -156.6,
+                27
+              ],
+              [
+                156.6,
+                156.6,
+                27
+              ],
+              [
+                -156.6,
+                156.6,
+                27
+              ]
+            ]
+          ]
+        }
+      ],
+      "repeat_count": 1,
+      "repeat_step_mm": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Ailette inclinée 3",
+      "material": "Aluminium",
+      "geometry": {
+        "kind": "loft",
+        "size_mm": [
+          0,
+          0,
+          0
+        ],
+        "position_mm": [
+          0,
+          0,
+          0
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "profile_mm": [],
+        "sections_mm": [
+          [
+            [
+              -150,
+              -150,
+              24
+            ],
+            [
+              150,
+              -150,
+              24
+            ],
+            [
+              150,
+              150,
+              24
+            ],
+            [
+              -150,
+              150,
+              24
+            ]
+          ],
+          [
+            [
+              -136,
+              -136,
+              34
+            ],
+            [
+              136,
+              -136,
+              34
+            ],
+            [
+              136,
+              136,
+              34
+            ],
+            [
+              -136,
+              136,
+              34
+            ]
+          ]
+        ]
+      },
+      "cuts": [
+        {
+          "kind": "loft",
+          "size_mm": [
+            0,
+            0,
+            0
+          ],
+          "position_mm": [
+            0,
+            0,
+            0
+          ],
+          "rotation_deg": [
+            0,
+            0,
+            0
+          ],
+          "profile_mm": [],
+          "sections_mm": [
+            [
+              [
+                -149.4,
+                -149.4,
+                23
+              ],
+              [
+                149.4,
+                -149.4,
+                23
+              ],
+              [
+                149.4,
+                149.4,
+                23
+              ],
+              [
+                -149.4,
+                149.4,
+                23
+              ]
+            ],
+            [
+              [
+                -132.6,
+                -132.6,
+                35
+              ],
+              [
+                132.6,
+                -132.6,
+                35
+              ],
+              [
+                132.6,
+                132.6,
+                35
+              ],
+              [
+                -132.6,
+                132.6,
+                35
+              ]
+            ]
+          ]
+        }
+      ],
+      "repeat_count": 1,
+      "repeat_step_mm": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Ailette inclinée 4",
+      "material": "Aluminium",
+      "geometry": {
+        "kind": "loft",
+        "size_mm": [
+          0,
+          0,
+          0
+        ],
+        "position_mm": [
+          0,
+          0,
+          0
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "profile_mm": [],
+        "sections_mm": [
+          [
+            [
+              -126,
+              -126,
+              32
+            ],
+            [
+              126,
+              -126,
+              32
+            ],
+            [
+              126,
+              126,
+              32
+            ],
+            [
+              -126,
+              126,
+              32
+            ]
+          ],
+          [
+            [
+              -112,
+              -112,
+              42
+            ],
+            [
+              112,
+              -112,
+              42
+            ],
+            [
+              112,
+              112,
+              42
+            ],
+            [
+              -112,
+              112,
+              42
+            ]
+          ]
+        ]
+      },
+      "cuts": [
+        {
+          "kind": "loft",
+          "size_mm": [
+            0,
+            0,
+            0
+          ],
+          "position_mm": [
+            0,
+            0,
+            0
+          ],
+          "rotation_deg": [
+            0,
+            0,
+            0
+          ],
+          "profile_mm": [],
+          "sections_mm": [
+            [
+              [
+                -125.4,
+                -125.4,
+                31
+              ],
+              [
+                125.4,
+                -125.4,
+                31
+              ],
+              [
+                125.4,
+                125.4,
+                31
+              ],
+              [
+                -125.4,
+                125.4,
+                31
+              ]
+            ],
+            [
+              [
+                -108.6,
+                -108.6,
+                43
+              ],
+              [
+                108.6,
+                -108.6,
+                43
+              ],
+              [
+                108.6,
+                108.6,
+                43
+              ],
+              [
+                -108.6,
+                108.6,
+                43
+              ]
+            ]
+          ]
+        }
+      ],
+      "repeat_count": 1,
+      "repeat_step_mm": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Ailette inclinée 5",
+      "material": "Aluminium",
+      "geometry": {
+        "kind": "loft",
+        "size_mm": [
+          0,
+          0,
+          0
+        ],
+        "position_mm": [
+          0,
+          0,
+          0
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "profile_mm": [],
+        "sections_mm": [
+          [
+            [
+              -102,
+              -102,
+              40
+            ],
+            [
+              102,
+              -102,
+              40
+            ],
+            [
+              102,
+              102,
+              40
+            ],
+            [
+              -102,
+              102,
+              40
+            ]
+          ],
+          [
+            [
+              -88,
+              -88,
+              50
+            ],
+            [
+              88,
+              -88,
+              50
+            ],
+            [
+              88,
+              88,
+              50
+            ],
+            [
+              -88,
+              88,
+              50
+            ]
+          ]
+        ]
+      },
+      "cuts": [
+        {
+          "kind": "loft",
+          "size_mm": [
+            0,
+            0,
+            0
+          ],
+          "position_mm": [
+            0,
+            0,
+            0
+          ],
+          "rotation_deg": [
+            0,
+            0,
+            0
+          ],
+          "profile_mm": [],
+          "sections_mm": [
+            [
+              [
+                -101.4,
+                -101.4,
+                39
+              ],
+              [
+                101.4,
+                -101.4,
+                39
+              ],
+              [
+                101.4,
+                101.4,
+                39
+              ],
+              [
+                -101.4,
+                101.4,
+                39
+              ]
+            ],
+            [
+              [
+                -84.6,
+                -84.6,
+                51
+              ],
+              [
+                84.6,
+                -84.6,
+                51
+              ],
+              [
+                84.6,
+                84.6,
+                51
+              ],
+              [
+                -84.6,
+                84.6,
+                51
+              ]
+            ]
+          ]
+        }
+      ],
+      "repeat_count": 1,
+      "repeat_step_mm": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Ailette inclinée 6",
+      "material": "Aluminium",
+      "geometry": {
+        "kind": "loft",
+        "size_mm": [
+          0,
+          0,
+          0
+        ],
+        "position_mm": [
+          0,
+          0,
+          0
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "profile_mm": [],
+        "sections_mm": [
+          [
+            [
+              -78,
+              -78,
+              48
+            ],
+            [
+              78,
+              -78,
+              48
+            ],
+            [
+              78,
+              78,
+              48
+            ],
+            [
+              -78,
+              78,
+              48
+            ]
+          ],
+          [
+            [
+              -64,
+              -64,
+              58
+            ],
+            [
+              64,
+              -64,
+              58
+            ],
+            [
+              64,
+              64,
+              58
+            ],
+            [
+              -64,
+              64,
+              58
+            ]
+          ]
+        ]
+      },
+      "cuts": [
+        {
+          "kind": "loft",
+          "size_mm": [
+            0,
+            0,
+            0
+          ],
+          "position_mm": [
+            0,
+            0,
+            0
+          ],
+          "rotation_deg": [
+            0,
+            0,
+            0
+          ],
+          "profile_mm": [],
+          "sections_mm": [
+            [
+              [
+                -77.4,
+                -77.4,
+                47
+              ],
+              [
+                77.4,
+                -77.4,
+                47
+              ],
+              [
+                77.4,
+                77.4,
+                47
+              ],
+              [
+                -77.4,
+                77.4,
+                47
+              ]
+            ],
+            [
+              [
+                -60.6,
+                -60.6,
+                59
+              ],
+              [
+                60.6,
+                -60.6,
+                59
+              ],
+              [
+                60.6,
+                60.6,
+                59
+              ],
+              [
+                -60.6,
+                60.6,
+                59
+              ]
+            ]
+          ]
+        }
+      ],
+      "repeat_count": 1,
+      "repeat_step_mm": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Ailette inclinée 7",
+      "material": "Aluminium",
+      "geometry": {
+        "kind": "loft",
+        "size_mm": [
+          0,
+          0,
+          0
+        ],
+        "position_mm": [
+          0,
+          0,
+          0
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "profile_mm": [],
+        "sections_mm": [
+          [
+            [
+              -54,
+              -54,
+              56
+            ],
+            [
+              54,
+              -54,
+              56
+            ],
+            [
+              54,
+              54,
+              56
+            ],
+            [
+              -54,
+              54,
+              56
+            ]
+          ],
+          [
+            [
+              -40,
+              -40,
+              66
+            ],
+            [
+              40,
+              -40,
+              66
+            ],
+            [
+              40,
+              40,
+              66
+            ],
+            [
+              -40,
+              40,
+              66
+            ]
+          ]
+        ]
+      },
+      "cuts": [
+        {
+          "kind": "loft",
+          "size_mm": [
+            0,
+            0,
+            0
+          ],
+          "position_mm": [
+            0,
+            0,
+            0
+          ],
+          "rotation_deg": [
+            0,
+            0,
+            0
+          ],
+          "profile_mm": [],
+          "sections_mm": [
+            [
+              [
+                -53.4,
+                -53.4,
+                55
+              ],
+              [
+                53.4,
+                -53.4,
+                55
+              ],
+              [
+                53.4,
+                53.4,
+                55
+              ],
+              [
+                -53.4,
+                53.4,
+                55
+              ]
+            ],
+            [
+              [
+                -36.6,
+                -36.6,
+                67
+              ],
+              [
+                36.6,
+                -36.6,
+                67
+              ],
+              [
+                36.6,
+                36.6,
+                67
+              ],
+              [
+                -36.6,
+                36.6,
+                67
+              ]
+            ]
+          ]
+        }
+      ],
+      "repeat_count": 1,
+      "repeat_step_mm": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Centre carré",
+      "material": "Peinture blanche",
+      "geometry": {
+        "kind": "box",
+        "size_mm": [
+          52,
+          52,
+          2
+        ],
+        "position_mm": [
+          -26,
+          -26,
+          67
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "profile_mm": []
+      },
+      "cuts": [],
+      "repeat_count": 1,
+      "repeat_step_mm": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Fixation -275 -275",
+      "material": "Vis",
+      "geometry": {
+        "kind": "cylinder",
+        "size_mm": [
+          4,
+          0,
+          2
+        ],
+        "position_mm": [
+          -275,
+          -275,
+          -1
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "profile_mm": []
+      },
+      "cuts": [],
+      "repeat_count": 1,
+      "repeat_step_mm": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Fixation 275 -275",
+      "material": "Vis",
+      "geometry": {
+        "kind": "cylinder",
+        "size_mm": [
+          4,
+          0,
+          2
+        ],
+        "position_mm": [
+          275,
+          -275,
+          -1
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "profile_mm": []
+      },
+      "cuts": [],
+      "repeat_count": 1,
+      "repeat_step_mm": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Fixation -275 275",
+      "material": "Vis",
+      "geometry": {
+        "kind": "cylinder",
+        "size_mm": [
+          4,
+          0,
+          2
+        ],
+        "position_mm": [
+          -275,
+          275,
+          -1
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "profile_mm": []
+      },
+      "cuts": [],
+      "repeat_count": 1,
+      "repeat_step_mm": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Fixation 275 275",
+      "material": "Vis",
+      "geometry": {
+        "kind": "cylinder",
+        "size_mm": [
+          4,
+          0,
+          2
+        ],
+        "position_mm": [
+          275,
+          275,
+          -1
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "profile_mm": []
+      },
+      "cuts": [],
+      "repeat_count": 1,
+      "repeat_step_mm": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "load_into_project": false,
+  "place_at_origin": false
+}
