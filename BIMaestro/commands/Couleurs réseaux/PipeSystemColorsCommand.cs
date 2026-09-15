@@ -13,7 +13,7 @@ namespace Visualisation
     [Transaction(TransactionMode.Manual)]
     public sealed class PipeSystemColorsCommand : BaseTrackedCommand
     {
-        private const string ManagedFilterPrefix = "BIMaestro_PipeSystemColor_";
+        private const string ManagedFilterPrefix = "FLU_";
         // V2 uses public write access. Revit 2025 can reject Vendor access when the
         // assembly is loaded through a deployment manifest whose vendor identity
         // differs from the development manifest. Schemas are immutable once loaded,
@@ -57,7 +57,9 @@ namespace Visualisation
                     transaction.Commit();
                 }
 
-                TaskDialog.Show("Couleurs réseaux", "Coloration désactivée dans la vue active.");
+                TaskDialog.Show(
+                    "Couleurs réseaux",
+                    "Coloration désactivée et filtres FLU_ retirés de la vue active.");
                 return Result.Succeeded;
             }
 
@@ -114,12 +116,13 @@ namespace Visualisation
 
                     if (!filtersBySystemId.TryGetValue(systemId, out filter))
                     {
-                        string filterName = GetAvailableFilterName(document, systemId);
+                        string filterName = GetAvailableFilterName(document, systemType.Name, null);
                         filter = ParameterFilterElement.Create(document, filterName, categories, rule);
                         MarkAsManaged(filter, schema, systemId);
                     }
                     else
                     {
+                        filter.Name = GetAvailableFilterName(document, systemType.Name, filter.Id);
                         filter.SetCategories(categories);
                         filter.SetElementFilter(rule);
                     }
@@ -251,13 +254,17 @@ namespace Visualisation
             }
         }
 
-        private static string GetAvailableFilterName(Document document, long systemTypeId)
+        private static string GetAvailableFilterName(
+            Document document,
+            string systemTypeName,
+            ElementId filterIdToExclude)
         {
-            string baseName = ManagedFilterPrefix + systemTypeId;
+            string baseName = ManagedFilterPrefix + systemTypeName;
             var usedNames = new HashSet<string>(
                 new FilteredElementCollector(document)
                     .OfClass(typeof(ParameterFilterElement))
                     .Cast<ParameterFilterElement>()
+                    .Where(filter => filterIdToExclude == null || filter.Id != filterIdToExclude)
                     .Select(filter => filter.Name),
                 StringComparer.OrdinalIgnoreCase);
 

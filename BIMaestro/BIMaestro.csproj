@@ -9,6 +9,8 @@
     <RootNamespace>BIMaestro</RootNamespace>
     <AssemblyName>BIMaestro</AssemblyName>
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <!-- Keep WPF resource resolution in the build domain (avoids loading reference-only assemblies during markup pass 2). -->
+    <AlwaysCompileMarkupFilesInSeparateDomain>false</AlwaysCompileMarkupFilesInSeparateDomain>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
     <LangVersion>9.0</LangVersion>
@@ -54,6 +56,16 @@
     <SignAssembly>true</SignAssembly>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="commands\Codex\CodexClient.cs" />
+    <Compile Include="commands\Codex\CodexShapeBatch.cs" />
+    <Compile Include="commands\Codex\CodexFamilyDesign.cs" />
+    <Compile Include="commands\Codex\CodexFamilyBuilder.cs" />
+    <Compile Include="commands\Codex\CodexSelectionGeometry.cs" />
+    <Compile Include="commands\Codex\CodexDiagnostics.cs" />
+    <Compile Include="commands\Codex\CodexImageAttachment.cs" />
+    <Compile Include="commands\Codex\CodexCommand.cs" />
+    <Compile Include="commands\Codex\CodexRevitBridge.cs" />
+    <Compile Include="commands\Codex\CodexWindow.cs" />
     <Compile Include="les couleurs\Personnalisation\ProjectBrowserIcons.cs" />
     <Compile Include="les couleurs\Personnalisation\AppearancePack.cs" />
     <Compile Include="les couleurs\Personnalisation\BrowserAtmosphere.cs" />
@@ -228,6 +240,11 @@
     <Reference Include="WindowsFormsIntegration" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="commands\MEP Booster\MepBoosterService.cs" />
+    <Compile Include="commands\MEP Booster\MepBoosterGeometry.cs" />
+    <Compile Include="commands\MEP Booster\MepBoosterKinematics.cs" />
+    <Compile Include="commands\MEP Booster\MepBoosterOrientation.cs" />
+    <Compile Include="commands\MEP Booster\MepBoosterWindow.cs" />
     <Compile Include="Controls\SimpleColorPicker.xaml.cs">
       <DependentUpon>SimpleColorPicker.xaml</DependentUpon>
     </Compile>
@@ -255,6 +272,7 @@
     <Compile Include="app et excel\Supabase\IssueReporter.cs" />
     <Compile Include="app et excel\Touche\AppUI.cs" />
     <Compile Include="app et excel\Supabase\ApiKeys.cs" />
+    <Compile Include="app et excel\Supabase\AiQuotaWindow.cs" />
     <Compile Include="app et excel\Touche\roue gta des touches\ButtonRecentManager.cs" />
     <Compile Include="app et excel\Touche\roue gta des touches\RadialButtonPickerWindow.xaml.cs">
       <DependentUpon>RadialButtonPickerWindow.xaml</DependentUpon>
@@ -284,6 +302,8 @@
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepImpact.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepCalculation.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\RevitGameWindow.MepImpact.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\GameSectionPlane.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\RevitGameWindow.Section.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepDirectionExplanation.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepDiagnostics.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepFlowRenderer.cs" />
@@ -1035,6 +1055,8 @@
     <EmbeddedResource Include="Resources\Déplacement protégé.png" />
     <EmbeddedResource Include="Resources\3D.jpg" />
     <EmbeddedResource Include="Resources\Maquette MEP v2.png" />
+    <EmbeddedResource Include="Resources\MEP Booster vanne rotation.png" />
+    <EmbeddedResource Include="Resources\MEP Booster vanne rotation OFF.png" />
     <Content Include="Themes\BIMaestro_Charte_Graphique.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

@@ -41,6 +41,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
+    <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameSectionPlane.cs" />
     <Compile Include="GameMepParity.cs" />
     <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameMepImpact.cs" />
     <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameMepCalculation.cs" />

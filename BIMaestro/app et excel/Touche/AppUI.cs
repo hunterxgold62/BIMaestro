@@ -64,6 +64,7 @@ public class AppUI : IExternalApplication
 
             new RibbonPanelDefinition("Beta", new List<RibbonItemDefinition>
             {
+                new RibbonItemDefinition("MepBooster", "MEP Booster", panel => AddPushButton(panel, "MepBooster", "MEP Booster\nOFF", assemblyPath, "BIMaestro.MepBooster.MepBoosterCommand", "MEP Booster vanne rotation.png", "Active ou désactive la pastille MEP après 0,2 seconde de sélection stable. Survolez la pastille puis un angle pour voir la rotation. Cliquez pour appliquer ; Échap ferme la rosace. Accessoires, raccords droits, coudes et tés, en plan, coupe et 3D orthographique. Les actions qui déplaceraient un connecteur raccordé sont désactivées.")),
                 new RibbonItemDefinition(
                     "RevitGameCommand",
                     "Maquette MEP",
@@ -123,6 +124,7 @@ public class AppUI : IExternalApplication
 
             new RibbonPanelDefinition("Outils IA", new List<RibbonItemDefinition>
             {
+                new RibbonItemDefinition("CodexChat", "Codex", panel => AddPushButton(panel, "CodexChat", "Codex", assemblyPath, "BIMaestro.Codex.CodexCommand", "Chatbot + élémet.png", "Ouvre le tchat Codex avec votre compte ChatGPT et le choix du modèle. Lecture du contexte sur demande ; modifications de famille après validation. Bêta.")),
                 new RibbonItemDefinition("GPTBotWindowButton", "Chatbot + élément", panel => AddPushButton(panel, "GPTBotWindowButton", "Chatbot\n+ élément", assemblyPath, "IA.GPTBotWindowCommand", "Chatbot + élémet.png", "Ouvre un assistant IA conversationnel connecté à votre contexte Revit.\r\nAnalyse les éléments sélectionnés et répond selon le profil choisi (Basique, Revit, BIM Manager).")),
                 new RibbonItemDefinition("TextCorrectionButton", "Correction de texte IA", panel => AddPushButton(panel, "TextCorrectionButton", "Correction \nde texte IA", assemblyPath, "IA.TextCorrectionCommand", "Correction de texte IA (2).png", "Corrige et reformule les textes Revit sélectionnés avec l'IA.\r\nPropose plusieurs styles et laisse valider, modifier ou ignorer chaque suggestion.")),
                 new RibbonItemDefinition("ScanText", "Audit texte IA", panel => AddPushButton(panel, "ScanText", "Audit texte\nIA", assemblyPath, "ScanTextRevit.SelectViewsCommand", "Audit texte IA.png", "Analyse les textes des vues/feuilles sélectionnées pour détecter les fautes d'orthographe, de grammaire et de ponctuation. \r\n\r\nPourquoi ce bouton est utile :\r\n- évite les oublis avant envoi client,\r\n- classe les anomalies par gravité (Mineur / Erreur),\r\n- propose des corrections détaillées ligne par ligne.\r\n\r\nConseil : sélectionne seulement les vues/feuilles à contrôler pour accélérer l'analyse.")),
@@ -527,6 +529,7 @@ public class AppUI : IExternalApplication
         var addedButton = panel.AddItem(buttonData) as PushButton;
         if (addedButton != null)
         {
+            if (buttonName == "MepBooster") BIMaestro.MepBooster.MepBoosterService.BindButton(addedButton);
             RegisterButtonInstance(buttonName, addedButton);
             RegisterButtonCommandId(buttonName, TryGetCommandId(addedButton));
         }

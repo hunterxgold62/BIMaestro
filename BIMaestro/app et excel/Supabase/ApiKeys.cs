@@ -39,7 +39,10 @@ namespace Licensing
             var raw = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
 
             if ((int)resp.StatusCode == 403)
+            {
+                AiQuotaWindow.NotifyQuotaExceeded();
                 throw new InvalidOperationException(QuotaExceededMessage);
+            }
             if ((int)resp.StatusCode == 429)
                 throw new InvalidOperationException("Trop de requêtes, veuillez réessayer.");
 
@@ -78,6 +81,12 @@ namespace Licensing
                 throw new InvalidOperationException("La requête IA a expiré (délai de 60 s dépassé). Veuillez réessayer ou reformuler votre demande.");
             }
             var raw = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+
+            if ((int)resp.StatusCode == 403)
+            {
+                AiQuotaWindow.NotifyQuotaExceeded();
+                throw new InvalidOperationException(QuotaExceededMessage);
+            }
 
             if (!resp.IsSuccessStatusCode)
                 throw new InvalidOperationException($"AI proxy error ({(int)resp.StatusCode}): {raw}");

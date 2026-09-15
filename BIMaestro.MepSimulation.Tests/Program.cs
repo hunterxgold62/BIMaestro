@@ -11,6 +11,46 @@ namespace BIMaestro.VideoGames
     {
         private static int _assertions;
 
+        private static void SectionPlaneClipsPickingAndFlowSegments()
+        {
+            var volume = new GameSectionVolume();
+            volume.Planes.Add(new GameSectionPlane { Enabled = true, FaceNormal = new Vector3D(1,0,0), Anchor = new Point3D(0,0,0) });
+            volume.Planes.Add(new GameSectionPlane { Enabled = true, FaceNormal = new Vector3D(-1,0,0), Anchor = new Point3D(10,0,0) });
+            var segmentA = new Point3D(-5,0,0); var segmentB = new Point3D(15,0,0);
+            Assert(volume.ClipSegment(ref segmentA, ref segmentB) && segmentA.X == 0 && segmentB.X == 10,
+                "Multiple face cuts must retain only the intersection, without removing an entire crossing flow.");
+            volume.Planes.RemoveAt(1);
+            segmentA = new Point3D(-5,0,0); segmentB = new Point3D(15,0,0);
+            Assert(volume.ClipSegment(ref segmentA, ref segmentB) && segmentB.X == 15,
+                "Deleting one cut must restore geometry independently of the remaining cuts.");
+            var face = new GameElementData { Key = "face", Name = "Wall" };
+            var triangle = new GameTriangle(new Point3D(0,0,0), new Point3D(1,0,0), new Point3D(0,1,0), new Vector3D(0,0,1), false);
+            face.Include(new[] { triangle.A, triangle.B, triangle.C }); face.SelectionTriangles.Add(triangle);
+            var hit = new GameSelectionIndex(new[] { face }).FindNearest(new Point3D(.2,.2,1), new Vector3D(0,0,-1));
+            Assert(hit?.IsPrecise == true && hit.Normal.HasValue && hit.Normal.Value.Z > 0,
+                "A face cut must use the actual hit triangle normal, not a bounding box axis.");
+            var plane = new GameSectionPlane { Enabled = true, Axis = 2, Position = 10 };
+            var start = new Point3D(0, 0, 15); var end = new Point3D(0, 0, 5);
+            Assert(plane.ClipSegment(ref start, ref end) && start.Z == 10 && end.Z == 5,
+                "A crossing flow segment must end at the cut, not disappear entirely.");
+            start = new Point3D(0, 0, 15); double distance = 20;
+            Assert(plane.ClipRay(ref start, new Vector3D(0, 0, -1), ref distance) &&
+                start.Z == 10 && distance == 15, "Picking must start after the hidden half-space.");
+            start = new Point3D(0, 0, 5); distance = 20;
+            Assert(plane.ClipRay(ref start, new Vector3D(0, 0, 1), ref distance) && distance == 5,
+                "Picking must stop at the cut when the camera is on the retained side.");
+            start = new Point3D(0, 0, 15); distance = 20;
+            Assert(!plane.ClipRay(ref start, new Vector3D(1, 0, 0), ref distance),
+                "A parallel ray in the hidden half-space must not select anything.");
+            plane.Inverted = true;
+            Assert(plane.Distance(new Point3D(0, 0, 15)) > 0,
+                "Inverting the plane retains the opposite half-space.");
+            plane.Enabled = false;
+            start = new Point3D(0, 0, 15); end = new Point3D(0, 0, 5);
+            Assert(plane.ClipSegment(ref start, ref end) && start.Z == 15 && end.Z == 5,
+                "Disabling the cut restores complete geometry.");
+        }
+
         private static void MilestonesOneAndTwo()
         {
             var fixture = new GraphFixture();
@@ -68,6 +108,72 @@ namespace BIMaestro.VideoGames
             try
             {
                 if (args.Length == 2 && args[0] == "--export-parity") GameMepParity.OutputPath = args[1];
+                if (args.Length == 3 && args[0] == "--verify-antibes-inlet")
+                {
+                    var graph = GameMepReplayStore.Load(args[1]).Graph;
+                    Assert(!graph.FindElement(944916).Paths.Single().HasCirculation,
+                        "Fixture must reproduce the stagnant branch.");
+                    var source = graph.Sources.Single(s => s.ElementKey == graph.FindElement(929913).Key);
+                    Assert(source.EntryConnectorIndex == 106 && source.ExitConnectorIndex == 107,
+                        "Fixture must contain the stale inlet port order.");
+                    var priorCirculation = graph.Elements.SelectMany(e => e.Paths).ToDictionary(p => p, p => p.HasCirculation);
+                    var engine = new GameMepSimulationEngine(graph);
+                    engine.Recalculate();
+                    Assert(source.EntryConnectorIndex == 107 && source.ExitConnectorIndex == 106,
+                        "The boundary inlet must face the connected network after the port swap.");
+                    foreach (long id in new long[] { 929913, 1018034, 1018028, 1018030, 944840, 944926, 944916, 929950, 1003351, 930914 })
+                        Assert(graph.FindElement(id).Paths.Single().HasCirculation,
+                            "Continuous inlet branch must circulate: " + id);
+                    Assert(priorCirculation.Count(p => !p.Value && p.Key.HasCirculation) == 10 &&
+                        priorCirculation.All(p => !p.Value || p.Key.HasCirculation),
+                        "Exactly ten previously stagnant paths resume; no circulating path is lost.");
+                    Assert(graph.FindElement(929913).Paths.Single().FlowForward == false &&
+                        graph.FindElement(930914).Paths.Single().FlowForward,
+                        "Both ends must point continuously away from the restored inlet.");
+                    var first = Newtonsoft.Json.JsonConvert.SerializeObject(GameMepParity.Summary(graph));
+                    engine.Recalculate();
+                    Assert(first == Newtonsoft.Json.JsonConvert.SerializeObject(GameMepParity.Summary(graph)),
+                        "Repair must be stable across recalculations.");
+                    GameMepReplayStore.Save(graph, args[2]);
+                    Console.WriteLine("Antibes inlet: " + _assertions + " assertions passed; corrected export: " + args[2]);
+                    return 0;
+                }
+                if (args.Length == 2 && args[0] == "--audit-antibes")
+                {
+                    var auditGraph = GameMepReplayStore.Load(args[1]).Graph;
+                    var auditEngine = new GameMepSimulationEngine(auditGraph);
+                    foreach (var valve in auditGraph.Valves.Where(v => v.IsEnabledAsValve).ToArray())
+                    {
+                        bool closed = valve.IsClosed;
+                        valve.IsClosed = !closed;
+                        auditEngine.Recalculate();
+                        if (!auditGraph.FindElement(944916).Paths.Single().HasCirculation)
+                            Console.WriteLine("Valve " + auditGraph.FindElement(valve.ElementKey).ElementId + " closed=" + valve.IsClosed +
+                                " : 929913=" + auditGraph.FindElement(929913).Paths.Single().HasCirculation +
+                                " 944916=" + auditGraph.FindElement(944916).Paths.Single().DirectionReason +
+                                " 930914=" + auditGraph.FindElement(930914).Paths.Single().HasCirculation);
+                        valve.IsClosed = closed;
+                    }
+                    foreach (var source in auditGraph.Sources.ToArray())
+                    {
+                        bool active = source.IsActive;
+                        source.IsActive = !active;
+                        auditEngine.Recalculate();
+                        if (!auditGraph.FindElement(944916).Paths.Single().HasCirculation)
+                            Console.WriteLine("Source " + auditGraph.FindElement(source.ElementKey).ElementId + " active=" + source.IsActive +
+                                " : 929913=" + auditGraph.FindElement(929913).Paths.Single().HasCirculation +
+                                " 944916=" + auditGraph.FindElement(944916).Paths.Single().DirectionReason +
+                                " 930914=" + auditGraph.FindElement(930914).Paths.Single().HasCirculation);
+                        source.IsActive = active;
+                    }
+                    return 0;
+                }
+                if (args.Length == 2 && args[0] == "--verify-antibes")
+                {
+                    VerifyAntibesLateralSuction(args[1]);
+                    Console.WriteLine("Antibes lateral suction: " + _assertions + " assertions passed.");
+                    return 0;
+                }
                 if (args.Length == 2 && args[0] == "--verify-crousty")
                 {
                     var graph = GameMepReplayStore.Load(args[1]).Graph;
@@ -111,6 +217,7 @@ namespace BIMaestro.VideoGames
                     return ReplayExportedGraph(args[1], inspectedElementId);
                 }
                 WebExportTests.Run();
+                SectionPlaneClipsPickingAndFlowSegments();
                 MilestonesOneAndTwo();
                 StraightValveCutsOnlyPath();
                 TeeSuppliesBothBranches();
@@ -125,6 +232,7 @@ namespace BIMaestro.VideoGames
                 NativePumpPortsImposeAspirationAndDischarge();
                 NativePumpSuctionOverridesSmallDnTeeInference();
                 NativePumpSuctionCrossesPassiveChainToFirstTee();
+                LateralPumpSuctionReceivesBothCollinearArms();
                 ParallelNativePumpDischargesDoNotReverseEachOther();
                 ConflictingPumpVotesDoNotUsePumpCountAsFlowRate();
                 OpeningValvePreservesEstablishedPumpConsensus();
@@ -148,6 +256,7 @@ namespace BIMaestro.VideoGames
                 ThreeWayValveCutsEveryOutlet();
                 MissingDirectionsDoNotBreakReachability();
                 DirectedPipeSourceSuppliesOnlyChosenSide();
+                OpenPipeInletSurvivesPortSwap();
                 ArrivalAndReturnStabilizeDirection();
                 OpenIsolationValveIsDirectionallyTransparent();
                 SourceOnlyNetworkKeepsDirectionAcrossOpenValve();
@@ -683,6 +792,49 @@ namespace BIMaestro.VideoGames
                     "A two-port fitting on the protected DN 300 header must keep the same continuous direction: " + key);
                 AssertRenderableFlow(fixture, key);
             }
+        }
+
+        private static void VerifyAntibesLateralSuction(string filePath)
+        {
+            var snapshot = GameMepReplayStore.Load(filePath);
+            var result = GameMepReplayStore.Replay(snapshot);
+            var graph = snapshot.Graph;
+            Assert(graph.FindElement(952560).Paths.Single().HasCirculation &&
+                !graph.FindElement(952560).Paths.Single().FlowForward,
+                "Antibes 952560 must flow toward the lateral pump suction.");
+
+            // The whole passive chain must reverse together, including the
+            // connected arms of its terminal tees; nothing outside it may change.
+            var branchIds = new HashSet<long>
+            {
+                1003360, 1003733, 1003756, 1003779, 1003791,
+                1013923, 1013924, 1013925, 1013926, 1013960, 1014016,
+                952528, 952560, 952667, 952670
+            };
+            foreach (var captured in snapshot.CapturedPathStates)
+            {
+                var element = graph.FindElement(captured.ElementKey);
+                var path = element.Paths[captured.PathOrdinal];
+                bool reversed = branchIds.Contains(element.ElementId) ||
+                    (element.ElementId == 940465 && captured.PathOrdinal == 0) ||
+                    (element.ElementId == 1003359 && captured.PathOrdinal == 1);
+                Assert(path.FlowForward == (reversed ? !captured.FlowForward : captured.FlowForward),
+                    "Unexpected direction on Antibes " + element.ElementId + "/" + captured.PathOrdinal);
+                Assert(path.HasCirculation == captured.HasCirculation &&
+                    path.FlowState == captured.FlowState && path.DirectionState == captured.DirectionState,
+                    "The suction correction must preserve circulation and resolution states on " + element.ElementId);
+            }
+            Assert(result.ReversedPathCount == 17,
+                "Only the 17 paths in the passive branch may reverse.");
+            Assert(result.CapturedVisibleDiscontinuityCount == result.ReplayedVisibleDiscontinuityCount,
+                "The correction must introduce no additional visible discontinuity.");
+            var expected = graph.Elements.SelectMany(e => e.Paths).ToDictionary(
+                p => p, p => (p.FlowForward, p.HasCirculation, p.DirectionState));
+            var engine = new GameMepSimulationEngine(graph);
+            engine.Recalculate();
+            Assert(expected.All(item => item.Value ==
+                (item.Key.FlowForward, item.Key.HasCirculation, item.Key.DirectionState)),
+                "Antibes must remain stable on a second calculation.");
         }
 
         private static int ReplayExportedGraph(
@@ -1233,6 +1385,77 @@ namespace BIMaestro.VideoGames
             Assert(fixture.Path("suction").DirectionReason.IndexOf(
                     "Aspiration propagée", StringComparison.Ordinal) >= 0,
                 "The suction pipe must explain that its direction comes from the native pump inlet.");
+        }
+
+        private static void LateralPumpSuctionReceivesBothCollinearArms()
+        {
+            var fixture = new GraphFixture();
+            fixture.AddElement("left-source", 1, source: true);
+            fixture.AddElement("right-source", 1, source: true);
+            fixture.AddElement("left", 2);
+            fixture.AddElement("target", 2);
+            fixture.AddElement("right", 2);
+            fixture.AddElement("suction-tee", 3);
+            fixture.AddElement("remote-tee", 3);
+            fixture.AddElement("suction", 2, valve: true);
+            fixture.AddElement("pump", 2);
+            fixture.AddElement("pump-outlet", 1);
+            fixture.AddElement("remote-outlet", 1);
+            fixture.Connect("left-source", 0, "left", 0);
+            fixture.Connect("left", 1, "suction-tee", 0);
+            fixture.Connect("suction-tee", 1, "target", 0);
+            fixture.Connect("target", 1, "remote-tee", 0);
+            fixture.Connect("remote-tee", 1, "right", 0);
+            fixture.Connect("right", 1, "right-source", 0);
+            fixture.Connect("remote-tee", 2, "remote-outlet", 0);
+            fixture.Connect("suction-tee", 2, "suction", 0);
+            fixture.Connect("suction", 1, "pump", 0);
+            fixture.Connect("pump", 1, "pump-outlet", 0);
+            fixture.AddBoundary("remote-outlet", GameMepBoundaryKind.Outlet);
+            fixture.AddBoundary("pump-outlet", GameMepBoundaryKind.Outlet);
+            fixture.SetElementIdentity("pump", "Pompe primaire", "Pompe primaire");
+            fixture.SetConnectorFlowDirection("pump", 0, "In");
+            fixture.SetConnectorFlowDirection("pump", 1, "Out");
+            foreach (string pipe in new[] { "left", "target", "right" })
+            {
+                fixture.SetPipeDiameter(pipe, 200.0);
+                fixture.SetPathLength(pipe, 5.0);
+            }
+            foreach (string tee in new[] { "suction-tee", "remote-tee" })
+            {
+                fixture.SetElementClassification(tee, "ReturnHydronic");
+                fixture.SetPortDirection(tee, 0, -1, 0, 0);
+                fixture.SetPortDirection(tee, 1, 1, 0, 0);
+                fixture.SetPortDirection(tee, 2, 0, 1, 0);
+                for (int port = 0; port < 3; port++)
+                    fixture.SetPortDiameter(tee, port, 200.0);
+                fixture.AddJunctionPaths(tee);
+            }
+            var engine = new GameMepSimulationEngine(fixture.Graph);
+            engine.Recalculate();
+            Assert(fixture.Path("target").HasCirculation &&
+                !fixture.Path("target").FlowForward,
+                "A remote return must not pull the collinear arm away from a lateral pump suction.");
+            Assert(fixture.Path("left").FlowForward &&
+                fixture.JunctionPath("suction-tee", 0).FlowForward &&
+                fixture.JunctionPath("suction-tee", 1).FlowForward &&
+                !fixture.JunctionPath("suction-tee", 2).FlowForward,
+                "Both collinear arms may converge into the lateral pump inlet.");
+            engine.Recalculate();
+            Assert(!fixture.Path("target").FlowForward,
+                "The suction branch must keep its direction on repeated calculation.");
+            fixture.CloseValve("suction");
+            engine.Recalculate();
+            Assert(!fixture.Path("suction").HasCirculation,
+                "A closed suction valve must not be reactivated by header convergence.");
+            fixture.Graph.FindValve("suction").IsClosed = false;
+            engine.Recalculate();
+            Assert(!fixture.Path("target").FlowForward,
+                "Reopening the suction must restore convergence toward the pump.");
+            fixture.SetDirectionConstraint("target", 0, 1);
+            engine.Recalculate();
+            Assert(fixture.Path("target").FlowForward,
+                "An explicit local override must retain priority over inferred convergence.");
         }
 
         private static void ParallelNativePumpDischargesDoNotReverseEachOther()
@@ -2060,6 +2283,37 @@ namespace BIMaestro.VideoGames
             fixture.Calculate();
             AssertState(fixture, "upstream", GameMepFlowState.Supplied);
             AssertState(fixture, "downstream", GameMepFlowState.Isolated);
+        }
+
+        private static void OpenPipeInletSurvivesPortSwap()
+        {
+            var fixture = new GraphFixture();
+            fixture.AddElement("inlet", 2);
+            fixture.AddElement("pipe", 2);
+            fixture.AddElement("terminal", 1);
+            fixture.Graph.FindElement("inlet").IsPipeCurve = true;
+            fixture.Connect("inlet", 0, "pipe", 0);
+            fixture.Connect("pipe", 1, "terminal", 0);
+            fixture.SetDirectedSource("inlet", 0, 1);
+            var source = fixture.Graph.Sources.Single();
+            source.IsUserCreated = true;
+            fixture.Calculate();
+            Assert(source.ExitConnectorIndex == fixture.Graph.FindElement("inlet").ConnectorIndices[0] &&
+                fixture.Path("pipe").HasCirculation,
+                "A reordered end inlet must supply the connected port, not its free end.");
+            fixture.Calculate();
+            Assert(fixture.Path("pipe").HasCirculation, "Inlet port repair must be idempotent.");
+            fixture.SetDirectedSource("inlet", 0, 1);
+            fixture.Graph.Connectors[source.ExitConnectorIndex].EndpointRole = GameMepEndpointRole.Capped;
+            GameMepBoundaryPolicy.AlignOpenPipeInlets(fixture.Graph);
+            Assert(source.ExitConnectorIndex == fixture.Graph.FindElement("inlet").ConnectorIndices[1],
+                "A declared cap must not become an implicit inlet.");
+            fixture.Graph.Connectors[source.ExitConnectorIndex].EndpointRole = GameMepEndpointRole.Unknown;
+            fixture.AddElement("other-side", 1);
+            fixture.Connect("inlet", 1, "other-side", 0);
+            GameMepBoundaryPolicy.AlignOpenPipeInlets(fixture.Graph);
+            Assert(source.ExitConnectorIndex == fixture.Graph.FindElement("inlet").ConnectorIndices[1],
+                "An interior directed inlet must keep the user's chosen side.");
         }
 
         private static void ArrivalAndReturnStabilizeDirection()

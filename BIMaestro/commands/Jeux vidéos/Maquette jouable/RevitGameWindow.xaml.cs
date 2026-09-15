@@ -320,6 +320,8 @@ namespace BIMaestro.VideoGames
         private void RevitGameWindow_Closed(object sender, EventArgs e)
         {
             _isClosing = true;
+            _sectionLines.Clear();
+            _sectionMeshes.Clear();
             // Garantit que la toute dernière action est écrite même si Revit
             // est fermé avant la fin d'une sauvegarde asynchrone précédente.
             GameMepScenarioStore.SaveNow(_scene.MepGraph);
@@ -740,6 +742,7 @@ namespace BIMaestro.VideoGames
                     DisableMepRenderingAfterError(mepException);
                 }
             }
+            UpdateSectionLines(now);
             UpdatePerformanceHud();
         }
 
@@ -1052,7 +1055,11 @@ namespace BIMaestro.VideoGames
         {
             if (e.Key == Key.Escape)
             {
-                if (_directionPickerBoundaryKind.HasValue)
+                if (_pickingSectionFace)
+                    CancelSectionPick();
+                else if (SectionControls.Visibility == Visibility.Visible)
+                    SectionControls.Visibility = Visibility.Collapsed;
+                else if (_directionPickerBoundaryKind.HasValue)
                     CancelDirectionPicker(true);
                 else if (ControlsHud.Visibility == Visibility.Visible)
                     ControlsHud.Visibility = Visibility.Collapsed;
@@ -1065,6 +1072,12 @@ namespace BIMaestro.VideoGames
                 else
                     Close();
                 e.Handled = true;
+                return;
+            }
+
+            if (SectionControls.IsKeyboardFocusWithin)
+            {
+                _pressedKeys.Clear();
                 return;
             }
 
@@ -1322,7 +1335,7 @@ namespace BIMaestro.VideoGames
         {
             _leftMouseDownPosition = e.GetPosition(GameViewport);
             _leftGestureMoved = false;
-            BeginMouseLook(MouseButton.Left, e);
+            if (!_pickingSectionFace) BeginMouseLook(MouseButton.Left, e);
             e.Handled = true;
         }
 
@@ -1336,6 +1349,13 @@ namespace BIMaestro.VideoGames
             // Un cran correspond à environ un mètre. Le déplacement est
             // consommé progressivement par la physique afin de conserver les
             // collisions, les marches et la fluidité de la caméra.
+            if ((Keyboard.Modifiers & ModifierKeys.Control) != 0 && SelectedSection != null)
+            {
+                SectionPosition.Value = Clamp(SectionPosition.Value + e.Delta / 120.0 * .1,
+                    SectionPosition.Minimum, SectionPosition.Maximum);
+                e.Handled = true;
+                return;
+            }
             _wheelMoveRemaining = Clamp(
                 _wheelMoveRemaining + (e.Delta / 120.0) * 3.2,
                 -12.0,
@@ -1348,6 +1368,12 @@ namespace BIMaestro.VideoGames
             Point releasedPosition = e.GetPosition(GameViewport);
             bool wasCameraGesture = _leftGestureMoved;
             EndMouseLook(MouseButton.Left);
+            if (_pickingSectionFace)
+            {
+                AddSectionAt(releasedPosition);
+                e.Handled = true;
+                return;
+            }
             if (_readyToPlay && !wasCameraGesture)
                 SelectObjectAtScreenPoint(releasedPosition);
             else
@@ -1604,7 +1630,9 @@ namespace BIMaestro.VideoGames
                 return;
             }
 
-            GameSelectionHit? hit = _selectionIndex.FindNearest(origin, direction, 300.0);
+            double selectionDistance = 300.0;
+            GameSelectionHit? hit = _sectionVolume.ClipRay(ref origin, direction, ref selectionDistance)
+                ? _selectionIndex.FindNearest(origin, direction, selectionDistance) : null;
             string nextKey = hit?.Element.Key ?? string.Empty;
             if (string.Equals(_hoveredElementKey, nextKey, StringComparison.Ordinal))
             {

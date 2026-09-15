@@ -1086,6 +1086,10 @@
                 BorderBrush="{StaticResource GameBorder}"
                 BorderThickness="1">
             <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="12"/>
@@ -1112,6 +1116,8 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Style="{StaticResource GlassButton}" Content="Coupe" Margin="0,0,6,0"
+                            Click="SectionButton_Click" ToolTip="Afficher les commandes de coupe de la maquette"/>
                     <Button x:Name="MepPanelButton"
                             Style="{StaticResource PrimaryGameButton}"
                             Content="Fluides"
@@ -1134,6 +1140,26 @@
                     </Border>
                     <Button Style="{StaticResource GlassButton}" Content="Quitter  ×" Click="ExitButton_Click"/>
                 </StackPanel>
+                <WrapPanel x:Name="SectionControls" Grid.Row="1" Grid.ColumnSpan="4"
+                           Visibility="Collapsed" Margin="0,10,0,0" VerticalAlignment="Center">
+                    <Button Content="+ Cliquer une face" Style="{StaticResource GlassButton}" Margin="0,0,12,6" Click="SectionAdd_Click"/>
+                    <ComboBox x:Name="SectionList" Width="110" Margin="0,0,12,6" SelectionChanged="SectionSelectionChanged"
+                              AutomationProperties.Name="Coupe sélectionnée"/>
+                    <CheckBox x:Name="SectionEnabled" Content="Visible" Foreground="White" IsEnabled="False"
+                              VerticalAlignment="Center" Margin="0,0,14,6" Checked="SectionChanged" Unchecked="SectionChanged"/>
+                    <TextBlock x:Name="SectionPositionText" Text="Décalage : 0,00 m" Foreground="White"
+                               VerticalAlignment="Center" Width="130" Margin="0,0,8,6"/>
+                    <Slider x:Name="SectionPosition" Minimum="-10" Maximum="10" Value="0" Width="150" IsEnabled="False"
+                            VerticalAlignment="Center" Margin="0,0,14,6" SmallChange="0.1" LargeChange="1"
+                            AutomationProperties.Name="Position du plan de coupe" ValueChanged="SectionPositionChanged"/>
+                    <CheckBox x:Name="SectionInverted" Content="Inverser le côté" Foreground="White" IsEnabled="False"
+                              VerticalAlignment="Center" Margin="0,0,14,6" Checked="SectionChanged" Unchecked="SectionChanged"/>
+                    <Button Content="Supprimer" Style="{StaticResource GlassButton}" Margin="0,0,8,6" Click="SectionDelete_Click"/>
+                    <Button Content="Tout réafficher" Style="{StaticResource GlassButton}" Margin="0,0,0,6"
+                            Click="SectionReset_Click"/>
+                    <TextBlock x:Name="SectionHint" Text="Ctrl + molette : déplacer la coupe sélectionnée"
+                               Foreground="#FFABC0B7" VerticalAlignment="Center" Margin="12,0,0,6"/>
+                </WrapPanel>
             </Grid>
         </Border>
 

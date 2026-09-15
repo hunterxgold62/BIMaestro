@@ -54,6 +54,13 @@ node_modules/
 # Fichiers de travail temporaires locaux
 /tmp/
 
+# Authentification et sessions Codex : ne jamais publier de copies locales
+**/auth.json
+**/.codex/auth.json
+**/.codex/sessions/
+**/.codex/history.jsonl
+**/.codex/log/
+
 # Supabase local secrets
 supabase/.temp/
 supabase/functions/.env

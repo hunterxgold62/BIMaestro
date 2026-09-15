@@ -199,7 +199,7 @@
                                    Text="Ce raccourci BIMaestro fonctionne aussi lorsque le curseur est placé dans une cellule de nomenclature. Il n’est actif que lorsque Revit est au premier plan."/>
                         <TextBlock Style="{StaticResource Label}" Text="Raccourci global (optionnel)"/>
                         <TextBox x:Name="RadialHotkeyBox" Width="280" Height="36" HorizontalAlignment="Left"
-                                 IsReadOnly="True" Text="{Binding RadialHotkeyText}"
+                                 IsReadOnly="True" Text="{Binding RadialHotkeyText, Mode=OneWay}"
                                  PreviewKeyDown="RadialHotkeyBox_PreviewKeyDown"
                                  ToolTip="Cliquez ici puis appuyez sur une combinaison contenant Ctrl, Alt, Maj ou Windows."/>
                         <StackPanel Orientation="Horizontal" Margin="0,10,0,0">

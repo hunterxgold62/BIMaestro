@@ -269,6 +269,33 @@ namespace BIMaestro.VideoGames
     /// </summary>
     internal static class GameMepBoundaryPolicy
     {
+        public static void AlignOpenPipeInlets(GameMepGraphData graph)
+        {
+            // Les identifiants de ports Revit peuvent permuter quand une
+            // canalisation est redessinée. Une arrivée située en bout de réseau
+            // doit entrer par le bout libre et sortir par le bout raccordé.
+            // Les frontières intérieures et les équipements gardent leur sens
+            // explicite : leur topologie ne permet pas de lever l'ambiguïté.
+            var connected = new HashSet<int>(graph.Connections
+                .Where(edge => !edge.IsInternal)
+                .SelectMany(edge => new[] { edge.ConnectorA, edge.ConnectorB }));
+            foreach (var source in graph.Sources.Where(source =>
+                source.IsUserCreated && source.HasExplicitDirection &&
+                source.BoundaryKind == GameMepBoundaryKind.Inlet))
+            {
+                var element = graph.FindElement(source.ElementKey);
+                if (element?.IsPipeCurve != true || element.ConnectorIndices.Count != 2 ||
+                    !IsUsable(element, source) ||
+                    !connected.Contains(source.EntryConnectorIndex) ||
+                    connected.Contains(source.ExitConnectorIndex)) continue;
+                int open = source.ExitConnectorIndex;
+                if (open < 0 || open >= graph.Connectors.Count ||
+                    graph.Connectors[open].EndpointRole != GameMepEndpointRole.Unknown) continue;
+                source.ExitConnectorIndex = source.EntryConnectorIndex;
+                source.EntryConnectorIndex = open;
+            }
+        }
+
         public static bool CanHostBoundary(GameMepElementData? element)
         {
             return element != null &&
@@ -672,6 +699,7 @@ namespace BIMaestro.VideoGames
         public void Recalculate()
         {
             var stopwatch = Stopwatch.StartNew();
+            GameMepBoundaryPolicy.AlignOpenPipeInlets(_graph);
             // Canonical traversal order also fixes tie-breaking in large networks.
             // Connector indices are identities and must never be reordered.
             ReplaceOrder(_graph.Elements, _graph.Elements.OrderBy(e => e.Key, StringComparer.Ordinal));
@@ -1415,6 +1443,8 @@ namespace BIMaestro.VideoGames
             var geometricHeaderContinuityElementKeys = new HashSet<string>(
                 StringComparer.Ordinal);
             var geometricProtectedJunctionPorts = new HashSet<int>();
+            var lateralSuctionElementKeys = new HashSet<string>(StringComparer.Ordinal);
+            var lateralSuctionJunctionPorts = new HashSet<int>();
             var inferredInletCandidates = new HashSet<int>();
             var suppliedManifoldBranchDirections =
                 new Dictionary<GameMepPathData, bool>();
@@ -1774,7 +1804,14 @@ namespace BIMaestro.VideoGames
 
                 if (arms.Values.Any(arm => arm.Any(pumpDischargeAnchorSeeds.Contains))) continue;
                 Dictionary<int, bool>? headerDirections = null;
-                if (arms.Values.Any(arm => arm.Any(inletAnchorSeeds.Contains)) &&
+                bool lateralSuction = HasLateralPumpSuction(junction, headerPorts, arms) &&
+                    pumpSuctionDistance[headerPorts[0]] >= 0 &&
+                    pumpSuctionDistance[headerPorts[0]] == pumpSuctionDistance[headerPorts[1]];
+                if (lateralSuction)
+                {
+                    headerDirections = headerPorts.ToDictionary(port => port, port => true);
+                }
+                else if (arms.Values.Any(arm => arm.Any(inletAnchorSeeds.Contains)) &&
                     TryBuildHeaderDirectionsFromBoundary(headerPorts, declaredReturnDistance, out var dischargeReturnDirections))
                 {
                     headerDirections = dischargeReturnDirections;
@@ -1837,11 +1874,19 @@ namespace BIMaestro.VideoGames
                         arms[headerPort],
                         towardCenter,
                         diameterHeaderElementDirections);
-                    ExtendHeaderBackbone(
-                        junctionKey,
-                        headerPort,
-                        towardCenter,
-                        geometricContinuity: true);
+                    if (lateralSuction)
+                    {
+                        AddArmPipeElements(arms[headerPort], lateralSuctionElementKeys);
+                        lateralSuctionJunctionPorts.Add(headerPort);
+                    }
+                    else
+                    {
+                        ExtendHeaderBackbone(
+                            junctionKey,
+                            headerPort,
+                            towardCenter,
+                            geometricContinuity: true);
+                    }
                 }
             }
 
@@ -2236,6 +2281,8 @@ namespace BIMaestro.VideoGames
                             if (!geometricContinuity)
                                 _graph.DiameterDirectedPathCount++;
                         }
+                        if (lateralSuctionElementKeys.Contains(path.ElementKey))
+                            path.DirectionReason = "Convergence du collecteur vers l'aspiration latérale de la pompe";
                     }
                     if (path.HasCirculation && path.EndConnector >= 0 &&
                         diameterInfluencedElementKeys.Contains(path.ElementKey) &&
@@ -2271,6 +2318,8 @@ namespace BIMaestro.VideoGames
                             : (junctionForward
                                 ? "Piquage vers le collecteur (continuité du gros DN)"
                                 : "Sortie du collecteur (continuité du gros DN)");
+                        if (lateralSuctionJunctionPorts.Contains(path.StartConnector))
+                            path.DirectionReason = "Convergence du collecteur vers l'aspiration latérale de la pompe";
                     }
                     else if (path.HasCirculation && path.EndConnector < 0 &&
                         element.IsPipeJunction &&
@@ -2548,6 +2597,9 @@ namespace BIMaestro.VideoGames
                     bool incomingDirection = !portFlowsTowardCenter;
                     if (geometricContinuity && nextArms.Values.Any(arm => arm.Any(pumpDischargeAnchorSeeds.Contains)))
                         return;
+                    if (HasLateralPumpSuction(nextJunction,
+                            new[] { incomingPort, continuationPort }, nextArms))
+                        return;
                     if ((diameterJunctionPortDirections.TryGetValue(
                                 incomingPort, out bool existingIncoming) &&
                             existingIncoming != incomingDirection) ||
@@ -2690,6 +2742,20 @@ namespace BIMaestro.VideoGames
                     return -1;
                 }
                 return aligned[0].Port;
+            }
+
+            bool HasLateralPumpSuction(
+                GameMepElementData junction,
+                int[] headerPorts,
+                IReadOnlyDictionary<int, HashSet<int>> arms)
+            {
+                // Une aspiration sur le bras latéral peut recevoir les deux
+                // bras alignés. Leur colinéarité ne prouve donc pas un passage
+                // tout droit, même si un retour distant départage leurs distances.
+                return junction.ConnectorIndices.Any(port =>
+                    !headerPorts.Contains(port) &&
+                    arms.TryGetValue(port, out HashSet<int> arm) &&
+                    arm.Overlaps(pumpSuctionAnchorSeeds));
             }
 
             static bool TryBuildHeaderDirectionsFromBoundary(

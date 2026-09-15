@@ -11,18 +11,21 @@ namespace BIMaestro.VideoGames
             GameElementData element,
             double distance,
             Point3D position,
-            bool isPrecise)
+            bool isPrecise,
+            Vector3D? normal = null)
         {
             Element = element;
             Distance = distance;
             Position = position;
             IsPrecise = isPrecise;
+            Normal = normal;
         }
 
         public GameElementData Element { get; }
         public double Distance { get; }
         public Point3D Position { get; }
         public bool IsPrecise { get; }
+        public Vector3D? Normal { get; }
     }
 
     /// <summary>
@@ -75,6 +78,7 @@ namespace BIMaestro.VideoGames
 
             direction.Normalize();
             GameElementData? preciseElement = null;
+            Vector3D? preciseNormal = null;
             double preciseDistance = maximumDistance;
             GameElementData? fallbackElement = null;
             double fallbackDistance = maximumDistance;
@@ -82,6 +86,7 @@ namespace BIMaestro.VideoGames
                 _root,
                 origin,
                 direction,
+                ref preciseNormal,
                 ref preciseElement,
                 ref preciseDistance,
                 ref fallbackElement,
@@ -93,7 +98,7 @@ namespace BIMaestro.VideoGames
                     preciseElement,
                     preciseDistance,
                     origin + direction * preciseDistance,
-                    true);
+                    true, preciseNormal);
             }
             if (fallbackElement != null)
             {
@@ -126,6 +131,7 @@ namespace BIMaestro.VideoGames
             Node node,
             Point3D origin,
             Vector3D direction,
+            ref Vector3D? preciseNormal,
             ref GameElementData? preciseElement,
             ref double preciseDistance,
             ref GameElementData? fallbackElement,
@@ -157,10 +163,10 @@ namespace BIMaestro.VideoGames
                     second = swap;
                 }
                 if (first != null)
-                    Query(first, origin, direction, ref preciseElement,
+                    Query(first, origin, direction, ref preciseNormal, ref preciseElement,
                         ref preciseDistance, ref fallbackElement, ref fallbackDistance);
                 if (second != null)
-                    Query(second, origin, direction, ref preciseElement,
+                    Query(second, origin, direction, ref preciseNormal, ref preciseElement,
                         ref preciseDistance, ref fallbackElement, ref fallbackDistance);
                 return;
             }
@@ -198,6 +204,7 @@ namespace BIMaestro.VideoGames
                     {
                         preciseDistance = triangleDistance;
                         preciseElement = target;
+                        preciseNormal = Vector3D.CrossProduct(triangle.B - triangle.A, triangle.C - triangle.A);
                     }
                 }
             }

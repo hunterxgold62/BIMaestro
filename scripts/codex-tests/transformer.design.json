@@ -1,0 +1,548 @@
+{
+  "name": "Transformateur démonstration",
+  "category": "electrical",
+  "target_dimensions_mm": [0, 0, 0],
+  "assumptions": [
+    "Géométrie de démonstration inspirée de la référence, sans valeur constructeur.",
+    "Pas de connecteurs électriques ; dimensions fixes."
+  ],
+  "materials": [
+    {
+      "name": "Acier peint",
+      "rgb": [
+        160,
+        181,
+        182
+      ],
+      "transparency": 0
+    },
+    {
+      "name": "Ailettes",
+      "rgb": [
+        115,
+        135,
+        137
+      ],
+      "transparency": 0
+    },
+    {
+      "name": "Porcelaine",
+      "rgb": [
+        65,
+        61,
+        55
+      ],
+      "transparency": 0
+    },
+    {
+      "name": "Acier galvanisé",
+      "rgb": [
+        170,
+        172,
+        174
+      ],
+      "transparency": 0
+    },
+    {
+      "name": "Signalisation",
+      "rgb": [
+        240,
+        195,
+        15
+      ],
+      "transparency": 0
+    }
+  ],
+  "parts": [
+    {
+      "name": "Cuve",
+      "material": "Acier peint",
+      "geometry": {
+        "kind": "box",
+        "size_mm": [
+          1100,
+          650,
+          1000
+        ],
+        "position_mm": [
+          0,
+          0,
+          220
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "profile_mm": []
+      },
+      "cuts": [],
+      "repeat_count": 1,
+      "repeat_step_mm": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Couvercle",
+      "material": "Acier peint",
+      "geometry": {
+        "kind": "box",
+        "size_mm": [
+          1160,
+          710,
+          45
+        ],
+        "position_mm": [
+          -30,
+          -30,
+          1220
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "profile_mm": []
+      },
+      "cuts": [],
+      "repeat_count": 1,
+      "repeat_step_mm": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Semelle",
+      "material": "Acier galvanisé",
+      "geometry": {
+        "kind": "box",
+        "size_mm": [
+          1160,
+          710,
+          40
+        ],
+        "position_mm": [
+          -30,
+          -30,
+          180
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "profile_mm": []
+      },
+      "cuts": [],
+      "repeat_count": 1,
+      "repeat_step_mm": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Rails support",
+      "material": "Acier galvanisé",
+      "geometry": {
+        "kind": "extrusion",
+        "size_mm": [
+          0,
+          0,
+          1300
+        ],
+        "position_mm": [
+          -100,
+          80,
+          0
+        ],
+        "rotation_deg": [
+          0,
+          90,
+          0
+        ],
+        "profile_mm": [
+          [
+            0,
+            0
+          ],
+          [
+            0,
+            80
+          ],
+          [
+            80,
+            80
+          ],
+          [
+            80,
+            65
+          ],
+          [
+            15,
+            65
+          ],
+          [
+            15,
+            15
+          ],
+          [
+            80,
+            15
+          ],
+          [
+            80,
+            0
+          ]
+        ]
+      },
+      "cuts": [],
+      "repeat_count": 2,
+      "repeat_step_mm": [
+        0,
+        440,
+        0
+      ]
+    },
+    {
+      "name": "Ailettes avant",
+      "material": "Ailettes",
+      "geometry": {
+        "kind": "box",
+        "size_mm": [
+          14,
+          130,
+          840
+        ],
+        "position_mm": [
+          5,
+          -130,
+          280
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "profile_mm": []
+      },
+      "cuts": [],
+      "repeat_count": 37,
+      "repeat_step_mm": [
+        30,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Ailettes arrière",
+      "material": "Ailettes",
+      "geometry": {
+        "kind": "box",
+        "size_mm": [
+          14,
+          130,
+          840
+        ],
+        "position_mm": [
+          5,
+          650,
+          280
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "profile_mm": []
+      },
+      "cuts": [],
+      "repeat_count": 37,
+      "repeat_step_mm": [
+        30,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Conservateur horizontal",
+      "material": "Acier peint",
+      "geometry": {
+        "kind": "cylinder",
+        "size_mm": [
+          170,
+          0,
+          1000
+        ],
+        "position_mm": [
+          40,
+          650,
+          1580
+        ],
+        "rotation_deg": [
+          0,
+          90,
+          0
+        ],
+        "profile_mm": []
+      },
+      "cuts": [],
+      "repeat_count": 1,
+      "repeat_step_mm": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Supports conservateur",
+      "material": "Acier galvanisé",
+      "geometry": {
+        "kind": "box",
+        "size_mm": [
+          50,
+          170,
+          190
+        ],
+        "position_mm": [
+          140,
+          565,
+          1265
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "profile_mm": []
+      },
+      "cuts": [],
+      "repeat_count": 2,
+      "repeat_step_mm": [
+        690,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Isolateurs HT",
+      "material": "Porcelaine",
+      "geometry": {
+        "kind": "lathe",
+        "size_mm": [
+          0,
+          0,
+          0
+        ],
+        "position_mm": [
+          210,
+          240,
+          1265
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "profile_mm": [
+          [
+            0,
+            0
+          ],
+          [
+            36,
+            0
+          ],
+          [
+            36,
+            40
+          ],
+          [
+            55,
+            55
+          ],
+          [
+            55,
+            65
+          ],
+          [
+            27,
+            80
+          ],
+          [
+            27,
+            110
+          ],
+          [
+            50,
+            125
+          ],
+          [
+            50,
+            135
+          ],
+          [
+            22,
+            150
+          ],
+          [
+            22,
+            180
+          ],
+          [
+            42,
+            195
+          ],
+          [
+            42,
+            205
+          ],
+          [
+            16,
+            220
+          ],
+          [
+            16,
+            260
+          ],
+          [
+            0,
+            260
+          ]
+        ]
+      },
+      "cuts": [],
+      "repeat_count": 3,
+      "repeat_step_mm": [
+        320,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Bornes BT",
+      "material": "Porcelaine",
+      "geometry": {
+        "kind": "cone",
+        "size_mm": [
+          24,
+          13,
+          95
+        ],
+        "position_mm": [
+          170,
+          100,
+          1265
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "profile_mm": []
+      },
+      "cuts": [],
+      "repeat_count": 4,
+      "repeat_step_mm": [
+        250,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Boulons couvercle",
+      "material": "Acier galvanisé",
+      "geometry": {
+        "kind": "cylinder",
+        "size_mm": [
+          8,
+          0,
+          12
+        ],
+        "position_mm": [
+          30,
+          0,
+          1265
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "profile_mm": []
+      },
+      "cuts": [],
+      "repeat_count": 12,
+      "repeat_step_mm": [
+        94,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Tuyau de liaison",
+      "material": "Acier peint",
+      "geometry": {
+        "kind": "tube",
+        "size_mm": [
+          24,
+          18,
+          180
+        ],
+        "position_mm": [
+          540,
+          650,
+          1220
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "profile_mm": []
+      },
+      "cuts": [],
+      "repeat_count": 1,
+      "repeat_step_mm": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Plaque signalétique",
+      "material": "Signalisation",
+      "geometry": {
+        "kind": "box",
+        "size_mm": [
+          95,
+          5,
+          70
+        ],
+        "position_mm": [
+          920,
+          -5,
+          360
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "profile_mm": []
+      },
+      "cuts": [],
+      "repeat_count": 1,
+      "repeat_step_mm": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "load_into_project": false,
+  "place_at_origin": false
+}

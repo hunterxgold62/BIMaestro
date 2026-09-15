@@ -1,0 +1,33 @@
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" />
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <LangVersion>9.0</LangVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <OutputPath>bin\</OutputPath>
+    <AssemblyName>MepBooster.UiTests</AssemblyName>
+    <RevitInstallDir Condition="'$(RevitInstallDir)' == ''">C:\Program Files\Autodesk\Revit 2023</RevitInstallDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xaml" />
+    <Reference Include="WindowsBase" />
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+    <Reference Include="RevitAPI"><HintPath>$(RevitInstallDir)\RevitAPI.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="RevitAPIUI"><HintPath>$(RevitInstallDir)\RevitAPIUI.dll</HintPath><Private>False</Private></Reference>
+    <Compile Include="Program.cs" />
+    <Compile Include="HostStubs.cs" />
+    <EmbeddedResource Include="..\..\BIMaestro\Resources\MEP Booster vanne rotation.png"><LogicalName>BIMaestro.Resources.MEP Booster vanne rotation.png</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\..\BIMaestro\Resources\MEP Booster vanne rotation OFF.png"><LogicalName>BIMaestro.Resources.MEP Booster vanne rotation OFF.png</LogicalName></EmbeddedResource>
+    <Compile Include="..\..\BIMaestro\commands\MEP Booster\MepBoosterService.cs" />
+    <Compile Include="..\..\BIMaestro\commands\MEP Booster\MepBoosterGeometry.cs" />
+    <Compile Include="..\..\BIMaestro\commands\MEP Booster\MepBoosterKinematics.cs" />
+    <Compile Include="..\..\BIMaestro\commands\MEP Booster\MepBoosterOrientation.cs" />
+    <Page Include="..\..\BIMaestro\Themes\BIMaestroTheme.xaml"><Link>Themes\BIMaestroTheme.xaml</Link></Page>
+    <Compile Include="..\..\BIMaestro\commands\MEP Booster\MepBoosterWindow.cs" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>
