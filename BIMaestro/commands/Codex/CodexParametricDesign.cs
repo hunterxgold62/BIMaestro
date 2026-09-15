@@ -1,4 +1,4 @@
-using Newtonsoft.Json.Linq;
+﻿using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -32,8 +32,7 @@ namespace BIMaestro.Codex
             properties.Remove("target_dimensions_mm");
             properties["connectors"] = FamilyConnectorSpec.Schema();
             properties["symbolic_outlines"] = FamilySymbolicSpec.Schema();
-            properties["hosting"] = new JObject { ["type"] = "string", ["enum"] = new JArray("free", "face", "wall", "ceiling", "work_plane"),
-                ["description"] = "Gabarit et comportement de placement du RFA. free par défaut historique. Les modes hébergés peuvent être chargés mais exigent place_at_origin=false : l'hôte doit ensuite être choisi dans le projet. Choisir avant la construction, pas après." };
+            properties["hosting"] = CodexFamilyDesign.HostingSchema();
             properties["family_options"] = new JObject { ["anyOf"] = new JArray(new JObject { ["type"] = "null" }, CodexFamilyParameters.Schema()),
                 ["description"] = "V1 : paramètres typés, formules, type/occurrence, types nommés et visibilité conditionnelle/grossier-moyen-fin. null pour une ancienne description simple. Les formules restent actives dans Revit sans Codex. Une pièce cachée doit rester géométriquement valide." };
             var number = new JObject { ["type"] = "number", ["minimum"] = -100000, ["maximum"] = 100000 };
@@ -97,16 +96,13 @@ namespace BIMaestro.Codex
             var metadata = (JObject)source.DeepClone(); metadata.Remove("parameters"); metadata.Remove("arrays"); metadata.Remove("angles"); metadata.Remove("family_options");
             metadata.Remove("connectors");
             metadata.Remove("symbolic_outlines");
-            metadata.Remove("hosting");
             metadata["target_dimensions_mm"] = new JArray(0, 0, 0);
             metadata["parts"] = new JArray(new JObject { ["name"] = "Metadata", ["material"] = CodexFamilyDesign.String(firstMaterial, "name", 70),
                 ["geometry"] = new JObject { ["kind"] = "box", ["size_mm"] = new JArray(1, 1, 1), ["position_mm"] = new JArray(0, 0, 0), ["rotation_deg"] = new JArray(0, 0, 0), ["profile_mm"] = new JArray() },
                 ["cuts"] = new JArray(), ["repeat_count"] = 1, ["repeat_step_mm"] = new JArray(0, 0, 0) });
             var design = new CodexParametricDesign { Metadata = CodexFamilyDesign.Parse(metadata), Registry = CodexFamilyParameters.Parse(source) };
             design.Metadata.Parts.Clear(); design.Metadata.Source = (JObject)source.DeepClone();
-            if (source["hosting"] != null) design.Hosting = (string)source["hosting"];
-            if (!new[] { "free", "face", "wall", "ceiling", "work_plane" }.Contains(design.Hosting)) throw new InvalidOperationException("Mode d'hébergement inconnu.");
-            if (design.Hosting != "free" && design.Metadata.Place) throw new InvalidOperationException("Une famille hébergée nécessite le choix d'un hôte : place_at_origin doit être false. Le chargement reste possible.");
+            design.Hosting = design.Metadata.Hosting;
             var lengthTokens = design.Registry == null ? CodexFamilyDesign.Items(source, "parameters", 1, 8) : new JArray(design.Registry.Lengths.Select(p => new JObject {
                 ["name"] = p.Name, ["value_mm"] = design.Registry.Initial[p.Name].Number,
                 ["test_value_mm"] = design.Registry.Cases().Select(c => c.Values[p.Name].Number).FirstOrDefault(v => v != design.Registry.Initial[p.Name].Number) is double test && test != 0 ? test : design.Registry.Initial[p.Name].Number }));

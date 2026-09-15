@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
@@ -10,6 +10,7 @@ namespace BIMaestro.Codex
     internal sealed class CodexFamilyDesign
     {
         internal string Name, Category;
+        internal string Hosting = "free";
         internal JObject Source;
         internal readonly List<FamilyMaterial> Materials = new List<FamilyMaterial>();
         internal readonly List<FamilyPart> Parts = new List<FamilyPart>();
@@ -34,7 +35,8 @@ namespace BIMaestro.Codex
             geometry["description"] += " loft : relie les sections_mm par des faces continues ; size=[0,0,0], profile_mm=[]. Permet transitions, trémies, ailettes inclinées et formes à sections variables. Un loft évidé par un autre loft crée une coque ajourée ; ne pas remplacer les ouvertures par un bloc sombre.";
             var properties = new JObject
             {
-                ["name"] = Text(90), ["category"] = Enum("generic", "electrical", "mechanical", "furniture", "plumbing", "air_terminal", "lighting"),
+                ["name"] = Text(90), ["category"] = Enum("generic", "electrical", "mechanical", "furniture", "plumbing", "air_terminal", "lighting", "door", "window"),
+                ["hosting"] = HostingSchema(),
                 ["target_dimensions_mm"] = new JObject { ["type"] = "array", ["minItems"] = 3, ["maxItems"] = 3, ["items"] = Number(0, 100000), ["description"] = "Encombrements extérieurs demandés [X,Y,Z], en mm ; 0 pour une cote inconnue. Le constructeur refuse une différence supérieure à 0,5 % (minimum 1 mm) sur une cote non nulle." },
                 ["assumptions"] = Array(Text(400), 0, 20),
                 ["materials"] = Array(Object(new JObject { ["name"] = Text(70), ["rgb"] = new JObject { ["type"] = "array", ["items"] = new JObject { ["type"] = "integer", ["minimum"] = 0, ["maximum"] = 255 }, ["minItems"] = 3, ["maxItems"] = 3 }, ["transparency"] = new JObject { ["type"] = "integer", ["minimum"] = 0, ["maximum"] = 90 } }), 1, 32),
@@ -58,7 +60,7 @@ namespace BIMaestro.Codex
             tool["name"] = "revit_create_project_shapes";
             tool["description"] = "Crée une composition libre directement dans le PROJET : solides DirectShape, matériaux, rotations, profils et lofts, évidements, répétitions. Ce ne sont ni des murs natifs ni des familles RFA, pas de limites de pièces ni de connecteurs. Une transaction, un Ctrl+Z. Géométrie décrite autour d'une origine locale puis placée avec project_origin_mm (coordonnées INTERNES Revit obtenues par lecture) et project_rotation_deg autour de Z. Ne remplace aucun élément existant.";
             var properties = (JObject)tool["inputSchema"]["properties"];
-            properties.Remove("load_into_project"); properties.Remove("place_at_origin");
+            properties.Remove("hosting"); properties.Remove("load_into_project"); properties.Remove("place_at_origin");
             properties["project_origin_mm"] = new JObject { ["type"] = "array", ["minItems"] = 3, ["maxItems"] = 3, ["items"] = Number(-10000000, 10000000) };
             properties["project_rotation_deg"] = Number(-360, 360);
             tool["inputSchema"]["required"] = new JArray(properties.Properties().Select(p => p.Name));
@@ -70,15 +72,33 @@ namespace BIMaestro.Codex
         private static JObject Text(int max) => new JObject { ["type"] = "string", ["minLength"] = 1, ["maxLength"] = max };
         private static JObject Enum(params string[] values) => new JObject { ["type"] = "string", ["enum"] = new JArray(values) };
 
+        internal static JObject HostingSchema() => new JObject {
+            ["type"] = "string", ["enum"] = new JArray("auto", "free", "face", "wall", "floor", "ceiling", "work_plane"),
+            ["description"] = "Choisir selon l'usage : wall pour un composant fixé à un mur, floor pour un composant hébergé sur sol, ceiling pour plafond, face pour une face quelconque, work_plane pour plan de travail, free pour indépendant. auto choisit wall pour category=door/window, free sinon. Une porte doit utiliser category=door et une fenêtre category=window, jamais generic sauf demande explicite. Les familles hébergées exigent place_at_origin=false ; choisir l'hôte dans le projet après chargement. L'hébergement ne garantit pas une découpe du mur par la géométrie créée." };
+
+        internal static string ResolveHosting(JObject value, string category, bool place)
+        {
+            var token = value["hosting"];
+            if (token != null && token.Type != JTokenType.String) throw new InvalidOperationException("Mode d'hébergement attendu sous forme de texte.");
+            string hosting = token == null ? "auto" : (string)token;
+            if (hosting == "auto") hosting = category == "door" || category == "window" ? "wall" : "free";
+            if (!new[] { "free", "face", "wall", "floor", "ceiling", "work_plane" }.Contains(hosting)) throw new InvalidOperationException("Mode d'hébergement inconnu.");
+            if (hosting != "free" && place) throw new InvalidOperationException("Une famille hébergée nécessite le choix d'un hôte : place_at_origin doit être false. Le chargement reste possible.");
+            return hosting;
+        }
+
         internal static CodexFamilyDesign Parse(JObject value)
         {
-            Keys(value, "name", "category", "target_dimensions_mm", "assumptions", "materials", "parts", "load_into_project", "place_at_origin");
+            var keys = new List<string> { "name", "category", "target_dimensions_mm", "assumptions", "materials", "parts", "load_into_project", "place_at_origin" };
+            if (value?["hosting"] != null) keys.Add("hosting");
+            Keys(value, keys.ToArray());
             var design = new CodexFamilyDesign { Name = String(value, "name", 90), Category = String(value, "category", 20), Source = (JObject)value.DeepClone() };
-            if (!new[] { "generic", "electrical", "mechanical", "furniture", "plumbing", "air_terminal", "lighting" }.Contains(design.Category)) throw new InvalidOperationException("Catégorie de famille non prise en charge.");
+            if (!new[] { "generic", "electrical", "mechanical", "furniture", "plumbing", "air_terminal", "lighting", "door", "window" }.Contains(design.Category)) throw new InvalidOperationException("Catégorie de famille non prise en charge.");
             design.TargetDimensions = Vector(value["target_dimensions_mm"], "target_dimensions_mm", 3, 0);
             if (value["load_into_project"].Type != JTokenType.Boolean || value["place_at_origin"].Type != JTokenType.Boolean) throw new InvalidOperationException("Options de chargement invalides.");
             design.Load = value.Value<bool>("load_into_project"); design.Place = value.Value<bool>("place_at_origin");
             if (design.Place && !design.Load) throw new InvalidOperationException("Le placement exige le chargement dans le projet.");
+            design.Hosting = ResolveHosting(value, design.Category, design.Place);
             design.Assumptions = Items(value, "assumptions", 0, 20).Select(v => ValidString(v, "hypothèse", 400)).ToArray();
             foreach (var token in Items(value, "materials", 1, 32))
             {

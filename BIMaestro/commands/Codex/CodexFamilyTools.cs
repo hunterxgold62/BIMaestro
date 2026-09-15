@@ -1,4 +1,4 @@
-using Autodesk.Revit.DB;
+﻿using Autodesk.Revit.DB;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
@@ -28,7 +28,7 @@ namespace BIMaestro.Codex
             implemented = new { typed_parameters = true, formulas = true, instance_parameters = true, named_types = true,
                 shared_parameters_explicit_guid = true, conditional_visibility = true, coarse_medium_fine = true, view_direction_visibility = true,
                 rectangular_extrusions = true, polygonal_parametric_profiles = true, rectangular_openings = true, nested_rectangular_arrays = true, visible_array_count_range = new[] { 0, 200 },
-                hosting_templates = new[] { "free", "face", "wall", "ceiling", "work_plane" },
+                hosting_templates = new[] { "auto", "free", "face", "wall", "floor", "ceiling", "work_plane" },
                 small_counts = "V1 : visibilité conditionnelle, géométries cachées conservées pour compatibilité Revit 2023+.",
                 symbolic_parametric_rectangles = true, face_centered_mep_connectors = true, native_validation_without_save = true,
                 array_angle_range_degrees = new[] { 1, 89 }, live_parameter_inspection = true, batch_parameter_edit = true },

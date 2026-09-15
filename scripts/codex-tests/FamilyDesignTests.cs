@@ -1,4 +1,4 @@
-using BIMaestro.Codex;
+﻿using BIMaestro.Codex;
 using Newtonsoft.Json.Linq;
 using System;
 using System.IO;
@@ -12,6 +12,23 @@ internal static class FamilyDesignTests
         var design = CodexFamilyDesign.Parse(fixture);
         if (design.SolidCount != 103 || design.Parts.Count != 13 || design.Materials.Count != 5) throw new Exception("Transformer design count mismatch");
         Console.WriteLine("PASS: transformer design, 103 solids / 13 groups / 5 materials");
+        foreach (var category in new[] { "door", "window" })
+        {
+            var hosted = (JObject)fixture.DeepClone(); hosted["category"] = category;
+            hosted["place_at_origin"] = false;
+            if (CodexFamilyDesign.Parse(hosted).Hosting != "wall") throw new Exception("Doors/windows must default to wall hosting");
+            hosted["hosting"] = "auto";
+            if (CodexFamilyDesign.Parse(hosted).Hosting != "wall") throw new Exception("Auto wall hosting failed");
+            hosted["hosting"] = "free";
+            if (CodexFamilyDesign.Parse(hosted).Hosting != "free") throw new Exception("Explicit free hosting ignored");
+        }
+        var floor = (JObject)fixture.DeepClone(); floor["hosting"] = "floor"; floor["place_at_origin"] = false;
+        if (CodexFamilyDesign.Parse(floor).Hosting != "floor") throw new Exception("Floor hosting failed");
+        Reject(floor, x => { x["load_into_project"] = true; x["place_at_origin"] = true; }, "hosted placement without host");
+        Reject(floor, x => x["hosting"] = "unknown", "unknown hosting");
+        Reject(floor, x => x["hosting"] = 42, "non-string hosting");
+        Console.WriteLine("PASS: automatic wall hosting, floor hosting, explicit override and host validation");
+
         design.TargetDimensions = new[] { 100.0, 0.0, 200.0 };
         design.CheckDimensions(new[] { 100.5, 999.0, 200.0 });
         bool mismatch = false;

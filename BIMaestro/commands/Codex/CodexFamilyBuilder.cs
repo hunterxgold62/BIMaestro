@@ -1,4 +1,4 @@
-using Autodesk.Revit.DB;
+﻿using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Structure;
 using Autodesk.Revit.UI;
 using Newtonsoft.Json;
@@ -26,7 +26,7 @@ namespace BIMaestro.Codex
         {
             if (!validateOnly && design.Load && (source == null || source.IsFamilyDocument || source.IsReadOnly || source.IsModifiable))
                 throw new InvalidOperationException("Le chargement nécessite un projet actif modifiable, hors d'une autre commande.");
-            string template = FindTemplate(app, parametric?.Hosting ?? "free");
+            string template = FindTemplate(app, parametric?.Hosting ?? design.Hosting);
             string fileName = SafeName(design.Name);
             var warnings = new List<string>();
             if (app.Application.Documents.Cast<Document>().Any(d => d.Title.Equals(fileName, StringComparison.OrdinalIgnoreCase)) ||
@@ -54,7 +54,7 @@ namespace BIMaestro.Codex
                     transaction.Start();
                     transaction.SetFailureHandlingOptions(transaction.GetFailureHandlingOptions().SetFailuresPreprocessor(new Failures(warnings)).SetClearAfterRollback(true));
                     family.OwnerFamily.FamilyCategory = Category.GetCategory(family, CategoryId(design.Category));
-                    if (parametric?.Hosting == "work_plane")
+                    if ((parametric?.Hosting ?? design.Hosting) == "work_plane")
                     {
                         var hosted = family.OwnerFamily.get_Parameter(BuiltInParameter.FAMILY_WORK_PLANE_BASED);
                         if (hosted == null || hosted.IsReadOnly) throw new InvalidOperationException("Le gabarit ne permet pas un hébergement par plan de travail.");
@@ -218,7 +218,7 @@ namespace BIMaestro.Codex
                     internal_calculated_lengths = parametricBuilder?.InternalLengthCount,
                     parameters = parametric?.Registry == null ? null : CodexFamilyTools.Read(family),
                     connectors = parametricBuilder?.ConnectorReports(),
-                    hosting = parametric?.Hosting ?? "free",
+                    hosting = parametric?.Hosting ?? design.Hosting,
                     flex_tests = flexTests,
                     assumptions = design.Assumptions, warnings = warnings.Distinct().Take(40).ToArray(), loadedFamilyId = loadedId, placedInstanceId = placedId,
                     undo = "Ctrl+Z annule le chargement/placement dans le projet ; le fichier RFA reste sur disque."
@@ -243,6 +243,7 @@ namespace BIMaestro.Codex
             {
                 string[] names = hosting == "face" ? new[] { "Metric Generic Model face based", "Modèle générique métrique (face)", "Metric_Generic_Model-Face_Based-FRA", "Metric_Generic_Model-Face_Based-ENU" } :
                     hosting == "wall" ? new[] { "Metric Generic Model wall based", "Modèle générique métrique (mur)" } :
+                    hosting == "floor" ? new[] { "Metric Generic Model floor based", "Modèle générique métrique (sol)", "Metric_Generic_Model-Floor_Based-FRA", "Metric_Generic_Model-Floor_Based-ENU" } :
                     hosting == "ceiling" ? new[] { "Metric Generic Model ceiling based", "Modèle générique métrique (plafond)" } :
                     new[] { "Modèle générique métrique", "Metric Generic Model", "Metric_Generic_Model-FRA", "Metric_Generic_Model-ENU" };
                 string found = Directory.EnumerateFiles(root, "*.rft", SearchOption.AllDirectories)
@@ -256,6 +257,8 @@ namespace BIMaestro.Codex
         {
             switch (category)
             {
+                case "door": return BuiltInCategory.OST_Doors;
+                case "window": return BuiltInCategory.OST_Windows;
                 case "electrical": return BuiltInCategory.OST_ElectricalEquipment;
                 case "mechanical": return BuiltInCategory.OST_MechanicalEquipment;
                 case "air_terminal": return BuiltInCategory.OST_DuctTerminal;
