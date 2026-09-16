@@ -1,0 +1,304 @@
+{
+  "name": "Arbre_3D_symbole_2D",
+  "category": "planting",
+  "hosting": "free",
+  "target_dimensions_mm": [
+    0,
+    0,
+    0
+  ],
+  "assumptions": [],
+  "materials": [
+    {
+      "name": "Bois",
+      "rgb": [
+        130,
+        80,
+        40
+      ],
+      "transparency": 0
+    },
+    {
+      "name": "Feuillage",
+      "rgb": [
+        60,
+        125,
+        65
+      ],
+      "transparency": 0
+    }
+  ],
+  "parts": [
+    {
+      "name": "Tronc",
+      "material": "Bois",
+      "geometry": {
+        "kind": "cylinder",
+        "size_mm": [
+          150,
+          0,
+          1800
+        ],
+        "position_mm": [
+          0,
+          0,
+          0
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "profile_mm": []
+      },
+      "cuts": [],
+      "repeat_count": 1,
+      "repeat_step_mm": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Houppier",
+      "material": "Feuillage",
+      "geometry": {
+        "kind": "sphere",
+        "size_mm": [
+          1000,
+          0,
+          0
+        ],
+        "position_mm": [
+          0,
+          0,
+          2100
+        ],
+        "rotation_deg": [
+          0,
+          0,
+          0
+        ],
+        "profile_mm": []
+      },
+      "cuts": [],
+      "repeat_count": 1,
+      "repeat_step_mm": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "load_into_project": false,
+  "place_at_origin": false,
+  "representation_2d": {
+    "hide_model_in": [
+      "xy"
+    ],
+    "drawings": [
+      {
+        "name": "Houppier",
+        "mode": "filled",
+        "plane": "xy",
+        "offset_mm": 0,
+        "curves": [
+          {
+            "kind": "circle",
+            "points_mm": [
+              [
+                0,
+                0
+              ]
+            ],
+            "radius_mm": 1000
+          }
+        ],
+        "rgb": [
+          65,
+          140,
+          70
+        ],
+        "fill_pattern": "solid"
+      },
+      {
+        "name": "Contour",
+        "mode": "symbolic",
+        "plane": "xy",
+        "offset_mm": 0,
+        "curves": [
+          {
+            "kind": "circle",
+            "points_mm": [
+              [
+                0,
+                0
+              ]
+            ],
+            "radius_mm": 1000
+          },
+          {
+            "kind": "line",
+            "points_mm": [
+              [
+                -600,
+                0
+              ],
+              [
+                600,
+                0
+              ]
+            ],
+            "radius_mm": 0
+          },
+          {
+            "kind": "arc",
+            "points_mm": [
+              [
+                800,
+                0
+              ],
+              [
+                0,
+                800
+              ],
+              [
+                565.685,
+                565.685
+              ]
+            ],
+            "radius_mm": 0
+          }
+        ],
+        "rgb": [
+          65,
+          140,
+          70
+        ],
+        "fill_pattern": "solid"
+      },
+      {
+        "name": "Masque tronc",
+        "mode": "masking",
+        "plane": "xy",
+        "offset_mm": 0,
+        "curves": [
+          {
+            "kind": "circle",
+            "points_mm": [
+              [
+                0,
+                0
+              ]
+            ],
+            "radius_mm": 150
+          }
+        ],
+        "rgb": [
+          65,
+          140,
+          70
+        ],
+        "fill_pattern": "solid"
+      },
+      {
+        "name": "Hachure",
+        "mode": "filled",
+        "plane": "xy",
+        "offset_mm": 0,
+        "curves": [
+          {
+            "kind": "line",
+            "points_mm": [
+              [
+                1300,
+                -300
+              ],
+              [
+                1900,
+                -300
+              ]
+            ],
+            "radius_mm": 0
+          },
+          {
+            "kind": "line",
+            "points_mm": [
+              [
+                1900,
+                -300
+              ],
+              [
+                1900,
+                300
+              ]
+            ],
+            "radius_mm": 0
+          },
+          {
+            "kind": "line",
+            "points_mm": [
+              [
+                1900,
+                300
+              ],
+              [
+                1300,
+                300
+              ]
+            ],
+            "radius_mm": 0
+          },
+          {
+            "kind": "line",
+            "points_mm": [
+              [
+                1300,
+                300
+              ],
+              [
+                1300,
+                -300
+              ]
+            ],
+            "radius_mm": 0
+          }
+        ],
+        "rgb": [
+          0,
+          0,
+          0
+        ],
+        "fill_pattern": "diagonal"
+      },
+      {
+        "name": "Ligne modele",
+        "mode": "model",
+        "plane": "xy",
+        "offset_mm": 0,
+        "curves": [
+          {
+            "kind": "line",
+            "points_mm": [
+              [
+                -1500,
+                -1200
+              ],
+              [
+                -1500,
+                1200
+              ]
+            ],
+            "radius_mm": 0
+          }
+        ],
+        "rgb": [
+          65,
+          140,
+          70
+        ],
+        "fill_pattern": "solid"
+      }
+    ]
+  }
+}

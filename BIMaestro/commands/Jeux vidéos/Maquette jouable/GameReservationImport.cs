@@ -54,9 +54,19 @@ namespace BIMaestro.VideoGames
                     var points = new[] { position - x * width / 2 - y * height / 2, position + x * width / 2 - y * height / 2,
                         position + x * width / 2 + y * height / 2, position - x * width / 2 + y * height / 2 };
                     var loop = new CurveLoop();
-                    for (int i = 0; i < 4; i++) loop.Append(Line.CreateBound(points[i], points[(i + 1) % 4]));
+                    string form = (string?)mark["shape"] ?? "rectangle";
+                    if (form != "rectangle" && form != "round") throw new InvalidOperationException("Forme de réservation non reconnue.");
+                    if (form == "round")
+                    {
+                        double radius = Dimension(mark["diameterCm"]) / 2;
+                        loop.Append(Arc.Create(position, radius, 0, Math.PI, x, y));
+                        loop.Append(Arc.Create(position, radius, Math.PI, Math.PI * 2, x, y));
+                    }
+                    else for (int i = 0; i < 4; i++) loop.Append(Line.CreateBound(points[i], points[(i + 1) % 4]));
                     var solid = GeometryCreationUtilities.CreateExtrusionGeometry(new[] { loop }, -normal, depth);
-                    string description = "Réservation web " + mark["widthCm"] + " × " + mark["heightCm"] + " × " + mark["depthCm"] + " cm · " + (string?)mark["elementName"] + " · " + (string?)mark["text"];
+                    string lot = (string?)mark["lot"] ?? "MEP";
+                    string dimensions = form == "round" ? "Ø " + mark["diameterCm"] : mark["widthCm"] + " × " + mark["heightCm"];
+                    string description = "Réservation web · Lot " + lot + " · " + dimensions + " × " + mark["depthCm"] + " cm · " + (string?)mark["elementName"] + " · " + (string?)mark["text"];
                     prepared.Add(Tuple.Create(publicationId + "|" + id, solid, description));
                 }
                 var existing = new FilteredElementCollector(document).OfClass(typeof(DirectShape)).Cast<DirectShape>()

@@ -8,8 +8,20 @@ internal static class FamilyDesignTests
 {
     internal static void Run()
     {
+        var drawingFixture = JObject.Parse(File.ReadAllText("scripts/codex-tests/native-fixtures/representation-2d.json"));
+        var representation = FamilyRepresentationSpec.Parse(drawingFixture["representation_2d"]);
+        if (representation.Drawings.Count != 5 || representation.HideModelIn.Single() != "xy") throw new Exception("Missing drawing modes");
+        var parametricDrawing = CodexParametricDesign.Parse(drawingFixture);
+        if (parametricDrawing.Metadata.Representation.Drawings.Count != 5) throw new Exception("Parametric metadata lost 2D representation");
         var fixture = JObject.Parse(File.ReadAllText("scripts/codex-tests/transformer.design.json"));
+        fixture["representation_2d"] = drawingFixture["representation_2d"].DeepClone();
+        Reject(fixture, x => x["representation_2d"]["drawings"][0]["curves"][0]["radius_mm"] = 0, "zero radius 2D");
+        Reject(fixture, x => x["representation_2d"]["drawings"][3]["curves"][0]["points_mm"][0][0] = 1200, "open region boundary");
+        Reject(fixture, x => x["representation_2d"]["drawings"][1]["curves"][2]["points_mm"][2] = new JArray(400,400), "collinear symbolic arc");
+        Reject(fixture, x => x["representation_2d"]["hide_model_in"] = new JArray("xz"), "hidden model without matching 2D");
+        Reject(fixture, x => x["representation_2d"]["drawings"][0]["mode"] = "unknown", "unknown drawing mode");
         var design = CodexFamilyDesign.Parse(fixture);
+        if (design.Representation.Drawings.Count != 5) throw new Exception("Fixed family lost 2D representation");
         if (design.SolidCount != 103 || design.Parts.Count != 13 || design.Materials.Count != 5) throw new Exception("Transformer design count mismatch");
         Console.WriteLine("PASS: transformer design, 103 solids / 13 groups / 5 materials");
         foreach (var category in new[] { "door", "window" })

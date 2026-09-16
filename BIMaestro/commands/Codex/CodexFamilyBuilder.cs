@@ -22,7 +22,7 @@ namespace BIMaestro.Codex
         internal static readonly string OutputRoot = Path.Combine(CodexClient.DataDirectory, "Families");
 
         // Called exclusively from the bridge's ExternalEvent. The source project is never saved.
-        internal static CodexFamilyArtifact Create(UIApplication app, Document source, CodexFamilyDesign design, bool validateOnly = false, CodexParametricDesign parametric = null, bool testHostPlacement = false)
+        internal static CodexFamilyArtifact Create(UIApplication app, Document source, CodexFamilyDesign design, bool validateOnly = false, CodexParametricDesign parametric = null, bool testHostPlacement = false, Action<Document> inspect = null)
         {
             if (!validateOnly && design.Load && (source == null || source.IsFamilyDocument || source.IsReadOnly || source.IsModifiable))
                 throw new InvalidOperationException("Le chargement nécessite un projet actif modifiable, hors d'une autre commande.");
@@ -151,10 +151,24 @@ namespace BIMaestro.Codex
                 stage = "tests de variation des paramètres";
                 object[] flexTests = parametricBuilder?.Flex() ?? new object[0];
                 hostOpening?.Check(parametric?.Initial ?? new Dictionary<string, double>());
+                object representationReport = null;
+                if (design.Representation != null)
+                {
+                    stage = "représentation 2D et visibilité du modèle";
+                    var regionSymbols = CodexRepresentationBuilder.PrepareRegions(family, design.Representation);
+                    using (var t = new Transaction(family, "BIMaestro — représentation 2D"))
+                    {
+                        t.Start();
+                        t.SetFailureHandlingOptions(t.GetFailureHandlingOptions().SetFailuresPreprocessor(new Failures(warnings)).SetClearAfterRollback(true));
+                        representationReport = CodexRepresentationBuilder.Build(family, design.Representation, createdElements, regionSymbols);
+                        if (t.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Représentation 2D annulée : " + string.Join(" ; ", warnings));
+                    }
+                }
                 object hostPlacementTest = testHostPlacement && hostOpening != null ? hostOpening.VerifyProjectPlacement(parametric?.TestCases() ?? new[] { new Dictionary<string, double>() }) : null;
+                inspect?.Invoke(family);
                 if (validateOnly) return new CodexFamilyArtifact { Report = new {
                     validated = true, saved = false, loaded = false, solidCount = parametric?.SolidCount ?? design.SolidCount,
-                    revit_version = app.Application.VersionNumber, flex_tests = flexTests, host_opening = hostOpening?.Report(), host_placement_test = hostPlacementTest,
+                    revit_version = app.Application.VersionNumber, flex_tests = flexTests, host_opening = hostOpening?.Report(), host_placement_test = hostPlacementTest, representation_2d = representationReport,
                     parameters = parametric?.Registry == null ? null : CodexFamilyTools.Read(family), connectors = parametricBuilder?.ConnectorReports(),
                     dimensions_mm = new[] { Mm(bounds.Max.X - bounds.Min.X), Mm(bounds.Max.Y - bounds.Min.Y), Mm(bounds.Max.Z - bounds.Min.Z) },
                     warnings = warnings.ToArray(), next = "Validation native terminée pour les cas demandés. Appeler " + (parametric == null ? "revit_create_family" : "revit_create_parametric_family") + " avec la même description pour enregistrer." } };
@@ -227,6 +241,7 @@ namespace BIMaestro.Codex
                     connectors = parametricBuilder?.ConnectorReports(),
                     hosting = parametric?.Hosting ?? design.Hosting,
                     host_opening = hostOpening?.Report(),
+                    representation_2d = representationReport,
                     flex_tests = flexTests,
                     assumptions = design.Assumptions, warnings = warnings.Distinct().Take(40).ToArray(), loadedFamilyId = loadedId, placedInstanceId = placedId,
                     undo = "Ctrl+Z annule le chargement/placement dans le projet ; le fichier RFA reste sur disque."
@@ -265,6 +280,7 @@ namespace BIMaestro.Codex
         {
             switch (category)
             {
+                case "planting": return BuiltInCategory.OST_Planting;
                 case "door": return BuiltInCategory.OST_Doors;
                 case "window": return BuiltInCategory.OST_Windows;
                 case "electrical": return BuiltInCategory.OST_ElectricalEquipment;

@@ -1,0 +1,329 @@
+{
+  "name": "Representation_2D_validation",
+  "category": "generic",
+  "hosting": "free",
+  "assumptions": [],
+  "materials": [
+    {
+      "name": "Cadre",
+      "rgb": [
+        80,
+        80,
+        80
+      ],
+      "transparency": 0
+    }
+  ],
+  "parameters": [
+    {
+      "name": "Largeur",
+      "value_mm": 1000,
+      "test_value_mm": 1400
+    },
+    {
+      "name": "Hauteur",
+      "value_mm": 1200,
+      "test_value_mm": 1500
+    }
+  ],
+  "parts": [
+    {
+      "name": "Dormant",
+      "material": "Cadre",
+      "axis": "y",
+      "openings": [
+        {
+          "minimum_uv": [
+            {
+              "offset_mm": 50,
+              "terms": [
+                {
+                  "parameter": "Largeur",
+                  "factor": -0.5
+                }
+              ]
+            },
+            {
+              "offset_mm": 250,
+              "terms": []
+            }
+          ],
+          "maximum_uv": [
+            {
+              "offset_mm": -50,
+              "terms": [
+                {
+                  "parameter": "Largeur",
+                  "factor": 0.5
+                }
+              ]
+            },
+            {
+              "offset_mm": 150,
+              "terms": [
+                {
+                  "parameter": "Hauteur",
+                  "factor": 1
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "minimum": [
+        {
+          "offset_mm": 0,
+          "terms": [
+            {
+              "parameter": "Largeur",
+              "factor": -0.5
+            }
+          ]
+        },
+        {
+          "offset_mm": -50,
+          "terms": []
+        },
+        {
+          "offset_mm": 200,
+          "terms": []
+        }
+      ],
+      "maximum": [
+        {
+          "offset_mm": 0,
+          "terms": [
+            {
+              "parameter": "Largeur",
+              "factor": 0.5
+            }
+          ]
+        },
+        {
+          "offset_mm": 50,
+          "terms": []
+        },
+        {
+          "offset_mm": 200,
+          "terms": [
+            {
+              "parameter": "Hauteur",
+              "factor": 1
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "load_into_project": false,
+  "place_at_origin": false,
+  "representation_2d": {
+    "hide_model_in": [
+      "xy"
+    ],
+    "drawings": [
+      {
+        "name": "Houppier",
+        "mode": "filled",
+        "plane": "xy",
+        "offset_mm": 0,
+        "curves": [
+          {
+            "kind": "circle",
+            "points_mm": [
+              [
+                0,
+                0
+              ]
+            ],
+            "radius_mm": 1000
+          }
+        ],
+        "rgb": [
+          65,
+          140,
+          70
+        ],
+        "fill_pattern": "solid"
+      },
+      {
+        "name": "Contour",
+        "mode": "symbolic",
+        "plane": "xy",
+        "offset_mm": 0,
+        "curves": [
+          {
+            "kind": "circle",
+            "points_mm": [
+              [
+                0,
+                0
+              ]
+            ],
+            "radius_mm": 1000
+          },
+          {
+            "kind": "line",
+            "points_mm": [
+              [
+                -600,
+                0
+              ],
+              [
+                600,
+                0
+              ]
+            ],
+            "radius_mm": 0
+          },
+          {
+            "kind": "arc",
+            "points_mm": [
+              [
+                800,
+                0
+              ],
+              [
+                0,
+                800
+              ],
+              [
+                565.685,
+                565.685
+              ]
+            ],
+            "radius_mm": 0
+          }
+        ],
+        "rgb": [
+          65,
+          140,
+          70
+        ],
+        "fill_pattern": "solid"
+      },
+      {
+        "name": "Masque tronc",
+        "mode": "masking",
+        "plane": "xy",
+        "offset_mm": 0,
+        "curves": [
+          {
+            "kind": "circle",
+            "points_mm": [
+              [
+                0,
+                0
+              ]
+            ],
+            "radius_mm": 150
+          }
+        ],
+        "rgb": [
+          65,
+          140,
+          70
+        ],
+        "fill_pattern": "solid"
+      },
+      {
+        "name": "Hachure",
+        "mode": "filled",
+        "plane": "xy",
+        "offset_mm": 0,
+        "curves": [
+          {
+            "kind": "line",
+            "points_mm": [
+              [
+                1300,
+                -300
+              ],
+              [
+                1900,
+                -300
+              ]
+            ],
+            "radius_mm": 0
+          },
+          {
+            "kind": "line",
+            "points_mm": [
+              [
+                1900,
+                -300
+              ],
+              [
+                1900,
+                300
+              ]
+            ],
+            "radius_mm": 0
+          },
+          {
+            "kind": "line",
+            "points_mm": [
+              [
+                1900,
+                300
+              ],
+              [
+                1300,
+                300
+              ]
+            ],
+            "radius_mm": 0
+          },
+          {
+            "kind": "line",
+            "points_mm": [
+              [
+                1300,
+                300
+              ],
+              [
+                1300,
+                -300
+              ]
+            ],
+            "radius_mm": 0
+          }
+        ],
+        "rgb": [
+          0,
+          0,
+          0
+        ],
+        "fill_pattern": "diagonal"
+      },
+      {
+        "name": "Ligne modele",
+        "mode": "model",
+        "plane": "xy",
+        "offset_mm": 0,
+        "curves": [
+          {
+            "kind": "line",
+            "points_mm": [
+              [
+                -1500,
+                -1200
+              ],
+              [
+                -1500,
+                1200
+              ]
+            ],
+            "radius_mm": 0
+          }
+        ],
+        "rgb": [
+          65,
+          140,
+          70
+        ],
+        "fill_pattern": "solid"
+      }
+    ]
+  }
+}

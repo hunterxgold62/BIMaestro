@@ -14,7 +14,7 @@ namespace BIMaestro.Codex
     {
         // Every scenario creates and closes its own temporary family. No saved RFA,
         // no project load, no model turn and no access to the source model's geometry.
-        internal static object Run(UIApplication app, Action<string> progress = null)
+        internal static object Run(UIApplication app, Action<string> progress = null, Action<Document> inspect = null)
         {
             var assembly = Assembly.GetExecutingAssembly();
             var names = assembly.GetManifestResourceNames().Where(n => n.StartsWith("BIMaestro.CodexTests.", StringComparison.Ordinal)).OrderBy(n => n).ToArray();
@@ -31,8 +31,9 @@ namespace BIMaestro.Codex
                     {
                         var source = JObject.Parse(reader.ReadToEnd());
                         source["load_into_project"] = false; source["place_at_origin"] = false;
-                        var design = CodexParametricDesign.Parse(source);
-                        var artifact = CodexFamilyBuilder.Create(app, null, design.Metadata, true, design, testHostPlacement: true);
+                        var design = source["parameters"] == null ? null : CodexParametricDesign.Parse(source);
+                        var metadata = design?.Metadata ?? CodexFamilyDesign.Parse(source);
+                        var artifact = CodexFamilyBuilder.Create(app, null, metadata, true, design, testHostPlacement: true, inspect: metadata.Representation == null ? null : inspect);
                         results.Add(new { scenario = name, passed = true, seconds = watch.Elapsed.TotalSeconds, report = artifact.Report }); passed++;
                     }
                 }

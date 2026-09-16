@@ -1,0 +1,17 @@
+import { readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+import ts from '../../../viewer-web/node_modules/typescript/lib/typescript.js';
+const source = readFileSync(new URL('./lots.ts', import.meta.url), 'utf8');
+const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } });
+const { updateReservationLot } = await import('data:text/javascript;base64,' + Buffer.from(outputText).toString('base64'));
+const state = { markups: { a: { kind: 'reservation', lot: 'ELEC' }, b: { kind: 'reservation', lot: 'TEST' } }, valves: { v: true } };
+const settings = updateReservationLot(state, 'ELEC', { name: ' Électricité ', color: '#F97316' });
+assert.deepEqual(settings.ELEC, { name: 'Électricité', color: '#f97316' });
+assert.equal(state.markups.a.lot, 'ELEC'); assert.equal(state.valves.v, true);
+const id = '12345678-1234-1234-1234-123456789012';
+assert.equal(updateReservationLot({ ...state, reservationLots: settings }, id, { name: 'Plomberie', color: '#123456' })[id].name, 'Plomberie');
+for (const name of ['', ' ', 'test', 'MEP', 'x'.repeat(41), 'Bad\nName']) assert.throws(() => updateReservationLot(state, id, { name, color: '#123456' }));
+assert.throws(() => updateReservationLot(state, '__proto__', { name: 'Lot', color: '#123456' }));
+assert.throws(() => updateReservationLot(state, id, { name: 'Lot', color: 'red' }));
+assert.throws(() => updateReservationLot({ ...state, reservationLots: settings }, id, { name: 'Électricité', color: '#123456' }));
+console.log('Lot renaming preserves references; duplicate names, invalid IDs and colours are rejected.');

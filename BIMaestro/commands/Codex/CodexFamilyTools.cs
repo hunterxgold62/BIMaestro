@@ -30,7 +30,7 @@ namespace BIMaestro.Codex
                 rectangular_extrusions = true, polygonal_parametric_profiles = true, rectangular_openings = true, native_wall_host_openings = true, parametric_wall_host_openings = true, nested_rectangular_arrays = true, visible_array_count_range = new[] { 0, 200 },
                 hosting_templates = new[] { "auto", "free", "face", "wall", "floor", "ceiling", "work_plane" },
                 small_counts = "V1 : visibilité conditionnelle, géométries cachées conservées pour compatibilité Revit 2023+.",
-                symbolic_parametric_rectangles = true, face_centered_mep_connectors = true, native_validation_without_save = true,
+                symbolic_parametric_rectangles = true, free_symbolic_lines_arcs_circles = true, model_lines_arcs_circles = true, filled_regions = true, masking_regions = true, model_visibility_by_view_plane = true, face_centered_mep_connectors = true, native_validation_without_save = true,
                 array_angle_range_degrees = new[] { 1, 89 }, live_parameter_inspection = true, batch_parameter_edit = true },
             native_validation = "Essais de variation pendant chaque création. Pas de certification générale de toutes les combinaisons par la seule compilation.",
             limitations = new[] { "Extrusions selon X/Y/Z : profils rectangulaires ou polygonaux droits pilotés par leurs sommets ; barres arrays inclinables de 1 à 89 degrés.", "Les pièces cachées doivent rester géométriquement valides.", "Les paramètres existants compatibles sont réutilisés sans distinction de majuscules. Pour un paramètre partagé existant, fournir son GUID. Un conflit de type, de formule ou de portée non convertible exige un autre nom ; ne pas réessayer le même nom.",
@@ -39,6 +39,7 @@ namespace BIMaestro.Codex
                 "Les comptes 0/1 portent sur les éléments visibles, avec géométries cachées conservées ; ce ne sont pas des réseaux natifs de zéro ou un membre.",
                 "host_opening crée une baie rectangulaire native dans un mur droit parallèle à X du gabarit, avec contrôle du volume découpé et des variations. Autres hôtes et contours courbes non pris en charge. Les anciennes familles doivent être recréées pour ajouter cette baie.",
                 "Les gabarits hébergés exigent place_at_origin=false : le choix de l'hôte et le placement se font ensuite dans le projet.",
+                "representation_2d : lignes/arcs/cercles symboliques ou de modèle, régions à un contour fermé simple (uni, hachure diagonale, masque). Coordonnées fixes, sans association aux dimensions ; symbolic_outlines reste disponible pour les rectangles paramétriques. Les lignes de modèle restent visibles en 3D.",
                 "La géométrie détaillée FreeForm reste fixe : nouvelle version nécessaire pour la reconstruire avec des contraintes." } };
         internal static object Read(Document doc)
         {

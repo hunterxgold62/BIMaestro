@@ -21,24 +21,73 @@ namespace BIMaestro.CodexTests
         public Result OnStartup(UIControlledApplication value)
         {
             application = value; application.Idling += OnIdle;
-            File.WriteAllText(Path.Combine(DirectoryPath, "started.txt"), Process.GetCurrentProcess().Id.ToString());
             return Result.Succeeded;
         }
         private void OnIdle(object sender, IdlingEventArgs args)
         {
+            // Revit may hot-load a newly registered add-in into an existing session.
+            // Only the process explicitly launched by StartNativeHarness may run tests.
+            string launch = Path.Combine(DirectoryPath, "launched-pid.txt");
+            if (!File.Exists(launch)) return;
+            if (File.ReadAllText(launch).Trim() != Process.GetCurrentProcess().Id.ToString())
+            { application.Idling -= OnIdle; return; }
             application.Idling -= OnIdle;
+            File.WriteAllText(Path.Combine(DirectoryPath, "started.txt"), Process.GetCurrentProcess().Id.ToString());
             try
             {
                 var ui = sender as UIApplication ?? throw new InvalidOperationException("Contexte UIApplication absent.");
                 if (ui.Application.Documents.Size != 0) throw new InvalidOperationException("Le banc exige une instance Revit vide ; aucun document utilisateur ne sera modifié.");
                 var parameters = ValidateParameterReuse(ui);
-                var report = Newtonsoft.Json.Linq.JObject.FromObject(CodexNativeValidation.Run(ui, message => File.WriteAllText(Path.Combine(DirectoryPath, "progress.txt"), DateTime.Now.ToString("O") + " " + message)));
+                var report = Newtonsoft.Json.Linq.JObject.FromObject(CodexNativeValidation.Run(ui, message => File.WriteAllText(Path.Combine(DirectoryPath, "progress.txt"), DateTime.Now.ToString("O") + " " + message), RenderRepresentation));
                 report["parameter_reuse_tests"] = Newtonsoft.Json.Linq.JObject.FromObject(parameters);
                 File.WriteAllText(Path.Combine(DirectoryPath, "result.json"), report.ToString(Formatting.Indented));
             }
             catch (Exception ex) { File.WriteAllText(Path.Combine(DirectoryPath, "result.json"), JsonConvert.SerializeObject(new { error = ex.ToString() }, Formatting.Indented)); }
         }
         public Result OnShutdown(UIControlledApplication value) { if (application != null) application.Idling -= OnIdle; return Result.Succeeded; }
+
+        private void RenderRepresentation(Document family)
+        {
+            Document project = null;
+            try
+            {
+                project = family.Application.NewProjectDocument(UnitSystem.Metric);
+                var loaded = family.LoadFamily(project);
+                var symbol = loaded.GetFamilySymbolIds().Select(project.GetElement).OfType<FamilySymbol>().First();
+                var views = new List<ElementId>();
+                using (var t = new Transaction(project, "Test des représentations plan et 3D"))
+                {
+                    t.Start();
+                    var level = Level.Create(project, 0);
+                    symbol.Activate(); project.Regenerate();
+                    project.Create.NewFamilyInstance(XYZ.Zero, symbol, level, Autodesk.Revit.DB.Structure.StructuralType.NonStructural);
+                    var planType = new FilteredElementCollector(project).OfClass(typeof(ViewFamilyType)).Cast<ViewFamilyType>().First(v => v.ViewFamily == ViewFamily.FloorPlan);
+                    var plan = ViewPlan.Create(project, planType.Id, level.Id); plan.Name = "Representation - Plan";
+                    var type3d = new FilteredElementCollector(project).OfClass(typeof(ViewFamilyType)).Cast<ViewFamilyType>().First(v => v.ViewFamily == ViewFamily.ThreeDimensional);
+                    var iso = View3D.CreateIsometric(project, type3d.Id); iso.Name = "Representation - 3D";
+                    var forward = new XYZ(-1,-1,-0.7).Normalize();
+                    iso.SetOrientation(new ViewOrientation3D(new XYZ(15,15,12), XYZ.BasisZ.Subtract(forward.Multiply(XYZ.BasisZ.DotProduct(forward))).Normalize(), forward));
+                    foreach (var view in new View[] { plan, iso })
+                    {
+                        view.DetailLevel = ViewDetailLevel.Fine; view.DisplayStyle = DisplayStyle.FlatColors;
+                        views.Add(view.Id);
+                    }
+                    // A background cross makes the opacity of the filled/masking regions visible.
+                    var work = SketchPlane.Create(project, Plane.CreateByNormalAndOrigin(XYZ.BasisZ, new XYZ(0,0,-0.01)));
+                    project.Create.NewModelCurve(Line.CreateBound(new XYZ(-5,0,-0.01), new XYZ(7,0,-0.01)), work);
+                    project.Create.NewModelCurve(Line.CreateBound(new XYZ(0,-5,-0.01), new XYZ(0,5,-0.01)), work);
+                    if (t.Commit() != TransactionStatus.Committed) throw new Exception("Representation project transaction failed");
+                }
+                string folder = Path.Combine(DirectoryPath, "representation-" + Guid.NewGuid().ToString("N").Substring(0,8));
+                Directory.CreateDirectory(folder);
+                var export = new ImageExportOptions { ExportRange = ExportRange.SetOfViews, FilePath = Path.Combine(folder, "view"),
+                    HLRandWFViewsFileType = ImageFileType.PNG, ShadowViewsFileType = ImageFileType.PNG,
+                    ZoomType = ZoomFitType.FitToPage, PixelSize = 1000, FitDirection = FitDirectionType.Horizontal, ImageResolution = ImageResolution.DPI_150 };
+                export.SetViewsAndSheets(views); project.ExportImage(export);
+                if (Directory.GetFiles(folder, "*.png").Length != 2) throw new Exception("Missing plan/3D visual test exports");
+            }
+            finally { if (project != null && project.IsValidObject) project.Close(false); }
+        }
 
         private static object ValidateParameterReuse(UIApplication ui)
         {

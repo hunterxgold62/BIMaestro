@@ -88,6 +88,7 @@ namespace BIMaestro.Codex
             if (source?["symbolic_outlines"] != null) keys.Add("symbolic_outlines");
             if (source?["hosting"] != null) keys.Add("hosting");
             if (source?["host_opening"] != null) keys.Add("host_opening");
+            if (source?["representation_2d"] != null) keys.Add("representation_2d");
             if (source?["arrays"] != null) keys.Add("arrays");
             if (source?["angles"] != null) keys.Add("angles");
             CodexFamilyDesign.Keys(source, keys.ToArray());

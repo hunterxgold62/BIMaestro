@@ -12,3 +12,9 @@ assert.deepEqual(validateMarkup({ ...mark, stableKey: 'doc|uid', anchorCenter: [
 assert.throws(() => validateMarkup({ ...mark, anchorCenter: [NaN, 2, 3] }));
 assert.throws(() => validateMarkup({ ...mark, anchorSize: [-1, 2, 3] }));
 console.log('Persistent anchor validation passed');
+const dimension = { id: 'floor', elementKey: 'floor', elementName: 'Sol', point: [0,0,0], normal: [0,1,0] };
+const round = validateMarkup({ ...mark, shape: 'round', diameterCm: 20, lot: ' ELEC ', dimensions: [dimension] });
+assert.equal(round.shape, 'round'); assert.equal(round.widthCm, 20); assert.equal(round.heightCm, 20); assert.equal(round.lot, 'ELEC'); assert.deepEqual(round.dimensions, [dimension]);
+assert.equal(validateMarkup(mark).lot, 'MEP');
+for (const patch of [{ shape: 'other' }, { shape: 'round', diameterCm: NaN }, { shape: 'round', diameterCm: 0 }, { lot: ' ' }, { dimensions: [dimension, dimension] }, { dimensions: [{ ...dimension, normal: [0,0,0] }] }, { dimensions: [{ ...dimension, point: [Infinity,0,0] }] }]) assert.throws(() => validateMarkup({ ...mark, ...patch }));
+console.log('Round reservations, lots and dimensions validation passed');

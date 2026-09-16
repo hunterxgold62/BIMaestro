@@ -78,6 +78,7 @@ namespace BIMaestro.Codex
                             CodexParameterBuilder.SetDisplay(child, form, display);
                             manager.AssociateElementParameterToFamilyParameter(form.get_Parameter(BuiltInParameter.IS_VISIBLE_PARAM), visible);
                         }
+                        CodexRepresentationBuilder.HideModel(design.Metadata?.Representation, new FilteredElementCollector(child).OfClass(typeof(GenericForm)).ToElements());
                         if (transaction.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Options de la barre non validées.");
                     }
                     var loaded = child.LoadFamily(host);

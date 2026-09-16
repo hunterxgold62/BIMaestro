@@ -1,5 +1,6 @@
 import { validateAssets, exportPaths, type Asset } from "./assets.ts";
 import { validateMarkup } from "./markup.ts";
+import { updateReservationLot } from "./lots.ts";
 import { validateAnalysis } from "./analysis.ts";
 import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
@@ -487,6 +488,29 @@ async function mutateMarkup(body: any) {
   throw new HttpError(409, "La maquette a changé. Réessayez ou rechargez le partage.");
 }
 
+async function mutateReservationLot(body: any) {
+  const access = await shareAccess(body.token);
+  if (access.role !== "editor") throw new HttpError(403, "Lien en lecture seule");
+  if (!Number.isSafeInteger(body.expectedRevision) || body.modelRevision !== access.publication.active_revision)
+    throw new HttpError(409, "La maquette a changé. Rechargez le partage.");
+  const current = await currentScenario(access.publication.id);
+  if (current.revision !== body.expectedRevision) throw new HttpError(409, "Le partage a changé. Attendez la synchronisation puis réessayez.");
+  let reservationLots;
+  try { reservationLots = updateReservationLot(current.state || {}, body.id, body.lot); }
+  catch (error) { throw new HttpError(400, error instanceof Error ? error.message : "Lot invalide."); }
+  const { error: budgetError } = await admin.rpc("reserve_mep_viewer_usage", { p_publication_id: access.publication.id, p_kind: "scenario", p_amount: 1 });
+  if (budgetError) throw new HttpError(429, "Budget collaboratif indisponible");
+  const updated = { revision: current.revision + 1, state: { ...current.state, reservationLots }, updated_by: "Invité web", updated_at: new Date().toISOString() };
+  const { data, error } = await admin.from("mep_publications").update({ scenario_revision: updated.revision, scenario_state: updated.state,
+    scenario_updated_by: updated.updated_by, scenario_updated_at: updated.updated_at })
+    .eq("id", access.publication.id).eq("scenario_revision", current.revision).eq("active_revision", body.modelRevision)
+    .is("revoked_at", null).gt("expires_at", updated.updated_at).select("id").maybeSingle();
+  if (error) throw new HttpError(500, "Enregistrement du lot impossible");
+  if (!data) throw new HttpError(409, "Le partage a changé. Attendez la synchronisation puis réessayez.");
+  await broadcastScenario(access.publication.id, updated);
+  return { scenario: updated };
+}
+
 async function mutateAnalysis(body: any) {
   const access = await shareAccess(body.token);
   if (access.role !== "editor") throw new HttpError(403, "Lien en lecture seule");
@@ -548,6 +572,7 @@ serve(async (req) => {
       case "resolve": result = await resolveShare(body); break;
       case "scenario": result = await mutateScenario(body); break;
       case "markup": result = await mutateMarkup(body); break;
+      case "reservation-lot": result = await mutateReservationLot(body); break;
       case "analysis": result = await mutateAnalysis(body); break;
       case "state": { const access = await shareAccess(body.token); result = { scenario: await currentScenario(access.publication.id) }; break; }
       case "manage": result = await managePublication(req, body); break;
