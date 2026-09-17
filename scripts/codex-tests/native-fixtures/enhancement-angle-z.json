@@ -1,0 +1,127 @@
+{
+  "name": "Enhancement_Angle_z",
+  "category": "electrical",
+  "assumptions": [
+    "Scénario de test, dimensions de module illustratives et non référence fabricant."
+  ],
+  "materials": [
+    {
+      "name": "Aluminium",
+      "rgb": [
+        100,
+        100,
+        110
+      ],
+      "transparency": 0
+    },
+    {
+      "name": "Verre",
+      "rgb": [
+        150,
+        190,
+        210
+      ],
+      "transparency": 60
+    },
+    {
+      "name": "PV",
+      "rgb": [
+        20,
+        30,
+        60
+      ],
+      "transparency": 0
+    }
+  ],
+  "hosting": "free",
+  "parameters": [],
+  "angles": [],
+  "parts": [],
+  "arrays": [
+    {
+      "name": "Vantail",
+      "material": "Aluminium",
+      "count_parameter": "NombreVantaux",
+      "axis": "z",
+      "minimum": [
+        {
+          "offset_mm": 0,
+          "terms": []
+        },
+        {
+          "offset_mm": 0,
+          "terms": []
+        },
+        {
+          "offset_mm": 0,
+          "terms": []
+        }
+      ],
+      "maximum": [
+        {
+          "offset_mm": 1000,
+          "terms": []
+        },
+        {
+          "offset_mm": 40,
+          "terms": []
+        },
+        {
+          "offset_mm": 2000,
+          "terms": []
+        }
+      ],
+      "span": {
+        "offset_mm": 5000,
+        "terms": []
+      },
+      "pitch": {
+        "offset_mm": 4000,
+        "terms": []
+      },
+      "quantity_parameter": "NombreUnites",
+      "rotation": {
+        "axis": "z",
+        "angle_parameter": "Ouverture"
+      }
+    }
+  ],
+  "load_into_project": false,
+  "place_at_origin": false,
+  "family_options": {
+    "parameters": [
+      {
+        "name": "Ouverture",
+        "kind": "angle",
+        "instance": false,
+        "value": 0,
+        "test_values": [
+          90,
+          180
+        ],
+        "formula": "",
+        "group": "geometry",
+        "description": "Test natif",
+        "shared_guid": ""
+      },
+      {
+        "name": "NombreUnites",
+        "kind": "integer",
+        "instance": false,
+        "value": 1,
+        "test_values": [],
+        "formula": "",
+        "group": "geometry",
+        "description": "Test natif",
+        "shared_guid": ""
+      }
+    ],
+    "types": [
+      {
+        "name": "Standard",
+        "values": []
+      }
+    ],
+    "representations": []
+  }
+}

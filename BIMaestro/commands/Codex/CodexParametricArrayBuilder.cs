@@ -21,11 +21,12 @@ namespace BIMaestro.Codex
 
         // Loading a family requires the destination to be outside a transaction.
         // These documents stay in memory; only the final host RFA is saved.
-        internal static Dictionary<string, FamilySymbol> Prepare(Document host, string template, CodexParametricDesign design)
+        internal static Dictionary<string, FamilySymbol> Prepare(Document host, string template, CodexParametricDesign design, IEnumerable<ParametricArray> specifications = null)
         {
             var result = new Dictionary<string, FamilySymbol>();
-            foreach (var spec in design.Arrays)
+            foreach (var spec in specifications ?? design.Arrays)
             {
+                if (spec.Grid != null) { result.Add(spec.Name, CodexComponentGridBuilder.Prepare(host, template, design, spec)); continue; }
                 Document child = null;
                 try
                 {
@@ -79,6 +80,7 @@ namespace BIMaestro.Codex
                             manager.AssociateElementParameterToFamilyParameter(form.get_Parameter(BuiltInParameter.IS_VISIBLE_PARAM), visible);
                         }
                         CodexRepresentationBuilder.HideModel(design.Metadata?.Representation, new FilteredElementCollector(child).OfClass(typeof(GenericForm)).ToElements());
+                        CodexFamilyBuilder.ApplyBranding(manager);
                         if (transaction.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Options de la barre non validées.");
                     }
                     var loaded = child.LoadFamily(host);
@@ -92,7 +94,7 @@ namespace BIMaestro.Codex
         }
 
         internal CodexParametricArrayBuilder(Document doc, ParametricArray spec, FamilySymbol symbol, Dictionary<string, double> initial,
-            FamilyParameter material, CodexParametricBuilder constraints)
+            FamilyParameter material, CodexParametricBuilder constraints, Dictionary<string, FamilyParameter> materials = null)
         {
             this.doc = doc; this.spec = spec; this.symbol = symbol; symbolId = symbol.Id; this.constraints = constraints;
             string stage = "préparation";
@@ -104,8 +106,9 @@ namespace BIMaestro.Codex
                 doc.Regenerate();
                 var position = new XYZ(spec.Min[0].Value(initial), spec.Min[1].Value(initial), spec.Min[2].Value(initial)) / 304.8;
                 var first = doc.FamilyCreate.NewFamilyInstance(position, symbol, StructuralType.NonStructural);
+                if(spec.Composite && materials!=null) CodexComponentGridBuilder.AssociateMaterials(doc,first,materials);
                 for (int axis = 0; axis < 3; axis++)
-                    constraints.AssociateLength(first.LookupParameter(SizeNames[axis]), LengthExpression.Combine(spec.Max[axis], spec.Min[axis], -1));
+                    constraints.AssociateLength(first.LookupParameter(SizeNames[axis]), LengthExpression.Combine(spec.Max[axis], spec.Min[axis], -1), constrainConstant: true);
                 if (spec.AngleParameter != null) constraints.AssociateAngle(first.LookupParameter("Inclinaison"), spec.AngleParameter);
                 manager.AssociateElementParameterToFamilyParameter(first.LookupParameter("Materiau"), material);
                 bool countInstance = spec.Span.Terms.Keys.Concat(spec.Pitch.Terms.Keys).Concat(new[] { spec.QuantityParameter }).Any(constraints.IsInstance);
@@ -119,7 +122,18 @@ namespace BIMaestro.Codex
                     nativeCount = CodexParameterBuilder.NewInternal(manager, "BIM_Reseau_" + spec.CountParameter, GroupTypeId.Constraints, SpecTypeId.Int.Integer, countInstance);
                     manager.SetFormula(nativeCount, constraints.NativeFormula("if(" + spec.CountParameter + " < 2, 2, " + spec.CountParameter + ")"));
                     string visible = constraints.VisibilityParameter(spec.Name);
-                    bool visibleInstance = countInstance || (!string.IsNullOrEmpty(visible) && constraints.IsInstance(visible));
+                    if (spec.Grid != null)
+                    {
+                        var columns=CodexParameterBuilder.GetOrAdd(manager,spec.Grid.ColumnsParameter,GroupTypeId.Geometry,SpecTypeId.Int.Integer,spec.Grid.Width.Terms.Keys.Any(constraints.IsInstance));
+                        manager.SetFormula(columns,constraints.NativeFormula("rounddown(("+LengthExpression.Combine(spec.Grid.Width,new LengthExpression{Offset=spec.Grid.Gap[0]}).Formula()+") / "+(spec.Grid.Size[spec.Grid.U]+spec.Grid.Gap[0]).ToString(System.Globalization.CultureInfo.InvariantCulture)+" mm)"));
+                        constraints.RegisterDriver(spec.Grid.ColumnsParameter,columns);
+                        var hasColumns=CodexParameterBuilder.NewInternal(manager,"BIM_GridVisible_"+spec.Grid.ColumnsParameter,GroupTypeId.Visibility,SpecTypeId.Boolean.YesNo,columns.IsInstance||(!string.IsNullOrEmpty(visible)&&constraints.IsInstance(visible)));
+                        string condition=spec.Grid.ColumnsParameter+" > 0";
+                        if(!string.IsNullOrEmpty(visible))condition="and("+visible+", "+condition+")";
+                        manager.SetFormula(hasColumns,constraints.NativeFormula(condition));
+                        visible=hasColumns.Definition.Name;
+                    }
+                    bool visibleInstance = countInstance || (!string.IsNullOrEmpty(visible) && manager.get_Parameter(visible)?.IsInstance == true);
                     var groupVisible = CodexParameterBuilder.NewInternal(manager, "BIM_Groupe_" + spec.CountParameter, GroupTypeId.Visibility, SpecTypeId.Boolean.YesNo, visibleInstance);
                     var singleVisible = CodexParameterBuilder.NewInternal(manager, "BIM_Unique_" + spec.CountParameter, GroupTypeId.Visibility, SpecTypeId.Boolean.YesNo, visibleInstance);
                     string groupFormula = spec.CountParameter + " > 1", singleFormula = spec.CountParameter + " = 1";
@@ -127,7 +141,8 @@ namespace BIMaestro.Codex
                     manager.SetFormula(groupVisible, constraints.NativeFormula(groupFormula)); manager.SetFormula(singleVisible, constraints.NativeFormula(singleFormula));
                     manager.AssociateElementParameterToFamilyParameter(first.LookupParameter("BIM_Visible"), groupVisible);
                     single = doc.FamilyCreate.NewFamilyInstance(position, symbol, StructuralType.NonStructural);
-                    for (int axis = 0; axis < 3; axis++) constraints.AssociateLength(single.LookupParameter(SizeNames[axis]), LengthExpression.Combine(spec.Max[axis], spec.Min[axis], -1));
+                    if(spec.Composite && materials!=null) CodexComponentGridBuilder.AssociateMaterials(doc,single,materials);
+                    for (int axis = 0; axis < 3; axis++) constraints.AssociateLength(single.LookupParameter(SizeNames[axis]), LengthExpression.Combine(spec.Max[axis], spec.Min[axis], -1), constrainConstant: true);
                     if (spec.AngleParameter != null) constraints.AssociateAngle(single.LookupParameter("Inclinaison"), spec.AngleParameter);
                     manager.AssociateElementParameterToFamilyParameter(single.LookupParameter("Materiau"), material);
                     manager.AssociateElementParameterToFamilyParameter(single.LookupParameter("BIM_Visible"), singleVisible);
@@ -178,8 +193,8 @@ namespace BIMaestro.Codex
             else if (element is Group group)
                 foreach (var nested in group.GetMemberIds().SelectMany(id => Instances(doc.GetElement(id)))) yield return nested;
         }
-        internal object Report(Dictionary<string, double> values) => new { name = spec.Name, count_parameter = spec.CountParameter,
-            count = spec.Count(values), native_array_count = array.NumMembers, visible_count = constraints.Visible(spec.Name, values) ? spec.Count(values) : 0,
+        internal object Report(Dictionary<string, double> values) => new { name = spec.Name, count_parameter = spec.CountParameter, columns = spec.Grid?.Columns(values), modules = spec.Grid == null ? (int?)null : spec.Grid.Columns(values)*spec.Count(values),
+            count = spec.Count(values), native_array_count = array.NumMembers, visible_count = (spec.Grid == null || spec.Grid.Columns(values)>0) && constraints.Visible(spec.Name, values) ? spec.Count(values) : 0,
             physical_instances = array.NumMembers + (single == null ? 0 : 1),
             small_count_mode = spec.SmallCounts ? "Visibilité conditionnelle compatible 2023+ ; les géométries cachées restent présentes." : null,
             hidden_member_checks = "Paramètres, position et visibilité contrôlés. Revit ne renvoie pas les solides masqués ; volumes et orientations sont mesurés pour les membres visibles.",
@@ -194,7 +209,7 @@ namespace BIMaestro.Codex
             for (int index = 0; index < members.Length; index++)
             {
                 bool isSingle = single != null && members[index].Id.Equals(single.Id);
-                bool expectedVisible = constraints.Visible(spec.Name, values) && (!spec.SmallCounts || (isSingle ? spec.Count(values) == 1 : spec.Count(values) > 1));
+                bool expectedVisible = (spec.Grid == null || spec.Grid.Columns(values)>0) && constraints.Visible(spec.Name, values) && (!spec.SmallCounts || (isSingle ? spec.Count(values) == 1 : spec.Count(values) > 1));
                 if (members[index].LookupParameter("BIM_Visible").AsInteger() != (expectedVisible ? 1 : 0)) throw new InvalidOperationException("Visibilité du réseau incorrecte : " + spec.Name);
                 var location = ((LocationPoint)members[index].Location).Point;
                 for (int a = 0; a < 3; a++)
@@ -209,6 +224,11 @@ namespace BIMaestro.Codex
                 if (spec.RotationAxis >= 0 && Math.Abs(members[index].LookupParameter("Inclinaison").AsDouble() * 180 / Math.PI - spec.Angle(values)) > 1e-6)
                     throw new InvalidOperationException("Angle natif incorrect : " + spec.Name);
                 if (!expectedVisible) continue;
+                if(spec.Composite)
+                {
+                    if(spec.Grid!=null)CodexComponentGridBuilder.CheckRow(members[index],spec.Grid,values);
+                    continue;
+                }
                 var box = SolidBounds(members[index]);
                 if (box == null) throw new InvalidOperationException("Encombrement de barre absent.");
                 var points = Enumerable.Range(0, 8).Select(c => box.Transform.OfPoint(new XYZ((c & 1) == 0 ? box.Min.X : box.Max.X,
@@ -222,14 +242,14 @@ namespace BIMaestro.Codex
                         throw new InvalidOperationException("Position, pas ou section incorrects pour la barre " + (index + 1) + " du réseau « " + spec.Name + " ».");
                     volume *= spec.Max[axis].Value(values) - spec.Min[axis].Value(values);
                 }
-                using (var geometry = members[index].get_Geometry(new Options { IncludeNonVisibleObjects = true }))
+                using (var geometry = MeasurableGeometry(members[index]))
                 {
                     if (Math.Abs(Volume(geometry) * Math.Pow(304.8, 3) - volume) > Math.Max(1, volume * 0.001)) throw new InvalidOperationException("Volume incorrect dans le réseau « " + spec.Name + " ».");
                     if (spec.RotationAxis >= 0) CodexAngularBarBuilder.CheckNormals(geometry, spec.RotationAxis, spec.Angle(values));
                 }
             }
         }
-        private static double Volume(GeometryElement geometry)
+        internal static double Volume(GeometryElement geometry)
         {
             double result = 0;
             foreach (var item in geometry)
@@ -241,7 +261,7 @@ namespace BIMaestro.Codex
         }
         internal static BoundingBoxXYZ SolidBounds(Element element)
         {
-            using (var geometry = element.get_Geometry(new Options { IncludeNonVisibleObjects = true }))
+            using (var geometry = MeasurableGeometry(element))
             {
                 var points = SolidPoints(geometry).ToArray();
                 if (points.Length == 0) throw new InvalidOperationException("La barre imbriquée ne contient aucun solide mesurable.");
@@ -259,6 +279,16 @@ namespace BIMaestro.Codex
                 }
                 else if (item is GeometryInstance instance)
                     using (var nested = instance.GetInstanceGeometry()) foreach (var point in SolidPoints(nested)) yield return point;
+        }
+        internal static GeometryElement MeasurableGeometry(Element element)
+        {
+            foreach (var detail in new[] { ViewDetailLevel.Fine, ViewDetailLevel.Medium, ViewDetailLevel.Coarse })
+            {
+                var geometry = element.get_Geometry(new Options { IncludeNonVisibleObjects = true, DetailLevel = detail });
+                if (geometry != null && SolidPoints(geometry).Any()) return geometry;
+                geometry?.Dispose();
+            }
+            throw new InvalidOperationException("La barre imbriquée ne contient aucun solide mesurable aux niveaux fin, moyen ou faible.");
         }
         private static XYZ Basis(int axis) => axis == 0 ? XYZ.BasisX : axis == 1 ? XYZ.BasisY : XYZ.BasisZ;
     }

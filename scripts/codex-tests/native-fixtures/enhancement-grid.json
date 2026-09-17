@@ -1,0 +1,239 @@
+{
+  "name": "Enhancement_Grid",
+  "category": "electrical",
+  "assumptions": [
+    "Scénario de test, dimensions de module illustratives et non référence fabricant."
+  ],
+  "materials": [
+    {
+      "name": "Aluminium",
+      "rgb": [
+        100,
+        100,
+        110
+      ],
+      "transparency": 0
+    },
+    {
+      "name": "Verre",
+      "rgb": [
+        150,
+        190,
+        210
+      ],
+      "transparency": 60
+    },
+    {
+      "name": "PV",
+      "rgb": [
+        20,
+        30,
+        60
+      ],
+      "transparency": 0
+    }
+  ],
+  "hosting": "free",
+  "parameters": [],
+  "angles": [],
+  "parts": [],
+  "arrays": [],
+  "load_into_project": false,
+  "place_at_origin": false,
+  "family_options": {
+    "parameters": [
+      {
+        "name": "LargeurChamp",
+        "kind": "length",
+        "instance": false,
+        "value": 10000,
+        "test_values": [
+          999,
+          1000
+        ],
+        "formula": "",
+        "group": "geometry",
+        "description": "Test natif",
+        "shared_guid": ""
+      },
+      {
+        "name": "HauteurChamp",
+        "kind": "length",
+        "instance": false,
+        "value": 5000,
+        "test_values": [
+          1999,
+          2000
+        ],
+        "formula": "",
+        "group": "geometry",
+        "description": "Test natif",
+        "shared_guid": ""
+      }
+    ],
+    "types": [
+      {
+        "name": "Standard",
+        "values": []
+      }
+    ],
+    "representations": []
+  },
+  "component_grids": [
+    {
+      "name": "Panneaux",
+      "columns_parameter": "NombreColonnes",
+      "rows_parameter": "NombreRangees",
+      "axis_u": "x",
+      "axis_v": "z",
+      "module_size_mm": [
+        1000,
+        35,
+        2000
+      ],
+      "gap_uv_mm": [
+        20,
+        20
+      ],
+      "extent_u": {
+        "offset_mm": 0,
+        "terms": [
+          {
+            "parameter": "LargeurChamp",
+            "factor": 1
+          }
+        ]
+      },
+      "extent_v": {
+        "offset_mm": 0,
+        "terms": [
+          {
+            "parameter": "HauteurChamp",
+            "factor": 1
+          }
+        ]
+      },
+      "components": [
+        {
+          "name": "LOD100",
+          "material": "PV",
+          "minimum_mm": [
+            0,
+            0,
+            0
+          ],
+          "maximum_mm": [
+            1000,
+            35,
+            2000
+          ],
+          "coarse": true,
+          "medium": false,
+          "fine": false
+        },
+        {
+          "name": "CadreGauche",
+          "material": "Aluminium",
+          "minimum_mm": [
+            0,
+            0,
+            0
+          ],
+          "maximum_mm": [
+            20,
+            35,
+            2000
+          ],
+          "coarse": false,
+          "medium": true,
+          "fine": true
+        },
+        {
+          "name": "CadreDroit",
+          "material": "Aluminium",
+          "minimum_mm": [
+            980,
+            0,
+            0
+          ],
+          "maximum_mm": [
+            1000,
+            35,
+            2000
+          ],
+          "coarse": false,
+          "medium": true,
+          "fine": true
+        },
+        {
+          "name": "CadreBas",
+          "material": "Aluminium",
+          "minimum_mm": [
+            20,
+            0,
+            0
+          ],
+          "maximum_mm": [
+            980,
+            35,
+            20
+          ],
+          "coarse": false,
+          "medium": true,
+          "fine": true
+        },
+        {
+          "name": "CadreHaut",
+          "material": "Aluminium",
+          "minimum_mm": [
+            20,
+            0,
+            1980
+          ],
+          "maximum_mm": [
+            980,
+            35,
+            2000
+          ],
+          "coarse": false,
+          "medium": true,
+          "fine": true
+        },
+        {
+          "name": "Vitrage",
+          "material": "Verre",
+          "minimum_mm": [
+            20,
+            28,
+            20
+          ],
+          "maximum_mm": [
+            980,
+            31,
+            1980
+          ],
+          "coarse": false,
+          "medium": true,
+          "fine": true
+        },
+        {
+          "name": "Cellules",
+          "material": "PV",
+          "minimum_mm": [
+            20,
+            25,
+            20
+          ],
+          "maximum_mm": [
+            980,
+            28,
+            1980
+          ],
+          "coarse": false,
+          "medium": true,
+          "fine": true
+        }
+      ]
+    }
+  ]
+}

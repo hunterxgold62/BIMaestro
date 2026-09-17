@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.IO;
@@ -20,7 +20,7 @@ namespace BIMaestro.Codex
                 var assembly = Assembly.GetExecutingAssembly();
                 File.WriteAllText(path, JsonConvert.SerializeObject(new { utc = DateTime.UtcNow, tool,
                     build_id = assembly.ManifestModule.ModuleVersionId, runtime = Environment.Version.ToString(),
-                    arguments, error = error.ToString() }, Formatting.Indented), new UTF8Encoding(false));
+                    arguments, context = error.Data, error = error.ToString() }, Formatting.Indented), new UTF8Encoding(false));
                 return path;
             }
             catch { return null; } // Diagnostics must never hide the original operation failure.

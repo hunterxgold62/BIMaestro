@@ -1,4 +1,4 @@
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
@@ -21,6 +21,7 @@ namespace BIMaestro.Codex
         private CodexClient client;
         private string threadId, turnId;
         private bool ready, busy, connecting, closed;
+        private int activeRevitCalls;
         private readonly List<CodexImageAttachment> attachments = new List<CodexImageAttachment>();
         private readonly HashSet<string> handledToolCalls = new HashSet<string>();
         private readonly WrapPanel attachmentPanel = new WrapPanel();
@@ -52,6 +53,7 @@ namespace BIMaestro.Codex
         internal CodexWindow(CodexRevitBridge bridge, ResourceDictionary theme = null)
         {
             this.bridge = bridge;
+            bridge.CreationProgress += message => { if (!closed) status.Text = message; };
             Title = "BIMaestro — Codex (bêta)";
             Width = 720; Height = 900; MinWidth = 640; MinHeight = 720;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -216,7 +218,7 @@ namespace BIMaestro.Codex
             middle.Children.Add(settingsScroll);
             var discussionCard = Card(conversation); discussionCard.Margin = new Thickness(0); Grid.SetRow(discussionCard, 1); middle.Children.Add(discussionCard);
             layout.Children.Add(middle);
-            Append("BIMaestro", "Décrivez l'objet à créer ou joignez jusqu'à trois images. Précisez son usage et les dimensions connues.\n\nPour une famille paramétrique, indiquez ce qui doit varier : dimensions, espacement, nombre d'éléments, matériaux… Si un point important manque, Codex vous posera quelques questions avant la création.\n\nSelon le besoin : géométrie détaillée, extrusions rectangulaires contraintes ou réseaux d'éléments répétés. Le résultat est enregistré dans un nouveau RFA avec ses aperçus. Inclinaison paramétrique disponible pour les éléments rectangulaires en réseau, de 1 à 89 degrés. Connecteurs MEP disponibles sur des faces identifiées.");
+            Append("BIMaestro", "Décrivez l'objet à créer ou joignez jusqu'à trois images. Précisez son usage et les dimensions connues.\n\nPour une famille paramétrique, indiquez ce qui doit varier : dimensions, espacement, nombre d'éléments, matériaux… Si un point important manque, Codex vous posera quelques questions avant la création.\n\nSelon le besoin : géométrie détaillée, extrusions rectangulaires contraintes ou réseaux d'éléments répétés. Le résultat est enregistré dans un nouveau RFA avec ses aperçus. Inclinaison paramétrique disponible pour les éléments rectangulaires en réseau, de 0 à 180 degrés. Connecteurs MEP disponibles sur des faces identifiées.");
 
             browse.Click += (_, __) =>
             {
@@ -289,6 +291,9 @@ namespace BIMaestro.Codex
             changes.Unchecked += (_, __) => { bridge.AllowChanges = false; direct.IsChecked = false; UpdateControls(); };
             direct.Checked += (_, __) => { bridge.ApplyDirectly = true; Append("BIMaestro", "Mode direct activé : opérations, création de nouveaux RFA et chargement selon votre demande, sans confirmation supplémentaire. Ctrl+Z annule les changements dans le document, mais ne supprime pas les fichiers créés."); };
             direct.Unchecked += (_, __) => bridge.ApplyDirectly = false;
+            context.IsChecked = true;
+            changes.IsChecked = true;
+            direct.IsChecked = true;
             Closed += (_, __) => { closed = true; bridge.Dispose(); client?.Dispose(); };
             UpdateControls();
         }
@@ -441,14 +446,19 @@ namespace BIMaestro.Codex
                             "Commence toute conception de famille en lisant revit_capabilities. Avant une première description paramétrique, lis revit_family_contract pour obtenir le schéma exact. Après une erreur de format, relis ce contrat et corrige tous les champs concernés ensemble, sans essais successifs au hasard. Base tes annonces sur ce retour, pas sur une limitation mémorisée. " +
                             "Pour une famille V1, utilise family_options : paramètres typés length/angle/integer/number/yesno/text, formules, portée instance ou type, types nommés et representations par composant. Enrichis un paramètre de longueur existant avec son même nom pour choisir sa portée ; ne le duplique pas. Les valeurs sont en mm et degrés, les formules utilisent des littéraux mm ou deg. Pour une visibilité automatique, crée un yesno avec une formule puis associe visible_parameter au composant. Choisis coarse/medium/fine et les vues selon l'usage. Une pièce invisible doit rester valide : ne la réduis pas à zéro pour la masquer. Prévois des tests juste avant, au seuil et après, et des cas combinés. Les GUID partagés doivent venir de l'utilisateur ou de son standard ; ne les invente pas. " +
                             "Avant de modifier une famille existante, lis revit_family_parameters : c'est l'état réel des valeurs, types et formules. revit_set_family_parameters applique plusieurs réglages existants dans un seul lot. Explique ce qui est modifiable après livraison et ce qui reste fixe. " +
-                            "Utilise uniquement les outils Revit fournis pour consulter ou agir dans Revit. " +
+                            "Utilise uniquement les outils Revit fournis pour consulter ou agir dans Revit. Les créations avancent par étapes dans Revit. Un appel en attente ne prouve pas qu'une boîte de dialogue est ouverte : annonce seulement l'attente, sans relancer la création ni confirmer l'enregistrement avant le résultat. Si une protection de durée, mémoire ou complexité intervient, simplifie les contraintes avant une nouvelle tentative ; ne répète pas le même descriptif. Pour les détails décoratifs polygonaux, privilégie des coordonnées fixes si leur redimensionnement n'est pas demandé. " +
                             "Pour créer une NOUVELLE famille depuis du texte ou des images, utilise revit_create_family pour une géométrie fixe riche, ou revit_create_parametric_family quand l'utilisateur demande des paramètres qui redimensionnent la géométrie. Analyse les proportions, matériaux et sous-ensembles, puis construis une description détaillée. " +
                             "La création est généraliste : grilles, mobilier, supports, équipements, garde-corps, etc. Une grille n'est qu'un exemple, jamais un modèle imposé aux autres demandes. Commence par comprendre l'usage de l'objet et son comportement attendu. Choisis ensuite les outils adaptés parmi ceux disponibles ; ne ramène pas chaque objet à une succession de blocs ou à un réseau. " +
+                            "Avant de créer une famille, distingue trois choix : sa catégorie métier, son hébergement et la découpe éventuelle de son hôte. Déduis ce qui est explicite et pose une question groupée si cela reste ambigu : famille indépendante, hébergée sur sol/mur/plafond, basée sur face ou plan de travail ; doit-elle percer cet hôte ? Un meuble posé au sol n'exige pas forcément un hébergement sol ; demande ce comportement s'il n'est pas précisé. Annonce la catégorie et l'hébergement retenus avant création. " +
+                            "Ne choisis pas generic par commodité : un meuble relève de furniture, une porte de door, une vanne de pipe_accessory, un raccord de canalisation de pipe_fitting, selon l'usage réel. Le nom Modèle générique du gabarit n'impose pas la catégorie finale. Si la catégorie adaptée n'est pas exposée, explique la limite et demande une alternative au lieu de la remplacer silencieusement. Pour corriger la catégorie d'une famille ouverte, lis revit_family_parameters puis utilise revit_set_family_category ; ce changement ne convertit pas son hébergement. " +
+                            "Avant toute famille, appelle revit_family_template_info avec l’hébergement résolu pour lire les paramètres intégrés ; pour mur ou sol : utilise ses faces réelles, jamais une épaisseur supposée de 150 mm ni un décalage fixe de 75 mm. Pour un mur parallèle à X, une applique sur +Y commence à maximum_y_mm ; sur -Y elle se termine à minimum_y_mm. Les portes/fenêtres peuvent traverser le mur et demandent une conception différente. Pour une applique qui doit suivre la face de murs de toute épaisseur, privilégie hosting=face ; un simple décalage calculé dans le gabarit wall ne constitue pas une liaison dynamique à cette face. Lis aussi les paramètres intégrés : leur portée ne peut pas être convertie ; choisis par exemple HauteurReglable si Hauteur intégrée est incompatible. " +
+                            "Pour répéter un panneau complet en deux directions, utilise component_grids : composants du module (cadre, vitrage, cellules), matériaux et niveaux coarse/medium/fine, dimensions du module fixes, étendues u/v paramétriques et jeux. La grille calcule ses nombres de colonnes et rangées sans déformer les panneaux ; ce ne sont pas de simples barres. Les cases 0/1 conservent des géométries masquées pour Revit 2023. Demande la référence fabricant si les dimensions exactes ne sont pas fournies ; ne prétends pas qu'une dimension est universelle. " +
+                            "Pour les sols, host_opening crée actuellement un vide NON ATTACHÉ : le sol du gabarit n'est pas découpé dans l'éditeur de familles. La découpe doit être appliquée après placement par revit_cut_floor_with_family ou Couper la géométrie. Ne présente pas cette solution comme une découpe automatique du sol dans la famille ou à la pose. Si cette automatisation est indispensable, expose la limite de cette méthode et demande si l'étape de découpe dans le projet convient. Distingue absence d'outil et restriction d'une méthode API ; n'affirme pas qu'une autorisation débloquerait une capacité absente. " +
                             "Si des choix importants restent ambigus, pose dans le tchat 1 à 3 questions ciblées regroupées, puis attends la réponse avant la création concernée. Questions possibles selon le besoin : quelles dimensions sont connues et lesquelles doivent varier ; quels éléments se répètent, avec un pas fixe, un nombre fixe ou une répartition ajustée ; quels détails, matériaux, catégorie et placement sont nécessaires. Utilise d'abord ce que l'utilisateur a déjà donné et le contexte autorisé. Ne repose pas des questions déjà résolues et ne fais pas un questionnaire systématique. Une demande complète doit avancer directement. " +
                             "Distingue les réglages utilisateur, les constantes et les valeurs calculées. Par exemple un nombre piloté par une longueur et un pas est un résultat calculé. Pour un besoin suffisamment défini, annonce brièvement la construction retenue et les hypothèses matérielles avant l'outil, sans demander une validation supplémentaire. Si un comportement indispensable n'est pas disponible (loft paramétrique, profil courbe...), expose cette limite et pose une question sur une alternative concrète avant de dégrader silencieusement le résultat. Le mot adaptatif peut simplement désigner un objet qui se redimensionne ; ne promets pas de composants adaptatifs Revit à points de placement, qui ne sont pas exposés ici. " +
                             "Le mode paramétrique crée de vraies extrusions rectangulaires natives avec des ouvertures rectangulaires, des plans, cotes libellées, alignements et paramètres de longueur de type ou d'occurrence. Choisis des paramètres pertinents pour l'objet, des coordonnées minimum/maximum exprimées en fractions de ces paramètres et des décalages fixes pour les épaisseurs constantes. Choisis des valeurs de test significatives ; l'outil vérifie les formes et restaure les valeurs initiales. Ne dis plus que tu ne peux créer aucun paramètre de famille. " +
                             "Pour des barres ou lames rectangulaires répétées, utilise arrays de revit_create_parametric_family : une barre imbriquée et un réseau natif dont le nombre entier est rounddown(span/pitch). 500 mm utiles avec un pas de 50 mm donnent 10 barres ; 600 donnent 12. Le pas est entre origines, pas le vide entre barres. Déduis le cadre de span et prévois les marges dans minimum/maximum de la première barre. Choisis des tests qui modifient le nombre, En V1, family_options permet 0 à 200 éléments visibles : les cas 0/1 utilisent des géométries cachées compatibles 2023+. Pour un nombre imposé, quantity_parameter référence un entier défini dans family_options. Pour une pièce inclinable isolée, utiliser un nombre constant de 1. Ne remplace pas un réseau demandé par une liste de pièces fixes. " +
-                            "Garde peu de paramètres utilisateur pertinents (dimensions, pas, section, matériaux). Les épaisseurs fixes peuvent rester constantes. Le moteur simplifie et partage les calculs, sans paramètre pour chaque constante ; ne présente pas les BIM_Calcul internes comme des réglages utilisateur. Pour des barres inclinables en réseau, déclare angles puis rotation dans le réseau : axe x/y/z et angle_parameter, de 1 à 89 degrés. Les dimensions minimum/maximum décrivent la barre AVANT rotation, autour du coin minimum. Prévois le dégagement réel après rotation et un test d'angle différent. Les dimensions, le nombre et l'angle peuvent varier ensemble. Pour modifier ensuite un angle existant, lis familyAngles avec revit_context puis utilise revit_set_family_angle. " +
+                            "Garde peu de paramètres utilisateur pertinents (dimensions, pas, section, matériaux). Les épaisseurs fixes peuvent rester constantes. Le moteur simplifie et partage les calculs, sans paramètre pour chaque constante ; ne présente pas les BIM_Calcul internes comme des réglages utilisateur. Pour des barres inclinables en réseau, déclare angles puis rotation dans le réseau : axe x/y/z et angle_parameter, de 0 à 180 degrés. Les dimensions minimum/maximum décrivent la barre AVANT rotation, autour du coin minimum. Prévois le dégagement réel après rotation et un test d'angle différent. Les dimensions, le nombre et l'angle peuvent varier ensemble. Pour modifier ensuite un angle existant, lis familyAngles avec revit_context puis utilise revit_set_family_angle. " +
                             "Pour rendre paramétrique une ancienne composition en FreeFormElement, relis son descriptif et reconstruis les pièces compatibles en extrusions avec expressions ; ajouter une cote seule ne convertit pas automatiquement tous les solides. Les rotations paramétriques sont disponibles pour les barres de arrays ; les pièces parts acceptent des profils polygonaux paramétriques avec profile_uv. Les lofts paramétriques restent indisponibles : explique précisément ces limites, conserve le mode géométrique riche quand elles sont nécessaires et n'annonce pas une flexibilité qui n'est pas construite. " +
                             "Utilise répétitions pour les ailettes et boulons, tubes pour les pièces creuses, révolutions pour les isolateurs et rotations pour les cuves horizontales. " +
                             "Ne te limite pas à empiler des blocs. Utilise loft et sections_mm pour les transitions et tôles inclinées à contour variable, avec des évidements réels pour les ouvertures. Pour une grille ou un diffuseur, distingue le cadre extérieur, les fentes périphériques, le plastron, les ailettes inclinées séparées par de l'air et le centre. Une suite de cadres plats pleins n'est pas équivalente. Ne reproduis pas une marque ou un filigrane présent sur la photo. " +
@@ -525,9 +535,14 @@ namespace BIMaestro.Codex
             }
             if (method == "turn/completed")
             {
-                bridge.CancelPending(); busy = false; turnId = null;
                 string state = (string)turn?["status"];
-                status.Text = state == "completed" ? "Prêt" : state == "interrupted" ? "Réponse arrêtée" : "La réponse a échoué.";
+                string completedId = (string)turn?["id"];
+                if (completedId != null && completedId != turnId) return;
+                // A normal model completion does not revoke an already accepted Revit operation.
+                if (state != "completed") bridge.CancelPending("fin du tour Codex : " + state);
+                turnId = null;
+                busy = activeRevitCalls > 0;
+                status.Text = busy ? "Revit termine l’opération en cours…" : state == "completed" ? "Prêt" : state == "interrupted" ? "Réponse arrêtée" : "La réponse a échoué.";
                 // JSON null is a non-null JValue. ?. alone does not protect its indexer.
                 string error = (string)(turn?["error"] as JObject)?["message"];
                 if (!string.IsNullOrEmpty(error)) Append("Codex", error);
@@ -542,14 +557,17 @@ namespace BIMaestro.Codex
             if (method == "item/tool/call")
             {
                 if (data.Value<string>("callId") is string callId) handledToolCalls.Add(callId);
+                bool accepted = false;
                 try
                 {
                     if (!busy || (string)data["threadId"] != threadId || turnId == null || (string)data["turnId"] != turnId)
                         throw new InvalidOperationException("La demande ne correspond pas à la réponse active.");
                     if (!(data["arguments"] is JObject args)) throw new InvalidOperationException("Arguments Revit invalides.");
                     string tool = (string)data["tool"];
+                    activeRevitCalls++; accepted = true;
                     status.Text = "Opération Revit en attente…";
                     object result = await bridge.CallAsync(tool, args);
+                    if (turnId == null) status.Text = "Opération Revit terminée";
                     documentLabel.Text = "Document : " + bridge.DocumentTitle;
                     if (result is CodexFamilyArtifact artifact)
                     {
@@ -584,6 +602,15 @@ namespace BIMaestro.Codex
                         instruction = "Expliquer cette erreur exacte. Ne pas inventer de cause ni annoncer de résultat. Un refus utilisateur ne doit pas être contourné." });
                     return new { success = false, contentItems = new[] { new { type = "inputText", text = detail } } };
                 }
+                finally
+                {
+                    if (accepted) activeRevitCalls--;
+                    if (!closed && origin == client && turnId == null)
+                    {
+                        busy = activeRevitCalls > 0;
+                        UpdateControls();
+                    }
+                }
             }
             // No execution of arbitrary code and no generic approval grants in this beta.
             if (method == "item/commandExecution/requestApproval" || method == "item/fileChange/requestApproval")
@@ -597,7 +624,7 @@ namespace BIMaestro.Codex
             try
             {
                 if (turnId != null) await client.RequestAsync("turn/interrupt", new { threadId, turnId });
-                else DisconnectLocal();
+                else if (activeRevitCalls == 0) DisconnectLocal();
             }
             catch (Exception ex) { Error(ex); DisconnectLocal(); }
         }

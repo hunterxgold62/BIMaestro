@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -6,6 +6,15 @@ namespace BIMaestro.Codex
 {
     internal static class CodexProfileDesign
     {
+        internal static void ValidateConstraintBudget(IEnumerable<ParametricPart> parts)
+        {
+            var driven = parts.Where(p => p.Profile != null && p.Profile.Any(v => v.Any(e => e.Terms.Count != 0))).ToArray();
+            var large = driven.FirstOrDefault(p => p.Profile.Length > 24);
+            if (large != null || driven.Sum(p => p.Profile.Length) > 96)
+                throw new InvalidOperationException("Profil paramétrique trop complexe pour une création interactive stable : maximum 24 sommets par profil piloté et 96 au total. " +
+                    "Conserver les détails décoratifs en profils fixes (terms=[]), simplifier les contours ou utiliser une famille géométrique fixe. Ne pas relancer le même descriptif." +
+                    (large == null ? "" : " Pièce : " + large.Name));
+        }
         internal static double Area(double[][] p) => Math.Abs(p.Select((v, i) => v[0] * p[(i + 1) % p.Length][1] - v[1] * p[(i + 1) % p.Length][0]).Sum()) / 2;
         private static double Cross(double[] a, double[] b, double[] p) => (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]);
         private static bool On(double[] a, double[] b, double[] p) => Math.Abs(Cross(a, b, p)) < 1e-6 && p[0] >= Math.Min(a[0], b[0]) - 1e-6 && p[0] <= Math.Max(a[0], b[0]) + 1e-6 && p[1] >= Math.Min(a[1], b[1]) - 1e-6 && p[1] <= Math.Max(a[1], b[1]) + 1e-6;

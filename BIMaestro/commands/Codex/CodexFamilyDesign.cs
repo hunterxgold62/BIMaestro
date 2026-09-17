@@ -20,6 +20,11 @@ namespace BIMaestro.Codex
         internal double[] TargetDimensions;
         internal int SolidCount => Parts.Sum(p => p.Count);
         internal bool Load, Place;
+        internal static readonly string[] Categories = { "generic", "electrical", "mechanical", "furniture", "plumbing", "air_terminal", "lighting", "door", "window", "planting", "pipe_accessory", "pipe_fitting", "duct_accessory", "duct_fitting" };
+
+        internal static JObject CategorySchema() => new JObject {
+            ["type"] = "string", ["enum"] = new JArray(Categories),
+            ["description"] = "Catégorie métier réelle, distincte du gabarit et de l'hébergement : door=Portes, window=Fenêtres, furniture=Mobilier, plumbing=Appareils sanitaires, mechanical=Équipements de génie climatique, electrical=Équipement électrique, air_terminal=Bouches d'aération, lighting=Luminaires, planting=Plantes, pipe_accessory=Accessoires de canalisation (vannes...), pipe_fitting=Raccords de canalisation, duct_accessory=Accessoires de gaine, duct_fitting=Raccords de gaine. generic=Modèles génériques uniquement si pertinent ou demandé. Ne pas choisir generic par défaut ni parce que le gabarit s'appelle Modèle générique. Si la catégorie métier est ambiguë, interroger l'utilisateur avant création." };
 
         internal static JObject Tool(bool validateOnly = false)
         {
@@ -37,7 +42,7 @@ namespace BIMaestro.Codex
             geometry["description"] += " loft : relie les sections_mm par des faces continues ; size=[0,0,0], profile_mm=[]. Permet transitions, trémies, ailettes inclinées et formes à sections variables. Un loft évidé par un autre loft crée une coque ajourée ; ne pas remplacer les ouvertures par un bloc sombre.";
             var properties = new JObject
             {
-                ["name"] = Text(90), ["category"] = Enum("generic", "electrical", "mechanical", "furniture", "plumbing", "air_terminal", "lighting", "door", "window", "planting"),
+                ["name"] = Text(90), ["category"] = CategorySchema(),
                 ["hosting"] = HostingSchema(),
                 ["host_opening"] = FamilyHostOpeningSpec.Schema(),
                 ["representation_2d"] = FamilyRepresentationSpec.Schema(),
@@ -78,7 +83,7 @@ namespace BIMaestro.Codex
 
         internal static JObject HostingSchema() => new JObject {
             ["type"] = "string", ["enum"] = new JArray("auto", "free", "face", "wall", "floor", "ceiling", "work_plane"),
-            ["description"] = "Choisir selon l'usage : wall pour un composant fixé à un mur, floor pour un composant hébergé sur sol, ceiling pour plafond, face pour une face quelconque, work_plane pour plan de travail, free pour indépendant. auto choisit wall pour category=door/window, free sinon. Une porte doit utiliser category=door et une fenêtre category=window, jamais generic sauf demande explicite. Les familles hébergées exigent place_at_origin=false ; choisir l'hôte dans le projet après chargement. Pour une porte/fenêtre murale, fournir host_opening pour percer réellement le mur ; les évidements des pièces ne coupent pas l'hôte." };
+            ["description"] = "Choisir selon l'usage : wall pour un composant fixé à un mur, floor pour un composant hébergé sur sol, ceiling pour plafond, face pour une face quelconque, work_plane pour plan de travail, free pour indépendant. auto choisit wall pour category=door/window, free sinon. Une porte doit utiliser category=door et une fenêtre category=window, jamais generic sauf demande explicite. Les familles hébergées exigent place_at_origin=false ; choisir l'hôte dans le projet après chargement. Pour une porte/fenêtre murale, fournir host_opening min_xz/max_xz pour percer le mur. Pour découper un sol, fournir host_opening min_xyz/max_xyz puis appliquer revit_cut_floor_with_family après placement ; les évidements des pièces ne coupent pas l'hôte." };
 
         internal static string ResolveHosting(JObject value, string category, bool place)
         {
@@ -99,7 +104,7 @@ namespace BIMaestro.Codex
             if (value?["representation_2d"] != null) keys.Add("representation_2d");
             Keys(value, keys.ToArray());
             var design = new CodexFamilyDesign { Name = String(value, "name", 90), Category = String(value, "category", 20), Source = (JObject)value.DeepClone() };
-            if (!new[] { "generic", "electrical", "mechanical", "furniture", "plumbing", "air_terminal", "lighting", "door", "window", "planting" }.Contains(design.Category)) throw new InvalidOperationException("Catégorie de famille non prise en charge.");
+            if (!Categories.Contains(design.Category)) throw new InvalidOperationException("Catégorie de famille non prise en charge.");
             design.TargetDimensions = Vector(value["target_dimensions_mm"], "target_dimensions_mm", 3, 0);
             if (value["load_into_project"].Type != JTokenType.Boolean || value["place_at_origin"].Type != JTokenType.Boolean) throw new InvalidOperationException("Options de chargement invalides.");
             design.Load = value.Value<bool>("load_into_project"); design.Place = value.Value<bool>("place_at_origin");

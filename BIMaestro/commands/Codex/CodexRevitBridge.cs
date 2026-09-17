@@ -1,4 +1,4 @@
-using Autodesk.Revit.DB;
+﻿using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Newtonsoft.Json.Linq;
 using System;
@@ -20,6 +20,12 @@ namespace BIMaestro.Codex
         private Func<UIApplication, object> operation;
         private TaskCompletionSource<object> pending;
         private bool disposed;
+        private IEnumerator<CodexFamilyArtifact> creation;
+        private bool cancelCreation;
+        private string cancellationReason;
+        private UIApplication creationApplication;
+        internal event Action<string> CreationProgress;
+        private int creationStep;
         internal bool ShareContext { get; set; }
         internal bool AllowChanges { get; set; }
         internal bool ApplyDirectly { get; set; }
@@ -36,6 +42,7 @@ namespace BIMaestro.Codex
         internal static JArray ToolDefinitions()
         {
             var catalog = new JArray(
+            Tool("revit_family_template_info", "Lit dans un gabarit temporaire les épaisseurs et faces réelles des hôtes et les paramètres intégrés. À appeler avant une famille mur/sol : coordonnées en mm, sans présumer un mur de 150 mm. Ne modifie pas le projet.", new JObject { ["hosting"]=new JObject { ["type"]="string", ["enum"]=new JArray("free","wall","floor","ceiling","face","work_plane") } }),
             CodexFamilyDesign.Tool(),
             CodexFamilyDesign.Tool(true),
             CodexParametricDesign.Tool(),
@@ -80,8 +87,8 @@ namespace BIMaestro.Codex
             properties.Remove("wall_type_id"); properties["width_mm"] = Number("Épaisseur de la muraille", 10, 10000);
             barrier["inputSchema"]["required"] = new JArray(properties.Properties().Select(p => p.Name));
             catalog.Add(barrier); catalog.Add(CodexFamilyDesign.ProjectTool());
-            catalog.Add(Tool("revit_set_family_angle", "Modifie un paramètre d'angle existant et modifiable du type courant dans la famille ouverte, entre 1 et 89 degrés. Pour les inclinaisons créées par BIMaestro. Une transaction annulable, sans sauvegarde automatique.", new JObject {
-                ["name"] = new JObject { ["type"] = "string", ["maxLength"] = 200 }, ["value_deg"] = Number("Angle en degrés", 1, 89) }));
+            catalog.Add(Tool("revit_set_family_angle", "Modifie un paramètre d'angle existant et modifiable du type courant dans la famille ouverte, entre 0 et 180 degrés. Pour les inclinaisons créées par BIMaestro. Une transaction annulable, sans sauvegarde automatique.", new JObject {
+                ["name"] = new JObject { ["type"] = "string", ["maxLength"] = 200 }, ["value_deg"] = Number("Angle en degrés", 0, 180) }));
             foreach (var tool in CodexFamilyTools.Definitions()) catalog.Add(tool);
             return catalog;
         }
@@ -148,16 +155,65 @@ namespace BIMaestro.Codex
         {
             var completion = pending;
             var action = operation;
-            pending = null;
             operation = null;
             if (disposed || completion == null || action == null) return;
-            try { completion.TrySetResult(action(app)); }
-            catch (Exception ex) { completion.TrySetException(ex); }
+            try
+            {
+                var result = action(app);
+                if (result is IEnumerable<CodexFamilyArtifact> steps)
+                {
+                    creation = steps.GetEnumerator();
+                    creationApplication = app;
+                    cancelCreation = false;
+                    creationStep = 0;
+                    app.Idling += ContinueCreation;
+                    return;
+                }
+                pending = null;
+                completion.TrySetResult(result);
+            }
+            catch (Exception ex) { pending = null; completion.TrySetException(ex); }
         }
 
-        internal void CancelPending()
+        private void ContinueCreation(object sender, Autodesk.Revit.UI.Events.IdlingEventArgs args)
+        {
+            var completion = pending;
+            CodexFamilyArtifact result = null;
+            Exception failure = null;
+            bool finished = false;
+            try
+            {
+                if (disposed || cancelCreation || !ShareContext || !AllowChanges)
+                    throw new OperationCanceledException("Création arrêtée entre deux étapes : " + (disposed ? "panneau fermé" : !ShareContext ? "partage du contexte désactivé" : !AllowChanges ? "modifications désactivées" : cancellationReason ?? "annulation demandée") + ". Aucun RFA partiel n'a été enregistré.");
+                if (document != null && (!document.IsValidObject || !document.Equals(creationApplication.ActiveUIDocument?.Document)))
+                    throw new InvalidOperationException("Le document actif a changé. Création arrêtée avant l'étape suivante.");
+                CreationProgress?.Invoke("Création Revit — étape " + (++creationStep));
+                if (!creation.MoveNext()) throw new InvalidOperationException("Création terminée sans résultat.");
+                result = creation.Current;
+                finished = result != null;
+                // Return to Revit with every transaction closed. The next Idling
+                // callback continues the same temporary family, without rebuilding.
+            }
+            catch (Exception ex) { failure = ex; finished = true; }
+            if (!finished) { args.SetRaiseWithoutDelay(); return; }
+            creationApplication.Idling -= ContinueCreation;
+            try { creation.Dispose(); }
+            catch (Exception ex) { if (failure == null) failure = ex; }
+            creation = null;
+            creationApplication = null;
+            pending = null;
+            if (failure != null) completion?.TrySetException(failure);
+            else
+            {
+                if (result.FilePath != null) lastCreated = result;
+                completion?.TrySetResult(result);
+            }
+        }
+
+        internal void CancelPending(string reason = "annulation demandée")
         {
             operation = null;
+            if (creation != null) { cancellationReason = reason; cancelCreation = true; return; }
             pending?.TrySetCanceled();
             pending = null;
         }
@@ -174,6 +230,7 @@ namespace BIMaestro.Codex
                 return CodexNativeValidation.Run(app);
             }
             if (!ShareContext) throw new InvalidOperationException("Le partage du contexte Revit est désactivé par l'utilisateur.");
+            if (tool == "revit_family_template_info") { RequireKeys(args,"hosting"); return CodexFamilyBuilder.TemplateInfo(app,CodexFamilyDesign.String(args,"hosting",20)); }
             var activeDocument = app.ActiveUIDocument?.Document;
             if (tool == "revit_create_parametric_family" || tool == "revit_validate_parametric_family")
             {
@@ -181,12 +238,11 @@ namespace BIMaestro.Codex
                 if (document != null && (!document.IsValidObject || activeDocument == null || !document.Equals(activeDocument)))
                     throw new InvalidOperationException("Le document attaché au panneau n'est plus actif. Revenez à ce document ou rouvrez le panneau.");
                 var design = CodexParametricDesign.Parse(args);
-                if (tool == "revit_validate_parametric_family") return CodexFamilyBuilder.Create(app, document, design.Metadata, true, design);
+                if (tool == "revit_validate_parametric_family") return CodexFamilyBuilder.CreateSteps(app, document, design.Metadata, true, design);
                 if (!Confirm("Créer une famille paramétrique « " + design.Metadata.Name + " »",
                     $"{design.Parts.Count} extrusions et {design.Arrays.Count} réseaux natifs ({design.SolidCount} solides au total).\nParamètres dimensionnels : {string.Join(", ", design.Parameters.Select(p => p.Name).Concat(design.Angles.Select(p => p.Name + " = " + p.Value + "°")))}.\nTests de dimensions, de nombre, de visibilité, de formules et d'angle puis restauration des valeurs initiales avant enregistrement dans un nouveau RFA.\nChargement : {design.Metadata.Load}. Placement à l'origine : {design.Metadata.Place}."))
                     throw new InvalidOperationException("Création refusée par l'utilisateur. Ne pas réessayer sans nouvelle demande.");
-                lastCreated = CodexFamilyBuilder.Create(app, document, design.Metadata, false, design);
-                return lastCreated;
+                return CodexFamilyBuilder.CreateSteps(app, document, design.Metadata, false, design);
             }
             if (tool == "revit_create_family" || tool == "revit_validate_family")
             {
@@ -194,11 +250,10 @@ namespace BIMaestro.Codex
                 if (document != null && (!document.IsValidObject || activeDocument == null || !document.Equals(activeDocument)))
                     throw new InvalidOperationException("Le document attaché au panneau n'est plus actif. Revenez à ce document ou rouvrez le panneau.");
                 var design = CodexFamilyDesign.Parse(args);
-                if (tool == "revit_validate_family") return CodexFamilyBuilder.Create(app, document, design, true);
+                if (tool == "revit_validate_family") return CodexFamilyBuilder.CreateSteps(app, document, design, true);
                 if (!Confirm("Créer la famille « " + design.Name + " »", $"{design.SolidCount} solides, {design.Materials.Count} matériaux.\nCatégorie : {design.Category}.\nUn nouveau fichier RFA sera enregistré dans le dossier des familles BIMaestro.\nChargement dans le projet : {design.Load}. Placement à l'origine : {design.Place}.\nHypothèses : " + string.Join(" ; ", design.Assumptions)))
                     throw new InvalidOperationException("Création de famille refusée. Ne pas réessayer sans nouvelle demande.");
-                lastCreated = CodexFamilyBuilder.Create(app, document, design);
-                return lastCreated;
+                return CodexFamilyBuilder.CreateSteps(app, document, design);
             }
             // Revit may return another managed wrapper for the same native document.
             if (tool != "revit_open_created_family" && (document == null || !document.IsValidObject || activeDocument == null || !document.Equals(activeDocument)))
@@ -224,8 +279,46 @@ namespace BIMaestro.Codex
             {
                 RequireKeys(args);
                 if (lastCreated == null || !File.Exists(lastCreated.FilePath)) throw new InvalidOperationException("Aucun nouveau RFA à ouvrir dans cette discussion.");
-                var opened = app.OpenAndActivateDocument(lastCreated.FilePath);
-                document = opened.Document; DocumentTitle = document.Title;
+                string path = Path.GetFullPath(lastCreated.FilePath);
+                var existing = app.Application.Documents.Cast<Document>().FirstOrDefault(d => !string.IsNullOrEmpty(d.PathName) && string.Equals(Path.GetFullPath(d.PathName), path, StringComparison.OrdinalIgnoreCase));
+                if (existing != null && existing.Equals(app.ActiveUIDocument?.Document))
+                {
+                    document = existing; DocumentTitle = document.Title;
+                    return new { opened = true, already_active = true, file = path, document = DocumentTitle };
+                }
+                try
+                {
+                    // A saved temporary document can remain open after preview export.
+                    // Never close a document containing unsaved user changes.
+                    if (existing != null)
+                    {
+                        if (existing.IsModified || existing.IsModifiable) throw new InvalidOperationException("Le RFA est déjà ouvert avec des modifications. Activez sa vue existante dans Revit ; aucune fermeture automatique.");
+                        if (!existing.Close(false)) throw new InvalidOperationException("Revit n'a pas fermé le document temporaire enregistré.");
+                    }
+                    var opened = app.OpenAndActivateDocument(path);
+                    document = opened.Document; DocumentTitle = document.Title;
+                }
+                catch (Exception ex)
+                {
+                    var failure = new InvalidOperationException("Échec d'ouverture du RFA enregistré : " + path + ". Le fichier n'a pas été supprimé. " + ex.Message, ex);
+                    failure.Data["operation"] = "open_saved_family";
+                    failure.Data["file"] = path;
+                    failure.Data["file_bytes"] = new FileInfo(path).Length;
+                    failure.Data["already_open"] = existing != null;
+                    failure.Data["active_document"] = app.ActiveUIDocument?.Document?.Title;
+                    failure.Data["revit_version"] = app.Application.VersionNumber;
+                    failure.Data["journal"] = app.Application.RecordingJournalFilename;
+                    var activeAfterError = app.ActiveUIDocument?.Document;
+                    bool targetActive = activeAfterError?.IsValidObject == true && string.Equals(activeAfterError.PathName, path, StringComparison.OrdinalIgnoreCase);
+                    failure.Data["target_active_after_exception"] = targetActive;
+                    if (targetActive)
+                    {
+                        document = activeAfterError; DocumentTitle = document.Title;
+                        string diagnostic = CodexDiagnostics.RecordFailure("revit_open_created_family", new JObject { ["file"] = path }, failure);
+                        return new { opened = true, document = DocumentTitle, file = path, warning = "Le document est actif malgré une exception Revit ou d'un complément lors de l'ouverture.", diagnostic };
+                    }
+                    throw failure;
+                }
                 return new { opened = true, document = DocumentTitle, file = lastCreated.FilePath, previous_document_saved = false };
             }
             if (tool == "revit_create_project_shapes")
@@ -236,6 +329,33 @@ namespace BIMaestro.Codex
                 if (!Confirm("Créer une composition libre « " + design.Name + " »", $"{design.SolidCount} solides, {design.Materials.Count} matériaux.\nObjets DirectShape dans le projet ; pas de famille RFA.\nOrigine interne en mm : {string.Join(", ", origin)}. Rotation : {rotation}°.\nUn Ctrl+Z annule le lot."))
                     throw new InvalidOperationException("Création refusée par l'utilisateur. Ne pas réessayer sans nouvelle demande.");
                 return CodexProjectBuilder.Create(document, design, origin, rotation);
+            }
+            if (tool == "revit_cut_floor_with_family")
+            {
+                RequireKeys(args);
+                if (!AllowChanges) throw new InvalidOperationException("Mode lecture seule : activez les modifications dans le panneau.");
+                if (document.IsFamilyDocument || document.IsReadOnly || document.IsModifiable)
+                    throw new InvalidOperationException("Ouvrez un projet modifiable, hors de toute autre commande.");
+                var selection = app.ActiveUIDocument.Selection.GetElementIds().Select(document.GetElement).ToArray();
+                var floor = selection.OfType<Floor>().FirstOrDefault();
+                var instance = selection.OfType<FamilyInstance>().FirstOrDefault();
+                if (selection.Length != 2 || floor == null || instance == null)
+                    throw new InvalidOperationException("Sélectionner exactement un sol et une instance de famille contenant le vide à appliquer.");
+                if (InstanceVoidCutUtils.InstanceVoidCutExists(floor, instance))
+                    return new { already_cut = true, floor_id = floor.Id.ToString(), instance_id = instance.Id.ToString(), saved = false };
+                if (!Confirm("Découper le sol avec la famille sélectionnée", "Sol : " + floor.Id + ". Famille : " + instance.Symbol.Family.Name +
+                    " (" + instance.Id + "). Tous les vides non attachés de cette instance seront appliqués à ce sol. Un Ctrl+Z annule la découpe."))
+                    throw new InvalidOperationException("Découpe refusée. Ne pas réessayer sans nouvelle demande.");
+                double removed;
+                using (var transaction = NewTransaction("Codex — découpe du sol par la famille"))
+                {
+                    removed = CodexFloorVoidBuilder.Cut(document, floor, instance);
+                    Commit(transaction);
+                }
+                return new { cut = true, floor_id = floor.Id.ToString(), instance_id = instance.Id.ToString(),
+                    removed_volume_m3 = removed * Math.Pow(0.3048, 3), saved = false,
+                    note = "Réduction de volume vérifiée ; une découpe traversante dépend de la profondeur du vide.",
+                    undo = "Un Ctrl+Z annule la découpe." };
             }
             if (tool == "revit_walls_from_floor_edges" || tool == "revit_barrier_from_floor_edges")
             {
@@ -285,11 +405,12 @@ namespace BIMaestro.Codex
                 }
                 finally { foreach (var curve in curves) curve.Dispose(); }
             }
-            if (tool != "revit_family_box" && tool != "revit_set_family_length" && tool != "revit_set_family_angle" && tool != "revit_family_shapes" && tool != "revit_set_family_parameters") throw new InvalidOperationException("Outil Revit inconnu.");
+            if (tool != "revit_family_box" && tool != "revit_set_family_length" && tool != "revit_set_family_angle" && tool != "revit_family_shapes" && tool != "revit_set_family_parameters" && tool != "revit_set_family_category") throw new InvalidOperationException("Outil Revit inconnu.");
             if (!AllowChanges) throw new InvalidOperationException("Mode lecture seule : l'utilisateur doit activer les modifications dans le panneau.");
             if (!document.IsFamilyDocument || document.IsReadOnly || document.IsModifiable)
                 throw new InvalidOperationException("Ouvrez une famille modifiable dans l'éditeur de familles, hors de toute autre commande.");
             if (tool == "revit_set_family_parameters") return CodexFamilyTools.Set(document, args, Confirm, NewTransaction, Commit);
+            if (tool == "revit_set_family_category") return CodexFamilyTools.SetCategory(document, args, Confirm, NewTransaction, Commit);
 
             if (tool == "revit_family_shapes")
             {
@@ -353,7 +474,7 @@ namespace BIMaestro.Codex
             string name = args.Value<string>("name");
             if (string.IsNullOrWhiteSpace(name) || name.Length > 200) throw new InvalidOperationException("Nom de paramètre invalide.");
             double value = ReadNumber(args, valueKey);
-            if (isAngle && (value < 1 || value > 89)) throw new InvalidOperationException("L'inclinaison doit rester entre 1 et 89 degrés.");
+            if (isAngle && (value < 0 || value > 180)) throw new InvalidOperationException("L'inclinaison doit rester entre 0 et 180 degrés.");
             var manager = document.FamilyManager;
             var parameter = manager.Parameters.Cast<FamilyParameter>().FirstOrDefault(p => p.Definition.Name == name);
             if (parameter == null || parameter.IsReadOnly || parameter.IsDeterminedByFormula || parameter.StorageType != StorageType.Double || parameter.Definition.GetDataType() != (isAngle ? SpecTypeId.Angle : SpecTypeId.Length) || manager.CurrentType == null)

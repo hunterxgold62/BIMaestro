@@ -1,4 +1,4 @@
-using Newtonsoft.Json.Linq;
+﻿using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -79,8 +79,8 @@ namespace BIMaestro.Codex
                     Tests = { FamilyValue.Numeric(CodexFamilyDesign.Scalar(p["test_value_mm"], "test_value_mm", 1, 100000), 1) } });
             foreach (var p in (source["angles"] as JArray ?? new JArray()).OfType<JObject>())
                 result.Parameters.Add(new FamilyParameterSpec { Name = (string)p["name"], Kind = "angle", Group = "geometry", Description = "Angle en degrés.",
-                    Value = FamilyValue.Numeric(CodexFamilyDesign.Scalar(p["value_deg"], "value_deg", 1, 89), 0, 1),
-                    Tests = { FamilyValue.Numeric(CodexFamilyDesign.Scalar(p["test_value_deg"], "test_value_deg", 1, 89), 0, 1) } });
+                    Value = FamilyValue.Numeric(CodexFamilyDesign.Scalar(p["value_deg"], "value_deg", 0, 180), 0, 1),
+                    Tests = { FamilyValue.Numeric(CodexFamilyDesign.Scalar(p["test_value_deg"], "test_value_deg", 0, 180), 0, 1) } });
             var declared = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var token in CodexFamilyDesign.Items(options, "parameters", 0, 64))
             {
@@ -128,7 +128,7 @@ namespace BIMaestro.Codex
                 double step = p.Kind == "number" ? 0.001 : 1;
                 var thresholds = p.Kind == "integer" ? new[] { Math.Floor(literal.Number) - 1, Math.Floor(literal.Number), Math.Ceiling(literal.Number), Math.Ceiling(literal.Number) + 1 } : new[] { literal.Number - step, literal.Number, literal.Number + step };
                 foreach (double threshold in thresholds)
-                    if (Math.Abs(threshold) <= 100000 && (p.Kind != "angle" || threshold >= 1 && threshold <= 89) && !p.Tests.Any(v => v.Number == threshold))
+                    if (Math.Abs(threshold) <= 100000 && (p.Kind != "angle" || threshold >= 0 && threshold <= 180) && !p.Tests.Any(v => v.Number == threshold))
                         p.Tests.Add(FamilyValue.Numeric(threshold, literal.LengthPower, literal.AnglePower));
             }
             foreach (var token in CodexFamilyDesign.Items(options, "types", 0, 16))

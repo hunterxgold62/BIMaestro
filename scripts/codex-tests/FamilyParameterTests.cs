@@ -89,6 +89,22 @@ internal static class FamilyParameterTests
         var mep = CodexParametricDesign.Parse(connected);
         if (mep.Connectors.Count != 1 || mep.Symbols.Count != 1) throw new Exception("Missing connector or symbolic outline");
         Reject(connected, s => s["category"] = "furniture", "connector category mismatch");
+        foreach (var category in new[] { "duct_accessory", "duct_fitting", "pipe_accessory", "pipe_fitting" })
+        {
+            var accessory = (JObject)connected.DeepClone(); accessory["category"] = category;
+            bool pipe = category.StartsWith("pipe", StringComparison.Ordinal);
+            if (pipe)
+            {
+                accessory["connectors"][0]["domain"] = "pipe";
+                accessory["connectors"][0]["system"] = "cold_water";
+                accessory["connectors"][0]["shape"] = "round";
+                accessory["connectors"][0]["diameter_parameter"] = "Largeur";
+                accessory["connectors"][0]["width_parameter"] = "";
+                accessory["connectors"][0]["height_parameter"] = "";
+            }
+            if (CodexParametricDesign.Parse(accessory).Connectors.Count != 1) throw new Exception("Missing accessory connector");
+            Reject(accessory, s => s["category"] = pipe ? "duct_accessory" : "pipe_accessory", "mismatched accessory connector domain");
+        }
         Reject(connected, s => s["connectors"][0]["width_parameter"] = "OptionFixations", "connector dimension type");
         Reject(connected, s => s["symbolic_outlines"][0]["plane"] = "unknown", "invalid symbolic plane");
         File.WriteAllText("tmp/codex-tests/parametric-v1-repetition.design.json", repeated.ToString());
@@ -100,6 +116,15 @@ internal static class FamilyParameterTests
             new JArray(part["maximum"][0].DeepClone(), part["minimum"][1].DeepClone()), new JArray(part["maximum"][0].DeepClone(), part["maximum"][1].DeepClone()));
         var poly = CodexParametricDesign.Parse(polygon);
         if (poly.Parts[0].Profile.Length != 3) throw new Exception("Polygon profile missing");
+        var originalProfile = poly.Parts[0].Profile;
+        poly.Parts[0].Profile = Enumerable.Repeat(originalProfile[0], 33).ToArray();
+        bool budgetRejected = false;
+        try { CodexProfileDesign.ValidateConstraintBudget(poly.Parts); } catch (InvalidOperationException) { budgetRejected = true; }
+        if (!budgetRejected) throw new Exception("Unbounded driven polygon accepted.");
+        poly.Parts[0].Profile = Enumerable.Range(0, 24).Select(i => new[] { new LengthExpression { Offset = i }, new LengthExpression { Offset = i } }).ToArray();
+        CodexProfileDesign.ValidateConstraintBudget(Enumerable.Repeat(poly.Parts[0], 5));
+        poly.Parts[0].Profile = originalProfile;
+        Console.WriteLine("PASS: driven profile budget rejects excess constraints and allows fixed decoration");
         double area = CodexProfileDesign.Area(poly.Parts[0].Profile.Select(p => p.Select(v => v.Value(poly.Initial)).ToArray()).ToArray());
         if (Math.Abs(area - 180000) > 0.1) throw new Exception("Triangle area");
         Reject(polygon, s => s["parts"][0]["profile_uv"][2] = s["parts"][0]["profile_uv"][1].DeepClone(), "collapsed polygon");

@@ -2,6 +2,7 @@
 using Autodesk.Revit.DB.Structure;
 using Autodesk.Revit.UI;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -21,9 +22,36 @@ namespace BIMaestro.Codex
     {
         internal static readonly string OutputRoot = Path.Combine(CodexClient.DataDirectory, "Families");
 
+        // Called inside a transaction, after all generated types have been created.
+        internal static void ApplyBranding(FamilyManager manager)
+        {
+            var manufacturer = manager.get_Parameter(BuiltInParameter.ALL_MODEL_MANUFACTURER);
+            var url = manager.get_Parameter(BuiltInParameter.ALL_MODEL_URL);
+            if (manufacturer == null || url == null)
+                throw new InvalidOperationException("Le gabarit ne contient pas les paramètres Fabricant et URL.");
+            if (manager.CurrentType == null) manager.NewType("Standard");
+            manager.SetFormula(manufacturer, "\"Plugin - BIMaestro\"");
+            if (url.IsDeterminedByFormula) manager.SetFormula(url, null);
+            var initialType = manager.CurrentType;
+            try
+            {
+                foreach (FamilyType type in manager.Types)
+                {
+                    manager.CurrentType = type;
+                    manager.Set(url, "https://www.bimaestro.fr");
+                }
+            }
+            finally { manager.CurrentType = initialType; }
+        }
+
         // Called exclusively from the bridge's ExternalEvent. The source project is never saved.
         internal static CodexFamilyArtifact Create(UIApplication app, Document source, CodexFamilyDesign design, bool validateOnly = false, CodexParametricDesign parametric = null, bool testHostPlacement = false, Action<Document> inspect = null)
         {
+            return CreateSteps(app, source, design, validateOnly, parametric, testHostPlacement, inspect).Last(x => x != null);
+        }
+        internal static IEnumerable<CodexFamilyArtifact> CreateSteps(UIApplication app, Document source, CodexFamilyDesign design, bool validateOnly = false, CodexParametricDesign parametric = null, bool testHostPlacement = false, Action<Document> inspect = null)
+        {
+            using var guard = new CodexCreationGuard(app.Application, design.Name);
             if (!validateOnly && design.Load && (source == null || source.IsFamilyDocument || source.IsReadOnly || source.IsModifiable))
                 throw new InvalidOperationException("Le chargement nécessite un projet actif modifiable, hors d'une autre commande.");
             string template = FindTemplate(app, parametric?.Hosting ?? design.Hosting);
@@ -41,9 +69,19 @@ namespace BIMaestro.Codex
             try
             {
                 family = app.Application.NewFamilyDocument(template);
+                CodexCreationGuard.Check("création du document temporaire");
                 if (family == null) throw new InvalidOperationException("Revit n'a pas créé le document de famille.");
+                guard.Pause(); yield return null; guard.Resume();
                 stage = "préparation des barres imbriquées";
-                var prototypes = parametric == null ? null : CodexParametricArrayBuilder.Prepare(family, FindTemplate(app, "free"), parametric);
+                var prototypes = new Dictionary<string, FamilySymbol>();
+                if (parametric != null)
+                    foreach (var spec in parametric.Arrays)
+                    {
+                        CodexCreationGuard.Check("préparation du réseau « " + spec.Name + " »");
+                        foreach (var pair in CodexParametricArrayBuilder.Prepare(family, FindTemplate(app, "free"), parametric, new[] { spec })) prototypes.Add(pair.Key, pair.Value);
+                        guard.Pause(); yield return null; guard.Resume();
+                    }
+                guard.Pause(); yield return null; guard.Resume();
                 var bounds = new Bounds();
                 var createdElements = new List<Element>();
                 CodexParametricBuilder parametricBuilder = null;
@@ -67,7 +105,10 @@ namespace BIMaestro.Codex
                     foreach (var spec in design.Materials)
                     {
                         stage = "matériau « " + spec.Name + " »";
-                        var material = (Material)family.GetElement(Material.Create(family, "BIMaestro " + SafeName(spec.Name)));
+                        string materialName = "BIMaestro " + SafeName(spec.Name);
+                        var material = new FilteredElementCollector(family).OfClass(typeof(Material)).Cast<Material>()
+                            .FirstOrDefault(m => m.Name.Equals(materialName, StringComparison.OrdinalIgnoreCase))
+                            ?? (Material)family.GetElement(Material.Create(family, materialName));
                         material.Color = new Color(spec.Rgb[0], spec.Rgb[1], spec.Rgb[2]); material.Transparency = spec.Transparency;
                         var parameter = CodexParameterBuilder.NewInternal(manager, "Matériau — " + SafeName(spec.Name), GroupTypeId.Materials, SpecTypeId.Reference.Material, false);
                         manager.Set(parameter, material.Id); materials[spec.Name] = parameter;
@@ -76,10 +117,20 @@ namespace BIMaestro.Codex
                     {
                         stage = "construction des extrusions et contraintes paramétriques";
                         parametricBuilder = new CodexParametricBuilder(family, parametric);
-                        createdElements.AddRange(parametricBuilder.Build(materials, prototypes));
+                        foreach (var buildStep in parametricBuilder.BuildSteps(materials, prototypes))
+                        {
+                            buildStep();
+                            if (transaction.Commit() != TransactionStatus.Committed)
+                                throw new InvalidOperationException("Étape de construction annulée : " + string.Join(" ; ", warnings.Take(5)));
+                            guard.Pause(); yield return null; guard.Resume();
+                            transaction.Start();
+                            transaction.SetFailureHandlingOptions(transaction.GetFailureHandlingOptions().SetFailuresPreprocessor(new Failures(warnings)).SetClearAfterRollback(true));
+                        }
+                        createdElements.AddRange(parametricBuilder.CreatedElements());
                     }
                     else foreach (var part in design.Parts)
                     {
+                        CodexCreationGuard.Check("construction de « " + part.Name + " »");
                         stage = "pièce « " + part.Name + " » (" + part.Geometry.Kind + ")";
                         Solid baseSolid = null;
                         try
@@ -110,8 +161,13 @@ namespace BIMaestro.Codex
                         }
                         catch (Exception ex) { throw new InvalidOperationException("Pièce « " + part.Name + " » : " + ex.Message, ex); }
                         finally { baseSolid?.Dispose(); }
+                        if (transaction.Commit() != TransactionStatus.Committed)
+                            throw new InvalidOperationException("Pièce annulée : " + part.Name);
+                        guard.Pause(); yield return null; guard.Resume();
+                        transaction.Start();
+                        transaction.SetFailureHandlingOptions(transaction.GetFailureHandlingOptions().SetFailuresPreprocessor(new Failures(warnings)).SetClearAfterRollback(true));
                     }
-                    stage = "ouverture du mur hôte";
+                    stage = "découpe de l'hôte";
                     hostOpening = parametricBuilder?.HostOpening;
                     if (parametric == null && design.HostOpening != null)
                         hostOpening = new CodexHostOpeningBuilder(family, design.HostOpening, new Dictionary<string, double>());
@@ -149,7 +205,16 @@ namespace BIMaestro.Codex
                         throw new InvalidOperationException("Famille annulée par Revit : " + string.Join(" ; ", warnings.Take(5)));
                 }
                 stage = "tests de variation des paramètres";
-                object[] flexTests = parametricBuilder?.Flex() ?? new object[0];
+                CodexCreationGuard.Check(stage);
+                guard.Pause(); yield return null; guard.Resume();
+                var flexReports = new List<object>();
+                if (parametricBuilder != null)
+                    foreach (var flexReport in parametricBuilder.FlexSteps())
+                    {
+                        if (flexReport != null) flexReports.Add(flexReport);
+                        guard.Pause(); yield return null; guard.Resume();
+                    }
+                object[] flexTests = flexReports.ToArray();
                 hostOpening?.Check(parametric?.Initial ?? new Dictionary<string, double>());
                 object representationReport = null;
                 if (design.Representation != null)
@@ -165,15 +230,27 @@ namespace BIMaestro.Codex
                     }
                 }
                 object hostPlacementTest = testHostPlacement && hostOpening != null ? hostOpening.VerifyProjectPlacement(parametric?.TestCases() ?? new[] { new Dictionary<string, double>() }) : null;
+                guard.Pause(); yield return null; guard.Resume();
+                stage = "identification BIMaestro";
+                using (var transaction = new Transaction(family, "BIMaestro — identification de la famille"))
+                {
+                    transaction.Start();
+                    ApplyBranding(family.FamilyManager);
+                    if (transaction.Commit() != TransactionStatus.Committed)
+                        throw new InvalidOperationException("Identification BIMaestro non enregistrée.");
+                }
                 inspect?.Invoke(family);
-                if (validateOnly) return new CodexFamilyArtifact { Report = new {
+                CodexCreationGuard.Check("validation terminée");
+                if (validateOnly) { guard.Complete(); yield return new CodexFamilyArtifact { Report = new {
                     validated = true, saved = false, loaded = false, solidCount = parametric?.SolidCount ?? design.SolidCount,
                     revit_version = app.Application.VersionNumber, flex_tests = flexTests, host_opening = hostOpening?.Report(), host_placement_test = hostPlacementTest, representation_2d = representationReport,
                     parameters = parametric?.Registry == null ? null : CodexFamilyTools.Read(family), connectors = parametricBuilder?.ConnectorReports(),
                     dimensions_mm = new[] { Mm(bounds.Max.X - bounds.Min.X), Mm(bounds.Max.Y - bounds.Min.Y), Mm(bounds.Max.Z - bounds.Min.Z) },
-                    warnings = warnings.ToArray(), next = "Validation native terminée pour les cas demandés. Appeler " + (parametric == null ? "revit_create_family" : "revit_create_parametric_family") + " avec la même description pour enregistrer." } };
+                    warnings = warnings.ToArray(), next = "Validation native terminée pour les cas demandés. Appeler " + (parametric == null ? "revit_create_family" : "revit_create_parametric_family") + " avec la même description pour enregistrer." } }; yield break; }
+                guard.Pause(); yield return null; guard.Resume();
                 // No partial RFA is saved when any geometry creation failed.
                 stage = "enregistrement du nouveau RFA";
+                CodexCreationGuard.Check(stage);
                 Directory.CreateDirectory(folder);
                 string path = Path.Combine(folder, fileName + ".rfa");
                 var options = new SaveAsOptions { OverwriteExistingFile = false, Compact = true, MaximumBackups = 1, PreviewViewId = preview.Id };
@@ -182,6 +259,7 @@ namespace BIMaestro.Codex
                 string[] previewPaths = new string[0];
                 try
                 {
+                    CodexCreationGuard.Check("export des aperçus");
                     var export = new ImageExportOptions { ExportRange = ExportRange.SetOfViews, FilePath = Path.Combine(folder, "apercu"),
                         HLRandWFViewsFileType = ImageFileType.PNG, ShadowViewsFileType = ImageFileType.PNG,
                         ZoomType = ZoomFitType.FitToPage, PixelSize = 1200, FitDirection = FitDirectionType.Horizontal, ImageResolution = ImageResolution.DPI_150 };
@@ -193,10 +271,12 @@ namespace BIMaestro.Codex
                 catch (Exception ex) { warnings.Add("RFA enregistré, aperçu non disponible : " + ex.Message); }
 
                 string loadedId = null, placedId = null;
+                object loadFailure = null;
                 if (design.Load)
                 {
                     try
                     {
+                        CodexCreationGuard.Check("chargement dans le projet");
                         using (var group = new TransactionGroup(source, "BIMaestro — charger la famille créée"))
                         {
                             group.Start();
@@ -225,11 +305,22 @@ namespace BIMaestro.Codex
                             if (group.Assimilate() != TransactionStatus.Committed) throw new InvalidOperationException("Chargement annulé.");
                         }
                     }
-                    catch (Exception ex) { loadedId = placedId = null; warnings.Add("RFA créé mais non chargé : " + ex.Message); }
+                    catch (Exception ex)
+                    {
+                        loadedId = placedId = null;
+                        ex.Data["operation"] = "load_saved_family";
+                        ex.Data["file"] = path;
+                        ex.Data["target_document"] = source?.IsValidObject == true ? source.Title : "document fermé";
+                        ex.Data["revit_version"] = app.Application.VersionNumber;
+                        ex.Data["journal"] = app.Application.RecordingJournalFilename;
+                        string diagnostic = CodexDiagnostics.RecordFailure("revit_load_created_family", new JObject { ["file"] = path }, ex);
+                        loadFailure = new { message = ex.Message, exception_type = ex.GetType().FullName, diagnostic };
+                        warnings.Add("RFA enregistré mais non chargé : " + ex.Message + (diagnostic == null ? "" : ". Diagnostic : " + diagnostic));
+                    }
                 }
                 var report = new
                 {
-                    file = path, category = design.Category, solidCount = parametric?.SolidCount ?? design.SolidCount, materialCount = design.Materials.Count,
+                    file = path, load_failure = loadFailure, category = design.Category, solidCount = parametric?.SolidCount ?? design.SolidCount, materialCount = design.Materials.Count,
                     dimensions_mm = new[] { Mm(bounds.Max.X - bounds.Min.X), Mm(bounds.Max.Y - bounds.Min.Y), Mm(bounds.Max.Z - bounds.Min.Z) },
                     requested_dimensions_mm = design.TargetDimensions,
                     geometry = parametric == null ? "Solides Revit à géométrie fixe ; matériaux paramétrés. Encombrements calculés non pilotants." : "Extrusions natives contraintes et réseaux de barres imbriquées. Dimensions, nombres et inclinaisons des barres pilotés dans Revit sans Codex. Pas de connecteurs MEP.",
@@ -252,10 +343,46 @@ namespace BIMaestro.Codex
                     File.WriteAllText(Path.Combine(folder, "rapport.json"), JsonConvert.SerializeObject(report, Formatting.Indented), new UTF8Encoding(false));
                 }
                 catch (IOException) { /* The RFA and in-memory report remain usable. */ }
-                return new CodexFamilyArtifact { FilePath = path, PreviewPath = previewPath, PreviewPaths = previewPaths, Report = report };
+                guard.Complete();
+                yield return new CodexFamilyArtifact { FilePath = path, PreviewPath = previewPath, PreviewPaths = previewPaths, Report = report };
             }
-            catch (Exception ex) { throw new InvalidOperationException("Étape " + stage + " : " + ex.Message, ex); }
-            finally { if (family != null && family.IsValidObject) family.Close(false); }
+            finally
+            {
+                // ExportImage can make this document active. Cleanup must not
+                // mask a successful save or the original construction error.
+                if (family != null && family.IsValidObject && app.ActiveUIDocument?.Document != family)
+                {
+                    try { family.Close(false); }
+                    catch (Autodesk.Revit.Exceptions.InvalidOperationException) { }
+                }
+            }
+        }
+
+        internal static object TemplateInfo(UIApplication app, string hosting)
+        {
+            if (!new[] { "free", "wall", "floor", "ceiling", "face", "work_plane" }.Contains(hosting)) throw new InvalidOperationException("Hébergement de gabarit inconnu.");
+            string path = FindTemplate(app, hosting);
+            Document temporary = null;
+            try
+            {
+                temporary = app.Application.NewFamilyDocument(path);
+                var walls = new FilteredElementCollector(temporary).OfClass(typeof(Wall)).Cast<Wall>().Select(w => {
+                    var bounds=w.get_BoundingBox(null);
+                    var direction=((w.Location as LocationCurve)?.Curve as Line)?.Direction;
+                    return new { id=w.Id.ToString(), width_mm=w.Width*304.8,
+                        parallel_to_x=direction!=null && Math.Abs(direction.DotProduct(XYZ.BasisX))>0.999999,
+                        minimum_y_mm=bounds.Min.Y*304.8, maximum_y_mm=bounds.Max.Y*304.8,
+                        orientation=new[]{w.Orientation.X,w.Orientation.Y,w.Orientation.Z} };
+                }).ToArray();
+                var floors = new FilteredElementCollector(temporary).OfClass(typeof(Floor)).Cast<Floor>().Select(f => {
+                    var bounds=f.get_BoundingBox(null);
+                    return new { minimum_z_mm=bounds.Min.Z*304.8, maximum_z_mm=bounds.Max.Z*304.8 };
+                }).ToArray();
+                return new { hosting, template=path, walls, floors,
+                    template_parameters=temporary.FamilyManager.Parameters.Cast<FamilyParameter>().Select(p=>new { name=p.Definition.Name, instance=p.IsInstance, built_in=p.Id.IntegerValue<0, reporting=p.IsReporting, read_only=p.IsReadOnly }).ToArray(),
+                    note="Coordonnées réelles du gabarit, en mm. Pour un mur parallèle à X : une applique côté +Y commence à maximum_y_mm ; côté -Y elle se termine à minimum_y_mm. Ne pas supposer 150 mm ou un centrage sur Y=0. Ces valeurs seules ne créent pas de liaison aux faces d'un autre mur plus épais : préférer hosting=face pour une applique qui doit suivre sa face hôte." };
+            }
+            finally { if(temporary!=null&&temporary.IsValidObject)temporary.Close(false); }
         }
 
         private static string FindTemplate(UIApplication app, string hosting)
@@ -289,7 +416,12 @@ namespace BIMaestro.Codex
                 case "lighting": return BuiltInCategory.OST_LightingFixtures;
                 case "furniture": return BuiltInCategory.OST_Furniture;
                 case "plumbing": return BuiltInCategory.OST_PlumbingFixtures;
-                default: return BuiltInCategory.OST_GenericModel;
+                case "pipe_accessory": return BuiltInCategory.OST_PipeAccessory;
+                case "pipe_fitting": return BuiltInCategory.OST_PipeFitting;
+                case "duct_accessory": return BuiltInCategory.OST_DuctAccessory;
+                case "duct_fitting": return BuiltInCategory.OST_DuctFitting;
+                case "generic": return BuiltInCategory.OST_GenericModel;
+                default: throw new InvalidOperationException("Catégorie de famille inconnue : " + category);
             }
         }
         internal static string SafeName(string name)

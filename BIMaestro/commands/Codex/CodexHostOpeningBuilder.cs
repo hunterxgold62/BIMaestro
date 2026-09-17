@@ -12,11 +12,17 @@ namespace BIMaestro.Codex
         private readonly Wall wall;
         private readonly Opening opening;
         private readonly double uncutVolume;
+        private readonly CodexFloorVoidBuilder floorVoid;
 
         internal CodexHostOpeningBuilder(Document doc, FamilyHostOpeningSpec spec,
             Dictionary<string, double> initial, CodexParametricBuilder constraints = null)
         {
             this.doc = doc; this.spec = spec;
+            if (spec.IsFloor)
+            {
+                floorVoid = new CodexFloorVoidBuilder(doc, spec, initial, constraints);
+                return;
+            }
             var walls = new FilteredElementCollector(doc).OfClass(typeof(Wall)).Cast<Wall>().ToArray();
             if (walls.Length != 1) throw new InvalidOperationException("Le gabarit doit contenir exactement un mur hôte pour host_opening.");
             wall = walls[0];
@@ -56,6 +62,7 @@ namespace BIMaestro.Codex
 
         internal void Check(Dictionary<string, double> values)
         {
+            if (floorVoid != null) { floorVoid.Check(values); return; }
             var curves = opening.BoundaryCurves.Cast<Curve>().ToArray();
             if (curves.Length != 4) throw new InvalidOperationException("Le contour de host_opening n'est plus rectangulaire.");
             var expected = Points(values, curves[0].GetEndPoint(0).Y);
@@ -69,12 +76,13 @@ namespace BIMaestro.Codex
                 throw new InvalidOperationException("La baie ne traverse pas entièrement le mur hôte, ou dépasse ses limites. Vérifier min_xz/max_xz dans le gabarit.");
         }
 
-        internal object Report() => new { created = true, kind = "native_wall_opening", opening_id = opening.Id.ToString(),
+        internal object Report() => floorVoid != null ? floorVoid.Report() : new { created = true, kind = "native_wall_opening", opening_id = opening.Id.ToString(),
             host_id = wall.Id.ToString(), through_host_verified = true, boundary = "XZ", project_instance_verified = false };
 
         // Native test harness only: the user's project is never used or saved.
         internal object VerifyProjectPlacement(IEnumerable<Dictionary<string, double>> cases)
         {
+            if (floorVoid != null) return floorVoid.VerifyProjectPlacement(cases);
             Document project = null;
             try
             {

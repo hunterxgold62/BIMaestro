@@ -39,15 +39,25 @@ internal static class Program
             Assert(!ReferenceEquals(greenIcon, redIcon), "ON et OFF utilisent des images distinctes");
         }
         string settingsTest = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(output)), "angle-test-" + Guid.NewGuid().ToString("N") + ".txt");
+        string enabledTest = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(output)), "enabled-test-" + Guid.NewGuid().ToString("N") + ".txt");
         try
         {
+            Assert(!BoosterPreferences.LoadEnabled(enabledTest), "Booster désactivé par défaut sans préférence enregistrée");
+            BoosterPreferences.SaveEnabled(enabledTest, true);
+            Assert(BoosterPreferences.LoadEnabled(enabledTest), "État ON conservé sur disque");
+            BoosterPreferences.SaveEnabled(enabledTest, false);
+            Assert(!BoosterPreferences.LoadEnabled(enabledTest), "État OFF conservé sur disque");
             Assert(BoosterPreferences.LoadAngle(settingsTest) == 22.5, "Angle par défaut sans préférence enregistrée");
             BoosterPreferences.SaveAngle(settingsTest, -37.25);
             Assert(BoosterPreferences.LoadAngle(settingsTest) == -37.25, "Angle personnalisé signé et décimal conservé sur disque");
             File.WriteAllText(settingsTest, "invalide");
             Assert(BoosterPreferences.LoadAngle(settingsTest) == 22.5, "Préférence invalide : repli sans bloquer la rosace");
         }
-        finally { if (File.Exists(settingsTest)) File.Delete(settingsTest); }
+        finally
+        {
+            if (File.Exists(settingsTest)) File.Delete(settingsTest);
+            if (File.Exists(enabledTest)) File.Delete(enabledTest);
+        }
         var axisX = new Vector3D(1, 0, 0);
         Assert(Math.Abs(BoosterOrientationMath.Roll(axisX, new Vector3D(0, 0, 1))) < 1e-8, "Copie : position haute = zéro autour d’un tuyau horizontal");
         Assert(Math.Abs(BoosterOrientationMath.Roll(axisX, new Vector3D(0, -1, 0)) - 90) < 1e-8, "Copie : rotation signée de 90 degrés");

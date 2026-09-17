@@ -1,4 +1,4 @@
-﻿using BIMaestro.Codex;
+using BIMaestro.Codex;
 using Newtonsoft.Json.Linq;
 using System;
 using System.IO;
@@ -22,6 +22,21 @@ internal static class ParametricDesignTests
         Reject(window, x => x["host_opening"]["max_xz"][0]["terms"][0]["factor"] = -1, "inverted opening");
         Reject(window, x => { x["host_opening"]["max_xz"][0]["offset_mm"] = 650; x["host_opening"]["max_xz"][0]["terms"][0]["factor"] = -0.5; }, "opening crossing origin on flex");
         Console.WriteLine("PASS: window host opening, width/height flex and invalid host/contour rejection");
+        var floor = JObject.Parse(File.ReadAllText("scripts/codex-tests/native-fixtures/host-opening-floor.json"));
+        var floorDesign = CodexParametricDesign.Parse(floor);
+        var floorValues = floorDesign.Initial;
+        floorValues["Largeur"] = 800; floorValues["Profondeur"] = 700; floorValues["ProfondeurVide"] = 1500;
+        floorDesign.ValidateAt(floorValues);
+        var floorOpening = floorDesign.Metadata.HostOpening;
+        if (!floorOpening.IsFloor || floorOpening.Max[0].Value(floorValues) - floorOpening.Min[0].Value(floorValues) != 700 ||
+            floorOpening.Max[1].Value(floorValues) - floorOpening.Min[1].Value(floorValues) != 600 || floorOpening.Min[2].Value(floorValues) != -1500)
+            throw new Exception("Floor void does not follow width, length and depth");
+        Reject(floor, x => x["hosting"] = "wall", "XYZ void on wall host");
+        Reject(floor, x => x["hosting"] = "ceiling", "unsupported void host");
+        Reject(floor, x => x["host_opening"]["min_xyz"][2]["terms"][0]["parameter"] = "Unknown", "unknown void depth driver");
+        Reject(floor, x => x["host_opening"]["max_xyz"][2] = x["host_opening"]["min_xyz"][2].DeepClone(), "zero void depth");
+        Reject(floor, x => x["host_opening"]["min_xyz"] = new JArray(x["host_opening"]["min_xyz"].Take(2)), "missing void Z coordinate");
+        Console.WriteLine("PASS: floor void width/length/depth flex and invalid host/geometry rejection");
         var source = JObject.Parse(File.ReadAllText("scripts/codex-tests/parametric-diffuser.design.json"));
         var design = CodexParametricDesign.Parse(source);
         var wide = design.Initial; wide["Largeur"] = 800;
@@ -108,8 +123,13 @@ internal static class ParametricDesignTests
             var rotated = ParametricArray.Rotate(vector, axis, 37);
             if (Math.Abs(rotated.Sum(v => v * v) - 50) > 1e-9 || rotated[axis] != vector[axis]) throw new Exception("Invalid rotation axis or scaling");
         }
-        Reject(tiltedSource, x => x["angles"][0]["value_deg"] = 0, "singular zero angle");
-        Reject(tiltedSource, x => x["angles"][0]["test_value_deg"] = 90, "singular right angle");
+        foreach (double endpoint in new[] { 0d, 90d, 180d })
+        {
+            var fullAngle = (JObject)tiltedSource.DeepClone(); fullAngle["angles"][0]["value_deg"] = endpoint;
+            CodexParametricDesign.Parse(fullAngle);
+        }
+        Reject(tiltedSource, x => x["angles"][0]["value_deg"] = -1, "negative angle");
+        Reject(tiltedSource, x => x["angles"][0]["test_value_deg"] = 181, "angle above 180");
         Reject(tiltedSource, x => x["angles"][0]["test_value_deg"] = 30, "unchanged angle test");
         Reject(tiltedSource, x => x["angles"][0]["name"] = "Largeur", "angle collides with length");
         Reject(tiltedSource, x => x["arrays"][0]["rotation"]["angle_parameter"] = "Unknown", "unknown angle reference");
@@ -117,6 +137,16 @@ internal static class ParametricDesignTests
         Reject(tiltedSource, x => x["arrays"][0]["minimum"][0]["terms"][0]["parameter"] = "Inclinaison", "angle used as length");
         Reject(tiltedSource, x => x["arrays"][0]["maximum"][2]["offset_mm"] = 100, "inclined projection overlaps adjacent member");
         Console.WriteLine("PASS: angle values, rotated bounds, preserved pitch, three axes, unit separation and singularity rejection");
+        var gridSource = JObject.Parse(File.ReadAllText("scripts/codex-tests/native-fixtures/enhancement-grid.json"));
+        var gridDesign = CodexParametricDesign.Parse(gridSource); var gridNetwork = gridDesign.Arrays.Single();
+        if (gridNetwork.Grid.Columns(gridDesign.Initial) != 9 || gridNetwork.Count(gridDesign.Initial) != 2 || gridDesign.SolidCount != 126) throw new Exception("2D grid quantities incorrect.");
+        foreach(var sample in new[] { new[]{999d,0d},new[]{1000d,1d},new[]{2019d,1d},new[]{2020d,2d},new[]{10000d,9d} })
+        { var values=gridDesign.Initial;values["LargeurChamp"]=sample[0]; if(gridNetwork.Grid.Columns(values)!=sample[1])throw new Exception("Grid fitting threshold incorrect."); }
+        Reject(gridSource, x=>x["component_grids"][0]["axis_v"]="x", "duplicate grid axes");
+        Reject(gridSource, x=>x["component_grids"][0]["rows_parameter"]="NombreColonnes", "duplicate grid count names");
+        Reject(gridSource, x=>x["component_grids"][0]["components"][0]["maximum_mm"][0]=1001, "component outside module");
+        Reject(gridSource, x=>x["family_options"]["parameters"][0]["value"]=100000, "grid solid budget");
+        Console.WriteLine("PASS: complete module grid, 0/1/2 thresholds, two directions and budgets");
     }
     private static void Reject(JObject original, Action<JObject> mutate, string name)
     {

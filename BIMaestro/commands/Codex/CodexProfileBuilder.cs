@@ -1,4 +1,4 @@
-using Autodesk.Revit.DB;
+﻿using Autodesk.Revit.DB;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -20,21 +20,27 @@ namespace BIMaestro.Codex
         }
         internal static void Constrain(Document doc, Extrusion extrusion, ParametricPart part, Dictionary<string, double> values, CodexParametricBuilder constraints)
         {
+            // Fixed decorative profiles need no vertex drivers. Hundreds of
+            // intersecting reference lines trigger expensive Revit auto-joins.
+            if (part.Profile.All(p => p.All(e => e.Terms.Count == 0))) return;
             var points = Points(part, values); var uv = part.ProfileAxes;
             doc.Regenerate();
-            var curves = extrusion.Sketch.GetAllElements().Select(doc.GetElement).OfType<ModelCurve>().ToArray();
             var view = constraints.ProfileView(part.Axis);
             for (int i = 0; i < points.Length; i++)
             {
+                CodexCreationGuard.Check();
                 var start = points[i]; var end = points[(i + 1) % points.Length];
-                var edge = curves.Single(c => Same(c.GeometryCurve, start, end));
+                var edge = extrusion.Sketch.GetAllElements().Select(doc.GetElement).OfType<ModelCurve>().Single(c => Same(c.GeometryCurve, start, end));
                 int endpoint = edge.GeometryCurve.GetEndPoint(0).DistanceTo(start) < 1e-6 ? 0 : 1;
                 for (int a = 0; a < 2; a++)
                 {
                     var direction = Basis(uv[1 - a]);
-                    var guide = doc.FamilyCreate.NewModelCurve(Line.CreateBound(start - direction * 2, start + direction * 2), extrusion.Sketch.SketchPlane);
+                    var guide = doc.FamilyCreate.NewModelCurve(Line.CreateBound(start - direction * (5 / 304.8), start + direction * (5 / 304.8)), extrusion.Sketch.SketchPlane);
                     guide.ChangeToReferenceLine();
                     var plane = constraints.PlaneAt(uv[a], part.Profile[i][a]); doc.Regenerate();
+                    // Regeneration may replace native curve references.
+                    edge = extrusion.Sketch.GetAllElements().Select(doc.GetElement).OfType<ModelCurve>().Single(c => Same(c.GeometryCurve, start, end));
+                    endpoint = edge.GeometryCurve.GetEndPoint(0).DistanceTo(start) < 1e-6 ? 0 : 1;
                     doc.FamilyCreate.NewAlignment(view, plane.GetReference(), guide.GeometryCurve.Reference);
                     doc.FamilyCreate.NewAlignment(view, guide.GeometryCurve.Reference, edge.GeometryCurve.GetEndPointReference(endpoint));
                 }

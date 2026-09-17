@@ -8,6 +8,7 @@ namespace BIMaestro.Codex
     internal sealed class FamilyHostOpeningSpec
     {
         internal LengthExpression[] Min, Max;
+        internal bool IsFloor;
         internal IEnumerable<LengthExpression> Expressions => Min.Concat(Max);
 
         internal static JObject Schema()
@@ -24,8 +25,12 @@ namespace BIMaestro.Codex
             return new JObject { ["anyOf"] = new JArray(new JObject { ["type"] = "null" },
                 new JObject { ["type"] = "object", ["additionalProperties"] = false,
                     ["required"] = new JArray("min_xz", "max_xz"), ["properties"] = new JObject {
-                        ["min_xz"] = vector, ["max_xz"] = vector.DeepClone() } }),
-                ["description"] = "Ouverture native RECTANGULAIRE traversant le mur hôte. Obligatoire pour door/window avec hosting=wall, null sinon en l'absence de découpe. Limites [X,Z] dans les mêmes coordonnées locales que les pièces ; mur parallèle à X, Z vertical. Décrire la baie de pose, pas l'encombrement des poignées/appuis. Chaque coordonnée = {offset_mm,terms:[{parameter,factor}]}. Famille fixe : terms=[] ; paramétrique : utiliser les paramètres de longueur du dormant pour que la baie suive largeur/hauteur. Aucun solide ni vitrage n'est créé par ce champ. Autres hôtes et contours courbes non pris en charge." };
+                        ["min_xz"] = vector, ["max_xz"] = vector.DeepClone() } },
+                new JObject { ["type"] = "object", ["additionalProperties"] = false,
+                    ["required"] = new JArray("min_xyz", "max_xyz"), ["properties"] = new JObject {
+                        ["min_xyz"] = new JObject { ["type"] = "array", ["minItems"] = 3, ["maxItems"] = 3, ["items"] = expression.DeepClone() },
+                        ["max_xyz"] = new JObject { ["type"] = "array", ["minItems"] = 3, ["maxItems"] = 3, ["items"] = expression.DeepClone() } } }),
+                ["description"] = "Découpe rectangulaire de l'hôte. hosting=wall : min_xz/max_xz [X,Z], baie native traversante, obligatoire pour door/window. hosting=floor : min_xyz/max_xyz [X,Y,Z], vide d'extrusion non attaché avec Couper avec des vides au chargement ; prévoir une profondeur Z couvrant le sol. Après placement, sélectionner le sol et l'instance puis appeler revit_cut_floor_with_family (ou Couper la géométrie dans Revit) : pas de découpe automatique à la pose. Coordonnées locales en mm, chaque coordonnée={offset_mm,terms:[{parameter,factor}]}. Famille fixe : terms=[] ; paramétrique : paramètres de longueur pour piloter la découpe. null sans découpe. Autres hôtes et contours courbes non pris en charge." };
         }
 
         internal static FamilyHostOpeningSpec Parse(JObject source, string hosting, string category, HashSet<string> names)
@@ -37,19 +42,23 @@ namespace BIMaestro.Codex
                     throw new InvalidOperationException("Une porte/fenêtre murale exige host_opening : fournir min_xz et max_xz pour la baie traversante (expressions de longueur). Les ouvertures des pièces ne percent pas le mur.");
                 return null;
             }
-            if (hosting != "wall") throw new InvalidOperationException("host_opening exige hosting=wall ; seules les ouvertures de mur sont prises en charge.");
+            if (hosting != "wall" && hosting != "floor") throw new InvalidOperationException("host_opening exige hosting=wall ou floor.");
+            bool floor = hosting == "floor";
+            string min = floor ? "min_xyz" : "min_xz", max = floor ? "max_xyz" : "max_xz";
+            int dimensions = floor ? 3 : 2;
             var value = token as JObject;
-            CodexFamilyDesign.Keys(value, "min_xz", "max_xz");
+            CodexFamilyDesign.Keys(value, min, max);
             return new FamilyHostOpeningSpec {
-                Min = CodexFamilyDesign.Items(value, "min_xz", 2, 2).Select(t => LengthExpression.Parse(t as JObject, names)).ToArray(),
-                Max = CodexFamilyDesign.Items(value, "max_xz", 2, 2).Select(t => LengthExpression.Parse(t as JObject, names)).ToArray() };
+                IsFloor = floor,
+                Min = CodexFamilyDesign.Items(value, min, dimensions, dimensions).Select(t => LengthExpression.Parse(t as JObject, names)).ToArray(),
+                Max = CodexFamilyDesign.Items(value, max, dimensions, dimensions).Select(t => LengthExpression.Parse(t as JObject, names)).ToArray() };
         }
 
         internal void Validate(Dictionary<string, double> values, Dictionary<string, double> initial)
         {
-            for (int a = 0; a < 2; a++)
+            for (int a = 0; a < Min.Length; a++)
                 if (Max[a].Value(values) - Min[a].Value(values) < 1)
-                    throw new InvalidOperationException("host_opening : largeur/hauteur inférieure à 1 mm pendant un test.");
+                    throw new InvalidOperationException("host_opening : dimension inférieure à 1 mm pendant un test.");
             foreach (var e in Expressions)
             {
                 double v = e.Value(values), start = e.Value(initial);

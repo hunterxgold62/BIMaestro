@@ -27,6 +27,7 @@ namespace BIMaestro.MepBooster
     {
         private static MepBoosterService _instance;
         private static PushButton _button;
+        private static bool _startupStateRestored;
         private static readonly Dictionary<string, System.Windows.Media.Imaging.BitmapImage> _icons =
             new Dictionary<string, System.Windows.Media.Imaging.BitmapImage>();
         internal static System.Windows.Media.Imaging.BitmapImage StateIcon(bool enabled, int size)
@@ -86,6 +87,7 @@ namespace BIMaestro.MepBooster
         }
         internal static void Toggle(UIApplication app)
         {
+            _startupStateRestored = true;
             if (_instance == null)
             {
                 _instance = new MepBoosterService();
@@ -93,6 +95,9 @@ namespace BIMaestro.MepBooster
             }
             var service = _instance;
             service._enabled = !service._enabled;
+            try { BoosterPreferences.SaveEnabled(BoosterPreferences.EnabledPath, service._enabled); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
             service.Dismiss();
             service._selection = null;
             service._selectionDirty = true;
@@ -107,6 +112,22 @@ namespace BIMaestro.MepBooster
             {
                 service._timer.Stop(); service._mouse?.Dispose(); service._mouse = null;
             }
+            UpdateButton();
+        }
+        internal static void RestorePersistedState(UIApplication app)
+        {
+            if (_startupStateRestored) return;
+            _startupStateRestored = true;
+            if (!BoosterPreferences.LoadEnabled(BoosterPreferences.EnabledPath)) return;
+
+            _instance = new MepBoosterService();
+            _instance.Initialize(app);
+            _instance._enabled = true;
+            _instance._selectionDirty = true;
+            _instance._suppressed = false;
+            _instance._quietSince = DateTime.UtcNow;
+            _instance.SetStatus("ON — sélectionnez un accessoire dans la vue.");
+            _instance._timer.Start();
             UpdateButton();
         }
         private void Initialize(UIApplication app)
@@ -458,6 +479,9 @@ namespace BIMaestro.MepBooster
         {
             var service = _instance;
             if (service == null) return;
+            try { BoosterPreferences.SaveEnabled(BoosterPreferences.EnabledPath, service._enabled); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
             service._enabled = false; service._timer.Stop(); service._mouse?.Dispose();
             var application = BIMaestroApp.UIControlledApp;
             application.Idling -= service.Idling;

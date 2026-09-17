@@ -19,14 +19,14 @@ namespace BIMaestro.Codex
         internal readonly List<DrivingLength> Angles = new List<DrivingLength>(); // Values and tests in degrees.
         internal readonly List<ParametricPart> Parts = new List<ParametricPart>();
         internal readonly List<ParametricArray> Arrays = new List<ParametricArray>();
-        internal int SolidCount => Parts.Count + Arrays.Sum(a => a.Count(Initial));
+        internal int SolidCount => Parts.Count + Arrays.Sum(a => a.Count(Initial) * (a.Grid == null ? 1 : a.Grid.Columns(Initial) * a.Grid.Components.Length));
         internal Dictionary<string, double> Initial => Registry == null ? Parameters.Concat(Angles).ToDictionary(p => p.Name, p => p.Value) : new FamilyCase { Values = Registry.Initial }.Numeric;
 
         internal static JObject Tool(bool validateOnly = false)
         {
             var root = CodexFamilyDesign.Tool();
             root["name"] = validateOnly ? "revit_validate_parametric_family" : "revit_create_parametric_family";
-            root["description"] = "Crée une NOUVELLE famille paramétrique : extrusions rectangulaires natives, ouvertures, cotes et paramètres de type ou d'occurrence via family_options. Les réseaux arrays peuvent incliner leurs barres via angles et rotation (X, Y ou Z, 1 à 89 degrés), avec dimensions et nombre également réglables sans Codex. Les pièces parts acceptent aussi profile_uv : un contour polygonal simple, sans trous, piloté par des coordonnées de longueur. Vérifie dimensions, positions, nombres et inclinaisons lors d'essais de variation, puis restaure les valeurs initiales avant sauvegarde. Ne convertit pas automatiquement les FreeFormElement existants. Connecteurs natifs via connectors, contours 2D via symbolic_outlines. Pas de loft paramétrique.";
+            root["description"] = "Crée une NOUVELLE famille paramétrique : extrusions rectangulaires natives, ouvertures, cotes et paramètres de type ou d'occurrence via family_options. Les réseaux arrays peuvent incliner leurs barres via angles et rotation (X, Y ou Z, 0 à 180 degrés), avec dimensions et nombre également réglables sans Codex. Les pièces parts acceptent aussi profile_uv : un contour polygonal simple, sans trous, piloté par des coordonnées de longueur. Vérifie dimensions, positions, nombres et inclinaisons lors d'essais de variation, puis restaure les valeurs initiales avant sauvegarde. Ne convertit pas automatiquement les FreeFormElement existants. Connecteurs natifs via connectors, contours 2D via symbolic_outlines. Pas de loft paramétrique.";
             var properties = (JObject)root["inputSchema"]["properties"];
             root["description"] = (string)root["description"] + " arrays permet aussi des réseaux natifs de barres imbriquées, avec nombre entier calculé à partir de la longueur utile et du pas. Les calculs de longueur sont simplifiés et partagés pour limiter les paramètres internes.";
             properties.Remove("target_dimensions_mm");
@@ -41,20 +41,21 @@ namespace BIMaestro.Codex
                 ["offset_mm"] = number.DeepClone(),
                 ["terms"] = Arr(Obj(new JObject { ["parameter"] = parameterName.DeepClone(), ["factor"] = new JObject { ["type"] = "number", ["minimum"] = -1000, ["maximum"] = 1000 } }), 0, 8) });
             expression["description"] = "offset_mm + somme(parameter * factor). Exemple -Largeur/2 : offset_mm=0, terms=[{parameter:Largeur,factor:-0.5}]. Les coordonnées ne doivent pas traverser l'origine pendant les tests ; une coordonnée identiquement nulle est autorisée.";
+            properties["component_grids"] = ComponentGridSpec.Schema(expression);
             var positive = new JObject { ["type"] = "number", ["minimum"] = 1, ["maximum"] = 100000 };
             properties["parameters"] = Arr(Obj(new JObject { ["name"] = parameterName.DeepClone(), ["value_mm"] = positive.DeepClone(), ["test_value_mm"] = positive.DeepClone() }), 1, 8);
             properties["parameters"]["minItems"] = 0;
             properties["parameters"]["description"] = "Format historique des longueurs. En V1, peut être vide si les réglages sont déclarés dans family_options.parameters. Les coordonnées utilisent les noms des longueurs des deux formats.";
-            var angleValue = new JObject { ["type"] = "number", ["minimum"] = 1, ["maximum"] = 89 };
+            var angleValue = new JObject { ["type"] = "number", ["minimum"] = 0, ["maximum"] = 180 };
             properties["angles"] = Arr(Obj(new JObject { ["name"] = parameterName.DeepClone(), ["value_deg"] = angleValue.DeepClone(), ["test_value_deg"] = angleValue.DeepClone() }), 0, 8);
-            properties["angles"]["description"] = "Paramètres d'angle de TYPE, en degrés, pour rotation des barres de arrays. Plage 1 à 89 degrés, test différent d'au moins 1 degré. angles=[] si aucune inclinaison. Les angles ne sont pas des longueurs et ne peuvent pas apparaître dans les expressions de coordonnées.";
+            properties["angles"]["description"] = "Paramètres d'angle de TYPE, en degrés, pour rotation des barres de arrays. Plage 0 à 180 degrés, test différent d'au moins 1 degré. angles=[] si aucune inclinaison. Les angles ne sont pas des longueurs et ne peuvent pas apparaître dans les expressions de coordonnées.";
             properties["parts"] = Arr(Obj(new JObject {
                 ["name"] = new JObject { ["type"] = "string", ["minLength"] = 1, ["maxLength"] = 70 },
                 ["material"] = new JObject { ["type"] = "string", ["minLength"] = 1, ["maxLength"] = 70 },
                 ["axis"] = new JObject { ["type"] = "string", ["enum"] = new JArray("x", "y", "z") },
                 ["minimum"] = Arr((JObject)expression.DeepClone(), 3, 3), ["maximum"] = Arr((JObject)expression.DeepClone(), 3, 3),
                 ["profile_uv"] = new JObject { ["anyOf"] = new JArray(new JObject { ["type"] = "null" }, Arr(Arr((JObject)expression.DeepClone(), 2, 2), 3, 24)),
-                    ["description"] = "null : rectangle. Sinon contour polygonal paramétrique simple en UV (axes du profil), sans répéter le premier sommet ; pas d'ouvertures internes dans ce mode. Ses limites doivent correspondre à minimum/maximum. Les sommets peuvent utiliser des longueurs calculées par formules (dont trigonométrie), donc des faces obliques restent réglables." },
+                    ["description"] = "null : rectangle. Maximum 96 sommets pilotés au total dans la famille (24 par profil) ; les profils décoratifs fixes terms=[] évitent les contraintes de sommets. Sinon contour polygonal paramétrique simple en UV (axes du profil), sans répéter le premier sommet ; pas d'ouvertures internes dans ce mode. Ses limites doivent correspondre à minimum/maximum. Les sommets peuvent utiliser des longueurs calculées par formules (dont trigonométrie), donc des faces obliques restent réglables." },
                 ["openings"] = Arr(Obj(new JObject { ["minimum_uv"] = Arr((JObject)expression.DeepClone(), 2, 2), ["maximum_uv"] = Arr((JObject)expression.DeepClone(), 2, 2) }), 0, 12)
             }), 1, 80);
             properties["parts"]["description"] = "Encombrement XYZ local, minimum et maximum sont des expressions. Extrusion selon axis ; profil UV : X=>YZ, Y=>XZ, Z=>XY. Les openings sont des trous traversants dans ce profil, strictement à l'intérieur, séparés d'au moins 1 mm entre eux et du bord.";
@@ -91,12 +92,13 @@ namespace BIMaestro.Codex
             if (source?["representation_2d"] != null) keys.Add("representation_2d");
             if (source?["arrays"] != null) keys.Add("arrays");
             if (source?["angles"] != null) keys.Add("angles");
+            if (source?["component_grids"] != null) keys.Add("component_grids");
             CodexFamilyDesign.Keys(source, keys.ToArray());
             var firstMaterial = CodexFamilyDesign.Items(source, "materials", 1, 32)[0] as JObject;
             if (firstMaterial == null) throw new InvalidOperationException("Un matériau doit être un objet avec un nom et une couleur.");
             // Reuse the existing validated metadata/material contract without pretending these are fixed solids.
             var metadata = (JObject)source.DeepClone(); metadata.Remove("parameters"); metadata.Remove("arrays"); metadata.Remove("angles"); metadata.Remove("family_options");
-            metadata.Remove("connectors");
+            metadata.Remove("connectors"); metadata.Remove("component_grids");
             metadata.Remove("symbolic_outlines");
             metadata.Remove("host_opening");
             metadata["target_dimensions_mm"] = new JArray(0, 0, 0);
@@ -129,7 +131,7 @@ namespace BIMaestro.Codex
                     string name = CodexFamilyDesign.String(a, "name", 40);
                     if (!Regex.IsMatch(name, "^[A-Za-z][A-Za-z0-9_]{0,39}$") || name.StartsWith("BIM_", StringComparison.OrdinalIgnoreCase) || design.Parameters.Concat(design.Angles).Any(p => p.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
                         throw new InvalidOperationException("Nom d'angle invalide, réservé ou déjà utilisé : " + name);
-                    double value = CodexFamilyDesign.Scalar(a["value_deg"], name, 1, 89), test = CodexFamilyDesign.Scalar(a["test_value_deg"], name, 1, 89);
+                    double value = CodexFamilyDesign.Scalar(a["value_deg"], name, 0, 180), test = CodexFamilyDesign.Scalar(a["test_value_deg"], name, 0, 180);
                     if (design.Registry == null && Math.Abs(value - test) < 1) throw new InvalidOperationException("Le test de l'angle doit varier d'au moins 1 degré : " + name);
                     design.Angles.Add(new DrivingLength { Name = name, Value = value, TestValue = test });
                 }
@@ -185,7 +187,9 @@ namespace BIMaestro.Codex
                     }
                     design.Arrays.Add(array);
                 }
+            ComponentGridSpec.Parse(source, design, names);
             if (design.Parts.Count + design.Arrays.Count == 0) throw new InvalidOperationException("La famille doit contenir au moins une pièce ou un réseau.");
+            CodexProfileDesign.ValidateConstraintBudget(design.Parts);
             design.Metadata.HostOpening = FamilyHostOpeningSpec.Parse(source, design.Hosting, design.Metadata.Category, names);
             var used = design.Parts.SelectMany(p => p.Expressions).Concat(design.Arrays.SelectMany(a => a.Expressions)).Concat(design.Metadata.HostOpening?.Expressions ?? Enumerable.Empty<LengthExpression>()).SelectMany(e => e.Terms.Keys).ToHashSet();
             if (design.Registry == null && source["connectors"] == null && design.Parameters.Any(p => !used.Contains(p.Name))) throw new InvalidOperationException("Chaque paramètre doit piloter au moins une coordonnée de géométrie.");
@@ -216,7 +220,7 @@ namespace BIMaestro.Codex
         internal void ValidateAt(Dictionary<string, double> values)
         {
             Metadata?.HostOpening?.Validate(values, Initial);
-            if (Angles.Any(a => values[a.Name] < 1 || values[a.Name] > 89)) throw new InvalidOperationException("Angle hors de la plage de 1 à 89 degrés.");
+            if (Angles.Any(a => values[a.Name] < 0 || values[a.Name] > 180)) throw new InvalidOperationException("Angle hors de la plage de 0 à 180 degrés.");
             foreach (var array in Arrays)
             {
                 double pitch = array.Pitch.Value(values), span = array.Span.Value(values);
@@ -229,13 +233,15 @@ namespace BIMaestro.Codex
                     if (max - min < 1 || Math.Abs(min) > 100000 || Math.Abs(max + (axis == array.Axis ? (count - 1) * pitch : 0)) > 100000) throw new InvalidOperationException("Dimensions de barre invalides : " + array.Name);
                 }
                 var corners = array.Corners(values, 0);
-                if (corners.Max(p => p[array.Axis]) - corners.Min(p => p[array.Axis]) >= pitch) throw new InvalidOperationException("Les projections des barres se touchent ou se chevauchent : " + array.Name);
+                if (array.Grid == null ? corners.Max(p => p[array.Axis]) - corners.Min(p => p[array.Axis]) >= pitch : corners.Max(p => p[array.Axis]) - corners.Min(p => p[array.Axis]) > pitch + 1e-6) throw new InvalidOperationException("Les projections des barres se touchent ou se chevauchent : " + array.Name);
                 if (array.Corners(values, Math.Max(2, count) - 1).Concat(corners).SelectMany(p => p).Any(p => Math.Abs(p) > 100000)) throw new InvalidOperationException("Encombrement incliné hors des limites : " + array.Name);
                 foreach (var e in array.Min.Concat(new[] { LengthExpression.Combine(array.Min[array.Axis], array.Pitch) }))
                     if (!e.IsZero && (Math.Abs(e.Value(values)) < 0.001 || Math.Abs(e.Value(Initial)) < 0.001 || Math.Sign(e.Value(values)) != Math.Sign(e.Value(Initial))))
                         throw new InvalidOperationException("L'ancrage du réseau traverse l'origine : " + array.Name);
             }
-            if (Parts.Count + Arrays.Sum(a => a.Count(values)) > 750) throw new InvalidOperationException("Limite de 750 solides, réseaux compris.");
+            foreach(var gridArray in Arrays.Where(a=>a.Grid!=null))
+                if(gridArray.Grid.Width.Value(values)<1 || gridArray.Grid.Height.Value(values)<1 || gridArray.Grid.Columns(values)>200 || gridArray.Grid.Columns(values)*gridArray.Count(values)>200) throw new InvalidOperationException("Grille limitée à 200 modules visibles et étendues positives.");
+            if (Parts.Count + Arrays.Sum(a => a.Count(values)*(a.Grid==null?1:a.Grid.Columns(values)*a.Grid.Components.Length)) > 750) throw new InvalidOperationException("Limite de 750 solides, réseaux compris.");
             foreach (var part in Parts)
             {
                 CodexProfileDesign.Validate(part, values);
@@ -261,6 +267,7 @@ namespace BIMaestro.Codex
     internal sealed class DrivingLength { internal string Name; internal double Value, TestValue; }
     internal sealed class ParametricArray
     {
+        internal ComponentGridSpec Grid; internal bool Composite;
         internal string Name, Material, CountParameter; internal int Axis;
         internal string QuantityParameter = ""; internal bool SmallCounts;
         internal int RotationAxis = -1; internal string AngleParameter;

@@ -18,8 +18,26 @@ namespace BIMaestro.MepBooster
 {
     internal static class BoosterPreferences
     {
+        internal static string EnabledPath => System.IO.Path.Combine(Environment.GetFolderPath(
+            Environment.SpecialFolder.LocalApplicationData), "BIMaestro", "Settings", "mep-booster-enabled.txt");
         internal static string AnglePath => System.IO.Path.Combine(Environment.GetFolderPath(
             Environment.SpecialFolder.LocalApplicationData), "BIMaestro", "Settings", "mep-booster-angle.txt");
+        internal static bool LoadEnabled(string path)
+        {
+            try
+            {
+                return System.IO.File.Exists(path) &&
+                    bool.TryParse(System.IO.File.ReadAllText(path), out bool enabled) && enabled;
+            }
+            catch (System.IO.IOException) { }
+            catch (UnauthorizedAccessException) { }
+            return false;
+        }
+        internal static void SaveEnabled(string path, bool enabled)
+        {
+            System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path));
+            System.IO.File.WriteAllText(path, enabled.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
         internal static double LoadAngle(string path)
         {
             try

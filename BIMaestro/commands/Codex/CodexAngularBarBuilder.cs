@@ -39,9 +39,12 @@ namespace BIMaestro.Codex
                 manager.Set(sizes[a], size[a] / 304.8);
             }
             angle = CodexParameterBuilder.GetOrAdd(manager, "Inclinaison", GroupTypeId.Geometry, SpecTypeId.Angle, false);
-            manager.Set(angle, degrees * Math.PI / 180);
+            // Build obliquely to avoid Revit inferring horizontal/vertical sketch
+            // constraints at 0/90/180, then flex to the requested angle.
+            const double constructionAngle = 37;
+            manager.Set(angle, constructionAngle * Math.PI / 180);
             int u = (axis + 1) % 3, vAxis = (axis + 2) % 3;
-            var rotate = Transform.CreateRotation(Basis(axis), degrees * Math.PI / 180);
+            var rotate = Transform.CreateRotation(Basis(axis), constructionAngle * Math.PI / 180);
             XYZ du = rotate.OfVector(Basis(u)), dv = rotate.OfVector(Basis(vAxis));
             double width = size[u] / 304.8, height = size[vAxis] / 304.8;
             var points = new[] { XYZ.Zero, du * width, du * width + dv * height, dv * height };
@@ -95,6 +98,7 @@ namespace BIMaestro.Codex
                     doc.FamilyCreate.NewAlignment(byAxis[axis], guide.GeometryCurve.Reference, edges[i].GeometryCurve.GetEndPointReference(endpoint));
                 }
             }
+            manager.Set(angle, degrees * Math.PI / 180);
             doc.Regenerate(); Check(size, degrees);
         }
         private ReferencePlane CoordinatePlane(View view, int coordinateAxis, double coordinate, string name)

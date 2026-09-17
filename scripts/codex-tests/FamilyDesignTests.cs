@@ -41,6 +41,10 @@ internal static class FamilyDesignTests
         }
         var floor = (JObject)fixture.DeepClone(); floor["hosting"] = "floor"; floor["place_at_origin"] = false;
         if (CodexFamilyDesign.Parse(floor).Hosting != "floor") throw new Exception("Floor hosting failed");
+        floor["host_opening"] = JObject.Parse("{min_xyz:[{offset_mm:-250,terms:[]},{offset_mm:-300,terms:[]},{offset_mm:-1000,terms:[]}],max_xyz:[{offset_mm:250,terms:[]},{offset_mm:300,terms:[]},{offset_mm:100,terms:[]}]}");
+        if (!CodexFamilyDesign.Parse(floor).HostOpening.IsFloor) throw new Exception("Fixed floor void missing");
+        Reject(floor, x => x["host_opening"]["max_xyz"][2]["offset_mm"] = -1000, "fixed zero-depth floor void");
+        Reject(floor, x => x["host_opening"]["min_xyz"][0]["terms"] = JArray.Parse("[{parameter:'Width',factor:1}]"), "fixed void referencing a parameter");
         Reject(floor, x => { x["load_into_project"] = true; x["place_at_origin"] = true; }, "hosted placement without host");
         Reject(floor, x => x["hosting"] = "unknown", "unknown hosting");
         Reject(floor, x => x["hosting"] = 42, "non-string hosting");
@@ -60,6 +64,12 @@ internal static class FamilyDesignTests
         if ((string)CodexFamilyDesign.Tool(true)["name"] != "revit_validate_family") throw new Exception("Missing validation tool");
         Console.WriteLine("PASS: validation tool, named part errors and all mismatched axes");
         Reject(fixture, x => x["category"] = "unknown", "unknown category");
+        foreach (var category in new[] { "furniture", "pipe_accessory", "pipe_fitting", "duct_accessory", "duct_fitting" })
+        {
+            var categorized = (JObject)fixture.DeepClone(); categorized["category"] = category;
+            if (CodexFamilyDesign.Parse(categorized).Category != category) throw new Exception("Lost category " + category);
+        }
+        Console.WriteLine("PASS: furniture and MEP accessory/fitting categories");
         Reject(fixture, x => x["parts"][0]["material"] = "unknown", "unknown material");
         Reject(fixture, x => x["parts"][0]["repeat_count"] = 2, "coincident repetitions");
         Reject(fixture, x => x["parts"][4]["repeat_step_mm"] = new JArray(100000, 0, 0), "repetition outside limits");

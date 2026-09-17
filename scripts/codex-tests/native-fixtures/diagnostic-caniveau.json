@@ -1,0 +1,701 @@
+{
+  "name": "Caniveau_beton_grille_1000x250x250",
+  "category": "plumbing",
+  "hosting": "free",
+  "host_opening": null,
+  "representation_2d": null,
+  "assumptions": [
+    "Dimensions hors tout grille comprise : longueur X 1000, largeur Y 250, profondeur Z 250 mm.",
+    "Corps beton ouvert aux deux extremites ; fond interieur polygonal a pans inclines, sans courbes.",
+    "Parois laterales 30 mm ; fond 35 mm au centre ; facettes constantes de 35 a 95 mm de hauteur.",
+    "Grille en acier galvanise : rives 10 mm, barreaux 12 x 20 mm au pas fixe de 40 mm.",
+    "Geometrie supposee des faces cachees, sans emboitement, fixation ni sortie de canalisation.",
+    "Origine au coin inferieur du corps ; dimensions de type. Largeur doit rester superieure a 150 mm, profondeur superieure a 115 mm."
+  ],
+  "materials": [
+    {
+      "name": "Beton",
+      "rgb": [
+        170,
+        168,
+        159
+      ],
+      "transparency": 0
+    },
+    {
+      "name": "Acier_galvanise",
+      "rgb": [
+        155,
+        165,
+        170
+      ],
+      "transparency": 0
+    }
+  ],
+  "parts": [
+    {
+      "name": "Corps_beton_facette",
+      "material": "Beton",
+      "axis": "x",
+      "minimum": [
+        {
+          "offset_mm": 0,
+          "terms": []
+        },
+        {
+          "offset_mm": 0,
+          "terms": []
+        },
+        {
+          "offset_mm": 0,
+          "terms": []
+        }
+      ],
+      "maximum": [
+        {
+          "offset_mm": 0,
+          "terms": [
+            {
+              "parameter": "Longueur",
+              "factor": 1
+            }
+          ]
+        },
+        {
+          "offset_mm": 0,
+          "terms": [
+            {
+              "parameter": "Largeur",
+              "factor": 1
+            }
+          ]
+        },
+        {
+          "offset_mm": 0,
+          "terms": [
+            {
+              "parameter": "Profondeur",
+              "factor": 1
+            }
+          ]
+        }
+      ],
+      "profile_uv": [
+        [
+          {
+            "offset_mm": 0,
+            "terms": []
+          },
+          {
+            "offset_mm": 0,
+            "terms": []
+          }
+        ],
+        [
+          {
+            "offset_mm": 0,
+            "terms": [
+              {
+                "parameter": "Largeur",
+                "factor": 1
+              }
+            ]
+          },
+          {
+            "offset_mm": 0,
+            "terms": []
+          }
+        ],
+        [
+          {
+            "offset_mm": 0,
+            "terms": [
+              {
+                "parameter": "Largeur",
+                "factor": 1
+              }
+            ]
+          },
+          {
+            "offset_mm": 0,
+            "terms": [
+              {
+                "parameter": "Profondeur",
+                "factor": 1
+              }
+            ]
+          }
+        ],
+        [
+          {
+            "offset_mm": -30,
+            "terms": [
+              {
+                "parameter": "Largeur",
+                "factor": 1
+              }
+            ]
+          },
+          {
+            "offset_mm": 0,
+            "terms": [
+              {
+                "parameter": "Profondeur",
+                "factor": 1
+              }
+            ]
+          }
+        ],
+        [
+          {
+            "offset_mm": -30,
+            "terms": [
+              {
+                "parameter": "Largeur",
+                "factor": 1
+              }
+            ]
+          },
+          {
+            "offset_mm": 95,
+            "terms": []
+          }
+        ],
+        [
+          {
+            "offset_mm": -45,
+            "terms": [
+              {
+                "parameter": "Largeur",
+                "factor": 1
+              }
+            ]
+          },
+          {
+            "offset_mm": 60,
+            "terms": []
+          }
+        ],
+        [
+          {
+            "offset_mm": -75,
+            "terms": [
+              {
+                "parameter": "Largeur",
+                "factor": 1
+              }
+            ]
+          },
+          {
+            "offset_mm": 35,
+            "terms": []
+          }
+        ],
+        [
+          {
+            "offset_mm": 75,
+            "terms": []
+          },
+          {
+            "offset_mm": 35,
+            "terms": []
+          }
+        ],
+        [
+          {
+            "offset_mm": 45,
+            "terms": []
+          },
+          {
+            "offset_mm": 60,
+            "terms": []
+          }
+        ],
+        [
+          {
+            "offset_mm": 30,
+            "terms": []
+          },
+          {
+            "offset_mm": 95,
+            "terms": []
+          }
+        ],
+        [
+          {
+            "offset_mm": 30,
+            "terms": []
+          },
+          {
+            "offset_mm": 0,
+            "terms": [
+              {
+                "parameter": "Profondeur",
+                "factor": 1
+              }
+            ]
+          }
+        ],
+        [
+          {
+            "offset_mm": 0,
+            "terms": []
+          },
+          {
+            "offset_mm": 0,
+            "terms": [
+              {
+                "parameter": "Profondeur",
+                "factor": 1
+              }
+            ]
+          }
+        ]
+      ],
+      "openings": []
+    },
+    {
+      "name": "Rive_grille_gauche",
+      "material": "Acier_galvanise",
+      "axis": "z",
+      "minimum": [
+        {
+          "offset_mm": 0,
+          "terms": []
+        },
+        {
+          "offset_mm": 30,
+          "terms": []
+        },
+        {
+          "offset_mm": -20,
+          "terms": [
+            {
+              "parameter": "Profondeur",
+              "factor": 1
+            }
+          ]
+        }
+      ],
+      "maximum": [
+        {
+          "offset_mm": 0,
+          "terms": [
+            {
+              "parameter": "Longueur",
+              "factor": 1
+            }
+          ]
+        },
+        {
+          "offset_mm": 40,
+          "terms": []
+        },
+        {
+          "offset_mm": 0,
+          "terms": [
+            {
+              "parameter": "Profondeur",
+              "factor": 1
+            }
+          ]
+        }
+      ],
+      "profile_uv": null,
+      "openings": []
+    },
+    {
+      "name": "Rive_grille_droite",
+      "material": "Acier_galvanise",
+      "axis": "z",
+      "minimum": [
+        {
+          "offset_mm": 0,
+          "terms": []
+        },
+        {
+          "offset_mm": -40,
+          "terms": [
+            {
+              "parameter": "Largeur",
+              "factor": 1
+            }
+          ]
+        },
+        {
+          "offset_mm": -20,
+          "terms": [
+            {
+              "parameter": "Profondeur",
+              "factor": 1
+            }
+          ]
+        }
+      ],
+      "maximum": [
+        {
+          "offset_mm": 0,
+          "terms": [
+            {
+              "parameter": "Longueur",
+              "factor": 1
+            }
+          ]
+        },
+        {
+          "offset_mm": -30,
+          "terms": [
+            {
+              "parameter": "Largeur",
+              "factor": 1
+            }
+          ]
+        },
+        {
+          "offset_mm": 0,
+          "terms": [
+            {
+              "parameter": "Profondeur",
+              "factor": 1
+            }
+          ]
+        }
+      ],
+      "profile_uv": null,
+      "openings": []
+    },
+    {
+      "name": "Traverse_depart",
+      "material": "Acier_galvanise",
+      "axis": "z",
+      "minimum": [
+        {
+          "offset_mm": 0,
+          "terms": []
+        },
+        {
+          "offset_mm": 40,
+          "terms": []
+        },
+        {
+          "offset_mm": -20,
+          "terms": [
+            {
+              "parameter": "Profondeur",
+              "factor": 1
+            }
+          ]
+        }
+      ],
+      "maximum": [
+        {
+          "offset_mm": 10,
+          "terms": []
+        },
+        {
+          "offset_mm": -40,
+          "terms": [
+            {
+              "parameter": "Largeur",
+              "factor": 1
+            }
+          ]
+        },
+        {
+          "offset_mm": 0,
+          "terms": [
+            {
+              "parameter": "Profondeur",
+              "factor": 1
+            }
+          ]
+        }
+      ],
+      "profile_uv": null,
+      "openings": []
+    },
+    {
+      "name": "Traverse_fin",
+      "material": "Acier_galvanise",
+      "axis": "z",
+      "minimum": [
+        {
+          "offset_mm": -10,
+          "terms": [
+            {
+              "parameter": "Longueur",
+              "factor": 1
+            }
+          ]
+        },
+        {
+          "offset_mm": 40,
+          "terms": []
+        },
+        {
+          "offset_mm": -20,
+          "terms": [
+            {
+              "parameter": "Profondeur",
+              "factor": 1
+            }
+          ]
+        }
+      ],
+      "maximum": [
+        {
+          "offset_mm": 0,
+          "terms": [
+            {
+              "parameter": "Longueur",
+              "factor": 1
+            }
+          ]
+        },
+        {
+          "offset_mm": -40,
+          "terms": [
+            {
+              "parameter": "Largeur",
+              "factor": 1
+            }
+          ]
+        },
+        {
+          "offset_mm": 0,
+          "terms": [
+            {
+              "parameter": "Profondeur",
+              "factor": 1
+            }
+          ]
+        }
+      ],
+      "profile_uv": null,
+      "openings": []
+    }
+  ],
+  "load_into_project": false,
+  "place_at_origin": false,
+  "connectors": [],
+  "symbolic_outlines": [],
+  "parameters": [
+    {
+      "name": "Longueur",
+      "value_mm": 1000,
+      "test_value_mm": 1200
+    },
+    {
+      "name": "Largeur",
+      "value_mm": 250,
+      "test_value_mm": 300
+    },
+    {
+      "name": "Profondeur",
+      "value_mm": 250,
+      "test_value_mm": 350
+    }
+  ],
+  "angles": [],
+  "arrays": [
+    {
+      "name": "Barreaux_grille",
+      "material": "Acier_galvanise",
+      "count_parameter": "Nombre_barreaux",
+      "axis": "x",
+      "minimum": [
+        {
+          "offset_mm": 24,
+          "terms": []
+        },
+        {
+          "offset_mm": 40,
+          "terms": []
+        },
+        {
+          "offset_mm": -20,
+          "terms": [
+            {
+              "parameter": "Profondeur",
+              "factor": 1
+            }
+          ]
+        }
+      ],
+      "maximum": [
+        {
+          "offset_mm": 36,
+          "terms": []
+        },
+        {
+          "offset_mm": -40,
+          "terms": [
+            {
+              "parameter": "Largeur",
+              "factor": 1
+            }
+          ]
+        },
+        {
+          "offset_mm": 0,
+          "terms": [
+            {
+              "parameter": "Profondeur",
+              "factor": 1
+            }
+          ]
+        }
+      ],
+      "span": {
+        "offset_mm": -20,
+        "terms": [
+          {
+            "parameter": "Longueur",
+            "factor": 1
+          }
+        ]
+      },
+      "pitch": {
+        "offset_mm": 40,
+        "terms": []
+      },
+      "quantity_parameter": "",
+      "rotation": null
+    }
+  ],
+  "family_options": {
+    "parameters": [
+      {
+        "name": "Longueur",
+        "kind": "length",
+        "instance": false,
+        "value": 1000,
+        "test_values": [
+          979,
+          980,
+          981,
+          1200
+        ],
+        "formula": "",
+        "group": "geometry",
+        "description": "Dimension hors tout en mm",
+        "shared_guid": ""
+      },
+      {
+        "name": "Largeur",
+        "kind": "length",
+        "instance": false,
+        "value": 250,
+        "test_values": [
+          200,
+          300
+        ],
+        "formula": "",
+        "group": "geometry",
+        "description": "Dimension hors tout en mm",
+        "shared_guid": ""
+      },
+      {
+        "name": "Profondeur",
+        "kind": "length",
+        "instance": false,
+        "value": 250,
+        "test_values": [
+          200,
+          350
+        ],
+        "formula": "",
+        "group": "geometry",
+        "description": "Dimension hors tout en mm",
+        "shared_guid": ""
+      }
+    ],
+    "types": [
+      {
+        "name": "1000 x 250 x 250",
+        "values": [
+          {
+            "parameter": "Longueur",
+            "value": 1000
+          },
+          {
+            "parameter": "Largeur",
+            "value": 250
+          },
+          {
+            "parameter": "Profondeur",
+            "value": 250
+          }
+        ]
+      }
+    ],
+    "representations": [
+      {
+        "component": "Corps_beton_facette",
+        "visible_parameter": "",
+        "subcategory": "Corps beton",
+        "coarse": true,
+        "medium": true,
+        "fine": true,
+        "plan": true,
+        "front_back": true,
+        "left_right": true
+      },
+      {
+        "component": "Rive_grille_gauche",
+        "visible_parameter": "",
+        "subcategory": "Grille metallique",
+        "coarse": true,
+        "medium": true,
+        "fine": true,
+        "plan": true,
+        "front_back": true,
+        "left_right": true
+      },
+      {
+        "component": "Rive_grille_droite",
+        "visible_parameter": "",
+        "subcategory": "Grille metallique",
+        "coarse": true,
+        "medium": true,
+        "fine": true,
+        "plan": true,
+        "front_back": true,
+        "left_right": true
+      },
+      {
+        "component": "Traverse_depart",
+        "visible_parameter": "",
+        "subcategory": "Grille metallique",
+        "coarse": true,
+        "medium": true,
+        "fine": true,
+        "plan": true,
+        "front_back": true,
+        "left_right": true
+      },
+      {
+        "component": "Traverse_fin",
+        "visible_parameter": "",
+        "subcategory": "Grille metallique",
+        "coarse": true,
+        "medium": true,
+        "fine": true,
+        "plan": true,
+        "front_back": true,
+        "left_right": true
+      },
+      {
+        "component": "Barreaux_grille",
+        "visible_parameter": "",
+        "subcategory": "Grille metallique",
+        "coarse": true,
+        "medium": true,
+        "fine": true,
+        "plan": true,
+        "front_back": true,
+        "left_right": true
+      }
+    ]
+  }
+}

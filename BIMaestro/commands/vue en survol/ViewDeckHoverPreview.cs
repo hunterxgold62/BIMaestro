@@ -11,7 +11,7 @@ namespace BIMaestro.ViewHover
     // UI only: hovering never calls Revit, opens a view, reads a file or exports.
     internal sealed class ViewDeckHoverPreview : IDisposable
     {
-        internal const int DelayMilliseconds = 500;
+        internal const int DelayMilliseconds = 200;
         private readonly TabItem _tab;
         private readonly TextBlock _title;
         private readonly Border _added, _modified, _deleted;

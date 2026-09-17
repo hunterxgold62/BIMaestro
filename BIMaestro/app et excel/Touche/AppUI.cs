@@ -127,7 +127,7 @@ public class AppUI : IExternalApplication
 
             new RibbonPanelDefinition("Outils IA", new List<RibbonItemDefinition>
             {
-                new RibbonItemDefinition("CodexChat", "Codex", panel => AddPushButton(panel, "CodexChat", "Codex", assemblyPath, "BIMaestro.Codex.CodexCommand", "Chatbot + élémet.png", "Ouvre le tchat Codex avec votre compte ChatGPT et le choix du modèle. Lecture du contexte sur demande ; modifications de famille après validation. Bêta.")),
+                new RibbonItemDefinition("CodexChat", "Famille IA", panel => AddPushButton(panel, "CodexChat", "Famille IA", assemblyPath, "BIMaestro.Codex.CodexCommand", "Chatbot + élémet.png", "Crée et modifie des familles Revit avec l’IA depuis votre compte ChatGPT. Lecture du contexte sur demande ; modifications après validation. Bêta.")),
                 new RibbonItemDefinition("IAQuickTools", "Outils IA rapides", panel => AddStackedPushButtons(
                     panel,
                     assemblyPath,

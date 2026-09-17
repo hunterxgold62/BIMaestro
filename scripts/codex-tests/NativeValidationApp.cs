@@ -1,4 +1,4 @@
-using Autodesk.Revit.UI;
+﻿using Autodesk.Revit.UI;
 using Autodesk.Revit.UI.Events;
 using Autodesk.Revit.DB;
 using BIMaestro.Codex;
@@ -23,7 +23,7 @@ namespace BIMaestro.CodexTests
             application = value; application.Idling += OnIdle;
             return Result.Succeeded;
         }
-        private void OnIdle(object sender, IdlingEventArgs args)
+        private async void OnIdle(object sender, IdlingEventArgs args)
         {
             // Revit may hot-load a newly registered add-in into an existing session.
             // Only the process explicitly launched by StartNativeHarness may run tests.
@@ -38,8 +38,47 @@ namespace BIMaestro.CodexTests
                 var ui = sender as UIApplication ?? throw new InvalidOperationException("Contexte UIApplication absent.");
                 if (ui.Application.Documents.Size != 0) throw new InvalidOperationException("Le banc exige une instance Revit vide ; aucun document utilisateur ne sera modifié.");
                 var parameters = ValidateParameterReuse(ui);
+                var categories = ValidateCategories(ui);
+                var wallTemplate = Newtonsoft.Json.Linq.JObject.FromObject(CodexFamilyBuilder.TemplateInfo(ui,"wall"));
+                var wall = wallTemplate["walls"].First();
+                if (Math.Abs((double)wall["maximum_y_mm"]-(double)wall["minimum_y_mm"]-(double)wall["width_mm"])>0.01) throw new Exception("Host wall measurement inconsistent.");
                 var report = Newtonsoft.Json.Linq.JObject.FromObject(CodexNativeValidation.Run(ui, message => File.WriteAllText(Path.Combine(DirectoryPath, "progress.txt"), DateTime.Now.ToString("O") + " " + message), RenderRepresentation));
                 report["parameter_reuse_tests"] = Newtonsoft.Json.Linq.JObject.FromObject(parameters);
+                report["category_tests"] = Newtonsoft.Json.Linq.JObject.FromObject(categories);
+                report["wall_template_test"] = wallTemplate;
+                var fixture = Assembly.GetExecutingAssembly().GetManifestResourceNames().FirstOrDefault(n => n.EndsWith("polygon-profile.json"));
+                if (fixture != null)
+                {
+                    Newtonsoft.Json.Linq.JObject design;
+                    using (var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(fixture))
+                    using (var reader = new StreamReader(stream)) design = Newtonsoft.Json.Linq.JObject.Parse(reader.ReadToEnd());
+                    int count = 0;
+                    var cancelBridge = new CodexRevitBridge(null) { ShareContext = true, AllowChanges = true, ApplyDirectly = true };
+                    cancelBridge.AttachEvent(ExternalEvent.Create(cancelBridge));
+                    using (var bridge = new CodexRevitBridge(null) { ShareContext = true, AllowChanges = true, ApplyDirectly = true })
+                    {
+                        bridge.AttachEvent(ExternalEvent.Create(bridge));
+                        bridge.CreationProgress += message =>
+                        {
+                            count++;
+                            if (ui.Application.Documents.Cast<Document>().Any(d => d.IsModifiable)) throw new Exception("Transaction left open between steps.");
+                            File.WriteAllText(Path.Combine(DirectoryPath, "progress.txt"), message);
+                        };
+                        await bridge.CallAsync("revit_validate_parametric_family", design);
+                        if (count < 5) throw new Exception("Creation did not yield between steps.");
+                        // Check document cleanup in a fresh API callback below.
+                    }
+                    using (var bridge = cancelBridge)
+                    {
+                        int cancelledSteps = 0;
+                        bridge.CreationProgress += message => { if (++cancelledSteps == 3) bridge.CancelPending(); };
+                        bool cancelled = false;
+                        try { await bridge.CallAsync("revit_validate_parametric_family", design); }
+                        catch (OperationCanceledException) { cancelled = true; }
+                        if (!cancelled) throw new Exception("Cancellation was ignored.");
+                    }
+                    report["staged_creation_tests"] = Newtonsoft.Json.Linq.JObject.FromObject(new { passed = true, steps = count, cancellation = true });
+                }
                 File.WriteAllText(Path.Combine(DirectoryPath, "result.json"), report.ToString(Formatting.Indented));
             }
             catch (Exception ex) { File.WriteAllText(Path.Combine(DirectoryPath, "result.json"), JsonConvert.SerializeObject(new { error = ex.ToString() }, Formatting.Indented)); }
@@ -87,6 +126,41 @@ namespace BIMaestro.CodexTests
                 if (Directory.GetFiles(folder, "*.png").Length != 2) throw new Exception("Missing plan/3D visual test exports");
             }
             finally { if (project != null && project.IsValidObject) project.Close(false); }
+        }
+
+        private static object ValidateCategories(UIApplication ui)
+        {
+            string template = Directory.EnumerateFiles(ui.Application.FamilyTemplatePath, "*.rft", SearchOption.AllDirectories).First(p =>
+                new[] { "Modèle générique métrique", "Metric Generic Model" }.Contains(Path.GetFileNameWithoutExtension(p)));
+            var doc = ui.Application.NewFamilyDocument(template);
+            try
+            {
+                var placement = doc.OwnerFamily.FamilyPlacementType;
+                int count = 0;
+                foreach (var code in CodexFamilyDesign.Categories)
+                {
+                    var args = new Newtonsoft.Json.Linq.JObject { ["category"] = code };
+                    CodexFamilyTools.SetCategory(doc, args, (title, detail) => true,
+                        name => { var t = new Transaction(doc, name); t.Start(); return t; },
+                        t => { if (t.Commit() != TransactionStatus.Committed) throw new Exception("Category transaction failed"); });
+                    if (doc.OwnerFamily.FamilyCategory.Id != Category.GetCategory(doc, CodexFamilyBuilder.CategoryId(code)).Id ||
+                        doc.OwnerFamily.FamilyPlacementType != placement)
+                        throw new Exception("Category or hosting mismatch for " + code);
+                    var read = Newtonsoft.Json.Linq.JObject.FromObject(CodexFamilyTools.Read(doc));
+                    if ((string)read["category"] != code) throw new Exception("Read category mismatch");
+                    count++;
+                }
+                bool rejected = false;
+                try
+                {
+                    CodexFamilyTools.SetCategory(doc, new Newtonsoft.Json.Linq.JObject { ["category"] = "furniture" },
+                        (title, detail) => false, name => throw new Exception("Rejected operation started a transaction"), t => { });
+                }
+                catch (InvalidOperationException) { rejected = true; }
+                if (!rejected) throw new Exception("Refused category change was applied");
+                return new { passed = true, categories = count, hosting_preserved = true, refusal_respected = true };
+            }
+            finally { doc.Close(false); }
         }
 
         private static object ValidateParameterReuse(UIApplication ui)

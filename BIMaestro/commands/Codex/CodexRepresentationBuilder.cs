@@ -96,6 +96,7 @@ namespace BIMaestro.Codex
                         var curves = drawing.Curves.SelectMany(c => Curves(c, XYZ.Zero, XYZ.BasisX, XYZ.BasisY)).ToList();
                         var type = RegionType(child, drawing);
                         FilledRegion.Create(child, type.Id, view.Id, new[] { CurveLoop.Create(curves) });
+                        CodexFamilyBuilder.ApplyBranding(child.FamilyManager);
                         if (t.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Région 2D annulée par Revit.");
                     }
                     var loaded = child.LoadFamily(parent);

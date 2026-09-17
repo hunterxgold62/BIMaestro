@@ -1,4 +1,4 @@
-using Newtonsoft.Json.Linq;
+﻿using Newtonsoft.Json.Linq;
 using System;
 using System.Reflection;
 using System.Linq;
@@ -15,6 +15,7 @@ namespace BIMaestro.Codex
     // UI regression tests use the real window without loading Revit or starting Codex.
     internal sealed class CodexRevitBridge : IDisposable
     {
+        internal event Action<string> CreationProgress;
         internal bool ShareContext { get; set; }
         internal bool AllowChanges { get; set; }
         internal bool ApplyDirectly { get; set; }
@@ -22,7 +23,8 @@ namespace BIMaestro.Codex
         internal static JArray ToolDefinitions() => new JArray();
         internal Func<string, JObject, Task<object>> Handler = (tool, args) => Task.FromResult<object>(new { });
         internal Task<object> CallAsync(string tool, JObject args) => Handler(tool, args);
-        internal void CancelPending() { }
+        internal int CancellationCount;
+        internal void CancelPending(string reason = null) { CancellationCount++; }
         public void Dispose() { }
     }
     internal static class WindowTests
@@ -42,6 +44,7 @@ namespace BIMaestro.Codex
                 using (var source = System.IO.File.OpenRead("BIMaestro/Themes/BIMaestroTheme.xaml"))
                     theme = (System.Windows.ResourceDictionary)System.Windows.Markup.XamlReader.Load(source);
                 var window = new CodexWindow(bridge, theme);
+                if (!bridge.ShareContext || !bridge.AllowChanges || !bridge.ApplyDirectly || ((CheckBox)Get(window, "context")).IsChecked != true || ((CheckBox)Get(window, "changes")).IsChecked != true || ((CheckBox)Get(window, "direct")).IsChecked != true) throw new Exception("Requested initial permissions are not checked.");
                 var modelType = typeof(CodexWindow).GetNestedType("ModelChoice", BindingFlags.NonPublic);
                 Func<string, bool, object> model = (id, isDefault) => Activator.CreateInstance(modelType, BindingFlags.NonPublic | BindingFlags.Instance, null,
                     new object[] { JObject.Parse("{\"model\":\"" + id + "\",\"isDefault\":" + (isDefault ? "true" : "false") + ",\"defaultReasoningEffort\":\"high\",\"supportedReasoningEfforts\":[{\"reasoningEffort\":\"low\"},{\"reasoningEffort\":\"high\"}]} ") }, null);
@@ -57,18 +60,21 @@ namespace BIMaestro.Codex
                 typeof(CodexWindow).GetMethod("SelectPreferredModel", PrivateInstance).Invoke(window, new object[0]);
                 if (!ReferenceEquals(picker.SelectedItem, fallback)) throw new Exception("Missing-model fallback failed");
                 Console.WriteLine("PASS: Astra low preference, new-discussion reset and unavailable-model fallback");
-                if (bridge.ApplyDirectly || ((CheckBox)Get(window, "direct")).IsEnabled) throw new Exception("Direct mode enabled initially");
+                if (bridge.ApplyDirectly) throw new Exception("New discussion should still reset direct mode.");
                 ((CheckBox)Get(window, "context")).IsChecked = true;
                 ((CheckBox)Get(window, "changes")).IsChecked = true;
                 ((CheckBox)Get(window, "direct")).IsChecked = true;
                 if (!bridge.ApplyDirectly) throw new Exception("Direct mode not applied");
                 ((CheckBox)Get(window, "context")).IsChecked = false;
                 if (bridge.ApplyDirectly || bridge.AllowChanges) throw new Exception("Revoked permissions remained active");
-                Console.WriteLine("PASS: direct mode requires opt-in and is revoked with context");
+                Console.WriteLine("PASS: permissions checked at opening, direct mode reset for new discussion, revocation respected");
                 foreach (string state in new[] { "completed", "interrupted", "failed" })
                 {
                     Set(window, "threadId", "test-thread"); Set(window, "turnId", "test-turn"); Set(window, "busy", true);
+                    int previousCancellations = bridge.CancellationCount;
                     Notify(window, "turn/completed", JObject.Parse("{\"threadId\":\"test-thread\",\"turn\":{\"status\":\"" + state + "\",\"error\":null}}"));
+                    if (bridge.CancellationCount != previousCancellations + (state == "completed" ? 0 : 1))
+                        throw new Exception("Incorrect cancellation policy for " + state);
                     if ((bool)Get(window, "busy") || ((Button)Get(window, "stop")).IsEnabled)
                         throw new Exception("The turn remained busy after " + state);
                     Console.WriteLine("PASS: UI " + state + " with error:null");
@@ -87,6 +93,23 @@ namespace BIMaestro.Codex
                     Set(window, "client", client); Set(window, "threadId", "test-thread"); Set(window, "turnId", "test-turn"); Set(window, "busy", true);
                     var arguments = new JObject { ["parts"] = new JArray() };
                     var call = new JObject { ["threadId"] = "test-thread", ["turnId"] = "test-turn", ["tool"] = "revit_validate_family", ["arguments"] = arguments };
+                    var pendingResult = new TaskCompletionSource<object>();
+                    bridge.Handler = (tool, args) => pendingResult.Task;
+                    int cancellations = bridge.CancellationCount;
+                    var pendingCall = (Task<object>)typeof(CodexWindow).GetMethod("HandleRequestAsync", PrivateInstance).Invoke(window, new object[] { client, "item/tool/call", call });
+                    Notify(window, "turn/completed", JObject.Parse("{\"threadId\":\"test-thread\",\"turn\":{\"id\":\"older-turn\",\"status\":\"completed\"}}"));
+                    if ((string)Get(window, "turnId") != "test-turn") throw new Exception("Stale completion cleared the active turn");
+                    Notify(window, "turn/completed", JObject.Parse("{\"threadId\":\"test-thread\",\"turn\":{\"id\":\"test-turn\",\"status\":\"completed\"}}"));
+                    if (bridge.CancellationCount != cancellations || !(bool)Get(window, "busy") || !((Button)Get(window, "stop")).IsEnabled || ((Button)Get(window, "reset")).IsEnabled)
+                        throw new Exception("Normal completion cancelled Revit or unlocked the panel too early");
+                    pendingResult.SetResult(new CodexFamilyArtifact { FilePath = "finished-after-turn.rfa", Report = new { saved = true } });
+                    var frame = new System.Windows.Threading.DispatcherFrame();
+                    pendingCall.ContinueWith(_ => window.Dispatcher.BeginInvoke(new Action(() => frame.Continue = false)));
+                    System.Windows.Threading.Dispatcher.PushFrame(frame);
+                    if (!JObject.FromObject(pendingCall.GetAwaiter().GetResult()).Value<bool>("success") || (bool)Get(window, "busy") || ((CodexFamilyArtifact)Get(window, "lastArtifact")).FilePath != "finished-after-turn.rfa")
+                        throw new Exception("Late Revit result was lost or panel remained busy");
+                    Console.WriteLine("PASS: normal turn completion preserves pending Revit operation and its saved result; stale completion ignored");
+                    Set(window, "turnId", "test-turn"); Set(window, "busy", true);
                     bridge.Handler = (tool, args) => Task.FromException<object>(new InvalidOperationException("Pièce « barbe » : le profil se croise."));
                     var failed = Request(window, client, call);
                     string errorText = (string)failed["contentItems"][0]["text"];

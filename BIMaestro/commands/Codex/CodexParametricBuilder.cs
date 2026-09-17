@@ -37,94 +37,116 @@ namespace BIMaestro.Codex
 
         internal List<Element> Build(Dictionary<string, FamilyParameter> materials, Dictionary<string, FamilySymbol> prototypes = null)
         {
-            if (design.Registry != null)
+            foreach (var step in BuildSteps(materials, prototypes)) step();
+            return CreatedElements();
+        }
+        internal List<Element> CreatedElements() => extrusions.Cast<Element>().Concat(arrays.SelectMany(a => a.AllInstances()).Cast<Element>()).ToList();
+        internal IEnumerable<Action> BuildSteps(Dictionary<string, FamilyParameter> materials, Dictionary<string, FamilySymbol> prototypes = null)
+        {
+            yield return () =>
             {
-                registryBuilder = new CodexParameterBuilder(doc, design.Registry);
-                foreach (var pair in registryBuilder.Parameters) drivers.Add(pair.Key, pair.Value);
-            }
-            for (int a = 0; a < 3; a++) { origins[a] = NewPlane(a, 0, "BIM_Origine_" + "XYZ"[a]); origins[a].Pinned = true; }
-            foreach (var parameter in design.Parameters)
-            {
-                var native = registryBuilder != null ? drivers[parameter.Name] : CodexParameterBuilder.GetOrAdd(manager, parameter.Name, GroupTypeId.Geometry, SpecTypeId.Length, false);
-                if (registryBuilder == null) { manager.Set(native, Feet(parameter.Value)); RegisterDriver(parameter.Name, native); CodexParameterBuilder.Describe(manager, native, "Réglage de la famille, en millimètres."); }
-                // A user-facing dimension labeled by the actual driving parameter.
-                int axis = Enumerable.Range(0, 3).OrderByDescending(a => design.Parts.Count(p => p.Min[a].Terms.ContainsKey(parameter.Name) || p.Max[a].Terms.ContainsKey(parameter.Name))).First();
-                var end = NewPlane(axis, Feet(parameter.Value), "BIM_Repere_" + parameter.Name);
-                sequence++;
-                doc.Regenerate(); Label(axis, end, Feet(parameter.Value), native);
-                var expression = new LengthExpression(); expression.Terms.Add(parameter.Name, 1);
-                planes[axis + ":" + expression.Formula()] = end;
-            }
+                if (design.Registry != null)
+                {
+                    registryBuilder = new CodexParameterBuilder(doc, design.Registry);
+                    foreach (var pair in registryBuilder.Parameters) drivers.Add(pair.Key, pair.Value);
+                }
+                for (int a = 0; a < 3; a++) { origins[a] = NewPlane(a, 0, "BIM_Origine_" + "XYZ"[a]); origins[a].Pinned = true; }
+                foreach (var parameter in design.Parameters)
+                {
+                    var native = registryBuilder != null ? drivers[parameter.Name] : CodexParameterBuilder.GetOrAdd(manager, parameter.Name, GroupTypeId.Geometry, SpecTypeId.Length, false);
+                    if (registryBuilder == null) { manager.Set(native, Feet(parameter.Value)); RegisterDriver(parameter.Name, native); CodexParameterBuilder.Describe(manager, native, "Réglage de la famille, en millimètres."); }
+                    // A user-facing dimension labeled by the actual driving parameter.
+                    int axis = Enumerable.Range(0, 3).OrderByDescending(a => design.Parts.Count(p => p.Min[a].Terms.ContainsKey(parameter.Name) || p.Max[a].Terms.ContainsKey(parameter.Name))).First();
+                    var end = NewPlane(axis, Feet(parameter.Value), "BIM_Repere_" + parameter.Name);
+                    sequence++;
+                    doc.Regenerate(); Label(axis, end, Feet(parameter.Value), native);
+                    var expression = new LengthExpression(); expression.Terms.Add(parameter.Name, 1);
+                    planes[axis + ":" + expression.Formula()] = end;
+                }
+            };
             foreach (var part in design.Parts)
             {
-                try
+                yield return () =>
                 {
-                    var min = part.Min.Select(e => Feet(e.Value(design.Initial))).ToArray();
-                    var max = part.Max.Select(e => Feet(e.Value(design.Initial))).ToArray();
-                    int[] uv = part.ProfileAxes;
-                    var profile = new CurveArrArray();
-                    profile.Append(part.Profile == null ? Rectangle(part.Axis, min[part.Axis], min[uv[0]], min[uv[1]], max[uv[0]], max[uv[1]], false) : CodexProfileBuilder.Profile(part, design.Initial));
-                    foreach (var hole in part.Openings)
-                        profile.Append(Rectangle(part.Axis, min[part.Axis], Feet(hole.Min[0].Value(design.Initial)), Feet(hole.Min[1].Value(design.Initial)),
-                            Feet(hole.Max[0].Value(design.Initial)), Feet(hole.Max[1].Value(design.Initial)), true));
-                    // Associative work plane: movement of the minimum plane moves the sketch.
-                    var workPlane = SketchPlane.Create(doc, PlaneAt(part.Axis, part.Min[part.Axis]).Id);
-                    var extrusion = doc.FamilyCreate.NewExtrusion(true, profile, workPlane, max[part.Axis] - min[part.Axis]);
-                    AssociateLength(extrusion.get_Parameter(BuiltInParameter.EXTRUSION_END_PARAM), LengthExpression.Combine(part.Max[part.Axis], part.Min[part.Axis], -1));
-                    manager.AssociateElementParameterToFamilyParameter(extrusion.get_Parameter(BuiltInParameter.MATERIAL_ID_PARAM), materials[part.Material]);
-                    extrusion.Subcategory = doc.Settings.Categories.NewSubcategory(doc.OwnerFamily.FamilyCategory, CodexFamilyBuilder.SafeName(part.Name));
-                    extrusion.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.Set(part.Name);
-                    doc.Regenerate();
-                    var boundaries = new List<Tuple<int, LengthExpression>>();
-                    foreach (int a in uv) { boundaries.Add(Tuple.Create(a, part.Min[a])); boundaries.Add(Tuple.Create(a, part.Max[a])); }
-                    foreach (var hole in part.Openings)
-                        for (int a = 0; a < 2; a++) { boundaries.Add(Tuple.Create(uv[a], hole.Min[a])); boundaries.Add(Tuple.Create(uv[a], hole.Max[a])); }
-                    if (part.Profile != null) { CodexProfileBuilder.Constrain(doc, extrusion, part, design.Initial, this); boundaries.Clear(); }
-                    foreach (var boundary in boundaries.GroupBy(b => b.Item1 + ":" + b.Item2.Formula()).Select(g => g.First()))
+                    CodexCreationGuard.Check("construction de « " + part.Name + " »");
+                    try
                     {
-                        var plane = PlaneAt(boundary.Item1, boundary.Item2);
+                        var min = part.Min.Select(e => Feet(e.Value(design.Initial))).ToArray();
+                        var max = part.Max.Select(e => Feet(e.Value(design.Initial))).ToArray();
+                        int[] uv = part.ProfileAxes;
+                        var profile = new CurveArrArray();
+                        profile.Append(part.Profile == null ? Rectangle(part.Axis, min[part.Axis], min[uv[0]], min[uv[1]], max[uv[0]], max[uv[1]], false) : CodexProfileBuilder.Profile(part, design.Initial));
+                        foreach (var hole in part.Openings)
+                            profile.Append(Rectangle(part.Axis, min[part.Axis], Feet(hole.Min[0].Value(design.Initial)), Feet(hole.Min[1].Value(design.Initial)),
+                                Feet(hole.Max[0].Value(design.Initial)), Feet(hole.Max[1].Value(design.Initial)), true));
+                        // Associative work plane: movement of the minimum plane moves the sketch.
+                        var workPlane = SketchPlane.Create(doc, PlaneAt(part.Axis, part.Min[part.Axis]).Id);
+                        var extrusion = doc.FamilyCreate.NewExtrusion(true, profile, workPlane, max[part.Axis] - min[part.Axis]);
+                        AssociateLength(extrusion.get_Parameter(BuiltInParameter.EXTRUSION_END_PARAM), LengthExpression.Combine(part.Max[part.Axis], part.Min[part.Axis], -1));
+                        manager.AssociateElementParameterToFamilyParameter(extrusion.get_Parameter(BuiltInParameter.MATERIAL_ID_PARAM), materials[part.Material]);
+                        extrusion.Subcategory = doc.Settings.Categories.NewSubcategory(doc.OwnerFamily.FamilyCategory, CodexFamilyBuilder.SafeName(part.Name));
+                        extrusion.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.Set(part.Name);
                         doc.Regenerate();
-                        using (var geometry = extrusion.get_Geometry(new Options { ComputeReferences = true, IncludeNonVisibleObjects = true }))
+                        var boundaries = new List<Tuple<int, LengthExpression>>();
+                        foreach (int a in uv) { boundaries.Add(Tuple.Create(a, part.Min[a])); boundaries.Add(Tuple.Create(a, part.Max[a])); }
+                        foreach (var hole in part.Openings)
+                            for (int a = 0; a < 2; a++) { boundaries.Add(Tuple.Create(uv[a], hole.Min[a])); boundaries.Add(Tuple.Create(uv[a], hole.Max[a])); }
+                        if (part.Profile != null) { CodexProfileBuilder.Constrain(doc, extrusion, part, design.Initial, this); boundaries.Clear(); }
+                        foreach (var boundary in boundaries.GroupBy(b => b.Item1 + ":" + b.Item2.Formula()).Select(g => g.First()))
                         {
-                            var faces = geometry.OfType<Solid>().SelectMany(s => s.Faces.Cast<Face>()).OfType<PlanarFace>()
-                                .Where(f => Math.Abs(f.FaceNormal.DotProduct(Basis(boundary.Item1))) > 0.999999 &&
-                                    Math.Abs(f.Origin.DotProduct(Basis(boundary.Item1)) - Feet(boundary.Item2.Value(design.Initial))) < 1e-6).ToList();
-                            if (faces.Count == 0) throw new InvalidOperationException("Face de référence introuvable pour " + boundary.Item2.Formula());
-                            foreach (var face in faces)
+                            var plane = PlaneAt(boundary.Item1, boundary.Item2);
+                            doc.Regenerate();
+                            using (var geometry = extrusion.get_Geometry(new Options { ComputeReferences = true, IncludeNonVisibleObjects = true }))
                             {
-                                if (face.Reference == null) throw new InvalidOperationException("Référence de face absente.");
-                                doc.FamilyCreate.NewAlignment(views[part.Axis], plane.GetReference(), face.Reference);
+                                var faces = geometry.OfType<Solid>().SelectMany(s => s.Faces.Cast<Face>()).OfType<PlanarFace>()
+                                    .Where(f => Math.Abs(f.FaceNormal.DotProduct(Basis(boundary.Item1))) > 0.999999 &&
+                                        Math.Abs(f.Origin.DotProduct(Basis(boundary.Item1)) - Feet(boundary.Item2.Value(design.Initial))) < 1e-6).ToList();
+                                if (faces.Count == 0) throw new InvalidOperationException("Face de référence introuvable pour " + boundary.Item2.Formula());
+                                foreach (var face in faces)
+                                {
+                                    if (face.Reference == null) throw new InvalidOperationException("Référence de face absente.");
+                                    doc.FamilyCreate.NewAlignment(views[part.Axis], plane.GetReference(), face.Reference);
+                                }
                             }
                         }
+                        registryBuilder?.Display(extrusion, part.Name);
+                        extrusions.Add(extrusion);
                     }
-                    registryBuilder?.Display(extrusion, part.Name);
-                    extrusions.Add(extrusion);
-                }
-                catch (Exception ex) { throw new InvalidOperationException("Contraintes de « " + part.Name + " » : " + ex.Message, ex); }
+                    catch (Exception ex) { throw new InvalidOperationException("Contraintes de « " + part.Name + " » : " + ex.Message, ex); }
+                };
             }
-            foreach (var parameter in design.Angles)
+            yield return () =>
             {
-                if (registryBuilder != null) continue;
-                var native = CodexParameterBuilder.GetOrAdd(manager, parameter.Name, GroupTypeId.Geometry, SpecTypeId.Angle, false);
-                manager.Set(native, parameter.Value * Math.PI / 180); RegisterDriver(parameter.Name, native);
-                CodexParameterBuilder.Describe(manager, native, "Inclinaison des éléments répétés, en degrés. Plage testée : 1 à 89 degrés.");
-            }
+                foreach (var parameter in design.Angles)
+                {
+                    if (registryBuilder != null) continue;
+                    var native = CodexParameterBuilder.GetOrAdd(manager, parameter.Name, GroupTypeId.Geometry, SpecTypeId.Angle, false);
+                    manager.Set(native, parameter.Value * Math.PI / 180); RegisterDriver(parameter.Name, native);
+                    CodexParameterBuilder.Describe(manager, native, "Inclinaison des éléments répétés, en degrés. Plage testée : 0 à 180 degrés.");
+                }
+            };
             foreach (var spec in design.Arrays)
             {
-                if (prototypes == null || !prototypes.TryGetValue(spec.Name, out var symbol)) throw new InvalidOperationException("Barre imbriquée absente : " + spec.Name);
-                arrays.Add(new CodexParametricArrayBuilder(doc, spec, symbol, design.Initial, materials[spec.Material], this));
+                yield return () =>
+                {
+                    CodexCreationGuard.Check("réseau « " + spec.Name + " »");
+                    if (prototypes == null || !prototypes.TryGetValue(spec.Name, out var symbol)) throw new InvalidOperationException("Barre imbriquée absente : " + spec.Name);
+                    arrays.Add(new CodexParametricArrayBuilder(doc, spec, symbol, design.Initial, materials[spec.Material], this, materials));
+                };
             }
-            connectorBuilder = new CodexConnectorBuilder(doc, design, extrusions, this);
-            symbolicBuilder = new CodexSymbolicBuilder(doc, design, this);
-            if (design.Metadata?.HostOpening != null) HostOpening = new CodexHostOpeningBuilder(doc, design.Metadata.HostOpening, design.Initial, this);
-            doc.Regenerate(); Check(design.Initial);
-            return extrusions.Cast<Element>().Concat(arrays.SelectMany(a => a.AllInstances()).Cast<Element>()).ToList();
+            yield return () =>
+            {
+                connectorBuilder = new CodexConnectorBuilder(doc, design, extrusions, this);
+                symbolicBuilder = new CodexSymbolicBuilder(doc, design, this);
+                if (design.Metadata?.HostOpening != null) HostOpening = new CodexHostOpeningBuilder(doc, design.Metadata.HostOpening, design.Initial, this);
+                doc.Regenerate(); Check(design.Initial);
+            };
         }
 
-        internal void AssociateLength(Parameter target, LengthExpression expression)
+        internal void AssociateLength(Parameter target, LengthExpression expression, bool constrainConstant = false)
         {
             if (target == null || target.IsReadOnly) throw new InvalidOperationException("Paramètre de longueur cible inaccessible.");
-            if (expression.Terms.Count == 0) target.Set(Feet(expression.Offset));
+            if (expression.Terms.Count == 0 && !constrainConstant) target.Set(Feet(expression.Offset));
             else manager.AssociateElementParameterToFamilyParameter(target, LengthParameter(expression));
         }
         internal void AssociateAngle(Parameter target, string parameterName)
@@ -154,31 +176,37 @@ namespace BIMaestro.Codex
 
         // Called after the construction transaction has COMMITTED. Every test commits as well,
         // so deferred Revit constraint failures cannot be mistaken for successful regeneration.
-        internal object[] Flex()
+        internal object[] Flex() => FlexSteps().Where(x => x != null).ToArray();
+        internal IEnumerable<object> FlexSteps()
         {
-            if (registryBuilder != null) return FlexRegistry();
-            var reports = new List<object>();
+            if (registryBuilder != null)
+            {
+                foreach (var report in FlexRegistry()) yield return report;
+                yield break;
+            }
             foreach (var values in design.TestCases().Skip(1))
             {
+                CodexCreationGuard.Check("test de variation");
                 Apply(values);
-                reports.Add(new { values_mm = values.Where(p => !design.Angles.Any(a => a.Name == p.Key)).ToDictionary(p => p.Key, p => p.Value),
-                    values_deg = design.Angles.ToDictionary(p => p.Name, p => values[p.Name]), arrays = ArrayReports(values), verified = true });
+                yield return new { values_mm = values.Where(p => !design.Angles.Any(a => a.Name == p.Key)).ToDictionary(p => p.Key, p => p.Value),
+                    values_deg = design.Angles.ToDictionary(p => p.Name, p => values[p.Name]), arrays = ArrayReports(values), verified = true };
                 Apply(design.Initial);
+                yield return null;
             }
-            return reports.ToArray();
         }
-        private object[] FlexRegistry()
+        private IEnumerable<object> FlexRegistry()
         {
-            var reports = new List<object>();
             foreach (var test in design.Registry.Cases())
             {
+                CodexCreationGuard.Check("test « " + test.Name + " »");
                 ApplyRegistry(test);
-                reports.Add(new { scenario = test.Name, type = test.TypeName, verified = true, arrays = ArrayReports(test.Numeric) });
+                yield return new { scenario = test.Name, type = test.TypeName, verified = true, arrays = ArrayReports(test.Numeric) };
                 var type = design.Registry.Types.Single(t => t.Name == test.TypeName);
                 ApplyRegistry(new FamilyCase { Name = "Restaurer " + type.Name, TypeName = type.Name, Values = design.Registry.Evaluate(type.Overrides) });
+                yield return null;
             }
             ApplyRegistry(new FamilyCase { Name = "Restaurer le type initial", TypeName = design.Registry.Types[0].Name, Values = design.Registry.Initial });
-            return reports.ToArray();
+            yield return null;
         }
         private void ApplyRegistry(FamilyCase test)
         {
@@ -191,6 +219,7 @@ namespace BIMaestro.Codex
                 {
                     registryBuilder.Apply(test); doc.Regenerate(); registryBuilder.Check(test); Check(test.Numeric);
                     if (transaction.Commit() != TransactionStatus.Committed) throw new InvalidOperationException(string.Join(" ; ", failures));
+                    CodexCreationGuard.Check();
                     registryBuilder.Check(test); Check(test.Numeric);
                 }
                 catch (Exception ex) { throw new InvalidOperationException("Échec du scénario « " + test.Name + " » : " + ex.Message, ex); }
@@ -222,6 +251,7 @@ namespace BIMaestro.Codex
                     foreach (var p in values) manager.Set(drivers[p.Key], design.Angles.Any(a => a.Name == p.Key) ? p.Value * Math.PI / 180 : Feet(p.Value));
                     doc.Regenerate(); Check(values);
                     if (transaction.Commit() != TransactionStatus.Committed) throw new InvalidOperationException(string.Join(" ; ", failures));
+                    CodexCreationGuard.Check();
                     Check(values);
                 }
                 catch (Exception ex) { throw new InvalidOperationException("Test paramétrique [" + string.Join(", ", values.Select(p => p.Key + "=" + p.Value + (design.Angles.Any(a => a.Name == p.Key) ? " degrés" : " mm"))) + "] : " + ex.Message, ex); }
@@ -297,7 +327,7 @@ namespace BIMaestro.Codex
         {
             var references = new ReferenceArray(); references.Append(origins[axis].GetReference()); references.Append(plane.GetReference());
             var offset = (axis == 0 ? XYZ.BasisY : XYZ.BasisX) * (2 + sequence * 0.02);
-            using (var line = Line.CreateBound(offset, offset + Basis(axis) * value))
+            using (var line = Line.CreateBound(offset, offset + Basis(axis) * Math.Sign(value) * Math.Max(Math.Abs(value), 10 / 304.8)))
                 doc.FamilyCreate.NewLinearDimension(axis == 2 ? views[1] : views[2], line, references).FamilyLabel = parameter;
         }
         private static CurveArray Rectangle(int axis, double origin, double u0, double v0, double u1, double v1, bool reverse)

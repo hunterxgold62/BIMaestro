@@ -5,6 +5,7 @@
     <Compile Include="commands\Codex\CodexFamilyDesign.cs" />
     <Compile Include="commands\Codex\CodexHostOpeningDesign.cs" />
     <Compile Include="commands\Codex\CodexHostOpeningBuilder.cs" />
+    <Compile Include="commands\Codex\CodexFloorVoidBuilder.cs" />
     <Compile Include="commands\Codex\CodexFamilyBuilder.cs" />
     <Compile Include="commands\Codex\CodexParametricDesign.cs" />
     <Compile Include="commands\Codex\CodexFamilyFormula.cs" />
@@ -20,6 +21,8 @@
     <Compile Include="commands\Codex\CodexSymbolicBuilder.cs" />
     <Compile Include="commands\Codex\CodexNativeValidation.cs" />
     <Compile Include="commands\Codex\CodexProfileDesign.cs" />
+    <Compile Include="commands\Codex\CodexComponentGridDesign.cs" />
+    <Compile Include="commands\Codex\CodexComponentGridBuilder.cs" />
     <Compile Include="commands\Codex\CodexProfileBuilder.cs" />
     <EmbeddedResource Include="..\scripts\codex-tests\native-fixtures\*.json">
       <LogicalName>BIMaestro.CodexTests.%(Filename).json</LogicalName>
@@ -30,6 +33,7 @@
     <Compile Include="commands\Codex\CodexSelectionGeometry.cs" />
     <Compile Include="commands\Codex\CodexProjectBuilder.cs" />
     <Compile Include="commands\Codex\CodexDiagnostics.cs" />
+    <Compile Include="commands\Codex\CodexCreationGuard.cs" />
     <Compile Include="commands\Codex\CodexImageAttachment.cs" />
     <Compile Include="commands\Codex\CodexCommand.cs" />
     <Compile Include="commands\Codex\CodexRevitBridge.cs" />
