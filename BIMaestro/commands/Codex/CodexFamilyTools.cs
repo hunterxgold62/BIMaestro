@@ -1,4 +1,4 @@
-﻿using Autodesk.Revit.DB;
+using Autodesk.Revit.DB;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
@@ -12,6 +12,10 @@ namespace BIMaestro.Codex
             ["inputSchema"] = new JObject { ["type"] = "object", ["properties"] = properties, ["required"] = new JArray(properties.Properties().Select(p => p.Name)), ["additionalProperties"] = false } };
         internal static IEnumerable<JObject> Definitions()
         {
+            yield return Tool("revit_configure_family", "Configure la famille OUVERTE, manuelle ou BIMaestro, sans reconstruction : paramètres length/angle/integer/number/yesno/text/material, portée instance/type, formules natives Revit, types nommés et associations aux éléments. Lire revit_inspect_family et revit_inspect_family_element. parameters.mode=add crée, reuse conserve, update modifie explicitement portée/valeur/formule. formula=null conserve, chaîne vide supprime ; value=null conserve/calculée. Valeur initiale des nouveaux paramètres appliquée à tous les types ; update.value au type courant seulement. shared_guid vide pour interne, GUID explicite pour partagé. bindings.property=visibility pour la case Visible, dimension_label pour une cote, sinon parameter_id exact lu sur l'élément. family_parameter vide dissocie. replace_associations=true seulement si remplacement/dissociation demandé. Exemple service de table : ajouter un yesno instance=true, value=true, group=visibility, puis associer visibility de TOUS les éléments concernés au même paramètre. Aucun filtre sur l'origine ou la classe des éléments : compatibilité vérifiée par Revit. Un Ctrl+Z annule le lot. Les unités des valeurs sont mm/degrés ; les formules utilisent mm/deg ; material.value=unique_id du matériau existant. Aucun enregistrement/rechargement du projet.", FamilyConfigurationEdit.Properties());
+            yield return Tool("revit_inspect_family_element", "Lit tous les paramètres réels d'un élément de famille, leur parameter_id, type, association existante et possibilité d'association. Fonctionne aussi sur formes libres, familles imbriquées, courbes, connecteurs et éléments manuels. À utiliser avant revit_configure_family pour des propriétés autres que visibility.", new JObject {
+                ["document_key"] = new JObject { ["type"] = "string", ["maxLength"] = 100 },
+                ["element_unique_id"] = new JObject { ["type"] = "string", ["maxLength"] = 100 } });
             yield return Tool("revit_inspect_family", "Inspecte la famille ouverte, y compris une famille manuelle : paramètres réels, inventaire paginé des formes, courbes, plans, cotes et connecteurs, encombrements, profils et limites des extrusions. Retourne document_key et unique_id à réutiliser exactement. Lire toutes les pages utiles avant une modification ; ce n'est pas une extraction complète de la logique constructive.", new JObject {
                 ["offset"] = new JObject { ["type"] = "integer", ["minimum"] = 0, ["maximum"] = 1000000 },
                 ["limit"] = new JObject { ["type"] = "integer", ["minimum"] = 1, ["maximum"] = 100 } });
@@ -41,7 +45,9 @@ namespace BIMaestro.Codex
                 symbolic_parametric_rectangles = true, free_symbolic_lines_arcs_circles = true, model_lines_arcs_circles = true, filled_regions = true, masking_regions = true, model_visibility_by_view_plane = true, face_centered_mep_connectors = true, native_validation_without_save = true,
                 array_angle_range_degrees = new[] { 0, 180 }, live_parameter_inspection = true, batch_parameter_edit = true,
                 family_categories = CodexFamilyDesign.Categories, edit_open_family_category = true,
-                live_family_element_inventory = true, edit_open_family_drawing_groups = true, edit_unassociated_extrusion_extents = true },
+                live_family_element_inventory = true, edit_open_family_drawing_groups = true, edit_unassociated_extrusion_extents = true,
+                configure_existing_family_parameters = true, existing_family_formulas = true, existing_family_parameter_associations = true,
+                instance_visibility_switches_on_existing_elements = true, existing_family_named_types = true },
             native_validation = "Essais de variation pendant chaque création. Pas de certification générale de toutes les combinaisons par la seule compilation.",
             limitations = new[] { "Extrusions selon X/Y/Z : profils rectangulaires ou polygonaux droits pilotés par leurs sommets ; barres arrays inclinables de 0 à 180 degrés.", "Les pièces cachées doivent rester géométriquement valides.", "Les paramètres existants compatibles sont réutilisés sans distinction de majuscules. Pour un paramètre partagé existant, fournir son GUID. Un conflit de type, de formule ou de portée non convertible exige un autre nom ; ne pas réessayer le même nom.",
                 "Connecteurs au centre d'une face d'une pièce pleine, avec section paramétrique. Les réglages électriques de puissance/tension ne sont pas exposés.",
@@ -51,7 +57,7 @@ namespace BIMaestro.Codex
                 "host_opening : wall=min_xz/max_xz pour une baie native de mur ; floor=min_xyz/max_xyz pour un vide rectangulaire pilotable. Le vide de sol doit couvrir l'épaisseur de l'hôte. Après placement, sélectionner sol+instance puis revit_cut_floor_with_family, ou Couper la géométrie dans Revit. Pas de découpe automatique à la pose. Autres hôtes et contours courbes non pris en charge. Recréer les anciennes familles pour ajouter ce vide.",
                 "Les gabarits hébergés exigent place_at_origin=false : le choix de l'hôte et le placement se font ensuite dans le projet. Catégorie métier et hébergement sont indépendants ; changer la catégorie ne convertit pas le gabarit. Le sol du gabarit reste non découpé dans l'éditeur avec le vide non attaché actuel.",
                 "representation_2d : lignes/arcs/cercles symboliques ou de modèle, régions à un contour fermé simple (uni, hachure diagonale, masque). Coordonnées fixes, sans association aux dimensions ; symbolic_outlines reste disponible pour les rectangles paramétriques. Les lignes de modèle restent visibles en 3D.",
-                "Édition de familles existantes : dessins ajoutés/remplacés par groupes identifiés, sans masquage automatique de la 3D ; limites des extrusions non associées modifiables. Profils existants, dessins manuels, contraintes et formules non réécrits. Les dessins libres restent fixes lors du redimensionnement.",
+                "Édition de familles existantes : dessins ajoutés/remplacés par groupes identifiés, sans masquage automatique de la 3D ; limites des extrusions non associées modifiables. Profils existants et dessins manuels non réécrits ; paramètres, formules, portée et associations configurables par revit_configure_family. Les dessins libres restent fixes lors du redimensionnement.",
                 "La géométrie détaillée FreeForm reste fixe : nouvelle version nécessaire pour la reconstruire avec des contraintes." } };
         internal static object Read(Document doc)
         {

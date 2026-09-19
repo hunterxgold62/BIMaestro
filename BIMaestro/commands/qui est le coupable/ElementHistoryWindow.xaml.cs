@@ -111,7 +111,7 @@ namespace Analyse
             public bool HasSelection => ElementId > 0 || !string.IsNullOrWhiteSpace(ElementUniqueId);
         }
 
-        private enum UiRequestType { None, Focus, VisualizeEvents, CleanPreviews, RestoreParameters, CaptureSelectedDetails }
+        private enum UiRequestType { None, Focus, VisualizeEvents, CleanPreviews, RestoreParameters, RestoreDeleted, CaptureSelectedDetails }
 
         private sealed class UiRequest
         {
@@ -159,6 +159,12 @@ namespace Analyse
                         return;
                     }
 
+                    if (req.Type == UiRequestType.RestoreDeleted)
+                    {
+                        _owner.ExecuteRestoreDeleted(req.Events);
+                        return;
+                    }
+
 
                     if (req.Type == UiRequestType.CleanPreviews)
                     {
@@ -194,6 +200,7 @@ namespace Analyse
         private UiRequest _pendingRequest;
         private bool _detailsVisible;
         private bool _syncingSelection;
+        private bool _restoringDeleted;
         private int _loadVersion;
         private string _scopeFilter = "model";
         private bool _showAllLoadedEvents;
@@ -1390,6 +1397,16 @@ namespace Analyse
                 DetailsButton.IsEnabled = hasRow;
 
             UpdateRestoreButtonLabel(row);
+            if (RestoreDeletedButton != null)
+            {
+                RestoreDeletedButton.Content = UiLanguage.T("Restaurer les éléments", "Restore elements");
+                RestoreDeletedButton.IsEnabled = !_restoringDeleted && GetSelectedDeletionEvents().Count > 0;
+            }
+            if (ClusterRestoreButton != null)
+            {
+                ClusterRestoreButton.Content = UiLanguage.T("Restaurer sélection", "Restore selection");
+                ClusterRestoreButton.IsEnabled = !_restoringDeleted;
+            }
         }
 
         private static string GetPrimaryActionText(RowVm row)
@@ -1849,6 +1866,103 @@ namespace Analyse
             });
         }
 
+        private static bool IsDeletion(ElementHistoryEvent ev) =>
+            string.Equals(ev?.Action, "delete", StringComparison.OrdinalIgnoreCase);
+
+        private List<ElementHistoryEvent> GetSelectedDeletionEvents()
+        {
+            var rows = HistoryTabs?.SelectedIndex == 1
+                ? HistoryGrid?.SelectedItems.Cast<RowVm>().ToList() ?? new List<RowVm>()
+                : new List<RowVm> { GetPrimarySelectedRow() };
+            return rows.Where(r => r != null && !r.IsTimelineSeparator).SelectMany(GetRowEvents)
+                .Where(IsDeletion).OrderByDescending(ev => ev.Ts).ToList();
+        }
+
+        private static HistoryRestoreRequest ToRestoreRequest(ElementHistoryEvent ev)
+        {
+            object source = null, raw = null;
+            ev.Delta?.TryGetValue("deletedUniqueId", out source);
+            ev.Delta?.TryGetValue("recipe", out raw);
+            return new HistoryRestoreRequest
+            {
+                SourceUniqueId = Convert.ToString(source),
+                Label = (ev.Family + " " + ev.TypeName).Trim() + " [" + ev.ElementId + "]",
+                Recipe = ElementHistoryReconstruction.ReadRecipe(raw)
+            };
+        }
+
+        private void RestoreDeletedButton_Click(object sender, RoutedEventArgs e) => RequestRestoreDeleted(GetSelectedDeletionEvents());
+
+        private void ClusterRestoreButton_Click(object sender, RoutedEventArgs e) =>
+            RequestRestoreDeleted(GetSelectedClusterItems().Select(item => item.Source).Where(IsDeletion).ToList());
+
+        private void RequestRestoreDeleted(List<ElementHistoryEvent> events)
+        {
+            if (_restoringDeleted || events.Count == 0) return;
+            int count = events.Select(ev => ToRestoreRequest(ev)).Select(r => string.IsNullOrEmpty(r.SourceUniqueId) ? r.Label : r.SourceUniqueId).Distinct().Count();
+            var confirm = MessageBox.Show(this, UiLanguage.T(
+                $"Restaurer {count} élément(s) dans la maquette à leur emplacement enregistré ?\n\nIls resteront dans le projet et seront modifiables normalement. Les connexions enregistrées seront rétablies si leurs deux extrémités sont disponibles et inchangées. Sélectionnez aussi les raccords et tronçons supprimés du réseau. Les éléments déjà présents ne seront pas dupliqués.\n\nLes anciennes suppressions sans données de reconstruction ne peuvent pas être restaurées.",
+                $"Restore {count} element(s) in the model at their recorded location?\n\nThey will remain in the project and be editable normally. Recorded connections will be restored when both ends are available and unchanged. Also select deleted network fittings and segments. Existing elements will not be duplicated.\n\nOlder deletions without reconstruction data cannot be restored."),
+                UiLanguage.T("Restaurer les éléments", "Restore elements"), MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (confirm != MessageBoxResult.Yes) return;
+            _restoringDeleted = true;
+            UpdateVisualizeButtonLabel();
+            RaiseRequest(new UiRequest { Type = UiRequestType.RestoreDeleted, Events = events });
+        }
+
+        private void ExecuteRestoreDeleted(List<ElementHistoryEvent> events)
+        {
+            string message;
+            try
+            {
+                var result = ElementHistoryRestoration.Restore(_doc, events.Where(IsDeletion).Select(ToRestoreRequest));
+                message = UiLanguage.T(
+                    $"{result.Created} élément(s) restauré(s).\n{result.Existing} déjà présent(s).\n{result.Failed} non restauré(s).",
+                    $"{result.Created} element(s) restored.\n{result.Existing} already present.\n{result.Failed} not restored.");
+                var failures = result.Items.Where(i => !i.Created && !i.Existing).ToList();
+                message += UiLanguage.T(
+                    $"\n\nConnexions : {result.ConnectionsRestored} rétablie(s), {result.ConnectionsExisting} déjà présente(s), {result.ConnectionFailures.Count} non rétablie(s).",
+                    $"\n\nConnections: {result.ConnectionsRestored} restored, {result.ConnectionsExisting} already present, {result.ConnectionFailures.Count} not restored.");
+                foreach (var failure in result.ConnectionFailures.Take(6)) message += "\n" + failure;
+                foreach (var failure in failures.Take(12))
+                    message += "\n\n" + failure.Label + " : " + RestoreFailureText(failure.Reason)
+                        + (string.IsNullOrWhiteSpace(failure.Detail) ? "" : "\n" + failure.Detail);
+                if (failures.Count > 12) message += UiLanguage.T("\nAutres éléments non restaurés : ", "\nOther elements not restored: ") + (failures.Count - 12);
+                var warnings = result.Items.Where(i => i.Created && !string.IsNullOrWhiteSpace(i.Detail)).Select(i => i.Detail).Distinct().Take(4).ToList();
+                if (warnings.Count > 0) message += "\n\n" + string.Join("\n", warnings);
+                // Selection/navigation failures must not misreport a successful commit.
+                try
+                {
+                    var ids = result.Items.Where(i => i.Created || i.Existing).Select(i => _doc.GetElement(i.UniqueId)?.Id)
+                        .Where(id => id != null).Distinct().ToList();
+                    if (ids.Count > 0) { _uidoc.Selection.SetElementIds(ids); _uidoc.ShowElements(ids); }
+                }
+                catch { }
+            }
+            catch (Exception ex)
+            {
+                message = UiLanguage.T("La restauration a été annulée.\n", "Restoration was rolled back.\n") + ex.Message;
+            }
+            _restoringDeleted = false;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                UpdateVisualizeButtonLabel();
+                MessageBox.Show(this, message, UiLanguage.T("Restaurer les éléments", "Restore elements"), MessageBoxButton.OK, MessageBoxImage.Information);
+            }));
+        }
+
+        private static string RestoreFailureText(string reason)
+        {
+            switch (reason)
+            {
+                case "identity": case "recipe": return UiLanguage.T("Données de reconstruction absentes ou forme non prise en charge.", "Reconstruction data missing or unsupported shape.");
+                case "type": return UiLanguage.T("La famille ou le type n’est plus présent dans le projet.", "The family or type is no longer in the project.");
+                case "level": return UiLanguage.T("Le niveau d’origine n’est plus présent.", "The original level is no longer present.");
+                case "host": return UiLanguage.T("L’hôte manque : restaurer aussi le mur ou le sol concerné.", "The host is missing: restore the corresponding wall or floor as well.");
+                default: return UiLanguage.T("Revit n’a pas pu recréer cet élément.", "Revit could not recreate this element.");
+            }
+        }
+
         private void FocusSelectedElement()
         {
             var row = GetPrimarySelectedRow();
@@ -2050,6 +2164,9 @@ namespace Analyse
 
         private void RaiseRequest(UiRequest request)
         {
+            // Do not replace a confirmed restoration with a subsequent focus/preview
+            // click while Revit is waiting to dispatch the external event.
+            if (_pendingRequest?.Type == UiRequestType.RestoreDeleted) return;
             _pendingRequest = request;
             _externalEvent?.Raise();
         }
@@ -2544,6 +2661,7 @@ namespace Analyse
 
         private void ExecuteVisualize(List<ElementHistoryEvent> events)
         {
+            var originals = new List<ElementId>();
             using (var t = new Transaction(_doc, "BIMaestro - Visualisation historique"))
             {
                 t.Start();
@@ -2559,13 +2677,25 @@ namespace Analyse
                         if (HasMoveDelta(ev))
                             CreateMovePreview(ev);
                         else if (string.Equals(ev.Action, "delete", StringComparison.OrdinalIgnoreCase))
-                            CreateDeletedPreview(ev);
+                        {
+                            var original = ElementHistoryReconstruction.FindOriginal(_doc,
+                                ev.Delta != null && ev.Delta.TryGetValue("deletedUniqueId", out var originalId)
+                                    ? Convert.ToString(originalId) : null);
+                            if (original != null) originals.Add(original.Id);
+                            else CreateDeletedPreview(ev);
+                        }
                     }
+                    catch (Autodesk.Revit.Exceptions.RegenerationFailedException) { throw; }
                     catch
                     {
                     }
                 }
                 t.Commit();
+            }
+            if (originals.Count > 0)
+            {
+                _uidoc.Selection.SetElementIds(originals.Distinct().ToList());
+                _uidoc.ShowElements(originals.Distinct().ToList());
             }
         }
 
@@ -2597,7 +2727,11 @@ namespace Analyse
 
         private void CreateDeletedPreview(ElementHistoryEvent ev)
         {
-            var geoms = BuildDeletedPreviewGeometry(ev);
+            var geoms = new List<GeometryObject>();
+            if (ElementHistoryTracker.CaptureDetailedDeletedMesh && ev?.Delta != null
+                && ev.Delta.TryGetValue("recipe", out var recipe))
+                geoms = BuildTessellatedGeometry(ElementHistoryReconstruction.Reconstruct(_doc, recipe));
+            if (geoms.Count == 0) geoms = BuildDeletedPreviewGeometry(ev);
             if (geoms.Count == 0) return;
             var ds = CreatePreviewDirectShape(DeletedPreviewPrefix + ev.ElementId.ToString(CultureInfo.InvariantCulture), geoms);
             ApplyOverride(ds.Id, new Autodesk.Revit.DB.Color(220, 30, 30), 65);

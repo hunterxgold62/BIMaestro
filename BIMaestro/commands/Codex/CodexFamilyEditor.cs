@@ -51,6 +51,7 @@ namespace BIMaestro.Codex
                 .OrderBy(e => e.Id.ToString(), StringComparer.Ordinal).ToArray();
             return new { document_key = doc.OwnerFamily.UniqueId, document = doc.Title, saved_path = doc.PathName,
                 parameters = CodexFamilyTools.Read(doc), total = elements.Length, offset = (int)offset,
+                materials = new FilteredElementCollector(doc).OfClass(typeof(Material)).Cast<Material>().Select(m => new { unique_id = m.UniqueId, name = m.Name }).ToArray(),
                 next_offset = offset + limit < elements.Length ? (int?)(offset + limit) : null,
                 drawing_groups = elements.Where(e => Group(e) != null).GroupBy(Group).Select(g => new { name = g.Key, count = g.Count() }).ToArray(),
                 elements = elements.Skip((int)offset).Take((int)limit).Select(e => Describe(doc, e)).ToArray(),
@@ -82,6 +83,14 @@ namespace BIMaestro.Codex
                     max = Mm(new XYZ(corners.Max(p => p.X), corners.Max(p => p.Y), corners.Max(p => p.Z))) });
             }
             if (element is CurveElement curve) result["curve"] = JObject.FromObject(CurveInfo(curve.GeometryCurve));
+            var visible = element.get_Parameter(BuiltInParameter.IS_VISIBLE_PARAM);
+            if (visible != null)
+            {
+                bool associable = doc.FamilyManager.CanElementParameterBeAssociated(visible);
+                result["visibility"] = JObject.FromObject(new { property = "visibility", parameter_id = visible.Id.ToString(),
+                    associable, value = visible.AsInteger() != 0,
+                    associated_parameter = associable ? doc.FamilyManager.GetAssociatedFamilyParameter(visible)?.Definition.Name : null });
+            }
             if (element is ReferencePlane reference)
                 result["reference_plane"] = JObject.FromObject(new { bubble_mm = Mm(reference.BubbleEnd), free_mm = Mm(reference.FreeEnd), normal = Mm(reference.GetPlane().Normal / 304.8) });
             if (element is GenericForm form)

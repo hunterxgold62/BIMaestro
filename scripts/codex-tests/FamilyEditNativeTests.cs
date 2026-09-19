@@ -36,6 +36,7 @@ namespace BIMaestro.CodexTests
                     Commit(t);
                 }
                 string familyId = doc.OwnerFamily.UniqueId, extrusionId = extrusion.UniqueId, manualId = manual.UniqueId;
+                FamilyConfigurationNativeTests.Run(ui, doc, template);
                 var originalIds = new FilteredElementCollector(doc).WhereElementIsNotElementType().Select(e => e.UniqueId).ToArray();
                 var inventory = JObject.FromObject(CodexFamilyEditor.Inspect(doc, JObject.Parse("{offset:0,limit:100}")));
                 if ((string)inventory["document_key"] != familyId || !inventory["elements"].Any(e => (string)e["unique_id"] == extrusionId)) throw new Exception("Missing manual extrusion inventory");
@@ -87,7 +88,8 @@ namespace BIMaestro.CodexTests
                 return new { passed = true, manual_family = true, inventory = true, add_replace_remove = true,
                     duplicate_and_wrong_document_rejected = true, rollback_after_commit = true, original_elements_preserved = true,
                     extrusion_edited_in_place = true, parameter_association_preserved = true,
-                    filled_regions = true, nested_region_rollback = true, persistent_groups_after_reopen = true };
+                    filled_regions = true, nested_region_rollback = true, persistent_groups_after_reopen = true,
+                    existing_family_parameters_formulas = true, mixed_elements_visibility = true, independent_project_instances = true, configuration_rollback = true };
             }
             finally { doc.Close(false); }
         }

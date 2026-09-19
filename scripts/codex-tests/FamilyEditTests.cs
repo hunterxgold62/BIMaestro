@@ -6,6 +6,17 @@ internal static class FamilyEditTests
 {
     internal static void Run()
     {
+        var configuration = JObject.Parse("{document_key:'family',replace_associations:false,type_names:[],parameters:[{name:'Service de table',mode:'add',kind:'yesno',instance:true,group:'visibility',shared_guid:'',formula:null,value:true}],bindings:[{element_unique_id:'plate',property:'visibility',family_parameter:'Service de table'}]}");
+        FamilyConfigurationEdit.Parse(configuration);
+        void RejectConfiguration(Action<JObject> change) { var copy = (JObject)configuration.DeepClone(); change(copy); ExpectReject(() => FamilyConfigurationEdit.Parse(copy)); }
+        RejectConfiguration(x => x["parameters"][0]["value"] = "true");
+        RejectConfiguration(x => x["parameters"][0]["value"] = JValue.CreateNull());
+        RejectConfiguration(x => x["parameters"][0]["mode"] = "reuse");
+        RejectConfiguration(x => x["parameters"][0]["formula"] = "1 = 1");
+        RejectConfiguration(x => x["bindings"][0]["family_parameter"] = "");
+        RejectConfiguration(x => ((JArray)x["bindings"]).Add(x["bindings"][0].DeepClone()));
+        RejectConfiguration(x => x["parameters"][0]["shared_guid"] = "invalid");
+        Console.WriteLine("PASS: existing-family configuration contract, typed defaults, association conflicts and duplicate targets");
         var request = JObject.Parse("{document_key:'family',group_name:'Plan',action:'add',representation_2d:{hide_model_in:[],drawings:[{name:'Ouverture',mode:'symbolic',plane:'xy',offset_mm:0,curves:[{kind:'line',points_mm:[[0,0],[100,0]],radius_mm:0}],rgb:[0,0,0],fill_pattern:'solid'}]}}");
         FamilyRepresentationEdit.Parse(request);
         Reject(request, x => x["representation_2d"]["drawings"][0]["curves"][0]["points_mm"][1][0] = 0.5);

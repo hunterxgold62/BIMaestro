@@ -17,7 +17,7 @@ namespace BIMaestro.Codex
             var manager = doc.FamilyManager;
             foreach (var p in spec.Parameters)
             {
-                var native = string.IsNullOrEmpty(p.SharedGuid) ? GetOrAdd(manager, p.Name, Group(p.Group), DataType(p.Kind), p.Instance) : AddShared(p);
+                var native = string.IsNullOrEmpty(p.SharedGuid) ? GetOrAdd(manager, p.Name, Group(p.Group), DataType(p.Kind), p.Instance) : AddShared(doc, p);
                 if (Parameters.Values.Any(v => v.Id == native.Id)) throw new InvalidOperationException("Deux réglages désignent le même paramètre du gabarit : " + p.Name);
                 Describe(manager, native, p.Description); Parameters.Add(p.Name, native);
             }
@@ -79,11 +79,12 @@ namespace BIMaestro.Codex
                 case "number": return SpecTypeId.Number;
                 case "yesno": return SpecTypeId.Boolean.YesNo;
                 case "text": return SpecTypeId.String.Text;
+                case "material": return SpecTypeId.Reference.Material;
                 default: throw new InvalidOperationException("Type de paramètre non pris en charge.");
             }
         }
-        private static ForgeTypeId Group(string name) => name == "visibility" ? GroupTypeId.Visibility : name == "constraints" ? GroupTypeId.Constraints : name == "identity" ? GroupTypeId.IdentityData : name == "data" ? GroupTypeId.Data : GroupTypeId.Geometry;
-        private FamilyParameter AddShared(FamilyParameterSpec p)
+        private static ForgeTypeId Group(string name) => name == "visibility" ? GroupTypeId.Visibility : name == "constraints" ? GroupTypeId.Constraints : name == "identity" ? GroupTypeId.IdentityData : name == "data" ? GroupTypeId.Data : name == "materials" ? GroupTypeId.Materials : GroupTypeId.Geometry;
+        internal static FamilyParameter AddShared(Document doc, FamilyParameterSpec p)
         {
             var manager = doc.FamilyManager;
             var guid = Guid.Parse(p.SharedGuid);

@@ -48,6 +48,7 @@ namespace Analyse
             public XYZ BBoxMax { get; set; }
             public List<XYZ> ObbCorners { get; set; }
             public GhostMeshSnapshot GhostMesh { get; set; }
+            public HistoryRecipe Recipe { get; set; }
             public bool DetailCaptureAttempted { get; set; }
             public Dictionary<string, string> Parameters { get; set; }
             public DateTime LastLogged { get; set; }
@@ -245,7 +246,6 @@ namespace Analyse
         private const int MaxSelectionSnapshotCount = 25;
         private const int SelectionSnapshotTimeBudgetMs = 80;
         private const int MaxChangedElementSnapshotsPerTransaction = 250;
-        private const int MaxDeletedElementSnapshotsPerTransaction = 500;
         private const int DocumentChangedTimeBudgetMs = 300;
         private const int SelectionDetailedGeometryTimeoutMs = 500;
         private static readonly TimeSpan DeferredPrimeDelay = TimeSpan.FromSeconds(8);
@@ -371,17 +371,8 @@ namespace Analyse
 
         private static bool ShouldScheduleDeferredPrime(Document doc)
         {
-            if (doc == null) return false;
-            if (CaptureDetailedDeletedMesh) return true;
-
-            try
-            {
-                return doc.IsFamilyDocument;
-            }
-            catch
-            {
-                return false;
-            }
+            // Native restoration needs the baseline in Simple mode as well.
+            return doc != null;
         }
 
         public static void ProcessDeferredPrime(Document doc)
@@ -548,9 +539,6 @@ namespace Analyse
 
                 foreach (var id in selectedIds)
                 {
-                    if (processed >= MaxSelectionSnapshotCount || DateTime.UtcNow >= deadlineUtc)
-                        break;
-
                     if (id == null || id == ElementId.InvalidElementId) continue;
 
                     var element = doc.GetElement(id);
@@ -572,6 +560,8 @@ namespace Analyse
                     }
 
                     if (HasDetailCaptureAttempted(doc, id)) continue;
+                    // Limit meshes, not the recipes for the rest of a multi-selection.
+                    if (processed > MaxSelectionSnapshotCount || DateTime.UtcNow >= deadlineUtc) continue;
 
                     var snapshot = BuildSnapshot(
                         element,
@@ -621,7 +611,11 @@ namespace Analyse
             var deadlineUtc = DateTime.UtcNow.AddMilliseconds(DocumentChangedTimeBudgetMs);
             var relatedTypeParameterDeltaCache = new Dictionary<int, Dictionary<string, object>>();
             var processedChanges = 0;
-            var processedDeletes = 0;
+            var capturedIds = new HashSet<ElementId>();
+            // Deleted elements can never be queried again: drain ALL cached snapshots
+            // before the time-limited geometry work for added/modified elements.
+            foreach (var id in deletedIds)
+                EnqueueDeleted(doc, id, user, tx);
 
             foreach (var id in addedIds)
             {
@@ -630,6 +624,7 @@ namespace Analyse
 
                 if (CaptureAddedOrModified(doc, id, user, tx, isCreate: true, relatedTypeParameterDeltaCache: relatedTypeParameterDeltaCache))
                     processedChanges++;
+                capturedIds.Add(id);
             }
 
             foreach (var id in modifiedIds.OrderBy(id => IsFamilySymbolElementId(doc, id) ? 1 : 0))
@@ -639,16 +634,13 @@ namespace Analyse
 
                 if (CaptureAddedOrModified(doc, id, user, tx, isCreate: false, suppressSecondaryModification: suppressSecondaryModifications, relatedTypeParameterDeltaCache: relatedTypeParameterDeltaCache))
                     processedChanges++;
+                capturedIds.Add(id);
             }
 
-            foreach (var id in deletedIds)
-            {
-                if (!CanContinueDocumentChangedCapture(deadlineUtc, processedDeletes, MaxDeletedElementSnapshotsPerTransaction))
-                    break;
-
-                EnqueueDeleted(doc, id, user, tx);
-                processedDeletes++;
-            }
+            // The detailed event budget must not leave newly pasted/modified networks
+            // without a pre-deletion snapshot. No triangle capture on this fallback.
+            foreach (var id in addedIds.Concat(modifiedIds).Distinct().Where(id => !capturedIds.Contains(id)))
+                PrimeElementSnapshot(doc.GetElement(id));
 
             if (DateTime.UtcNow < deadlineUtc)
                 CaptureFamilyDocumentTypeChanges(doc, user, tx);
@@ -1293,6 +1285,8 @@ namespace Analyse
                 BBoxMin = GetBBoxMin(el),
                 BBoxMax = GetBBoxMax(el),
                 DetailCaptureAttempted = includeOrientedCorners,
+                // Restoration data is independent of the visual preview mode.
+                Recipe = ElementHistoryReconstruction.Capture(el),
                 Parameters = parameters
             };
 
@@ -1302,8 +1296,11 @@ namespace Analyse
                     ? DateTime.UtcNow.AddMilliseconds(detailedGeometryTimeoutMs)
                     : DateTime.MaxValue;
 
-                snapshot.GhostMesh = CaptureGhostMesh(el, deadlineUtc);
-                if (!IsDeadlineExpired(deadlineUtc))
+                // A supported placement recipe replaces the per-instance triangle payload.
+                // Unsupported shapes retain the historical detailed mesh.
+                if (snapshot.Recipe == null || snapshot.Recipe.RequiresMeshPreview)
+                    snapshot.GhostMesh = CaptureGhostMesh(el, deadlineUtc);
+                if ((snapshot.Recipe == null || snapshot.Recipe.RequiresMeshPreview) && !IsDeadlineExpired(deadlineUtc))
                     snapshot.ObbCorners = GetOrientedCorners(el, deadlineUtc);
             }
 
@@ -1979,6 +1976,7 @@ namespace Analyse
             var delta = new Dictionary<string, object>
             {
                 ["deletedUniqueId"] = snapshot.UniqueId,
+                ["recipe"] = snapshot.Recipe,
                 ["lastKnown"] = snapshot.Location == null ? null : new { x = snapshot.Location.X, y = snapshot.Location.Y, z = snapshot.Location.Z },
                 ["bboxMin"] = snapshot.BBoxMin == null ? null : new { x = snapshot.BBoxMin.X, y = snapshot.BBoxMin.Y, z = snapshot.BBoxMin.Z },
                 ["bboxMax"] = snapshot.BBoxMax == null ? null : new { x = snapshot.BBoxMax.X, y = snapshot.BBoxMax.Y, z = snapshot.BBoxMax.Z },

@@ -14,6 +14,7 @@
     <Compile Include="commands\Codex\CodexFamilyTools.cs" />
     <Compile Include="commands\Codex\CodexFamilyEditDesign.cs" />
     <Compile Include="commands\Codex\CodexFamilyEditor.cs" />
+    <Compile Include="commands\Codex\CodexFamilyConfiguration.cs" />
     <Compile Include="commands\Codex\CodexParametricInput.cs" />
     <Compile Include="commands\Codex\CodexConnectorDesign.cs" />
     <Compile Include="commands\Codex\CodexConnectorBuilder.cs" />
@@ -346,6 +347,9 @@
       <DependentUpon>ViewThumbnailBatchWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="commands\qui est le coupable\ElementHistoryTracker.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryReconstruction.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryNetwork.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryRestoration.cs" />
     <Compile Include="commands\qui est le coupable\information au survol d%27un objet\LatestElementHistoryIndex.cs" />
     <Compile Include="commands\qui est le coupable\information au survol d%27un objet\ElementHistoryHoverInfoService.cs" />
     <Compile Include="commands\qui est le coupable\information au survol d%27un objet\ElementHistoryHoverToggleCommand.cs" />

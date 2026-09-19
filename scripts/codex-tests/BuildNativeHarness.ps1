@@ -11,7 +11,7 @@ $resources = @(Get-ChildItem (Join-Path $PSScriptRoot 'native-fixtures') -Filter
 [string[]]$defines = @(if ($FamilyEditOnly) { '/define:FAMILY_EDIT_ONLY' })
 $assembly = Join-Path $output 'BIMaestro.Codex.NativeValidation.dll'
 $json = Join-Path $repo 'BIMaestro/bin/Release/Newtonsoft.Json.dll'
-& 'C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/Roslyn/csc.exe' /nologo /langversion:9 /target:library "/out:$assembly" "/reference:$api/RevitAPI.dll" "/reference:$api/RevitAPIUI.dll" "/reference:$json" @defines @resources @sources (Join-Path $PSScriptRoot 'FamilyEditNativeTests.cs') (Join-Path $PSScriptRoot 'NativeValidationApp.cs')
+& 'C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/Roslyn/csc.exe' /nologo /langversion:9 /target:library "/out:$assembly" "/reference:$api/RevitAPI.dll" "/reference:$api/RevitAPIUI.dll" "/reference:$json" @defines @resources @sources (Join-Path $PSScriptRoot 'FamilyConfigurationNativeTests.cs') (Join-Path $PSScriptRoot 'FamilyEditNativeTests.cs') (Join-Path $PSScriptRoot 'NativeValidationApp.cs')
 if ($LASTEXITCODE -ne 0) { throw 'Compilation du banc natif échouée.' }
 Copy-Item -LiteralPath $json -Destination $output -Force
 $escaped = [Security.SecurityElement]::Escape($assembly)

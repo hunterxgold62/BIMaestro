@@ -270,7 +270,7 @@
                     <TextBlock x:Name="ResultText" VerticalAlignment="Center" Foreground="{DynamicResource Text.Secondary}" Text="0 / 0 évènements affichés"/>
                 </WrapPanel>
                 <WrapPanel x:Name="DeletedMeshModePanel" Grid.Row="1" Margin="0,8,0,0">
-                    <TextBlock Text="Maillage suppression"
+                    <TextBlock Text="Aperçu suppression"
                                Style="{StaticResource FilterLabel}"
                                VerticalAlignment="Center"
                                Margin="0,0,8,6"/>
@@ -286,7 +286,7 @@
                                  GroupName="DeletedMeshMode"
                                  Tag="detailed"
                                  Style="{StaticResource ScopeRadioStyle}"
-                                 ToolTip="Capture le maillage réel des suppressions futures"
+                                 ToolTip="Reconstitue les suppressions futures depuis les familles et types présents (dans leur état actuel). Conserve le maillage pour les formes non prises en charge. Si le type ou l’hôte manque, utilise l’aperçu simplifié."
                                  Checked="DeletedMeshMode_Checked"/>
                 </WrapPanel>
                 <WrapPanel x:Name="ContextScopePanel" Grid.Row="2" Margin="0,8,0,0" Visibility="Collapsed">
@@ -323,6 +323,7 @@
                 </WrapPanel>
                 <WrapPanel Grid.Row="3" Margin="0,8,0,0">
                     <Button x:Name="VisualizeDeletedButton" Content="Visualiser" Width="185" Style="{StaticResource HistoryPrimaryButton}" Click="VisualizeDeletedButton_Click"/>
+                    <Button x:Name="RestoreDeletedButton" Content="Restaurer les éléments" Width="185" Style="{StaticResource HistoryButton}" Click="RestoreDeletedButton_Click" IsEnabled="False" ToolTip="Recrée durablement les éléments supprimés à leur emplacement enregistré. Les familles/types et niveaux doivent être disponibles. Les connexions enregistrées sont rétablies lorsque leurs extrémités sont disponibles."/>
                     <Button x:Name="FocusButton" Content="Focus" Width="88" Style="{StaticResource HistoryButton}" Click="FocusButton_Click"/>
                     <Button x:Name="DetailsButton" Content="Détails" Width="96" Style="{StaticResource HistoryButton}" Click="DetailsButton_Click"/>
                     <Button x:Name="RestoreParametersButton" Content="Restaurer" Width="108" Style="{StaticResource HistoryButton}" Click="RestoreParametersButton_Click" Visibility="Collapsed"/>
@@ -597,6 +598,7 @@
                 </ListBox>
                 <WrapPanel Grid.Row="3" x:Name="ClusterActionsPanel" Visibility="Collapsed" Margin="0,10,0,0">
                     <Button x:Name="ClusterVisualizeButton" Content="Visualiser sélection" Width="160" Style="{StaticResource HistoryButton}" Click="ClusterVisualizeButton_Click"/>
+                    <Button x:Name="ClusterRestoreButton" Content="Restaurer sélection" Width="160" Style="{StaticResource HistoryButton}" Click="ClusterRestoreButton_Click"/>
                     <Button x:Name="ClusterFocusButton" Content="Focus sélection" Width="140" Style="{StaticResource HistoryButton}" Click="ClusterFocusButton_Click"/>
                 </WrapPanel>
             </Grid>

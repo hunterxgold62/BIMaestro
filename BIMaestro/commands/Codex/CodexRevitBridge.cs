@@ -261,6 +261,7 @@ namespace BIMaestro.Codex
             if (tool == "revit_context") return ReadContext(app);
             if (tool == "revit_family_parameters") { RequireKeys(args); return CodexFamilyTools.Read(document); }
             if (tool == "revit_inspect_family") return CodexFamilyEditor.Inspect(document, args);
+            if (tool == "revit_inspect_family_element") return CodexFamilyConfiguration.Inspect(document, args);
             if (tool == "revit_selection_geometry") { RequireKeys(args); return selectionGeometry.Read(app, document); }
             if (tool == "revit_read_family_design")
             {
@@ -408,7 +409,7 @@ namespace BIMaestro.Codex
                 }
                 finally { foreach (var curve in curves) curve.Dispose(); }
             }
-            if (tool != "revit_family_box" && tool != "revit_set_family_length" && tool != "revit_set_family_angle" && tool != "revit_family_shapes" && tool != "revit_set_family_parameters" && tool != "revit_set_family_category" && tool != "revit_edit_family_representation" && tool != "revit_edit_family_extrusion") throw new InvalidOperationException("Outil Revit inconnu.");
+            if (tool != "revit_family_box" && tool != "revit_set_family_length" && tool != "revit_set_family_angle" && tool != "revit_family_shapes" && tool != "revit_set_family_parameters" && tool != "revit_set_family_category" && tool != "revit_edit_family_representation" && tool != "revit_edit_family_extrusion" && tool != "revit_configure_family") throw new InvalidOperationException("Outil Revit inconnu.");
             if (!AllowChanges) throw new InvalidOperationException("Mode lecture seule : l'utilisateur doit activer les modifications dans le panneau.");
             if (!document.IsFamilyDocument || document.IsReadOnly || document.IsModifiable)
                 throw new InvalidOperationException("Ouvrez une famille modifiable dans l'éditeur de familles, hors de toute autre commande.");
@@ -416,6 +417,7 @@ namespace BIMaestro.Codex
             if (tool == "revit_set_family_category") return CodexFamilyTools.SetCategory(document, args, Confirm, NewTransaction, Commit);
             if (tool == "revit_edit_family_representation") return CodexFamilyEditor.EditRepresentation(document, args, Confirm, NewTransaction, Commit);
             if (tool == "revit_edit_family_extrusion") return CodexFamilyEditor.EditExtrusion(document, args, Confirm, NewTransaction, Commit);
+            if (tool == "revit_configure_family") return CodexFamilyConfiguration.Apply(document, args, Confirm, NewTransaction, Commit);
 
             if (tool == "revit_family_shapes")
             {
