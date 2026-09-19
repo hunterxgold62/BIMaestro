@@ -37,6 +37,12 @@ namespace BIMaestro.CodexTests
             {
                 var ui = sender as UIApplication ?? throw new InvalidOperationException("Contexte UIApplication absent.");
                 if (ui.Application.Documents.Size != 0) throw new InvalidOperationException("Le banc exige une instance Revit vide ; aucun document utilisateur ne sera modifié.");
+                var familyEdits = FamilyEditNativeTests.Run(ui);
+#if FAMILY_EDIT_ONLY
+                File.WriteAllText(Path.Combine(DirectoryPath, "result.json"), JsonConvert.SerializeObject(familyEdits, Formatting.Indented));
+                if (ui.Application.Documents.Size == 0) ui.PostCommand(RevitCommandId.LookupPostableCommandId(PostableCommand.ExitRevit));
+                return;
+#endif
                 var parameters = ValidateParameterReuse(ui);
                 var categories = ValidateCategories(ui);
                 var wallTemplate = Newtonsoft.Json.Linq.JObject.FromObject(CodexFamilyBuilder.TemplateInfo(ui,"wall"));
@@ -45,6 +51,7 @@ namespace BIMaestro.CodexTests
                 var report = Newtonsoft.Json.Linq.JObject.FromObject(CodexNativeValidation.Run(ui, message => File.WriteAllText(Path.Combine(DirectoryPath, "progress.txt"), DateTime.Now.ToString("O") + " " + message), RenderRepresentation));
                 report["parameter_reuse_tests"] = Newtonsoft.Json.Linq.JObject.FromObject(parameters);
                 report["category_tests"] = Newtonsoft.Json.Linq.JObject.FromObject(categories);
+                report["family_edit_tests"] = Newtonsoft.Json.Linq.JObject.FromObject(familyEdits);
                 report["wall_template_test"] = wallTemplate;
                 var fixture = Assembly.GetExecutingAssembly().GetManifestResourceNames().FirstOrDefault(n => n.EndsWith("polygon-profile.json"));
                 if (fixture != null)

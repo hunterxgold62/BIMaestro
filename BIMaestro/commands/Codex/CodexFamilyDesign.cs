@@ -255,6 +255,8 @@ namespace BIMaestro.Codex
                 throw new InvalidOperationException("Dimension minimale : 1 mm.");
             if (p.Kind == "tube" && (p.Size[1] < 1 || p.Size[0] - p.Size[1] < 1)) throw new InvalidOperationException("Le tube doit avoir au moins 1 mm d'épaisseur.");
             if (p.Kind == "cone" && (p.Size[0] < 1 && p.Size[1] < 1)) throw new InvalidOperationException("Rayons du cône invalides.");
+            if (p.Kind == "cone" && p.Size.Take(2).Any(r => r > 0 && r < 1))
+                throw new InvalidOperationException("Chaque rayon du cône doit être nul (pointe) ou au moins égal à 1 mm : un rayon positif plus petit produit un trait trop court.");
             if (p.Kind == "lathe" && p.Profile.Any(v => v[0] < 0)) throw new InvalidOperationException("Rayon négatif dans le profil de révolution.");
             return p;
         }

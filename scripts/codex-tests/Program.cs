@@ -14,6 +14,7 @@ internal static class Program
         try
         {
             FamilyDesignTests.Run();
+            FamilyEditTests.Run();
             ParametricDesignTests.Run(); FamilyParameterTests.Run();
             var shapes = JObject.Parse("{\"boxes\":[{\"x_mm\":0,\"y_mm\":0,\"z_mm\":0,\"height_mm\":100,\"width_mm\":200,\"length_mm\":300}],\"cylinders\":[{\"x_mm\":10,\"y_mm\":20,\"z_mm\":30,\"height_mm\":400,\"radius_mm\":50}]}");
             var batch = CodexShapeBatch.Parse(shapes);

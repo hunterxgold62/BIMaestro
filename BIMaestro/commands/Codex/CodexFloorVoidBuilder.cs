@@ -27,7 +27,7 @@ namespace BIMaestro.Codex
             using (var profile = new CurveArray())
             using (var profiles = new CurveArrArray())
             {
-                for (int i = 0; i < 4; i++) profile.Append(Line.CreateBound(points[i], points[(i + 1) % 4]));
+                for (int i = 0; i < 4; i++) profile.Append(CodexCreationGuard.CreateLine(points[i], points[(i + 1) % 4]));
                 profiles.Append(profile);
                 var plane = SketchPlane.Create(doc, Plane.CreateByNormalAndOrigin(XYZ.BasisZ, XYZ.Zero));
                 extrusion = doc.FamilyCreate.NewExtrusion(false, profiles, plane, (spec.Max[2].Value(initial) - spec.Min[2].Value(initial)) / 304.8);
@@ -106,7 +106,7 @@ namespace BIMaestro.Codex
                     var type = new FilteredElementCollector(project).OfClass(typeof(FloorType)).Cast<FloorType>().First(f => !f.IsFoundationSlab);
                     var points = new[] { new XYZ(-20,-20,0), new XYZ(20,-20,0), new XYZ(20,20,0), new XYZ(-20,20,0) };
                     var loop = new CurveLoop();
-                    for (int i = 0; i < 4; i++) loop.Append(Line.CreateBound(points[i], points[(i + 1) % 4]));
+                    for (int i = 0; i < 4; i++) loop.Append(CodexCreationGuard.CreateLine(points[i], points[(i + 1) % 4]));
                     floor = Floor.Create(project, new[] { loop }, type.Id, level.Id);
                     project.Regenerate(); before = Volume(floor);
                     var box = floor.get_BoundingBox(null); thickness = box.Max.Z - box.Min.Z;

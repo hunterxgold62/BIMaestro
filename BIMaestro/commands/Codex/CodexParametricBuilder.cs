@@ -1,4 +1,4 @@
-﻿using Autodesk.Revit.DB;
+using Autodesk.Revit.DB;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -210,6 +210,7 @@ namespace BIMaestro.Codex
         }
         private void ApplyRegistry(FamilyCase test)
         {
+            design.ValidateAt(test.Numeric);
             var failures = new List<string>();
             using (var transaction = new Transaction(doc, "BIMaestro — " + test.Name))
             {
@@ -241,6 +242,7 @@ namespace BIMaestro.Codex
         internal View ProfileView(int axis) => views[axis];
         private void Apply(Dictionary<string, double> values)
         {
+            design.ValidateAt(values);
             var failures = new List<string>();
             using (var transaction = new Transaction(doc, "BIMaestro — test de flexion"))
             {
@@ -327,7 +329,7 @@ namespace BIMaestro.Codex
         {
             var references = new ReferenceArray(); references.Append(origins[axis].GetReference()); references.Append(plane.GetReference());
             var offset = (axis == 0 ? XYZ.BasisY : XYZ.BasisX) * (2 + sequence * 0.02);
-            using (var line = Line.CreateBound(offset, offset + Basis(axis) * Math.Sign(value) * Math.Max(Math.Abs(value), 10 / 304.8)))
+            using (var line = CodexCreationGuard.CreateLine(offset, offset + Basis(axis) * Math.Sign(value) * Math.Max(Math.Abs(value), 10 / 304.8)))
                 doc.FamilyCreate.NewLinearDimension(axis == 2 ? views[1] : views[2], line, references).FamilyLabel = parameter;
         }
         private static CurveArray Rectangle(int axis, double origin, double u0, double v0, double u1, double v1, bool reverse)
@@ -337,7 +339,7 @@ namespace BIMaestro.Codex
                 .Select(p => Basis(axis) * origin + Basis(uv[0]) * p[0] + Basis(uv[1]) * p[1]).ToArray();
             if (reverse) Array.Reverse(points);
             var profile = new CurveArray();
-            for (int i = 0; i < 4; i++) profile.Append(Line.CreateBound(points[i], points[(i + 1) % 4]));
+            for (int i = 0; i < 4; i++) profile.Append(CodexCreationGuard.CreateLine(points[i], points[(i + 1) % 4]));
             return profile;
         }
         private static XYZ Basis(int axis) => axis == 0 ? XYZ.BasisX : axis == 1 ? XYZ.BasisY : XYZ.BasisZ;

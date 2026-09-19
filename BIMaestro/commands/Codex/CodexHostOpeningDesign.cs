@@ -64,8 +64,8 @@ namespace BIMaestro.Codex
                 double v = e.Value(values), start = e.Value(initial);
                 if (double.IsNaN(v) || double.IsInfinity(v) || Math.Abs(v) > 100000)
                     throw new InvalidOperationException("host_opening : coordonnée hors limites.");
-                if (!e.IsZero && (Math.Abs(v) < 0.001 || Math.Abs(start) < 0.001 || Math.Sign(v) != Math.Sign(start)))
-                    throw new InvalidOperationException("host_opening : une limite pilotée traverse l'origine ; utiliser une limite constante nulle ou un repère décalé.");
+                if (!e.IsZero && (Math.Abs(v) < 1 || Math.Abs(start) < 1 || Math.Sign(v) != Math.Sign(start)))
+                    throw new InvalidOperationException("host_opening : une limite non nulle est à moins de 1 mm de l'origine ou la traverse ; utiliser une limite constante nulle ou un repère décalé.");
             }
         }
     }

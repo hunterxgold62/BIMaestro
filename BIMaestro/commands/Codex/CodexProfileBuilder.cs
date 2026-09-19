@@ -1,4 +1,4 @@
-﻿using Autodesk.Revit.DB;
+using Autodesk.Revit.DB;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,7 +15,7 @@ namespace BIMaestro.Codex
         internal static CurveArray Profile(ParametricPart part, Dictionary<string, double> values)
         {
             var points = Points(part, values); var result = new CurveArray();
-            for (int i = 0; i < points.Length; i++) result.Append(Line.CreateBound(points[i], points[(i + 1) % points.Length]));
+            for (int i = 0; i < points.Length; i++) result.Append(CodexCreationGuard.CreateLine(points[i], points[(i + 1) % points.Length]));
             return result;
         }
         internal static void Constrain(Document doc, Extrusion extrusion, ParametricPart part, Dictionary<string, double> values, CodexParametricBuilder constraints)
@@ -35,7 +35,7 @@ namespace BIMaestro.Codex
                 for (int a = 0; a < 2; a++)
                 {
                     var direction = Basis(uv[1 - a]);
-                    var guide = doc.FamilyCreate.NewModelCurve(Line.CreateBound(start - direction * (5 / 304.8), start + direction * (5 / 304.8)), extrusion.Sketch.SketchPlane);
+                    var guide = doc.FamilyCreate.NewModelCurve(CodexCreationGuard.CreateLine(start - direction * (5 / 304.8), start + direction * (5 / 304.8)), extrusion.Sketch.SketchPlane);
                     guide.ChangeToReferenceLine();
                     var plane = constraints.PlaneAt(uv[a], part.Profile[i][a]); doc.Regenerate();
                     // Regeneration may replace native curve references.

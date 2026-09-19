@@ -88,6 +88,15 @@ internal static class FamilyDesignTests
         if ((string)schema["name"] != "revit_create_family" || schema["inputSchema"]["properties"]["parts"] == null) throw new Exception("Missing tool schema");
         var sphere = (JObject)fixture.DeepClone(); sphere["parts"][0]["geometry"]["kind"] = "sphere"; sphere["parts"][0]["geometry"]["size_mm"] = new JArray(50, 0, 0);
         CodexFamilyDesign.Parse(sphere);
+        var cone = (JObject)sphere.DeepClone();
+        cone["parts"][0]["geometry"]["kind"] = "cone";
+        cone["parts"][0]["geometry"]["size_mm"] = new JArray(50, 0, 100);
+        CodexFamilyDesign.Parse(cone);
+        cone["parts"][0]["geometry"]["size_mm"][1] = 1;
+        CodexFamilyDesign.Parse(cone);
+        Reject(cone, x => x["parts"][0]["geometry"]["size_mm"][1] = 0.5, "submillimetre cone top");
+        Reject(cone, x => x["parts"][0]["geometry"]["size_mm"][0] = 0.5, "submillimetre cone base");
+        Console.WriteLine("PASS: cone tips and 1 mm radii accepted, shorter radial edges rejected");
         Console.WriteLine("PASS: seven supported primitive types and schema");
         var diffuser = JObject.Parse(File.ReadAllText("scripts/codex-tests/diffuser.design.json"));
         var parsedDiffuser = CodexFamilyDesign.Parse(diffuser);

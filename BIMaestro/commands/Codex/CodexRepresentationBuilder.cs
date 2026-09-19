@@ -1,4 +1,4 @@
-﻿using Autodesk.Revit.DB;
+using Autodesk.Revit.DB;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,9 +8,10 @@ namespace BIMaestro.Codex
 {
     internal static class CodexRepresentationBuilder
     {
-        internal static object Build(Document doc, FamilyRepresentationSpec spec, IEnumerable<Element> model, Dictionary<string, FamilySymbol> regions)
+        internal static object Build(Document doc, FamilyRepresentationSpec spec, IEnumerable<Element> model, Dictionary<string, FamilySymbol> regions, Action<Element, string> onCreated = null)
         {
             if (spec == null) return null;
+            onCreated ??= (element, drawing) => CodexFamilyEditor.Tag(element, drawing, drawing);
             HideModel(spec, model);
             var ids = new List<string>();
             foreach (var drawing in spec.Drawings)
@@ -40,6 +41,7 @@ namespace BIMaestro.Codex
                             region = doc.FamilyCreate.NewFamilyInstance(origin, symbol, work, Autodesk.Revit.DB.Structure.StructuralType.NonStructural);
                         }
                         ids.Add(region.Id.ToString());
+                        onCreated?.Invoke(region, drawing.Name);
                     }
                     else
                     {
@@ -51,6 +53,7 @@ namespace BIMaestro.Codex
                                 using (var visibility = new FamilyElementVisibility(FamilyElementVisibilityType.ViewSpecific)
                                 { IsShownInCoarse = true, IsShownInMedium = true, IsShownInFine = true }) element.SetVisibility(visibility);
                                 ids.Add(element.Id.ToString());
+                                onCreated?.Invoke(element, drawing.Name);
                             }
                             else
                             {
@@ -58,6 +61,7 @@ namespace BIMaestro.Codex
                                 using (var visibility = new FamilyElementVisibility(FamilyElementVisibilityType.Model)
                                 { IsShownInCoarse = true, IsShownInMedium = true, IsShownInFine = true }) element.SetVisibility(visibility);
                                 ids.Add(element.Id.ToString());
+                                onCreated?.Invoke(element, drawing.Name);
                             }
                         }
                     }
@@ -150,7 +154,7 @@ namespace BIMaestro.Codex
         private static IEnumerable<Curve> Curves(FamilyDrawingCurve curve, XYZ origin, XYZ u, XYZ v)
         {
             var p = curve.Points.Select(a => origin + u * (a[0] / 304.8) + v * (a[1] / 304.8)).ToArray();
-            if (curve.Kind == "line") yield return Line.CreateBound(p[0], p[1]);
+            if (curve.Kind == "line") yield return CodexCreationGuard.CreateLine(p[0], p[1]);
             else if (curve.Kind == "arc") yield return Arc.Create(p[0], p[1], p[2]);
             else
             {

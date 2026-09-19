@@ -39,6 +39,13 @@ internal static class ParametricDesignTests
         Console.WriteLine("PASS: floor void width/length/depth flex and invalid host/geometry rejection");
         var source = JObject.Parse(File.ReadAllText("scripts/codex-tests/parametric-diffuser.design.json"));
         var design = CodexParametricDesign.Parse(source);
+        Reject(source, x => x["parts"][0]["minimum"][2]["offset_mm"] = 0.5, "submillimetre constraint at creation");
+        Reject(source, x => x["parts"][0]["minimum"][2] = JObject.Parse("{offset_mm:8.5,terms:[{parameter:'Epaisseur',factor:-1}]}"), "submillimetre constraint only during flex");
+        var atLimit = (JObject)source.DeepClone();
+        atLimit["parts"][0]["minimum"][2]["offset_mm"] = 1;
+        CodexParametricDesign.Parse(atLimit);
+        Reject(window, x => x["host_opening"]["min_xz"][1]["offset_mm"] = 0.5, "submillimetre opening constraint");
+        Console.WriteLine("PASS: 1 mm constraint floor at creation and during flex, including host opening");
         var wide = design.Initial; wide["Largeur"] = 800;
         if (design.Parts[0].Max[0].Value(wide) - design.Parts[0].Min[0].Value(wide) != 800 || design.Parts[0].Max[1].Value(wide) - design.Parts[0].Min[1].Value(wide) != 600)
             throw new Exception("Width must change independently from depth");

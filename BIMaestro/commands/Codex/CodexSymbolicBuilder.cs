@@ -21,7 +21,7 @@ namespace BIMaestro.Codex
                 {
                     for (int i = 0; i < 4; i++)
                     {
-                        using (var line = Line.CreateBound(points[i], points[(i + 1) % 4])) curves[i] = doc.FamilyCreate.NewSymbolicCurve(line, work);
+                        using (var line = CodexCreationGuard.CreateLine(points[i], points[(i + 1) % 4])) curves[i] = doc.FamilyCreate.NewSymbolicCurve(line, work);
                         using (var visibility = new FamilyElementVisibility(FamilyElementVisibilityType.ViewSpecific)
                         { IsShownInCoarse = spec.Coarse, IsShownInMedium = spec.Medium, IsShownInFine = spec.Fine }) curves[i].SetVisibility(visibility);
                         if (!string.IsNullOrEmpty(spec.VisibleParameter)) constraints.AssociateBoolean(curves[i].get_Parameter(BuiltInParameter.IS_VISIBLE_PARAM), spec.VisibleParameter);

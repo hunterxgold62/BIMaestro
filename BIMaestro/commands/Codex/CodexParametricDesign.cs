@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -236,8 +236,8 @@ namespace BIMaestro.Codex
                 if (array.Grid == null ? corners.Max(p => p[array.Axis]) - corners.Min(p => p[array.Axis]) >= pitch : corners.Max(p => p[array.Axis]) - corners.Min(p => p[array.Axis]) > pitch + 1e-6) throw new InvalidOperationException("Les projections des barres se touchent ou se chevauchent : " + array.Name);
                 if (array.Corners(values, Math.Max(2, count) - 1).Concat(corners).SelectMany(p => p).Any(p => Math.Abs(p) > 100000)) throw new InvalidOperationException("Encombrement incliné hors des limites : " + array.Name);
                 foreach (var e in array.Min.Concat(new[] { LengthExpression.Combine(array.Min[array.Axis], array.Pitch) }))
-                    if (!e.IsZero && (Math.Abs(e.Value(values)) < 0.001 || Math.Abs(e.Value(Initial)) < 0.001 || Math.Sign(e.Value(values)) != Math.Sign(e.Value(Initial))))
-                        throw new InvalidOperationException("L'ancrage du réseau traverse l'origine : " + array.Name);
+                    if (!e.IsZero && (Math.Abs(e.Value(values)) < 1 || Math.Abs(e.Value(Initial)) < 1 || Math.Sign(e.Value(values)) != Math.Sign(e.Value(Initial))))
+                        throw new InvalidOperationException("L'ancrage du réseau est à moins de 1 mm de l'origine ou la traverse : " + array.Name);
             }
             foreach(var gridArray in Arrays.Where(a=>a.Grid!=null))
                 if(gridArray.Grid.Width.Value(values)<1 || gridArray.Grid.Height.Value(values)<1 || gridArray.Grid.Columns(values)>200 || gridArray.Grid.Columns(values)*gridArray.Count(values)>200) throw new InvalidOperationException("Grille limitée à 200 modules visibles et étendues positives.");
@@ -251,7 +251,7 @@ namespace BIMaestro.Codex
                 {
                     double initial = e.Value(Initial), next = e.Value(values);
                     if (Math.Abs(next) > 100000) throw new InvalidOperationException("Pièce hors de la limite de 100 m : " + part.Name);
-                    if (!e.IsZero && (Math.Abs(initial) < 0.001 || Math.Abs(next) < 0.001 || Math.Sign(initial) != Math.Sign(next))) throw new InvalidOperationException("Coordonnée variable nulle ou traversant l'origine : " + part.Name + ". Utiliser un repère stable, par exemple -Largeur/2 et Largeur/2.");
+                    if (!e.IsZero && (Math.Abs(initial) < 1 || Math.Abs(next) < 1 || Math.Sign(initial) != Math.Sign(next))) throw new InvalidOperationException("Coordonnée non nulle à moins de 1 mm de l'origine ou traversant l'origine : " + part.Name + ". Utiliser un repère stable, par exemple -Largeur/2 et Largeur/2.");
                 }
                 int[] uv = part.ProfileAxes;
                 var holes = part.Openings.Select(h => new { Min = h.Min.Select(e => e.Value(values)).ToArray(), Max = h.Max.Select(e => e.Value(values)).ToArray() }).ToArray();

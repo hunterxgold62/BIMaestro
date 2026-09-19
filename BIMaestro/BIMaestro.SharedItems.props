@@ -12,6 +12,8 @@
     <Compile Include="commands\Codex\CodexFamilyParameters.cs" />
     <Compile Include="commands\Codex\CodexParameterBuilder.cs" />
     <Compile Include="commands\Codex\CodexFamilyTools.cs" />
+    <Compile Include="commands\Codex\CodexFamilyEditDesign.cs" />
+    <Compile Include="commands\Codex\CodexFamilyEditor.cs" />
     <Compile Include="commands\Codex\CodexParametricInput.cs" />
     <Compile Include="commands\Codex\CodexConnectorDesign.cs" />
     <Compile Include="commands\Codex\CodexConnectorBuilder.cs" />

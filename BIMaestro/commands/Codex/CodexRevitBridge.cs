@@ -47,7 +47,7 @@ namespace BIMaestro.Codex
             CodexFamilyDesign.Tool(true),
             CodexParametricDesign.Tool(),
             CodexParametricDesign.Tool(true),
-            Tool("revit_read_family_design", "Relit la description constructive de la famille BIMaestro active (construction.json à côté du RFA), ou de la dernière famille créée dans ce panneau si le document actif n'est pas un RFA BIMaestro. Permet une correction ciblée sans réinventer toutes les pièces. Ce descriptif peut être antérieur aux modifications manuelles : ce n'est pas une extraction de toute la géométrie actuelle.", new JObject()),
+            Tool("revit_read_family_design", "Relit la description constructive de la famille BIMaestro active (construction.json à côté du RFA), ou de la dernière famille créée dans ce panneau si le document actif est un projet. Refuse de lire le descriptif d'une autre famille quand une famille manuelle est ouverte : utiliser revit_inspect_family. Ce descriptif historique peut être antérieur aux modifications : ce n'est pas une extraction de la géométrie actuelle.", new JObject()),
             Tool("revit_open_created_family", "Ouvre et affiche dans Revit le dernier RFA créé par ce panneau, puis rattache le panneau à cette famille. À utiliser pour montrer une création ou une révision demandée. Ne ferme et n'enregistre pas le document précédent.", new JObject()),
             Tool("revit_selection_geometry", "Lit la position, l'encombrement et les contours des faces supérieures des sols sélectionnés (20 éléments maximum), en coordonnées internes Revit en mm, ainsi que les types de murs disponibles. Renvoie des contour_id et edge_index utilisables directement pour créer des murs sur ces contours. Réservations comprises ; pas de fusion automatique de plusieurs sols.", new JObject()),
             Tool("revit_walls_from_floor_edges", "Crée des MURS NATIFS dans le projet sur les arêtes choisies des sols sélectionnés, à leur emplacement réel. Appeler revit_selection_geometry avant. Axe du mur sur la limite du sol ; base au-dessus du sol + base_offset_mm. Segments/arcs horizontaux uniquement ; une transaction annulable. Ne crée ni créneaux ni famille. Ne pas entourer les réservations sans demande. Si plusieurs sols se touchent, sélectionner explicitement les arêtes utiles sans doubler leurs limites communes.", new JObject
@@ -260,11 +260,14 @@ namespace BIMaestro.Codex
                 throw new InvalidOperationException("Le document actif a changé ou a été fermé. Revenez au document indiqué dans le panneau, ou fermez puis rouvrez Codex.");
             if (tool == "revit_context") return ReadContext(app);
             if (tool == "revit_family_parameters") { RequireKeys(args); return CodexFamilyTools.Read(document); }
+            if (tool == "revit_inspect_family") return CodexFamilyEditor.Inspect(document, args);
             if (tool == "revit_selection_geometry") { RequireKeys(args); return selectionGeometry.Read(app, document); }
             if (tool == "revit_read_family_design")
             {
                 RequireKeys(args);
                 string root = Path.GetFullPath(CodexFamilyBuilder.OutputRoot) + Path.DirectorySeparatorChar;
+                if (document.IsFamilyDocument && (string.IsNullOrEmpty(document.PathName) || !Path.GetFullPath(document.PathName).StartsWith(root, StringComparison.OrdinalIgnoreCase)))
+                    throw new InvalidOperationException("Cette famille ouverte n'a pas de description BIMaestro accessible. Utiliser revit_inspect_family pour lire son état réel ; ne pas réutiliser la description d'une autre famille.");
                 string path = document.IsFamilyDocument && !string.IsNullOrEmpty(document.PathName)
                     && Path.GetFullPath(document.PathName).StartsWith(root, StringComparison.OrdinalIgnoreCase) ? document.PathName : lastCreated?.FilePath;
                 if (path == null) throw new InvalidOperationException("Aucune description disponible. Ouvrez le RFA BIMaestro depuis son dossier de création, puis rouvrez le panneau.");
@@ -405,12 +408,14 @@ namespace BIMaestro.Codex
                 }
                 finally { foreach (var curve in curves) curve.Dispose(); }
             }
-            if (tool != "revit_family_box" && tool != "revit_set_family_length" && tool != "revit_set_family_angle" && tool != "revit_family_shapes" && tool != "revit_set_family_parameters" && tool != "revit_set_family_category") throw new InvalidOperationException("Outil Revit inconnu.");
+            if (tool != "revit_family_box" && tool != "revit_set_family_length" && tool != "revit_set_family_angle" && tool != "revit_family_shapes" && tool != "revit_set_family_parameters" && tool != "revit_set_family_category" && tool != "revit_edit_family_representation" && tool != "revit_edit_family_extrusion") throw new InvalidOperationException("Outil Revit inconnu.");
             if (!AllowChanges) throw new InvalidOperationException("Mode lecture seule : l'utilisateur doit activer les modifications dans le panneau.");
             if (!document.IsFamilyDocument || document.IsReadOnly || document.IsModifiable)
                 throw new InvalidOperationException("Ouvrez une famille modifiable dans l'éditeur de familles, hors de toute autre commande.");
             if (tool == "revit_set_family_parameters") return CodexFamilyTools.Set(document, args, Confirm, NewTransaction, Commit);
             if (tool == "revit_set_family_category") return CodexFamilyTools.SetCategory(document, args, Confirm, NewTransaction, Commit);
+            if (tool == "revit_edit_family_representation") return CodexFamilyEditor.EditRepresentation(document, args, Confirm, NewTransaction, Commit);
+            if (tool == "revit_edit_family_extrusion") return CodexFamilyEditor.EditExtrusion(document, args, Confirm, NewTransaction, Commit);
 
             if (tool == "revit_family_shapes")
             {

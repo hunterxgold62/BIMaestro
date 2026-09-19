@@ -1,4 +1,4 @@
-﻿using Autodesk.Revit.DB;
+using Autodesk.Revit.DB;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -49,7 +49,7 @@ namespace BIMaestro.Codex
             double width = size[u] / 304.8, height = size[vAxis] / 304.8;
             var points = new[] { XYZ.Zero, du * width, du * width + dv * height, dv * height };
             var profile = new CurveArray();
-            for (int i = 0; i < 4; i++) profile.Append(Line.CreateBound(points[i], points[(i + 1) % 4]));
+            for (int i = 0; i < 4; i++) profile.Append(CodexCreationGuard.CreateLine(points[i], points[(i + 1) % 4]));
             var profiles = new CurveArrArray(); profiles.Append(profile);
             var workPlane = SketchPlane.Create(doc, Plane.CreateByNormalAndOrigin(Basis(axis), XYZ.Zero));
             extrusion = doc.FamilyCreate.NewExtrusion(true, profiles, workPlane, size[axis] / 304.8);
@@ -90,9 +90,9 @@ namespace BIMaestro.Codex
                     doc.Regenerate();
                     var refs = new ReferenceArray(); refs.Append(datums[a].GetReference()); refs.Append(target.GetReference());
                     var offset = Basis(axes[1 - a]) * (3 + i * 0.1);
-                    using (var dimensionLine = Line.CreateBound(offset - Basis(axes[a]) * (datumMm / 304.8), offset + Basis(axes[a]) * coordinate))
+                    using (var dimensionLine = CodexCreationGuard.CreateLine(offset - Basis(axes[a]) * (datumMm / 304.8), offset + Basis(axes[a]) * coordinate))
                         doc.FamilyCreate.NewLinearDimension(byAxis[axis], dimensionLine, refs).FamilyLabel = driver;
-                    var guide = doc.FamilyCreate.NewModelCurve(Line.CreateBound(points[i] - Basis(axes[1 - a]) * 2, points[i] + Basis(axes[1 - a]) * 2), workPlane);
+                    var guide = doc.FamilyCreate.NewModelCurve(CodexCreationGuard.CreateLine(points[i] - Basis(axes[1 - a]) * 2, points[i] + Basis(axes[1 - a]) * 2), workPlane);
                     guide.ChangeToReferenceLine(); doc.Regenerate();
                     doc.FamilyCreate.NewAlignment(byAxis[axis], target.GetReference(), guide.GeometryCurve.Reference);
                     doc.FamilyCreate.NewAlignment(byAxis[axis], guide.GeometryCurve.Reference, edges[i].GeometryCurve.GetEndPointReference(endpoint));
@@ -110,7 +110,7 @@ namespace BIMaestro.Codex
         }
         private ModelCurve ReferenceLine(SketchPlane plane, XYZ direction)
         {
-            var line = doc.FamilyCreate.NewModelCurve(Line.CreateBound(-direction, direction), plane);
+            var line = doc.FamilyCreate.NewModelCurve(CodexCreationGuard.CreateLine(-direction, direction), plane);
             line.ChangeToReferenceLine(); line.Pinned = true; doc.Regenerate(); return line;
         }
         private static bool SameEdge(Curve curve, XYZ start, XYZ end) =>

@@ -21,6 +21,19 @@ namespace BIMaestro.Codex
         private bool listening;
         internal static bool IsActive => current != null;
 
+        // Revit expects feet. Keep a 1 mm floor even on versions whose native
+        // short-curve tolerance is smaller; never stretch a requested profile.
+        internal static Autodesk.Revit.DB.Line CreateLine(Autodesk.Revit.DB.XYZ start, Autodesk.Revit.DB.XYZ end)
+        {
+            double minimum = Math.Max(1 / 304.8, (current?.app.ShortCurveTolerance ?? 0) * 1.01);
+            double length = start.DistanceTo(end);
+            if (double.IsNaN(length) || double.IsInfinity(length) || length + 1e-12 < minimum)
+                throw new InvalidOperationException("Trait trop court : " + (length * 304.8).ToString("0.######") +
+                    " mm ; minimum " + (minimum * 304.8).ToString("0.######") +
+                    " mm. Corriger les coordonnées ou le scénario de variation avant de relancer.");
+            return Autodesk.Revit.DB.Line.CreateBound(start, end);
+        }
+
         internal CodexCreationGuard(Autodesk.Revit.ApplicationServices.Application app, string name)
         {
             if (current != null) throw new InvalidOperationException("Une création de famille est déjà en cours.");

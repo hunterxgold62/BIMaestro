@@ -1,4 +1,4 @@
-﻿using Autodesk.Revit.DB;
+using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Structure;
 using Autodesk.Revit.UI;
 using Newtonsoft.Json;
@@ -457,7 +457,7 @@ namespace BIMaestro.Codex
         private static CurveLoop Polygon(IEnumerable<XYZ> points)
         {
             var p = points.ToList(); var loop = new CurveLoop();
-            for (int i = 0; i < p.Count; i++) loop.Append(Line.CreateBound(p[i], p[(i + 1) % p.Count]));
+            for (int i = 0; i < p.Count; i++) loop.Append(CodexCreationGuard.CreateLine(p[i], p[(i + 1) % p.Count]));
             return loop;
         }
         private static CurveLoop Circle(double radius)
@@ -481,7 +481,7 @@ namespace BIMaestro.Codex
             {
                 var loop = new CurveLoop();
                 loop.Append(Arc.Create(new XYZ(0, 0, -a), new XYZ(0, 0, a), new XYZ(a, 0, 0)));
-                loop.Append(Line.CreateBound(new XYZ(0, 0, a), new XYZ(0, 0, -a)));
+                loop.Append(CodexCreationGuard.CreateLine(new XYZ(0, 0, a), new XYZ(0, 0, -a)));
                 raw = GeometryCreationUtilities.CreateRevolvedGeometry(new Frame(XYZ.Zero, XYZ.BasisX, XYZ.BasisY, XYZ.BasisZ), new[] { loop }, 0, 2 * Math.PI, options);
             }
             else if (spec.Kind == "cone" || spec.Kind == "lathe")

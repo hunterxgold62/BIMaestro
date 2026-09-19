@@ -36,7 +36,7 @@ namespace BIMaestro.Codex
             var points = Points(initial, line.GetEndPoint(0).Y);
             using (var profile = new CurveArray())
             {
-                for (int i = 0; i < 4; i++) profile.Append(Line.CreateBound(points[i], points[(i + 1) % 4]));
+                for (int i = 0; i < 4; i++) profile.Append(CodexCreationGuard.CreateLine(points[i], points[(i + 1) % 4]));
                 opening = doc.FamilyCreate.NewOpening(wall, profile);
             }
             if (opening == null) throw new InvalidOperationException("Revit n'a pas créé l'ouverture du mur.");
@@ -95,7 +95,7 @@ namespace BIMaestro.Codex
                 {
                     t.Start();
                     var level = Level.Create(project, 0);
-                    host = Wall.Create(project, Line.CreateBound(new XYZ(-20, 0, 0), new XYZ(20, 0, 0)), wallType.Id, level.Id, 20, 0, false, false);
+                    host = Wall.Create(project, CodexCreationGuard.CreateLine(new XYZ(-20, 0, 0), new XYZ(20, 0, 0)), wallType.Id, level.Id, 20, 0, false, false);
                     project.Regenerate(); before = ElementVolume(host);
                     symbol.Activate(); project.Regenerate();
                     instance = project.Create.NewFamilyInstance(XYZ.Zero, symbol, host, level, Autodesk.Revit.DB.Structure.StructuralType.NonStructural);
