@@ -1,0 +1,12 @@
+{
+ "name":"bimaestro-family-library",
+ "main":"worker.js",
+ "compatibility_date":"2026-09-20",
+ "compatibility_flags":["nodejs_compat"],
+ "workers_dev":false,
+ "preview_urls":false,
+ "vars":{"LIBRARY_ENABLED":"false"},
+ "observability":{"enabled":false},
+ "d1_databases":[{"binding":"CATALOG","database_name":"bimaestro-family-catalog","database_id":"1918916c-c5cb-4165-8db2-0532291d859c"}],
+ "r2_buckets":[{"binding":"FAMILIES","bucket_name":"bimaestro-families"}]
+}

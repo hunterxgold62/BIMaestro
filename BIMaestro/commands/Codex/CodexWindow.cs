@@ -48,7 +48,23 @@ namespace BIMaestro.Codex
         private readonly Button pasteImage = Button("Coller une image");
         private readonly Button showArtifact = Button("Voir le RFA créé");
         private readonly Button openArtifact = Button("Ouvrir dans Revit");
+        private readonly Button community = Button("Bibliothèque commune");
+        private readonly Button shareArtifact = Button("Partager le RFA");
+        private bool publishing;
         private readonly TextBlock documentLabel = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 8) };
+
+        private async Task ShareFamilyAsync(CodexFamilyArtifact artifact)
+        {
+            if (artifact == null || publishing) return;
+            publishing = true; UpdateControls();
+            try
+            {
+                if (await CodexCommunityPublishWindow.ShowAsync(this, bridge, artifact.FilePath, "ai"))
+                    Append("Bibliothèque commune", "Famille partagée : " + Path.GetFileNameWithoutExtension(artifact.FilePath));
+            }
+            catch (Exception ex) { Append("Partage non effectué — votre RFA local est conservé", ex is TaskCanceledException ? "Le service ne répond pas. Vérifiez la bibliothèque avant un nouvel envoi." : ex.Message); }
+            finally { publishing = false; if (!closed) UpdateControls(); }
+        }
 
         internal CodexWindow(CodexRevitBridge bridge, ResourceDictionary theme = null)
         {
@@ -135,7 +151,7 @@ namespace BIMaestro.Codex
                   </ControlTemplate.Triggers>
                 </ControlTemplate>")));
             context.Style = changes.Style = direct.Style = permissionStyle;
-            foreach (var button in new[] { connect, disconnect, send, stop, reset, browse, attach, pasteImage, showArtifact, openArtifact })
+            foreach (var button in new[] { connect, disconnect, send, stop, reset, browse, attach, pasteImage, showArtifact, openArtifact, community, shareArtifact })
                 button.SetResourceReference(StyleProperty, "SecondaryButton");
             send.SetResourceReference(StyleProperty, "PrimaryButton");
             nativeTests.SetResourceReference(StyleProperty, "SecondaryButton");
@@ -197,7 +213,9 @@ namespace BIMaestro.Codex
             input.ToolTip = "Décrivez l'objet, ses dimensions ou la modification souhaitée. Ctrl+Entrée pour envoyer.";
             bottom.Children.Add(input);
             bottom.Children.Add(attachmentPanel);
-            var artifacts = new WrapPanel(); artifacts.Children.Add(showArtifact); artifacts.Children.Add(openArtifact); bottom.Children.Add(artifacts);
+            var artifacts = new WrapPanel(); artifacts.Children.Add(showArtifact); artifacts.Children.Add(openArtifact); artifacts.Children.Add(shareArtifact); artifacts.Children.Add(community); bottom.Children.Add(artifacts);
+            community.Click += (_, __) => new CodexCommunityWindow(bridge) { Owner = this }.Show();
+            shareArtifact.Click += async (_, __) => await ShareFamilyAsync(lastArtifact);
             attach.Content = "Joindre"; attach.ToolTip = "Joindre une image de référence"; attach.MinWidth = 88;
             pasteImage.Content = "Coller"; pasteImage.ToolTip = "Coller une image du presse-papiers"; pasteImage.MinWidth = 88;
             send.MinWidth = 120; stop.MinWidth = 72; reset.MinWidth = 146;
@@ -343,6 +361,9 @@ namespace BIMaestro.Codex
             direct.IsEnabled = context.IsChecked == true && changes.IsChecked == true && !busy;
             attach.IsEnabled = pasteImage.IsEnabled = attachmentPanel.IsEnabled = !busy && !connecting;
             showArtifact.IsEnabled = lastArtifact != null && !busy;
+            community.IsEnabled = !busy && !publishing;
+            shareArtifact.IsEnabled = lastArtifact != null && !busy && !publishing;
+            shareArtifact.Visibility = lastArtifact == null ? Visibility.Collapsed : Visibility.Visible;
             openArtifact.IsEnabled = lastArtifact != null && context.IsChecked == true && !busy && !connecting;
             showArtifact.Visibility = openArtifact.Visibility = lastArtifact == null ? Visibility.Collapsed : Visibility.Visible;
         }
@@ -572,7 +593,10 @@ namespace BIMaestro.Codex
                     documentLabel.Text = "Document : " + bridge.DocumentTitle;
                     if (result is CodexFamilyArtifact artifact)
                     {
-                        if (artifact.FilePath != null) lastArtifact = artifact;
+                        if (artifact.FilePath != null)
+                        {
+                            lastArtifact = artifact;
+                        }
                         UpdateControls();
                         string report = JsonConvert.SerializeObject(artifact.Report);
                         Append(artifact.FilePath == null ? "Validation de la famille" : "Famille enregistrée", report);

@@ -6,18 +6,19 @@ using System.Windows.Interop;
 namespace BIMaestro.Codex
 {
     [Transaction(TransactionMode.Manual)]
-    public class CodexCommand : Licensing.BaseTrackedCommand
+    public class CodexCommunityCommand : Licensing.BaseTrackedCommand
     {
-        protected override string ButtonId => "CodexChat";
-        private static CodexWindow window;
+        protected override string ButtonId => "CommunityFamilies";
+        private static CodexCommunityWindow window;
+
         protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
             if (window != null) { window.Activate(); return Result.Succeeded; }
             var bridge = new CodexRevitBridge(data.Application.ActiveUIDocument?.Document, data.Application.Application.VersionNumber);
             bridge.AttachEvent(ExternalEvent.Create(bridge));
-            window = new CodexWindow(bridge);
+            window = new CodexCommunityWindow(bridge);
             new WindowInteropHelper(window).Owner = data.Application.MainWindowHandle;
-            window.Closed += (_, __) => window = null;
+            window.Closed += (_, __) => { bridge.Dispose(); window = null; };
             window.Show();
             return Result.Succeeded;
         }

@@ -30,11 +30,91 @@ namespace BIMaestro.Codex
         internal bool AllowChanges { get; set; }
         internal bool ApplyDirectly { get; set; }
         internal string DocumentTitle { get; private set; }
+        internal string RevitVersion { get; private set; }
 
-        internal CodexRevitBridge(Document document)
+        internal CodexRevitBridge(Document document, string revitVersion = null)
         {
             this.document = document;
             DocumentTitle = document?.Title ?? "Aucun document";
+            RevitVersion = revitVersion ?? document?.Application.VersionNumber ?? "";
+        }
+        internal async Task<JObject> InspectCommunityFamilyAsync(string path)
+        {
+            if (disposed) throw new ObjectDisposedException(nameof(CodexRevitBridge));
+            if (pending != null) throw new InvalidOperationException("Une opération Revit est déjà en attente.");
+            string fullPath = Path.GetFullPath(path);
+            if (!string.Equals(Path.GetExtension(fullPath), ".rfa", StringComparison.OrdinalIgnoreCase) || !File.Exists(fullPath))
+                throw new InvalidOperationException("Choisissez un fichier de famille Revit (.rfa) enregistré.");
+            if (new FileInfo(fullPath).Length > CodexCommunityLibrary.MaxBytes)
+                throw new InvalidOperationException("Le RFA dépasse la limite de 20 Mo.");
+            var completion = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+            pending = completion;
+            operation = app =>
+            {
+                string savedVersion;
+                using (var info = BasicFileInfo.Extract(fullPath)) savedVersion = info.Format;
+                var versionMatch = System.Text.RegularExpressions.Regex.Match(savedVersion ?? "", @"\b20\d{2}\b");
+                if (!versionMatch.Success || !int.TryParse(app.Application.VersionNumber, out int currentVersion) ||
+                    int.Parse(versionMatch.Value) > currentVersion || int.Parse(versionMatch.Value) < 2023)
+                    throw new InvalidOperationException("La famille doit être enregistrée entre Revit 2023 et votre version de Revit.");
+                Document family = app.Application.Documents.Cast<Document>().FirstOrDefault(d =>
+                    !string.IsNullOrEmpty(d.PathName) && string.Equals(d.PathName, fullPath, StringComparison.OrdinalIgnoreCase));
+                bool openedHere = family == null;
+                try
+                {
+                    if (openedHere) family = app.Application.OpenDocumentFile(fullPath);
+                    if (family == null || !family.IsFamilyDocument)
+                        throw new InvalidOperationException("Ce fichier n'est pas une famille Revit.");
+                    return new JObject
+                    {
+                        ["filePath"] = fullPath,
+                        ["name"] = Path.GetFileNameWithoutExtension(fullPath),
+                        ["category"] = family.OwnerFamily.FamilyCategory?.Name ?? "Modèles génériques",
+                        ["revitVersion"] = versionMatch.Value
+                    };
+                }
+                finally { if (openedHere && family != null && family.IsValidObject) family.Close(false); }
+            };
+            try
+            {
+                var request = externalEvent.Raise();
+                if (request != ExternalEventRequest.Accepted && request != ExternalEventRequest.Pending)
+                    throw new InvalidOperationException("Revit est occupé. Réessayez après fermeture de la boîte de dialogue active.");
+            }
+            catch (Exception ex) { completion.TrySetException(ex); pending = null; operation = null; }
+            return (JObject)await completion.Task;
+        }
+        // Dedicated UI operation; deliberately absent from the AI tool catalogue.
+        internal Task<object> LoadCommunityFamilyAsync(string path)
+        {
+            if (disposed) throw new ObjectDisposedException(nameof(CodexRevitBridge));
+            if (pending != null) throw new InvalidOperationException("Une opération Revit est déjà en attente.");
+            string fullPath = Path.GetFullPath(path);
+            if (!fullPath.StartsWith(Path.GetFullPath(CodexCommunityLibrary.CacheRoot) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) || !File.Exists(fullPath))
+                throw new InvalidOperationException("Le RFA téléchargé n'est plus disponible.");
+            pending = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var task = pending.Task;
+            operation = app =>
+            {
+                var target = app.ActiveUIDocument?.Document;
+                if (target == null || target.IsFamilyDocument || target.IsReadOnly || target.IsModifiable)
+                    throw new InvalidOperationException("Activez un projet Revit modifiable pour charger cette famille.");
+                using (var transaction = new Transaction(target, "Charger une famille communautaire"))
+                {
+                    transaction.Start();
+                    if (!target.LoadFamily(fullPath, out Family family)) throw new InvalidOperationException("Revit n'a pas chargé la famille ; elle est peut-être déjà présente. Aucune famille existante n'a été écrasée.");
+                    if (transaction.Commit() != TransactionStatus.Committed)
+                        throw new InvalidOperationException("Le chargement a été annulé par Revit.");
+                    return new { loaded = true };
+                }
+            };
+            try
+            {
+                var request = externalEvent.Raise();
+                if (request != ExternalEventRequest.Accepted && request != ExternalEventRequest.Pending) throw new InvalidOperationException("Revit est occupé. Réessayez après fermeture de la boîte de dialogue active.");
+            }
+            catch (Exception ex) { pending.TrySetException(ex); pending = null; operation = null; }
+            return task;
         }
         internal void AttachEvent(ExternalEvent value) { externalEvent = value; }
         public string GetName() => "BIMaestro — opérations Codex validées";

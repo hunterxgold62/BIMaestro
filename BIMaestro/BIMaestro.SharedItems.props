@@ -42,6 +42,10 @@
     <Compile Include="commands\Codex\CodexCommand.cs" />
     <Compile Include="commands\Codex\CodexRevitBridge.cs" />
     <Compile Include="commands\Codex\CodexWindow.cs" />
+    <Compile Include="commands\Codex\CodexCommunityLibrary.cs" />
+    <Compile Include="commands\Codex\CodexCommunityWindow.cs" />
+    <Compile Include="commands\Codex\CodexCommunityCommand.cs" />
+    <Compile Include="commands\Codex\CodexCommunitySnapshot.cs" />
     <Compile Include="les couleurs\Personnalisation\ProjectBrowserIcons.cs" />
     <Compile Include="les couleurs\Personnalisation\AppearancePack.cs" />
     <Compile Include="les couleurs\Personnalisation\BrowserAtmosphere.cs" />

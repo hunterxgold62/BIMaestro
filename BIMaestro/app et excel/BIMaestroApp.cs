@@ -162,6 +162,7 @@ public class BIMaestroApp : IExternalApplication
         try
         {
             BIMaestro.Codex.CodexCommand.Shutdown();
+            BIMaestro.Codex.CodexCommunityCommand.Shutdown();
             BIMaestro.MepBooster.MepBoosterService.Shutdown();
             BIMaestro.ViewHover.ViewDeckService.Shutdown();
             try { Telemetry.FlushAsync().GetAwaiter().GetResult(); }
