@@ -37,8 +37,12 @@ namespace BIMaestro.CodexTests
             {
                 var ui = sender as UIApplication ?? throw new InvalidOperationException("Contexte UIApplication absent.");
                 if (ui.Application.Documents.Size != 0) throw new InvalidOperationException("Le banc exige une instance Revit vide ; aucun document utilisateur ne sera modifié.");
+#if FAMILY_PROGRAM_ONLY
+                var familyEdits = FamilyProgramNativeTests.Run(ui);
+#else
                 var familyEdits = FamilyEditNativeTests.Run(ui);
-#if FAMILY_EDIT_ONLY
+#endif
+#if FAMILY_EDIT_ONLY || FAMILY_PROGRAM_ONLY
                 File.WriteAllText(Path.Combine(DirectoryPath, "result.json"), JsonConvert.SerializeObject(familyEdits, Formatting.Indented));
                 if (ui.Application.Documents.Size == 0) ui.PostCommand(RevitCommandId.LookupPostableCommandId(PostableCommand.ExitRevit));
                 return;

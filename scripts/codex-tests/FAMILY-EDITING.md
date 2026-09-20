@@ -58,9 +58,11 @@ automatiquement les formes existantes (`hide_model_in=[]`). Les régions utilise
 des familles de détail imbriquées ; leurs définitions inutilisées ne sont pas purgées.
 Les plans de travail auxiliaires sont conservés pour éviter de supprimer des dépendances Revit.
 L'inventaire n'est pas une extraction exhaustive de la logique constructive.
-Les profils longs sont tronqués explicitement. L'édition générale des profils,
-des dessins manuels, des contraintes géométriques et de la topologie des connecteurs
-reste à développer. Leurs paramètres associables sont déjà accessibles à la configuration.
+Les profils longs sont tronqués explicitement. Les opérations qui dépassent les
+éditeurs spécialisés peuvent désormais utiliser les [programmes natifs](FAMILY-PROGRAMS.md),
+avec découverte de l'API et validation annulée avant application. Cela inclut
+les familles imbriquées et les réseaux de géométries détaillées. Les possibilités
+exactes dépendent de l'API Revit et des contraintes de la famille inspectée.
 Le descriptif historique construction.json n'est pas synchronisé après une édition.
 
 ## Validation
@@ -96,4 +98,4 @@ réelle de l'utilisateur ; il exerce les mêmes opérations sur une famille temp
 2. Dessins 2D qui suivent les paramètres et réglages de visibilité ciblés.
 3. Édition géométrique des connecteurs et extension des réglages non associables.
 4. Tests de variation sur les familles existantes, comparaison avant/après et aperçus.
-5. Extension aux familles imbriquées, réseaux et géométries plus complexes.
+5. Élargissement des essais des programmes natifs aux autres versions de Revit.

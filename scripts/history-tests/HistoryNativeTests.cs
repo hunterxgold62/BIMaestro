@@ -37,7 +37,7 @@ namespace BIMaestro.HistoryTests
             try
             {
                 Check(ui.Application.Documents.Size == 0, "Requires an empty test process");
-                var results = Run(ui);
+                var results = File.Exists(Path.Combine(Output,"CML-source.rvt")) ? RunCml(ui) : Run(ui);
                 File.WriteAllText(Path.Combine(Output, "result.json"), JsonConvert.SerializeObject(new { passed = !results.Any(r => r.StartsWith("FAILED")), tests = results }, Formatting.Indented));
             }
             catch (Exception ex) { File.WriteAllText(Path.Combine(Output, "error.txt"), ex.ToString()); }
@@ -50,6 +50,7 @@ namespace BIMaestro.HistoryTests
             try
             {
                 var symbol = CreateFamily(ui, doc, "Metric Generic Model.rft");
+                string freeSymbolId = symbol.UniqueId;
                 var hostedSymbol = CreateFamily(ui, doc, "Metric Generic Model wall based.rft");
                 var networkSymbol = CreateFamily(ui, doc, "Metric Generic Model.rft", true);
                 string networkSymbolId = networkSymbol.UniqueId;
@@ -110,9 +111,152 @@ namespace BIMaestro.HistoryTests
                 VerifyPermanent(ui, ref doc, symbol.UniqueId, hostedSymbol.UniqueId, results);
                 VerifyNetworks(ui, ref doc, results);
                 VerifyNetworkFamily(doc, networkSymbolId, results);
+                VerifyMirroredFamily(doc, freeSymbolId, results);
+                var filtered = ElementHistoryRestoration.Restore(doc, new[] {
+                    new HistoryRestoreRequest { SourceUniqueId="excluded-a", Label="CML_Calorifuge [1]", Category="Modèles génériques" },
+                    new HistoryRestoreRequest { SourceUniqueId="excluded-b", Label="Isolation [2]", Category="Isolants de canalisation" },
+                    new HistoryRestoreRequest { SourceUniqueId="excluded-c", Label="Insulation [3]", Category="Duct Insulations" },
+                    new HistoryRestoreRequest { SourceUniqueId="visible-error", Label="CML_Piquage acier [4]", Category="Raccords de canalisation", CaptureFailure="Placement non pris en charge" }
+                });
+                Check(filtered.Items.Count==1 && filtered.Failed==1 && filtered.Items[0].SourceUniqueId=="visible-error"
+                    && filtered.Items[0].Detail=="Placement non pris en charge","Insulation must be excluded without hiding pipe/fitting failures");
+                results.Add("native and named calorifuge excluded from all counts; other errors and capture diagnostics preserved");
             }
             finally { doc.Close(false); }
             return results;
+        }
+
+        private List<string> RunCml(UIApplication ui)
+        {
+            var path=Path.Combine(Output,"CML-source.rvt");
+            var options=new OpenOptions();
+            using(var info=BasicFileInfo.Extract(path))
+                if(info.IsWorkshared) options.DetachFromCentralOption=DetachFromCentralOption.DetachAndPreserveWorksets;
+            var doc=ui.Application.OpenDocumentFile(ModelPathUtils.ConvertUserVisiblePathToModelPath(path),options);
+            var results=new List<string>();
+            try
+            {
+                var targetsPath=Path.Combine(Output,"CML-targets.json");
+                var targets=File.Exists(targetsPath) ? JsonConvert.DeserializeObject<string[]>(File.ReadAllText(targetsPath))
+                    : new[]{"CML_Coude acier", "CML_Réduction acier"};
+                var reportedIds=new[]{903986L,903766L,877948L,770610L,770608L,744493L};
+                var fixtures=new FilteredElementCollector(doc).OfClass(typeof(FamilyInstance)).Cast<FamilyInstance>()
+                    .Where(f=>targets.Contains(f.Symbol.Family.Name))
+                    .OrderByDescending(f=>reportedIds.Contains(f.Id.GetIdLongValue()))
+                    .GroupBy(f=>File.Exists(targetsPath) ? f.UniqueId : f.Symbol.Family.Name+":"+string.Join("/",ElementHistoryNetwork.Ports(f).Select(c=>Math.Round(c.Radius,4)+":"+Math.Round(c.Angle,4))))
+                    .Select(g=>g.First()).Take(10).ToList();
+                Check(fixtures.Count>=2,"CML fixture families missing in isolated source copy");
+                var fixtureIds=fixtures.Select(f=>f.UniqueId).ToList();
+                if(File.Exists(targetsPath)) Check(reportedIds.All(id=>fixtures.Any(f=>f.Id.GetIdLongValue()==id)),"A reported fitting is missing from the isolated copy");
+                foreach(var fixtureUid in fixtureIds)
+                foreach(var mode in new[]{"current", "legacy", "repair"})
+                {
+                    // Rollback can invalidate wrappers of connected neighbors too.
+                    var original=(FamilyInstance)doc.GetElement(fixtureUid);
+                    var uid=fixtureUid;
+                    var request=new HistoryRestoreRequest { SourceUniqueId=uid,Label=original.Symbol.Family.Name+" ["+original.Id.GetIdLongValue()+"]",
+                        Recipe=ElementHistoryReconstruction.Capture(original) };
+                    Check(request.Recipe!=null,"Missing CML capture: "+request.Label);
+                    if(mode=="current") File.AppendAllText(Path.Combine(Output,"cml-parameters.jsonl"),JsonConvert.SerializeObject(new {
+                        request.Label, Part=(original.MEPModel as MechanicalFitting)?.PartType.ToString(),
+                        Parameters=original.Parameters.Cast<Parameter>().Where(p=>p.StorageType==StorageType.Double).Select(p=>new {
+                            Name=p.Definition.Name, Id=p.Id.GetIdLongValue(), ReadOnly=p.IsReadOnly, Value=p.AsDouble() }) })+Environment.NewLine);
+                    request.Label += " ("+mode+")";
+                    if(mode!="current")
+                    {
+                        request.Recipe.Ports=null;
+                        // Older captures omitted solver-controlled dimensions. Do
+                        // not accidentally let new parameter capture mask that gap.
+                        request.Recipe.Parameters.RemoveAll(p=>p.BuiltIn==0 && p.Storage==(int)StorageType.Double
+                            && original.Parameters.Cast<Parameter>().Any(source=>source.IsReadOnly
+                                && (p.Definition!=null ? source.Id==doc.GetElement(p.Definition)?.Id
+                                    : p.Shared!=null ? source.IsShared && source.GUID.ToString()==p.Shared : source.Definition.Name==p.Name)));
+                        foreach(var link in request.Recipe.Connections)
+                        { link.Port.Id=null; link.Port.Angle=null; link.PeerPort.Id=null; link.PeerPort.Angle=null; }
+                    }
+                    File.AppendAllText(Path.Combine(Output,"cml-recipes.jsonl"),JsonConvert.SerializeObject(request)+Environment.NewLine);
+                    using(var group=new TransactionGroup(doc,"CML isolated restoration verification"))
+                    {
+                        group.Start();
+                        var curvesBefore=new FilteredElementCollector(doc).OfClass(typeof(MEPCurve)).Select(e=>e.UniqueId).OrderBy(s=>s).ToList();
+                        var curveClasses=new FilteredElementCollector(doc).OfClass(typeof(MEPCurve)).ToDictionary(e=>e.UniqueId,e=>e.GetType().Name+" / "+e.Name);
+                        using(var tx=new Transaction(doc,"Delete CML test fitting"))
+                        { tx.Start(); tx.SetFailureHandlingOptions(tx.GetFailureHandlingOptions().SetFailuresPreprocessor(new FixtureFailures()).SetClearAfterRollback(true)); doc.Delete(original.Id); Check(tx.Commit()==TransactionStatus.Committed,"CML deletion failed"); }
+                        var deletedWithFixture=curvesBefore.Where(id=>doc.GetElement(id)==null).ToList();
+                        File.AppendAllText(Path.Combine(Output,"fixture-deletions.jsonl"),JsonConvert.SerializeObject(deletedWithFixture.Select(id=>new{Id=id,Class=curveClasses[id]}))+Environment.NewLine);
+                        curvesBefore=curvesBefore.Except(deletedWithFixture).ToList();
+                        var curveGeometry=curvesBefore.Select(id=>doc.GetElement(id)).Where(e=>e.Location is LocationCurve)
+                            .ToDictionary(e=>e.UniqueId,e=>new[]{((LocationCurve)e.Location).Curve.GetEndPoint(0),((LocationCurve)e.Location).Curve.GetEndPoint(1)});
+                        if(mode=="repair")
+                        {
+                            var bad=JsonConvert.DeserializeObject<HistoryRecipe>(JsonConvert.SerializeObject(request.Recipe));
+                            bad.Ports=new List<HistoryPort>(); bad.Connections=new List<HistoryConnection>();
+                            var initial=ElementHistoryRestoration.Restore(doc,new[]{new HistoryRestoreRequest{SourceUniqueId=uid,Label=request.Label,Recipe=bad}});
+                            Check(initial.Created==1,"Bad legacy fitting fixture failed");
+                        }
+                        var batch=ElementHistoryRestoration.Restore(doc,new[]{request});
+                        File.AppendAllText(Path.Combine(Output,"cml-results.jsonl"),JsonConvert.SerializeObject(batch)+Environment.NewLine);
+                        var curvesAfter=new FilteredElementCollector(doc).OfClass(typeof(MEPCurve)).Select(e=>e.UniqueId).OrderBy(s=>s).ToList();
+                        Check(curvesBefore.SequenceEqual(curvesAfter),"Temporary sizing pipes leaked or real pipe deleted: removed="
+                            +string.Join(",",curvesBefore.Except(curvesAfter))+"; added="+string.Join(",",curvesAfter.Except(curvesBefore)));
+                        foreach(var entry in curveGeometry)
+                        {
+                            var actual=((LocationCurve)doc.GetElement(entry.Key).Location).Curve;
+                            Check(actual.GetEndPoint(0).DistanceTo(entry.Value[0])<1e-5 && actual.GetEndPoint(1).DistanceTo(entry.Value[1])<1e-5,
+                                "Existing network curve moved: "+entry.Key);
+                        }
+                        results.Add(((mode=="repair" ? batch.Existing==1 : batch.Created==1) && batch.Failed==0 && batch.ConnectionFailures.Count==0 && batch.RepairFailures.Count==0 ? "" : "FAILED ")
+                            +request.Label+" dimensions, angle, placement and connections restored");
+                        if(batch.Failed==0 && batch.RepairFailures.Count==0)
+                        {
+                            var retry=ElementHistoryRestoration.Restore(doc,new[]{request});
+                            Check(retry.Created==0 && retry.Existing==1 && retry.Repaired==0,"Restoration retry must be idempotent");
+                        }
+                        group.RollBack();
+                    }
+                }
+            }
+            finally { doc.Close(false); }
+            return results;
+        }
+
+
+        private void VerifyMirroredFamily(Document doc, string symbolId, List<string> results)
+        {
+            HistoryRestoreRequest request;
+            Transform expected;
+            XYZ expectedMin, expectedMax;
+            using(var tx=new Transaction(doc,"Create reflected family fixture"))
+            {
+                tx.Start();
+                tx.SetFailureHandlingOptions(tx.GetFailureHandlingOptions().SetFailuresPreprocessor(new FixtureFailures()).SetClearAfterRollback(true));
+                var level=new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>().First();
+                var symbol=(FamilySymbol)doc.GetElement(symbolId);
+                var instance=doc.Create.NewFamilyInstance(new XYZ(0,350,15),symbol,level,StructuralType.NonStructural);
+                ElementTransformUtils.MirrorElements(doc,new[]{instance.Id},Plane.CreateByNormalAndOrigin(XYZ.BasisX,new XYZ(0,350,15)),false);
+                ElementTransformUtils.RotateElement(doc,instance.Id,Line.CreateBound(new XYZ(0,350,15),new XYZ(0,350,16)),0.4);
+                doc.Regenerate(); expected=instance.GetTransform();
+                string diagnostic=null;
+                var recipe=ElementHistoryReconstruction.Capture(instance, s=>diagnostic=s);
+                Check(recipe!=null && recipe.Mirrored,"Reflected recipe missing: " + diagnostic
+                    + "; determinant=" + expected.Determinant + "; mirrored=" + instance.Mirrored);
+                request=new HistoryRestoreRequest { SourceUniqueId=instance.UniqueId,Label="Reflected fixture",Recipe=recipe };
+                var box=instance.get_BoundingBox(null); expectedMin=box.Min; expectedMax=box.Max;
+                Check(tx.Commit()==TransactionStatus.Committed,"Reflected fixture commit");
+            }
+            using(var tx=new Transaction(doc,"Delete reflected fixture"))
+            { tx.Start(); doc.Delete(doc.GetElement(request.SourceUniqueId).Id); tx.Commit(); }
+            request=JsonConvert.DeserializeObject<HistoryRestoreRequest>(JsonConvert.SerializeObject(request));
+            var batch=ElementHistoryRestoration.Restore(doc,new[]{request});
+            Check(batch.Created==1 && batch.Failed==0,"Mirrored restore: "+JsonConvert.SerializeObject(batch));
+            var restored=(FamilyInstance)doc.GetElement(batch.Items[0].UniqueId);
+            Check(restored.Mirrored,"Restored family must remain mirrored");
+            var restoredBox=restored.get_BoundingBox(null);
+            Check(restoredBox.Min.DistanceTo(expectedMin)<1e-6 && restoredBox.Max.DistanceTo(expectedMax)<1e-6,"Mirrored geometry mismatch");
+            var actual=restored.GetTransform();
+            Check(actual.Origin.DistanceTo(expected.Origin)<1e-6 && actual.BasisX.DistanceTo(expected.BasisX)<1e-6
+                && actual.BasisY.DistanceTo(expected.BasisY)<1e-6 && actual.BasisZ.DistanceTo(expected.BasisZ)<1e-6,"Reflected frame mismatch");
+            results.Add("mirrored rotated family restored with the exact reflected transform after JSON roundtrip");
         }
 
         private void VerifyNetworkFamily(Document doc, string symbolId, List<string> results)

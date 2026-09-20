@@ -221,6 +221,8 @@ namespace BIMaestro.Codex
         private object Run(UIApplication app, string tool, JObject args)
         {
             if (tool == "revit_capabilities") { RequireKeys(args); return CodexFamilyTools.Capabilities(app.Application.VersionNumber); }
+            if (tool == "revit_family_program_contract") { RequireKeys(args); return CodexFamilyProgram.Contract(); }
+            if (tool == "revit_family_api") return CodexFamilyProgram.Api(args);
             if (tool == "revit_family_contract") { RequireKeys(args); return new { schema = CodexParametricDesign.Tool()["inputSchema"],
                 note = "Coordonnées [X,Y,Z], expressions {offset_mm:25,terms:[]} ou {offset_mm:-25,terms:[{parameter:Largeur,factor:1}]}. family_options.parameters utilise kind, instance et group=geometry/constraints/visibility/identity/data. types.values est une liste {parameter,value}. Respecter les champs du schéma ; pas de dimensions inventées." }; }
             if (tool == "revit_test_family_engine")
@@ -409,7 +411,7 @@ namespace BIMaestro.Codex
                 }
                 finally { foreach (var curve in curves) curve.Dispose(); }
             }
-            if (tool != "revit_family_box" && tool != "revit_set_family_length" && tool != "revit_set_family_angle" && tool != "revit_family_shapes" && tool != "revit_set_family_parameters" && tool != "revit_set_family_category" && tool != "revit_edit_family_representation" && tool != "revit_edit_family_extrusion" && tool != "revit_configure_family") throw new InvalidOperationException("Outil Revit inconnu.");
+            if (tool != "revit_family_box" && tool != "revit_set_family_length" && tool != "revit_set_family_angle" && tool != "revit_family_shapes" && tool != "revit_set_family_parameters" && tool != "revit_set_family_category" && tool != "revit_edit_family_representation" && tool != "revit_edit_family_extrusion" && tool != "revit_configure_family" && tool != "revit_run_family_program") throw new InvalidOperationException("Outil Revit inconnu.");
             if (!AllowChanges) throw new InvalidOperationException("Mode lecture seule : l'utilisateur doit activer les modifications dans le panneau.");
             if (!document.IsFamilyDocument || document.IsReadOnly || document.IsModifiable)
                 throw new InvalidOperationException("Ouvrez une famille modifiable dans l'éditeur de familles, hors de toute autre commande.");
@@ -418,6 +420,7 @@ namespace BIMaestro.Codex
             if (tool == "revit_edit_family_representation") return CodexFamilyEditor.EditRepresentation(document, args, Confirm, NewTransaction, Commit);
             if (tool == "revit_edit_family_extrusion") return CodexFamilyEditor.EditExtrusion(document, args, Confirm, NewTransaction, Commit);
             if (tool == "revit_configure_family") return CodexFamilyConfiguration.Apply(document, args, Confirm, NewTransaction, Commit);
+            if (tool == "revit_run_family_program") return CodexFamilyProgram.Run(app, document, args, Confirm);
 
             if (tool == "revit_family_shapes")
             {

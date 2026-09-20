@@ -1,5 +1,7 @@
 ﻿using Autodesk.Revit.UI;
 using System;
+using ContextMenu = System.Windows.Controls.ContextMenu;
+using MenuItem = System.Windows.Controls.MenuItem;
 using BIMaestro.Localization;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;

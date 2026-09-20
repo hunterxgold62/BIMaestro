@@ -4,6 +4,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using MenuItem = System.Windows.Controls.MenuItem;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -1880,14 +1881,16 @@ namespace Analyse
 
         private static HistoryRestoreRequest ToRestoreRequest(ElementHistoryEvent ev)
         {
-            object source = null, raw = null;
+            object source = null, raw = null, captureFailure = null;
             ev.Delta?.TryGetValue("deletedUniqueId", out source);
             ev.Delta?.TryGetValue("recipe", out raw);
+            ev.Delta?.TryGetValue("captureFailure", out captureFailure);
             return new HistoryRestoreRequest
             {
                 SourceUniqueId = Convert.ToString(source),
                 Label = (ev.Family + " " + ev.TypeName).Trim() + " [" + ev.ElementId + "]",
-                Recipe = ElementHistoryReconstruction.ReadRecipe(raw)
+                Recipe = ElementHistoryReconstruction.ReadRecipe(raw),
+                CaptureFailure = captureFailure == null ? null : Convert.ToString(captureFailure), Category = ev.Category
             };
         }
 
@@ -1898,12 +1901,21 @@ namespace Analyse
 
         private void RequestRestoreDeleted(List<ElementHistoryEvent> events)
         {
+            events = events.Where(ev => !ElementHistoryRestoration.IsCalorifuge(ev.Category, ev.Family + " " + ev.TypeName)).ToList();
+            if (events.Count == 0)
+            {
+                MessageBox.Show(this, UiLanguage.T("Aucun élément à restaurer : le calorifuge est exclu.", "No elements to restore: insulation is excluded."));
+                return;
+            }
             if (_restoringDeleted || events.Count == 0) return;
             int count = events.Select(ev => ToRestoreRequest(ev)).Select(r => string.IsNullOrEmpty(r.SourceUniqueId) ? r.Label : r.SourceUniqueId).Distinct().Count();
+            var repairNotice = UiLanguage.T(
+                "\n\nLes raccords déjà recréés par BIMaestro pourront être redimensionnés ou remplacés pour retrouver leurs connecteurs historiques. Les raccords déplacés, réorientés ou reliés à de nouveaux voisins seront conservés sans modification.",
+                "\n\nFittings previously recreated by BIMaestro may be resized or replaced to recover their recorded connectors. Moved, reoriented fittings or fittings connected to new neighbors will be left unchanged.");
             var confirm = MessageBox.Show(this, UiLanguage.T(
                 $"Restaurer {count} élément(s) dans la maquette à leur emplacement enregistré ?\n\nIls resteront dans le projet et seront modifiables normalement. Les connexions enregistrées seront rétablies si leurs deux extrémités sont disponibles et inchangées. Sélectionnez aussi les raccords et tronçons supprimés du réseau. Les éléments déjà présents ne seront pas dupliqués.\n\nLes anciennes suppressions sans données de reconstruction ne peuvent pas être restaurées.",
-                $"Restore {count} element(s) in the model at their recorded location?\n\nThey will remain in the project and be editable normally. Recorded connections will be restored when both ends are available and unchanged. Also select deleted network fittings and segments. Existing elements will not be duplicated.\n\nOlder deletions without reconstruction data cannot be restored."),
-                UiLanguage.T("Restaurer les éléments", "Restore elements"), MessageBoxButton.YesNo, MessageBoxImage.Question);
+                $"Restore {count} element(s) in the model at their recorded location?\n\nThey will remain in the project and be editable normally. Recorded connections will be restored when both ends are available and unchanged. Also select deleted network fittings and segments. Existing elements will not be duplicated.\n\nOlder deletions without reconstruction data cannot be restored.")
+                + repairNotice, UiLanguage.T("Restaurer les éléments", "Restore elements"), MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (confirm != MessageBoxResult.Yes) return;
             _restoringDeleted = true;
             UpdateVisualizeButtonLabel();
@@ -1920,16 +1932,41 @@ namespace Analyse
                     $"{result.Created} élément(s) restauré(s).\n{result.Existing} déjà présent(s).\n{result.Failed} non restauré(s).",
                     $"{result.Created} element(s) restored.\n{result.Existing} already present.\n{result.Failed} not restored.");
                 var failures = result.Items.Where(i => !i.Created && !i.Existing).ToList();
+                if (result.Repaired > 0 || result.RepairFailures.Count > 0)
+                    message += UiLanguage.T($"\nParmi les éléments déjà présents : {result.Repaired} raccord(s) corrigé(s), {result.RepairFailures.Count} correction(s) impossible(s).",
+                        $"\nAmong existing elements: {result.Repaired} fitting(s) repaired, {result.RepairFailures.Count} repair(s) failed.");
+                foreach (var failure in result.RepairFailures.Take(2)) message += "\n" + ShortRestoreDetail(failure);
                 message += UiLanguage.T(
                     $"\n\nConnexions : {result.ConnectionsRestored} rétablie(s), {result.ConnectionsExisting} déjà présente(s), {result.ConnectionFailures.Count} non rétablie(s).",
                     $"\n\nConnections: {result.ConnectionsRestored} restored, {result.ConnectionsExisting} already present, {result.ConnectionFailures.Count} not restored.");
-                foreach (var failure in result.ConnectionFailures.Take(6)) message += "\n" + failure;
-                foreach (var failure in failures.Take(12))
-                    message += "\n\n" + failure.Label + " : " + RestoreFailureText(failure.Reason)
-                        + (string.IsNullOrWhiteSpace(failure.Detail) ? "" : "\n" + failure.Detail);
-                if (failures.Count > 12) message += UiLanguage.T("\nAutres éléments non restaurés : ", "\nOther elements not restored: ") + (failures.Count - 12);
+                foreach (var failure in result.ConnectionFailures.Take(3)) message += "\n" + ShortRestoreDetail(failure);
+                foreach (var failure in failures.Take(4))
+                    message += "\n\n" + failure.Label + (string.IsNullOrWhiteSpace(failure.Category) ? "" : " (" + failure.Category + ")") + " : " + RestoreFailureText(failure.Reason)
+                        + (string.IsNullOrWhiteSpace(failure.Detail) ? "" : "\n" + ShortRestoreDetail(failure.Detail));
+                if (failures.Count > 4) message += UiLanguage.T("\nAutres éléments non restaurés (rapport complet) : ", "\nOther elements not restored (full report): ") + (failures.Count - 4);
                 var warnings = result.Items.Where(i => i.Created && !string.IsNullOrWhiteSpace(i.Detail)).Select(i => i.Detail).Distinct().Take(4).ToList();
                 if (warnings.Count > 0) message += "\n\n" + string.Join("\n", warnings);
+                if (result.CaptureWarnings.Count > 0)
+                    message += UiLanguage.T("\n\nCertaines connexions n’avaient pas pu être enregistrées : voir le rapport complet.",
+                        "\n\nSome connections could not be recorded: see the full report.");
+                // Preserve every failure, not only the twelve shown in the summary.
+                // Report I/O must never turn a successful restore into a reported rollback.
+                try
+                {
+                    var folder = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BIMaestro", "HistoryReports");
+                    System.IO.Directory.CreateDirectory(folder);
+                    var path = System.IO.Path.Combine(folder, "restauration-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + "-" + Guid.NewGuid().ToString("N").Substring(0, 8) + ".json");
+                    System.IO.File.WriteAllText(path, Newtonsoft.Json.JsonConvert.SerializeObject(new
+                    {
+                        ReportVersion = 1, GeneratedUtc = DateTime.UtcNow, RevitVersion = _doc.Application.VersionNumber,
+                        Result = result
+                    }, Newtonsoft.Json.Formatting.Indented));
+                    message += UiLanguage.T("\n\nRapport complet (tous les éléments et connexions) :\n", "\n\nFull report (all elements and connections):\n") + path;
+                }
+                catch (Exception reportError)
+                {
+                    message += UiLanguage.T("\n\nRapport non enregistré : ", "\n\nReport could not be saved: ") + reportError.Message;
+                }
                 // Selection/navigation failures must not misreport a successful commit.
                 try
                 {
@@ -1958,10 +1995,13 @@ namespace Analyse
                 case "identity": case "recipe": return UiLanguage.T("Données de reconstruction absentes ou forme non prise en charge.", "Reconstruction data missing or unsupported shape.");
                 case "type": return UiLanguage.T("La famille ou le type n’est plus présent dans le projet.", "The family or type is no longer in the project.");
                 case "level": return UiLanguage.T("Le niveau d’origine n’est plus présent.", "The original level is no longer present.");
-                case "host": return UiLanguage.T("L’hôte manque : restaurer aussi le mur ou le sol concerné.", "The host is missing: restore the corresponding wall or floor as well.");
+                case "host": return UiLanguage.T("Le support manque : restaurer aussi le mur, sol, tuyau, gaine ou raccord concerné.", "The host is missing: also restore the corresponding wall, floor, pipe, duct or fitting.");
                 default: return UiLanguage.T("Revit n’a pas pu recréer cet élément.", "Revit could not recreate this element.");
             }
         }
+
+        private static string ShortRestoreDetail(string text) => string.IsNullOrEmpty(text) || text.Length <= 220
+            ? text : text.Substring(0, 220) + "…";
 
         private void FocusSelectedElement()
         {

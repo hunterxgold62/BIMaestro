@@ -1,4 +1,4 @@
-param([ValidateSet('2023','2024')][string]$RevitVersion = '2023', [ValidatePattern('^[a-zA-Z0-9-]*$')][string]$RunName = '')
+param([ValidateSet('2023','2024','2025')][string]$RevitVersion = '2023', [ValidatePattern('^[a-zA-Z0-9-]*$')][string]$RunName = '')
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $runFolder = $RevitVersion

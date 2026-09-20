@@ -1,6 +1,8 @@
 ﻿// MenuControl.xaml.cs
 using System;
 using System.Collections.Generic;
+using MenuItem = System.Windows.Controls.MenuItem;
+using ContextMenu = System.Windows.Controls.ContextMenu;
 using System.IO;
 using Newtonsoft.Json;
 using System.Windows;

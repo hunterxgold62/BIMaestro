@@ -6,6 +6,7 @@ using System.Collections.ObjectModel;
 using System.Windows;
 using Newtonsoft.Json;
 using System.Collections.Generic;
+using MenuItem = System.Windows.Controls.MenuItem;
 using System.Windows.Input;
 using System.ComponentModel;
 using System.Windows.Controls;

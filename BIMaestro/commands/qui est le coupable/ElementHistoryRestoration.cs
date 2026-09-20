@@ -12,6 +12,8 @@ namespace Analyse
         public string SourceUniqueId { get; set; }
         public string Label { get; set; }
         public HistoryRecipe Recipe { get; set; }
+        public string CaptureFailure { get; set; }
+        public string Category { get; set; }
     }
 
     internal sealed class HistoryRestoreItem
@@ -22,6 +24,9 @@ namespace Analyse
         public string UniqueId { get; set; }
         public bool Created { get; set; }
         public bool Existing { get; set; }
+        public bool Repaired { get; set; }
+        public string SourceUniqueId { get; set; }
+        public string Category { get; set; }
     }
 
     internal sealed class HistoryRestoreBatch
@@ -33,10 +38,26 @@ namespace Analyse
         public int ConnectionsRestored { get; set; }
         public int ConnectionsExisting { get; set; }
         public List<string> ConnectionFailures { get; } = new List<string>();
+        public List<string> CaptureWarnings { get; } = new List<string>();
+        public int Repaired => Items.Count(i => i.Repaired);
+        public List<string> RepairFailures { get; } = new List<string>();
     }
 
     internal static class ElementHistoryRestoration
     {
+        // Old histories only retain localized categories and labels. Keep matching
+        // explicit: an unrelated parameter mentioning insulation is not an exclusion.
+        internal static bool IsCalorifuge(string category, string label)
+        {
+            var name = (category ?? "").Trim();
+            return name.IndexOf("calorifuge", StringComparison.OrdinalIgnoreCase) >= 0
+                || (label ?? "").IndexOf("calorifuge", StringComparison.OrdinalIgnoreCase) >= 0
+                || new[] { "Pipe Insulations", "Pipe Insulation", "Duct Insulations", "Duct Insulation",
+                    "Isolants de canalisation", "Isolant de canalisation", "Isolation de canalisation",
+                    "Isolants de gaine", "Isolant de gaine", "Isolation de gaine" }
+                    .Any(s => string.Equals(name, s, StringComparison.OrdinalIgnoreCase));
+        }
+
         // Saved on each native element. Survives project save/reopen and follows Undo.
         private static readonly Guid OriginSchemaId = new Guid("4b0d2453-93dd-4b44-9280-d2758acb4a84");
         private static Schema OriginSchema()
@@ -85,14 +106,17 @@ namespace Analyse
             var index = ReadIndex(doc);
             var selected = (requests ?? Enumerable.Empty<HistoryRestoreRequest>()).Where(r => r != null)
                 .GroupBy(r => r.SourceUniqueId ?? r.Label ?? string.Empty).Select(g => g.First())
+                .Where(r => !IsCalorifuge(r.Category, r.Label))
                 .OrderBy(r => r.Recipe?.Kind == "family" ? 1 : 0).ToList();
             using (var group = new TransactionGroup(doc, "BIMaestro - Restaurer éléments supprimés"))
             {
                 group.Start();
                 foreach (var request in selected)
                 {
-                    var result = new HistoryRestoreItem { Label = request.Label };
+                    var result = new HistoryRestoreItem { Label = request.Label, SourceUniqueId = request.SourceUniqueId, Category = request.Category };
                     batch.Items.Add(result);
+                    foreach (var warning in request.Recipe?.CaptureWarnings ?? new List<string>())
+                        batch.CaptureWarnings.Add(request.Label + " : " + warning);
                     if (string.IsNullOrEmpty(request.SourceUniqueId)) { result.Reason = "identity"; continue; }
                     var existing = Resolve(doc, index, request.SourceUniqueId);
                     if (existing != null)
@@ -100,7 +124,8 @@ namespace Analyse
                         result.Existing = true; result.UniqueId = existing; continue;
                     }
                     var recipe = ElementHistoryReconstruction.ReadRecipe(request.Recipe);
-                    if (recipe == null) { result.Reason = "recipe"; continue; }
+                    if (recipe == null) { result.Reason = "recipe"; result.Detail = request.CaptureFailure
+                        ?? "Cet événement ne contient ni recette exploitable ni diagnostic de capture ; la cause d’origine n’a pas été enregistrée."; continue; }
                     // Clone before remapping dependencies. The historical payload is immutable.
                     recipe = JObject.FromObject(recipe).ToObject<HistoryRecipe>();
                     if (ElementHistoryReconstruction.FindOriginal(doc, recipe.Type) == null) { result.Reason = "type"; continue; }
@@ -158,8 +183,9 @@ namespace Analyse
                         }
                     }
                 }
+                RepairRestoredFittings(doc, selected, index, batch);
                 Reconnect(doc, selected, index, batch);
-                if (batch.Created > 0 || batch.ConnectionsRestored > 0)
+                if (batch.Created > 0 || batch.ConnectionsRestored > 0 || batch.Repaired > 0)
                 {
                     if (group.Assimilate() != TransactionStatus.Committed)
                         throw new InvalidOperationException("Restoration could not be committed.");
@@ -167,6 +193,68 @@ namespace Analyse
                 else group.RollBack();
             }
             return batch;
+        }
+
+        private static void RepairRestoredFittings(Document doc, List<HistoryRestoreRequest> selected,
+            Dictionary<string, string> index, HistoryRestoreBatch batch)
+        {
+            foreach (var request in selected.Where(r => r.Recipe?.Kind == "family"))
+            {
+                var result = batch.Items.FirstOrDefault(i => i.SourceUniqueId == request.SourceUniqueId);
+                if (result?.Existing != true || result.UniqueId == request.SourceUniqueId) continue;
+                var instance = ElementHistoryReconstruction.FindOriginal(doc, result.UniqueId) as FamilyInstance;
+                if (instance == null || !(GetOrigins(instance)?.Contains(request.SourceUniqueId) == true)) continue;
+                var saved = request.Recipe.Ports ?? request.Recipe.Connections?.Select(c => c.Port).ToList();
+                if (saved == null || saved.Count == 0 || saved.All(p => ElementHistoryNetwork.Match(instance, p) != null)) continue;
+                using (var tx = new Transaction(doc, "BIMaestro - Réparer dimensions raccord restauré"))
+                {
+                    tx.Start();
+                    var failures = new RestoreFailures();
+                    tx.SetFailureHandlingOptions(tx.GetFailureHandlingOptions().SetFailuresPreprocessor(failures).SetClearAfterRollback(true));
+                    try
+                    {
+                        // Only our previously recreated, unmoved instances are eligible.
+                        // Never resize an original object or disconnect an unrelated neighbor.
+                        if (!(instance.Location is LocationPoint point) || point.Point.DistanceTo(ElementHistoryNetwork.Vector(request.Recipe.Point)) > 1e-4
+                            || request.Recipe.BasisX == null || request.Recipe.BasisZ == null
+                            || instance.GetTransform().BasisX.DistanceTo(ElementHistoryNetwork.Vector(request.Recipe.BasisX)) > 1e-4
+                            || instance.GetTransform().BasisZ.DistanceTo(ElementHistoryNetwork.Vector(request.Recipe.BasisZ)) > 1e-4)
+                            throw new InvalidOperationException("Raccord déplacé, réorienté ou orientation historique absente : conservé sans modification.");
+                        var peers = new HashSet<string>((request.Recipe.Connections ?? new List<HistoryConnection>())
+                            .Select(c => Resolve(doc, index, c.Peer)).Where(id => id != null));
+                        foreach (var port in ElementHistoryNetwork.Ports(instance))
+                            foreach (var peer in port.AllRefs.Cast<Connector>().Where(c => c.Owner.Id != instance.Id && !(c.Owner is MEPSystem)
+                                && (c.ConnectorType == ConnectorType.End || c.ConnectorType == ConnectorType.Curve || c.ConnectorType == ConnectorType.Physical)).ToList())
+                            {
+                                if (!port.IsConnectedTo(peer)) continue;
+                                if (!peers.Contains(peer.Owner.UniqueId)) throw new InvalidOperationException("Une nouvelle connexion non historique existe : raccord conservé sans modification.");
+                                port.DisconnectFrom(peer);
+                            }
+                        var origins = GetOrigins(instance);
+                        var previousUid = instance.UniqueId;
+                        try { ElementHistoryNetwork.RestoreFamilyPorts(doc, instance, request.Recipe); }
+                        catch (Autodesk.Revit.Exceptions.RegenerationFailedException) { throw; }
+                        catch (InvalidOperationException)
+                        { instance = ElementHistoryNetwork.RebuildWithSizingStubs(doc, instance, request.Recipe, true); }
+                        if (instance.UniqueId != previousUid && !origins.Contains(previousUid)) origins.Add(previousUid);
+                        var schema = OriginSchema();
+                        var entity = new Entity(schema);
+                        entity.Set<IList<string>>(schema.GetField("OriginalUniqueIds"), origins);
+                        instance.SetEntity(entity);
+                        var repairedUid = instance.UniqueId;
+                        if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException(failures.Message ?? "Réparation refusée.");
+                        result.UniqueId = repairedUid;
+                        foreach (var origin in origins) index[origin] = repairedUid;
+                        result.Repaired = true;
+                    }
+                    catch (Autodesk.Revit.Exceptions.RegenerationFailedException) { throw; }
+                    catch (Exception ex)
+                    {
+                        if (tx.GetStatus() == TransactionStatus.Started) tx.RollBack();
+                        batch.RepairFailures.Add(request.Label + " : " + ex.Message);
+                    }
+                }
+            }
         }
 
         private static void Reconnect(Document doc, List<HistoryRestoreRequest> selected,
@@ -199,7 +287,9 @@ namespace Analyse
                             {
                                 var a = ElementHistoryNetwork.Match(doc.GetElement(uid), link.Port);
                                 var b = ElementHistoryNetwork.Match(doc.GetElement(peerUid), link.PeerPort);
-                                if (a == null || b == null) throw new InvalidOperationException("Connecteur déplacé ou introuvable.");
+                                if (a == null || b == null) throw new InvalidOperationException("Connecteur déplacé ou introuvable : "
+                                    + (a == null ? "source [" + ElementHistoryNetwork.DescribeMismatch(doc.GetElement(uid), link.Port) + "] " : "")
+                                    + (b == null ? "voisin [" + ElementHistoryNetwork.DescribeMismatch(doc.GetElement(peerUid), link.PeerPort) + "]" : ""));
                                 if (a.IsConnectedTo(b)) { tx.RollBack(); batch.ConnectionsExisting++; continue; }
                                 if (a.IsConnected || b.IsConnected) throw new InvalidOperationException("Connecteur déjà utilisé par une autre connexion.");
                                 if (a.Origin.DistanceTo(b.Origin) > 1e-4) throw new InvalidOperationException("Les connecteurs ne coïncident plus.");

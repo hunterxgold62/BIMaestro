@@ -38,6 +38,9 @@ namespace Analyse
         public List<HistoryConnection> Connections { get; set; }
         public double[] BasisX { get; set; }
         public double[] BasisZ { get; set; }
+        public List<string> CaptureWarnings { get; set; }
+        public bool Mirrored { get; set; }
+        public List<HistoryPort> Ports { get; set; }
     }
 
     [JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
@@ -65,14 +68,34 @@ namespace Analyse
     {
         internal static HistoryRecipe Capture(Element element, Action<string> diagnostic = null)
         {
+            string detail = null;
+            var recipe = CaptureCore(element, message => detail = message);
+            if (recipe == null)
+            {
+                var instance = element as FamilyInstance;
+                string context = element?.GetType().Name ?? "Élément absent";
+                try
+                {
+                    if (instance != null)
+                        context += "; placement=" + instance.Symbol.Family.FamilyPlacementType
+                            + "; miroir=" + instance.Mirrored + "; sous-composant=" + (instance.SuperComponent != null);
+                }
+                catch { /* Diagnostics must not break snapshot capture. */ }
+                diagnostic?.Invoke(detail ?? ("Capture non prise en charge : " + context + "."));
+            }
+            return recipe;
+        }
+
+        private static HistoryRecipe CaptureCore(Element element, Action<string> diagnostic)
+        {
             try
             {
                 var doc = element.Document;
                 if (element is MEPCurve) return ElementHistoryNetwork.Capture(element);
                 if (doc.IsFamilyDocument || !(element is FamilyInstance || element is Wall || element is Floor)) return null;
                 var type = doc.GetElement(element.GetTypeId());
-                var level = doc.GetElement(element.LevelId) as Level;
-                if (type == null || level == null) return null;
+                var level = FindLevel(element);
+                if (type == null || level == null) { diagnostic?.Invoke("Type ou niveau de référence introuvable à la capture."); return null; }
                 // Keep a mesh for cuts/joins, but retain the native placement recipe
                 // so the host itself can still be restored with its deleted instances.
                 bool hasCuts = JoinGeometryUtils.GetJoinedElements(doc, element).Count != 0
@@ -88,7 +111,7 @@ namespace Analyse
                 if (element is FamilyInstance instance)
                 {
                     var placement = instance.Symbol.Family.FamilyPlacementType;
-                    if (instance.Symbol.Family.IsInPlace || instance.SuperComponent != null || instance.Mirrored
+                    if (instance.Symbol.Family.IsInPlace || instance.SuperComponent != null
                         || !(instance.Location is LocationPoint location)
                         || (placement != FamilyPlacementType.OneLevelBased
                             && placement != FamilyPlacementType.OneLevelBasedHosted)) return null;
@@ -97,14 +120,19 @@ namespace Analyse
                     recipe.Kind = "family";
                     recipe.Host = instance.Host?.UniqueId;
                     recipe.Point = Pack(location.Point);
-                    recipe.Rotation = location.Rotation;
+                    // The saved transform is authoritative. LocationPoint.Rotation is
+                    // not available for every 3D MEP placement and must not discard it.
+                    recipe.Rotation = 0;
                     recipe.HandFlipped = instance.HandFlipped;
                     recipe.FacingFlipped = instance.FacingFlipped;
                     recipe.StructuralType = (int)instance.StructuralType;
                     recipe.Parameters = CaptureParameters(instance);
                     recipe.BasisX = Pack(instance.GetTransform().BasisX);
                     recipe.BasisZ = Pack(instance.GetTransform().BasisZ);
-                    recipe.Connections = ElementHistoryNetwork.CaptureConnections(instance);
+                    recipe.Mirrored = instance.Mirrored;
+                    recipe.CaptureWarnings = new List<string>();
+                    recipe.Connections = ElementHistoryNetwork.CaptureConnections(instance, recipe.CaptureWarnings);
+                    recipe.Ports = ElementHistoryNetwork.CaptureFamilyPorts(instance);
                 }
                 else if (element is Wall wall)
                 {
@@ -155,7 +183,7 @@ namespace Analyse
                 else return null;
                 return recipe;
             }
-            catch (Exception ex) { diagnostic?.Invoke(ex.ToString()); return null; }
+            catch (Exception ex) { diagnostic?.Invoke("Échec de capture " + element?.GetType().Name + " : " + ex.Message); return null; }
         }
 
         internal static Element FindOriginal(Document doc, string uniqueId)
@@ -165,13 +193,30 @@ namespace Analyse
             catch { return null; }
         }
 
+        internal static Level FindLevel(Element element)
+        {
+            var doc = element.Document;
+            var level = doc.GetElement(element.LevelId) as Level;
+            if (level != null) return level;
+            foreach (var key in new[] { BuiltInParameter.FAMILY_LEVEL_PARAM, BuiltInParameter.INSTANCE_REFERENCE_LEVEL_PARAM,
+                BuiltInParameter.RBS_START_LEVEL_PARAM, BuiltInParameter.SCHEDULE_LEVEL_PARAM })
+            {
+                var p = element.get_Parameter(key);
+                if (p?.StorageType != StorageType.ElementId) continue;
+                level = doc.GetElement(p.AsElementId()) as Level;
+                if (level != null) return level;
+            }
+            return null;
+        }
+
         internal static HistoryRecipe ReadRecipe(object raw)
         {
             try
             {
                 var recipe = raw as HistoryRecipe ?? (raw as JObject ?? JObject.FromObject(raw)).ToObject<HistoryRecipe>();
                 return recipe != null && recipe.Version == 1 && !string.IsNullOrEmpty(recipe.Type)
-                    && !string.IsNullOrEmpty(recipe.Level) && new[] { "family", "wall", "floor", "network" }.Contains(recipe.Kind)
+                    && !string.IsNullOrEmpty(recipe.Level)
+                    && new[] { "family", "wall", "floor", "network" }.Contains(recipe.Kind)
                     ? recipe : null;
             }
             catch { return null; }
@@ -239,9 +284,18 @@ namespace Analyse
                     : doc.Create.NewFamilyInstance(point, symbol, host, level, (StructuralType)recipe.StructuralType);
                 ApplyParameters(doc, instance, recipe.Parameters);
                 doc.Regenerate();
-                if (instance.HandFlipped != recipe.HandFlipped && !instance.flipHand()) { diagnostic?.Invoke("Cannot restore hand flip."); return null; }
-                if (instance.FacingFlipped != recipe.FacingFlipped && !instance.flipFacing()) { diagnostic?.Invoke("Cannot restore facing flip."); return null; }
+                if (instance.HandFlipped != recipe.HandFlipped && !instance.flipHand() && recipe.BasisX == null)
+                { diagnostic?.Invoke("Cannot restore hand flip."); return null; }
+                if (instance.FacingFlipped != recipe.FacingFlipped && !instance.flipFacing() && recipe.BasisX == null)
+                { diagnostic?.Invoke("Cannot restore facing flip."); return null; }
                 if (!(instance.Location is LocationPoint location)) { diagnostic?.Invoke("Location is not a point."); return null; }
+                if (recipe.BasisX != null && instance.Mirrored != recipe.Mirrored)
+                {
+                    ElementTransformUtils.MirrorElements(doc, new[] { instance.Id }, Plane.CreateByNormalAndOrigin(XYZ.BasisX, location.Point), false);
+                    doc.Regenerate();
+                    if (instance.Mirrored != recipe.Mirrored)
+                        throw new InvalidOperationException("Impossible de rétablir le miroir de la famille.");
+                }
                 if (recipe.BasisX != null && recipe.BasisZ != null)
                     ElementHistoryNetwork.Orient(doc, instance, Unpack(recipe.BasisX), Unpack(recipe.BasisZ));
                 else
@@ -252,6 +306,9 @@ namespace Analyse
                 }
                 // Placement parameters and changed levels can shift the insertion point.
                 ElementTransformUtils.MoveElement(doc, instance.Id, point - ((LocationPoint)instance.Location).Point);
+                try { ElementHistoryNetwork.RestoreFamilyPorts(doc, instance, recipe); }
+                catch (Autodesk.Revit.Exceptions.RegenerationFailedException) { throw; }
+                catch (InvalidOperationException) { return ElementHistoryNetwork.RebuildWithSizingStubs(doc, instance, recipe); }
                 return instance;
             }
             if (recipe.Kind == "wall" && type is WallType)
@@ -280,8 +337,12 @@ namespace Analyse
             var values = new List<HistoryParameter>();
             foreach (Parameter parameter in element.Parameters)
             {
-                if (parameter.IsReadOnly || !parameter.HasValue || parameter.StorageType == StorageType.None) continue;
+                if (!parameter.HasValue || parameter.StorageType == StorageType.None) continue;
                 long id = parameter.Id.GetIdLongValue();
+                // Connected fittings can expose their instance dimensions as read-only.
+                // Retain custom numeric values; replay only if writable on the new,
+                // disconnected instance. Derived/formula values remain read-only.
+                if (parameter.IsReadOnly && !(element is FamilyInstance && id >= 0 && parameter.StorageType == StorageType.Double)) continue;
                 // Instance identity and host/level placement are handled separately.
                 if (id == (int)BuiltInParameter.ALL_MODEL_MARK || id == (int)BuiltInParameter.ELEM_TYPE_PARAM
                     || id == (int)BuiltInParameter.FAMILY_LEVEL_PARAM) continue;

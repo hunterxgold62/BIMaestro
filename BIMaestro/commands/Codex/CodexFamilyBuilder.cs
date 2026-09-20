@@ -385,7 +385,7 @@ namespace BIMaestro.Codex
             finally { if(temporary!=null&&temporary.IsValidObject)temporary.Close(false); }
         }
 
-        private static string FindTemplate(UIApplication app, string hosting)
+        internal static string FindTemplate(UIApplication app, string hosting)
         {
             var roots = new[] { app.Application.FamilyTemplatePath,
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Autodesk", "RVT " + app.Application.VersionNumber, "Family Templates") };

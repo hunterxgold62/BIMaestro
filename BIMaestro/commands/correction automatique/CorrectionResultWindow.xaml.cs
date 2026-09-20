@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using MenuItem = System.Windows.Controls.MenuItem;
+using ContextMenu = System.Windows.Controls.ContextMenu;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;

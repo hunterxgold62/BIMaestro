@@ -49,6 +49,7 @@ namespace Analyse
             public List<XYZ> ObbCorners { get; set; }
             public GhostMeshSnapshot GhostMesh { get; set; }
             public HistoryRecipe Recipe { get; set; }
+            public string CaptureFailure { get; set; }
             public bool DetailCaptureAttempted { get; set; }
             public Dictionary<string, string> Parameters { get; set; }
             public DateTime LastLogged { get; set; }
@@ -1273,6 +1274,8 @@ namespace Analyse
             var parameters = CaptureWritableParameters(el);
             AddTypeParametersToSnapshot(el, parameters);
 
+            string captureFailure = null;
+            var recipe = ElementHistoryReconstruction.Capture(el, reason => captureFailure = reason);
             var snapshot = new ElementSnapshot
             {
                 UniqueId = el.UniqueId,
@@ -1286,7 +1289,8 @@ namespace Analyse
                 BBoxMax = GetBBoxMax(el),
                 DetailCaptureAttempted = includeOrientedCorners,
                 // Restoration data is independent of the visual preview mode.
-                Recipe = ElementHistoryReconstruction.Capture(el),
+                Recipe = recipe,
+                CaptureFailure = captureFailure,
                 Parameters = parameters
             };
 
@@ -1977,6 +1981,7 @@ namespace Analyse
             {
                 ["deletedUniqueId"] = snapshot.UniqueId,
                 ["recipe"] = snapshot.Recipe,
+                ["captureFailure"] = snapshot.CaptureFailure,
                 ["lastKnown"] = snapshot.Location == null ? null : new { x = snapshot.Location.X, y = snapshot.Location.Y, z = snapshot.Location.Z },
                 ["bboxMin"] = snapshot.BBoxMin == null ? null : new { x = snapshot.BBoxMin.X, y = snapshot.BBoxMin.Y, z = snapshot.BBoxMin.Z },
                 ["bboxMax"] = snapshot.BBoxMax == null ? null : new { x = snapshot.BBoxMax.X, y = snapshot.BBoxMax.Y, z = snapshot.BBoxMax.Z },
@@ -2001,6 +2006,7 @@ namespace Analyse
         private static bool ShouldIgnoreElement(Element element)
         {
             if (element == null) return true;
+            if (element is Autodesk.Revit.DB.Plumbing.PipeInsulation || element is Autodesk.Revit.DB.Mechanical.DuctInsulation) return true;
             if (IsBIMaestroPreviewElement(element)) return true;
             if (IsAxisLineElement(element)) return true;
             if (element is FamilySymbol familySymbol)
