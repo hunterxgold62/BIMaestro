@@ -45,7 +45,7 @@ namespace BIMaestro.Codex
         private readonly ObservableCollection<KeyValuePair<string, string>> categoryItems = new ObservableCollection<KeyValuePair<string, string>>(CommunityStyle.Categories);
         private readonly ComboBox origin = new ComboBox { MinWidth = 130, Margin = new Thickness(0, 0, 12, 0) };
         private readonly CheckBox mine = new CheckBox { Content = "Mes publications", VerticalAlignment = VerticalAlignment.Center };
-        private readonly WrapPanel cards = new WrapPanel();
+        private readonly WrapPanel cards = new WrapPanel { Width = 642, ItemWidth = 214, HorizontalAlignment = HorizontalAlignment.Center };
         private readonly StackPanel details = new StackPanel();
         private readonly TextBlock status = CommunityStyle.Text("Recherchez ou parcourez les familles de la communauté.");
         private readonly Button search = CommunityStyle.Button("Rechercher", true), more = CommunityStyle.Button("Afficher la suite"), share = CommunityStyle.Button("Partager une famille…"), download = CommunityStyle.Button("Télécharger le RFA"), load = CommunityStyle.Button("Charger dans le projet", true), remove = CommunityStyle.Button("Retirer ma publication"), changeCover = CommunityStyle.Button("Modifier la photo de couverture…"), editDetails = CommunityStyle.Button("Modifier les informations…"), newVersion = CommunityStyle.Button("Publier une nouvelle version…"), history = CommunityStyle.Button("Historique des versions…");
@@ -56,16 +56,16 @@ namespace BIMaestro.Codex
         internal CodexCommunityWindow(CodexRevitBridge bridge)
         {
             this.bridge = bridge; CommunityStyle.Apply(this);
-            Title = "BIMaestro — Bibliothèque commune"; Width = 1180; Height = 780; MinWidth = 950; MinHeight = 620;
-            var root = new DockPanel { Margin = new Thickness(22) }; Content = root;
-            var heading = new DockPanel(); DockPanel.SetDock(share, Dock.Right); heading.Children.Add(share);
-            var titles = new StackPanel(); titles.Children.Add(CommunityStyle.Text("Bibliothèque commune", 26)); titles.Children.Add(CommunityStyle.Text("Familles personnelles et créations IA · Revit 2023 à " + bridge.RevitVersion + " · sans inscription")); heading.Children.Add(titles); DockPanel.SetDock(heading, Dock.Top); root.Children.Add(heading);
-            var filters = new DockPanel { Margin = new Thickness(0, 14, 0, 8) }; DockPanel.SetDock(search, Dock.Right); filters.Children.Add(search);
+            Title = "BIMaestro — Bibliothèque commune"; Width = 1280; Height = 820; MinWidth = 1180; MinHeight = 680;
+            var root = new DockPanel { Margin = new Thickness(18) }; Content = root;
+            var heading = new DockPanel { Margin = new Thickness(4, 2, 4, 10) }; DockPanel.SetDock(share, Dock.Right); heading.Children.Add(share);
+            var titles = new StackPanel(); var title = CommunityStyle.Text("Bibliothèque commune", 28); title.FontWeight = FontWeights.SemiBold; titles.Children.Add(title); var subtitle = CommunityStyle.Text("Découvrez, partagez et mettez à jour les familles de la communauté · Revit 2023 à " + bridge.RevitVersion); subtitle.Opacity = 0.72; titles.Children.Add(subtitle); heading.Children.Add(titles); DockPanel.SetDock(heading, Dock.Top); root.Children.Add(heading);
+            var filters = new DockPanel { Margin = new Thickness(0, 4, 0, 12) }; query.ToolTip = "Rechercher par nom ou description"; DockPanel.SetDock(search, Dock.Right); filters.Children.Add(search);
             var options = new StackPanel { Orientation = Orientation.Horizontal }; origin.Items.Add("Toutes les origines"); origin.Items.Add("Personnelles"); origin.Items.Add("Créées avec IA"); origin.SelectedIndex = 0; options.Children.Add(origin); options.Children.Add(mine); DockPanel.SetDock(options, Dock.Right); filters.Children.Add(options); filters.Children.Add(query);
-            DockPanel.SetDock(filters, Dock.Top); root.Children.Add(filters); DockPanel.SetDock(status, Dock.Bottom); root.Children.Add(status);
-            var columns = new Grid(); columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(215) }); columns.ColumnDefinitions.Add(new ColumnDefinition()); columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(265) }); root.Children.Add(columns);
+            var filterCard = CommunityStyle.Card(filters); filterCard.Padding = new Thickness(14, 9, 6, 9); filterCard.Margin = new Thickness(0, 0, 0, 12); DockPanel.SetDock(filterCard, Dock.Top); root.Children.Add(filterCard); status.Margin = new Thickness(6, 8, 0, 0); status.Opacity = 0.72; DockPanel.SetDock(status, Dock.Bottom); root.Children.Add(status);
+            var columns = new Grid(); columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(190) }); columns.ColumnDefinitions.Add(new ColumnDefinition()); columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(270) }); root.Children.Add(columns);
             var side = new DockPanel(); var catTitle = CommunityStyle.Text("CATÉGORIES", 12); DockPanel.SetDock(catTitle, Dock.Top); side.Children.Add(catTitle); side.Children.Add(categories);
-            categories.ItemsSource = categoryItems; categories.SelectedIndex = 0; columns.Children.Add(CommunityStyle.Card(side));
+            categories.ItemsSource = categoryItems; categories.SelectedIndex = 0; var sideCard = CommunityStyle.Card(side); sideCard.Padding = new Thickness(12); columns.Children.Add(sideCard);
             var center = new DockPanel(); DockPanel.SetDock(more, Dock.Bottom); center.Children.Add(more); center.Children.Add(new ScrollViewer { Content = cards, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }); Grid.SetColumn(center, 1); columns.Children.Add(center);
             var right = CommunityStyle.Card(new ScrollViewer { Content = details, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }); right.Margin = new Thickness(8, 0, 0, 12); Grid.SetColumn(right, 2); columns.Children.Add(right); Select(null);
             search.Click += async (_, __) => await Refresh(); query.KeyDown += async (_, e) => { if (e.Key == Key.Enter) await Refresh(); };
@@ -118,12 +118,12 @@ namespace BIMaestro.Codex
                     }
                     var previewUri = service.PreviewUri(item);
                     if (previewUri != null) item["previewUrl"] = previewUri.AbsoluteUri;
-                    var body = new StackPanel { Width = 205 }; body.Children.Add(CreatePreview(item, 205, 145)); body.Children.Add(CommunityStyle.Text(CommunityStyle.Origin((string)item["origin"]).ToUpperInvariant(), 11));
-                    body.Children.Add(CommunityStyle.Text((string)item["name"], 16)); body.Children.Add(CommunityStyle.Text(CommunityStyle.Category((string)item["category"])));
+                    var body = new StackPanel { Width = 174, MinHeight = 286 }; body.Children.Add(CreatePreview(item, 174, 126)); var badge = CommunityStyle.Text(CommunityStyle.Origin((string)item["origin"]).ToUpperInvariant(), 10); badge.FontWeight = FontWeights.SemiBold; badge.Opacity = 0.72; body.Children.Add(badge);
+                    var familyName = CommunityStyle.Text((string)item["name"], 16); familyName.FontWeight = FontWeights.SemiBold; familyName.MaxHeight = 48; body.Children.Add(familyName); body.Children.Add(CommunityStyle.Text(CommunityStyle.Category((string)item["category"]), 12));
                     body.Children.Add(CommunityStyle.Text("Créateur : " + ((string)item["creatorName"] ?? "Non renseigné"), 11));
                     body.Children.Add(CommunityStyle.Text("Revit " + item["revitVersion"] + "  ·  " + ((item.Value<long?>("sizeBytes") ?? 0) / 1000000d).ToString("0.0") + " Mo"));
                     body.Children.Add(CommunityStyle.Text((item.Value<long?>("downloadCount") ?? 0).ToString("N0") + " téléchargement(s)" + (item.Value<bool?>("isOwner") == true ? " · à vous" : ""), 11));
-                    var button = new Button { Content = CommunityStyle.Card(body), Background = Brushes.Transparent, BorderThickness = new Thickness(0), Padding = new Thickness(0), HorizontalContentAlignment = HorizontalAlignment.Stretch, ToolTip = (string)item["description"] };
+                    var card = CommunityStyle.Card(body); card.Padding = new Thickness(12); card.Margin = new Thickness(5, 0, 5, 12); var button = new Button { Width = 214, Content = card, Background = Brushes.Transparent, BorderThickness = new Thickness(0), Padding = new Thickness(0), HorizontalContentAlignment = HorizontalAlignment.Center, ToolTip = (string)item["description"] };
                     button.Click += (_, __) => Select(item); cards.Children.Add(button); count++;
                 }
                 cursor = (string)page["nextCursor"]; status.Text = count + " famille(s) affichée(s)." + (count == 0 ? " Aucune famille dans cette sélection." : "") + (!string.IsNullOrEmpty(cursor) ? " D'autres résultats peuvent être disponibles avec « Afficher la suite »." : "");
