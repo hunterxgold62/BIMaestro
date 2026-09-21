@@ -40,6 +40,28 @@ namespace BIMaestro.VideoGames
         {
             _rootDocument = document ?? throw new ArgumentNullException(nameof(document));
             _scene.SourceDocumentId = SafeText(() => document.ProjectInformation.UniqueId);
+            try
+            {
+                ProjectLocation location = document.ActiveProjectLocation;
+                // Sample the API's shared-coordinate mapping, avoiding an ambiguous
+                // GetTotalTransform direction or a reversed true-north angle.
+                ProjectPosition origin = location.GetProjectPosition(XYZ.Zero);
+                ProjectPosition x = location.GetProjectPosition(XYZ.BasisX);
+                double dx = x.EastWest - origin.EastWest;
+                double dy = x.NorthSouth - origin.NorthSouth;
+                double length = Math.Sqrt(dx * dx + dy * dy);
+                if (length > 0.999 && length < 1.001)
+                {
+                    _scene.SourceSharedOrigin = new[] { origin.EastWest, origin.NorthSouth, origin.Elevation };
+                    _scene.SourceSharedXAxis = new[] { dx / length, dy / length, 0.0 };
+                    _scene.SourceSharedSiteName = location.Name;
+                }
+            }
+            catch (Autodesk.Revit.Exceptions.InvalidOperationException)
+            {
+                // Keep the model publishable; the viewer refuses shared IFC export
+                // when the active site's coordinate mapping could not be captured.
+            }
         }
 
         public GameSceneData Scene => _scene;

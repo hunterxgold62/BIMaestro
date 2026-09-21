@@ -366,6 +366,10 @@ namespace BIMaestro.VideoGames
     {
         public string SourceDocumentId { get; set; } = string.Empty;
         public Vector3D SourceOrigin { get; private set; }
+        // Internal Revit coordinates -> active shared site coordinates, in feet.
+        public double[]? SourceSharedOrigin { get; set; }
+        public double[]? SourceSharedXAxis { get; set; }
+        public string SourceSharedSiteName { get; set; } = string.Empty;
         public IList<GameMeshData> Meshes { get; } = new List<GameMeshData>();
         public IList<GameDoorData> Doors { get; } = new List<GameDoorData>();
         public IList<GameElementData> Elements { get; } = new List<GameElementData>();

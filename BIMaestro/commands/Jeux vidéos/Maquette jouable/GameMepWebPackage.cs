@@ -324,6 +324,12 @@ namespace BIMaestro.VideoGames
                 coordinateSystem = "right-handed-z-up",
                 sourceDocumentId = scene.SourceDocumentId,
                 sourceOrigin = new[] { scene.SourceOrigin.X, scene.SourceOrigin.Y, scene.SourceOrigin.Z },
+                sharedCoordinates = scene.SourceSharedOrigin == null || scene.SourceSharedXAxis == null ? null : new
+                {
+                    origin = scene.SourceSharedOrigin,
+                    xAxis = scene.SourceSharedXAxis,
+                    siteName = scene.SourceSharedSiteName
+                },
                 tiles = scene.WebTiles,
                 triangleCount = scene.OriginalRenderTriangleCount,
                 elementCount = scene.Elements.Count,
