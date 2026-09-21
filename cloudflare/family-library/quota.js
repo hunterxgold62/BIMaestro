@@ -13,6 +13,6 @@ export async function reserve(db, costs, now = new Date().toISOString()) {
 }
 export function requestCost(kind, bytes=0) {
  return {worker_requests:1,d1_reads:256,d1_writes:16,
-  r2_a:kind==='upload'?1:0,r2_b:kind==='download'?1:0,
-  r2_bytes:kind==='upload'?bytes:0,d1_bytes:kind==='upload'?16384:0};
+  r2_a:(kind==='upload'||kind==='previewUpload')?1:0,r2_b:(kind==='download'||kind==='previewDownload')?1:0,
+  r2_bytes:(kind==='upload'||kind==='previewUpload')?bytes:0,d1_bytes:kind==='upload'?16384:0};
 }

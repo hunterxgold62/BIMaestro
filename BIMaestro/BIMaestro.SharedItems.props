@@ -995,6 +995,7 @@
     <EmbeddedResource Include="Resources\Bride auto %282%29.png" />
     <EmbeddedResource Include="Resources\Calcul de canalisation.png" />
     <EmbeddedResource Include="Resources\Chatbot + élémet.png" />
+    <EmbeddedResource Include="Resources\Famille IA.png" />
     <EmbeddedResource Include="Resources\Clash 3D.png" />
     <EmbeddedResource Include="Resources\Convertir paramètres %282%29.png" />
     <EmbeddedResource Include="Resources\Correction de texte IA %282%29.png" />

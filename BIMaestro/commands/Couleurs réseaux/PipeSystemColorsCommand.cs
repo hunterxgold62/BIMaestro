@@ -174,6 +174,11 @@ namespace Visualisation
 
         private static string GetUnsupportedViewReason(Document document, View view)
         {
+            if (document.IsFamilyDocument)
+            {
+                return "Cette commande n’est pas disponible dans un fichier famille Revit (.rfa). Ouvrez un projet Revit (.rvt) pour utiliser les couleurs de réseaux.";
+            }
+
             if (view.IsTemplate)
             {
                 return "La vue active est un gabarit. BIMaestro ne modifie pas les gabarits de vue.";

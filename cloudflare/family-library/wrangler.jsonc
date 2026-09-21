@@ -3,7 +3,7 @@
  "main":"worker.js",
  "compatibility_date":"2026-09-20",
  "compatibility_flags":["nodejs_compat"],
- "workers_dev":false,
+ "workers_dev":true,
  "preview_urls":false,
  "vars":{"LIBRARY_ENABLED":"false"},
  "observability":{"enabled":false},

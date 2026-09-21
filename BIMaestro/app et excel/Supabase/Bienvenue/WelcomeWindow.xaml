@@ -62,29 +62,29 @@
                             <Image x:Name="LogoImage" Width="43" Height="43" Stretch="Uniform"/>
                         </Border>
                         <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                            <TextBlock Text="Bienvenue dans BIMaestro" FontSize="22" FontWeight="Bold" Foreground="White"/>
-                            <TextBlock Margin="0,5,0,0" Foreground="#E8FFF4" FontSize="13.5"
+                            <TextBlock x:Name="HeadingText" Text="Bienvenue dans BIMaestro" FontSize="22" FontWeight="Bold" Foreground="White"/>
+                            <TextBlock x:Name="HeadingSubtitleText" Margin="0,5,0,0" Foreground="#E8FFF4" FontSize="13.5"
                                        Text="Un plugin Revit gratuit, développé avec les retours du terrain."/>
                         </StackPanel>
                     </Grid>
                 </Border>
 
                 <StackPanel Grid.Row="1" Margin="22,18,22,14">
-                    <TextBlock Text="Souhaitez-vous rester informé ?" FontSize="18" FontWeight="SemiBold"
+                    <TextBlock x:Name="IntroTitleText" Text="Souhaitez-vous rester informé ?" FontSize="18" FontWeight="SemiBold"
                                Foreground="{DynamicResource Text.Primary}"/>
-                    <TextBlock Margin="0,5,0,0" Style="{StaticResource TrustText}"
+                    <TextBlock x:Name="IntroText" Margin="0,5,0,0" Style="{StaticResource TrustText}"
                                Text="Recevez uniquement les informations utiles : correctifs importants, nouveautés et demandes occasionnelles de retour."/>
 
                     <Border Margin="0,14,0,14" Padding="14" CornerRadius="12"
                             Background="#ECFDF5" BorderBrush="#A7F3D0" BorderThickness="1">
                         <StackPanel>
-                            <TextBlock Text="Vous gardez le contrôle" Foreground="#065F46" FontWeight="SemiBold"/>
-                            <TextBlock Margin="0,5,0,0" Foreground="#047857" TextWrapping="Wrap" LineHeight="19"
+                            <TextBlock x:Name="TrustTitleText" Text="Vous gardez le contrôle" Foreground="#065F46" FontWeight="SemiBold"/>
+                            <TextBlock x:Name="TrustDetailsText" Margin="0,5,0,0" Foreground="#047857" TextWrapping="Wrap" LineHeight="19"
                                        Text="✓ Email facultatif   •   ✓ Aucun compte à créer   •   ✓ Modifiable ou supprimable depuis Options"/>
                         </StackPanel>
                     </Border>
 
-                    <TextBlock Text="Votre email" Style="{StaticResource Label}" Margin="2,0,0,6"/>
+                    <TextBlock x:Name="EmailLabel" Text="Votre email" Style="{StaticResource Label}" Margin="2,0,0,6"/>
                     <TextBox x:Name="EmailBox" Height="40" Padding="12,8"
                              ToolTip="Adresse utilisée uniquement pour les informations BIMaestro"/>
 
@@ -95,16 +95,16 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel>
-                            <TextBlock Text="Prénom (optionnel)" Style="{StaticResource Label}" Margin="2,0,0,6"/>
+                            <TextBlock x:Name="FirstNameLabel" Text="Prénom (optionnel)" Style="{StaticResource Label}" Margin="2,0,0,6"/>
                             <TextBox x:Name="FirstNameBox" Height="40" Padding="12,8"/>
                         </StackPanel>
                         <StackPanel Grid.Column="2">
-                            <TextBlock Text="Nom (optionnel)" Style="{StaticResource Label}" Margin="2,0,0,6"/>
+                            <TextBlock x:Name="LastNameLabel" Text="Nom (optionnel)" Style="{StaticResource Label}" Margin="2,0,0,6"/>
                             <TextBox x:Name="LastNameBox" Height="40" Padding="12,8"/>
                         </StackPanel>
                     </Grid>
 
-                    <TextBlock Margin="2,7,0,0" Style="{StaticResource TrustText}"
+                    <TextBlock x:Name="PrivacyText" Margin="2,7,0,0" Style="{StaticResource TrustText}"
                                Text="Votre adresse sert uniquement à vous tenir au courant de BIMaestro. Vous pourrez la retirer à tout moment dans Option."/>
 
                     <Border Margin="0,14,0,0" Padding="12" CornerRadius="12"
@@ -133,12 +133,12 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <Button Content="Continuer sans email" Style="{StaticResource WelcomeSecondaryButton}"
+                        <Button x:Name="NoThanksButton" Content="Continuer sans email" Style="{StaticResource WelcomeSecondaryButton}"
                                 Click="NoThanks_Click"/>
-                        <Button Grid.Column="1" Content="Me le rappeler plus tard" Margin="10,0,0,0"
+                        <Button x:Name="LaterButton" Grid.Column="1" Content="Me le rappeler plus tard" Margin="10,0,0,0"
                                 HorizontalAlignment="Left" Style="{StaticResource WelcomeSecondaryButton}"
                                 Click="Later_Click"/>
-                        <Button Grid.Column="2" Content="Recevoir les nouveautés" Margin="10,0,0,0"
+                        <Button x:Name="PrimaryButton" Grid.Column="2" Content="Recevoir les nouveautés" Margin="10,0,0,0"
                                 Style="{StaticResource WelcomePrimaryButton}" Click="OptIn_Click"/>
                     </Grid>
                 </Border>

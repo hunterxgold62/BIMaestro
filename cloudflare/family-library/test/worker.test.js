@@ -17,7 +17,7 @@ function harness(){
  const env={LIBRARY_ENABLED:'true',CATALOG:db,FAMILIES:{async put(key,value){calls.put++;objects.set(key,value);},async get(key){calls.get++;const value=objects.get(key);return value?{body:value,size:value.length}:null;}}};
  return {sql,db,env,calls};
 }
-function upload(size=512,body){const bytes=body||new Uint8Array(size);if(!body)bytes.set([208,207,17,224,161,177,26,225]);return new Request('https://library/v1/families',{method:'POST',headers:{'Content-Length':String(size),'X-Family-Name':encodeURIComponent('Étagère'),'X-Family-Category':'Mobilier','X-Revit-Version':'2024','X-Owner-Token':'a'.repeat(64),'X-Family-Origin':'ai'},body:bytes});}
+function upload(size=512,body){const bytes=body||new Uint8Array(size);if(!body)bytes.set([208,207,17,224,161,177,26,225]);return new Request('https://library/v1/families',{method:'POST',headers:{'Content-Length':String(size),'X-Family-Name':encodeURIComponent('Étagère'),'X-Family-Category':'Mobilier','X-Revit-Version':'2024','X-Owner-Token':'a'.repeat(64),'X-Family-Origin':'ai','X-Creator-Name':encodeURIComponent('Marie Martin')},body:bytes});}
 
 test('stalled upload hits wall-clock deadline and cancels the input stream',async()=>{
  let cancelled=false;
@@ -77,12 +77,30 @@ test('Worker denied upload at 1% never calls R2 or inserts family',async()=>{
 });
 test('upload, deduplication, catalogue filters and binary download',async()=>{
  const h=harness();let response=await worker.fetch(upload(),h.env);assert.equal(response.status,201);
- const {item}=await response.json();assert.equal(item.name,'Étagère');assert.equal(h.calls.put,1);
+ const {item}=await response.json();assert.equal(item.name,'Étagère');assert.equal(item.creatorName,'Marie Martin');assert.equal(h.calls.put,1);
  response=await worker.fetch(upload(),h.env);assert.equal((await response.json()).duplicate,true);assert.equal(h.calls.put,1);
  response=await worker.fetch(new Request('https://library/v1/families?q='+encodeURIComponent('étag')),h.env);
  assert.equal((await response.json()).items.length,1);
  response=await worker.fetch(new Request(`https://library/v1/families/${item.id}/file`),h.env);
  assert.equal(response.status,200);assert.equal((await response.arrayBuffer()).byteLength,512);
+});
+test('owner can add a PNG preview that is advertised and publicly cached',async()=>{
+ const h=harness();const {item}=await (await worker.fetch(upload(),h.env)).json();
+ const png=new Uint8Array([137,80,78,71,13,10,26,10,0,0,0,0]);
+ const put=new Request(`https://library/v1/families/${item.id}/preview`,{method:'PUT',headers:{'Content-Length':String(png.length),'Content-Type':'image/png','X-Owner-Token':'a'.repeat(64)},body:png});
+ assert.equal((await worker.fetch(put,h.env)).status,204);
+ const list=await (await worker.fetch(new Request('https://library/v1/families'),h.env)).json();
+ assert.equal(list.items[0].hasPreview,true);
+ const response=await worker.fetch(new Request(`https://library/v1/families/${item.id}/preview`),h.env);
+ assert.equal(response.status,200);assert.equal(response.headers.get('Content-Type'),'image/png');assert.match(response.headers.get('Cache-Control'),/max-age=300/);
+ assert.deepEqual(new Uint8Array(await response.arrayBuffer()),png);
+});
+test('preview upload rejects another owner and non-PNG content',async()=>{
+ const h=harness();const {item}=await (await worker.fetch(upload(),h.env)).json();
+ const request=(token,bytes)=>new Request(`https://library/v1/families/${item.id}/preview`,{method:'PUT',headers:{'Content-Length':String(bytes.length),'Content-Type':'image/png','X-Owner-Token':token},body:bytes});
+ assert.equal((await worker.fetch(request('b'.repeat(64),new Uint8Array([137,80,78,71,13,10,26,10])),h.env)).status,403);
+ assert.equal((await worker.fetch(request('a'.repeat(64),new Uint8Array(8)),h.env)).status,400);
+ assert.equal(h.sql.prepare('SELECT has_preview FROM shared_families').get().has_preview,0);
 });
 test('length lies, invalid magic and oversize cannot write R2',async()=>{
  for(const request of [upload(512,new Uint8Array(513)),upload(512,new Uint8Array(511)),upload(512,new Uint8Array(512)),upload(MAX_UPLOAD_BYTES+1,new Uint8Array(8))]){
@@ -143,7 +161,7 @@ test('ownership proof is required and never leaked in public items',async()=>{
  assert.equal(listing.items[0].isOwner,false);assert.equal('owner_hash' in listing.items[0],false);
  assert.equal(JSON.stringify(listing).includes('a'.repeat(64)),false);
 });
-test('different owner cannot claim duplicate or withdraw; author withdraws idempotently',async()=>{
+test('different owner cannot claim duplicate; author can withdraw and restore',async()=>{
  const h=harness();const {item}=await (await worker.fetch(upload(),h.env)).json();
  const duplicate=upload();duplicate.headers.set('X-Owner-Token','b'.repeat(64));duplicate.headers.set('X-Family-Origin','personal');
  const dupe=await (await worker.fetch(duplicate,h.env)).json();assert.equal(dupe.duplicate,true);assert.equal(dupe.item.isOwner,false);assert.equal(dupe.item.origin,'ai');
@@ -155,7 +173,17 @@ test('different owner cannot claim duplicate or withdraw; author withdraws idemp
  assert.deepEqual(h.sql.prepare('SELECT r2_bytes,r2_a,r2_b FROM quota_state').get(),before);
  assert.equal((await (await worker.fetch(new Request('https://library/v1/families'),h.env)).json()).items.length,0);
  assert.equal((await worker.fetch(new Request(`https://library/v1/families/${item.id}/file`),h.env)).status,404);
- assert.equal((await worker.fetch(upload(),h.env)).status,409);assert.equal(h.calls.put,1);assert.equal(h.calls.get,0);
+ const restoredResponse=await worker.fetch(upload(),h.env);assert.equal(restoredResponse.status,200);
+ const restored=await restoredResponse.json();assert.equal(restored.restored,true);assert.equal(restored.item.isOwner,true);
+ assert.equal((await (await worker.fetch(new Request('https://library/v1/families'),h.env)).json()).items.length,1);
+ assert.equal(h.calls.put,1);assert.equal(h.calls.get,0);
+});
+test('withdrawn family cannot be restored by a different owner',async()=>{
+ const h=harness();const {item}=await (await worker.fetch(upload(),h.env)).json();
+ await worker.fetch(new Request(`https://library/v1/families/${item.id}`,{method:'DELETE',headers:{'X-Owner-Token':'a'.repeat(64)}}),h.env);
+ const other=upload();other.headers.set('X-Owner-Token','b'.repeat(64));
+ assert.equal((await worker.fetch(other,h.env)).status,409);
+ assert.equal(h.sql.prepare('SELECT withdrawn FROM shared_families').get().withdrawn,1);
 });
 test('mine and origin filters respect token and legacy ownerless rows',async()=>{
  const h=harness();await worker.fetch(upload(),h.env);
@@ -179,5 +207,17 @@ test('withdrawal during R2 lookup prevents subsequent delivery',async()=>{
  h.env.FAMILIES.get=async()=>{h.sql.exec('UPDATE shared_families SET withdrawn=1');return {body:new Uint8Array(512),size:512};};
  assert.equal((await worker.fetch(new Request(`https://library/v1/families/${item.id}/file`),h.env)).status,404);
  assert.equal(h.sql.prepare('SELECT download_count FROM shared_families').get().download_count,0);
+});
+test('owner edits metadata and publishes a downloadable version history',async()=>{
+ const h=harness();const first=(await (await worker.fetch(upload(),h.env)).json()).item;
+ const edit=new Request(`https://library/v1/families/${first.id}`,{method:'PATCH',headers:{'X-Owner-Token':'a'.repeat(64),'X-Family-Name':encodeURIComponent('Nom corrigé'),'X-Family-Category':'generic','X-Family-Description':'Description','X-Family-Origin':'personal'}});
+ const edited=await worker.fetch(edit,h.env);assert.equal(edited.status,200);assert.equal((await edited.json()).item.name,'Nom corrigé');
+ const forbidden=new Request(`https://library/v1/families/${first.id}`,{method:'PATCH',headers:{'X-Owner-Token':'b'.repeat(64),'X-Family-Name':'Vol','X-Family-Category':'generic','X-Family-Description':'','X-Family-Origin':'ai'}});assert.equal((await worker.fetch(forbidden,h.env)).status,403);
+ const bytes=new Uint8Array(512);bytes.set([0xd0,0xcf,0x11,0xe0,0xa1,0xb1,0x1a,0xe1]);bytes[20]=1;
+ const next=upload(512,bytes);next.headers.set('X-Replaces-Family-ID',first.id);next.headers.set('X-Change-Note',encodeURIComponent('Paramètres corrigés'));
+ const published=await worker.fetch(next,h.env);assert.equal(published.status,201);const second=(await published.json()).item;assert.equal(second.revisionNumber,2);
+ const list=await (await worker.fetch(new Request('https://library/v1/families'),h.env)).json();assert.deepEqual(list.items.map(x=>x.id),[second.id]);
+ const history=await (await worker.fetch(new Request(`https://library/v1/families/${second.id}/versions`,{headers:{'X-Owner-Token':'a'.repeat(64)}}),h.env)).json();assert.deepEqual(history.items.map(x=>x.revisionNumber),[2,1]);assert.equal(history.items[0].changeNote,'Paramètres corrigés');
+ assert.equal((await worker.fetch(new Request(`https://library/v1/families/${first.id}/file`),h.env)).status,200);
 });
 

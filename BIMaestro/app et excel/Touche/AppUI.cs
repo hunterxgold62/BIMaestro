@@ -41,7 +41,6 @@ public class AppUI : IExternalApplication
                 new RibbonItemDefinition("OpenSheetFromViewButton", "Ouvrir la vue du Plan", panel => AddPushButton(panel, "OpenSheetFromViewButton", " Ouvrir \nla vue", assemblyPath, "Visualisation.OpenSheetFromView", "Ouvrir la vue.png", "Passe rapidement de la vue active à la feuille associée (et inversement).\r\nPermet aussi d'ouvrir une vue directement depuis un viewport sélectionné sur une feuille.")),
                 new RibbonItemDefinition("Export Nomenclature", "Export Nomenclature", panel => AddPushButton(panel, "Export Nomenclature", "Export de\nNomenclature", assemblyPath, "Visualisation.ExportScheduleCommand", "Export de Nomenclature.png", "Exporte les nomenclatures Revit sélectionnées en fichier Excel ou PDF.")),
                 new RibbonItemDefinition("Sélection d'objet", "Sélection d'objet", panel => AddPushButton(panel, "Sélection d'objet", "Sélection\nd'objet", assemblyPath, "Visualisation.SelectSimilarCommand", "Sélection d'objet.png", "Sélectionne des éléments similaires dans le projet")),
-                new RibbonItemDefinition("PipeSystemColors", "Couleurs réseaux", panel => AddPushButton(panel, "PipeSystemColors", "Couleurs\nréseaux", assemblyPath, "Visualisation.PipeSystemColorsCommand", "Couleur.png", "Colore les canalisations et raccords selon les couleurs des types de systèmes de canalisation.")),
                 new RibbonItemDefinition("Boutons de Visualisation", "Boutons de Visualisation", panel => AddStackedVisualizationButtons(
             panel,
             assemblyPath,
@@ -64,7 +63,11 @@ public class AppUI : IExternalApplication
 
             new RibbonPanelDefinition("Beta", new List<RibbonItemDefinition>
             {
-                new RibbonItemDefinition("MepBooster", "MEP Booster", panel => AddPushButton(panel, "MepBooster", "MEP Booster\nOFF", assemblyPath, "BIMaestro.MepBooster.MepBoosterCommand", "MEP Booster vanne rotation.png", "Active ou désactive la pastille MEP après 0,2 seconde de sélection stable. Survolez la pastille puis un angle pour voir la rotation. Cliquez pour appliquer ; Échap ferme la rosace. Accessoires, raccords droits, coudes et tés, en plan, coupe et 3D orthographique. Les actions qui déplaceraient un connecteur raccordé sont désactivées.")),
+                new RibbonItemDefinition("MepBooster", "MEP Booster", panel => AddSplitButton(panel, "MepBooster", "MEP Booster\nOFF", assemblyPath, new List<(string, string, string, string, string)>
+                {
+                    ("MepBooster", "MEP Booster\nOFF", "BIMaestro.MepBooster.MepBoosterCommand", "MEP Booster vanne rotation.png", "Active ou désactive la pastille MEP après 0,2 seconde de sélection stable. Survolez la pastille puis un angle pour voir la rotation. Cliquez pour appliquer ; Échap ferme la rosace. Accessoires, raccords droits, coudes et tés, en plan, coupe et 3D orthographique. Les actions qui déplaceraient un connecteur raccordé sont désactivées."),
+                    ("PipeSystemColors", "Couleurs\nréseaux", "Visualisation.PipeSystemColorsCommand", "Couleur.png", "Colore les canalisations et raccords selon les couleurs des types de systèmes de canalisation.")
+                })),
                 new RibbonItemDefinition(
                     "RevitGameCommand",
                     "Maquette MEP",
@@ -127,7 +130,11 @@ public class AppUI : IExternalApplication
 
             new RibbonPanelDefinition("Outils IA", new List<RibbonItemDefinition>
             {
-                new RibbonItemDefinition("CodexChat", "Famille IA", panel => AddPushButton(panel, "CodexChat", "Famille IA", assemblyPath, "BIMaestro.Codex.CodexCommand", "Famille IA.png", "Crée et modifie des familles Revit avec l’IA depuis votre compte ChatGPT. Lecture du contexte sur demande ; modifications après validation. Bêta.")),
+                new RibbonItemDefinition("CodexChat", "Famille IA", panel => AddSplitButton(panel, "CodexChat", "Famille IA", assemblyPath, new List<(string, string, string, string, string)>
+                {
+                    ("CodexChat", "Famille IA", "BIMaestro.Codex.CodexCommand", "Famille IA.png", "Crée et modifie des familles Revit avec l’IA depuis votre compte ChatGPT. Lecture du contexte sur demande ; modifications après validation. Bêta."),
+                    ("CommunityFamilies", "Bibliothèque\ncommune", "BIMaestro.Codex.CodexCommunityCommand", "Famille.png", "Parcourt les familles partagées par catégorie, consulte les téléchargements et partage vos familles personnelles ou IA. Retirez vos propres publications depuis Mes publications.")
+                })),
                 new RibbonItemDefinition("IAQuickTools", "Outils IA rapides", panel => AddStackedPushButtons(
                     panel,
                     assemblyPath,
@@ -161,7 +168,6 @@ public class AppUI : IExternalApplication
                     ("FamilyBrowser", "Navigateur\nde Familles", "Famille.FamilyBrowserCommand", "Famille.png","Parcourt vos dossiers de familles Revit et charge les contenus en quelques clics.\r\nInclut aperçu visuel, favoris, recherche et options d'affichage pour accélérer le travail."), 
                     ("Rosace", ".","BIMaestro.UI.RadialMenuCommand", "vide.png","Rosace des familles à ajouter en raccourci clavier voir raccourci souris.")
                 }, "Navigateur de Familles", "maison famille (1).png", keepDefaultCurrentButton: true, fixedDisplayText: "Famille")),
-                new RibbonItemDefinition("CommunityFamilies", "Bibliothèque commune", panel => AddPushButton(panel, "CommunityFamilies", "Bibliothèque\ncommune", assemblyPath, "BIMaestro.Codex.CodexCommunityCommand", "Famille.png", "Parcourt les familles partagées par catégorie, consulte les téléchargements et partage vos familles personnelles ou IA. Retirez vos propres publications depuis Mes publications.")),
         new RibbonItemDefinition("ConvertSharedToFamily", "Convertir les paramètres partagés", panel => AddPushButton(panel, "ConvertSharedToFamily", "Convertir\nparamètres", assemblyPath, "Famille.ConvertSharedToFamilyParametersCommand", "Convertir paramètres (2).png", "Convertit tous les paramètres partagés modifiables de la famille en paramètres de famille (même nom, même groupe et même type instance/type).")),                new RibbonItemDefinition("FamilyUtilitiesStack", "Outils familles", panel => AddStackedFamilyUtilities(
                     panel,
                     assemblyPath,
@@ -669,6 +675,7 @@ public class AppUI : IExternalApplication
             var addedButton = splitButton.AddPushButton(buttonData);
             if (addedButton != null)
             {
+                if (buttonName == "MepBooster") BIMaestro.MepBooster.MepBoosterService.BindButton(addedButton);
                 RegisterButtonInstance(buttonName, addedButton);
                 RegisterButtonCommandId(buttonName, TryGetCommandId(addedButton));
             }

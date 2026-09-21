@@ -14,6 +14,7 @@ namespace BIMaestro.Codex
     internal sealed class CodexCommunityLibrary : IDisposable
     {
         internal const long MaxBytes = 20000000;
+        internal const long MaxPreviewBytes = 1000000;
         internal static readonly string CacheRoot = Path.Combine(CodexClient.DataDirectory, "CommunityFamilies");
         private readonly HttpClient http;
         private readonly string ownerPath;
@@ -69,9 +70,9 @@ namespace BIMaestro.Codex
         }
         internal async Task Publish(CodexFamilyArtifact artifact, string version)
         {
-            await Publish(artifact.FilePath, Path.GetFileNameWithoutExtension(artifact.FilePath), (string)JObject.FromObject(artifact.Report)["category"] ?? "generic", "Famille créée avec BIMaestro Famille IA.", version, "ai");
+            await Publish(artifact.FilePath, Path.GetFileNameWithoutExtension(artifact.FilePath), (string)JObject.FromObject(artifact.Report)["category"] ?? "generic", "Famille créée avec BIMaestro Famille IA.", version, "ai", artifact.PreviewPath);
         }
-        internal async Task<JObject> Publish(string path, string name, string category, string description, string version, string origin)
+        internal async Task<JObject> Publish(string path, string name, string category, string description, string version, string origin, string previewPath = null, string replacesId = null, string changeNote = null)
         {
             using (var file = CodexCommunitySnapshot.Read(path, MaxBytes))
             using (var request = new HttpRequestMessage(HttpMethod.Post, "v1/families"))
@@ -83,11 +84,102 @@ namespace BIMaestro.Codex
                 request.Headers.Add("X-Revit-Version", version);
                 request.Headers.Add("X-Family-Description", Uri.EscapeDataString(Regex.Replace(description ?? "", "[\\r\\n]+", " ")));
                 request.Headers.Add("X-Family-Origin", origin);
+                if (!string.IsNullOrWhiteSpace(replacesId)) request.Headers.Add("X-Replaces-Family-ID", replacesId);
+                if (!string.IsNullOrWhiteSpace(changeNote)) request.Headers.Add("X-Change-Note", Uri.EscapeDataString(Regex.Replace(changeNote, "[\\r\\n]+", " ")));
+                string creatorName = BIMaestro.Welcome.WelcomeManager.GetCommunityCreatorName();
+                if (!string.IsNullOrWhiteSpace(creatorName)) request.Headers.Add("X-Creator-Name", Uri.EscapeDataString(creatorName));
                 request.Content = new StreamContent(file);
                 request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
                 request.Content.Headers.ContentLength = file.Length;
-                using (var response = await http.SendAsync(request)) { await Check(response); return JObject.Parse(await response.Content.ReadAsStringAsync()); }
+                using (var response = await http.SendAsync(request))
+                {
+                    await Check(response);
+                    var result = JObject.Parse(await response.Content.ReadAsStringAsync());
+                    if (result["item"]?.Value<bool?>("isOwner") == true && result["item"]?.Value<bool?>("hasPreview") != true && !string.IsNullOrEmpty(previewPath) && File.Exists(previewPath))
+                    {
+                        try { await UploadPreview((string)result["item"]?["id"], previewPath); result["previewUploaded"] = true; }
+                        catch (Exception ex) { result["previewUploaded"] = false; result["previewError"] = ex.Message; }
+                    }
+                    return result;
+                }
             }
+        }
+        internal async Task<JArray> GetVersions(JObject item)
+        {
+            string id = (string)item?["id"];
+            using (var request = new HttpRequestMessage(HttpMethod.Get, "v1/families/" + id + "/versions"))
+            { Identify(request); using (var response = await http.SendAsync(request)) { await Check(response); return (JArray)JObject.Parse(await response.Content.ReadAsStringAsync())["items"] ?? new JArray(); } }
+        }
+        internal async Task EditMetadata(JObject item, string name, string category, string description, string origin)
+        {
+            using (var request = new HttpRequestMessage(new HttpMethod("PATCH"), "v1/families/" + (string)item["id"]))
+            {
+                Identify(request); request.Headers.Add("X-Family-Name", Uri.EscapeDataString(name)); request.Headers.Add("X-Family-Category", Uri.EscapeDataString(category));
+                request.Headers.Add("X-Family-Description", Uri.EscapeDataString(Regex.Replace(description ?? "", "[\\r\\n]+", " "))); request.Headers.Add("X-Family-Origin", origin);
+                using (var response = await http.SendAsync(request)) { await Check(response); var updated = (JObject)JObject.Parse(await response.Content.ReadAsStringAsync())["item"]; foreach (var property in updated.Properties()) item[property.Name] = property.Value; }
+            }
+        }
+        private async Task UploadPreview(string id, string path)
+        {
+            if (!Regex.IsMatch(id ?? "", "^[a-fA-F0-9]{64}$")) return;
+            string prepared = PreparePreview(path);
+            try
+            {
+                using (var request = new HttpRequestMessage(HttpMethod.Put, "v1/families/" + id.ToLowerInvariant() + "/preview"))
+                using (var file = File.OpenRead(prepared))
+                {
+                    Identify(request);
+                    request.Content = new StreamContent(file);
+                    request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+                    request.Content.Headers.ContentLength = file.Length;
+                    using (var response = await http.SendAsync(request)) await Check(response);
+                }
+            }
+            finally { if (!string.Equals(prepared, path, StringComparison.OrdinalIgnoreCase)) try { File.Delete(prepared); } catch { } }
+        }
+        internal async Task UpdatePreview(JObject item, string path)
+        {
+            if (item?.Value<bool?>("isOwner") != true) throw new InvalidOperationException("Seul l’auteur peut modifier la photo de couverture.");
+            await UploadPreview((string)item["id"], path);
+            item["hasPreview"] = true;
+            item["previewUrl"] = new Uri(PreviewUri(item).AbsoluteUri + "?v=" + DateTime.UtcNow.Ticks).AbsoluteUri;
+        }
+        private static string PreparePreview(string sourcePath)
+        {
+            if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath)) throw new InvalidOperationException("Photo de couverture introuvable.");
+            string folder = Path.Combine(CodexClient.DataDirectory, "CommunityPreviewDrafts"); Directory.CreateDirectory(folder);
+            string output = Path.Combine(folder, Guid.NewGuid().ToString("N") + ".png");
+            try
+            {
+                using (var source = System.Drawing.Image.FromFile(sourcePath))
+                {
+                    int box = Math.Min(1200, Math.Max(source.Width, source.Height));
+                    while (box >= 240)
+                    {
+                        double scale = Math.Min(1d, (double)box / Math.Max(source.Width, source.Height));
+                        int width = Math.Max(1, (int)Math.Round(source.Width * scale)), height = Math.Max(1, (int)Math.Round(source.Height * scale));
+                        using (var bitmap = new System.Drawing.Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format24bppRgb))
+                        using (var graphics = System.Drawing.Graphics.FromImage(bitmap))
+                        {
+                            graphics.Clear(System.Drawing.Color.White);
+                            graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                            graphics.DrawImage(source, 0, 0, width, height);
+                            bitmap.Save(output, System.Drawing.Imaging.ImageFormat.Png);
+                        }
+                        if (new FileInfo(output).Length <= MaxPreviewBytes) return output;
+                        box = (int)(box * 0.75);
+                    }
+                }
+            }
+            catch (Exception ex) when (!(ex is InvalidOperationException)) { throw new InvalidOperationException("La photo choisie n’est pas une image valide.", ex); }
+            try { File.Delete(output); } catch { }
+            throw new InvalidOperationException("Impossible de compresser la photo sous 1 Mo.");
+        }
+        internal Uri PreviewUri(JObject item)
+        {
+            string id = (string)item?["id"];
+            return item?.Value<bool?>("hasPreview") == true && Regex.IsMatch(id ?? "", "^[a-fA-F0-9]{64}$")
+                ? new Uri(http.BaseAddress, "v1/families/" + id.ToLowerInvariant() + "/preview") : null;
         }
         internal async Task Remove(string id)
         {

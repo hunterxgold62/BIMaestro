@@ -9,7 +9,7 @@
 - Aucun dialogue automatique après création : partage manuel depuis Famille IA ou le bouton indépendant « Bibliothèque commune ».
 - Tout RFA compatible peut être proposé, avec choix personnelle/IA et inspection de sa version enregistrée. Interface WPF avec catégories, cartes, fiche et « Mes publications ».
 - SHA-256 vérifié avant chargement, cache local réutilisé, 20 000 000 octets maximum par fichier, aucun retry automatique.
-- Première version textuelle : miniatures PNG non partagées.
+- Les nouvelles publications extraient automatiquement l’aperçu Revit et l’envoient en PNG séparément du RFA (1 Mo maximum). Les cartes et la fiche détaillée l’affichent ; les anciennes publications restent compatibles avec un emplacement neutre tant qu’elles n’ont pas été republiées par leur propriétaire.
 - Compatibilité : un client Revit 2025 voit les familles 2023, 2024 et 2025 ; les versions ultérieures sont exclues. Le paramètre API `revitVersion` est un maximum inclusif, avec minimum 2023.
 - Chaque fiche expose `downloadCount`, affiché dans la fenêtre WPF. Incrément atomique lors de la remise d'un fichier par le serveur ; ce n'est ni un nombre d'utilisateurs uniques ni une confirmation de transfert entièrement reçu. Le cache local ne l'incrémente pas. Les compteurs commencent à zéro à l'installation de la migration ; les anciens téléchargements ne sont pas reconstitués.
 - Compilation Debug et Release2024 réussie. Interface native Revit non exercée pendant cette session.
@@ -22,7 +22,7 @@ Identité locale aléatoire de 256 bits par endpoint, protégée par DPAPI dans 
 
 `DELETE /v1/families/{id}` retire uniquement une publication possédée par cette identité : fiche masquée et nouveaux téléchargements bloqués. Les copies déjà téléchargées et transferts commencés restent disponibles. Le fichier reste privé dans R2, sans remboursement des compteurs. Le retrait reste soumis aux quotas.
 
-Migration déployée : `migrations/0003_family_ownership.sql`, à appliquer une seule fois avant le nouveau Worker. 19 tests Node/SQLite passent, couvrant aussi propriété, doublons, retrait et recherche avec origine vide. Test réel `live-test.mjs ownership` : publication 201, retrait tiers refusé 403, retrait propriétaire 204, téléchargement ultérieur 404. Ce test utilise une fixture native distincte et n'est pas répétable avec le même fichier après retrait.
+La migration `migrations/0004_family_previews.sql` doit être appliquée une seule fois avant le Worker avec miniatures. La suite locale compte 21 tests Node/SQLite, couvrant notamment propriété, doublons, retrait, recherche, contrôle PNG et droits d’ajout d’un aperçu.
 
 ## Garde-fous
 
@@ -48,7 +48,7 @@ La vérification expire le **20 octobre 2026 à 00:00 UTC** : le service se ferm
 
 ## Tests
 
-14 tests Node/SQLite réussis : chaque compteur à 1 % et 80 %, huit connexions SQLite concurrentes, absence d'accès R2 après refus, flux trop grand/tronqué ou bloqué (délai de 90 secondes), politique invalide/expirée, crash, doublons, compatibilité des versions et comptage des téléchargements concurrents. Test réel supplémentaire : famille 2024 visible avec le filtre 2025, compteur passé de 0 à 1 après téléchargement vérifié.
+21 tests Node/SQLite réussis : chaque compteur à 1 % et 80 %, huit connexions SQLite concurrentes, absence d'accès R2 après refus, flux trop grand/tronqué ou bloqué (délai de 90 secondes), politique invalide/expirée, crash, doublons, compatibilité des versions, miniatures et comptage des téléchargements concurrents.
 
 Test réel Cloudflare :
 1. Seuil temporaire 1 %, ajout d'une réservation **fictive** de 100 000 000 octets.
@@ -64,9 +64,9 @@ Commande locale : `node --test cloudflare/family-library/test/*.test.js` (Node 2
 
 ## Exploitation
 
-Le schéma est additif et initialise toute nouvelle installation fermée. Le fichier wrangler reste fermé par défaut pour prévenir une ouverture involontaire. `build-api-deployment.mjs --enabled` produit une requête MCP Cloudflare multipart sans credentials ; il n'envoie rien lui-même. Le verrou D1 est indépendant.
+Le schéma est additif. L’adresse publique `workers.dev` est activée dans `wrangler.jsonc`, tandis que l’accès métier reste contrôlé par `LIBRARY_ENABLED` et par le verrou D1. `build-api-deployment.mjs --enabled` produit une requête MCP Cloudflare multipart sans credentials ; il n'envoie rien lui-même.
 
-Installation existante : vérifier `PRAGMA table_info(shared_families)` puis appliquer `migrations/0002-download-count.sql` une seule fois si la colonne manque, avant le déploiement du Worker. Le schéma neuf contient déjà cette colonne.
+Installation existante : vérifier `PRAGMA table_info(shared_families)`, appliquer les migrations manquantes dans l’ordre et notamment `migrations/0004_family_previews.sql` avant le déploiement du Worker. Le schéma neuf contient déjà toutes les colonnes.
 
 Fermeture immédiate : `UPDATE quota_policy SET enabled=0 WHERE id=1;`. Pour couper aussi les lectures D1, redéployer avec `LIBRARY_ENABLED=false` ou désactiver workers.dev.
 

@@ -18,12 +18,29 @@ namespace BIMaestro.Welcome
         public string Email => EmailBox?.Text?.Trim();
         public string FirstName => FirstNameBox?.Text?.Trim();
         public string LastName => LastNameBox?.Text?.Trim();
+        private readonly bool communityProfileRequired;
 
-        public WelcomeWindow()
+        public WelcomeWindow() : this(false, null) { }
+
+        internal WelcomeWindow(bool communityProfileRequired, WelcomeState existing)
         {
+            this.communityProfileRequired = communityProfileRequired;
             ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
             LogoImage.Source = LoadBitmapFromResource("BIMaestro.png");
+            if (existing != null) { EmailBox.Text = existing.Email ?? ""; FirstNameBox.Text = existing.FirstName ?? ""; LastNameBox.Text = existing.LastName ?? ""; }
+            if (communityProfileRequired)
+            {
+                Title = "BIMaestro — Profil de la bibliothèque commune";
+                HeadingText.Text = "Bibliothèque commune"; HeadingSubtitleText.Text = "Identifiez votre profil avant un échange de famille.";
+                IntroTitleText.Text = "Complétez votre profil";
+                IntroText.Text = "Le nom, le prénom et l’e-mail sont demandés avant de publier ou télécharger une famille.";
+                TrustTitleText.Text = "Pourquoi ces informations ?";
+                TrustDetailsText.Text = "Elles permettent de reconnaître votre profil. Une identité technique protégée reste conservée sur cet ordinateur afin que vous puissiez ensuite modifier la couverture ou retirer vos propres familles.";
+                EmailLabel.Text = "Votre e-mail (obligatoire)"; FirstNameLabel.Text = "Prénom (obligatoire)"; LastNameLabel.Text = "Nom (obligatoire)";
+                PrivacyText.Text = "Ces informations sont enregistrées dans votre profil BIMaestro. Vous pourrez les modifier depuis Options.";
+                NoThanksButton.Content = "Annuler"; LaterButton.Visibility = Visibility.Collapsed; PrimaryButton.Content = "Enregistrer et continuer";
+            }
         }
 
         private void Contact_Click(object sender, RoutedEventArgs e)
@@ -45,6 +62,11 @@ namespace BIMaestro.Welcome
 
         private void OptIn_Click(object sender, RoutedEventArgs e)
         {
+            if (communityProfileRequired && (string.IsNullOrWhiteSpace(FirstName) || string.IsNullOrWhiteSpace(LastName)))
+            {
+                MessageBox.Show(this, "Indiquez votre prénom et votre nom pour continuer avec la bibliothèque commune.", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
             if (string.IsNullOrWhiteSpace(Email))
             {
                 MessageBox.Show(this, UiLanguage.T("Indique un email, ou clique sur “Plus tard” si tu préfères passer.", "Enter an email, or click “Later” if you prefer to skip."),

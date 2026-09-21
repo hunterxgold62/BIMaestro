@@ -3,6 +3,7 @@ using System;
 using System.Diagnostics;
 using System.Threading;
 using System.Windows.Interop;
+using System.Windows;
 
 namespace BIMaestro.Welcome
 {
@@ -128,6 +129,43 @@ namespace BIMaestro.Welcome
             }
 
             TryUpsertProfileNoThrow();
+        }
+        public static bool EnsureCommunityProfile(Window owner)
+        {
+            WelcomeState existing;
+            lock (_sync)
+            {
+                _state ??= WelcomeStorage.LoadOrCreate();
+                existing = _state;
+                if (HasCompleteCommunityProfile(existing)) return true;
+            }
+
+            var window = new WelcomeWindow(true, existing) { Owner = owner };
+            window.ShowDialog();
+            if (window.ResultAction != WelcomeResultAction.OptIn) return false;
+
+            lock (_sync)
+            {
+                _state ??= WelcomeStorage.LoadOrCreate();
+                _state.Email = NormalizeValue(window.Email); _state.FirstName = NormalizeValue(window.FirstName); _state.LastName = NormalizeValue(window.LastName);
+                _state.EmailOptIn = true; _state.OptInUtc ??= DateTime.UtcNow; _state.ProfilePending = true; _state.WelcomeShown = true;
+                WelcomeStorage.Save(_state);
+            }
+            TryUpsertProfileNoThrow();
+            return true;
+        }
+
+        private static bool HasCompleteCommunityProfile(WelcomeState state) =>
+            state != null && !string.IsNullOrWhiteSpace(state.Email) && !string.IsNullOrWhiteSpace(state.FirstName) && !string.IsNullOrWhiteSpace(state.LastName);
+
+        internal static string GetCommunityCreatorName()
+        {
+            lock (_sync)
+            {
+                _state ??= WelcomeStorage.LoadOrCreate();
+                if (!HasCompleteCommunityProfile(_state)) return null;
+                return (_state.FirstName.Trim() + " " + _state.LastName.Trim()).Trim();
+            }
         }
         private static void ArmTimer()
         {
