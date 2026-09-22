@@ -7,6 +7,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Threading;
+using System.Globalization;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -19,6 +23,9 @@ namespace BIMaestro.Codex
     {
         private readonly CodexRevitBridge bridge;
         private CodexClient client;
+        private ClaudeClient claudeClient;
+        private CancellationTokenSource claudeCancellation;
+        private bool claudeLoginStarted;
         private string threadId, turnId;
         private bool ready, busy, connecting, closed;
         private int activeRevitCalls;
@@ -34,6 +41,7 @@ namespace BIMaestro.Codex
         private readonly TextBox input = new TextBox { AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, Height = 64, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Padding = new Thickness(8), MaxLength = 24000 };
         private readonly TextBlock status = new TextBlock { Text = "Non connecté", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 8) };
         private readonly ComboBox models = new ComboBox { MinWidth = 180, DisplayMemberPath = "Label", Margin = new Thickness(0, 0, 8, 0) };
+        private readonly ComboBox provider = new ComboBox { MinWidth = 180, ItemsSource = new[] { "Codex (ChatGPT)", "Claude (Claude Code)" }, SelectedIndex = 0 };
         private readonly ComboBox effort = new ComboBox { MinWidth = 90 };
         private readonly CheckBox context = new CheckBox { Content = "Autoriser la lecture de la sélection et de sa géométrie", Margin = new Thickness(0, 8, 12, 8), ToolTip = "Sur demande : 20 éléments sélectionnés, 30 paramètres par élément, positions, encombrements et contours des sols ; types de murs disponibles. Dans une famille, jusqu'à 150 paramètres avec valeurs, formules, GUID partagés et 64 noms de types, et description d'une famille BIMaestro. Pas de lecture complète du modèle ni de capture d'écran." };
         private readonly CheckBox changes = new CheckBox { Content = "Autoriser les créations et modifications dans Revit", Margin = new Thickness(0, 0, 0, 8), ToolTip = "Peut créer et valider des familles, les charger, modifier la famille ouverte, créer des murs ou des murailles sur les sols sélectionnés et des volumes libres DirectShape dans le projet. Le projet ouvert n'est jamais enregistré automatiquement." };
@@ -51,6 +59,8 @@ namespace BIMaestro.Codex
         private readonly Button community = Button("Bibliothèque commune");
         private readonly Button shareArtifact = Button("Partager le RFA");
         private bool publishing;
+        private string lastLibraryCheck;
+        private bool checkingLibrary;
         private readonly TextBlock documentLabel = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 8) };
 
         private async Task ShareFamilyAsync(CodexFamilyArtifact artifact)
@@ -70,7 +80,7 @@ namespace BIMaestro.Codex
         {
             this.bridge = bridge;
             bridge.CreationProgress += message => { if (!closed) status.Text = message; };
-            Title = "BIMaestro — Codex (bêta)";
+            Title = "BIMaestro — Famille IA (bêta)";
             Width = 720; Height = 900; MinWidth = 640; MinHeight = 720;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             Resources.MergedDictionaries.Add(theme ?? new ResourceDictionary { Source = new Uri("/BIMaestro;component/Themes/BIMaestroTheme.xaml", UriKind.Relative) });
@@ -122,7 +132,7 @@ namespace BIMaestro.Codex
                     <Trigger Property='IsEnabled' Value='False'><Setter Property='Opacity' Value='0.55'/></Trigger>
                   </ControlTemplate.Triggers>
                 </ControlTemplate>")));
-            models.Style = effort.Style = pickerStyle;
+            models.Style = effort.Style = provider.Style = pickerStyle;
             var pickerItem = new Style(typeof(ComboBoxItem));
             pickerItem.Setters.Add(new Setter(PaddingProperty, new Thickness(10, 6, 10, 6)));
             pickerItem.Setters.Add(new Setter(TemplateProperty, (ControlTemplate)XamlReader.Parse(@"
@@ -133,7 +143,7 @@ namespace BIMaestro.Codex
                     <Trigger Property='IsSelected' Value='True'><Setter TargetName='bd' Property='Background' Value='{DynamicResource Brand}'/><Setter Property='Foreground' Value='{DynamicResource Surface}'/></Trigger>
                   </ControlTemplate.Triggers>
                 </ControlTemplate>")));
-            models.ItemContainerStyle = effort.ItemContainerStyle = pickerItem;
+            models.ItemContainerStyle = effort.ItemContainerStyle = provider.ItemContainerStyle = pickerItem;
             var permissionStyle = new Style(typeof(CheckBox), (Style)FindResource(typeof(CheckBox)));
             permissionStyle.Setters.Add(new Setter(TemplateProperty, (ControlTemplate)XamlReader.Parse(@"
                 <ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='CheckBox'>
@@ -164,7 +174,7 @@ namespace BIMaestro.Codex
             var brandLabel = Text("BIMaestro  /  OUTILS IA", "Hint");
             brandLabel.SetResourceReference(TextBlock.ForegroundProperty, "Surface"); brandLabel.Opacity = 0.8;
             heading.Children.Add(brandLabel);
-            heading.Children.Add(Text("Codex dans Revit", "H1"));
+            heading.Children.Add(Text("Famille IA", "H1"));
             documentLabel.Text = "Document : " + bridge.DocumentTitle;
             documentLabel.SetResourceReference(TextBlock.ForegroundProperty, "Surface"); documentLabel.Opacity = 0.9;
             documentLabel.Margin = new Thickness(0, 6, 0, 0); heading.Children.Add(documentLabel);
@@ -172,6 +182,9 @@ namespace BIMaestro.Codex
             header.SetResourceReference(Border.BackgroundProperty, "Brand"); DockPanel.SetDock(header, Dock.Top); layout.Children.Add(header);
 
             var session = new StackPanel();
+            var providerRow = new DockPanel();
+            var providerLabel = Text("Assistant", "Label"); DockPanel.SetDock(providerLabel, Dock.Left);
+            providerRow.Children.Add(providerLabel); providerRow.Children.Add(provider); session.Children.Add(providerRow);
             var authRow = new WrapPanel(); authRow.Children.Add(connect); authRow.Children.Add(disconnect);
             accountDetails.Content = authRow;
             var accountRow = new DockPanel { Margin = new Thickness(0, 0, 0, 8) };
@@ -185,6 +198,19 @@ namespace BIMaestro.Codex
             models.Margin = new Thickness(0, 0, 12, 0); effort.Margin = new Thickness(0);
             Grid.SetColumn(effortField, 1); modelRow.Children.Add(modelField); modelRow.Children.Add(effortField); session.Children.Add(modelRow);
             top.Children.Add(Card(session));
+            provider.SelectionChanged += (_, __) =>
+            {
+                bool useClaude = provider.SelectedIndex == 1;
+                accountDetails.Header = useClaude ? "Compte Claude" : "Compte ChatGPT";
+                connect.Content = useClaude ? "Connexion Claude" : "Connexion ChatGPT";
+                disconnect.Content = useClaude ? "Fermer la session" : "Déconnexion";
+                executable.Text = useClaude ? ClaudeClient.FindExecutable() ?? "" : CodexClient.FindExecutable() ?? "";
+                models.ItemsSource = useClaude ? new[] { new ModelChoice("sonnet", "Claude Sonnet"), new ModelChoice("opus", "Claude Opus"), new ModelChoice("haiku", "Claude Haiku") } : null;
+                if (useClaude) models.SelectedIndex = 0;
+                effort.Visibility = useClaude ? Visibility.Collapsed : Visibility.Visible;
+                status.Text = "Non connecté";
+                UpdateControls();
+            };
 
             var settings = new StackPanel();
             foreach (var permission in new[] { context, changes, direct })
@@ -195,13 +221,13 @@ namespace BIMaestro.Codex
             }
             settings.Children.Add(Text("Lecture et modifications désactivées par défaut. Le mode direct s'applique uniquement à la discussion en cours.", "Hint"));
             var installation = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
-            installation.Children.Add(Text("Codex officiel (codex.exe)", "Label"));
+            installation.Children.Add(Text("Exécutable officiel du fournisseur (codex.exe ou claude.exe)", "Label"));
             var pathRow = new DockPanel();
             executable.Margin = new Thickness(0, 5, 8, 5);
             DockPanel.SetDock(browse, Dock.Right); pathRow.Children.Add(browse); pathRow.Children.Add(executable); installation.Children.Add(pathRow);
             executable.Text = CodexClient.FindExecutable() ?? "";
             installation.Children.Add(nativeTests);
-            settings.Children.Add(new Expander { Header = "Installation Codex", Content = installation, Margin = new Thickness(0, 10, 0, 0) });
+            settings.Children.Add(new Expander { Header = "Installation de l'assistant", Content = installation, Margin = new Thickness(0, 10, 0, 0) });
             settings.Margin = new Thickness(0, 8, 0, 0);
             permissions.Content = settings;
             top.Children.Add(Card(permissions, new Thickness(16, 10, 16, 10)));
@@ -214,7 +240,7 @@ namespace BIMaestro.Codex
             bottom.Children.Add(input);
             bottom.Children.Add(attachmentPanel);
             var artifacts = new WrapPanel(); artifacts.Children.Add(showArtifact); artifacts.Children.Add(openArtifact); artifacts.Children.Add(shareArtifact); artifacts.Children.Add(community); bottom.Children.Add(artifacts);
-            community.Click += (_, __) => new CodexCommunityWindow(bridge) { Owner = this }.Show();
+            community.Click += (_, __) => new CodexCommunityWindow(bridge, null, UseCommunityFamilyAsBase) { Owner = this }.Show();
             shareArtifact.Click += async (_, __) => await ShareFamilyAsync(lastArtifact);
             attach.Content = "Joindre"; attach.ToolTip = "Joindre une image de référence"; attach.MinWidth = 88;
             pasteImage.Content = "Coller"; pasteImage.ToolTip = "Coller une image du presse-papiers"; pasteImage.MinWidth = 88;
@@ -223,7 +249,7 @@ namespace BIMaestro.Codex
             bottom.Children.Add(Text("Ctrl+Entrée : envoyer · Fermer termine cette discussion.", "Hint"));
             var conversation = new DockPanel();
             var conversationTitle = Text("Discussion", "H2"); DockPanel.SetDock(conversationTitle, Dock.Top); conversation.Children.Add(conversationTitle);
-            var privacy = Text("Compte ChatGPT requis · usage Codex de votre abonnement. Messages, images et contexte autorisé envoyés à OpenAI.", "Hint");
+            var privacy = Text("Compte ChatGPT ou Claude Code requis selon l'assistant choisi. Messages et contexte autorisé envoyés au fournisseur choisi.", "Hint");
             privacy.Margin = new Thickness(0, 8, 0, 0); DockPanel.SetDock(privacy, Dock.Bottom); conversation.Children.Add(privacy);
             conversation.Children.Add(transcript);
             // Keep the composer and conversation reachable at the minimum window size.
@@ -236,11 +262,13 @@ namespace BIMaestro.Codex
             middle.Children.Add(settingsScroll);
             var discussionCard = Card(conversation); discussionCard.Margin = new Thickness(0); Grid.SetRow(discussionCard, 1); middle.Children.Add(discussionCard);
             layout.Children.Add(middle);
-            Append("BIMaestro", "Décrivez l'objet à créer ou joignez jusqu'à trois images. Précisez son usage et les dimensions connues.\n\nPour une famille paramétrique, indiquez ce qui doit varier : dimensions, espacement, nombre d'éléments, matériaux… Si un point important manque, Codex vous posera quelques questions avant la création.\n\nSelon le besoin : géométrie détaillée, extrusions rectangulaires contraintes ou réseaux d'éléments répétés. Le résultat est enregistré dans un nouveau RFA avec ses aperçus. Inclinaison paramétrique disponible pour les éléments rectangulaires en réseau, de 0 à 180 degrés. Connecteurs MEP disponibles sur des faces identifiées.");
+            Append("BIMaestro", "Décrivez l'objet à créer et précisez son usage et les dimensions connues. Vous pouvez joindre jusqu'à trois images avec Codex.\n\nPour une famille paramétrique, indiquez ce qui doit varier : dimensions, espacement, nombre d'éléments, matériaux… Si un point important manque, l'assistant vous posera quelques questions avant la création.\n\nSelon le besoin : géométrie détaillée, extrusions rectangulaires contraintes ou réseaux d'éléments répétés. Le résultat est enregistré dans un nouveau RFA avec ses aperçus. Inclinaison paramétrique disponible pour les éléments rectangulaires en réseau, de 0 à 180 degrés. Connecteurs MEP disponibles sur des faces identifiées.");
 
             browse.Click += (_, __) =>
             {
-                var dialog = new OpenFileDialog { Title = "Choisir l'exécutable officiel Codex", Filter = "Codex|codex.exe", CheckFileExists = true };
+                var dialog = provider.SelectedIndex == 1
+                    ? new OpenFileDialog { Title = "Choisir l'exécutable officiel Claude Code", Filter = "Claude Code|claude.exe", CheckFileExists = true }
+                    : new OpenFileDialog { Title = "Choisir l'exécutable officiel Codex", Filter = "Codex|codex.exe", CheckFileExists = true };
                 if (dialog.ShowDialog(this) == true) executable.Text = dialog.FileName;
             };
             attach.Click += (_, __) =>
@@ -291,7 +319,7 @@ namespace BIMaestro.Codex
             disconnect.Click += async (_, __) => await LogoutAsync();
             send.Click += async (_, __) => await SendAsync();
             stop.Click += async (_, __) => await StopAsync();
-            reset.Click += (_, __) => { threadId = null; turnId = null; SelectPreferredModel(); direct.IsChecked = false; attachments.Clear(); RefreshAttachments(); transcript.Clear(); Append("BIMaestro", "Nouvelle discussion. Les modifications déjà faites dans Revit et les fichiers créés sont conservés."); };
+            reset.Click += (_, __) => { threadId = null; turnId = null; claudeClient?.NewDiscussion(); SelectPreferredModel(); direct.IsChecked = false; attachments.Clear(); RefreshAttachments(); transcript.Clear(); Append("BIMaestro", "Nouvelle discussion. Les modifications déjà faites dans Revit et les fichiers créés sont conservés."); };
             input.PreviewKeyDown += async (_, e) =>
             {
                 if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Control) { e.Handled = true; await SendAsync(); }
@@ -312,7 +340,7 @@ namespace BIMaestro.Codex
             context.IsChecked = true;
             changes.IsChecked = true;
             direct.IsChecked = true;
-            Closed += (_, __) => { closed = true; bridge.Dispose(); client?.Dispose(); };
+            Closed += (_, __) => { closed = true; claudeCancellation?.Cancel(); claudeClient?.Dispose(); bridge.Dispose(); client?.Dispose(); };
             UpdateControls();
         }
 
@@ -349,12 +377,13 @@ namespace BIMaestro.Codex
         private void UpdateControls()
         {
             nativeTests.IsEnabled = !busy && !connecting && changes.IsChecked == true;
-            send.IsEnabled = ready && !busy && !connecting && models.SelectedItem != null;
+            send.IsEnabled = ready && !busy && !connecting && !checkingLibrary && models.SelectedItem != null;
             stop.IsEnabled = busy;
             connect.IsEnabled = !connecting && !busy;
-            disconnect.IsEnabled = client != null && !connecting && !busy;
+            disconnect.IsEnabled = (client != null || claudeClient != null) && !connecting && !busy;
             reset.IsEnabled = !busy && !connecting;
-            browse.IsEnabled = executable.IsEnabled = client == null && !connecting;
+            browse.IsEnabled = executable.IsEnabled = client == null && claudeClient == null && !connecting;
+            provider.IsEnabled = client == null && claudeClient == null && !connecting && !busy;
             models.IsEnabled = effort.IsEnabled = ready && !busy;
             context.IsEnabled = !busy;
             changes.IsEnabled = context.IsChecked == true && !busy;
@@ -386,6 +415,7 @@ namespace BIMaestro.Codex
         private async Task ConnectAsync()
         {
             if (connecting || busy) return;
+            if (provider.SelectedIndex == 1) { await ConnectClaudeAsync(); return; }
             connecting = true; UpdateControls();
             try
             {
@@ -417,6 +447,86 @@ namespace BIMaestro.Codex
             finally { connecting = false; UpdateControls(); }
         }
 
+        private async Task ConnectClaudeAsync()
+        {
+            connecting = true; UpdateControls();
+            try
+            {
+                if (claudeClient == null) claudeClient = new ClaudeClient(executable.Text.Trim());
+                if (await claudeClient.IsAuthenticatedAsync())
+                {
+                    claudeLoginStarted = false;
+                    ready = true; status.Text = "Connecté avec Claude Code";
+                    connect.Content = "Vérifier connexion";
+                    accountDetails.IsExpanded = false;
+                }
+                else
+                {
+                    if (!claudeLoginStarted) { claudeClient.StartLogin(); claudeLoginStarted = true; }
+                    status.Text = "Terminez la connexion Claude dans la fenêtre ouverte, puis cliquez sur « Vérifier connexion ».";
+                    connect.Content = "Vérifier connexion";
+                }
+            }
+            catch (Exception ex)
+            {
+                claudeClient?.Dispose(); claudeClient = null; claudeLoginStarted = false; ready = false; Error(ex);
+            }
+            finally { connecting = false; UpdateControls(); }
+        }
+
+        private async Task SendClaudeAsync()
+        {
+            if (!ready || busy || claudeClient == null || !(models.SelectedItem is ModelChoice model) || string.IsNullOrWhiteSpace(input.Text)) return;
+            if (attachments.Count > 0)
+            {
+                Error(new InvalidOperationException("Les images jointes ne sont pas encore prises en charge avec Claude Code dans ce panneau."));
+                return;
+            }
+            string request = input.Text.Trim();
+            busy = true; claudeCancellation = new CancellationTokenSource(); UpdateControls();
+            Append("Vous", request); input.Clear();
+            try
+            {
+                await claudeClient.AskAsync(request, model.Id,
+                    async (tool, args) =>
+                    {
+                        activeRevitCalls++; status.Text = "Opération Revit en attente…";
+                        try
+                        {
+                            object result = await bridge.CallAsync(tool, args);
+                            documentLabel.Text = "Document : " + bridge.DocumentTitle;
+                            if (result is CodexFamilyArtifact artifact)
+                            {
+                                if (artifact.FilePath != null) lastArtifact = artifact;
+                                string report = JsonConvert.SerializeObject(artifact.Report);
+                                Append(artifact.FilePath == null ? "Validation de la famille" : "Famille enregistrée", report);
+                                UpdateControls(); return report;
+                            }
+                            string data = JsonConvert.SerializeObject(result);
+                            Append("Revit", data); return data;
+                        }
+                        catch (Exception ex)
+                        {
+                            string detail = ex is TaskCanceledException ? "Opération annulée." : ex.Message;
+                            string diagnostic = ex is TaskCanceledException ? null : CodexDiagnostics.RecordFailure(tool, args, ex);
+                            Append("Échec · " + tool, detail);
+                            return JsonConvert.SerializeObject(new { error = detail, diagnostic_file = diagnostic,
+                                instruction = "Expliquer l'erreur exacte. Un refus utilisateur ne doit pas être contourné." });
+                        }
+                        finally { activeRevitCalls--; }
+                    },
+                    message => Append("Claude", message), claudeCancellation.Token);
+                status.Text = "Prêt";
+            }
+            catch (OperationCanceledException) { status.Text = "Réponse arrêtée"; }
+            catch (Exception ex) { Error(ex); }
+            finally
+            {
+                claudeCancellation?.Dispose(); claudeCancellation = null;
+                busy = activeRevitCalls > 0; UpdateControls();
+            }
+        }
+
         private async Task<bool> RefreshAccountAsync()
         {
             var activeClient = client;
@@ -443,6 +553,13 @@ namespace BIMaestro.Codex
 
         private async Task SendAsync()
         {
+            if (!ready || busy || connecting || checkingLibrary || string.IsNullOrWhiteSpace(input.Text)) return;
+            checkingLibrary = true; UpdateControls();
+            bool proceed;
+            try { proceed = await CheckLibraryBeforeCreationAsync(input.Text.Trim()); }
+            finally { checkingLibrary = false; UpdateControls(); }
+            if (!proceed) return;
+            if (provider.SelectedIndex == 1) { await SendClaudeAsync(); return; }
             if (!ready || busy || connecting || !(models.SelectedItem is ModelChoice model) || string.IsNullOrWhiteSpace(input.Text)) return;
             if (attachments.Count > 0 && !model.SupportsImages) { Error(new InvalidOperationException("Ce modèle n'accepte pas d'images. Choisissez un modèle avec vision ou retirez les images.")); return; }
             string text = input.Text.Trim();
@@ -517,6 +634,83 @@ namespace BIMaestro.Codex
                 if (busy) { turnId = (string)response["turn"]?["id"]; status.Text = "Codex travaille…"; }
             }
             catch (Exception ex) { DisconnectLocal(); Error(ex); }
+        }
+
+        private static readonly HashSet<string> LibraryStopWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "avec", "dans", "pour", "une", "des", "les", "sur", "qui", "famille", "revit", "creer", "cree", "faire", "voudrais", "veux", "besoin", "ajouter", "parametres", "parametrique", "dimensions", "type", "types"
+        };
+
+        private static string[] LibraryTerms(string value)
+        {
+            string decomposed = (value ?? "").ToLowerInvariant().Normalize(NormalizationForm.FormD);
+            var plain = new StringBuilder(decomposed.Length);
+            foreach (char character in decomposed)
+                if (CharUnicodeInfo.GetUnicodeCategory(character) != UnicodeCategory.NonSpacingMark)
+                    plain.Append(char.IsLetterOrDigit(character) ? character : ' ');
+            return Regex.Split(plain.ToString(), @"\s+").Where(term => term.Length >= 4 && !LibraryStopWords.Contains(term)).Distinct().ToArray();
+        }
+
+        private async Task<bool> CheckLibraryBeforeCreationAsync(string request)
+        {
+            if (request == lastLibraryCheck || threadId != null ||
+                !Regex.IsMatch(request, @"\b(cr[ée]e?r?|construire|fabriquer|g[ée]n[ée]rer)\b", RegexOptions.IgnoreCase) ||
+                !Regex.IsMatch(request, @"\bfamille\b", RegexOptions.IgnoreCase)) return true;
+            lastLibraryCheck = request;
+            var terms = LibraryTerms(request);
+            if (terms.Length == 0) return true;
+            try
+            {
+                status.Text = "Recherche de familles proches dans la bibliothèque…";
+                JObject best = null; int bestScore = 0;
+                using (var service = new CodexCommunityLibrary())
+                {
+                    string cursor = null;
+                    // The service scans a bounded page. Follow its cursor so a growing catalogue is searched too.
+                    do
+                    {
+                        var page = await service.Search("", bridge.RevitVersion, cursor);
+                        foreach (JObject item in page["items"] as JArray ?? new JArray())
+                        {
+                            var nameTerms = new HashSet<string>(LibraryTerms((string)item["name"]));
+                            var detailTerms = new HashSet<string>(LibraryTerms((string)item["description"]));
+                            int score = terms.Sum(term => nameTerms.Contains(term) ? 3 : detailTerms.Contains(term) ? 1 : 0);
+                            if (score > bestScore) { best = item; bestScore = score; }
+                        }
+                        cursor = (string)page["nextCursor"];
+                    } while (!string.IsNullOrEmpty(cursor));
+                }
+                status.Text = "Prêt";
+                if (best == null || bestScore < 3) return true;
+                string name = (string)best["name"] ?? "Famille";
+                var choice = MessageBox.Show(this,
+                    "Une famille de la bibliothèque pourrait correspondre à votre demande :\n\n« " + name + " » · " + CommunityStyle.Category((string)best["category"]) +
+                    "\n\nOui : consulter la bibliothèque\nNon : poursuivre la création\nAnnuler : conserver la demande sans l'envoyer",
+                    "Famille existante à vérifier", MessageBoxButton.YesNoCancel, MessageBoxImage.Information, MessageBoxResult.Yes);
+                if (choice == MessageBoxResult.Yes)
+                {
+                    new CodexCommunityWindow(bridge, name, UseCommunityFamilyAsBase) { Owner = this }.Show();
+                    return false;
+                }
+                return choice == MessageBoxResult.No;
+            }
+            catch (Exception ex)
+            {
+                status.Text = "Bibliothèque indisponible · création possible";
+                Append("Bibliothèque commune", "Vérification impossible : " + ex.Message);
+                return true;
+            }
+        }
+
+        private void UseCommunityFamilyAsBase(JObject item)
+        {
+            string original = input.Text.Trim();
+            input.Text = "La famille communautaire « " + ((string)item["name"] ?? "Famille") + " » est maintenant ouverte comme copie dans l'éditeur Revit. " +
+                "Lis ses paramètres et ses types réels avec revit_family_parameters et inspecte la famille avant toute modification. " +
+                "Propose les valeurs adaptées à ma demande, signale celles qui manquent, puis modifie uniquement les paramètres existants que j'ai demandés :\n" + original;
+            documentLabel.Text = "Document : " + bridge.DocumentTitle;
+            Append("Bibliothèque commune", "Copie de « " + (string)item["name"] + " » ouverte dans Revit. Vérifiez la demande préparée avant de l'envoyer.");
+            input.Focus();
         }
 
         private void SelectPreferredModel()
@@ -646,6 +840,11 @@ namespace BIMaestro.Codex
         private async Task StopAsync()
         {
             bridge.CancelPending();
+            if (claudeClient != null)
+            {
+                claudeCancellation?.Cancel(); claudeClient.Stop();
+                busy = false; status.Text = "Réponse arrêtée"; UpdateControls(); return;
+            }
             try
             {
                 if (turnId != null) await client.RequestAsync("turn/interrupt", new { threadId, turnId });
@@ -655,6 +854,13 @@ namespace BIMaestro.Codex
         }
         private async Task LogoutAsync()
         {
+            if (claudeClient != null)
+            {
+                claudeCancellation?.Cancel(); claudeClient.Dispose(); claudeClient = null;
+                claudeLoginStarted = false;
+                ready = false; busy = false; status.Text = "Déconnecté du panneau";
+                connect.Content = "Connexion Claude"; UpdateControls(); return;
+            }
             try { if (client != null) await client.RequestAsync("account/logout", new { }); }
             catch (Exception ex) { Error(ex); }
             finally { DisconnectLocal(); }
@@ -692,6 +898,10 @@ namespace BIMaestro.Codex
             public string DefaultEffort { get; }
             public bool IsDefault { get; }
             public bool SupportsImages { get; }
+            internal ModelChoice(string id, string label)
+            {
+                Id = id; Label = label; Efforts = new string[0]; SupportsImages = false;
+            }
             internal ModelChoice(JToken value)
             {
                 Id = (string)value["model"]; Label = (string)value["displayName"] ?? Id;

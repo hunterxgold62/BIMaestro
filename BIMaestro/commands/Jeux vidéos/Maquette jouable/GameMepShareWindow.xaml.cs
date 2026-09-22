@@ -10,6 +10,7 @@ namespace BIMaestro.VideoGames
 {
     public partial class GameMepShareWindow : Window
     {
+        private const string TemporaryExportPassword = "Pl1234";
         private readonly GameSceneData _scene;
         private GameMepShareState _state;
         private GameSceneData? _lighterScene;
@@ -139,6 +140,14 @@ namespace BIMaestro.VideoGames
 
         private async void PublishButton_Click(object sender, RoutedEventArgs e)
         {
+            if (!string.Equals(ExportPasswordBox.Password, TemporaryExportPassword,
+                    StringComparison.Ordinal))
+            {
+                StatusText.Text = "Mot de passe d’export incorrect.";
+                ExportPasswordBox.Clear();
+                ExportPasswordBox.Focus();
+                return;
+            }
             if (string.IsNullOrWhiteSpace(PublicationNameTextBox.Text))
             {
                 StatusText.Text = "Donnez un nom à la publication.";
@@ -219,6 +228,7 @@ namespace BIMaestro.VideoGames
             LightenButton.IsEnabled = !busy && !_analyzing && _lighterSize < _originalSize;
             PublishButton.IsEnabled = !busy;
             PublicationNameTextBox.IsEnabled = !busy;
+            ExportPasswordBox.IsEnabled = !busy;
         }
 
         private void CopyViewerButton_Click(object sender, RoutedEventArgs e) =>

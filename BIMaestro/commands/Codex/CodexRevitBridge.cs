@@ -178,6 +178,37 @@ namespace BIMaestro.Codex
             catch (Exception ex) { pending.TrySetException(ex); pending = null; operation = null; }
             return task;
         }
+        internal Task<object> OpenCommunityFamilyAsync(string path)
+        {
+            if (disposed) throw new ObjectDisposedException(nameof(CodexRevitBridge));
+            if (pending != null) throw new InvalidOperationException("Une opération Revit est déjà en attente.");
+            string source = Path.GetFullPath(path);
+            if (!source.StartsWith(Path.GetFullPath(CodexCommunityLibrary.CacheRoot) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) || !File.Exists(source))
+                throw new InvalidOperationException("Le RFA téléchargé n'est plus disponible.");
+            string folder = Path.Combine(CodexClient.DataDirectory, "CommunityWorking");
+            Directory.CreateDirectory(folder);
+            string copy = Path.Combine(folder, Path.GetFileNameWithoutExtension(source) + "_" + Guid.NewGuid().ToString("N").Substring(0, 8) + ".rfa");
+            File.Copy(source, copy);
+            pending = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var task = pending.Task;
+            operation = app =>
+            {
+                var opened = app.OpenAndActivateDocument(copy);
+                if (opened?.Document == null || !opened.Document.IsFamilyDocument)
+                    throw new InvalidOperationException("Revit n'a pas ouvert une famille modifiable.");
+                document = opened.Document;
+                DocumentTitle = document.Title;
+                return new { opened = true, file = copy, document = DocumentTitle };
+            };
+            try
+            {
+                var request = externalEvent.Raise();
+                if (request != ExternalEventRequest.Accepted && request != ExternalEventRequest.Pending)
+                    throw new InvalidOperationException("Revit est occupé. Réessayez après fermeture de la boîte de dialogue active.");
+            }
+            catch (Exception ex) { pending.TrySetException(ex); pending = null; operation = null; }
+            return task;
+        }
         internal void AttachEvent(ExternalEvent value) { externalEvent = value; }
         public string GetName() => "BIMaestro — opérations Codex validées";
 

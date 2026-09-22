@@ -16,6 +16,10 @@
             <Setter Property="Background" Value="#FF132229"/><Setter Property="Foreground" Value="White"/>
             <Setter Property="BorderBrush" Value="#FF34515A"/><Setter Property="Padding" Value="9"/>
         </Style>
+        <Style TargetType="PasswordBox">
+            <Setter Property="Background" Value="#FF132229"/><Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#FF34515A"/><Setter Property="Padding" Value="9"/>
+        </Style>
     </Window.Resources>
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
     <Grid Margin="26">
@@ -33,6 +37,8 @@
         <StackPanel Grid.Row="1" Margin="0,22,0,0">
             <TextBlock Text="Nom de la publication" FontSize="11" Foreground="#FFAFC0C6" Margin="0,0,0,6"/>
             <TextBox x:Name="PublicationNameTextBox" MaxLength="120"/>
+            <TextBlock Text="Mot de passe d’export" FontSize="11" Foreground="#FFAFC0C6" Margin="0,12,0,6"/>
+            <PasswordBox x:Name="ExportPasswordBox" MaxLength="64" PasswordChar="●"/>
         </StackPanel>
         <Grid Grid.Row="2" Margin="0,18,0,0">
             <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>

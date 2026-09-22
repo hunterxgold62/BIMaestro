@@ -132,7 +132,7 @@ public class AppUI : IExternalApplication
             {
                 new RibbonItemDefinition("CodexChat", "Famille IA", panel => AddSplitButton(panel, "CodexChat", "Famille IA", assemblyPath, new List<(string, string, string, string, string)>
                 {
-                    ("CodexChat", "Famille IA", "BIMaestro.Codex.CodexCommand", "Famille IA.png", "Crée et modifie des familles Revit avec l’IA depuis votre compte ChatGPT. Lecture du contexte sur demande ; modifications après validation. Bêta."),
+                    ("CodexChat", "Famille IA", "BIMaestro.Codex.CodexCommand", "Famille IA.png", "Crée et modifie des familles Revit avec Codex ou Claude Code. Lecture du contexte et modifications selon les autorisations du panneau. Bêta."),
                     ("CommunityFamilies", "Bibliothèque\ncommune", "BIMaestro.Codex.CodexCommunityCommand", "Famille.png", "Parcourt les familles partagées par catégorie, consulte les téléchargements et partage vos familles personnelles ou IA. Retirez vos propres publications depuis Mes publications.")
                 })),
                 new RibbonItemDefinition("IAQuickTools", "Outils IA rapides", panel => AddStackedPushButtons(

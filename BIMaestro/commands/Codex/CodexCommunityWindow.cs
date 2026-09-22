@@ -40,6 +40,7 @@ namespace BIMaestro.Codex
     internal sealed class CodexCommunityWindow : Window
     {
         private readonly CodexRevitBridge bridge;
+        private readonly Action<JObject> useAsBase;
         private readonly TextBox query = new TextBox { MaxLength = 120, MinWidth = 180, Margin = new Thickness(0, 0, 8, 0) };
         private readonly ListBox categories = new ListBox { DisplayMemberPath = "Value", SelectedValuePath = "Key", BorderThickness = new Thickness(0) };
         private readonly ObservableCollection<KeyValuePair<string, string>> categoryItems = new ObservableCollection<KeyValuePair<string, string>>(CommunityStyle.Categories);
@@ -48,14 +49,15 @@ namespace BIMaestro.Codex
         private readonly WrapPanel cards = new WrapPanel { Width = 642, ItemWidth = 214, HorizontalAlignment = HorizontalAlignment.Center };
         private readonly StackPanel details = new StackPanel();
         private readonly TextBlock status = CommunityStyle.Text("Recherchez ou parcourez les familles de la communauté.");
-        private readonly Button search = CommunityStyle.Button("Rechercher", true), more = CommunityStyle.Button("Afficher la suite"), share = CommunityStyle.Button("Partager une famille…"), download = CommunityStyle.Button("Télécharger le RFA"), load = CommunityStyle.Button("Charger dans le projet", true), remove = CommunityStyle.Button("Retirer ma publication"), changeCover = CommunityStyle.Button("Modifier la photo de couverture…"), editDetails = CommunityStyle.Button("Modifier les informations…"), newVersion = CommunityStyle.Button("Publier une nouvelle version…"), history = CommunityStyle.Button("Historique des versions…");
+        private readonly Button search = CommunityStyle.Button("Rechercher", true), more = CommunityStyle.Button("Afficher la suite"), share = CommunityStyle.Button("Partager une famille…"), download = CommunityStyle.Button("Télécharger le RFA"), load = CommunityStyle.Button("Charger dans le projet", true), openAsBase = CommunityStyle.Button("Utiliser comme base dans Famille IA"), remove = CommunityStyle.Button("Retirer ma publication"), changeCover = CommunityStyle.Button("Modifier la photo de couverture…"), editDetails = CommunityStyle.Button("Modifier les informations…"), newVersion = CommunityStyle.Button("Publier une nouvelle version…"), history = CommunityStyle.Button("Historique des versions…");
         private string cursor, activeQuery = "", activeCategory = "", activeOrigin = "";
         private bool activeMine, busy, initialized;
         private JObject selected;
         private int count;
-        internal CodexCommunityWindow(CodexRevitBridge bridge)
+        internal CodexCommunityWindow(CodexRevitBridge bridge, string initialQuery = null, Action<JObject> useAsBase = null)
         {
-            this.bridge = bridge; CommunityStyle.Apply(this);
+            this.bridge = bridge; this.useAsBase = useAsBase; CommunityStyle.Apply(this);
+            if (!string.IsNullOrWhiteSpace(initialQuery)) query.Text = initialQuery;
             Title = "BIMaestro — Bibliothèque commune"; Width = 1280; Height = 820; MinWidth = 1180; MinHeight = 680;
             var root = new DockPanel { Margin = new Thickness(18) }; Content = root;
             var heading = new DockPanel { Margin = new Thickness(4, 2, 4, 10) }; DockPanel.SetDock(share, Dock.Right); heading.Children.Add(share);
@@ -74,6 +76,7 @@ namespace BIMaestro.Codex
             mine.Checked += async (_, __) => { if (initialized) await Refresh(); }; mine.Unchecked += async (_, __) => { if (initialized) await Refresh(); };
             more.Click += async (_, __) => await Run(() => Search(false));
             download.Click += async (_, __) => await Run(() => Download(false)); load.Click += async (_, __) => await Run(() => Download(true));
+            openAsBase.Click += async (_, __) => await Run(OpenAsBase);
             remove.Click += async (_, __) => await Run(Remove);
             changeCover.Click += async (_, __) => await Run(ChangeCover);
             editDetails.Click += async (_, __) => await Run(EditDetails);
@@ -99,6 +102,7 @@ namespace BIMaestro.Codex
         {
             search.IsEnabled = share.IsEnabled = query.IsEnabled = categories.IsEnabled = origin.IsEnabled = mine.IsEnabled = !busy;
             more.IsEnabled = !busy && !string.IsNullOrEmpty(cursor); download.IsEnabled = load.IsEnabled = !busy && selected != null; remove.IsEnabled = !busy && selected?.Value<bool?>("isOwner") == true;
+            openAsBase.IsEnabled = !busy && selected != null && useAsBase != null;
             changeCover.IsEnabled = !busy && selected?.Value<bool?>("isOwner") == true;
             editDetails.IsEnabled = newVersion.IsEnabled = !busy && selected?.Value<bool?>("isOwner") == true; history.IsEnabled = !busy && selected != null;
         }
@@ -139,7 +143,7 @@ namespace BIMaestro.Codex
             details.Children.Add(CommunityStyle.Text(CommunityStyle.Origin((string)item["origin"]))); details.Children.Add(CommunityStyle.Text("Version d'origine : Revit " + item["revitVersion"]));
             details.Children.Add(CommunityStyle.Text("Révision " + (item.Value<int?>("revisionNumber") ?? 1)));
             if (!string.IsNullOrWhiteSpace((string)item["changeNote"])) details.Children.Add(CommunityStyle.Text("Modifications : " + (string)item["changeNote"], 11));
-            details.Children.Add(CommunityStyle.Text((string)item["description"] ?? "Aucune description.")); details.Children.Add(load); details.Children.Add(download);
+            details.Children.Add(CommunityStyle.Text((string)item["description"] ?? "Aucune description.")); if (useAsBase != null) details.Children.Add(openAsBase); details.Children.Add(load); details.Children.Add(download);
             details.Children.Add(history);
             if (item.Value<bool?>("isOwner") == true) { details.Children.Add(editDetails); details.Children.Add(newVersion); details.Children.Add(changeCover); details.Children.Add(remove); }
             SetControls();
@@ -167,6 +171,19 @@ namespace BIMaestro.Codex
             if (MessageBox.Show(this, "Retirer « " + (string)selected["name"] + " » de la bibliothèque commune ?\nLes copies déjà téléchargées resteront sur les ordinateurs de leurs utilisateurs.", "Retirer ma publication", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) { status.Text = "Retrait annulé."; return; }
             using (var service = new CodexCommunityLibrary()) await service.Remove((string)selected["id"]);
             cursor = null; await Search(true); status.Text = "Publication retirée de la bibliothèque.";
+        }
+        private async Task OpenAsBase()
+        {
+            if (selected == null || useAsBase == null) return;
+            if (!BIMaestro.Welcome.WelcomeManager.EnsureCommunityProfile(this)) { status.Text = "Ouverture annulée : profil non renseigné."; return; }
+            using (var service = new CodexCommunityLibrary())
+            {
+                string path = await service.Download(selected);
+                await bridge.OpenCommunityFamilyAsync(path);
+            }
+            useAsBase(selected);
+            status.Text = "Copie de la famille ouverte dans Revit. Vérifiez les paramètres avant toute modification.";
+            Close();
         }
         private async Task ChangeCover()
         {
