@@ -64,33 +64,39 @@ namespace BIMaestro.Codex
         private readonly ObservableCollection<KeyValuePair<string, string>> categoryItems = new ObservableCollection<KeyValuePair<string, string>>();
         private readonly ComboBox origin = new ComboBox { MinWidth = 130, Margin = new Thickness(0, 0, 12, 0) };
         private readonly CheckBox mine = new CheckBox { Content = "Mes publications", VerticalAlignment = VerticalAlignment.Center };
-        private readonly WrapPanel cards = new WrapPanel { Width = 690, ItemWidth = 220, HorizontalAlignment = HorizontalAlignment.Center };
+        private readonly WrapPanel cards = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Center };
+        private readonly Dictionary<Button, FrameworkElement> galleryPreviews = new Dictionary<Button, FrameworkElement>();
         private readonly StackPanel details = new StackPanel();
         private readonly TextBlock status = CommunityStyle.Text("Recherchez ou parcourez les familles de la communauté.");
         private readonly Button search = CommunityStyle.Button("Rechercher", true), more = CommunityStyle.Button("Afficher la suite"), share = CommunityStyle.Button("Partager une famille…"), download = CommunityStyle.Button("Télécharger le RFA"), load = CommunityStyle.Button("Charger dans le projet", true), openAsBase = CommunityStyle.Button("Utiliser comme base dans Famille IA"), remove = CommunityStyle.Button("Retirer ma publication"), changeCover = CommunityStyle.Button("Modifier la photo de couverture…"), editDetails = CommunityStyle.Button("Modifier les informations…"), newVersion = CommunityStyle.Button("Publier une nouvelle version…"), history = CommunityStyle.Button("Historique des versions…");
         private string cursor, activeQuery = "", activeCategory = "", activeOrigin = "";
         private bool activeMine, busy, initialized;
         private JObject selected;
+        private Border selectedCard;
+        private double galleryWidth;
         private int count;
         internal CodexCommunityWindow(CodexRevitBridge bridge, string initialQuery = null, Action<JObject> useAsBase = null)
         {
             this.bridge = bridge; this.useAsBase = useAsBase; CommunityStyle.Apply(this);
             if (!string.IsNullOrWhiteSpace(initialQuery)) query.Text = initialQuery;
-            Title = "BIMaestro — Bibliothèque commune"; Width = 1500; Height = 880; MinWidth = 1400; MinHeight = 760;
+            Title = "BIMaestro — Bibliothèque commune"; Width = 1500; Height = 880; MinWidth = 1100; MinHeight = 700;
             var root = new DockPanel { Margin = new Thickness(18) }; Content = root;
             var heading = new DockPanel { Margin = new Thickness(4, 2, 4, 10) }; DockPanel.SetDock(share, Dock.Right); heading.Children.Add(share);
             var titles = new StackPanel(); var title = CommunityStyle.Text("Bibliothèque commune", 28); title.FontWeight = FontWeights.SemiBold; titles.Children.Add(title); var subtitle = CommunityStyle.Text(CommunityStyle.L("Découvrez, partagez et mettez à jour les familles de la communauté · Revit 2023 à ") + bridge.RevitVersion); subtitle.Opacity = 0.72; titles.Children.Add(subtitle); heading.Children.Add(titles); DockPanel.SetDock(heading, Dock.Top); root.Children.Add(heading);
             var filters = new DockPanel { Margin = new Thickness(0, 4, 0, 12) }; query.ToolTip = "Rechercher par nom ou description"; DockPanel.SetDock(search, Dock.Right); filters.Children.Add(search);
             var options = new StackPanel { Orientation = Orientation.Horizontal }; origin.Items.Add(CommunityStyle.L("Toutes les origines")); origin.Items.Add(CommunityStyle.L("Personnelles")); origin.Items.Add(CommunityStyle.L("Créées avec IA")); origin.SelectedIndex = 0; options.Children.Add(origin); options.Children.Add(mine); DockPanel.SetDock(options, Dock.Right); filters.Children.Add(options); filters.Children.Add(query);
             var filterCard = CommunityStyle.Card(filters); filterCard.Padding = new Thickness(14, 9, 6, 9); filterCard.Margin = new Thickness(0, 0, 0, 12); DockPanel.SetDock(filterCard, Dock.Top); root.Children.Add(filterCard); status.Margin = new Thickness(6, 8, 0, 0); status.Opacity = 0.72; DockPanel.SetDock(status, Dock.Bottom); root.Children.Add(status);
-            var columns = new Grid(); columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(250) }); columns.ColumnDefinitions.Add(new ColumnDefinition()); columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(330) }); root.Children.Add(columns);
+            var columns = new Grid(); columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(230) }); columns.ColumnDefinitions.Add(new ColumnDefinition()); columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(350) }); root.Children.Add(columns);
             var side = new DockPanel(); var catTitle = CommunityStyle.Text("CATÉGORIES", 12); DockPanel.SetDock(catTitle, Dock.Top); side.Children.Add(catTitle); side.Children.Add(categories);
             foreach (var entry in CommunityStyle.Categories) categoryItems.Add(new KeyValuePair<string, string>(entry.Key, CommunityStyle.L(entry.Value)));
             var categoryText = new FrameworkElementFactory(typeof(TextBlock)); categoryText.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding("Value")); categoryText.SetValue(TextBlock.TextWrappingProperty, TextWrapping.Wrap);
             categories.ItemTemplate = new DataTemplate { VisualTree = categoryText };
             ScrollViewer.SetHorizontalScrollBarVisibility(categories, ScrollBarVisibility.Disabled);
             categories.ItemsSource = categoryItems; categories.SelectedIndex = 0; var sideCard = CommunityStyle.Card(side); sideCard.Padding = new Thickness(12); columns.Children.Add(sideCard);
-            var center = new DockPanel(); DockPanel.SetDock(more, Dock.Bottom); center.Children.Add(more); center.Children.Add(new ScrollViewer { Content = cards, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }); Grid.SetColumn(center, 1); columns.Children.Add(center);
+            var center = new DockPanel(); DockPanel.SetDock(more, Dock.Bottom); center.Children.Add(more);
+            var galleryScroll = new ScrollViewer { Content = cards, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+            galleryScroll.SizeChanged += (_, e) => ResizeGallery(e.NewSize.Width);
+            center.Children.Add(galleryScroll); Grid.SetColumn(center, 1); columns.Children.Add(center);
             var right = CommunityStyle.Card(new ScrollViewer { Content = details, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }); right.Margin = new Thickness(8, 0, 0, 12); Grid.SetColumn(right, 2); columns.Children.Add(right); Select(null);
             search.Click += async (_, __) => await Refresh(); query.KeyDown += async (_, e) => { if (e.Key == Key.Enter) await Refresh(); };
             categories.SelectionChanged += async (_, __) => { if (initialized) await Refresh(); };
@@ -128,12 +134,26 @@ namespace BIMaestro.Codex
             changeCover.IsEnabled = !busy && selected?.Value<bool?>("isOwner") == true;
             editDetails.IsEnabled = newVersion.IsEnabled = !busy && selected?.Value<bool?>("isOwner") == true; history.IsEnabled = !busy && selected != null;
         }
+        private void ResizeGallery(double viewportWidth)
+        {
+            if (viewportWidth < 1) return;
+            galleryWidth = Math.Max(210, viewportWidth - 20);
+            int columns = galleryWidth >= 1040 ? 4 : galleryWidth >= 650 ? 3 : galleryWidth >= 430 ? 2 : 1;
+            double itemWidth = galleryWidth / columns;
+            cards.Width = galleryWidth;
+            cards.ItemWidth = itemWidth;
+            foreach (var entry in galleryPreviews)
+            {
+                entry.Key.Width = itemWidth - 12;
+                entry.Value.Height = Math.Max(170, Math.Min(270, itemWidth * 0.82));
+            }
+        }
         private async Task Search(bool clear)
         {
             using (var service = new CodexCommunityLibrary())
             {
                 var page = await service.Search(activeQuery, bridge.RevitVersion, cursor, activeCategory, activeOrigin, activeMine);
-                if (clear) { cards.Children.Clear(); count = 0; Select(null); }
+                if (clear) { cards.Children.Clear(); galleryPreviews.Clear(); count = 0; Select(null); }
                 foreach (JObject item in page["items"] as JArray ?? new JArray())
                 {
                     string categoryKey = (string)item["category"];
@@ -144,26 +164,38 @@ namespace BIMaestro.Codex
                     }
                     var previewUri = service.PreviewUri(item);
                     if (previewUri != null) item["previewUrl"] = previewUri.AbsoluteUri;
-                    var body = new StackPanel { Width = 174, MinHeight = 286 }; body.Children.Add(CreatePreview(item, 174, 126)); var badge = CommunityStyle.Text(CommunityStyle.Origin((string)item["origin"]).ToUpperInvariant(), 10); badge.FontWeight = FontWeights.SemiBold; badge.Opacity = 0.72; body.Children.Add(badge);
-                    var familyName = CommunityStyle.Text((string)item["name"], 16); familyName.FontWeight = FontWeights.SemiBold; familyName.MaxHeight = 48; body.Children.Add(familyName); body.Children.Add(CommunityStyle.Text(CommunityStyle.Category((string)item["category"]), 12));
-                    body.Children.Add(CommunityStyle.Text(CommunityStyle.L("Créateur : ") + ((string)item["creatorName"] ?? CommunityStyle.L("Non renseigné")), 11));
-                    body.Children.Add(CommunityStyle.Text("Revit " + item["revitVersion"] + "  ·  " + ((item.Value<long?>("sizeBytes") ?? 0) / 1000000d).ToString("0.0") + CommunityStyle.L(" Mo")));
-                    body.Children.Add(CommunityStyle.Text((item.Value<long?>("downloadCount") ?? 0).ToString("N0") + CommunityStyle.L(" téléchargement(s)") + (item.Value<bool?>("isOwner") == true ? CommunityStyle.L(" · à vous") : ""), 11));
-                    var card = CommunityStyle.Card(body); card.Padding = new Thickness(12); card.Margin = new Thickness(5, 0, 5, 12); var button = new Button { Width = 214, Content = card, Background = Brushes.Transparent, BorderThickness = new Thickness(0), Padding = new Thickness(0), HorizontalContentAlignment = HorizontalAlignment.Center, ToolTip = (string)item["description"] };
-                    button.Click += (_, __) => Select(item); cards.Children.Add(button); count++;
+                    var body = new StackPanel();
+                    var preview = CreatePreview(item, double.NaN, 215);
+                    preview.Margin = new Thickness(0);
+                    body.Children.Add(preview);
+                    var caption = new Border { Padding = new Thickness(12, 9, 12, 11) };
+                    var familyName = CommunityStyle.Text((string)item["name"], 15);
+                    familyName.FontWeight = FontWeights.SemiBold; familyName.Margin = new Thickness(0); familyName.MaxHeight = 44;
+                    caption.Child = familyName; body.Children.Add(caption);
+                    var card = CommunityStyle.Card(body); card.Padding = new Thickness(0); card.Margin = new Thickness(6, 0, 6, 14); card.ClipToBounds = true;
+                    var button = new Button { Content = card, Background = Brushes.Transparent, BorderThickness = new Thickness(0), Padding = new Thickness(0), HorizontalContentAlignment = HorizontalAlignment.Stretch, ToolTip = (string)item["name"] };
+                    button.Click += (_, __) => Select(item, card);
+                    galleryPreviews.Add(button, preview); cards.Children.Add(button); count++;
                 }
+                ResizeGallery(galleryWidth > 0 ? galleryWidth + 20 : 800);
                 cursor = (string)page["nextCursor"]; status.Text = count + CommunityStyle.L(" famille(s) affichée(s).") + (count == 0 ? CommunityStyle.L(" Aucune famille dans cette sélection.") : "") + (!string.IsNullOrEmpty(cursor) ? CommunityStyle.L(" D'autres résultats peuvent être disponibles avec « Afficher la suite ».") : "");
             }
         }
-        private void Select(JObject item)
+        private void Select(JObject item, Border card = null)
         {
+            if (selectedCard != null) { selectedCard.BorderThickness = new Thickness(1); selectedCard.SetResourceReference(Border.BorderBrushProperty, "Border"); }
+            selectedCard = card;
+            if (selectedCard != null) { selectedCard.BorderThickness = new Thickness(2); selectedCard.SetResourceReference(Border.BorderBrushProperty, "Brand"); }
             selected = item; details.Children.Clear(); details.Children.Add(CommunityStyle.Text("DÉTAILS", 12));
             if (item == null) { details.Children.Add(CommunityStyle.Text("Sélectionnez une famille pour consulter sa fiche et la charger dans votre projet.")); SetControls(); return; }
-            details.Children.Add(CommunityStyle.Text((string)item["name"], 21)); details.Children.Add(CommunityStyle.Text(CommunityStyle.Category((string)item["category"])));
-            details.Children.Add(CreatePreview(item, 225, 210));
+            var name = CommunityStyle.Text((string)item["name"], 21); name.FontWeight = FontWeights.SemiBold; details.Children.Add(name);
+            details.Children.Add(CreatePreview(item, double.NaN, 230));
+            details.Children.Add(CommunityStyle.Text(CommunityStyle.Category((string)item["category"])));
+            details.Children.Add(CommunityStyle.Text(CommunityStyle.Origin((string)item["origin"])));
             details.Children.Add(CommunityStyle.Text(CommunityStyle.L("Créateur : ") + ((string)item["creatorName"] ?? CommunityStyle.L("Non renseigné"))));
-            details.Children.Add(CommunityStyle.Text(CommunityStyle.Origin((string)item["origin"]))); details.Children.Add(CommunityStyle.Text(CommunityStyle.L("Version d'origine : Revit ") + item["revitVersion"]));
-            details.Children.Add(CommunityStyle.Text(CommunityStyle.L("Révision ") + (item.Value<int?>("revisionNumber") ?? 1)));
+            details.Children.Add(CommunityStyle.Text(CommunityStyle.L("Version d'origine : Revit ") + item["revitVersion"]));
+            details.Children.Add(CommunityStyle.Text(CommunityStyle.L("Révision ") + (item.Value<int?>("revisionNumber") ?? 1) + "  ·  " + ((item.Value<long?>("sizeBytes") ?? 0) / 1000000d).ToString("0.0") + CommunityStyle.L(" Mo")));
+            details.Children.Add(CommunityStyle.Text((item.Value<long?>("downloadCount") ?? 0).ToString("N0") + CommunityStyle.L(" téléchargement(s)")));
             if (!string.IsNullOrWhiteSpace((string)item["changeNote"])) details.Children.Add(CommunityStyle.Text(CommunityStyle.L("Modifications : ") + (string)item["changeNote"], 11));
             details.Children.Add(CommunityStyle.Text((string)item["description"] ?? "Aucune description.")); if (useAsBase != null) details.Children.Add(openAsBase); details.Children.Add(load); details.Children.Add(download);
             details.Children.Add(history);
@@ -172,11 +204,11 @@ namespace BIMaestro.Codex
         }
         private static FrameworkElement CreatePreview(JObject item, double width, double height)
         {
-            var preview = new Grid { Width = width, Height = height, Margin = new Thickness(0, 0, 0, 10) };
+            var preview = new Grid { Width = width, Height = height, Margin = new Thickness(0, 0, 0, 10), Background = new SolidColorBrush(Color.FromRgb(249, 250, 251)) };
             var fallback = CommunityStyle.Text("APERÇU\nNON DISPONIBLE", 12); fallback.TextAlignment = TextAlignment.Center; fallback.VerticalAlignment = VerticalAlignment.Center; fallback.Opacity = 0.55; preview.Children.Add(fallback);
             if (Uri.TryCreate((string)item?["previewUrl"], UriKind.Absolute, out var uri))
             {
-                var bitmap = new BitmapImage(); bitmap.BeginInit(); bitmap.UriSource = uri; bitmap.DecodePixelWidth = (int)(width * 2); bitmap.CacheOption = BitmapCacheOption.OnDemand; bitmap.EndInit();
+                var bitmap = new BitmapImage(); bitmap.BeginInit(); bitmap.UriSource = uri; bitmap.DecodePixelWidth = (int)(double.IsNaN(width) ? 640 : width * 2); bitmap.CacheOption = BitmapCacheOption.OnDemand; bitmap.EndInit();
                 preview.Children.Add(new Image { Source = bitmap, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center });
             }
             return preview;
@@ -269,7 +301,7 @@ namespace BIMaestro.Codex
             if (!CommunityStyle.Categories.ContainsKey(categoryKey)) category.Items.Add(new KeyValuePair<string, string>(categoryKey, categoryKey));
             category.SelectedValue = categoryKey; panel.Children.Add(category);
             panel.Children.Add(CommunityStyle.Text("Origine")); origin.Items.Add(CommunityStyle.L("Famille IA")); origin.Items.Add(CommunityStyle.L("Famille personnelle")); origin.SelectedIndex = source == "personal" ? 1 : 0; panel.Children.Add(origin);
-            panel.Children.Add(CommunityStyle.Text("Photo de couverture")); coverName.Text = string.IsNullOrEmpty(coverPath) ? "Aucun aperçu automatique — choisissez une image." : "Aperçu Revit automatique"; panel.Children.Add(coverName); panel.Children.Add(chooseCover);
+            panel.Children.Add(CommunityStyle.Text("Photo de couverture")); coverName.Text = string.IsNullOrEmpty(coverPath) ? "Aucune vignette trouvée — choisissez une image." : "Vignette du fichier sélectionné"; panel.Children.Add(coverName); panel.Children.Add(chooseCover);
             panel.Children.Add(CommunityStyle.Text("Description")); description.Text = (string)replaces?["description"] ?? ""; panel.Children.Add(description); if (replaces != null) { panel.Children.Add(CommunityStyle.Text("Résumé des modifications")); panel.Children.Add(changeNote); } panel.Children.Add(consent);
             panel.Children.Add(CommunityStyle.Text("Sans compte : le droit de retrait est conservé dans ce profil Windows. Il ne sera pas disponible depuis un autre ordinateur ou après la perte de cette identité locale.", 11)); panel.Children.Add(publish); panel.Children.Add(status);
             chooseCover.Click += (_, __) => ChooseCover(); publish.Click += async (_, __) => await Publish(); Closing += (_, e) => { if (sending) { e.Cancel = true; return; } try { if (!string.IsNullOrEmpty(generatedPreviewPath) && File.Exists(generatedPreviewPath)) File.Delete(generatedPreviewPath); } catch { } };
@@ -279,7 +311,23 @@ namespace BIMaestro.Codex
             if (!BIMaestro.Welcome.WelcomeManager.EnsureCommunityProfile(owner)) return false;
             if (string.IsNullOrEmpty(filePath)) { var picker = new OpenFileDialog { Filter = "Famille Revit (*.rfa)|*.rfa", CheckFileExists = true, Multiselect = false }; if (picker.ShowDialog(owner) != true) return false; filePath = picker.FileName; }
             var metadata = await bridge.InspectCommunityFamilyAsync(filePath);
+            metadata["previewPath"] = await Task.Run(() => CreateShellPreview(filePath));
             var dialog = new CodexCommunityPublishWindow(metadata, origin, replaces) { Owner = owner }; dialog.ShowDialog(); return dialog.published;
+        }
+        private static string CreateShellPreview(string filePath)
+        {
+            try
+            {
+                if (!Famille.ShellThumbnailProvider.TryGetThumbnail(filePath, 512, out var thumbnail)) return null;
+                string folder = Path.Combine(CodexClient.DataDirectory, "CommunityPreviewDrafts");
+                Directory.CreateDirectory(folder);
+                string previewPath = Path.Combine(folder, Guid.NewGuid().ToString("N") + ".png");
+                var encoder = new PngBitmapEncoder();
+                encoder.Frames.Add(BitmapFrame.Create(thumbnail));
+                using (var stream = File.Create(previewPath)) encoder.Save(stream);
+                return previewPath;
+            }
+            catch { return null; }
         }
         private async Task Publish()
         {

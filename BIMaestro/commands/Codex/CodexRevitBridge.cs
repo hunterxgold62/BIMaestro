@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.IO;
 using System.Threading.Tasks;
-using System.Drawing.Imaging;
 
 namespace BIMaestro.Codex
 {
@@ -61,25 +60,12 @@ namespace BIMaestro.Codex
                 if (!versionMatch.Success || !int.TryParse(app.Application.VersionNumber, out int currentVersion) ||
                     int.Parse(versionMatch.Value) > currentVersion || int.Parse(versionMatch.Value) < 2023)
                     throw new InvalidOperationException("La famille doit être enregistrée entre Revit 2023 et votre version de Revit.");
-                Document family = app.Application.Documents.Cast<Document>().FirstOrDefault(d =>
-                    !string.IsNullOrEmpty(d.PathName) && string.Equals(d.PathName, fullPath, StringComparison.OrdinalIgnoreCase));
-                bool openedHere = family == null;
-                try
+                return new JObject
                 {
-                    if (openedHere) family = app.Application.OpenDocumentFile(fullPath);
-                    if (family == null || !family.IsFamilyDocument)
-                        throw new InvalidOperationException("Ce fichier n'est pas une famille Revit.");
-                    string previewPath = CreateCommunityPreview(family);
-                    return new JObject
-                    {
-                        ["filePath"] = fullPath,
-                        ["name"] = Path.GetFileNameWithoutExtension(fullPath),
-                        ["category"] = family.OwnerFamily.FamilyCategory?.Name ?? "Modèles génériques",
-                        ["revitVersion"] = versionMatch.Value,
-                        ["previewPath"] = previewPath
-                    };
-                }
-                finally { if (openedHere && family != null && family.IsValidObject) family.Close(false); }
+                    ["filePath"] = fullPath,
+                    ["name"] = Path.GetFileNameWithoutExtension(fullPath),
+                    ["revitVersion"] = versionMatch.Value
+                };
             };
             try
             {
@@ -89,65 +75,6 @@ namespace BIMaestro.Codex
             }
             catch (Exception ex) { completion.TrySetException(ex); pending = null; operation = null; }
             return (JObject)await completion.Task;
-        }
-        private static string CreateCommunityPreview(Document family)
-        {
-            string previewFolder = Path.Combine(CodexClient.DataDirectory, "CommunityPreviewDrafts");
-            Directory.CreateDirectory(previewFolder);
-            string key = Guid.NewGuid().ToString("N");
-            try
-            {
-                var symbol = new FilteredElementCollector(family).OfClass(typeof(FamilySymbol)).Cast<FamilySymbol>().FirstOrDefault();
-                if (symbol != null)
-                {
-                    using (var bitmap = symbol.GetPreviewImage(new System.Drawing.Size(512, 512)))
-                    {
-                        if (bitmap != null)
-                        {
-                            string nativePath = Path.Combine(previewFolder, key + ".png");
-                            bitmap.Save(nativePath, ImageFormat.Png);
-                            return nativePath;
-                        }
-                    }
-                }
-            }
-            catch { }
-
-            try
-            {
-                View view = null;
-                try
-                {
-                    var settings = family.GetDocumentPreviewSettings();
-                    if (settings?.PreviewViewId != null && settings.PreviewViewId != ElementId.InvalidElementId)
-                        view = family.GetElement(settings.PreviewViewId) as View;
-                }
-                catch { }
-                if (view == null || view.IsTemplate || !view.CanBePrinted)
-                    view = new FilteredElementCollector(family).OfClass(typeof(View3D)).Cast<View3D>()
-                        .FirstOrDefault(candidate => !candidate.IsTemplate && candidate.CanBePrinted);
-                if (view == null)
-                    view = new FilteredElementCollector(family).OfClass(typeof(View)).Cast<View>()
-                        .FirstOrDefault(candidate => !candidate.IsTemplate && candidate.CanBePrinted && candidate.ViewType != ViewType.DrawingSheet);
-                if (view == null) return null;
-
-                string exportBase = Path.Combine(previewFolder, key);
-                var options = new ImageExportOptions
-                {
-                    ExportRange = ExportRange.SetOfViews,
-                    FilePath = exportBase,
-                    FitDirection = FitDirectionType.Horizontal,
-                    HLRandWFViewsFileType = ImageFileType.PNG,
-                    ImageResolution = ImageResolution.DPI_150,
-                    PixelSize = 512,
-                    ShadowViewsFileType = ImageFileType.PNG,
-                    ZoomType = ZoomFitType.FitToPage
-                };
-                options.SetViewsAndSheets(new List<ElementId> { view.Id });
-                family.ExportImage(options);
-                return Directory.EnumerateFiles(previewFolder, key + "*.png").OrderByDescending(File.GetLastWriteTimeUtc).FirstOrDefault();
-            }
-            catch { return null; }
         }
         // Dedicated UI operation; deliberately absent from the AI tool catalogue.
         internal Task<object> LoadCommunityFamilyAsync(string path)

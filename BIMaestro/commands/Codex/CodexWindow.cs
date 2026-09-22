@@ -55,6 +55,10 @@ namespace BIMaestro.Codex
         private readonly Button reset = Button("Nouvelle discussion");
         private readonly CheckBox separateMode = new CheckBox { Content = "Nouvelle famille dans un Revit séparé", IsChecked = true, Margin = new Thickness(0, 6, 0, 6) };
         private bool separateRevitStarting;
+        private CodexDedicatedRevitClient dedicatedClient, pendingDedicatedClient;
+        private Process dedicatedProcess;
+        private bool IsRemoteTarget => separateMode.IsChecked == true && dedicatedClient != null;
+        private bool IsDedicatedTarget => bridge.DedicatedSession || IsRemoteTarget;
         private readonly Button browse = Button("Parcourir…");
         private readonly Button claudeInstall = Button("Installer Claude Code");
         private readonly Button attach = Button("Joindre une image");
@@ -68,28 +72,67 @@ namespace BIMaestro.Codex
         private bool checkingLibrary;
         private readonly TextBlock documentLabel = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 8) };
 
-        private void LaunchSeparateRevit()
+        private async Task<bool> LaunchSeparateRevitAsync()
         {
-            if (separateRevitStarting) return;
+            if (separateRevitStarting) return false;
+            separateRevitStarting = true; UpdateControls();
             try
             {
-                string executablePath = Process.GetCurrentProcess().MainModule.FileName;
-                if (!string.Equals(Path.GetFileName(executablePath), "Revit.exe", StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidOperationException("Impossible de retrouver l'exécutable de cette version de Revit.");
-                var launch = new ProcessStartInfo(executablePath) {
-                    UseShellExecute = false, WorkingDirectory = Path.GetDirectoryName(executablePath)
-                };
-                launch.EnvironmentVariables["BIMAESTRO_FAMILY_DEDICATED"] = "1";
-                launch.EnvironmentVariables["BIMAESTRO_FAMILY_REQUEST"] = input.Text;
-                launch.EnvironmentVariables["BIMAESTRO_FAMILY_PROVIDER"] = provider.SelectedIndex.ToString(CultureInfo.InvariantCulture);
-                using (var process = Process.Start(launch))
-                    if (process == null) throw new InvalidOperationException("Revit n'a pas démarré.");
-                separateRevitStarting = true;
-                status.Text = "Une seconde session de Revit démarre avec Famille IA. Votre projet reste ouvert ici.";
-                UpdateControls();
+                if (dedicatedProcess == null || dedicatedProcess.HasExited)
+                {
+                    dedicatedProcess?.Dispose();
+                    string executablePath = Process.GetCurrentProcess().MainModule.FileName;
+                    if (!string.Equals(Path.GetFileName(executablePath), "Revit.exe", StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidOperationException("Impossible de retrouver l'exécutable de cette version de Revit.");
+                    string pipeName = "BIMaestro-Family-" + Guid.NewGuid().ToString("N");
+                    string secret = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
+                    var launch = new ProcessStartInfo(executablePath) {
+                        UseShellExecute = false, WorkingDirectory = Path.GetDirectoryName(executablePath)
+                    };
+                    launch.EnvironmentVariables["BIMAESTRO_FAMILY_DEDICATED"] = "1";
+                    launch.EnvironmentVariables["BIMAESTRO_FAMILY_PIPE"] = pipeName;
+                    launch.EnvironmentVariables["BIMAESTRO_FAMILY_SECRET"] = secret;
+                    dedicatedProcess = Process.Start(launch) ?? throw new InvalidOperationException("Revit n'a pas démarré.");
+                    pendingDedicatedClient = new CodexDedicatedRevitClient(pipeName, secret);
+                }
+                status.Text = "Démarrage du Revit séparé et connexion à cette page Famille IA…";
+                await pendingDedicatedClient.WaitReadyAsync(dedicatedProcess);
+                if (closed) return false;
+                dedicatedClient = pendingDedicatedClient;
+                // A thread opened against the project must not silently continue against another Revit.
+                if (threadId != null) { threadId = turnId = null; Append("BIMaestro", "Nouvelle discussion liée au Revit séparé."); }
+                documentLabel.Text = "Document : " + dedicatedClient.DocumentTitle;
+                status.Text = "Revit séparé connecté · discussion conservée dans cette fenêtre.";
+                return true;
             }
-            catch (Exception ex) { Error(ex); }
+            catch (Exception ex) { Error(ex); return false; }
+            finally { separateRevitStarting = false; if (!closed) UpdateControls(); }
         }
+
+        private async Task<object> CallRevitAsync(string tool, JObject args)
+        {
+            if (IsRemoteTarget)
+            {
+                object result = await dedicatedClient.CallAsync(tool, args, bridge.ShareContext, bridge.AllowChanges,
+                    bridge.ApplyDirectly, provider.SelectedIndex == 1);
+                if (result is CodexFamilyArtifact artifact && artifact.FilePath != null)
+                {
+                    try { await dedicatedClient.CallAsync("revit_open_created_family", new JObject(), bridge.ShareContext,
+                        bridge.AllowChanges, bridge.ApplyDirectly, provider.SelectedIndex == 1); }
+                    catch (Exception ex) { Append("Famille enregistrée · ouverture dans le Revit séparé impossible", ex.Message); }
+                }
+                return result;
+            }
+            return await bridge.CallAsync(tool, args);
+        }
+
+        private void CancelRevit(string reason = "annulation demandée")
+        {
+            bridge.CancelPending(reason);
+            if (dedicatedClient != null) _ = dedicatedClient.CancelAsync();
+        }
+
+        private string TargetDocumentTitle => IsRemoteTarget ? dedicatedClient.DocumentTitle : bridge.DocumentTitle;
 
         private async Task ShareFamilyAsync(CodexFamilyArtifact artifact)
         {
@@ -234,10 +277,10 @@ namespace BIMaestro.Codex
             }
             else
             {
-                separateMode.ToolTip = "Coché : une nouvelle session Revit de la même version s'ouvre pour créer une famille. Décoché : travailler dans le document actuel. Les pièces jointes devront être ajoutées dans la nouvelle session.";
+                separateMode.ToolTip = "Coché : cette discussion et ses pièces jointes restent ici ; les opérations Revit s'exécutent dans une nouvelle session de la même version. Décoché : travailler dans le document actuel.";
                 session.Children.Add(separateMode);
-                separateMode.Checked += (_, __) => UpdateControls();
-                separateMode.Unchecked += (_, __) => UpdateControls();
+                separateMode.Checked += (_, __) => ChangeRevitTarget();
+                separateMode.Unchecked += (_, __) => ChangeRevitTarget();
             }
             top.Children.Add(Card(session));
             provider.SelectionChanged += (_, __) =>
@@ -369,8 +412,8 @@ namespace BIMaestro.Codex
                 busy = true; UpdateControls();
                 try
                 {
-                    var result = await bridge.CallAsync("revit_open_created_family", new JObject());
-                    documentLabel.Text = "Document : " + bridge.DocumentTitle;
+                    var result = await CallRevitAsync("revit_open_created_family", new JObject());
+                    documentLabel.Text = "Document : " + TargetDocumentTitle;
                     Append("Revit", JsonConvert.SerializeObject(result));
                 }
                 catch (Exception ex) { Error(ex); }
@@ -406,7 +449,7 @@ namespace BIMaestro.Codex
                 if (Environment.GetEnvironmentVariable("BIMAESTRO_FAMILY_PROVIDER") == "1") provider.SelectedIndex = 1;
                 Environment.SetEnvironmentVariable("BIMAESTRO_FAMILY_PROVIDER", null, EnvironmentVariableTarget.Process);
             }
-            Closed += (_, __) => { closed = true; claudeProgress.Stop(); claudeCancellation?.Cancel(); claudeClient?.Dispose(); bridge.Dispose(); client?.Dispose(); };
+            Closed += (_, __) => { closed = true; claudeProgress.Stop(); claudeCancellation?.Cancel(); CancelRevit(); claudeClient?.Dispose(); bridge.Dispose(); client?.Dispose(); dedicatedProcess?.Dispose(); };
             UpdateControls();
         }
 
@@ -564,14 +607,26 @@ namespace BIMaestro.Codex
                 box.Children.Add(remove); attachmentPanel.Children.Add(box);
             }
         }
+        private void ChangeRevitTarget()
+        {
+            if (threadId != null)
+            {
+                threadId = turnId = null;
+                claudeClient?.NewDiscussion();
+                Append("BIMaestro", "Nouvelle discussion pour le changement de session Revit ; le contenu affiché reste ici.");
+            }
+            documentLabel.Text = "Document : " + TargetDocumentTitle;
+            UpdateControls();
+        }
+
         private void UpdateControls()
         {
             permissions.Header = direct.IsChecked == true ? "Autorisations Revit : application directe" :
                 changes.IsChecked == true ? "Autorisations Revit : confirmation" :
                 context.IsChecked == true ? "Autorisations Revit : lecture seule" : "Autorisations Revit : désactivées";
-            send.IsEnabled = !busy && !connecting && !checkingLibrary &&
-                (!bridge.DedicatedSession && separateMode.IsChecked == true && !separateRevitStarting || ready && models.SelectedItem != null);
-            send.Content = !bridge.DedicatedSession && separateMode.IsChecked == true ? "Ouvrir la session dédiée" : "Envoyer";
+            send.IsEnabled = !busy && !connecting && !checkingLibrary && !separateRevitStarting && ready && models.SelectedItem != null;
+            send.Content = !bridge.DedicatedSession && separateMode.IsChecked == true ? "Envoyer dans le Revit séparé" : "Envoyer";
+            separateMode.IsEnabled = !busy && !connecting && !checkingLibrary && !separateRevitStarting;
             stop.IsEnabled = busy;
             stop.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
             connect.IsEnabled = !connecting && !busy;
@@ -673,8 +728,8 @@ namespace BIMaestro.Codex
                         activeRevitCalls++; status.Text = "Opération Revit en attente…";
                         try
                         {
-                            object result = await bridge.CallAsync(tool, args);
-                            documentLabel.Text = "Document : " + bridge.DocumentTitle;
+                            object result = await CallRevitAsync(tool, args);
+                            documentLabel.Text = "Document : " + TargetDocumentTitle;
                             if (result is CodexFamilyArtifact artifact)
                             {
                                 if (artifact.FilePath != null) lastArtifact = artifact;
@@ -695,7 +750,7 @@ namespace BIMaestro.Codex
                         }
                         finally { activeRevitCalls--; }
                     },
-                    message => Append("Claude", message), claudeCancellation.Token, bridge.DedicatedSession);
+                    message => Append("Claude", message), claudeCancellation.Token, IsDedicatedTarget);
                 status.Text = "Prêt";
             }
             catch (OperationCanceledException) { status.Text = "Réponse arrêtée"; }
@@ -733,12 +788,13 @@ namespace BIMaestro.Codex
 
         private async Task SendAsync()
         {
-            if (!bridge.DedicatedSession && separateMode.IsChecked == true)
-            {
-                if (!busy && !connecting && !string.IsNullOrWhiteSpace(input.Text)) LaunchSeparateRevit();
-                return;
-            }
             if (!ready || busy || connecting || checkingLibrary || string.IsNullOrWhiteSpace(input.Text)) return;
+            if (!bridge.DedicatedSession && separateMode.IsChecked == true &&
+                (dedicatedClient == null || dedicatedProcess == null || dedicatedProcess.HasExited))
+            {
+                if (dedicatedProcess?.HasExited == true) { dedicatedClient = null; pendingDedicatedClient = null; }
+                if (!await LaunchSeparateRevitAsync()) return;
+            }
             checkingLibrary = true; UpdateControls();
             bool proceed;
             try { proceed = await CheckLibraryBeforeCreationAsync(input.Text.Trim()); }
@@ -767,7 +823,7 @@ namespace BIMaestro.Codex
                         sandbox = "read-only", approvalPolicy = "on-request", approvalsReviewer = "user",
                         ephemeral = true, environments = new object[0],
                         dynamicTools = CodexRevitBridge.ToolDefinitions(),
-                        developerInstructions = (bridge.DedicatedSession
+                        developerInstructions = (IsDedicatedTarget
                             ? "Session Revit dédiée à une NOUVELLE famille : aucun document du Revit d'origine n'est accessible. Ne demande pas la sélection, la géométrie ou les paramètres de ce projet. N'utilise pas d'outil de modification de projet. Crée un RFA indépendant avec load_into_project=false et place_at_origin=false ; l'utilisateur pourra le charger ensuite dans son projet. "
                             : "") + "Tu es l'assistant BIMaestro dans Revit. Réponds en français, simplement. " +
                             "Commence toute conception de famille en lisant revit_capabilities. Avant une première description paramétrique, lis revit_family_contract pour obtenir le schéma exact. Après une erreur de format, relis ce contrat et corrige tous les champs concernés ensemble, sans essais successifs au hasard. Base tes annonces sur ce retour, pas sur une limitation mémorisée. " +
@@ -897,7 +953,7 @@ namespace BIMaestro.Codex
             input.Text = "La famille communautaire « " + ((string)item["name"] ?? "Famille") + " » est maintenant ouverte comme copie dans l'éditeur Revit. " +
                 "Lis ses paramètres et ses types réels avec revit_family_parameters et inspecte la famille avant toute modification. " +
                 "Propose les valeurs adaptées à ma demande, signale celles qui manquent, puis modifie uniquement les paramètres existants que j'ai demandés :\n" + original;
-            documentLabel.Text = bridge.DedicatedSession ? "Nouvelle famille · session Revit dédiée" : "Document : " + bridge.DocumentTitle;
+            documentLabel.Text = "Document : " + TargetDocumentTitle;
             Append("Bibliothèque commune", "Copie de « " + (string)item["name"] + " » ouverte dans Revit. Vérifiez la demande préparée avant de l'envoyer.");
             input.Focus();
         }
@@ -944,7 +1000,7 @@ namespace BIMaestro.Codex
                 string completedId = (string)turn?["id"];
                 if (completedId != null && completedId != turnId) return;
                 // A normal model completion does not revoke an already accepted Revit operation.
-                if (state != "completed") bridge.CancelPending("fin du tour Codex : " + state);
+                if (state != "completed") CancelRevit("fin du tour Codex : " + state);
                 turnId = null;
                 busy = activeRevitCalls > 0;
                 status.Text = busy ? "Revit termine l’opération en cours…" : state == "completed" ? "Prêt" : state == "interrupted" ? "Réponse arrêtée" : "La réponse a échoué.";
@@ -971,9 +1027,9 @@ namespace BIMaestro.Codex
                     string tool = (string)data["tool"];
                     activeRevitCalls++; accepted = true;
                     status.Text = "Opération Revit en attente…";
-                    object result = await bridge.CallAsync(tool, args);
+                    object result = await CallRevitAsync(tool, args);
                     if (turnId == null) status.Text = "Opération Revit terminée";
-                    documentLabel.Text = "Document : " + bridge.DocumentTitle;
+                    documentLabel.Text = "Document : " + TargetDocumentTitle;
                     if (result is CodexFamilyArtifact artifact)
                     {
                         if (artifact.FilePath != null)
@@ -1028,7 +1084,7 @@ namespace BIMaestro.Codex
 
         private async Task StopAsync()
         {
-            bridge.CancelPending();
+            CancelRevit();
             if (claudeClient != null)
             {
                 claudeCancellation?.Cancel(); claudeClient.Stop();
@@ -1057,7 +1113,7 @@ namespace BIMaestro.Codex
         private void DisconnectLocal()
         {
             var old = client; client = null; old?.Dispose();
-            bridge.CancelPending(); ready = false; busy = false; threadId = turnId = null;
+            CancelRevit(); ready = false; busy = false; threadId = turnId = null;
             direct.IsChecked = false;
             connect.Content = "Connexion ChatGPT"; status.Text = "Non connecté";
             models.ItemsSource = null; effort.ItemsSource = null; UpdateControls();
@@ -1073,7 +1129,7 @@ namespace BIMaestro.Codex
                 catch (Exception ex)
                 {
                     // A protocol/UI error must not escape into Revit's dispatcher.
-                    bridge.CancelPending(); busy = false; ready = false;
+                    CancelRevit(); busy = false; ready = false;
                     Error(ex); UpdateControls();
                 }
             }));

@@ -1,6 +1,7 @@
 ﻿<Project>
   <ItemGroup>
     <Compile Include="commands\Codex\CodexClient.cs" />
+    <Compile Include="commands\Codex\CodexDedicatedRevitLink.cs" />
     <Compile Include="commands\Codex\ClaudeClient.cs" />
     <Compile Include="commands\Codex\CodexPdfAttachment.cs" />
     <Compile Include="commands\Codex\CodexShapeBatch.cs" />

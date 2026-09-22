@@ -10,6 +10,7 @@ namespace BIMaestro.Codex
     {
         protected override string ButtonId => "CodexChat";
         private static CodexWindow window;
+        private static CodexDedicatedRevitLink dedicatedLink;
         protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
             if (window != null) { window.Activate(); return Result.Succeeded; }
@@ -22,17 +23,17 @@ namespace BIMaestro.Codex
             return Result.Succeeded;
         }
 
-        internal static void OpenDedicatedSession(UIApplication app)
+        internal static void StartDedicatedLink(UIApplication app)
         {
-            if (window != null) { window.Activate(); return; }
-            var bridge = new CodexRevitBridge(null, app.Application.VersionNumber) { DedicatedSession = true };
-            bridge.AttachEvent(ExternalEvent.Create(bridge));
-            window = new CodexWindow(bridge);
-            new WindowInteropHelper(window).Owner = app.MainWindowHandle;
-            window.Closed += (_, __) => window = null;
-            window.Show();
+            if (dedicatedLink != null) return;
+            string pipe = System.Environment.GetEnvironmentVariable("BIMAESTRO_FAMILY_PIPE");
+            string secret = System.Environment.GetEnvironmentVariable("BIMAESTRO_FAMILY_SECRET");
+            if (string.IsNullOrEmpty(pipe) || string.IsNullOrEmpty(secret)) return;
+            dedicatedLink = new CodexDedicatedRevitLink(pipe, secret, app);
+            System.Environment.SetEnvironmentVariable("BIMAESTRO_FAMILY_PIPE", null, System.EnvironmentVariableTarget.Process);
+            System.Environment.SetEnvironmentVariable("BIMAESTRO_FAMILY_SECRET", null, System.EnvironmentVariableTarget.Process);
         }
 
-        internal static void Shutdown() { window?.Close(); }
+        internal static void Shutdown() { window?.Close(); dedicatedLink?.Dispose(); dedicatedLink = null; }
     }
 }
