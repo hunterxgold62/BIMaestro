@@ -69,7 +69,8 @@
                     </Grid>
                 </Border>
 
-                <StackPanel Grid.Row="1" Margin="22,18,22,14">
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="22,18,30,14">
                     <TextBlock x:Name="IntroTitleText" Text="Souhaitez-vous rester informé ?" FontSize="18" FontWeight="SemiBold"
                                Foreground="{DynamicResource Text.Primary}"/>
                     <TextBlock x:Name="IntroText" Margin="0,5,0,0" Style="{StaticResource TrustText}"
@@ -85,7 +86,7 @@
                     </Border>
 
                     <TextBlock x:Name="EmailLabel" Text="Votre email" Style="{StaticResource Label}" Margin="2,0,0,6"/>
-                    <TextBox x:Name="EmailBox" Height="40" Padding="12,8"
+                    <TextBox x:Name="EmailBox" Height="40" Padding="12,4"
                              ToolTip="Adresse utilisée uniquement pour les informations BIMaestro"/>
 
                     <Grid Margin="0,12,0,0">
@@ -96,11 +97,11 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel>
                             <TextBlock x:Name="FirstNameLabel" Text="Prénom (optionnel)" Style="{StaticResource Label}" Margin="2,0,0,6"/>
-                            <TextBox x:Name="FirstNameBox" Height="40" Padding="12,8"/>
+                            <TextBox x:Name="FirstNameBox" Height="40" Padding="12,4"/>
                         </StackPanel>
                         <StackPanel Grid.Column="2">
                             <TextBlock x:Name="LastNameLabel" Text="Nom (optionnel)" Style="{StaticResource Label}" Margin="2,0,0,6"/>
-                            <TextBox x:Name="LastNameBox" Height="40" Padding="12,8"/>
+                            <TextBox x:Name="LastNameBox" Height="40" Padding="12,4"/>
                         </StackPanel>
                     </Grid>
 
@@ -124,6 +125,7 @@
                         </Grid>
                     </Border>
                 </StackPanel>
+                </ScrollViewer>
 
                 <Border Grid.Row="2" Padding="18,14" Background="{DynamicResource Surface.Subtle}"
                         CornerRadius="0,0,18,18" BorderBrush="{DynamicResource Border}" BorderThickness="0,1,0,0">

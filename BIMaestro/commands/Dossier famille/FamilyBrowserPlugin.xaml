@@ -1550,7 +1550,8 @@
 
                     <TextBlock Grid.Row="7"
                                Text="Export d'aperçus 3D"
-                               Style="{StaticResource SettingSectionTitleStyle}"/>
+                               Style="{StaticResource SettingSectionTitleStyle}"
+                               Margin="0,20,0,10"/>
 
                     <Border Grid.Row="8"
                             Style="{StaticResource SettingSectionBorderStyle}">

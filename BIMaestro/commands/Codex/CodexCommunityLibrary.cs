@@ -191,15 +191,12 @@ namespace BIMaestro.Codex
         {
             string id = (string)item["id"];
             if (string.IsNullOrEmpty(id) || !Regex.IsMatch(id, "^[a-fA-F0-9]{64}$")) throw new InvalidOperationException("Identifiant de famille invalide.");
-            string name = (string)item["name"] ?? "Famille";
-            name = Regex.Replace(name, "[<>:\"/\\\\|?*\\x00-\\x1F]", "_").Trim().TrimEnd('.');
-            if (name.Length > 100) name = name.Substring(0, 100).TrimEnd('.');
-            if (string.IsNullOrWhiteSpace(name) || Regex.IsMatch(name, "^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\\.|$)", RegexOptions.IgnoreCase)) name = "Famille_" + name;
+            string name = SuggestedFileName(item);
             string directory = Path.Combine(CacheRoot, id.ToLowerInvariant());
-            string destination = Path.Combine(directory, name + ".rfa");
+            string destination = Path.Combine(directory, name);
             if (File.Exists(destination) && VerifyHash(destination, id)) return destination;
             // An existing modified file may be an edited user copy. Preserve it.
-            if (File.Exists(destination)) destination = Path.Combine(directory, name + "_" + Guid.NewGuid().ToString("N").Substring(0, 8) + ".rfa");
+            if (File.Exists(destination)) destination = Path.Combine(directory, Path.GetFileNameWithoutExtension(name) + "_" + Guid.NewGuid().ToString("N").Substring(0, 8) + ".rfa");
             using (var response = await http.GetAsync("v1/families/" + Uri.EscapeDataString(id) + "/file", HttpCompletionOption.ResponseHeadersRead))
             {
                 await Check(response);
@@ -227,6 +224,14 @@ namespace BIMaestro.Codex
                 }
                 catch { if (File.Exists(path)) File.Delete(path); throw; }
             }
+        }
+        internal static string SuggestedFileName(JObject item)
+        {
+            string name = (string)item["name"] ?? "Famille";
+            name = Regex.Replace(name, "[<>:\"/\\\\|?*\\x00-\\x1F]", "_").Trim().TrimEnd('.');
+            if (name.Length > 100) name = name.Substring(0, 100).TrimEnd('.');
+            if (string.IsNullOrWhiteSpace(name) || Regex.IsMatch(name, "^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\\.|$)", RegexOptions.IgnoreCase)) name = "Famille_" + name;
+            return name + ".rfa";
         }
         private static bool VerifyHash(string path, string id)
         {

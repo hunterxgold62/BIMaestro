@@ -21,6 +21,8 @@ namespace BIMaestro.Codex
     internal static class CodexFamilyBuilder
     {
         internal static readonly string OutputRoot = Path.Combine(CodexClient.DataDirectory, "Families");
+        internal static readonly string ClaudeOutputRoot = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BIMaestro", "Claude", "Families");
 
         // Called inside a transaction, after all generated types have been created.
         internal static void ApplyBranding(FamilyManager manager)
@@ -45,11 +47,11 @@ namespace BIMaestro.Codex
         }
 
         // Called exclusively from the bridge's ExternalEvent. The source project is never saved.
-        internal static CodexFamilyArtifact Create(UIApplication app, Document source, CodexFamilyDesign design, bool validateOnly = false, CodexParametricDesign parametric = null, bool testHostPlacement = false, Action<Document> inspect = null)
+        internal static CodexFamilyArtifact Create(UIApplication app, Document source, CodexFamilyDesign design, bool validateOnly = false, CodexParametricDesign parametric = null, bool testHostPlacement = false, Action<Document> inspect = null, string outputRoot = null)
         {
-            return CreateSteps(app, source, design, validateOnly, parametric, testHostPlacement, inspect).Last(x => x != null);
+            return CreateSteps(app, source, design, validateOnly, parametric, testHostPlacement, inspect, outputRoot).Last(x => x != null);
         }
-        internal static IEnumerable<CodexFamilyArtifact> CreateSteps(UIApplication app, Document source, CodexFamilyDesign design, bool validateOnly = false, CodexParametricDesign parametric = null, bool testHostPlacement = false, Action<Document> inspect = null)
+        internal static IEnumerable<CodexFamilyArtifact> CreateSteps(UIApplication app, Document source, CodexFamilyDesign design, bool validateOnly = false, CodexParametricDesign parametric = null, bool testHostPlacement = false, Action<Document> inspect = null, string outputRoot = null)
         {
             using var guard = new CodexCreationGuard(app.Application, design.Name);
             if (!validateOnly && design.Load && (source == null || source.IsFamilyDocument || source.IsReadOnly || source.IsModifiable))
@@ -63,7 +65,7 @@ namespace BIMaestro.Codex
                 fileName += "_v" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + "_" + Guid.NewGuid().ToString("N").Substring(0, 4);
                 warnings.Add("Une famille homonyme est déjà ouverte ou chargée. Nouvelle version distincte : " + fileName + ". Les anciennes instances ne sont pas remplacées.");
             }
-            string folder = Path.Combine(OutputRoot, fileName + "_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + "_" + Guid.NewGuid().ToString("N").Substring(0, 8));
+            string folder = Path.Combine(outputRoot ?? OutputRoot, fileName + "_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + "_" + Guid.NewGuid().ToString("N").Substring(0, 8));
             Document family = null;
             string stage = "création du document temporaire";
             try

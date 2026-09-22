@@ -90,8 +90,8 @@
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="10">
                         <ScrollViewer x:Name="PART_ContentHost"
-                                      Margin="0"
-                                      VerticalAlignment="Center"/>
+                                      Margin="{TemplateBinding Padding}"
+                                      VerticalAlignment="Stretch"/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">

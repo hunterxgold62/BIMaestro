@@ -30,7 +30,10 @@ namespace BIMaestro.Codex
         internal bool ShareContext { get; set; }
         internal bool AllowChanges { get; set; }
         internal bool ApplyDirectly { get; set; }
+        internal bool DedicatedSession { get; set; }
+        internal string FamilyOutputRoot { get; set; } = CodexFamilyBuilder.OutputRoot;
         internal string DocumentTitle { get; private set; }
+        internal bool IsAttachedFamilyDocument => document?.IsFamilyDocument == true;
         internal string RevitVersion { get; private set; }
 
         internal CodexRevitBridge(Document document, string revitVersion = null)
@@ -393,6 +396,12 @@ namespace BIMaestro.Codex
 
         private object Run(UIApplication app, string tool, JObject args)
         {
+            if (DedicatedSession && document == null && tool == "revit_context")
+            {
+                RequireKeys(args);
+                return new { document = "Session dédiée — nouvelle famille", isFamily = false, selectedCount = 0,
+                    elements = new object[0], familyLengths = new object[0], familyCounts = new object[0], familyAngles = new object[0] };
+            }
             if (tool == "revit_capabilities") { RequireKeys(args); return CodexFamilyTools.Capabilities(app.Application.VersionNumber); }
             if (tool == "revit_family_program_contract") { RequireKeys(args); return CodexFamilyProgram.Contract(); }
             if (tool == "revit_family_api") return CodexFamilyProgram.Api(args);
@@ -413,11 +422,11 @@ namespace BIMaestro.Codex
                 if (document != null && (!document.IsValidObject || activeDocument == null || !document.Equals(activeDocument)))
                     throw new InvalidOperationException("Le document attaché au panneau n'est plus actif. Revenez à ce document ou rouvrez le panneau.");
                 var design = CodexParametricDesign.Parse(args);
-                if (tool == "revit_validate_parametric_family") return CodexFamilyBuilder.CreateSteps(app, document, design.Metadata, true, design);
+                if (tool == "revit_validate_parametric_family") return CodexFamilyBuilder.CreateSteps(app, document, design.Metadata, true, design, outputRoot: FamilyOutputRoot);
                 if (!Confirm("Créer une famille paramétrique « " + design.Metadata.Name + " »",
                     $"{design.Parts.Count} extrusions et {design.Arrays.Count} réseaux natifs ({design.SolidCount} solides au total).\nParamètres dimensionnels : {string.Join(", ", design.Parameters.Select(p => p.Name).Concat(design.Angles.Select(p => p.Name + " = " + p.Value + "°")))}.\nTests de dimensions, de nombre, de visibilité, de formules et d'angle puis restauration des valeurs initiales avant enregistrement dans un nouveau RFA.\nChargement : {design.Metadata.Load}. Placement à l'origine : {design.Metadata.Place}."))
                     throw new InvalidOperationException("Création refusée par l'utilisateur. Ne pas réessayer sans nouvelle demande.");
-                return CodexFamilyBuilder.CreateSteps(app, document, design.Metadata, false, design);
+                return CodexFamilyBuilder.CreateSteps(app, document, design.Metadata, false, design, outputRoot: FamilyOutputRoot);
             }
             if (tool == "revit_create_family" || tool == "revit_validate_family")
             {
@@ -425,10 +434,10 @@ namespace BIMaestro.Codex
                 if (document != null && (!document.IsValidObject || activeDocument == null || !document.Equals(activeDocument)))
                     throw new InvalidOperationException("Le document attaché au panneau n'est plus actif. Revenez à ce document ou rouvrez le panneau.");
                 var design = CodexFamilyDesign.Parse(args);
-                if (tool == "revit_validate_family") return CodexFamilyBuilder.CreateSteps(app, document, design, true);
+                if (tool == "revit_validate_family") return CodexFamilyBuilder.CreateSteps(app, document, design, true, outputRoot: FamilyOutputRoot);
                 if (!Confirm("Créer la famille « " + design.Name + " »", $"{design.SolidCount} solides, {design.Materials.Count} matériaux.\nCatégorie : {design.Category}.\nUn nouveau fichier RFA sera enregistré dans le dossier des familles BIMaestro.\nChargement dans le projet : {design.Load}. Placement à l'origine : {design.Place}.\nHypothèses : " + string.Join(" ; ", design.Assumptions)))
                     throw new InvalidOperationException("Création de famille refusée. Ne pas réessayer sans nouvelle demande.");
-                return CodexFamilyBuilder.CreateSteps(app, document, design);
+                return CodexFamilyBuilder.CreateSteps(app, document, design, outputRoot: FamilyOutputRoot);
             }
             // Revit may return another managed wrapper for the same native document.
             if (tool != "revit_open_created_family" && (document == null || !document.IsValidObject || activeDocument == null || !document.Equals(activeDocument)))
@@ -441,11 +450,13 @@ namespace BIMaestro.Codex
             if (tool == "revit_read_family_design")
             {
                 RequireKeys(args);
-                string root = Path.GetFullPath(CodexFamilyBuilder.OutputRoot) + Path.DirectorySeparatorChar;
-                if (document.IsFamilyDocument && (string.IsNullOrEmpty(document.PathName) || !Path.GetFullPath(document.PathName).StartsWith(root, StringComparison.OrdinalIgnoreCase)))
+                string[] roots = { CodexFamilyBuilder.OutputRoot, CodexFamilyBuilder.ClaudeOutputRoot };
+                bool managedFamily = document.IsFamilyDocument && !string.IsNullOrEmpty(document.PathName) &&
+                    roots.Any(root => Path.GetFullPath(document.PathName).StartsWith(
+                        Path.GetFullPath(root) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase));
+                if (document.IsFamilyDocument && !managedFamily)
                     throw new InvalidOperationException("Cette famille ouverte n'a pas de description BIMaestro accessible. Utiliser revit_inspect_family pour lire son état réel ; ne pas réutiliser la description d'une autre famille.");
-                string path = document.IsFamilyDocument && !string.IsNullOrEmpty(document.PathName)
-                    && Path.GetFullPath(document.PathName).StartsWith(root, StringComparison.OrdinalIgnoreCase) ? document.PathName : lastCreated?.FilePath;
+                string path = managedFamily ? document.PathName : lastCreated?.FilePath;
                 if (path == null) throw new InvalidOperationException("Aucune description disponible. Ouvrez le RFA BIMaestro depuis son dossier de création, puis rouvrez le panneau.");
                 string descriptor = Path.Combine(Path.GetDirectoryName(path), "construction.json");
                 if (!File.Exists(descriptor) || new FileInfo(descriptor).Length > 4 * 1024 * 1024)

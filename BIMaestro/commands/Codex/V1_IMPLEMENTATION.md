@@ -31,7 +31,7 @@ Corrections associées : utilisation de l'identifiant du plan de référence pou
 
 `scripts/codex-tests/Run.ps1 -RealCodex` vérifie hors Revit le contrat, les formules, les refus de données invalides, le protocole app-server et le panneau WPF. Le test app-server n'envoie pas de demande à un modèle.
 
-Dans le panneau, **Installation Codex → Tester le moteur de familles** exécute les scénarios intégrés via le contexte API Revit. Il faut autoriser les créations, mais aucune connexion ChatGPT n'est nécessaire. Chaque scénario crée puis ferme une famille temporaire ; aucun projet n'est modifié et aucun RFA n'est sauvegardé. Le rapport est écrit dans `%LOCALAPPDATA%\BIMaestro\Codex\Validation\`.
+Les scénarios natifs intégrés restent disponibles pour le diagnostic du moteur, sans bouton dans le panneau Famille IA. Chaque scénario crée puis ferme une famille temporaire ; aucun projet n'est modifié et aucun RFA n'est sauvegardé. Le rapport est écrit dans `%LOCALAPPDATA%\BIMaestro\Codex\Validation\`.
 
 Le banc autonome `BuildNativeHarness.ps1` / `StartNativeHarness.ps1` permet aussi d'utiliser une nouvelle instance 2023 ou 2024. Revit peut demander de charger une fois le complément non signé. Le banc refuse de démarrer si cette instance contient déjà un document. L'inscription temporaire est retirée après le démarrage ou le délai d'attente.
 

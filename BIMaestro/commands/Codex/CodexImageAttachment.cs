@@ -19,6 +19,15 @@ namespace BIMaestro.Codex
                 return FromBitmap(image, Path.GetFileName(path));
             }
         }
+        internal static CodexImageAttachment FromPngBytes(byte[] png, string name)
+        {
+            using (var stream = new MemoryStream(png, false))
+            {
+                var image = new BitmapImage(); image.BeginInit(); image.CacheOption = BitmapCacheOption.OnLoad;
+                image.StreamSource = stream; image.EndInit(); image.Freeze();
+                return FromBitmap(image, name);
+            }
+        }
         internal static CodexImageAttachment FromBitmap(BitmapSource source, string name)
         {
             if (source == null || source.PixelWidth < 1 || source.PixelHeight < 1) throw new InvalidOperationException("Image vide.");

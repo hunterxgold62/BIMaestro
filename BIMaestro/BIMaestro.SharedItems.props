@@ -2,6 +2,7 @@
   <ItemGroup>
     <Compile Include="commands\Codex\CodexClient.cs" />
     <Compile Include="commands\Codex\ClaudeClient.cs" />
+    <Compile Include="commands\Codex\CodexPdfAttachment.cs" />
     <Compile Include="commands\Codex\CodexShapeBatch.cs" />
     <Compile Include="commands\Codex\CodexFamilyDesign.cs" />
     <Compile Include="commands\Codex\CodexHostOpeningDesign.cs" />
@@ -101,6 +102,15 @@
     </PackageReference>
     <PackageReference Include="NLog">
       <Version>6.0.3</Version>
+    </PackageReference>
+    <PackageReference Include="PdfPig">
+      <Version>0.1.16</Version>
+    </PackageReference>
+    <PackageReference Include="PdfPig.Rendering.Skia">
+      <Version>0.1.16.4</Version>
+    </PackageReference>
+    <PackageReference Include="SkiaSharp.NativeAssets.Win32">
+      <Version>3.119.4</Version>
     </PackageReference>
     <PackageReference Include="NPOI">
       <Version>2.7.4</Version>

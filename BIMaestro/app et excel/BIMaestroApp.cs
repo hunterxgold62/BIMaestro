@@ -23,6 +23,7 @@ public class BIMaestroApp : IExternalApplication
 
 
     private UIApplication _uiApp;
+    private bool _dedicatedFamilyWindowOpened;
     private bool _hasResetWhenOff = false;
     private bool _hasShownTimeTrackingError = false;
     private string _lastRibbonTabTitle;
@@ -188,6 +189,13 @@ public class BIMaestroApp : IExternalApplication
         {
             _uiApp ??= sender as UIApplication;
             if (_uiApp == null) return;
+
+            if (!_dedicatedFamilyWindowOpened && Environment.GetEnvironmentVariable("BIMAESTRO_FAMILY_DEDICATED") == "1")
+            {
+                BIMaestro.Codex.CodexCommand.OpenDedicatedSession(_uiApp);
+                _dedicatedFamilyWindowOpened = true;
+                Environment.SetEnvironmentVariable("BIMAESTRO_FAMILY_DEDICATED", null, EnvironmentVariableTarget.Process);
+            }
 
             BIMaestro.MepBooster.MepBoosterService.RestorePersistedState(_uiApp);
             Page.SecretGifShortcutManager.PollKeyboardState();
