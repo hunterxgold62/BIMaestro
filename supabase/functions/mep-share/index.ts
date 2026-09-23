@@ -29,6 +29,7 @@ const allowedOrigins = new Set([
 ]);
 const maxPackageBytes = 50 * 1024 * 1024;
 const maxViewerStorageBytes = 850 * 1024 * 1024;
+const r2WorkerUrl = "https://bimaestro-maquette-pilot.bimaestro-community.workers.dev";
 
 class HttpError extends Error {
   constructor(public status: number, message: string) { super(message); }
@@ -126,6 +127,22 @@ async function removeAssets(paths: string[]) {
   return { error: null };
 }
 
+async function removeExportAssets(item: { publication_id: string; revision: number; storage_path: string; manifest?: { storage_backend?: string; assets?: Asset[] } }) {
+  if (item.manifest?.storage_backend !== "r2") return removeAssets(exportPaths(item));
+  const names = item.manifest.assets?.map(asset => asset.name) ?? [];
+  for (let offset = 0; offset < names.length; offset += 100) {
+    let result: Response;
+    try {
+      result = await fetch(`${r2WorkerUrl}/delete`, {
+        method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${serviceRoleKey}` },
+        body: JSON.stringify({ publicationId: item.publication_id, revision: item.revision, names: names.slice(offset, offset + 100) }),
+      });
+    } catch (error) { return { error }; }
+    if (!result.ok) return { error: new Error(`Nettoyage R2 refusé (${result.status})`) };
+  }
+  return { error: null };
+}
+
 async function cleanupExpiredPublications() {
   const now = new Date().toISOString();
   const { data: expired } = await admin.from("mep_publications").select("id")
@@ -133,26 +150,23 @@ async function cleanupExpiredPublications() {
   const ids = (expired ?? []).map((item) => item.id);
   if (!ids.length) return;
   const { data: revisions } = await admin.from("mep_exports")
-    .select("storage_path, manifest").in("publication_id", ids);
-  const paths = (revisions ?? []).flatMap((item) => exportPaths(item));
-  if (paths.length) { const { error } = await removeAssets(paths); if (error) return; }
+    .select("publication_id, revision, storage_path, manifest").in("publication_id", ids);
+  for (const item of revisions ?? []) { const { error } = await removeExportAssets(item); if (error) return; }
   await admin.from("mep_publications").delete().in("id", ids);
 }
 
 async function cleanupSupersededExports(publicationId: string, activeRevision: number) {
   const { data: superseded, error: listError } = await admin.from("mep_exports")
-    .select("storage_path, manifest")
+    .select("publication_id, revision, storage_path, manifest")
     .eq("publication_id", publicationId)
     .lt("revision", activeRevision);
   if (listError || !superseded?.length) {
     if (listError) console.error("mep-share superseded export lookup", listError);
     return;
   }
-  const paths = superseded.flatMap((item) => exportPaths(item));
-  const { error: storageError } = await removeAssets(paths);
-  if (storageError) {
-    console.error("mep-share superseded storage cleanup", storageError);
-    return;
+  for (const item of superseded) {
+    const { error: storageError } = await removeExportAssets(item);
+    if (storageError) { console.error("mep-share superseded storage cleanup", storageError); return; }
   }
   const { error: deleteError } = await admin.from("mep_exports")
     .delete()
@@ -172,10 +186,13 @@ async function startPublication(req: Request, body: any) {
   }
   if (!/^[0-9a-f]{64}$/.test(packageSha256)) throw new HttpError(400, "Empreinte SHA-256 invalide");
   await cleanupExpiredPublications();
-  const { data: storedBytes, error: storageUsageError } = await admin.rpc("mep_viewer_storage_bytes");
-  if (storageUsageError) throw new HttpError(500, "Quota de stockage indisponible");
-  if (Number(storedBytes) + packageBytes > maxViewerStorageBytes) {
-    throw new HttpError(507, "Quota gratuit du viewer atteint. Révoquez un ancien partage avant de publier.");
+  const useR2 = body.storageBackend === "r2" && !!assets;
+  if (!useR2) {
+    const { data: storedBytes, error: storageUsageError } = await admin.rpc("mep_viewer_storage_bytes");
+    if (storageUsageError) throw new HttpError(500, "Quota de stockage indisponible");
+    if (Number(storedBytes) + packageBytes > maxViewerStorageBytes) {
+      throw new HttpError(507, "Quota gratuit du viewer atteint. Révoquez un ancien partage avant de publier.");
+    }
   }
   const modelKeyHash = await sha256(String(body.modelKey ?? "model"));
   let publication: any;
@@ -214,8 +231,8 @@ async function startPublication(req: Request, body: any) {
     : [];
   // A failed upload may leave an inactive draft. Retrying the same publication
   // safely replaces that draft without touching the active immutable revision.
-  const { data: draft } = await admin.from("mep_exports").select("storage_path, manifest").eq("publication_id", publication.id).eq("revision", revision).maybeSingle();
-  if (draft) { const { error } = await removeAssets(exportPaths(draft)); if (error) throw new HttpError(500, "Nettoyage du transfert précédent impossible"); }
+  const { data: draft } = await admin.from("mep_exports").select("publication_id, revision, storage_path, manifest").eq("publication_id", publication.id).eq("revision", revision).maybeSingle();
+  if (draft) { const { error } = await removeExportAssets(draft); if (error) throw new HttpError(500, "Nettoyage du transfert précédent impossible"); }
   await admin.from("mep_exports").delete()
     .eq("publication_id", publication.id).eq("revision", revision);
   const { error: revisionError } = await admin.from("mep_exports").insert({
@@ -229,20 +246,23 @@ async function startPublication(req: Request, body: any) {
     package_bytes: packageBytes,
     editor_link: publication.editor_link,
     export_date: new Date().toISOString(),
-    manifest: { ...(typeof body.manifest === "object" && body.manifest ? body.manifest : {}), ...(assets ? { assets } : {}) },
+    manifest: { ...(typeof body.manifest === "object" && body.manifest ? body.manifest : {}), ...(assets ? { assets } : {}), storage_backend: useR2 ? "r2" : "supabase" },
     valve_ids: valveIds,
   });
   if (revisionError) throw new HttpError(409, revisionError.message);
-  const { data: upload, error: uploadError } = await admin.storage
-    .from("mep-publications").createSignedUploadUrl(storagePath);
-  if (uploadError || !upload) throw new HttpError(500, uploadError?.message ?? "Upload impossible");
+  let upload: { path: string; token: string; signedUrl: string } | null = null;
+  if (!useR2) {
+    const { data, error } = await admin.storage.from("mep-publications").createSignedUploadUrl(storagePath);
+    if (error || !data) throw new HttpError(500, error?.message ?? "Upload impossible");
+    upload = data;
+  }
   return {
     publicationId: publication.id,
     revision,
     expiresAt: publication.expires_at,
-    uploadPath: upload.path,
-    uploadToken: upload.token,
-    uploadUrl: upload.signedUrl,
+    uploadPath: upload?.path ?? storagePath,
+    uploadToken: upload?.token ?? "",
+    uploadUrl: upload?.signedUrl ?? "",
     viewerToken,
     editorToken,
   };
@@ -257,10 +277,32 @@ async function completePublication(req: Request, body: any) {
   const assets = candidate.manifest?.assets as Asset[] | undefined;
   const expected = assets || [{ name: `${revision}.bimaestro-mep.zip`, bytes: Number(candidate.package_bytes) }];
   if (Number(publication.active_revision) === revision) return { publicationId: publication.id, revision, active: true, removedValveIds: [] };
-  const { data: verified, error: verificationError } = await admin.rpc("verify_mep_export_files", { p_publication_id: publication.id, p_revision: revision });
-  if (verificationError) {
-    console.error("mep verification", { code: verificationError.code, message: verificationError.message });
-    throw new HttpError(503, "Vérification temporairement indisponible. Les fichiers envoyés sont conservés.");
+  let verified: { expected: number; valid: number; bytes: number } | null = null;
+  if (candidate.manifest?.storage_backend === "r2") {
+    verified = { expected: 0, valid: 0, bytes: 0 };
+    for (let offset = 0; offset < expected.length; offset += 32) {
+      const names = expected.slice(offset, offset + 32).map((asset: Asset) => asset.name);
+      let response: Response;
+      try {
+        response = await fetch(`${r2WorkerUrl}/verify`, {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: req.headers.get("authorization") ?? "" },
+          body: JSON.stringify({ publicationId: publication.id, revision, names }),
+        });
+      } catch { throw new HttpError(503, "Vérification R2 temporairement indisponible"); }
+      if (!response.ok) throw new HttpError(503, "Vérification R2 temporairement indisponible");
+      const batch = await response.json();
+      verified.expected += Number(batch.expected || 0);
+      verified.valid += Number(batch.valid || 0);
+      verified.bytes += Number(batch.bytes || 0);
+    }
+  } else {
+    const { data, error: verificationError } = await admin.rpc("verify_mep_export_files", { p_publication_id: publication.id, p_revision: revision });
+    if (verificationError) {
+      console.error("mep verification", { code: verificationError.code, message: verificationError.message });
+      throw new HttpError(503, "Vérification temporairement indisponible. Les fichiers envoyés sont conservés.");
+    }
+    verified = data;
   }
   if (!verified || verified.expected !== expected.length || verified.valid !== expected.length || Number(verified.bytes) !== Number(candidate.package_bytes))
     throw new HttpError(409, "Des zones sont absentes ou incomplètes. Relancez la publication.");
@@ -302,19 +344,25 @@ async function resolveShare(body: any) {
     .eq("publication_id", access.publication.id)
     .eq("revision", access.publication.active_revision).single();
   if (error) throw new HttpError(500, error.message);
-  const { data: signed, error: signedError } = await admin.storage
-    .from("mep-publications").createSignedUrl(revision.storage_path, 900);
-  if (signedError || !signed) throw new HttpError(500, signedError?.message ?? "Fichier indisponible");
+  let packageUrl = "";
+  if (revision.manifest?.storage_backend !== "r2") {
+    const { data: signed, error: signedError } = await admin.storage
+      .from("mep-publications").createSignedUrl(revision.storage_path, 900);
+    if (signedError || !signed) throw new HttpError(500, signedError?.message ?? "Fichier indisponible");
+    packageUrl = signed.signedUrl;
+  }
   await cleanupSupersededExports(access.publication.id, access.publication.active_revision);
-  const { error: budgetError } = await admin.rpc("reserve_mep_viewer_usage", {
-    p_publication_id: access.publication.id,
-    p_kind: "download", p_amount: Number(revision.manifest?.assets?.find((asset: Asset) => asset.name === "index.zip")?.bytes ?? revision.package_bytes),
-  });
-  if (budgetError) {
-    if (budgetError.message.includes("VIEWER_EGRESS_LIMIT")) {
-      throw new HttpError(429, "Budget mensuel gratuit du viewer atteint");
+  if (revision.manifest?.storage_backend !== "r2") {
+    const { error: budgetError } = await admin.rpc("reserve_mep_viewer_usage", {
+      p_publication_id: access.publication.id,
+      p_kind: "download", p_amount: Number(revision.manifest?.assets?.find((asset: Asset) => asset.name === "index.zip")?.bytes ?? revision.package_bytes),
+    });
+    if (budgetError) {
+      if (budgetError.message.includes("VIEWER_EGRESS_LIMIT")) {
+        throw new HttpError(429, "Budget mensuel gratuit du viewer atteint");
+      }
+      throw new HttpError(500, "Contrôle du quota indisponible");
     }
-    throw new HttpError(500, "Contrôle du quota indisponible");
   }
   const { data: collaborative } = await admin.from("mep_publications")
     .select("scenario_revision, scenario_state, scenario_updated_by, scenario_updated_at, scenario_events")
@@ -339,7 +387,8 @@ async function resolveShare(body: any) {
   return {
     publication: { id: access.publication.id, name: access.publication.name, slug: access.publication.slug, revision: access.publication.active_revision, expiresAt: access.publication.expires_at },
     role: access.role,
-    packageUrl: signed.signedUrl,
+    packageUrl,
+    storageBackend: revision.manifest?.storage_backend === "r2" ? "r2" : "supabase",
     manifest: revision.manifest,
     scenario,
     events: events ?? [],
@@ -356,6 +405,13 @@ async function publishAsset(req: Request, body: any) {
   if (!names.length || names.length > 32 || names.some(name => typeof name !== "string") || new Set(names).size !== names.length) throw new HttpError(400, "Lot invalide");
   const declared = new Set((revision?.manifest?.assets || []).map((asset: Asset) => asset.name));
   if (names.some(name => !declared.has(name))) throw new HttpError(404, "Zone introuvable");
+  if (revision.manifest?.storage_backend === "r2") {
+    const uploads = names.map(name => ({
+      name,
+      uploadUrl: `${r2WorkerUrl}/upload?publicationId=${encodeURIComponent(publication.id)}&revision=${body.revision}&name=${encodeURIComponent(name)}`,
+    }));
+    return Array.isArray(body.names) ? { uploads } : { uploadUrl: uploads[0].uploadUrl };
+  }
   const uploads: { name: string; uploadUrl: string }[] = [];
   for (let offset = 0; offset < names.length; offset += 8) {
     uploads.push(...await Promise.all(names.slice(offset, offset + 8).map(async name => {
@@ -511,6 +567,58 @@ async function mutateReservationLot(body: any) {
   return { scenario: updated };
 }
 
+async function r2PublishAccess(req: Request, body: any, verifyBatch: boolean) {
+  const identity = await licenseIdentity(req);
+  const publication = await publicationOwned(String(body.publicationId ?? ""), identity.licenseHash);
+  const revision = Number(body.revision);
+  if (!Number.isSafeInteger(revision) || revision !== Number(publication.active_revision) + 1) throw new HttpError(409, "Révision inactive");
+  const { data: draft, error } = await admin.from("mep_exports").select("manifest")
+    .eq("publication_id", publication.id).eq("revision", revision).single();
+  if (error || draft?.manifest?.storage_backend !== "r2") throw new HttpError(404, "Publication R2 introuvable");
+  const declared = new Map<string, Asset>((draft.manifest.assets as Asset[]).map(item => [item.name, item]));
+  if (verifyBatch) {
+    const names = body.names;
+    if (!Array.isArray(names) || names.length < 1 || names.length > 32 || new Set(names).size !== names.length ||
+        names.some(name => typeof name !== "string" || !declared.has(name))) throw new HttpError(400, "Lot invalide");
+    return { publicationId: publication.id, revision, assets: names.map(name => declared.get(name)) };
+  }
+  const asset = declared.get(body.name);
+  if (!asset) throw new HttpError(404, "Fichier inconnu");
+  return { publicationId: publication.id, revision, asset };
+}
+
+async function r2DeleteAccess(req: Request, body: any) {
+  if (req.headers.get("authorization") !== `Bearer ${serviceRoleKey}`) throw new HttpError(403, "Accès refusé");
+  const publicationId = String(body.publicationId ?? "");
+  const revision = Number(body.revision);
+  const { data: publication } = await admin.from("mep_publications")
+    .select("active_revision, expires_at, revoked_at").eq("id", publicationId).single();
+  if (!publication || (Number(publication.active_revision) === revision && !publication.revoked_at &&
+      new Date(publication.expires_at).getTime() > Date.now())) throw new HttpError(403, "Révision active protégée");
+  const { data: item } = await admin.from("mep_exports").select("manifest")
+    .eq("publication_id", publicationId).eq("revision", revision).single();
+  if (item?.manifest?.storage_backend !== "r2") throw new HttpError(404, "Révision R2 introuvable");
+  const declared = new Set((item.manifest.assets as Asset[]).map(asset => asset.name));
+  const names = body.names;
+  if (!Array.isArray(names) || names.length < 1 || names.length > 100 || new Set(names).size !== names.length ||
+      names.some(name => typeof name !== "string" || !declared.has(name))) throw new HttpError(400, "Lot invalide");
+  return { publicationId, revision, names };
+}
+
+async function r2AssetAccess(body: any) {
+  const access = await shareAccess(body.token);
+  if (Number(body.revision) !== Number(access.publication.active_revision)) throw new HttpError(409, "La maquette a changé");
+  const name = String(body.name ?? "");
+  if (!/^(index\.zip|tile-\d{5}\.glb\.gz)$/.test(name)) throw new HttpError(400, "Fichier invalide");
+  const { data: revision, error } = await admin.from("mep_exports")
+    .select("manifest").eq("publication_id", access.publication.id)
+    .eq("revision", access.publication.active_revision).single();
+  if (error || revision?.manifest?.storage_backend !== "r2") throw new HttpError(404, "Copie R2 indisponible");
+  const asset = (revision.manifest.assets as Asset[] | undefined)?.find(item => item.name === name);
+  if (!asset) throw new HttpError(404, "Fichier inconnu");
+  return { publicationId: access.publication.id, revision: access.publication.active_revision, asset };
+}
+
 async function mutateAnalysis(body: any) {
   const access = await shareAccess(body.token);
   if (access.role !== "editor") throw new HttpError(403, "Lien en lecture seule");
@@ -543,9 +651,11 @@ async function managePublication(req: Request, body: any) {
     const now = new Date().toISOString();
     await admin.from("mep_publications").update({ revoked_at: now, updated_at: now }).eq("id", publication.id);
     const { data: revisions } = await admin.from("mep_exports")
-      .select("storage_path, manifest").eq("publication_id", publication.id);
-    const paths = (revisions ?? []).flatMap((item) => exportPaths(item));
-    if (paths.length) { const { error } = await removeAssets(paths); if (error) throw new HttpError(500, "Nettoyage du partage impossible"); }
+      .select("publication_id, revision, storage_path, manifest").eq("publication_id", publication.id);
+    for (const item of revisions ?? []) {
+      const { error } = await removeExportAssets(item);
+      if (error) throw new HttpError(500, "Nettoyage du partage impossible");
+    }
     await admin.from("mep_publications").delete().eq("id", publication.id);
     return { revoked: true };
   }
@@ -570,6 +680,10 @@ serve(async (req) => {
       case "publish-start": result = await startPublication(req, body); break;
       case "publish-complete": result = await completePublication(req, body); break;
       case "resolve": result = await resolveShare(body); break;
+      case "r2-asset": result = await r2AssetAccess(body); break;
+      case "r2-upload-authorize": result = await r2PublishAccess(req, body, false); break;
+      case "r2-verify-authorize": result = await r2PublishAccess(req, body, true); break;
+      case "r2-delete-authorize": result = await r2DeleteAccess(req, body); break;
       case "scenario": result = await mutateScenario(body); break;
       case "markup": result = await mutateMarkup(body); break;
       case "reservation-lot": result = await mutateReservationLot(body); break;

@@ -1,20 +1,20 @@
-# Essai R2 : Projet_AntibesV2 · {3D}
+# Stockage R2 des maquettes MEP
 
-Ce pilote copie uniquement la révision 2 de la publication `5b1d1220-2b0c-4194-8b4e-ea18db63f73d` dans le bucket privé `bimaestro-maquettes-test`. Il ne modifie ni les fichiers Supabase d'origine, ni `mep_publications.scenario_state` (réservations, notes et lots). Le site utilise R2 seulement avec `?r2pilot=1` sur cette publication. Sans ce paramètre, tous les liens utilisent Supabase.
+Le Worker `bimaestro-maquette-pilot` sert les fichiers depuis le bucket privé `bimaestro-maquettes`. Le nom historique du Worker est conservé pour ne pas changer son URL. Supabase garde les publications, les liens, les annotations, les réservations, les lots et les notes.
 
-Le Worker vérifie le jeton du lien auprès de la fonction Supabase existante, limite la lecture aux fichiers déclarés dans le manifeste actif et refuse les objets absents ou de taille incorrecte. Le navigateur vérifie également le SHA-256 des zones téléchargées.
+## État au 23 septembre 2026
 
-## Contrôles effectués le 23 septembre 2026
+- AntibesV2, révision 2 : 15 fichiers, 16 633 642 octets.
+- SIGMA 20260729 · 3D Travail, révision 4 : 42 fichiers, 15 520 696 octets.
+- Les 57 objets ont été relus depuis R2 et comparés au SHA-256 du manifeste Supabase.
+- Le viewer public charge les liens habituels depuis R2, sans paramètre `r2pilot=1`. Test dans Chrome : 15/15 objets AntibesV2 et 42/42 objets SIGMA, aucun fichier de maquette lu depuis Supabase Storage, aucune erreur de page. SIGMA affichait 75 annotations et ses lots.
+- Une lecture de l'index SIGMA depuis le Worker n'a pas changé `reserved_download_bytes` dans Supabase.
+- Les originaux Supabase des deux révisions sont conservés. Les quatre autres publications de test et leurs fichiers Supabase ont été supprimés à la demande de l'utilisateur.
 
-- Copie des 15 fichiers (16 633 642 octets), vérifiés par taille et SHA-256 avant chaque envoi.
-- Lecture réelle de l'index et d'une zone via le Worker R2 : taille et SHA-256 identiques au manifeste.
-- Chargement des 14 zones dans le viewer local puis sur `viewer.bimaestro.fr` avec `?r2pilot=1`.
-- Trois étiquettes de réservation visibles ; la fiche d'une réservation s'ouvre.
-- État Supabase avant/après : révision maquette 2, révision scénario 6, trois annotations, empreinte `336f97fb4a5a2609b1f816b3df3f8da3` inchangée.
-- 57 tests du viewer et deux tests du Worker réussis ; build du viewer réussi.
+## Prochaines publications
 
-## Limite du pilote
+`GameMepPublishClient` demande `storageBackend = "r2"`. La fonction Supabase crée le brouillon et garde le scénario collaboratif ; le Worker valide le JWT de licence auprès de Supabase, contrôle taille et SHA-256, puis écrit chaque fichier dans R2. Avant d'activer une révision, Supabase demande au Worker de vérifier tous les objets. Une révision incomplète ne devient pas active.
 
-Le Worker utilise encore l'action Supabase `resolve` pour chaque zone afin de vérifier l'accès. Cette action réserve du budget de téléchargement dans le compteur interne du viewer même lorsque les octets sont servis par R2. Le pilote permet de valider la conservation des données et le chargement R2 ; une version destinée à tous les liens devra remplacer cette vérification répétée, gérer les nouvelles publications et prévoir le retour au parcours Supabase si R2 est indisponible.
+Le code serveur et le Worker sont déployés. La DLL Revit a été compilée en Release, mais son installation locale attend la fermeture de Revit par l'utilisateur. L'ancienne DLL continue de publier vers Supabase ; cela évite de casser une publication pendant la transition. Une publication réelle avec la nouvelle DLL reste à vérifier avant de considérer ce parcours entièrement validé.
 
-Le script `copy-pilot.ps1` attend un jeton de partage fourni à l'exécution ; aucun jeton de partage n'est conservé dans le dépôt.
+`copy-publication.ps1` et `verify-publication.ps1` servent à copier puis à relire une révision existante. Ne pas supprimer les originaux Supabase des deux maquettes sans contrôle explicite de la mise à jour suivante et de ses annotations.

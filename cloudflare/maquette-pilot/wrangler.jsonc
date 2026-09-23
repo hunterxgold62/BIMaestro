@@ -6,6 +6,6 @@
   "preview_urls": false,
   "observability": { "enabled": false },
   "r2_buckets": [
-    { "binding": "MODELS", "bucket_name": "bimaestro-maquettes-test" }
+    { "binding": "MODELS", "bucket_name": "bimaestro-maquettes" }
   ]
 }

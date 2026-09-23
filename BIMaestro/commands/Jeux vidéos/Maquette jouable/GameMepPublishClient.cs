@@ -70,6 +70,7 @@ namespace BIMaestro.VideoGames
                 name,
                 modelKey,
                 packageBytes = totalBytes,
+                storageBackend = "r2",
                 assets = assets.Select(asset => new { name = asset.Name, bytes = asset.Size, sha256 = asset.Sha256 }),
                 packageSha256 = package.Sha256,
                 valveIds = package.ValveIds,
@@ -142,7 +143,13 @@ namespace BIMaestro.VideoGames
                 {
                     using (var request = new HttpRequestMessage(HttpMethod.Put, url))
                     {
-                        request.Headers.TryAddWithoutValidation("x-upsert", "false");
+                        if (new Uri(url).Host.EndsWith(".workers.dev", StringComparison.OrdinalIgnoreCase))
+                        {
+                            string jwt = global::BIMaestroApp.LicenseJwt;
+                            if (string.IsNullOrWhiteSpace(jwt)) throw new InvalidOperationException("Licence requise pour envoyer la maquette vers Cloudflare.");
+                            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
+                        }
+                        else request.Headers.TryAddWithoutValidation("x-upsert", "false");
                         request.Content = new ByteArrayContent(asset.Bytes);
                         request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
                         using (var upload = await Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token).ConfigureAwait(false))
