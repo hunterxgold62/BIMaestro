@@ -271,6 +271,17 @@
                                TextWrapping="Wrap"
                                Margin="0,9,0,0"/>
 
+                    <Button x:Name="MepShareWebButton"
+                            Style="{StaticResource GlassButton}"
+                            Content="Partager sur le web"
+                            HorizontalAlignment="Stretch"
+                            Padding="8,7"
+                            Margin="0,10,0,0"
+                            Background="#FF165C60"
+                            ToolTip="Publie un instantané privé sur viewer.bimaestro.fr"
+                            ToolTipService.ShowOnDisabled="True"
+                            Click="MepShareWebButton_Click"/>
+
                     <Button x:Name="MepAdvancedToggleButton"
                             Style="{StaticResource GlassButton}"
                             Content="Réglages et analyses  +"
@@ -616,6 +627,7 @@
                     </WrapPanel>
                     <Button x:Name="MepExportReplayButton"
                             Grid.Row="3"
+                            Visibility="Collapsed"
                             Style="{StaticResource GlassButton}"
                             Content="Exporter le cas MEP"
                             HorizontalAlignment="Stretch"
@@ -629,17 +641,6 @@
                             Padding="10,6"
                             ToolTip="Récupère le fichier de réservations exporté depuis le site sous forme de volumes Revit, sans doublons."
                             Click="ImportReservations_Click"/>
-                    <Button x:Name="MepShareWebButton"
-                            Grid.Row="5"
-                            Style="{StaticResource GlassButton}"
-                            Content="Partager sur le web"
-                            HorizontalAlignment="Stretch"
-                            Padding="8,7"
-                            Margin="0,7,0,0"
-                            Background="#FF165C60"
-                            ToolTip="Publie un instantané privé sur viewer.bimaestro.fr"
-                            ToolTipService.ShowOnDisabled="True"
-                            Click="MepShareWebButton_Click"/>
                 </Grid>
             </Grid>
         </Border>

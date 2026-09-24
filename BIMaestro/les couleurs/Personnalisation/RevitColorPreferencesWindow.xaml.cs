@@ -6,6 +6,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Interop;
+using System.Windows.Media;
 using System.Windows.Threading;
 using BIMaestro.Localization;
 
@@ -23,6 +24,9 @@ namespace Couleur
         private bool _isGlobalColoringEnabled;
         private bool _hasPendingChanges;
         private string _autoSaveStatus;
+        private Color? _uniformTabColor = Colors.SkyBlue;
+        private string _selectedUniformPreset;
+        private bool _uniformFullPanel;
 
         public static void ShowModeless(IntPtr mainWindowHandle)
         {
@@ -63,6 +67,8 @@ namespace Couleur
                 : Tabs.Count + UiLanguage.T(" onglet(s) détecté(s). Une case décochée limite la couleur au bandeau de titre.", " tab(s) detected. An Unchecked Box Limits the Color to the Title Bar.");
             _autoSaveStatus =
                 UiLanguage.T("Les modifications sont enregistrées automatiquement.", "Changes Are Saved Automatically.");
+            UniformPresetNames = RibbonColorPresetCatalog.PresetNames;
+            _selectedUniformPreset = UniformPresetNames.FirstOrDefault();
 
             _autoSaveTimer = new DispatcherTimer
             {
@@ -86,6 +92,26 @@ namespace Couleur
         public string PreferenceFilePath { get; }
 
         public string DiscoveryMessage { get; }
+
+        public IReadOnlyList<string> UniformPresetNames { get; }
+
+        public Color? UniformTabColor
+        {
+            get => _uniformTabColor;
+            set { _uniformTabColor = value; OnPropertyChanged(); }
+        }
+
+        public string SelectedUniformPreset
+        {
+            get => _selectedUniformPreset;
+            set { _selectedUniformPreset = value; OnPropertyChanged(); }
+        }
+
+        public bool UniformFullPanel
+        {
+            get => _uniformFullPanel;
+            set { _uniformFullPanel = value; OnPropertyChanged(); }
+        }
 
         public string AutoSaveStatus
         {
@@ -155,9 +181,43 @@ namespace Couleur
             if (SelectedTab == null)
                 return;
 
+            if (MessageBox.Show(this,
+                "Restaurer l’apparence Revit de tous les panneaux de l’onglet « " + SelectedTab.Title + " » ?\n\nCe changement sera enregistré automatiquement.",
+                "Restaurer cet onglet", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                return;
+
             foreach (RevitRibbonPanelColorItem panel in SelectedTab.Panels)
                 panel.Reset();
 
+            ScheduleAutoSave();
+        }
+
+        private void ApplyUniformColorButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (!UniformTabColor.HasValue) return;
+            Color color = UniformTabColor.Value;
+            Color textColor = (color.R * 299 + color.G * 587 + color.B * 114) / 1000 < 145
+                ? Colors.White : Colors.Black;
+            ApplyToSelectedTab(new RibbonPanelColorScheme(color, color, textColor));
+        }
+
+        private void ApplyUniformPresetButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(SelectedUniformPreset)) return;
+            RibbonPanelColorScheme scheme = RibbonColorPresetCatalog.Create(SelectedUniformPreset)
+                .Values.FirstOrDefault();
+            if (scheme != null) ApplyToSelectedTab(scheme);
+        }
+
+        private void ApplyToSelectedTab(RibbonPanelColorScheme scheme)
+        {
+            if (SelectedTab == null) return;
+            foreach (RevitRibbonPanelColorItem panel in SelectedTab.Panels)
+            {
+                panel.Palette.ApplyScheme(scheme);
+                panel.MarkCustomized();
+                panel.IsFullPanel = UniformFullPanel;
+            }
             ScheduleAutoSave();
         }
 

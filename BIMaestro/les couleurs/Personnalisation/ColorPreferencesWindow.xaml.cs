@@ -4,8 +4,10 @@ using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using BIMaestro.Localization;
+using Autodesk.Revit.UI;
 using BrowserOrganization = Autodesk.Revit.DB.BrowserOrganization;
 using Document = Autodesk.Revit.DB.Document;
 using FilteredElementCollector = Autodesk.Revit.DB.FilteredElementCollector;
@@ -20,6 +22,10 @@ namespace Couleur
     {
         private readonly System.IntPtr _mainWindowHandle;
         private readonly Document _document;
+        private readonly bool _canApplyBrowserToProject;
+        private bool _hasSharedBrowserAppearance;
+        private readonly BrowserProjectWriteHandler _projectWriteHandler;
+        private readonly ExternalEvent _projectWriteEvent;
         private string _selectedPresetName;
         private ProjectBrowserColorSettings _browserPreferences;
         private readonly System.Random _previewRandom = new System.Random();
@@ -31,6 +37,14 @@ namespace Couleur
         private string _newBrowserColorProfileName = string.Empty;
         private bool _areColoredPanelsEnabled;
         private bool _useFullPanelColoring;
+        private readonly System.Collections.Generic.Stack<BrowserRuleUndoState> _browserRuleUndo =
+            new System.Collections.Generic.Stack<BrowserRuleUndoState>();
+
+        private sealed class BrowserRuleUndoState
+        {
+            public ProjectBrowserColorSettings Settings;
+            public bool WasShared;
+        }
 
         public ColorPreferencesWindow(
             System.IntPtr mainWindowHandle,
@@ -41,6 +55,10 @@ namespace Couleur
 
             _mainWindowHandle = mainWindowHandle;
             _document = document;
+            bool browserSourceChanged = document != null &&
+                ProjectBrowserProjectStorage.Activate(document);
+            _canApplyBrowserToProject = document != null && !document.IsReadOnly && !document.IsFamilyDocument;
+            _hasSharedBrowserAppearance = document != null && ProjectBrowserProjectStorage.HasAppearance(document);
             _areColoredPanelsEnabled =
                 ColoringStateManager.IsColoringActive;
             _useFullPanelColoring =
@@ -48,6 +66,11 @@ namespace Couleur
             PanelColors = CreateItems(RibbonColorPreferences.Load());
             BrowserPreferences =
                 ProjectBrowserColorPreferences.Load();
+            if (browserSourceChanged)
+            {
+                ProjectBrowserColoring.Reset();
+                ProjectBrowserColoring.Apply(_mainWindowHandle);
+            }
             RefreshBrowserProfiles();
             PreferenceFilePath = UiLanguage.T("Sauvegarde : ", "Saved at: ") +
                 RibbonColorPreferences.PreferenceFilePath;
@@ -63,28 +86,165 @@ namespace Couleur
                 RibbonColorPresetCatalog.StandardPresetNames.FirstOrDefault();
             GenerateBrowserPreviewNames();
             DetectBrowserCategories();
+            _projectWriteHandler = new BrowserProjectWriteHandler();
+            _projectWriteEvent = ExternalEvent.Create(_projectWriteHandler);
+            _projectWriteHandler.Event = _projectWriteEvent;
+            Closing += (_, args) =>
+            {
+                if (_projectWriteHandler.HasPending)
+                {
+                    args.Cancel = true;
+                    MessageBox.Show(this, "Patientez : Revit termine l’application au projet.", "Application en cours", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            };
+            Closed += (_, __) =>
+            {
+                _projectWriteHandler.DisposeWhenIdle = true;
+                if (!_projectWriteHandler.HasPending)
+                    _projectWriteHandler.DisposeEventOnce();
+            };
             DataContext = this;
+        }
+
+        private sealed class BrowserProjectWriteRequest
+        {
+            public Document Document;
+            public ProjectBrowserColorSettings Browser;
+            public BrowserIconSettings Icons;
+            public bool Clear;
+            public System.Action<UIApplication> ApiAction;
+            public System.Action<System.Exception> Completed;
+            public System.Windows.Threading.Dispatcher Dispatcher;
+        }
+
+        private sealed class BrowserProjectWriteHandler : IExternalEventHandler
+        {
+            public BrowserProjectWriteRequest Pending;
+            public ExternalEvent Event;
+            public bool DisposeWhenIdle;
+            private bool _isExecuting;
+            private bool _isDisposed;
+            public bool HasPending => Pending != null || _isExecuting;
+
+            public void DisposeEventOnce()
+            {
+                if (_isDisposed) return;
+                _isDisposed = true;
+                Event.Dispose();
+            }
+
+            public string GetName() => "BIMaestro - Apparence de l’arborescence du projet";
+
+            public void Execute(UIApplication app)
+            {
+                BrowserProjectWriteRequest request = Pending;
+                Pending = null;
+                if (request == null) return;
+                _isExecuting = true;
+                System.Exception error = null;
+                try
+                {
+                    Document active = app.ActiveUIDocument?.Document;
+                    if (active == null || !active.Equals(request.Document))
+                        throw new System.InvalidOperationException("Le projet actif a changé. Revenez au projet initial puis réessayez.");
+                    if (request.ApiAction != null)
+                        request.ApiAction(app);
+                    else if (request.Clear)
+                        ProjectBrowserProjectStorage.Clear(request.Document);
+                    else
+                    {
+                        ProjectBrowserProjectStorage.Save(request.Document, request.Browser, request.Icons);
+                        ProjectBrowserProjectStorage.Activate(request.Document);
+                    }
+                }
+                catch (System.Exception ex) { error = ex; }
+                request.Dispatcher.BeginInvoke(new System.Action(() =>
+                {
+                    _isExecuting = false;
+                    try { request.Completed(error); }
+                    finally { if (DisposeWhenIdle) DisposeEventOnce(); }
+                }));
+            }
+        }
+
+        private bool QueueProjectWrite(bool clear, ProjectBrowserColorSettings browser,
+            BrowserIconSettings icons, System.Action<System.Exception> completed)
+        {
+            if (_projectWriteHandler.HasPending)
+            {
+                completed(new System.InvalidOperationException("Une modification du projet est déjà en cours. Patientez un instant."));
+                return false;
+            }
+            var request = new BrowserProjectWriteRequest
+            {
+                Document = _document,
+                Browser = browser == null ? null : ProjectBrowserColorPreferences.Clone(browser),
+                Icons = icons == null ? null : ProjectBrowserIcons.Clone(icons),
+                Clear = clear,
+                Completed = completed,
+                Dispatcher = Dispatcher
+            };
+            return QueueExternalRequest(request);
+        }
+
+        private bool QueueBrowserRead(System.Action<UIApplication> action,
+            System.Action<System.Exception> completed)
+        {
+            return QueueExternalRequest(new BrowserProjectWriteRequest
+            {
+                Document = _document,
+                ApiAction = action,
+                Completed = completed,
+                Dispatcher = Dispatcher
+            });
+        }
+
+        private bool QueueExternalRequest(BrowserProjectWriteRequest request)
+        {
+            if (_projectWriteHandler.HasPending)
+            {
+                request.Completed(new System.InvalidOperationException("Une opération Revit est déjà en cours. Patientez un instant."));
+                return false;
+            }
+            _projectWriteHandler.Pending = request;
+            ExternalEventRequest response = _projectWriteEvent.Raise();
+            if (response == ExternalEventRequest.Accepted || response == ExternalEventRequest.Pending)
+                return true;
+            _projectWriteHandler.Pending = null;
+            request.Completed(new System.InvalidOperationException("Revit n’a pas accepté la demande. Réessayez lorsqu’il est disponible."));
+            return false;
         }
 
         public ObservableCollection<PanelColorItem> PanelColors { get; }
 
         public BrowserIconSettings BrowserIcons { get; private set; } = ProjectBrowserIcons.Load();
+        public bool CanApplyBrowserToProject => _canApplyBrowserToProject;
+        public bool HasSharedBrowserAppearance => _hasSharedBrowserAppearance;
+        public string BrowserSourceLabel => HasSharedBrowserAppearance
+            ? "Style partagé dans la maquette"
+            : "Mes réglages personnels";
+        public string BrowserSourceStatus => HasSharedBrowserAppearance
+            ? "Source actuelle : style partagé dans cette maquette. « Enregistrer mes réglages » met aussi à jour les vues, dossiers et icônes de ce projet."
+            : "Source actuelle : mes réglages personnels. Pour les partager, utilisez « Appliquer au projet ».";
+
+        private void NotifyBrowserSourceChanged(bool shared)
+        {
+            _hasSharedBrowserAppearance = shared;
+            OnPropertyChanged(nameof(HasSharedBrowserAppearance));
+            OnPropertyChanged(nameof(BrowserSourceLabel));
+            OnPropertyChanged(nameof(BrowserSourceStatus));
+        }
         private string _packStatus = "Partagez un fichier contenant les couleurs du ruban, l’arborescence et les icônes, y compris vos images importées.";
         public string PackStatus { get => _packStatus; private set { _packStatus = value; OnPropertyChanged(); } }
 
         private void ExportPack_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new Microsoft.Win32.SaveFileDialog { Title = "Exporter un pack d’apparence",
-                Filter = "Pack BIMaestro|*.bimaestro-style.json", FileName = "Mon pack.bimaestro-style.json", AddExtension = true };
-            if (dialog.ShowDialog(this) != true) return;
+            var scopeDialog = new AppearancePackScopeDialog { Owner = this };
+            if (scopeDialog.ShowDialog() != true) return;
             try
             {
-                AppearancePackFile.Export(dialog.FileName, new AppearancePack {
-                    RibbonEnabled = AreColoredPanelsEnabled, FullPanels = UseFullPanelColoring,
-                    Ribbon = PanelColors.ToDictionary(item => item.PanelName, item => item.CreateScheme()),
-                    Browser = BrowserPreferences, Icons = BrowserIcons
-                });
-                PackStatus = "Pack exporté : " + System.IO.Path.GetFileName(dialog.FileName) + ". Vous pouvez transmettre ce fichier à votre équipe.";
+                ExportCurrentPack(scopeDialog.IncludesRibbon, scopeDialog.IncludesBrowser,
+                    "Exporter un pack d’apparence", "Mon pack.bimaestro-style.json");
             }
             catch (System.Exception ex) { MessageBox.Show(this, ex.Message, "Export du pack", MessageBoxButton.OK, MessageBoxImage.Error); }
         }
@@ -97,18 +257,91 @@ namespace Couleur
             try
             {
                 var pack = AppearancePackFile.Import(dialog.FileName);
-                foreach (var item in PanelColors)
-                    if (pack.Ribbon.TryGetValue(item.PanelName, out var scheme)) item.ApplyScheme(scheme);
-                AreColoredPanelsEnabled = pack.RibbonEnabled;
-                UseFullPanelColoring = pack.FullPanels;
-                BrowserPreferences = pack.Browser;
-                BrowserIcons = pack.Icons;
-                _browserIconAssets = null;
-                OnPropertyChanged(nameof(BrowserIcons));
-                OnPropertyChanged(nameof(BrowserIconAssets));
+                if (!OfferBackup("Avant l’import, voulez-vous enregistrer vos réglages actuels dans un pack de secours ?", "Import du pack"))
+                    return;
+                if (pack.IncludesRibbon)
+                {
+                    foreach (var item in PanelColors)
+                        if (pack.Ribbon.TryGetValue(item.PanelName, out var scheme)) item.ApplyScheme(scheme);
+                    AreColoredPanelsEnabled = pack.RibbonEnabled;
+                    UseFullPanelColoring = pack.FullPanels;
+                }
+                if (pack.IncludesBrowser)
+                {
+                    BrowserPreferences = pack.Browser;
+                    BrowserIcons = pack.Icons;
+                    _browserIconAssets = null;
+                    OnPropertyChanged(nameof(BrowserIcons));
+                    OnPropertyChanged(nameof(BrowserIconAssets));
+                }
                 PackStatus = "Pack chargé : " + System.IO.Path.GetFileName(dialog.FileName) + ". Vérifiez les onglets puis cliquez sur Enregistrer pour l’appliquer, ou Annuler pour abandonner.";
             }
             catch (System.Exception ex) { MessageBox.Show(this, ex.Message, "Import du pack", MessageBoxButton.OK, MessageBoxImage.Error); }
+        }
+
+        private bool OfferBackup(string question, string title)
+        {
+            var choice = MessageBox.Show(this,
+                question + "\n\nOui : enregistrer un fichier de secours.\nNon : continuer sans sauvegarder.\nAnnuler : ne rien modifier.",
+                title, MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+            if (choice == MessageBoxResult.Cancel) return false;
+            return choice != MessageBoxResult.Yes || ExportCurrentPack(true, true,
+                "Enregistrer mes réglages actuels", "Mes réglages avant modification.bimaestro-style.json");
+        }
+
+        private bool ExportCurrentPack(bool includesRibbon, bool includesBrowser, string title, string fileName)
+        {
+            var dialog = new Microsoft.Win32.SaveFileDialog { Title = title,
+                Filter = "Pack BIMaestro|*.bimaestro-style.json", FileName = fileName, AddExtension = true };
+            if (dialog.ShowDialog(this) != true) return false;
+            AppearancePackFile.Export(dialog.FileName, new AppearancePack {
+                IncludesRibbon = includesRibbon, IncludesBrowser = includesBrowser,
+                RibbonEnabled = AreColoredPanelsEnabled, FullPanels = UseFullPanelColoring,
+                Ribbon = includesRibbon ? PanelColors.ToDictionary(item => item.PanelName, item => item.CreateScheme()) : null,
+                Browser = includesBrowser ? BrowserPreferences : null,
+                Icons = includesBrowser ? BrowserIcons : null
+            });
+            PackStatus = "Pack exporté : " + System.IO.Path.GetFileName(dialog.FileName) + ".";
+            return true;
+        }
+
+        private void ApplyBrowserToCurrentProject_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            if (!CanApplyBrowserToProject)
+            {
+                PackStatus = "Aucun projet Revit modifiable n’est actif.";
+                return;
+            }
+
+            try
+            {
+                BrowserPreferences.IsEnabled = true;
+                PackStatus = "Application au projet en cours…";
+                QueueProjectWrite(false, BrowserPreferences, BrowserIcons, error =>
+                {
+                    if (error != null)
+                    {
+                        PackStatus = "Le projet n’a pas été modifié : " + error.Message;
+                        MessageBox.Show(this, error.Message, "Configuration du projet", MessageBoxButton.OK, MessageBoxImage.Error);
+                        return;
+                    }
+                    ProjectBrowserColoring.Reset();
+                    ProjectBrowserColoring.Apply(_mainWindowHandle);
+                    NotifyBrowserSourceChanged(true);
+                    PackStatus = "Arborescence enregistrée dans le projet. Elle sera partagée lors du prochain enregistrement ou de la prochaine synchronisation.";
+                });
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show(
+                    this,
+                    "Impossible d’enregistrer l’arborescence dans le projet.\n\n" + ex.Message,
+                    "Configuration du projet",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
         }
         private ObservableCollection<BrowserIconAsset> _browserIconAssets;
         public ObservableCollection<BrowserIconAsset> BrowserIconAssets => _browserIconAssets ??
@@ -524,6 +757,155 @@ namespace Couleur
             BrowserPreferences.IsCategoryColoringEnabled = true;
         }
 
+        private void ChooseBrowserFolderButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_document == null)
+            {
+                MessageBox.Show(this,
+                    "Ouvrez d’abord un projet Revit pour choisir un dossier.",
+                    "Arborescence du projet", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            QueueBrowserRead(_ =>
+            {
+                if (!int.TryParse(_document.Application.VersionNumber, out int version) || version < 2024)
+                    throw new System.InvalidOperationException("La sélection des dossiers nécessite Revit 2024 ou plus récent.");
+                var dialog = new ProjectBrowserRuleWindow(
+                    _document, BrowserPreferences,
+                    (selected, previous, completed) => ApplyBrowserRule(selected, previous, completed),
+                    (selected, completed) => ApplyBrowserRule(null, selected, completed),
+                    UndoBrowserRule, _browserRuleUndo.Count > 0)
+                    { Owner = this };
+                dialog.Show();
+            }, error =>
+            {
+                if (error != null)
+                    MessageBox.Show(this, error.Message, "Arborescence du projet", MessageBoxButton.OK, MessageBoxImage.Error);
+            });
+        }
+
+        private void ApplyBrowserRule(
+            ProjectBrowserCategoryColorRule selected,
+            ProjectBrowserCategoryColorRule previous,
+            System.Action<System.Exception> completed)
+        {
+            if (HasSharedBrowserAppearance && !CanApplyBrowserToProject)
+            {
+                completed(new System.InvalidOperationException(
+                    "Le style de cette maquette est partagé, mais le projet est en lecture seule. Aucune modification personnelle ne peut le remplacer ici."));
+                return;
+            }
+            var undoState = new BrowserRuleUndoState
+            {
+                Settings = ProjectBrowserColorPreferences.Clone(BrowserPreferences),
+                WasShared = HasSharedBrowserAppearance
+            };
+            var next = ProjectBrowserColorPreferences.Clone(BrowserPreferences);
+            if (previous != null)
+            {
+                var old = next.CategoryColorRules.FirstOrDefault(rule =>
+                    string.Equals(rule.FolderPath, previous.FolderPath,
+                        System.StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(rule.Effect, previous.Effect,
+                        System.StringComparison.OrdinalIgnoreCase));
+                if (old != null) next.CategoryColorRules.Remove(old);
+            }
+            if (selected != null)
+            {
+                var existing = next.CategoryColorRules.FirstOrDefault(rule =>
+                    !string.IsNullOrWhiteSpace(rule.FolderPath) &&
+                    string.Equals(rule.FolderPath, selected.FolderPath,
+                        System.StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(rule.Effect, selected.Effect,
+                        System.StringComparison.OrdinalIgnoreCase));
+                if (existing == null)
+                    next.CategoryColorRules.Add(selected.Clone());
+                else
+                {
+                    existing.CategoryName = selected.CategoryName;
+                    existing.Color = selected.Color;
+                    existing.Effect = selected.Effect;
+                    existing.Scope = selected.Scope;
+                }
+            }
+            next.IsCategoryColoringEnabled = next.CategoryColorRules.Count > 0;
+            next.IsEnabled = true;
+            System.Action<System.Exception> finish = error =>
+            {
+                if (error != null) { completed(error); return; }
+                try
+                {
+                    if (!CanApplyBrowserToProject)
+                        ProjectBrowserColorPreferences.Save(next);
+                    BrowserPreferences = next;
+                    NotifyBrowserSourceChanged(CanApplyBrowserToProject || HasSharedBrowserAppearance);
+                    ProjectBrowserColoring.Reset();
+                    ProjectBrowserColoring.Apply(_mainWindowHandle);
+                    _browserRuleUndo.Push(undoState);
+                    completed(null);
+                }
+                catch (System.Exception ex) { completed(ex); }
+            };
+            if (CanApplyBrowserToProject)
+                QueueProjectWrite(false, next, BrowserIcons, finish);
+            else
+                finish(null);
+        }
+
+        private void UndoBrowserRule(
+            System.Action<ProjectBrowserColorSettings, bool, System.Exception> completed)
+        {
+            if (_browserRuleUndo.Count == 0)
+            {
+                completed(null, false, new System.InvalidOperationException("Aucune application récente à annuler."));
+                return;
+            }
+            BrowserRuleUndoState previous = _browserRuleUndo.Peek();
+            System.Action<System.Exception> finish = error =>
+            {
+                if (error != null) { completed(null, true, error); return; }
+                try
+                {
+                    if (!CanApplyBrowserToProject)
+                        ProjectBrowserColorPreferences.Save(previous.Settings);
+                    BrowserPreferences = ProjectBrowserColorPreferences.Clone(previous.Settings);
+                    NotifyBrowserSourceChanged(previous.WasShared);
+                    ProjectBrowserColoring.Reset();
+                    ProjectBrowserColoring.Apply(_mainWindowHandle);
+                    _browserRuleUndo.Pop();
+                    completed(ProjectBrowserColorPreferences.Clone(BrowserPreferences),
+                        _browserRuleUndo.Count > 0, null);
+                }
+                catch (System.Exception ex) { completed(null, true, ex); }
+            };
+            if (CanApplyBrowserToProject)
+                QueueProjectWrite(!previous.WasShared, previous.Settings, BrowserIcons, finish);
+            else
+                finish(null);
+        }
+
+        private void EditBrowserCategoryRuleButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (!(sender is FrameworkElement element) ||
+                !(element.DataContext is ProjectBrowserCategoryColorRule rule) ||
+                _document == null)
+                return;
+            QueueBrowserRead(_ =>
+            {
+            var dialog = new ProjectBrowserRuleWindow(
+                _document, BrowserPreferences,
+                (selected, previous, completed) => ApplyBrowserRule(selected, previous, completed),
+                (selected, completed) => ApplyBrowserRule(null, selected, completed),
+                UndoBrowserRule, _browserRuleUndo.Count > 0, rule)
+                    { Owner = this };
+                dialog.Show();
+            }, error =>
+            {
+                if (error != null)
+                    MessageBox.Show(this, error.Message, "Modifier un dossier", MessageBoxButton.OK, MessageBoxImage.Error);
+            });
+        }
+
         private void RemoveBrowserCategoryRuleButton_Click(
             object sender,
             RoutedEventArgs e)
@@ -539,7 +921,17 @@ namespace Couleur
             object sender,
             RoutedEventArgs e)
         {
-            DetectBrowserCategories();
+            QueueCategoryRefresh();
+        }
+
+        private void QueueCategoryRefresh()
+        {
+            if (_document == null) return;
+            QueueBrowserRead(_ => DetectBrowserCategories(), error =>
+            {
+                if (error != null)
+                    MessageBox.Show(this, error.Message, "Actualiser les dossiers", MessageBoxButton.OK, MessageBoxImage.Error);
+            });
         }
 
         private void AddDetectedBrowserCategoryButton_Click(
@@ -598,7 +990,7 @@ namespace Couleur
             if (SelectedBrowserColorProfile?.Settings == null) return;
             BrowserPreferences = ProjectBrowserColorPreferences.Clone(
                 SelectedBrowserColorProfile.Settings);
-            DetectBrowserCategories();
+            QueueCategoryRefresh();
         }
 
         private void DeleteBrowserProfileButton_Click(
@@ -822,6 +1214,16 @@ namespace Couleur
 
         private void ResetDefaultsButton_Click(object sender, RoutedEventArgs e)
         {
+            try
+            {
+                if (!OfferBackup("Avant de revenir aux valeurs par défaut, voulez-vous enregistrer vos réglages actuels ?", "Valeurs par défaut"))
+                    return;
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show(this, ex.Message, "Sauvegarde des réglages", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
             BrowserIcons.Enabled = false;
             BrowserIcons.Rules.Clear();
             foreach (var rule in ProjectBrowserIcons.Defaults().Rules)
@@ -837,11 +1239,56 @@ namespace Couleur
 
             BrowserPreferences =
                 ProjectBrowserColorPreferences.GetDefaults();
+            AreColoredPanelsEnabled = true;
+            UseFullPanelColoring = false;
+            PackStatus = HasSharedBrowserAppearance
+                ? "Valeurs par défaut préparées. Si vous enregistrez, elles remplaceront le style partagé de ce projet ; vos préférences personnelles resteront intactes."
+                : "Valeurs personnelles remises à zéro dans cette fenêtre. Cliquez sur « Enregistrer mes réglages » pour les appliquer.";
         }
 
         private void ResetBrowserDefaultsButton_Click(
             object sender,
             RoutedEventArgs e)
+        {
+            try
+            {
+                if (!OfferBackup("Avant de restaurer l’arborescence Revit, voulez-vous enregistrer vos réglages actuels ?", "Restaurer Revit"))
+                    return;
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show(this, ex.Message, "Sauvegarde des réglages", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+            if (HasSharedBrowserAppearance && MessageBox.Show(this,
+                "Cette maquette contient un style d’arborescence partagé. Le retirer modifiera la maquette pour toute l’équipe après enregistrement ou synchronisation. Continuer ?",
+                "Retirer le style partagé", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                return;
+            if (HasSharedBrowserAppearance)
+            {
+                QueueProjectWrite(true, null, null, error =>
+                {
+                    if (error != null)
+                    {
+                        MessageBox.Show(this, error.Message, "Restaurer l’arborescence Revit", MessageBoxButton.OK, MessageBoxImage.Error);
+                        return;
+                    }
+                    BrowserPreferences = ProjectBrowserColorPreferences.Load();
+                    BrowserIcons = ProjectBrowserIcons.Load();
+                    _browserIconAssets = null;
+                    OnPropertyChanged(nameof(BrowserIcons));
+                    OnPropertyChanged(nameof(BrowserIconAssets));
+                    NotifyBrowserSourceChanged(false);
+                    ProjectBrowserColoring.Reset();
+                    ProjectBrowserColoring.Apply(_mainWindowHandle);
+                    PackStatus = "Style partagé retiré. Ce projet utilise à nouveau vos réglages personnels, sans les modifier.";
+                });
+                return;
+            }
+            RestoreBrowserLocally();
+        }
+
+        private void RestoreBrowserLocally()
         {
             ProjectBrowserColorSettings reset =
                 ProjectBrowserColorPreferences.GetDefaults();
@@ -854,30 +1301,60 @@ namespace Couleur
             ProjectBrowserColorPreferences.Save(reset);
             ProjectBrowserColoring.Reset();
             ProjectBrowserColoring.Apply(_mainWindowHandle);
+            NotifyBrowserSourceChanged(false);
+            PackStatus = "Arborescence Revit restaurée. Le style partagé a été retiré du projet s’il était présent.";
         }
 
         private void OpenRevitColorsButton_Click(
             object sender,
             RoutedEventArgs e)
         {
-            try
+            SaveSettingsAndContinue(() =>
             {
-                SaveCurrentColors();
                 RevitColorPreferencesWindow.ShowModeless(_mainWindowHandle);
-                DialogResult = true;
-            }
-            catch (System.Exception ex)
-            {
-                ShowSaveError(ex);
-            }
+                Close();
+            });
         }
 
         private void SaveButton_Click(object sender, RoutedEventArgs e)
         {
+            SaveSettingsAndContinue(Close);
+        }
+
+        private void SaveSettingsAndContinue(System.Action next)
+        {
+            if (HasSharedBrowserAppearance)
+            {
+                if (!CanApplyBrowserToProject)
+                {
+                    MessageBox.Show(this,
+                        "Cette maquette partage son apparence, mais elle est en lecture seule. Les changements ne peuvent pas être conservés dans ce projet.",
+                        "Enregistrer mes réglages", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+                QueueProjectWrite(false, BrowserPreferences, BrowserIcons, error =>
+                {
+                    if (error != null)
+                    {
+                        ShowSaveError(error);
+                        return;
+                    }
+                    try
+                    {
+                        NotifyBrowserSourceChanged(true);
+                        SaveCurrentColors(false);
+                        CustomizeRibbonColorsCommand.ReapplyColors(_mainWindowHandle);
+                        next();
+                    }
+                    catch (System.Exception ex) { ShowSaveError(ex); }
+                });
+                return;
+            }
             try
             {
-                SaveCurrentColors();
-                DialogResult = true;
+                SaveCurrentColors(true);
+                CustomizeRibbonColorsCommand.ReapplyColors(_mainWindowHandle);
+                next();
             }
             catch (System.Exception ex)
             {
@@ -885,9 +1362,8 @@ namespace Couleur
             }
         }
 
-        private void SaveCurrentColors()
+        private void SaveCurrentColors(bool saveBrowserLocally)
         {
-            ProjectBrowserIcons.Save(BrowserIcons);
             ColoringStateManager.SetColoringActive(
                 AreColoredPanelsEnabled);
             ColoringStateManager.SetFullMode(
@@ -896,8 +1372,11 @@ namespace Couleur
                 item => item.PanelName,
                 item => item.CreateScheme());
             RibbonColorPreferences.Save(colors);
-            ProjectBrowserColorPreferences.Save(
-                BrowserPreferences);
+            if (saveBrowserLocally)
+            {
+                ProjectBrowserIcons.Save(BrowserIcons);
+                ProjectBrowserColorPreferences.Save(BrowserPreferences);
+            }
             ProjectBrowserColoring.Reset();
             ProjectBrowserColoring.Apply(_mainWindowHandle);
         }
@@ -937,6 +1416,57 @@ namespace Couleur
             PropertyChanged?.Invoke(
                 this,
                 new PropertyChangedEventArgs(propertyName));
+        }
+    }
+
+    internal sealed class AppearancePackScopeDialog : Window
+    {
+        private readonly RadioButton _both;
+        private readonly RadioButton _ribbon;
+        private readonly RadioButton _browser;
+
+        public AppearancePackScopeDialog()
+        {
+            Title = "Que voulez-vous exporter ?";
+            Width = 430;
+            Height = 265;
+            MinWidth = 430;
+            MinHeight = 265;
+            WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            ResizeMode = ResizeMode.NoResize;
+            ShowInTaskbar = false;
+            var layout = new DockPanel { Margin = new Thickness(20) };
+            Content = layout;
+            var actions = new StackPanel { Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 18, 0, 0) };
+            DockPanel.SetDock(actions, Dock.Bottom);
+            layout.Children.Add(actions);
+            var cancel = new Button { Content = "Annuler", MinWidth = 90, Height = 32,
+                Margin = new Thickness(0, 0, 8, 0), IsCancel = true };
+            var confirm = new Button { Content = "Exporter…", MinWidth = 105,
+                Height = 32, IsDefault = true };
+            confirm.Click += (_, __) => DialogResult = true;
+            actions.Children.Add(cancel);
+            actions.Children.Add(confirm);
+            var choices = new StackPanel();
+            layout.Children.Add(choices);
+            choices.Children.Add(new TextBlock { Text = "Choisissez le contenu du pack :",
+                FontSize = 17, FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(0, 0, 0, 14) });
+            _both = AddChoice(choices, "L’arborescence et les panneaux BIMaestro", true);
+            _ribbon = AddChoice(choices, "Les panneaux BIMaestro uniquement", false);
+            _browser = AddChoice(choices, "L’arborescence et ses icônes uniquement", false);
+        }
+
+        public bool IncludesRibbon => _both.IsChecked == true || _ribbon.IsChecked == true;
+        public bool IncludesBrowser => _both.IsChecked == true || _browser.IsChecked == true;
+
+        private static RadioButton AddChoice(Panel parent, string text, bool selected)
+        {
+            var choice = new RadioButton { Content = text, IsChecked = selected,
+                Margin = new Thickness(0, 0, 0, 11), FontSize = 13 };
+            parent.Children.Add(choice);
+            return choice;
         }
     }
 

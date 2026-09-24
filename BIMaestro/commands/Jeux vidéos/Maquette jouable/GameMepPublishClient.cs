@@ -55,8 +55,8 @@ namespace BIMaestro.VideoGames
                 () => GameMepWebPackage.Build(scene, name), cancellationToken);
             var assets = new[] { new GameMepWebAsset { Name = "index.zip", Bytes = package.Bytes, Sha256 = package.Sha256 } }.Concat(package.Assets).ToList();
             long totalBytes = assets.Sum(asset => asset.Size);
-            if (assets.Count > 4096 || totalBytes > 512L * 1024 * 1024 || assets.Any(asset => asset.Size > 48L * 1024 * 1024))
-                throw new InvalidOperationException("Export trop volumineux : limite de 512 Mo au total et 48 Mo par fichier. Réduisez la vue publiée.");
+            if (assets.Count > 4096 || totalBytes > 50L * 1024 * 1024 || assets.Any(asset => asset.Size > 48L * 1024 * 1024))
+                throw new InvalidOperationException("Export trop volumineux : limite de 50 Mo au total et 48 Mo par fichier. Réduisez la vue publiée.");
             GameMepShareState state = Load(scene.MepGraph);
             string modelKey = string.IsNullOrWhiteSpace(scene.MepGraph.ScenarioModelKey)
                 ? scene.MepGraph.DocumentTitle

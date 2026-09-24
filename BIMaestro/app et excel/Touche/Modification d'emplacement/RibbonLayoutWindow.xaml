@@ -295,6 +295,7 @@
                                 <StackPanel>
                                     <TextBlock FontWeight="SemiBold"
                                                FontSize="15"
+                                               Foreground="{DynamicResource Text.Primary}"
                                                Text="Une question, un bug ou une idée ?"/>
                                     <TextBlock Style="{StaticResource Hint}"
                                                Margin="0,8,0,0"
@@ -304,14 +305,16 @@
                                                Margin="0,8,0,0"
                                                TextWrapping="Wrap"
                                                Text="Même un message rapide peut faire la différence, alors n’hésite pas à me contacter :"/>
-                                    <TextBlock Margin="0,12,0,0">
+                                    <TextBlock Margin="0,12,0,0"
+                                               Foreground="{DynamicResource Text.Secondary}">
                                         <Run Text="LinkedIn : "/>
                                         <Hyperlink NavigateUri="https://www.linkedin.com/in/paul-lemert-b40921207"
                                                    RequestNavigate="OnRequestNavigate">
                                             <Run Text="Paul Lemert"/>
                                         </Hyperlink>
                                     </TextBlock>
-                                    <TextBlock Margin="0,6,0,0">
+                                    <TextBlock Margin="0,6,0,0"
+                                               Foreground="{DynamicResource Text.Secondary}">
                                         <Run Text="E-mail : "/>
                                         <Hyperlink NavigateUri="mailto:bimaestro.plugin@gmail.com"
                                                    RequestNavigate="OnRequestNavigate">

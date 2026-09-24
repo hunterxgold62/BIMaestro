@@ -30,6 +30,7 @@ public class BIMaestroApp : IExternalApplication
     private DateTime _nextRibbonInspectionUtc = DateTime.MinValue;
     private DateTime _lastRibbonApplyUtc = DateTime.MinValue;
     private int _pendingProjectBrowserViewRefreshes;
+    private int _pendingProjectBrowserAppearanceRefreshes;
     private DateTime _nextProjectBrowserViewRefreshUtc =
         DateTime.MinValue;
 
@@ -273,6 +274,13 @@ public class BIMaestroApp : IExternalApplication
         try
         {
             _uiApp ??= new UIApplication(args.Document.Application);
+            if (Couleur.ProjectBrowserProjectStorage.Activate(args.Document))
+            {
+                Couleur.ProjectBrowserColoring.Reset();
+                Couleur.ProjectBrowserColoring.Apply(
+                    _uiApp.MainWindowHandle);
+                _pendingProjectBrowserAppearanceRefreshes = 3;
+            }
             Analyse.ElementHistoryTracker.ScheduleDeferredPrime(args.Document);
             ExcelLogger.OnViewActivated(args.Document, _uiApp);
             Couleur.ProjectBrowserColoring
@@ -284,6 +292,10 @@ public class BIMaestroApp : IExternalApplication
                 args.Document,
                 args.CurrentActiveView);
             BIMaestro.ViewHover.ViewDeckChangeService.Activate(args.Document, args.CurrentActiveView);
+            // Closing a view can recreate the remaining tab headers after the
+            // previous color pass; refresh them on the next Idling callback.
+            _lastRibbonApplyUtc = DateTime.MinValue;
+            _nextRibbonInspectionUtc = DateTime.MinValue;
             _pendingProjectBrowserViewRefreshes = 3;
             _nextProjectBrowserViewRefreshUtc =
                 DateTime.UtcNow.AddMilliseconds(80);
@@ -324,6 +336,13 @@ public class BIMaestroApp : IExternalApplication
         View activeView = uiDocument?.ActiveView;
         if (document != null && activeView != null)
         {
+            if (_pendingProjectBrowserAppearanceRefreshes > 0)
+            {
+                Couleur.ProjectBrowserColoring.Reset();
+                Couleur.ProjectBrowserColoring.Apply(
+                    _uiApp.MainWindowHandle);
+                _pendingProjectBrowserAppearanceRefreshes--;
+            }
             Couleur.ProjectBrowserColoring.TrackActiveView(
                 document,
                 activeView);
@@ -398,6 +417,11 @@ public class BIMaestroApp : IExternalApplication
         try
         {
             _uiApp ??= new UIApplication(e.Document.Application);
+            if (Couleur.ProjectBrowserProjectStorage.Forget(e.Document))
+            {
+                _pendingProjectBrowserAppearanceRefreshes = 0;
+                Couleur.ProjectBrowserColoring.Reset();
+            }
             Analyse.ElementHistoryHoverInfoService.Hide();
             BIMaestro.ViewHover.ViewHoverPreviewService.ForgetDocument(
                 e.Document);

@@ -32,8 +32,12 @@ namespace BIMaestro.Codex
         private int activeRevitCalls;
         private readonly List<CodexImageAttachment> attachments = new List<CodexImageAttachment>();
         private readonly List<CodexPdfAttachment> pdfAttachments = new List<CodexPdfAttachment>();
-        private readonly DispatcherTimer claudeProgress = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        private DateTime claudeStarted;
+        private readonly DispatcherTimer activityTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        private readonly ProgressBar activityProgress = new ProgressBar { Height = 7, IsIndeterminate = true, Margin = new Thickness(0, 5, 0, 5) };
+        private readonly TextBlock activityPhaseText = new TextBlock { FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
+        private readonly TextBlock activityElapsedText = new TextBlock { FontSize = 11, TextWrapping = TextWrapping.Wrap };
+        private readonly StackPanel activityPanel = new StackPanel { Visibility = Visibility.Collapsed, Margin = new Thickness(0, 2, 0, 10) };
+        private DateTime activityStarted;
         private readonly HashSet<string> handledToolCalls = new HashSet<string>();
         private readonly WrapPanel attachmentPanel = new WrapPanel();
         private readonly Expander permissions = new Expander { Header = "Autorisations et réglages avancés", IsExpanded = false };
@@ -75,6 +79,8 @@ namespace BIMaestro.Codex
         private async Task<bool> LaunchSeparateRevitAsync()
         {
             if (separateRevitStarting) return false;
+            if (activityPanel.Visibility != Visibility.Visible) BeginActivity("Démarrage du Revit séparé…");
+            else SetActivityPhase("Démarrage du Revit séparé…");
             separateRevitStarting = true; UpdateControls();
             try
             {
@@ -96,6 +102,7 @@ namespace BIMaestro.Codex
                     pendingDedicatedClient = new CodexDedicatedRevitClient(pipeName, secret);
                 }
                 status.Text = "Démarrage du Revit séparé et connexion à cette page Famille IA…";
+                SetActivityPhase("Connexion à la nouvelle session Revit…");
                 await pendingDedicatedClient.WaitReadyAsync(dedicatedProcess);
                 if (closed) return false;
                 dedicatedClient = pendingDedicatedClient;
@@ -105,7 +112,7 @@ namespace BIMaestro.Codex
                 status.Text = "Revit séparé connecté · discussion conservée dans cette fenêtre.";
                 return true;
             }
-            catch (Exception ex) { Error(ex); return false; }
+            catch (Exception ex) { EndActivity(); Error(ex); return false; }
             finally { separateRevitStarting = false; if (!closed) UpdateControls(); }
         }
 
@@ -151,12 +158,8 @@ namespace BIMaestro.Codex
         {
             this.bridge = bridge;
             separateMode.IsChecked = !bridge.IsAttachedFamilyDocument;
-            claudeProgress.Tick += (_, __) =>
-            {
-                if (!closed && busy && provider.SelectedIndex == 1 && activeRevitCalls == 0)
-                    status.Text = "Claude travaille… " + (int)(DateTime.UtcNow - claudeStarted).TotalSeconds + " s";
-            };
-            bridge.CreationProgress += message => { if (!closed) status.Text = message; };
+            activityTimer.Tick += (_, __) => UpdateActivityElapsed();
+            bridge.CreationProgress += message => { if (!closed) SetActivityPhase(message); };
             Title = bridge.DedicatedSession ? "BIMaestro — Famille IA · session dédiée" : "BIMaestro — Famille IA (bêta)";
             Width = 720; Height = 900; MinWidth = 640; MinHeight = 720;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -262,6 +265,11 @@ namespace BIMaestro.Codex
             status.SetResourceReference(TextBlock.ForegroundProperty, "Text.Secondary");
             status.Margin = new Thickness(0, 0, 0, 8);
             session.Children.Add(status);
+            activityPhaseText.SetResourceReference(TextBlock.ForegroundProperty, "Text.Primary");
+            activityElapsedText.SetResourceReference(TextBlock.ForegroundProperty, "Text.Secondary");
+            activityProgress.SetResourceReference(ProgressBar.ForegroundProperty, "Brand");
+            activityPanel.Children.Add(activityPhaseText); activityPanel.Children.Add(activityProgress); activityPanel.Children.Add(activityElapsedText);
+            session.Children.Add(activityPanel);
             var modelRow = new Grid();
             modelRow.ColumnDefinitions.Add(new ColumnDefinition()); modelRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(172) });
             var modelField = new DockPanel(); var modelLabel = Text("Modèle", "Label"); DockPanel.SetDock(modelLabel, Dock.Left); modelField.Children.Add(modelLabel); modelField.Children.Add(models);
@@ -449,7 +457,7 @@ namespace BIMaestro.Codex
                 if (Environment.GetEnvironmentVariable("BIMAESTRO_FAMILY_PROVIDER") == "1") provider.SelectedIndex = 1;
                 Environment.SetEnvironmentVariable("BIMAESTRO_FAMILY_PROVIDER", null, EnvironmentVariableTarget.Process);
             }
-            Closed += (_, __) => { closed = true; claudeProgress.Stop(); claudeCancellation?.Cancel(); CancelRevit(); claudeClient?.Dispose(); bridge.Dispose(); client?.Dispose(); dedicatedProcess?.Dispose(); };
+            Closed += (_, __) => { closed = true; activityTimer.Stop(); claudeCancellation?.Cancel(); CancelRevit(); claudeClient?.Dispose(); bridge.Dispose(); client?.Dispose(); dedicatedProcess?.Dispose(); };
             UpdateControls();
         }
 
@@ -619,6 +627,46 @@ namespace BIMaestro.Codex
             UpdateControls();
         }
 
+        private void BeginActivity(string phase)
+        {
+            activityStarted = DateTime.UtcNow;
+            activityPanel.Visibility = Visibility.Visible;
+            activityProgress.IsIndeterminate = true;
+            activityPhaseText.Text = phase;
+            UpdateActivityElapsed();
+            activityTimer.Start();
+        }
+
+        private void SetActivityPhase(string phase)
+        {
+            if (activityPanel.Visibility != Visibility.Visible) BeginActivity(phase);
+            else activityPhaseText.Text = phase;
+            UpdateActivityElapsed();
+        }
+
+        private void UpdateActivityElapsed()
+        {
+            if (activityPanel.Visibility != Visibility.Visible) return;
+            var elapsed = DateTime.UtcNow - activityStarted;
+            activityElapsedText.Text = "Temps écoulé : " + (elapsed.TotalHours >= 1 ? elapsed.ToString(@"h\:mm\:ss") : elapsed.ToString(@"m\:ss")) +
+                " · la durée dépend de la complexité de la famille";
+        }
+
+        private void EndActivity()
+        {
+            activityTimer.Stop();
+            activityPanel.Visibility = Visibility.Collapsed;
+        }
+
+        private static string RevitActivity(string tool)
+        {
+            if (tool == "revit_create_family" || tool == "revit_create_parametric_family") return "Construction de la famille dans Revit…";
+            if (tool == "revit_validate_family" || tool == "revit_validate_parametric_family") return "Validation de la famille dans Revit…";
+            if (tool == "revit_open_created_family") return "Ouverture du RFA créé…";
+            if (tool != null && tool.StartsWith("revit_inspect", StringComparison.Ordinal)) return "Lecture de la famille Revit…";
+            return "Opération Revit en cours…";
+        }
+
         private void UpdateControls()
         {
             permissions.Header = direct.IsChecked == true ? "Autorisations Revit : application directe" :
@@ -717,7 +765,9 @@ namespace BIMaestro.Codex
             string prompt = request + PdfContext();
             var images = attachments.Concat(pdfAttachments.SelectMany(p => p.PageImages)).ToArray();
             busy = true; claudeCancellation = new CancellationTokenSource(); UpdateControls();
-            claudeStarted = DateTime.UtcNow; status.Text = "Claude travaille…"; claudeProgress.Start();
+            if (activityPanel.Visibility != Visibility.Visible) BeginActivity("Claude analyse la demande…");
+            else SetActivityPhase("Claude analyse la demande…");
+            status.Text = "Claude travaille…";
             Append("Vous", request + (attachments.Count > 0 ? "\n[" + attachments.Count + " image(s) jointe(s)]" : "") + PdfSummary());
             input.Clear(); attachments.Clear(); pdfAttachments.Clear(); RefreshAttachments();
             try
@@ -725,7 +775,7 @@ namespace BIMaestro.Codex
                 await claudeClient.AskAsync(prompt, images, model.Id, effort.SelectedItem as string,
                     async (tool, args) =>
                     {
-                        activeRevitCalls++; status.Text = "Opération Revit en attente…";
+                        activeRevitCalls++; status.Text = "Opération Revit en attente…"; SetActivityPhase(RevitActivity(tool));
                         try
                         {
                             object result = await CallRevitAsync(tool, args);
@@ -757,9 +807,8 @@ namespace BIMaestro.Codex
             catch (Exception ex) { Error(ex); }
             finally
             {
-                claudeProgress.Stop();
                 claudeCancellation?.Dispose(); claudeCancellation = null;
-                busy = activeRevitCalls > 0; UpdateControls();
+                busy = activeRevitCalls > 0; if (!busy) EndActivity(); UpdateControls();
             }
         }
 
@@ -789,17 +838,18 @@ namespace BIMaestro.Codex
         private async Task SendAsync()
         {
             if (!ready || busy || connecting || checkingLibrary || string.IsNullOrWhiteSpace(input.Text)) return;
+            BeginActivity("Préparation de la demande…");
             if (!bridge.DedicatedSession && separateMode.IsChecked == true &&
                 (dedicatedClient == null || dedicatedProcess == null || dedicatedProcess.HasExited))
             {
                 if (dedicatedProcess?.HasExited == true) { dedicatedClient = null; pendingDedicatedClient = null; }
                 if (!await LaunchSeparateRevitAsync()) return;
             }
-            checkingLibrary = true; UpdateControls();
+            checkingLibrary = true; SetActivityPhase("Recherche de familles proches…"); UpdateControls();
             bool proceed;
             try { proceed = await CheckLibraryBeforeCreationAsync(input.Text.Trim()); }
             finally { checkingLibrary = false; UpdateControls(); }
-            if (!proceed) return;
+            if (!proceed) { EndActivity(); return; }
             if (provider.SelectedIndex == 1) { await SendClaudeAsync(); return; }
             if (!ready || busy || connecting || !(models.SelectedItem is ModelChoice model) || string.IsNullOrWhiteSpace(input.Text)) return;
             if (attachments.Count + pdfAttachments.Sum(p => p.PageImages.Length) > 0 && !model.SupportsImages)
@@ -808,7 +858,7 @@ namespace BIMaestro.Codex
             var messageInput = new List<object> { new { type = "text", text = text + PdfContext() } };
             messageInput.AddRange(attachments.Select(a => (object)new { type = "image", url = a.DataUrl }));
             messageInput.AddRange(pdfAttachments.SelectMany(p => p.PageImages).Select(a => (object)new { type = "image", url = a.DataUrl }));
-            busy = true; UpdateControls();
+            busy = true; SetActivityPhase("Codex analyse la demande…"); UpdateControls();
             handledToolCalls.Clear();
             try
             {
@@ -876,9 +926,9 @@ namespace BIMaestro.Codex
                     input = messageInput
                 });
                 input.Clear(); attachments.Clear(); pdfAttachments.Clear(); RefreshAttachments();
-                if (busy) { turnId = (string)response["turn"]?["id"]; status.Text = "Codex travaille…"; }
+                if (busy) { turnId = (string)response["turn"]?["id"]; status.Text = "Codex travaille…"; SetActivityPhase("Codex prépare la réponse…"); }
             }
-            catch (Exception ex) { DisconnectLocal(); Error(ex); }
+            catch (Exception ex) { EndActivity(); DisconnectLocal(); Error(ex); }
         }
 
         private static readonly HashSet<string> LibraryStopWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -978,6 +1028,7 @@ namespace BIMaestro.Codex
             if (method == "turn/started") turnId = (string)turn?["id"];
             if (method == "item/agentMessage/delta")
             {
+                SetActivityPhase("Codex rédige la réponse…");
                 transcript.AppendText((string)data["delta"] ?? ""); transcript.ScrollToEnd();
             }
             if (method == "item/completed" && (string)item?["type"] == "agentMessage") transcript.AppendText("\n\n");
@@ -1004,6 +1055,7 @@ namespace BIMaestro.Codex
                 turnId = null;
                 busy = activeRevitCalls > 0;
                 status.Text = busy ? "Revit termine l’opération en cours…" : state == "completed" ? "Prêt" : state == "interrupted" ? "Réponse arrêtée" : "La réponse a échoué.";
+                if (busy) SetActivityPhase("Revit termine l’opération en cours…"); else EndActivity();
                 // JSON null is a non-null JValue. ?. alone does not protect its indexer.
                 string error = (string)(turn?["error"] as JObject)?["message"];
                 if (!string.IsNullOrEmpty(error)) Append("Codex", error);
@@ -1026,7 +1078,7 @@ namespace BIMaestro.Codex
                     if (!(data["arguments"] is JObject args)) throw new InvalidOperationException("Arguments Revit invalides.");
                     string tool = (string)data["tool"];
                     activeRevitCalls++; accepted = true;
-                    status.Text = "Opération Revit en attente…";
+                    status.Text = "Opération Revit en attente…"; SetActivityPhase(RevitActivity(tool));
                     object result = await CallRevitAsync(tool, args);
                     if (turnId == null) status.Text = "Opération Revit terminée";
                     documentLabel.Text = "Document : " + TargetDocumentTitle;
@@ -1072,6 +1124,7 @@ namespace BIMaestro.Codex
                     if (!closed && origin == client && turnId == null)
                     {
                         busy = activeRevitCalls > 0;
+                        if (!busy) EndActivity();
                         UpdateControls();
                     }
                 }
@@ -1088,7 +1141,7 @@ namespace BIMaestro.Codex
             if (claudeClient != null)
             {
                 claudeCancellation?.Cancel(); claudeClient.Stop();
-                busy = false; status.Text = "Réponse arrêtée"; UpdateControls(); return;
+                busy = false; status.Text = "Réponse arrêtée"; EndActivity(); UpdateControls(); return;
             }
             try
             {
@@ -1115,7 +1168,7 @@ namespace BIMaestro.Codex
             var old = client; client = null; old?.Dispose();
             CancelRevit(); ready = false; busy = false; threadId = turnId = null;
             direct.IsChecked = false;
-            connect.Content = "Connexion ChatGPT"; status.Text = "Non connecté";
+            connect.Content = "Connexion ChatGPT"; status.Text = "Non connecté"; EndActivity();
             models.ItemsSource = null; effort.ItemsSource = null; UpdateControls();
         }
         private void Error(Exception ex) { if (!closed) { status.Text = ex.Message; Append("BIMaestro", ex.Message); } }

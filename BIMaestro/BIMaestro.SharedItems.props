@@ -51,6 +51,8 @@
     <Compile Include="commands\Codex\CodexCommunitySnapshot.cs" />
     <Compile Include="les couleurs\Personnalisation\ProjectBrowserIcons.cs" />
     <Compile Include="les couleurs\Personnalisation\AppearancePack.cs" />
+    <Compile Include="les couleurs\Personnalisation\ProjectBrowserProjectStorage.cs" />
+    <Compile Include="les couleurs\Personnalisation\ProjectBrowserRuleWindow.cs" />
     <Compile Include="les couleurs\Personnalisation\BrowserAtmosphere.cs" />
     <EmbeddedResource Include="Resources\BrowserIcons\*.png" />
     <EmbeddedResource Include="Resources\BrowserIcons\browser-icons.js" />
@@ -348,6 +350,9 @@
     <Compile Include="commands\Suivi maquette collaboratif\CollaborativeModelTrackerWindow.xaml.cs">
       <DependentUpon>CollaborativeModelTrackerWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="commands\gabarit de vue\ViewTemplateTransferModels.cs" />
+    <Compile Include="commands\gabarit de vue\ViewTemplateTransferService.cs" />
+    <Compile Include="commands\gabarit de vue\ViewTemplateTransferCommand.cs" />
     <Compile Include="commands\vue en survol\ViewHoverPreviewService.cs" />
     <Compile Include="commands\vue en survol\ViewHoverPreviewBatchService.cs" />
     <Compile Include="commands\vue en survol\ViewThumbnailBatchCommand.cs" />
@@ -1020,6 +1025,7 @@
     <EmbeddedResource Include="Resources\Import unités.png" />
     <EmbeddedResource Include="Resources\Miniature.png" />
     <EmbeddedResource Include="Resources\Option.png" />
+    <EmbeddedResource Include="Resources\Gabarit de vue simple.png" />
     <EmbeddedResource Include="Resources\Organisateur.png" />
     <EmbeddedResource Include="Resources\Ouvrir la vue.png" />
     <EmbeddedResource Include="Resources\Peinture.png" />

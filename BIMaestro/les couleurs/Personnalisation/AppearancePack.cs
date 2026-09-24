@@ -11,6 +11,9 @@ namespace Couleur
     {
         public string Format { get; set; } = "BIMaestro.Appearance";
         public int Version { get; set; } = 1;
+        // Defaults keep packs created before scoped exports fully compatible.
+        public bool IncludesRibbon { get; set; } = true;
+        public bool IncludesBrowser { get; set; } = true;
         public bool RibbonEnabled { get; set; }
         public bool FullPanels { get; set; }
         public Dictionary<string, RibbonPanelColorScheme> Ribbon { get; set; }
@@ -29,14 +32,29 @@ namespace Couleur
 
         public static void Export(string path, AppearancePack pack)
         {
-            File.WriteAllText(path, JsonConvert.SerializeObject(pack, Formatting.Indented, Settings));
+            File.WriteAllText(path, Serialize(pack));
         }
 
         public static AppearancePack Import(string path)
         {
             if (new FileInfo(path).Length > 20 * 1024 * 1024)
                 throw new InvalidDataException("Le pack dépasse 20 Mo.");
-            var json = File.ReadAllText(path);
+            return Deserialize(File.ReadAllText(path));
+        }
+
+        internal static string Serialize(AppearancePack pack)
+        {
+            if (pack == null)
+                throw new ArgumentNullException(nameof(pack));
+
+            return JsonConvert.SerializeObject(pack, Formatting.Indented, Settings);
+        }
+
+        internal static AppearancePack Deserialize(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json) || json.Length > 20 * 1024 * 1024)
+                throw new InvalidDataException("Le pack est vide ou dépasse 20 Mo.");
+
             using (var reader = new JsonTextReader(new StringReader(json)) { MaxDepth = 32 })
             {
                 var header = Newtonsoft.Json.Linq.JObject.Load(reader);
@@ -45,12 +63,17 @@ namespace Couleur
             }
             var pack = JsonConvert.DeserializeObject<AppearancePack>(json, Settings);
             if (pack == null || pack.Format != "BIMaestro.Appearance" || pack.Version != 1 ||
-                pack.Ribbon == null || pack.Browser == null || pack.Icons == null ||
-                pack.Icons.Rules == null || pack.Icons.CustomAssets == null || pack.Browser.CategoryColorRules == null)
+                (!pack.IncludesRibbon && !pack.IncludesBrowser) ||
+                (pack.IncludesRibbon && pack.Ribbon == null) ||
+                (pack.IncludesBrowser && (pack.Browser == null || pack.Icons == null ||
+                    pack.Icons.Rules == null || pack.Icons.CustomAssets == null || pack.Browser.CategoryColorRules == null)))
                 throw new InvalidDataException("Ce fichier n’est pas un pack BIMaestro compatible.");
-            if (pack.Ribbon.Any(p => p.Value == null) || pack.Icons.Rules.Any(r => r == null) ||
-                pack.Browser.CategoryColorRules.Any(r => r == null))
+            if ((pack.IncludesRibbon && pack.Ribbon.Any(p => p.Value == null)) ||
+                (pack.IncludesBrowser && (pack.Icons.Rules.Any(r => r == null) ||
+                    pack.Browser.CategoryColorRules.Any(r => r == null))))
                 throw new InvalidDataException("Le pack contient une règle incomplète.");
+            if (!pack.IncludesBrowser)
+                return pack;
             var ids = new HashSet<string>(ProjectBrowserIcons.Assets(new BrowserIconSettings()).Select(a => a.Id));
             foreach (var asset in pack.Icons.CustomAssets)
             {

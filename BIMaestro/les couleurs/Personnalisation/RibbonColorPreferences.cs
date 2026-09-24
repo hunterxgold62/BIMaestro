@@ -17,6 +17,9 @@ namespace Couleur
     {
         private string _categoryName = string.Empty;
         private Color _color = Color.FromRgb(209, 250, 229);
+        private string _folderPath = string.Empty;
+        private string _effect = string.Empty;
+        private string _scope = "Branche";
 
         public string CategoryName
         {
@@ -45,6 +48,24 @@ namespace Couleur
             }
         }
 
+        public string FolderPath
+        {
+            get => _folderPath;
+            set { _folderPath = value ?? string.Empty; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(FolderPath))); }
+        }
+
+        public string Effect
+        {
+            get => _effect;
+            set { _effect = value ?? string.Empty; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Effect))); }
+        }
+
+        public string Scope
+        {
+            get => _scope;
+            set { _scope = value ?? "Branche"; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Scope))); }
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         public ProjectBrowserCategoryColorRule Clone()
@@ -52,7 +73,10 @@ namespace Couleur
             return new ProjectBrowserCategoryColorRule
             {
                 CategoryName = CategoryName,
-                Color = Color
+                Color = Color,
+                FolderPath = FolderPath,
+                Effect = Effect,
+                Scope = Scope
             };
         }
     }
@@ -1937,6 +1961,7 @@ namespace Couleur
     public static class ProjectBrowserColorPreferences
     {
         private static ProjectBrowserColorSettings _cached;
+        private static ProjectBrowserColorSettings _projectOverride;
 
         public static ProjectBrowserColorSettings GetDefaults()
         {
@@ -1967,6 +1992,9 @@ namespace Couleur
         {
             lock (RibbonColorPreferences.PreferenceSyncRoot)
             {
+                if (_projectOverride != null)
+                    return Clone(_projectOverride);
+
                 if (_cached != null)
                     return Clone(_cached);
 
@@ -2064,7 +2092,10 @@ namespace Couleur
                                     new ProjectBrowserCategoryColorRule
                                     {
                                         CategoryName = name,
-                                        Color = ruleColor
+                                        Color = ruleColor,
+                                        FolderPath = rule.Value<string>("Chemin") ?? string.Empty,
+                                        Effect = rule.Value<string>("Effet") ?? string.Empty,
+                                        Scope = rule.Value<string>("Portee") ?? "Branche"
                                     });
                             }
                         }
@@ -2077,6 +2108,17 @@ namespace Couleur
 
                 _cached = settings;
                 return Clone(_cached);
+            }
+        }
+
+        internal static void SetProjectOverride(
+            ProjectBrowserColorSettings settings)
+        {
+            lock (RibbonColorPreferences.PreferenceSyncRoot)
+            {
+                _projectOverride = settings == null
+                    ? null
+                    : Clone(settings);
             }
         }
 
@@ -2133,7 +2175,10 @@ namespace Couleur
                             .Select(rule => new JObject
                             {
                                 ["Nom"] = rule.CategoryName.Trim(),
-                                ["Couleur"] = ToHex(rule.Color)
+                                ["Couleur"] = ToHex(rule.Color),
+                                ["Chemin"] = rule.FolderPath,
+                                ["Effet"] = rule.Effect,
+                                ["Portee"] = rule.Scope
                             }))
                 };
                 RibbonColorPreferences.SavePreferenceRoot(root);
@@ -2411,7 +2456,10 @@ namespace Couleur
                             ["Nom"] = rule.CategoryName.Trim(),
                             ["Couleur"] =
                                 ProjectBrowserColorPreferences.ToHex(
-                                    rule.Color)
+                                    rule.Color),
+                            ["Chemin"] = rule.FolderPath,
+                            ["Effet"] = rule.Effect,
+                            ["Portee"] = rule.Scope
                         }))
             };
         }
@@ -2472,7 +2520,10 @@ namespace Couleur
                         new ProjectBrowserCategoryColorRule
                         {
                             CategoryName = ruleName,
-                            Color = ruleColor
+                            Color = ruleColor,
+                            FolderPath = rule.Value<string>("Chemin") ?? string.Empty,
+                            Effect = rule.Value<string>("Effet") ?? string.Empty,
+                            Scope = rule.Value<string>("Portee") ?? "Branche"
                         });
                 }
             }

@@ -50,6 +50,7 @@ namespace BIMaestro.UI
         // ======== Eléments visuels ========
         private readonly List<Path> _sectors = new();
         private readonly List<Border> _iconBorders = new();
+        private readonly List<TextBlock> _pinnedStars = new();
         private Path _hoverOutlinePath;
         private Ellipse _centerDisk;
         private Image _centerPreview;
@@ -386,6 +387,21 @@ namespace BIMaestro.UI
                 Canvas.SetTop(border, iy);
                 _iconBorders.Add(border);
                 RootCanvas.Children.Add(border);
+
+                // Repère discret pour les boutons choisis dans la rosace.
+                var star = new TextBlock
+                {
+                    Text = "★",
+                    FontSize = 15,
+                    Foreground = new SolidColorBrush(Color.FromRgb(210, 154, 42)),
+                    Effect = new DropShadowEffect { Color = Colors.White, BlurRadius = 3, ShadowDepth = 0, Opacity = 1 },
+                    IsHitTestVisible = false,
+                    Visibility = Visibility.Collapsed
+                };
+                Canvas.SetLeft(star, ix + IMG_SIZE - 10);
+                Canvas.SetTop(star, iy - 8);
+                _pinnedStars.Add(star);
+                RootCanvas.Children.Add(star);
             }
 
             // clic ailleurs dans la roue => fermeture (après délai d’armement)
@@ -503,6 +519,8 @@ namespace BIMaestro.UI
                 img.Source = src;
                 _iconBorders[i].Opacity = (item == null || !item.HasAction) ? 0.2 : 1.0;
                 _iconBorders[i].ToolTip = item == null || !item.HasAction ? null : item.Label;
+                _pinnedStars[i].Visibility = item?.IsPinned == true && item.HasAction
+                    ? Visibility.Visible : Visibility.Collapsed;
                 _iconBorders[i].BorderBrush = Brushes.Transparent;
                 _iconBorders[i].BorderThickness = new Thickness(0);
                 _iconBorders[i].Padding = new Thickness(0);

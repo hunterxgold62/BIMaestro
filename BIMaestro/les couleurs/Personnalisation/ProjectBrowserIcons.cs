@@ -62,6 +62,7 @@ namespace Couleur
         private static readonly string FilePath = Path.Combine(
             Path.GetDirectoryName(RibbonColorPreferences.PreferenceFilePath), "iconesArborescence.json");
         private static BrowserIconSettings _current;
+        private static BrowserIconSettings _projectOverride;
         private static readonly Lazy<List<BrowserIconAsset>> BuiltIns = new Lazy<List<BrowserIconAsset>>(() =>
         {
             var result = new List<BrowserIconAsset>();
@@ -94,6 +95,9 @@ namespace Couleur
 
         public static BrowserIconSettings Load()
         {
+            if (_projectOverride != null)
+                return Clone(_projectOverride);
+
             try
             {
                 var settings = File.Exists(FilePath)
@@ -110,7 +114,32 @@ namespace Couleur
         {
             Directory.CreateDirectory(Path.GetDirectoryName(FilePath));
             File.WriteAllText(FilePath, JsonConvert.SerializeObject(settings, Formatting.Indented));
-            _current = Load();
+            _current = null;
+        }
+
+        internal static void SetProjectOverride(BrowserIconSettings settings)
+        {
+            _projectOverride = settings == null ? null : Clone(settings);
+            _current = null;
+        }
+
+        internal static BrowserIconSettings Clone(BrowserIconSettings settings)
+        {
+            if (settings == null)
+                return null;
+
+            var clone = new BrowserIconSettings { Enabled = settings.Enabled };
+            foreach (BrowserIconRule rule in settings.Rules ?? new ObservableCollection<BrowserIconRule>())
+            {
+                if (rule != null)
+                    clone.Rules.Add(new BrowserIconRule { Name = rule.Name, IconId = rule.IconId });
+            }
+            foreach (BrowserIconAsset asset in settings.CustomAssets ?? new ObservableCollection<BrowserIconAsset>())
+            {
+                if (asset != null)
+                    clone.CustomAssets.Add(new BrowserIconAsset { Id = asset.Id, Name = asset.Name, Data = asset.Data });
+            }
+            return clone;
         }
 
         // Decode and re-encode imports as small PNGs; no external paths or executable SVG enter the browser.

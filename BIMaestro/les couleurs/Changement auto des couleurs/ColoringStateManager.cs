@@ -25,7 +25,6 @@ namespace Couleur
     {
         private const int DoubleClickThresholdMs = 300;
         private static DispatcherTimer _singleClickTimer;
-        private static ExternalCommandData _pendingCommandData;
         protected override string ButtonId => "ToggleCombinedColoringCommand";
         protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
@@ -36,7 +35,8 @@ namespace Couleur
 
                 if (_singleClickTimer == null)
                 {
-                    _pendingCommandData = commandData;
+                    // The delayed click runs outside the command's API context.
+                    CustomizeRibbonColorsCommand.EnsureOpenEvent();
                     _singleClickTimer = new DispatcherTimer(
                         DispatcherPriority.Normal)
                     {
@@ -65,10 +65,8 @@ namespace Couleur
             object sender,
             EventArgs e)
         {
-            ExternalCommandData commandData = _pendingCommandData;
             CancelPendingSingleClick();
-            if (commandData != null)
-                DoSingleClick(commandData);
+            DoSingleClick();
         }
 
         private static void CancelPendingSingleClick()
@@ -79,16 +77,13 @@ namespace Couleur
                 _singleClickTimer.Tick -= SingleClickTimer_Tick;
                 _singleClickTimer = null;
             }
-            _pendingCommandData = null;
         }
 
-        private static void DoSingleClick(
-            ExternalCommandData commandData)
+        private static void DoSingleClick()
         {
             try
             {
-                CustomizeRibbonColorsCommand.ShowPreferences(
-                    commandData);
+                CustomizeRibbonColorsCommand.RequestOpenPreferences();
             }
             catch (Exception ex)
             {
@@ -280,6 +275,9 @@ namespace Couleur
                 var brush = GetFlashyProjectColor(proj, out var borderBrush);
                 tab.Background = brush;
                 tab.BorderBrush = borderBrush;
+                // Revit may rebuild the header visuals after a view closes.
+                // Keep the contrast on the tab so newly created text inherits it.
+                tab.Foreground = Brushes.Black;
                 ColorTextBlocks(tab, Brushes.Black);
             }
 
@@ -343,6 +341,7 @@ namespace Couleur
             {
                 t.ClearValue(TabItem.BackgroundProperty);
                 t.ClearValue(TabItem.BorderBrushProperty);
+                t.ClearValue(TabItem.ForegroundProperty);
                 ClearTextBlocks(t);
             }
         }
@@ -992,6 +991,9 @@ namespace Couleur
 
             [Newtonsoft.Json.JsonProperty("kind")]
             public string Kind { get; set; }
+
+            [Newtonsoft.Json.JsonProperty("path")]
+            public string Path { get; set; }
         }
 
         private sealed class ViewHoverPreviewInfo
@@ -1312,7 +1314,8 @@ namespace Couleur
                             {
                                 Id = id,
                                 Name = view.Name ?? string.Empty,
-                                Kind = kind
+                                Kind = kind,
+                                Path = string.Join(" / ", GetActiveViewFolderPath(document, view))
                             });
                         }
                     }
@@ -1615,7 +1618,7 @@ namespace Couleur
                 DispatcherPriority.Background,
                 root.Dispatcher)
             {
-                Interval = TimeSpan.FromMilliseconds(250)
+                Interval = TimeSpan.FromMilliseconds(50)
             };
             _viewHoverPollTimer.Tick += (_, __) =>
                 PollViewHoverPreview();
@@ -1722,12 +1725,15 @@ namespace Couleur
                         .Select(rule => new
                         {
                             name = rule.CategoryName.Trim(),
-                            color = ToCssColor(rule.Color)
+                            color = ToCssColor(rule.Color),
+                            path = rule.FolderPath ?? string.Empty,
+                            effect = rule.Effect ?? "Fond",
+                            scope = rule.Scope ?? "Branche"
                         }));
             string script = @"
 (()=>{
   const key='__bimaestroProjectBrowserTheme';
-  const version=25;
+  const version=28;
   const theme={
     appearanceEnabled:__BIMAESTRO_BROWSER_APPEARANCE_ENABLED__,
     activeParentEnabled:__BIMAESTRO_ACTIVE_PARENT_ENABLED__,
@@ -2028,6 +2034,17 @@ __BIMAESTRO_ATMOSPHERE_CSS__
         [data-bimaestro-view-parent]{
           font-weight:600;
         }
+        [data-bimaestro-category-effects~='Souligné'] [data-bimaestro-category-label]{text-decoration:underline !important;text-decoration-color:var(--bimaestro-decoration-color) !important;}
+        [data-bimaestro-category-effects~='Gras'] [data-bimaestro-category-label]{font-weight:800 !important;}
+        [data-bimaestro-category-effects~='Italique'] [data-bimaestro-category-label]{font-style:italic !important;}
+        [data-bimaestro-category-effects~='Barré'] [data-bimaestro-category-label]{text-decoration:line-through !important;text-decoration-color:var(--bimaestro-decoration-color) !important;}
+        [data-bimaestro-category-effects~='Bordure']{box-shadow:inset 4px 0 var(--bimaestro-border-color) !important;}
+        [data-bimaestro-category-effects~='Pastille'] [data-bimaestro-category-label]::before{content:'●';color:var(--bimaestro-prefix-color);margin-right:5px;}
+        [data-bimaestro-category-effects~='Icône'] [data-bimaestro-category-label]::before{content:'✦';color:var(--bimaestro-prefix-color);margin-right:5px;}
+        [data-bimaestro-category-effects~='Badge'] [data-bimaestro-category-label]::after{content:' ★';color:var(--bimaestro-badge-color);font-size:.8em;}
+        [data-bimaestro-category-effects~='Dégradé']{background:linear-gradient(90deg,var(--bimaestro-gradient-color),transparent) !important;}
+        [data-bimaestro-category-effects~='Animation']{animation:bimaestroCategoryPulse 1.8s ease-in-out infinite;}
+        @keyframes bimaestroCategoryPulse{50%{box-shadow:inset 4px 0 var(--bimaestro-animation-color),0 0 8px var(--bimaestro-animation-color);}}
         [data-bimaestro-view-kind][data-bimaestro-selected]{
           color:${theme.text} !important;
           background-color:rgba(25,174,232,.78) !important;
@@ -2064,6 +2081,10 @@ __BIMAESTRO_ATMOSPHERE_CSS__
       });
     let viewTypesById=new Map();
     let viewTypesByName=new Map();
+    let viewPathsById=new Map();
+    let viewPathsByName=new Map();
+    const rowContextByElement=new WeakMap();
+    const rowContextById=new Map();
     let clickedRowId='';
     let clickedRowName='';
     const paint=()=>{
@@ -2303,18 +2324,25 @@ __BIMAESTRO_ATMOSPHERE_CSS__
         .filter(Boolean)
         .sort((a,b)=>a.top-b.top||a.left-b.left);
       if(!rows.length)return rows;
-      const rootLeft=Math.min(...rows.map(row=>row.left));
       let currentBranch=null;
       const stack=[];
       rows.forEach(row=>{
-        if(row.left<=rootLeft+3){
-          if(/^(vues|views)(\s*\([^)]*\))?$/.test(row.name))
-            currentBranch='views';
-          else if(
-            /^(feuilles|sheets)(\s*\([^)]*\))?$/.test(
-              row.name))
-            currentBranch='sheets';
-          else currentBranch=null;
+        const elementContext=rowContextByElement.get(row.wrap);
+        const idContext=row.id?rowContextById.get(row.id):null;
+        const remembered=elementContext&&elementContext.name===row.name
+          ?elementContext
+          :idContext&&idContext.name===row.name?idContext:null;
+        if(remembered&&(!currentBranch||!stack.length)){
+          currentBranch=remembered.branch;
+          stack.length=0;
+          remembered.ancestors.forEach(item=>stack.push(item));
+        }
+        if(/^(vues|views)(\s*\([^)]*\))?$/.test(row.name)){
+          currentBranch='views';
+          stack.length=0;
+        }else if(/^(feuilles|sheets)(\s*\([^)]*\))?$/.test(row.name)){
+          currentBranch='sheets';
+          stack.length=0;
         }
         row.branch=currentBranch;
         while(stack.length&&
@@ -2322,25 +2350,40 @@ __BIMAESTRO_ATMOSPHERE_CSS__
           stack.pop();
         row.ancestors=stack.slice();
         stack.push(row);
+        if(row.branch){
+          const context={name:row.name,branch:row.branch,ancestors:row.ancestors.map(item=>({
+            name:item.name,left:item.left,branch:item.branch
+          }))};
+          rowContextByElement.set(row.wrap,context);
+          if(row.id)rowContextById.set(row.id,context);
+        }
       });
       return rows;
     };
     const clearViewTypeMarkers=()=>{
-      document.querySelectorAll('[data-bimaestro-view-text]')
+      document.querySelectorAll('[data-bimaestro-view-text],[data-bimaestro-category-label]')
         .forEach(element=>{
+          const hadViewText=element.hasAttribute('data-bimaestro-view-text');
           element.removeAttribute('data-bimaestro-view-text');
+          element.removeAttribute('data-bimaestro-category-label');
+          if(!hadViewText)return;
           if(theme.appearanceEnabled)
             element.style.setProperty('color',theme.text,'important');
           else
             element.style.removeProperty('color');
         });
-      document.querySelectorAll('[data-bimaestro-view-kind]')
+      document.querySelectorAll('[data-bimaestro-view-kind],[data-bimaestro-category-effects]')
         .forEach(element=>{
           element.removeAttribute('data-bimaestro-view-kind');
           element.removeAttribute('data-bimaestro-view-parent');
           element.removeAttribute('data-bimaestro-selected');
           element.removeAttribute('data-bimaestro-color-target');
+          element.removeAttribute('data-bimaestro-category-effects');
           element.style.removeProperty('--bimaestro-view-color');
+          ['--bimaestro-decoration-color','--bimaestro-border-color',
+           '--bimaestro-prefix-color','--bimaestro-badge-color',
+           '--bimaestro-gradient-color','--bimaestro-animation-color']
+            .forEach(name=>element.style.removeProperty(name));
         });
     };
     const resolveViewKind=row=>{
@@ -2382,17 +2425,81 @@ __BIMAESTRO_ATMOSPHERE_CSS__
           'important');
       }
     };
-    const getCategoryRule=row=>{
+    const getCategoryRules=row=>{
       if(!theme.categoryEnabled||
-         !Array.isArray(theme.categoryRules))return null;
-      const candidates=[row]
-        .concat((row.ancestors||[]).slice().reverse());
-      for(const candidate of candidates){
-        const rule=theme.categoryRules.find(item=>
-          item&&normalizeLabel(item.name)===candidate.name);
-        if(rule&&rule.color)return rule;
-      }
-      return null;
+         !Array.isArray(theme.categoryRules))return [];
+      const lineage=(row.ancestors||[]).concat(row);
+      const path=lineage.filter(item=>item.branch==='views'&&
+        !/^(vues|views)(\s*\([^)]*\))?$/.test(item.name));
+      return theme.categoryRules.filter(rule=>{
+        if(!rule||!rule.color)return false;
+        if(!rule.path)return lineage.some(item=>item.branch==='views'&&
+          item.name===normalizeLabel(rule.name));
+        const parts=String(rule.path).split(' / ').map(normalizeLabel);
+        const targetIndex=path.findIndex((item,index)=>
+          index+1>=parts.length&&parts.every((part,offset)=>
+            path[index+offset+1-parts.length].name===part));
+        if(targetIndex<0)return false;
+        if(rule.scope==='Dossier'&&path[targetIndex]!==row)return false;
+        if(rule.scope==='Enfants'&&path[targetIndex]===row)return false;
+        return true;
+      }).sort((a,b)=>(a.path||'').length-(b.path||'').length);
+    };
+    const resolveMappedViewPath=row=>{
+      if(row.id&&viewPathsById.has(row.id))return viewPathsById.get(row.id);
+      if(viewPathsByName.has(row.name))return viewPathsByName.get(row.name);
+      const match=Array.from(viewPathsByName).find(([name])=>
+        row.name.endsWith(`: ${name}`)||row.name.endsWith(`:${name}`));
+      return match?match[1]:null;
+    };
+    const getPlacedViewRules=row=>{
+      const path=resolveMappedViewPath(row);
+      if(!path||!theme.categoryEnabled)return [];
+      const parts=path.split(' / ').map(normalizeLabel);
+      return theme.categoryRules.filter(rule=>{
+        if(!rule||!rule.color||rule.scope==='Dossier')return false;
+        if(!rule.path)return parts.includes(normalizeLabel(rule.name));
+        const target=String(rule.path).split(' / ').map(normalizeLabel);
+        return parts.some((_,index)=>index+1>=target.length&&
+          target.every((part,offset)=>parts[index+offset+1-target.length]===part));
+      }).sort((a,b)=>(a.path||'').length-(b.path||'').length);
+    };
+    const applyCategoryRules=(row,rules)=>{
+      const effects=[];
+      rules.forEach(rule=>{
+        const effect=rule.effect||'Fond';
+        if(!effects.includes(effect))effects.push(effect);
+        if(effect==='Fond'||effect==='Texte'){
+          if(effect==='Fond'){
+            markViewTypeRow(row,'category',false,rule.color);
+            row.wrap.setAttribute('data-bimaestro-color-target','background');
+          }
+          if(effect==='Texte'&&row.label){
+            row.label.setAttribute('data-bimaestro-view-text','1');
+            row.label.style.setProperty('color',rule.color,'important');
+          }
+          return;
+        }
+        const colorVariable={
+          'Souligné':'--bimaestro-decoration-color',
+          'Barré':'--bimaestro-decoration-color',
+          'Bordure':'--bimaestro-border-color',
+          'Pastille':'--bimaestro-prefix-color',
+          'Icône':'--bimaestro-prefix-color',
+          'Badge':'--bimaestro-badge-color',
+          'Dégradé':'--bimaestro-gradient-color',
+          'Animation':'--bimaestro-animation-color'
+        }[effect];
+        if(colorVariable)row.wrap.style.setProperty(colorVariable,rule.color);
+        if(row.label){
+          row.label.setAttribute('data-bimaestro-category-label','1');
+          if(['Souligné','Gras','Italique','Barré'].includes(effect)){
+            row.label.setAttribute('data-bimaestro-view-text','1');
+            row.label.style.setProperty('color',rule.color,'important');
+          }
+        }
+      });
+      if(effects.length)row.wrap.setAttribute('data-bimaestro-category-effects',effects.join(' '));
     };
     const paintViewTypes=()=>{
       clearViewTypeMarkers();
@@ -2404,22 +2511,19 @@ __BIMAESTRO_ATMOSPHERE_CSS__
       if(!hasViewTypes&&!hasCategories)return;
       const rows=getProjectBrowserRows();
       const coloredRows=[];
-      rows.filter(row=>row.branch!=='sheets')
+      rows.filter(row=>row.branch==='views'||row.branch==='sheets')
         .forEach(row=>{
-          const categoryRule=getCategoryRule(row);
-          if(categoryRule){
-            markViewTypeRow(
-              row,
-              'category',
-              false,
-              categoryRule.color);
-            return;
-          }
-          if(!hasViewTypes)return;
+          const mappedPath=resolveMappedViewPath(row);
+          const categoryRules=mappedPath!==null
+            ?getPlacedViewRules(row)
+            :row.branch==='views'?getCategoryRules(row):[];
+          if(!hasViewTypes&&!categoryRules.length)return;
           const kind=resolveViewKind(row);
-          if(!kind||!theme.viewColors[kind])return;
-          coloredRows.push({row,kind});
-          markViewTypeRow(row,kind,false);
+          if(hasViewTypes&&kind&&theme.viewColors[kind]){
+            coloredRows.push({row,kind});
+            markViewTypeRow(row,kind,false);
+          }
+          applyCategoryRules(row,categoryRules);
         });
       if(!hasViewTypes||!theme.viewParentEnabled)return;
       const parentKinds=new Map();
@@ -2440,6 +2544,8 @@ __BIMAESTRO_ATMOSPHERE_CSS__
     const setViewTypes=entries=>{
       viewTypesById=new Map();
       viewTypesByName=new Map();
+      viewPathsById=new Map();
+      viewPathsByName=new Map();
       if(Array.isArray(entries))
         entries.forEach(entry=>{
           if(!entry||typeof entry!=='object')return;
@@ -2449,6 +2555,8 @@ __BIMAESTRO_ATMOSPHERE_CSS__
           if(!theme.viewColors[kind])return;
           if(id)viewTypesById.set(id,kind);
           if(name)viewTypesByName.set(name,kind);
+          if(id)viewPathsById.set(id,String(entry.path||''));
+          if(name)viewPathsByName.set(name,String(entry.path||''));
         });
       paintViewTypes();
     };
@@ -2795,6 +2903,7 @@ __BIMAESTRO_ATMOSPHERE_CSS__
       if(activeParentScrollTimer!==null)return;
       activeParentScrollTimer=requestAnimationFrame(()=>{
         activeParentScrollTimer=null;
+        paintViewTypes();
         refreshActiveHighlight();
         renderActiveParent();
       });
@@ -3174,7 +3283,7 @@ __BIMAESTRO_ATMOSPHERE_CSS__
       if(state.disposed||pendingKey!==info.key)return;
       currentKey=info.key;
       currentRowTop=pendingRowTop;
-    },1000);
+    },200);
   };
   const onLeave=()=>hide();
   document.addEventListener('pointermove',onMove,true);
