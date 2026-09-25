@@ -276,16 +276,20 @@ namespace BIMaestro.VideoGames
             string publicationName)
         {
             if (scene == null) throw new ArgumentNullException(nameof(scene));
-            if (!scene.MepGraph.HasData)
-                throw new InvalidOperationException("Le graphe MEP est vide.");
             if (scene.WebTiles.Count == 0)
                 throw new InvalidOperationException("La géométrie web n'est plus disponible.");
 
+            // A 3D model may have no pipe network; keep a valid empty replay for the viewer.
+            GameMepReplaySnapshot replay = scene.MepGraph.HasData
+                ? GameMepReplayStore.Capture(scene.MepGraph,
+                    preserveElementPersistentIds: true)
+                : new GameMepReplaySnapshot
+                {
+                    DocumentLabel = scene.MepGraph.DocumentTitle,
+                    Graph = scene.MepGraph
+                };
             byte[] mep = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(
-                GameMepReplayStore.Capture(
-                    scene.MepGraph,
-                    preserveElementPersistentIds: true),
-                JsonSettings));
+                replay, JsonSettings));
             byte[] properties = Encoding.UTF8.GetBytes(scene.WebPropertiesJson ?? "[]");
             byte[] viewer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(
                 new

@@ -422,6 +422,7 @@ public class BIMaestroApp : IExternalApplication
                 _pendingProjectBrowserAppearanceRefreshes = 0;
                 Couleur.ProjectBrowserColoring.Reset();
             }
+            Couleur.ProjectBrowserColoring.ForgetViewTypeMap(e.Document);
             Analyse.ElementHistoryHoverInfoService.Hide();
             BIMaestro.ViewHover.ViewHoverPreviewService.ForgetDocument(
                 e.Document);
@@ -440,6 +441,7 @@ public class BIMaestroApp : IExternalApplication
         try
         {
             document = e.GetDocument();
+            Couleur.ProjectBrowserColoring.InvalidateViewTypeMap(document);
             BIMaestro.ViewHover.ViewDeckChangeService.Track(document, e);
         }
         catch (Exception ex) { AppendLog("ViewDeck change tracking: " + ex); }

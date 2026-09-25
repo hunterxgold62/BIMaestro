@@ -3563,21 +3563,15 @@ namespace BIMaestro.VideoGames
             }
             if (MepShareWebButton != null)
             {
-                bool hasWebGeometry =
-                    _scene.WebTiles.Count > 0 || _scene.WebModelGlb.Length > 0;
+                bool hasWebGeometry = _scene.WebTiles.Count > 0;
                 MepShareWebButton.IsEnabled =
-                    _scene.MepGraph.HasData &&
                     hasWebGeometry &&
                     !_mepRecalculationRunning;
                 MepShareWebButton.ToolTip = _mepRecalculationRunning
                     ? UiLanguage.T(
                         "Partage disponible après la fin du calcul MEP.",
                         "Sharing Will Be Available After the MEP Calculation Finishes.")
-                    : !_scene.MepGraph.HasData
-                        ? UiLanguage.T(
-                            "Partage indisponible : aucun réseau de canalisation avec des connecteurs MEP exploitables n'a été détecté dans le document actif.",
-                            "Sharing Unavailable: No Pipe Network With Usable MEP Connectors Was Detected in the Active Document.")
-                        : !hasWebGeometry
+                    : !hasWebGeometry
                             ? UiLanguage.T(
                                 "Partage indisponible : aucune géométrie 3D compatible avec le viewer web n'a été générée.",
                                 "Sharing Unavailable: No 3D Geometry Compatible With the Web Viewer Was Generated.")
@@ -3589,9 +3583,9 @@ namespace BIMaestro.VideoGames
 
         private void MepShareWebButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_mepRecalculationRunning || !_scene.MepGraph.HasData)
+            if (_mepRecalculationRunning || _scene.WebTiles.Count == 0)
             {
-                ShowToast("La maquette MEP n'est pas encore prête à être partagée");
+                ShowToast("La géométrie web de la maquette n'est pas encore prête à être partagée");
                 return;
             }
             var window = new GameMepShareWindow(_scene) { Owner = this };

@@ -12,6 +12,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 public static class ExcelLogger
 {
@@ -22,6 +23,7 @@ public static class ExcelLogger
     private static string _excelFilePath;
     private static readonly object _storageLock = new object();
     private static readonly object _stateLock = new object();
+    private static Task _pendingSnapshotWrite = Task.CompletedTask;
 
     private static readonly Dictionary<string, WorkSession> _sessions =
         new Dictionary<string, WorkSession>(StringComparer.Ordinal);
@@ -741,34 +743,49 @@ public static class ExcelLogger
         if (!force && (DateTime.UtcNow - _lastSnapshotWriteUtc) < SnapshotHeartbeatInterval)
             return;
 
-        WithStorageLock(() =>
+        // Capture the session while Revit owns the state, then perform file I/O
+        // off its UI thread. The chain preserves the order of project switches.
+        var storageKey = BuildSnapshotStorageKey(docKey, CurrentProcessId);
+        var snapshot = new Snapshot
         {
-            var map = LoadSnapshotsCore();
-            var storageKey = BuildSnapshotStorageKey(docKey, CurrentProcessId);
-            var dailySeconds = session.GetDailySeconds();
+            StorageKey = storageKey,
+            DocKey = docKey,
+            DocName = session.DocumentName ?? "(unknown)",
+            RevitVersion = session.RevitVersion ?? "(unknown)",
+            ActiveSeconds = (long)session.GetTotalActiveDuration().TotalSeconds,
+            LastUpdateTicks = DateTime.UtcNow.Ticks,
+            IsOpen = true,
+            ProcessId = CurrentProcessId,
+            DailySeconds = session.GetDailySeconds(),
+            Classification = session.Classification ?? TimeLogMetadataExtractor.ClassifyFromLog(docKey, session.DocumentName, null, null, null, null)
+        };
 
-            map[storageKey] = new Snapshot
+        var previousWrite = _pendingSnapshotWrite;
+        _pendingSnapshotWrite = previousWrite.ContinueWith(previous =>
+        {
+            // A failed earlier write must not prevent later snapshots.
+            if (previous.IsFaulted)
+                Debug.WriteLine(previous.Exception);
+            WithStorageLock(() =>
             {
-                StorageKey = storageKey,
-                DocKey = docKey,
-                DocName = session.DocumentName ?? "(unknown)",
-                RevitVersion = session.RevitVersion ?? "(unknown)",
-                ActiveSeconds = (long)session.GetTotalActiveDuration().TotalSeconds,
-                LastUpdateTicks = DateTime.UtcNow.Ticks,
-                IsOpen = true,
-                ProcessId = CurrentProcessId,
-                DailySeconds = dailySeconds,
-                Classification = session.Classification ?? TimeLogMetadataExtractor.ClassifyFromLog(docKey, session.DocumentName, null, null, null, null)
-            };
+                var map = LoadSnapshotsCore();
+                map[storageKey] = snapshot;
+                SaveSnapshotsCore(map);
+            });
+        }, TaskScheduler.Default);
+        _lastSnapshotWriteUtc = DateTime.UtcNow;
+    }
 
-            SaveSnapshotsCore(map);
-            _lastSnapshotWriteUtc = DateTime.UtcNow;
-        });
+    private static void FlushPendingSnapshots()
+    {
+        try { _pendingSnapshotWrite.GetAwaiter().GetResult(); }
+        catch (Exception ex) { Debug.WriteLine(ex); }
     }
 
     private static void RemoveSnapshot(string docKey)
     {
         if (string.IsNullOrWhiteSpace(docKey)) return;
+        FlushPendingSnapshots();
 
         WithStorageLock(() =>
         {
@@ -780,6 +797,7 @@ public static class ExcelLogger
 
     private static void RemoveSnapshotsForCurrentProcess()
     {
+        FlushPendingSnapshots();
         try
         {
             WithStorageLock(() =>

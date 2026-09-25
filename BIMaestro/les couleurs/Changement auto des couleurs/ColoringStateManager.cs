@@ -981,6 +981,8 @@ namespace Couleur
         private static Document _viewTypeMapDocument;
         private static string _viewTypeMapActiveViewId = string.Empty;
         private static string _viewTypeMapJson = "[]";
+        private static readonly Dictionary<Document, string> ViewTypeMapsByDocument =
+            new Dictionary<Document, string>();
         private sealed class BrowserViewTypeInfo
         {
             [Newtonsoft.Json.JsonProperty("id")]
@@ -1277,6 +1279,20 @@ namespace Couleur
             PushViewTypeMap();
         }
 
+        public static void InvalidateViewTypeMap(Document document)
+        {
+            if (document == null) return;
+
+            ViewTypeMapsByDocument.Remove(document);
+            if (ReferenceEquals(_viewTypeMapDocument, document))
+                _viewTypeMapDocument = null;
+        }
+
+        public static void ForgetViewTypeMap(Document document)
+        {
+            InvalidateViewTypeMap(document);
+        }
+
         private static void RefreshViewTypeMap(
             Document document,
             View activeView)
@@ -1290,6 +1306,15 @@ namespace Couleur
                     activeViewId,
                     StringComparison.Ordinal))
             {
+                return;
+            }
+
+            if (document != null &&
+                ViewTypeMapsByDocument.TryGetValue(document, out string cachedJson))
+            {
+                _viewTypeMapDocument = document;
+                _viewTypeMapActiveViewId = activeViewId;
+                _viewTypeMapJson = cachedJson;
                 return;
             }
 
@@ -1332,6 +1357,8 @@ namespace Couleur
             _viewTypeMapActiveViewId = activeViewId;
             _viewTypeMapJson =
                 Newtonsoft.Json.JsonConvert.SerializeObject(viewTypes);
+            if (document != null)
+                ViewTypeMapsByDocument[document] = _viewTypeMapJson;
         }
 
         private static string GetBrowserViewKind(View view)
