@@ -53,6 +53,8 @@ node_modules/
 
 # Fichiers de travail temporaires locaux
 /tmp/
+/.codex-remote-attachments/
+/.dotnet-cli/
 
 # Authentification et sessions Codex : ne jamais publier de copies locales
 **/auth.json

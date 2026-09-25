@@ -1,7 +1,7 @@
 using System;
+using System.IO;
 using System.Collections.Generic;
 using System.Linq;
-using System.IO;
 using System.Windows.Threading;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
@@ -62,7 +62,7 @@ namespace BIMaestro.MepBooster
         private uint _lastInputStamp;
         private string _status;
         private string _appliedStatus;
-        private DateTime _nextInspectionUtc, _lastLoggedUtc;
+        private DateTime _nextInspectionUtc;
         private bool _enabled, _suppressed, _selectionDirty, _previewDirty, _flip, _apply;
         private bool _ready;
         private bool _selectionCheckPending;
@@ -443,20 +443,7 @@ namespace BIMaestro.MepBooster
         {
             if (_status == status) return;
             _status = status;
-            if (DiagnosticSink != null) { DiagnosticSink(status); return; }
-            bool important = status.StartsWith("Erreur") || status.StartsWith("Initialisation") || status == "OFF" || status.StartsWith("ON");
-            if (!important && DateTime.UtcNow - _lastLoggedUtc < TimeSpan.FromSeconds(2)) return;
-            _lastLoggedUtc = DateTime.UtcNow;
-            try
-            {
-                string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BIMaestro", "Logs");
-                Directory.CreateDirectory(folder);
-                string file = Path.Combine(folder, "mep-booster.log");
-                if (File.Exists(file) && new FileInfo(file).Length > 1024 * 1024)
-                    File.WriteAllText(file, string.Empty);
-                File.AppendAllText(file, DateTime.Now.ToString("s") + " " + status + Environment.NewLine);
-            }
-            catch { }
+            DiagnosticSink?.Invoke(status);
         }
         private void Rearm()
         {

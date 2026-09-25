@@ -431,8 +431,7 @@ namespace BIMaestro.Codex
                     if (targetActive)
                     {
                         document = activeAfterError; DocumentTitle = document.Title;
-                        string diagnostic = CodexDiagnostics.RecordFailure("revit_open_created_family", new JObject { ["file"] = path }, failure);
-                        return new { opened = true, document = DocumentTitle, file = path, warning = "Le document est actif malgré une exception Revit ou d'un complément lors de l'ouverture.", diagnostic };
+                        return new { opened = true, document = DocumentTitle, file = path, warning = "Le document est actif malgré une exception Revit ou d'un complément lors de l'ouverture." };
                     }
                     throw failure;
                 }

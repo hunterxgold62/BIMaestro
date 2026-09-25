@@ -367,7 +367,7 @@ namespace BIMaestro.Codex
             middle.Children.Add(settingsScroll);
             var discussionCard = Card(conversation); discussionCard.Margin = new Thickness(0); Grid.SetRow(discussionCard, 1); middle.Children.Add(discussionCard);
             layout.Children.Add(middle);
-            Append("BIMaestro", "Décrivez la famille à créer ou la modification souhaitée. Précisez les dimensions connues et joignez une image ou un PDF si utile.");
+            Append("BIMaestro", "Décrivez la famille à créer ou la modification souhaitée. Précisez les dimensions connues et joignez une image ou un PDF si utile.\n\nExemple de demande : Crée une famille Revit de table de bureau avec un plateau, quatre pieds et un tiroir sous le plateau. Dimensions initiales : largeur 1 200 mm, profondeur 600 mm et hauteur 750 mm. Rends paramétrables la largeur, la profondeur, la hauteur, l’épaisseur du plateau, la section et la position des pieds ainsi que la largeur, la hauteur et la profondeur du tiroir. Le tiroir et les pieds doivent rester correctement positionnés lorsque les dimensions changent. Ajoute un PC portable posé sur la table, avec un paramètre de visibilité Oui/Non nommé « Afficher_PC » pour l’afficher ou le masquer. Prévois deux niveaux de détail : en LOD 100, montre uniquement un volume simplifié représentant l’encombrement de la table ; en LOD 300, montre le plateau, les pieds, le tiroir avec sa façade et sa poignée, ainsi que le PC si « Afficher_PC » est activé. Vérifie que les paramètres et les deux niveaux de détail fonctionnent après modification des dimensions.");
 
             browse.Click += (_, __) =>
             {
@@ -793,9 +793,8 @@ namespace BIMaestro.Codex
                         catch (Exception ex)
                         {
                             string detail = ex is TaskCanceledException ? "Opération annulée." : ex.Message;
-                            string diagnostic = ex is TaskCanceledException ? null : CodexDiagnostics.RecordFailure(tool, args, ex);
                             Append("Échec · " + tool, detail);
-                            return JsonConvert.SerializeObject(new { error = detail, diagnostic_file = diagnostic,
+                            return JsonConvert.SerializeObject(new { error = detail,
                                 instruction = "Expliquer l'erreur exacte. Un refus utilisateur ne doit pas être contourné." });
                         }
                         finally { activeRevitCalls--; }
@@ -1041,8 +1040,7 @@ namespace BIMaestro.Codex
                     string detail = string.Join("\n", (item["contentItems"] as JArray ?? new JArray()).OfType<JObject>()
                         .Where(c => (string)c["type"] == "inputText").Select(c => (string)c["text"]));
                     if (string.IsNullOrWhiteSpace(detail)) detail = "Codex signale un échec d'outil sans détail exploitable. La passerelle ne peut pas en déduire la cause.";
-                    string diagnostic = CodexDiagnostics.RecordFailure((string)item["tool"], item["arguments"] as JObject, new InvalidOperationException(detail));
-                    Append("Échec signalé par Codex · " + (string)item["tool"], detail + (diagnostic == null ? "" : "\nDiagnostic local : " + diagnostic));
+                    Append("Échec signalé par Codex · " + (string)item["tool"], detail);
                 }
             }
             if (method == "turn/completed")
@@ -1111,10 +1109,9 @@ namespace BIMaestro.Codex
                 catch (Exception ex)
                 {
                     string text = ex is TaskCanceledException ? "Opération annulée." : ex.Message;
-                    string diagnostic = ex is TaskCanceledException ? null : CodexDiagnostics.RecordFailure((string)data["tool"], data["arguments"] as JObject, ex);
                     status.Text = "Opération Revit échouée";
-                    Append("Échec · " + (string)data["tool"], text + (diagnostic == null ? "" : "\nDiagnostic local : " + diagnostic));
-                    string detail = JsonConvert.SerializeObject(new { tool = (string)data["tool"], error = text, diagnostic_file = diagnostic,
+                    Append("Échec · " + (string)data["tool"], text);
+                    string detail = JsonConvert.SerializeObject(new { tool = (string)data["tool"], error = text,
                         instruction = "Expliquer cette erreur exacte. Ne pas inventer de cause ni annoncer de résultat. Un refus utilisateur ne doit pas être contourné." });
                     return new { success = false, contentItems = new[] { new { type = "inputText", text = detail } } };
                 }

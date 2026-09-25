@@ -39,7 +39,6 @@
     <Compile Include="commands\Codex\CodexAngularBarBuilder.cs" />
     <Compile Include="commands\Codex\CodexSelectionGeometry.cs" />
     <Compile Include="commands\Codex\CodexProjectBuilder.cs" />
-    <Compile Include="commands\Codex\CodexDiagnostics.cs" />
     <Compile Include="commands\Codex\CodexCreationGuard.cs" />
     <Compile Include="commands\Codex\CodexImageAttachment.cs" />
     <Compile Include="commands\Codex\CodexCommand.cs" />

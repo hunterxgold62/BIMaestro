@@ -155,23 +155,6 @@ namespace IA
                     )
                 );
 
-                WriteDebugFile(
-                    "last_image_size.txt",
-                    "Taille demandée à OpenAI : " + outputSize +
-                    Environment.NewLine +
-                    "Vue Revit exportée : " + exportedPath +
-                    Environment.NewLine +
-                    "Entrée max edge : " + InputMaxEdge +
-                    Environment.NewLine +
-                    "Sortie max edge : " + OutputMaxEdge +
-                    Environment.NewLine +
-                    "Qualité : " + ImageQuality +
-                    Environment.NewLine +
-                    "Mode demandé : " + GetModeLabel(picker.SelectedRenderMode) +
-                    Environment.NewLine +
-                    "Mode appliqué : " + GetModeLabel(effectiveMode)
-                );
-
                 JObject response = SendImageRequestWithFallback(jwt, b64Input, outputSize, prompt);
 
                 TrackImageTokenUsage(response, outputSize, effectiveMode, picker.SelectedView);
@@ -749,27 +732,6 @@ namespace IA
                 Environment.NewLine +
                 "PROMPT :" + Environment.NewLine +
                 prompt;
-        }
-
-        private static void WriteDebugFile(string fileName, string content)
-        {
-            try
-            {
-                string folder = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                    "RevitLogs",
-                    "AImage"
-                );
-
-                Directory.CreateDirectory(folder);
-
-                string path = Path.Combine(folder, fileName);
-                File.WriteAllText(path, content ?? string.Empty);
-            }
-            catch
-            {
-                // Ne jamais bloquer la commande Revit pour un simple log.
-            }
         }
 
         private static void TryWriteAllBytes(string path, byte[] bytes)

@@ -1,7 +1,6 @@
 using Autodesk.Revit.UI;
 using BIMaestro.RibbonLayout;
 using System;
-using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Interop;
@@ -129,7 +128,6 @@ namespace BIMaestro.UI
                 index < preferences.PinnedButtonIds.Count && info != null &&
                 string.Equals(preferences.PinnedButtonIds[index], info.Id, StringComparison.OrdinalIgnoreCase)))
                 .ToList();
-            WriteResolvedLayout(preferences, items);
             return items;
         }
 
@@ -139,30 +137,6 @@ namespace BIMaestro.UI
                 $"{index + 1}/{count}");
             window.IsButtonPinned = index => index >= 0 && index < preferences.PinnedButtonIds.Count &&
                 !string.IsNullOrWhiteSpace(preferences.PinnedButtonIds[index]);
-        }
-
-        private static void WriteResolvedLayout(
-            RadialButtonsPreferences preferences,
-            System.Collections.Generic.IReadOnlyList<RadialItem> items)
-        {
-            try
-            {
-                string folder = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                    "RevitLogs", "SauvegardePréférence");
-                Directory.CreateDirectory(folder);
-                var lines = Enumerable.Range(0, RadialButtonsPreferencesManager.SlotCount)
-                    .Select(index =>
-                    {
-                        string requested = index < preferences.PinnedButtonIds.Count
-                            ? preferences.PinnedButtonIds[index]
-                            : null;
-                        var item = index < items.Count ? items[index] : null;
-                        return $"{index + 1:00} | favori={requested ?? "-"} | affiche={item?.ButtonId ?? "-"} | libelle={item?.Label ?? "-"}";
-                    });
-                File.WriteAllLines(Path.Combine(folder, "RadialButtonsResolved.log"), lines);
-            }
-            catch { }
         }
 
         private static RadialItem BuildItem(RibbonButtonInfo info, bool isPinned)

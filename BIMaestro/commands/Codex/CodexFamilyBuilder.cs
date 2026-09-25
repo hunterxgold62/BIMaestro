@@ -315,9 +315,8 @@ namespace BIMaestro.Codex
                         ex.Data["target_document"] = source?.IsValidObject == true ? source.Title : "document fermé";
                         ex.Data["revit_version"] = app.Application.VersionNumber;
                         ex.Data["journal"] = app.Application.RecordingJournalFilename;
-                        string diagnostic = CodexDiagnostics.RecordFailure("revit_load_created_family", new JObject { ["file"] = path }, ex);
-                        loadFailure = new { message = ex.Message, exception_type = ex.GetType().FullName, diagnostic };
-                        warnings.Add("RFA enregistré mais non chargé : " + ex.Message + (diagnostic == null ? "" : ". Diagnostic : " + diagnostic));
+                        loadFailure = new { message = ex.Message, exception_type = ex.GetType().FullName };
+                        warnings.Add("RFA enregistré mais non chargé : " + ex.Message);
                     }
                 }
                 var report = new

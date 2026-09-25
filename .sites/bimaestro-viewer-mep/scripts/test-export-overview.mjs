@@ -1,0 +1,20 @@
+import { readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import assert from 'node:assert/strict';
+import { unzipSync, strFromU8 } from 'fflate';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+const archive = unzipSync(new Uint8Array(await readFile(process.argv[2])));
+const manifest = JSON.parse(strFromU8(archive['manifest.json']));
+const data = archive['overview.glb'];
+assert.equal(data.length, manifest.files['overview.glb'].bytes);
+assert.equal(createHash('sha256').update(data).digest('hex'), manifest.files['overview.glb'].sha256);
+const model = await new GLTFLoader().parseAsync(Uint8Array.from(data).buffer, '');
+const covered = new Set();
+model.scene.traverse(object => {
+  if (!object.isMesh) return;
+  covered.add(object.userData.lodTileName);
+  assert.ok(object.geometry.getAttribute('position').count > 0);
+  assert.ok(object.geometry.getAttribute('_element') || object.geometry.getAttribute('_ELEMENT'));
+});
+assert.deepEqual([...covered].sort(), manifest.tiles.map(tile => tile.name).sort());
+console.log('C# export -> Three.js: overview integrity, tile mapping and selectable element IDs passed.');
