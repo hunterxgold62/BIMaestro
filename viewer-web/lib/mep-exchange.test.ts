@@ -51,7 +51,7 @@ test('annotation IFC exports confirmed notes with text, host identity and shared
   const ifc = annotationsIfc(exchange);
   expect(ifc).toContain('IFCBUILDINGELEMENTPROXY(');
   expect(ifc).toContain("'Body','SweptSolid'");
-  expect(ifc.match(/IFCEXTRUDEDAREASOLID\(/g)).toHaveLength(48);
+  expect(ifc.match(/IFCEXTRUDEDAREASOLID\(/g)).toHaveLength(40);
   expect(ifc).toContain('0.000000000,-1.000000000,0.000000000');
   expect(ifc).toContain("'BIMaestro Annotation'");
   expect(ifc).toContain("IFCPROPERTYSET(");

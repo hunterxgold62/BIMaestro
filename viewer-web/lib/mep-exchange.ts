@@ -114,7 +114,7 @@ export function annotationsIfc(exchange: ReturnType<typeof annotationExchange>) 
   const products: string[] = [];
   // A solid marker is deliberately used here: most coordination viewers omit IFC text geometry.
   // Two perpendicular rings make the marker visible from any viewing angle.
-  // Each ring has 16 short bars and eight triangular fins pointing to its centre.
+  // Each ring has 16 short bars and four triangular fins pointing to its centre.
   const extrusionDirection = direction([0, 0, 1]);
   const barProfile = entity('IFCRECTANGLEPROFILEDEF(.AREA.,$,$,0.091000000,0.045000000)');
   const colour = entity("IFCCOLOURRGB('Annotation',0.700000000,0.700000000,0.700000000)");
@@ -132,8 +132,8 @@ export function annotationsIfc(exchange: ReturnType<typeof annotationExchange>) 
           : placement([x, .02, y], [0, -1, 0], tangent);
         markerSolids.push(entity(`IFCEXTRUDEDAREASOLID(${barProfile},${barFrame},${extrusionDirection},0.040000000)`));
       }
-      for (let i = 0; i < 8; i++) {
-        const angle = i * Math.PI / 4;
+      for (let i = 0; i < 4; i++) {
+        const angle = i * Math.PI / 2;
         const vertices = [
           [.045 * Math.cos(angle), .045 * Math.sin(angle)],
           [.19 * Math.cos(angle - .24), .19 * Math.sin(angle - .24)],

@@ -96,7 +96,9 @@ namespace BIMaestro.Codex
                 }
                 catch (Exception ex)
                 {
-                    try { await writer.WriteLineAsync(new JObject { ["ok"] = false, ["error"] = ex.Message }.ToString(Formatting.None)).ConfigureAwait(false); }
+                    try { await writer.WriteLineAsync(new JObject {
+                        ["ok"] = false, ["error"] = ex.Message, ["failureKind"] = CodexToolRecovery.RemoteFailureKind(ex)
+                    }.ToString(Formatting.None)).ConfigureAwait(false); }
                     catch (IOException) { }
                 }
             }
@@ -124,7 +126,9 @@ namespace BIMaestro.Codex
                     var line = await reader.ReadLineAsync().ConfigureAwait(false);
                     if (line == null) throw new IOException("La liaison avec le Revit séparé a été interrompue.");
                     var response = JObject.Parse(line);
-                    if (response.Value<bool>("ok") != true) throw new InvalidOperationException((string)response["error"] ?? "Le Revit séparé a refusé la commande.");
+                    if (response.Value<bool>("ok") != true)
+                        throw CodexToolRecovery.RestoreRemoteFailure((string)response["failureKind"],
+                            (string)response["error"] ?? "Le Revit séparé a refusé la commande.");
                     DocumentTitle = (string)response["documentTitle"] ?? DocumentTitle;
                     return response;
                 }

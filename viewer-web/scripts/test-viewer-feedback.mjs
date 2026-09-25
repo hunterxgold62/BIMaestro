@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import * as THREE from 'three';
-import { zipSync } from 'fflate';
+import { zipSync, unzipSync, strFromU8 } from 'fflate';
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/lemer/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 const url = process.env.VIEWER_TEST_URL || 'http://localhost:3000';
@@ -33,7 +33,7 @@ glb.writeUInt32LE(byteLength, 20 + document.length); glb.writeUInt32LE(0x004e494
 let offset = 28 + document.length; for (const chunk of chunks) { glb.set(chunk, offset); offset += chunk.length; }
 const properties = [{ index: 1, key: 'wall', name: 'Mur test', category: 'Murs', center: [0, 4, 0], size: [12, 8, 1] }, { index: 2, key: 'floor', name: 'Sol test', category: 'Sols', center: [0, -.5, 0], size: [20, 1, 20] }].map(p => ({ ...p, elementId: p.index, stableKey: p.key, typeName: '', levelName: '', documentTitle: 'Test', properties: {} }));
 const files = { 'model.glb': glb, 'properties.json': json(properties), 'mep.json': json({ schemaVersion: 1, graph: { elements: [], connectors: [], connections: [], valves: [], sources: [], systems: [] } }) };
-files['manifest.json'] = json({ schemaVersion: 1, name: 'Maquette de validation', sourceOrigin: [0, 0, 0], sourceDocumentId: 'test', units: 'revit-internal-feet', coordinateSystem: 'right-handed-z-up', files: Object.fromEntries(Object.entries(files).map(([k, v]) => [k, { bytes: v.length, sha256: hash(v) }])) });
+files['manifest.json'] = json({ schemaVersion: 1, name: 'Maquette de validation', sourceOrigin: [0, 0, 0], sourceDocumentId: 'test', sharedCoordinates: { origin: [0, 0, 0], xAxis: [1, 0, 0], siteName: 'Site test' }, units: 'revit-internal-feet', coordinateSystem: 'right-handed-z-up', files: Object.fromEntries(Object.entries(files).map(([k, v]) => [k, { bytes: v.length, sha256: hash(v) }])) });
 const archive = zipSync(files);
 const mark = (kind, i) => ({ id: randomUUID(), kind, elementKey: 'wall', elementName: 'Mur test ' + i, position: [-4, 2, .5], normal: [0, 0, 1], widthCm: 60, heightCm: 40, depthCm: 30.5, lot: i % 2 ? 'ELEC' : 'GC', text: `Repère ${i}`, modelRevision: 1, dimensions: [] });
 const entries = Array.from({ length: 45 }, (_, i) => mark(i === 0 ? 'reservation' : 'note', i));
@@ -80,6 +80,18 @@ try {
   await page.waitForFunction(() => document.querySelector('.markup-list').scrollTop > 100);
   await list.locator('.markup-list-item').last().scrollIntoViewIfNeeded();
   assert.ok(await list.locator('.markup-list-item').last().isVisible());
+  await list.locator('.markup-list-item').nth(1).click();
+  const bcfDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Exporter BCF', exact: true }).click();
+  const bcf = await bcfDownload;
+  assert.equal(bcf.suggestedFilename(), 'annotation.bcfzip');
+  const bcfFiles = unzipSync(await readFile(await bcf.path()));
+  const topicFolder = entries[1].id + '/';
+  assert.ok(bcfFiles[topicFolder + 'snapshot.png']?.length > 1000);
+  assert.equal(Buffer.from(bcfFiles[topicFolder + 'snapshot.png']).subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
+  assert.match(strFromU8(bcfFiles[topicFolder + 'viewpoint.bcfv']), /<PerspectiveCamera>/);
+  await page.locator('.markup-card').getByRole('button', { name: 'Fermer' }).click();
+  await page.getByRole('button', { name: /^Annotation et Résa/ }).click();
   await list.locator('.markup-list-item').first().click();
   assert.equal(await page.getByRole('button', { name: 'Replacer sur une face' }).count(), 0);
   await page.getByRole('button', { name: 'Modifier / déplacer' }).click();

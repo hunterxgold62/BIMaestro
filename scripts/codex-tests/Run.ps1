@@ -7,13 +7,26 @@ $compiler = 'C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Cur
 $jsonAssembly = Join-Path $repoRoot 'BIMaestro/bin/Release/Newtonsoft.Json.dll'
 if (!(Test-Path -LiteralPath $jsonAssembly)) { throw 'Compiler BIMaestro en Release avant ce test.' }
 $testExe = Join-Path $testOutput 'CodexProtocolTests.exe'
-& $compiler /nologo /langversion:9 /target:exe "/out:$testExe" "/reference:$jsonAssembly" (Join-Path $repoRoot 'BIMaestro/commands/Codex/CodexClient.cs') (Join-Path $repoRoot 'BIMaestro/commands/Codex/CodexShapeBatch.cs') (Join-Path $repoRoot 'BIMaestro/commands/Codex/CodexFamilyDesign.cs') (Join-Path $repoRoot 'BIMaestro/commands/Codex/CodexHostOpeningDesign.cs') (Join-Path $repoRoot 'BIMaestro/commands/Codex/CodexParametricDesign.cs') (Join-Path $repoRoot 'BIMaestro/commands/Codex/CodexParametricInput.cs') (Join-Path $repoRoot 'BIMaestro/commands/Codex/CodexFamilyFormula.cs') (Join-Path $repoRoot 'BIMaestro/commands/Codex/CodexFamilyParameters.cs') (Join-Path $repoRoot 'BIMaestro/commands/Codex/CodexConnectorDesign.cs') (Join-Path $repoRoot 'BIMaestro/commands/Codex/CodexSymbolicDesign.cs') (Join-Path $repoRoot 'BIMaestro/commands/Codex/CodexRepresentationDesign.cs') (Join-Path $repoRoot 'BIMaestro/commands/Codex/CodexProfileDesign.cs') (Join-Path $repoRoot 'BIMaestro/commands/Codex/CodexComponentGridDesign.cs') (Join-Path $repoRoot 'BIMaestro/commands/Codex/CodexFamilyEditDesign.cs') (Join-Path $PSScriptRoot 'FamilyEditTests.cs') (Join-Path $PSScriptRoot 'FamilyDesignTests.cs') (Join-Path $PSScriptRoot 'ParametricDesignTests.cs') (Join-Path $PSScriptRoot 'FamilyParameterTests.cs') (Join-Path $PSScriptRoot 'Program.cs')
+$recoverySource = Join-Path $repoRoot 'BIMaestro/commands/Codex/CodexToolRecovery.cs'
+$sharedSources = @((Join-Path $repoRoot 'BIMaestro/commands/Codex/CodexClient.cs'))
+if (Test-Path -LiteralPath $recoverySource) { $sharedSources += $recoverySource }
+$protocolSources = @('CodexShapeBatch', 'CodexFamilyDesign', 'CodexHostOpeningDesign', 'CodexParametricDesign',
+    'CodexParametricInput', 'CodexFamilyFormula', 'CodexFamilyParameters', 'CodexConnectorDesign',
+    'CodexSymbolicDesign', 'CodexRepresentationDesign', 'CodexProfileDesign', 'CodexComponentGridDesign',
+    'CodexFamilyEditDesign') | ForEach-Object { Join-Path $repoRoot ('BIMaestro/commands/Codex/' + $_ + '.cs') }
+$protocolTests = @('FamilyEditTests', 'FamilyDesignTests', 'ParametricDesignTests', 'FamilyParameterTests', 'Program') |
+    ForEach-Object { Join-Path $PSScriptRoot ($_ + '.cs') }
+$recoveryTests = Join-Path $PSScriptRoot 'ToolRecoveryTests.cs'
+if (Test-Path -LiteralPath $recoveryTests) { $protocolTests += $recoveryTests }
+& $compiler /nologo /langversion:9 /target:exe "/out:$testExe" "/reference:$jsonAssembly" @sharedSources @protocolSources @protocolTests
 if ($LASTEXITCODE -ne 0) { throw 'Compilation des tests échouée.' }
 Copy-Item -LiteralPath $jsonAssembly -Destination $testOutput -Force
 $referenceRoot = 'C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8'
 $referenceArgs = @('PresentationCore','PresentationFramework','WindowsBase','System.Xaml') | ForEach-Object { '/reference:' + (Join-Path $referenceRoot ($_ + '.dll')) }
 $windowTestExe = Join-Path $testOutput 'CodexWindowTests.exe'
-& $compiler /nologo /langversion:9 /target:exe "/out:$windowTestExe" "/reference:$jsonAssembly" @referenceArgs (Join-Path $repoRoot 'BIMaestro/commands/Codex/CodexClient.cs') (Join-Path $repoRoot 'BIMaestro/commands/Codex/CodexImageAttachment.cs') (Join-Path $repoRoot 'BIMaestro/commands/Codex/CodexWindow.cs') (Join-Path $PSScriptRoot 'WindowTests.cs')
+# Keep both real provider clients in this build. Native Revit, PDF rendering and
+# community-service boundaries have explicit test doubles in WindowTests.cs.
+& $compiler /nologo /langversion:9 /target:exe "/out:$windowTestExe" "/reference:$jsonAssembly" @referenceArgs @sharedSources (Join-Path $repoRoot 'BIMaestro/commands/Codex/ClaudeClient.cs') (Join-Path $repoRoot 'BIMaestro/commands/Codex/CodexImageAttachment.cs') (Join-Path $repoRoot 'BIMaestro/commands/Codex/CodexWindow.cs') (Join-Path $PSScriptRoot 'WindowTests.cs')
 if ($LASTEXITCODE -ne 0) { throw 'Compilation des tests interface échouée.' }
 Push-Location $repoRoot
 try {
