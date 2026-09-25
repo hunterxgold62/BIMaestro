@@ -108,7 +108,7 @@
                     <TextBlock x:Name="IntroText" Foreground="#26332D"
                                FontSize="14" LineHeight="22" TextWrapping="Wrap"/>
 
-                    <Border Margin="0,18,0,14" Padding="16,13" CornerRadius="12"
+                    <Border x:Name="HighlightBorder" Margin="0,18,0,14" Padding="16,13" CornerRadius="12"
                             Background="#FFF3E2" BorderBrush="#F1D2A5" BorderThickness="1">
                         <StackPanel>
                             <TextBlock x:Name="HighlightTitleText" Foreground="#A35417"

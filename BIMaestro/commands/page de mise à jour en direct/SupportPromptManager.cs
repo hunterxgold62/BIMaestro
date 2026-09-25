@@ -19,6 +19,7 @@ namespace Page
     internal static class SupportPromptManager
     {
         private const int UsageThreshold = 20;
+        private static readonly TimeSpan UpdatePromptDelay = TimeSpan.FromMinutes(1);
         private const string SupportUrl = "https://ko-fi.com/bimaestro";
 
         private static readonly object Sync = new object();
@@ -27,6 +28,7 @@ namespace Page
         private static bool _initialized;
         private static bool _dialogOpen;
         private static bool _usagePromptPending;
+        private static DateTime _updatePromptReadyUtc;
 
         public static void Initialize(UIControlledApplication application)
         {
@@ -64,6 +66,7 @@ namespace Page
 
                 _usagePromptPending = !_state.UsagePromptShown
                     && _state.UsageCount >= UsageThreshold;
+                _updatePromptReadyUtc = DateTime.UtcNow.Add(UpdatePromptDelay);
 
                 application.Idling += OnIdling;
             }
@@ -102,7 +105,9 @@ namespace Page
             {
                 if (_dialogOpen || _state == null) return;
 
-                showUpdate = !string.IsNullOrWhiteSpace(_state.PendingUpdatePromptVersion);
+                bool updatePending = !string.IsNullOrWhiteSpace(_state.PendingUpdatePromptVersion);
+                if (updatePending && DateTime.UtcNow < _updatePromptReadyUtc) return;
+                showUpdate = updatePending;
                 showUsage = !showUpdate && _usagePromptPending && !_state.UsagePromptShown;
                 if (!showUpdate && !showUsage) return;
 

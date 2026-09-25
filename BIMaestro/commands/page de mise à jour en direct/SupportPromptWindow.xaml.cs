@@ -31,25 +31,21 @@ namespace Page
         {
             if (kind == SupportPromptKind.AfterUpdate)
             {
-                Title = UiLanguage.T("BIMaestro vient d'évoluer", "BIMaestro has just evolved");
-                TitleText.Text = UiLanguage.T("BIMaestro vient d’évoluer", "BIMaestro has just evolved");
-                SubtitleText.Text = UiLanguage.T(
-                    "Une nouvelle étape, construite pour vous faire gagner du temps.",
-                    "A new step, built to save you time.");
+                Height = 470;
+                Title = UiLanguage.T("BIMaestro 1.0.6.4 est là", "BIMaestro 1.0.6.4 is here");
+                TitleText.Text = Title;
+                SubtitleText.Visibility = Visibility.Collapsed;
                 IntroText.Text = UiLanguage.T(
-                    "Cette mise à jour représente de nouvelles heures de conception, de développement et de tests pour garder BIMaestro fiable et agréable à utiliser.",
-                    "This update represents more hours of design, development, and testing to keep BIMaestro reliable and enjoyable to use.");
-                HighlightTitleText.Text = UiLanguage.T(
-                    "Même 2 € font une vraie différence",
-                    "Even €2 makes a real difference");
-                HighlightBodyText.Text = UiLanguage.T(
-                    "Votre soutien participe au développement ainsi qu'aux frais de stockage et d'intelligence artificielle.",
-                    "Your support contributes to development as well as storage and AI costs.");
+                    "Merci d’utiliser BIMaestro. Je développe ce plugin seul, sur mon temps, et vos retours m’aident à le faire évoluer.",
+                    "Thank you for using BIMaestro. I develop this plugin on my own, in my own time, and your feedback helps me improve it.");
+                HighlightBorder.Visibility = Visibility.Collapsed;
                 ClosingText.Text = UiLanguage.T(
-                    "Merci d’utiliser BIMaestro et de faire vivre ce projet indépendant.",
-                    "Thank you for using BIMaestro and helping this independent project grow.");
+                    "BIMaestro reste gratuit. Si vous l’utilisez régulièrement et souhaitez m’aider à poursuivre son développement et à couvrir ses frais, vous pouvez faire un don, même de 2 €. C’est entièrement libre.",
+                    "BIMaestro remains free. If you use it regularly and would like to help me keep developing it and cover its costs, you can make a donation, even just €2. It is entirely up to you.");
+                ClosingText.FontSize = 14;
+                ClosingText.LineHeight = 22;
                 LaterButton.Content = UiLanguage.T("Continuer", "Continue");
-                SupportButton.Content = UiLanguage.T("♥  Soutenir le développement", "♥  Support development");
+                SupportButton.Content = UiLanguage.T("♥  Soutenir BIMaestro", "♥  Support BIMaestro");
             }
             else
             {

@@ -5,9 +5,40 @@ namespace Page
     internal static class ButtonUpdateNotesCatalog
     {
         private const string Release1063 = "1.0.6.3";
+        private const string Release1064 = "1.0.6.4";
 
         public static IReadOnlyList<ButtonUpdateNote> Notes { get; } = new List<ButtonUpdateNote>
         {
+            Create1064Note("CodexChat", "BIMaestro.Codex.CodexCommand", "Famille IA", "AI Families",
+                "Créez ou modifiez une famille Revit en décrivant ce que vous voulez. Vous pouvez choisir Codex ou Claude et joindre une image ou un PDF.",
+                "Create or edit a Revit family by describing what you want. Choose Codex or Claude and attach an image or PDF."),
+            Create1064Note("CommunityFamilies", "BIMaestro.Codex.CodexCommunityCommand", "Bibliothèque commune", "Community Library",
+                "Parcourez les familles partagées, téléchargez celles qui vous intéressent et publiez les vôtres.",
+                "Browse shared families, download the ones you need, and publish your own."),
+            Create1064Note("MepBooster", "BIMaestro.MepBooster.MepBoosterCommand", "MEP Booster", "MEP Booster",
+                "Sélectionnez un élément MEP pour accéder rapidement aux rotations possibles. Les mouvements qui déconnecteraient le réseau sont désactivés.",
+                "Select an MEP element to quickly access available rotations. Moves that would disconnect the network are disabled."),
+            Create1064Note("PipeSystemColors", "Visualisation.PipeSystemColorsCommand", "Couleurs réseaux", "Network Colors",
+                "Repérez plus facilement les réseaux : les canalisations et raccords prennent la couleur de leur système.",
+                "Spot networks more easily: pipes and fittings take the color of their system."),
+            Create1064Note("ViewTemplateTransfer", "BIMaestro.ViewTemplates.ViewTemplateTransferCommand", "Gabarit de vue", "View Template",
+                "Exportez les réglages d’une vue, puis importez-les dans un autre projet. Vous pouvez créer un gabarit ou appliquer les réglages à la vue active.",
+                "Export view settings and import them into another project. Create a template or apply the settings to the active view."),
+            Create1064Note("RevitGameCommand", "BIMaestro.VideoGames.RevitGameCommand", "Maquette jouable", "Playable Model",
+                "Partagez votre maquette dans un navigateur et consultez plus facilement les réseaux, les vannes et les scénarios.",
+                "Share your model in a browser and explore networks, valves, and scenarios more easily."),
+            Create1064Note("ViewDeckToggle", "BIMaestro.ViewHover.ToggleViewDeckCommand", "Onglets de vues", "View Tabs",
+                "Activez les miniatures dans les onglets. Survolez un onglet pour voir son aperçu agrandi.",
+                "Turn on thumbnails in view tabs. Hover over a tab to see a larger preview."),
+            Create1064Note("MainCommand", "Analyse.MainCommand", "Historique des éléments", "Element History",
+                "Retrouvez les changements d’un élément et restaurez plus facilement une version précédente.",
+                "Find changes to an element and restore an earlier version more easily."),
+            Create1064Note("GetPaintedMaterialsCommand", "Visualisation.GetPaintedMaterialsCommand", "Peinture", "Paint",
+                "Cliquez sur une face peinte pour identifier le matériau appliqué et voir la composition du mur.",
+                "Click a painted face to identify its material and view the wall composition."),
+            Create1064Note("AddFlangesAtEnds", "Modification.AddFlangesAtEnds", "Bride auto", "Automatic Flanges",
+                "Ajoutez automatiquement des brides aux extrémités sélectionnées.",
+                "Automatically add flanges to the selected ends."),
             Create1063Note(
                 "RevitGameCommand",
                 "BIMaestro.VideoGames.RevitGameCommand",
@@ -642,6 +673,26 @@ namespace Page
                 }
             }
         };
+
+        private static ButtonUpdateNote Create1064Note(
+            string buttonId,
+            string commandClass,
+            string title,
+            string englishTitle,
+            string summary,
+            string englishSummary)
+        {
+            return new ButtonUpdateNote
+            {
+                Version = Release1064,
+                ButtonId = buttonId,
+                CommandClass = commandClass,
+                Title = title,
+                EnglishTitle = englishTitle,
+                Summary = summary,
+                EnglishSummary = englishSummary
+            };
+        }
 
         private static ButtonUpdateNote Create1063Note(
             string buttonId,
