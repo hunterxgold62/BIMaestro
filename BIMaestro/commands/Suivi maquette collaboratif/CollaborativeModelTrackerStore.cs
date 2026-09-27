@@ -28,8 +28,6 @@ namespace Analyse
     {
         private static readonly object SyncObj = new object();
 
-        public const string PreferredSharedDirectory = @"P:\0-Boîte à outils Revit\5-Logiciels";
-
         private static string _activeDirectory;
         private static string _lastDirectoryResolutionMessage;
         private static string _configuredSharedDirectory;
@@ -486,28 +484,21 @@ namespace Analyse
                 return _activeDirectory;
             }
 
-            if (TryCreateAndWrite(PreferredSharedDirectory, out var prefError))
-            {
-                _activeDirectory = PreferredSharedDirectory;
-                _lastDirectoryResolutionMessage = UiLanguage.T($"Dossier partagé utilisé : {PreferredSharedDirectory}", $"Shared folder in use: {PreferredSharedDirectory}");
-                return _activeDirectory;
-            }
-
             if (TryCreateAndWrite(FallbackDirectory, out var fallbackError))
             {
                 _activeDirectory = FallbackDirectory;
                 _lastDirectoryResolutionMessage =
                     UiLanguage.T(
-                        $"Lecteur partagé indisponible ({PreferredSharedDirectory}). Dossier local utilisé : {FallbackDirectory}. Erreur initiale : {prefError}",
-                        $"Shared drive unavailable ({PreferredSharedDirectory}). Local folder in use: {FallbackDirectory}. Initial error: {prefError}");
+                        $"Aucun dossier partagé configuré ou disponible. Dossier local utilisé : {FallbackDirectory}.",
+                        $"No shared folder configured or available. Local folder in use: {FallbackDirectory}.");
                 return _activeDirectory;
             }
 
-            _activeDirectory = PreferredSharedDirectory;
+            _activeDirectory = FallbackDirectory;
             _lastDirectoryResolutionMessage =
                 UiLanguage.T(
-                    $"Impossible d'initialiser les dossiers de sortie. Erreur partagée : {prefError} | Erreur locale : {fallbackError}",
-                    $"Unable to initialize output folders. Shared error: {prefError} | Local error: {fallbackError}");
+                    $"Impossible d'initialiser le dossier local : {fallbackError}",
+                    $"Unable to initialize the local folder: {fallbackError}");
             return _activeDirectory;
         }
 

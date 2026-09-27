@@ -15,6 +15,7 @@ namespace BIMaestro.Codex
         private Document document;
         private CodexFamilyArtifact lastCreated;
         private readonly CodexSelectionGeometry selectionGeometry = new CodexSelectionGeometry();
+        private readonly List<JObject> previewedMepRoutes = new List<JObject>();
         private readonly List<string> transactionFailures = new List<string>();
         private ExternalEvent externalEvent;
         private Func<UIApplication, object> operation;
@@ -30,6 +31,7 @@ namespace BIMaestro.Codex
         internal bool AllowChanges { get; set; }
         internal bool ApplyDirectly { get; set; }
         internal bool DedicatedSession { get; set; }
+        internal bool MepMode { get; set; }
         internal string FamilyOutputRoot { get; set; } = CodexFamilyBuilder.OutputRoot;
         internal string DocumentTitle { get; private set; }
         internal bool IsAttachedFamilyDocument => document?.IsFamilyDocument == true;
@@ -142,8 +144,9 @@ namespace BIMaestro.Codex
         internal void AttachEvent(ExternalEvent value) { externalEvent = value; }
         public string GetName() => "BIMaestro — opérations Codex validées";
 
-        internal static JArray ToolDefinitions()
+        internal static JArray ToolDefinitions(bool mepMode = false)
         {
+            if (mepMode) return new JArray(CodexMepTools.Definitions());
             var catalog = new JArray(
             Tool("revit_family_template_info", "Lit dans un gabarit temporaire les épaisseurs et faces réelles des hôtes et les paramètres intégrés. À appeler avant une famille mur/sol : coordonnées en mm, sans présumer un mur de 150 mm. Ne modifie pas le projet.", new JObject { ["hosting"]=new JObject { ["type"]="string", ["enum"]=new JArray("free","wall","floor","ceiling","face","work_plane") } }),
             CodexFamilyDesign.Tool(),
@@ -323,6 +326,10 @@ namespace BIMaestro.Codex
 
         private object Run(UIApplication app, string tool, JObject args)
         {
+            if (MepMode && tool != "revit_mep_inspect" && tool != "revit_mep_preview_route" && tool != "revit_mep_apply_route")
+                throw new InvalidOperationException("Cet outil n'est pas disponible dans Assistant MEP IA.");
+            if (!MepMode && tool != null && tool.StartsWith("revit_mep_", StringComparison.Ordinal))
+                throw new InvalidOperationException("Cet outil est réservé à Assistant MEP IA.");
             if (DedicatedSession && document == null && tool == "revit_context")
             {
                 RequireKeys(args);
@@ -369,6 +376,41 @@ namespace BIMaestro.Codex
             // Revit may return another managed wrapper for the same native document.
             if (tool != "revit_open_created_family" && (document == null || !document.IsValidObject || activeDocument == null || !document.Equals(activeDocument)))
                 throw new InvalidOperationException("Le document actif a changé ou a été fermé. Revenez au document indiqué dans le panneau, ou fermez puis rouvrez Codex.");
+            if (MepMode)
+            {
+                if (document.IsFamilyDocument) throw new InvalidOperationException("Ouvrez un projet Revit pour utiliser Assistant MEP IA.");
+                if (tool == "revit_mep_inspect")
+                {
+                    RequireKeys(args);
+                    previewedMepRoutes.Clear();
+                    return CodexMepTools.Inspect(document, app.ActiveUIDocument.Selection.GetElementIds());
+                }
+                var selected = new HashSet<string>(app.ActiveUIDocument.Selection.GetElementIds().Select(id => id.ToString()), StringComparer.Ordinal);
+                string startId = (string)args?["start"]?["element_id"];
+                string endId = (string)args?["end"]?["element_id"];
+                if (startId == null || endId == null || !selected.Contains(startId) || !selected.Contains(endId))
+                    throw new InvalidOperationException("Les deux équipements à raccorder doivent rester sélectionnés dans Revit.");
+                if (tool == "revit_mep_preview_route")
+                {
+                    var preview = CodexMepTools.Preview(document, args);
+                    if (JObject.FromObject(preview).Value<bool>("valid"))
+                    {
+                        if (previewedMepRoutes.Count == 16) previewedMepRoutes.RemoveAt(0);
+                        previewedMepRoutes.Add((JObject)args.DeepClone());
+                    }
+                    return preview;
+                }
+                if (!AllowChanges) throw new InvalidOperationException("Activez les modifications dans le panneau avant de créer un réseau.");
+                if (document.IsReadOnly || document.IsModifiable)
+                    throw new InvalidOperationException("Ouvrez un projet modifiable, hors de toute autre commande.");
+                if (!previewedMepRoutes.Any(route => JToken.DeepEquals(route, args)))
+                    throw new InvalidOperationException("Prévisualisez d'abord exactement ce raccordement, puis appliquez le même tracé.");
+                string description = CodexMepTools.Describe(document, args);
+                if (!Confirm("Créer le raccordement MEP", description))
+                    throw new InvalidOperationException("Raccordement refusé par l'utilisateur. Ne pas réessayer sans nouvelle demande.");
+                previewedMepRoutes.RemoveAll(route => JToken.DeepEquals(route, args));
+                return CodexMepTools.Apply(document, args);
+            }
             if (tool == "revit_context") return ReadContext(app);
             if (tool == "revit_family_parameters") { RequireKeys(args); return CodexFamilyTools.Read(document); }
             if (tool == "revit_inspect_family") return CodexFamilyEditor.Inspect(document, args);

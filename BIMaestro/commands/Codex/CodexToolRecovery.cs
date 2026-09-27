@@ -28,7 +28,8 @@ namespace BIMaestro.Codex
         {
             "revit_context", "revit_capabilities", "revit_family_contract", "revit_family_program_contract",
             "revit_family_api", "revit_family_template_info", "revit_family_parameters", "revit_inspect_family",
-            "revit_inspect_family_element", "revit_selection_geometry", "revit_read_family_design"
+            "revit_inspect_family_element", "revit_selection_geometry", "revit_read_family_design",
+            "revit_mep_inspect", "revit_mep_preview_route"
         };
         private readonly object gate = new object();
         private readonly Func<int, CancellationToken, Task> delay;

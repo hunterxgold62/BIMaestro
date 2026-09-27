@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using SkiaSharp;
 using UglyToad.PdfPig;
@@ -20,6 +21,12 @@ namespace BIMaestro.Codex
         internal CodexImageAttachment[] PageImages { get; set; } = Array.Empty<CodexImageAttachment>();
 
         internal static CodexPdfAttachment FromFile(string path)
+        {
+            using (CodexPdfAssemblyResolver.EnterPdfOperation()) return ReadFile(path);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static CodexPdfAttachment ReadFile(string path)
         {
             var info = new FileInfo(path);
             if (!info.Exists || info.Length > 20 * 1024 * 1024)
@@ -53,6 +60,12 @@ namespace BIMaestro.Codex
         }
 
         internal (int Page, byte[] Png)[] RenderPages(int[] pageNumbers)
+        {
+            using (CodexPdfAssemblyResolver.EnterPdfOperation()) return RenderPagesCore(pageNumbers);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private (int Page, byte[] Png)[] RenderPagesCore(int[] pageNumbers)
         {
             if (!File.Exists(SourcePath) || new FileInfo(SourcePath).Length != FileSizeBytes)
                 throw new InvalidOperationException("Le PDF a changé depuis son ajout. Joignez-le à nouveau.");

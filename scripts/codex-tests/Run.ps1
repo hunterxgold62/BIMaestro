@@ -26,7 +26,7 @@ $referenceArgs = @('PresentationCore','PresentationFramework','WindowsBase','Sys
 $windowTestExe = Join-Path $testOutput 'CodexWindowTests.exe'
 # Keep both real provider clients in this build. Native Revit, PDF rendering and
 # community-service boundaries have explicit test doubles in WindowTests.cs.
-& $compiler /nologo /langversion:9 /target:exe "/out:$windowTestExe" "/reference:$jsonAssembly" @referenceArgs @sharedSources (Join-Path $repoRoot 'BIMaestro/commands/Codex/ClaudeClient.cs') (Join-Path $repoRoot 'BIMaestro/commands/Codex/CodexImageAttachment.cs') (Join-Path $repoRoot 'BIMaestro/commands/Codex/CodexWindow.cs') (Join-Path $PSScriptRoot 'WindowTests.cs')
+& $compiler /nologo /langversion:9 /target:exe "/out:$windowTestExe" "/reference:$jsonAssembly" @referenceArgs @sharedSources (Join-Path $repoRoot 'BIMaestro/commands/Codex/ClaudeClient.cs') (Join-Path $repoRoot 'BIMaestro/commands/Codex/CodexImageAttachment.cs') (Join-Path $repoRoot 'BIMaestro/commands/Codex/CodexMepDiagnostics.cs') (Join-Path $repoRoot 'BIMaestro/commands/Codex/CodexWindow.cs') (Join-Path $PSScriptRoot 'WindowTests.cs')
 if ($LASTEXITCODE -ne 0) { throw 'Compilation des tests interface échouée.' }
 Push-Location $repoRoot
 try {

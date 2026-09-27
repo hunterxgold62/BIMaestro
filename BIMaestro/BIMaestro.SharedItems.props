@@ -5,6 +5,7 @@
     <Compile Include="commands\Codex\CodexDedicatedRevitLink.cs" />
     <Compile Include="commands\Codex\ClaudeClient.cs" />
     <Compile Include="commands\Codex\CodexPdfAttachment.cs" />
+    <Compile Include="commands\Codex\CodexPdfAssemblyResolver.cs" />
     <Compile Include="commands\Codex\CodexShapeBatch.cs" />
     <Compile Include="commands\Codex\CodexFamilyDesign.cs" />
     <Compile Include="commands\Codex\CodexHostOpeningDesign.cs" />
@@ -43,6 +44,9 @@
     <Compile Include="commands\Codex\CodexCreationGuard.cs" />
     <Compile Include="commands\Codex\CodexImageAttachment.cs" />
     <Compile Include="commands\Codex\CodexCommand.cs" />
+    <Compile Include="commands\Codex\CodexMepCommand.cs" />
+    <Compile Include="commands\Codex\CodexMepTools.cs" />
+    <Compile Include="commands\Codex\CodexMepDiagnostics.cs" />
     <Compile Include="commands\Codex\CodexRevitBridge.cs" />
     <Compile Include="commands\Codex\CodexWindow.cs" />
     <Compile Include="commands\Codex\CodexCommunityLibrary.cs" />

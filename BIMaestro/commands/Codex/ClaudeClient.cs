@@ -112,15 +112,21 @@ namespace BIMaestro.Codex
 
         internal async Task AskAsync(string prompt, CodexImageAttachment[] images, string model, string effort, Func<string, JObject, Task<string>> toolCall,
             Action<string> reply, CancellationToken cancellation, bool dedicatedSession = false, bool internetAccess = false,
-            CodexToolRecovery recovery = null)
+            CodexToolRecovery recovery = null, bool mepMode = false)
         {
             Directory.CreateDirectory(storageDirectory);
             string workspace = Path.Combine(storageDirectory, "workspace");
             Directory.CreateDirectory(workspace);
             string systemPath = Path.Combine(storageDirectory, "instructions.txt");
-            var definitions = CodexRevitBridge.ToolDefinitions();
+            var definitions = CodexRevitBridge.ToolDefinitions(mepMode);
             File.WriteAllText(systemPath,
-                (dedicatedSession
+                mepMode
+                    ? "Tu peux demander une opération Revit en donnant son nom exact dans tool et ses arguments JSON dans arguments. " +
+                      "Pour appeler un outil, mets done=false ; son résultat arrivera dans le message suivant. " +
+                      "Pour répondre à l'utilisateur, mets done=true, tool vide et arguments={}. " +
+                      (internetAccess ? "La recherche Web est autorisée. Aucun autre outil, fichier, shell ou connecteur n'est autorisé. " : "Aucun autre outil, fichier, shell, réseau ou connecteur n'est autorisé. ") +
+                      CodexWindow.MepDeveloperInstructions + "\n\nOutils Revit :\n" + definitions.ToString(Formatting.None)
+                    : ((dedicatedSession
                     ? "Session Revit dédiée à une NOUVELLE famille : aucun document du Revit d'origine n'est accessible. Ne demande pas la sélection, la géométrie ou les paramètres de ce projet. N'utilise pas d'outil de modification de projet. Crée un RFA indépendant avec load_into_project=false et place_at_origin=false ; l'utilisateur pourra le charger ensuite dans son projet. "
                     : "") + "Tu es l'assistant Famille IA de BIMaestro dans Revit. Réponds en français. " +
                 "Tu peux demander une opération Revit en donnant son nom exact dans tool et ses arguments JSON dans arguments. " +
@@ -134,7 +140,7 @@ namespace BIMaestro.Codex
                 "Une création dans l'éditeur de famille doit être enregistrée dans un nouveau RFA puis ouverte avec revit_open_created_family. " +
                 "Respecte les droits de lecture, modification et confirmation appliqués par BIMaestro. " +
                 CodexToolRecovery.Instructions + "\n\nOutils Revit :\n" +
-                definitions.ToString(Formatting.None), new UTF8Encoding(false));
+                definitions.ToString(Formatting.None)), new UTF8Encoding(false));
 
             for (int step = 0; step < 30; step++)
             {

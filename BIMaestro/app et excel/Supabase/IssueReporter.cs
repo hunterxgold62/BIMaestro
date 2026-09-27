@@ -10,6 +10,7 @@ namespace Licensing
     internal static class IssueReporter
     {
         private const string LinkedInUrl = "https://www.linkedin.com/in/paul-lemert-b40921207";
+        private const string ContactEmail = "bimaestro.plugin@gmail.com";
 
         public static void OpenContact()
         {
@@ -26,7 +27,7 @@ namespace Licensing
             ShowIssueDialog(
                 "BIMaestro - Erreur",
                 $"Le bouton \"{commandName}\" a rencontré un souci.",
-                "Tu peux réessayer. Si le problème revient, clique sur \"Signaler un souci\" : LinkedIn s'ouvrira et un résumé sera copié pour m'aider à corriger plus vite.",
+                "Tu peux réessayer. Si le problème revient, choisis comment me signaler le souci. Le résumé technique est disponible ci-dessous.",
                 report);
         }
 
@@ -36,7 +37,7 @@ namespace Licensing
             ShowIssueDialog(
                 "BIMaestro - Erreur",
                 "Une erreur est survenue au démarrage.",
-                "Impossible de lancer BIMaestro pour le moment. Clique sur \"Signaler un souci\" pour me contacter sur LinkedIn avec un résumé copié automatiquement.",
+                "Impossible de lancer BIMaestro pour le moment. Choisis comment me signaler le souci. Le résumé technique est disponible ci-dessous.",
                 report);
         }
 
@@ -50,20 +51,30 @@ namespace Licensing
                 CommonButtons = TaskDialogCommonButtons.Close
             };
 
-            td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, UiLanguage.T("Signaler un souci", "Report an Issue"));
+            td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, UiLanguage.T("Signaler sur LinkedIn (copier le résumé)", "Report on LinkedIn (copy summary)"));
+            td.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, UiLanguage.T("Signaler par e-mail", "Report by email"));
 
             var result = td.Show();
-            if (result != TaskDialogResult.CommandLink1) return;
+            if (result != TaskDialogResult.CommandLink1 && result != TaskDialogResult.CommandLink2) return;
 
             TryCopyReport(report);
 
             try
             {
-                OpenContact();
+                if (result == TaskDialogResult.CommandLink1)
+                    OpenContact();
+                else
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "mailto:" + ContactEmail + "?subject=" + Uri.EscapeDataString("Signalement BIMaestro") + "&body=" + Uri.EscapeDataString(report),
+                        UseShellExecute = true
+                    });
             }
             catch (Exception openEx)
             {
-                TaskDialog.Show(UiLanguage.T("BIMaestro - Contact", "BIMaestro - Contact"), UiLanguage.T($"Impossible d'ouvrir LinkedIn : {openEx.Message}", $"Unable to open LinkedIn: {openEx.Message}"));
+                var destination = result == TaskDialogResult.CommandLink1 ? "LinkedIn" : "l'application de messagerie";
+                var englishDestination = result == TaskDialogResult.CommandLink1 ? "LinkedIn" : "the email application";
+                TaskDialog.Show(UiLanguage.T("BIMaestro - Contact", "BIMaestro - Contact"), UiLanguage.T($"Impossible d'ouvrir {destination} : {openEx.Message}. Le résumé a été copié si le presse-papiers est disponible.", $"Unable to open {englishDestination}: {openEx.Message}. The summary was copied if the clipboard is available."));
             }
         }
 

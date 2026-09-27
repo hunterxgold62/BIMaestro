@@ -135,7 +135,7 @@ namespace Analyse
                 return;
 
             var result = MessageBox.Show(
-                UiLanguage.T("Le chemin partagé par défaut est inaccessible. Voulez-vous choisir maintenant un dossier commun (serveur) ?", "The default shared path is unavailable. Would you like to select a common server folder now?"),
+                UiLanguage.T("Aucun dossier partagé n'est configuré ou disponible. Voulez-vous choisir maintenant votre dossier commun (serveur) ?", "No shared folder is configured or available. Would you like to select your common server folder now?"),
                 UiLanguage.T("Choisir un chemin commun", "Select a Common Path"),
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);

@@ -13,6 +13,7 @@ namespace BIMaestro.Codex
     internal sealed class CodexPdfAttachment
     {
         internal string Name { get; set; }
+        internal string SourcePath { get; set; }
         internal string Text { get; set; }
         internal int PageCount { get; set; }
         internal long FileSizeBytes { get; set; }
@@ -61,7 +62,9 @@ namespace BIMaestro.Codex
         internal string FamilyOutputRoot { get; set; }
         internal string RevitVersion => "Test";
         internal string DocumentTitle => "Test";
-        internal static JArray ToolDefinitions() => new JArray(new JObject {
+        internal static JArray ToolDefinitions(bool mepMode = false) => mepMode
+            ? new JArray(new JObject { ["name"] = "revit_mep_inspect", ["description"] = "Local MEP inspection test boundary.", ["inputSchema"] = new JObject { ["type"] = "object" } })
+            : new JArray(new JObject {
             ["name"] = "revit_create_family", ["description"] = "Local test boundary for family creation.",
             ["inputSchema"] = new JObject { ["type"] = "object" }
         });
@@ -115,6 +118,38 @@ namespace BIMaestro.Codex
                 ((CheckBox)Get(window, "context")).IsChecked = false;
                 if (bridge.ApplyDirectly || bridge.AllowChanges) throw new Exception("Revoked permissions remained active");
                 Console.WriteLine("PASS: permissions checked at opening, direct mode reset for new discussion, revocation respected");
+                var mepBridge = new CodexRevitBridge();
+                System.Windows.ResourceDictionary mepTheme;
+                using (var source = System.IO.File.OpenRead("BIMaestro/Themes/BIMaestroTheme.xaml"))
+                    mepTheme = (System.Windows.ResourceDictionary)System.Windows.Markup.XamlReader.Load(source);
+                var mepWindow = new CodexWindow(mepBridge, mepTheme, mepMode: true);
+                if (!mepBridge.ShareContext || mepBridge.AllowChanges || mepBridge.ApplyDirectly ||
+                    ((CheckBox)Get(mepWindow, "changes")).IsChecked != false ||
+                    ((CheckBox)Get(mepWindow, "direct")).IsChecked != false ||
+                    ((CheckBox)Get(mepWindow, "separateMode")).Parent != null ||
+                    ((Button)Get(mepWindow, "community")).Parent != null ||
+                    ((Button)Get(mepWindow, "openDiagnostics")).Parent == null)
+                    throw new Exception("MEP mode did not start read-only or still exposes family controls.");
+                if (!mepWindow.Title.Contains("Assistant MEP") || !CodexWindow.MepDeveloperInstructions.Contains("revit_mep_inspect"))
+                    throw new Exception("MEP mode identity or instructions are missing.");
+                typeof(CodexWindow).GetMethod("Error", PrivateInstance).Invoke(mepWindow,
+                    new object[] { new InvalidOperationException("Diagnostic UI test"), "test.ui", null });
+                if (!((TextBox)Get(mepWindow, "transcript")).Text.Contains("Diagnostic "))
+                    throw new Exception("MEP errors do not expose a diagnostic reference.");
+                bool rejectedFamilyTool = false;
+                try
+                {
+                    var call = (Task<object>)typeof(CodexWindow).GetMethod("CallRevitAsync", PrivateInstance)
+                        .Invoke(mepWindow, new object[] { "revit_create_family", new JObject() });
+                    Pump(call);
+                }
+                catch (InvalidOperationException ex) when (ex.Message.Contains("n'est pas disponible"))
+                {
+                    rejectedFamilyTool = true;
+                }
+                if (!rejectedFamilyTool) throw new Exception("MEP mode accepted a family tool.");
+                mepWindow.Close();
+                Console.WriteLine("PASS: MEP panel starts read-only, hides family controls and rejects family tools");
                 Set(window, "busy", true);
                 typeof(CodexWindow).GetMethod("UpdateControls", PrivateInstance).Invoke(window, new object[0]);
                 if (((CheckBox)Get(window, "internet")).IsEnabled) throw new Exception("Internet settings remained editable during a response.");
