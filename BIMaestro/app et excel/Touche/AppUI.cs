@@ -136,9 +136,9 @@ public class AppUI : IExternalApplication
                     ("CodexChat", "Famille IA", "BIMaestro.Codex.CodexCommand", "Famille IA.png", "Crée et modifie des familles Revit avec Codex ou Claude Code. Lecture du contexte et modifications selon les autorisations du panneau. Bêta."),
                     ("CommunityFamilies", "Bibliothèque\ncommune", "BIMaestro.Codex.CodexCommunityCommand", "Famille.png", "Parcourt les familles partagées par catégorie, consulte les téléchargements et partage vos familles personnelles ou IA. Retirez vos propres publications depuis Mes publications.")
                 })),
-                new RibbonItemDefinition("MepAssistantAi", "Assistant MEP IA", panel => AddPushButton(panel,
-                    "MepAssistantAi", "Assistant\nMEP IA", assemblyPath, "BIMaestro.Codex.CodexMepCommand",
-                    "Maquette MEP v2.png", "Analyse les connecteurs des équipements MEP sélectionnés, prépare un chemin de tuyauterie et crée un raccordement contrôlé dans le projet ouvert.")),
+                //new RibbonItemDefinition("MepAssistantAi", "Assistant MEP IA", panel => AddPushButton(panel,
+                  //  "MepAssistantAi", "Assistant\nMEP IA", assemblyPath, "BIMaestro.Codex.CodexMepCommand",
+                   // "Maquette MEP v2.png", "Analyse les connecteurs des équipements MEP sélectionnés, prépare un chemin de tuyauterie et crée un raccordement contrôlé dans le projet ouvert.")),
                 new RibbonItemDefinition("IAQuickTools", "Outils IA rapides", panel => AddStackedPushButtons(
                     panel,
                     assemblyPath,
