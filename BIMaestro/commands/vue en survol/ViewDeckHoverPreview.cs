@@ -78,6 +78,7 @@ namespace BIMaestro.ViewHover
                 Interval = TimeSpan.FromMilliseconds(DelayMilliseconds)
             };
             _delay.Tick += OnDelay;
+            ViewHoverPreviewPreferences.Changed += OnPreferencesChanged;
         }
 
         private static Border Badge(Color background, Color foreground) => new Border
@@ -110,7 +111,7 @@ namespace BIMaestro.ViewHover
 
         private void OnMouseEnter(object sender, MouseEventArgs args)
         {
-            if (_disposed) return;
+            if (_disposed || !ViewHoverPreviewPreferences.Enabled) return;
             SetOwner(Window.GetWindow(_tab));
             _delay.Stop();
             _delay.Start();
@@ -125,7 +126,7 @@ namespace BIMaestro.ViewHover
         private void OnDelay(object sender, EventArgs args)
         {
             _delay.Stop();
-            if (!_disposed && _tab.IsLoaded && _tab.IsVisible && _tab.IsMouseOver &&
+            if (!_disposed && ViewHoverPreviewPreferences.Enabled && _tab.IsLoaded && _tab.IsVisible && _tab.IsMouseOver &&
                 Mouse.LeftButton == MouseButtonState.Released && (_owner == null || _owner.IsActive))
                 ToolTip.IsOpen = true;
         }
@@ -139,6 +140,7 @@ namespace BIMaestro.ViewHover
         }
 
         private void OnOwnerDeactivated(object sender, EventArgs args) => Close();
+        private void OnPreferencesChanged() => Close();
         private void OnMouseDown(object sender, MouseButtonEventArgs args) => Close();
         private void OnUnloaded(object sender, RoutedEventArgs args) { Close(); SetOwner(null); }
         internal void Close()
@@ -158,6 +160,7 @@ namespace BIMaestro.ViewHover
             _tab.MouseLeave -= OnMouseLeave;
             _tab.ToolTipOpening -= OnNativeToolTipOpening;
             _delay.Tick -= OnDelay;
+            ViewHoverPreviewPreferences.Changed -= OnPreferencesChanged;
             SetOwner(null);
             ToolTip.PlacementTarget = null;
             ToolTip.Content = null;

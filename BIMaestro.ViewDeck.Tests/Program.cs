@@ -20,10 +20,15 @@ internal static class Program
     private static int _passed;
 
     [STAThread]
-    private static int Main()
+    private static int Main(string[] args)
     {
         try
         {
+            if (args.Length == 1 && args[0] == "--schedule")
+            {
+                Test("Schedule PNG renders merged headers, formatted values and partial footer", ScheduleImage);
+                return 0;
+            }
             Test("Native tab count, Header, Content and selection unchanged", NativeItems);
             Test("Image is below the single title inside the header", TemplateLayout);
             Test("Original local sizes and header template restored", RestoreLocals);
@@ -62,6 +67,7 @@ internal static class Program
             Test("Visiting a view acknowledges queued changes, not future changes", VisitAcknowledgesQueue);
             Test("A scan is not replayed and an initialization gap is partial", ChangeScanBoundaries);
             Test("Location translation is distinct from pipe resizing and tiny jitter", MovementClassification);
+            Test("Schedule PNG renders merged headers, formatted values and partial footer", ScheduleImage);
             RenderExample();
             RenderHoverExample();
             Console.WriteLine(_passed + " ViewDeck tests passed.");
@@ -411,7 +417,7 @@ internal static class Program
             Check(hover != null && hover.Width > tab.Width, "Missing large hover preview");
             Check(hover.PlacementTarget == tab && !hover.Focusable && !hover.IsHitTestVisible,
                 "Hover should not steal focus or clicks");
-            Check(ViewDeckHoverPreview.DelayMilliseconds == 500, "Hover delay incorrect");
+            Check(ViewDeckHoverPreview.DelayMilliseconds == 200, "Hover delay incorrect");
             Check(Equals(tab.ToolTip, nativeTip), "Native tooltip/identity was overwritten");
         }
         Check(Equals(tab.ToolTip, nativeTip), "OFF lost original tooltip");
@@ -543,6 +549,51 @@ internal static class Program
         string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "native-tabs-preview.png");
         using (var stream = File.Create(path)) encoder.Save(stream);
         Console.WriteLine("WPF sample rendered: " + path);
+    }
+
+    private static void ScheduleImage()
+    {
+        var image = new SchedulePreviewImage
+        {
+            Width = 620, Height = 182,
+            Footer = "Aperçu partiel — ouvrez la nomenclature pour tout voir."
+        };
+        image.Cells.Add(new SchedulePreviewImage.Cell
+        {
+            Bounds = new Rect(0, 0, 620, 32), Text = "canalisations gaz",
+            Bold = true, Italic = false, Underline = false, Alignment = TextAlignment.Center,
+            Background = Brushes.AliceBlue
+        });
+        string[,] values = {
+            { "Type", "Diamètre", "Longueur", "Niveau" },
+            { "Acier — Gaz naturel", "Ø 40 mm", "12,35 m", "RDC" },
+            { "Acier — Gaz naturel", "Ø 65 mm", "8,20 m", "R+1" },
+            { "Description très longue qui doit rester dans sa cellule", "Ø 80 mm", "4,10 m", "R+2" },
+            { "Total général", "", "24,65 m", "" }
+        };
+        double[] xs = { 0, 260, 370, 500, 620 };
+        for (int row = 0; row < 5; row++)
+        for (int column = 0; column < 4; column++)
+            image.Cells.Add(new SchedulePreviewImage.Cell
+            {
+                Bounds = new Rect(xs[column], 32 + row * 30, xs[column + 1] - xs[column], 30),
+                Text = values[row, column], Bold = row == 0 || row == 4,
+                Alignment = column == 2 ? TextAlignment.Right : TextAlignment.Left
+            });
+        string path = NewPreviewPath();
+        image.Save(path);
+        var cached = new ViewDeckCachedImage();
+        cached.Refresh(path);
+        var bitmap = (BitmapSource)cached.Image;
+        Check(bitmap != null && bitmap.PixelWidth == 644 && bitmap.PixelHeight == 234,
+            "Schedule PNG must include the whole table and the partial-preview footer.");
+        byte[] pixel = new byte[4];
+        bitmap.CopyPixels(new Int32Rect(20, 20, 1, 1), pixel, 4, 0);
+        Check(pixel[0] == 255 && pixel[1] == 248 && pixel[2] == 240,
+            "Merged header background must survive PNG encoding and cache decoding.");
+        string sample = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "schedule-preview.png");
+        File.Copy(path, sample, true);
+        Console.WriteLine("WPF schedule sample rendered: " + sample);
     }
 
     private static Button CloseButton(TabItem tab)

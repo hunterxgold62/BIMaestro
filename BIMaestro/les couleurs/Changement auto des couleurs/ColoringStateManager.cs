@@ -865,6 +865,10 @@ namespace Couleur
     /// </summary>
     public static class ProjectBrowserColoring
     {
+        static ProjectBrowserColoring()
+        {
+            BIMaestro.ViewHover.ViewHoverPreviewPreferences.Changed += HideViewHoverPopup;
+        }
         [StructLayout(LayoutKind.Sequential)]
         private struct NativePoint
         {
@@ -3374,6 +3378,11 @@ __BIMAESTRO_ATMOSPHERE_CSS__
 
         private static void PollViewHoverPreview()
         {
+            if (!BIMaestro.ViewHover.ViewHoverPreviewPreferences.Enabled)
+            {
+                HideViewHoverPopup();
+                return;
+            }
             if (_viewHoverPollPending ||
                 _chromiumBrowser == null ||
                 _projectBrowserRoot == null ||
@@ -3414,6 +3423,11 @@ __BIMAESTRO_ATMOSPHERE_CSS__
 
         private static void ApplyViewHoverResult(object rawValue)
         {
+            if (!BIMaestro.ViewHover.ViewHoverPreviewPreferences.Enabled)
+            {
+                HideViewHoverPopup();
+                return;
+            }
             string result = NormalizeBrowserEvaluationResult(rawValue);
             string[] parts = result.Split(new[] { '\t' }, 2);
             string key = parts.Length > 0 ? parts[0] : string.Empty;

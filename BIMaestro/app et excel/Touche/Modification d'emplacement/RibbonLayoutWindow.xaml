@@ -175,6 +175,17 @@
                     </StackPanel>
                 </TabItem>
 
+                <TabItem Header="Miniatures">
+                    <StackPanel Margin="22,20">
+                        <TextBlock Style="{StaticResource H2}" Text="Miniatures au survol des vues"/>
+                        <CheckBox x:Name="HoverPreviewCheckBox" Margin="0,16,0,0"
+                                  Content="Afficher les miniatures au survol"
+                                  Click="HoverPreviewCheckBox_Click"/>
+                        <TextBlock Style="{StaticResource Hint}" Margin="0,10,0,0" TextWrapping="Wrap"
+                                   Text="Arborescence du projet et onglets de vues au-dessus du projet. Le réglage est appliqué immédiatement et mémorisé."/>
+                    </StackPanel>
+                </TabItem>
+
                 <TabItem Header="Ruban">
                     <Grid Margin="10,12,10,0">
                         <Grid.ColumnDefinitions>

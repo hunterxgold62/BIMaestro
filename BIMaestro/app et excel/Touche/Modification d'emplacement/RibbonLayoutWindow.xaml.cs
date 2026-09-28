@@ -11,6 +11,7 @@ using System.Windows.Input;
 using BIMaestro.Welcome;
 using BIMaestro.Localization;
 using BIMaestro.UI;
+using BIMaestro.ViewHover;
 
 namespace BIMaestro.RibbonLayout
 {
@@ -30,6 +31,9 @@ namespace BIMaestro.RibbonLayout
         {
             ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
+            HoverPreviewCheckBox.IsChecked = ViewHoverPreviewPreferences.Enabled;
+            ViewHoverPreviewPreferences.Changed += OnHoverPreferencesChanged;
+            Closed += (_, __) => ViewHoverPreviewPreferences.Changed -= OnHoverPreferencesChanged;
             Panels = new ObservableCollection<PanelViewModel>(layout.Panels
                 .Select(panel => CreatePanelViewModel(panel, definitions.First(d => d.Name == panel.Name))));
 
@@ -44,6 +48,21 @@ namespace BIMaestro.RibbonLayout
 
             DataContext = this;
             SelectedPanel = Panels.FirstOrDefault();
+        }
+
+        private void OnHoverPreferencesChanged()
+        {
+            HoverPreviewCheckBox.IsChecked = ViewHoverPreviewPreferences.Enabled;
+        }
+
+        private void HoverPreviewCheckBox_Click(object sender, RoutedEventArgs e)
+        {
+            if (!ViewHoverPreviewPreferences.SetEnabled(HoverPreviewCheckBox.IsChecked == true))
+            {
+                OnHoverPreferencesChanged();
+                MessageBox.Show(UiLanguage.T("Impossible d’enregistrer le réglage des miniatures au survol.",
+                    "Unable to save the hover thumbnail setting."), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         private void HelpButton_Click(object sender, RoutedEventArgs e)

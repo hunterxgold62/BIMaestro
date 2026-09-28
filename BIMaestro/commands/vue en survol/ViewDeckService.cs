@@ -222,8 +222,8 @@ namespace BIMaestro.ViewHover
         internal static void UpdateButton()
         {
             AppUI.UpdatePushButtonPresentation("ViewDeckToggle", _enabled ? "Onglets : ON" : "Onglets : OFF",
-                UiLanguage.T("ON : miniatures dans les onglets. OFF : onglets compacts. Dans les deux modes, survolez un onglet 0,2 seconde pour afficher l'aperçu agrandi.",
-                    "ON: inline thumbnails. OFF: compact tabs. In both modes, hover over a tab for 0.2 seconds to see the large preview."));
+                UiLanguage.T("ON : miniatures dans les onglets. OFF : onglets compacts. Les aperçus au survol se règlent dans Miniature ou Option > Miniatures.",
+                    "ON: inline thumbnails. OFF: compact tabs. Configure hover previews in Thumbnail or Options > Thumbnails."));
         }
 
         private static void Disable()

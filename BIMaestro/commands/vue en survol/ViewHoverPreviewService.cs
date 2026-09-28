@@ -541,8 +541,7 @@ namespace BIMaestro.ViewHover
 
             try
             {
-                return view.CanBePrinted &&
-                       !(view is ViewSchedule);
+                return view is ViewSchedule || view.CanBePrinted;
             }
             catch
             {
@@ -588,6 +587,9 @@ namespace BIMaestro.ViewHover
             string directory = Path.GetDirectoryName(targetPath);
             if (string.IsNullOrWhiteSpace(directory)) return false;
             Directory.CreateDirectory(directory);
+
+            if (view is ViewSchedule schedule)
+                return SchedulePreviewExporter.Export(schedule, targetPath);
 
             string baseName = "capture-" +
                               GetElementIdText(view.Id) + "-" +

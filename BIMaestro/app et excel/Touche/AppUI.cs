@@ -47,7 +47,7 @@ public class AppUI : IExternalApplication
             assemblyPath,
 
             ("ViewThumbnailBatch", "Miniature", "BIMaestro.ViewHover.ViewThumbnailBatchCommand", "Miniature.png",
-                "Génère automatiquement les miniatures manquantes ou obsolètes du projet, une vue à la fois. Affiche la progression et permet de mettre en pause, reprendre ou arrêter le traitement sans changer la vue active."),
+                "Génère les miniatures des vues et permet d’activer ou de désactiver les aperçus au survol dans l’arborescence et les onglets."),
             ("ExportDwgBatch", "DWG Exp.", "Visualisation.ExportSheetsCommand", "DWG Exp..png",
                 "Exporte automatiquement plusieurs vues ou feuilles en DWG, en nommant chaque fichier selon le projet et la vue comme pour les PDF."),
             ("GetPaintedMaterialsButton", "Peinture", new List<(string, string, string, string, string)>
@@ -195,7 +195,7 @@ public class AppUI : IExternalApplication
                     ("Couleur de projet", "Couleurs", "Couleur.ToggleCombinedColoringCommand", "Couleur oui non.png","Clic : ouvre la personnalisation des couleurs. Double-clic : active ou désactive les panneaux colorés."),
                     ("Couleur de maquette", "Couleur reset", "Couleur.ResetTabItemRandomColorsCommand", "reset.png","Réinitialise les couleurs appliquées"),
                     ("papa Noël", "papa\nNoël", "Couleur.PapanoelCommand", "papa noel.png","Fait apparaître des couleurs comme des guirlandes\nDouble clic pour revenir à la normale.\n\nAttention désactiver <couleur Oui/Non> avant activation."),
-                    ("ViewDeckToggle", "Onglets : OFF", "BIMaestro.ViewHover.ToggleViewDeckCommand", "Miniature.png", "ON : miniatures dans les onglets. OFF : onglets compacts.\r\nDans les deux modes, survolez un onglet 0,5 seconde pour afficher l'aperçu agrandi. Les miniatures intégrées sont désactivées au démarrage."),
+                    ("ViewDeckToggle", "Onglets : OFF", "BIMaestro.ViewHover.ToggleViewDeckCommand", "Miniature.png", "ON : miniatures dans les onglets. OFF : onglets compacts.\r\nLes aperçus au survol se règlent dans Miniature ou Option > Miniatures."),
                     ("BIMaestro_Exemple", "Exemple", "Page.GuideCommand", "Exemple.png", "Page d'information sur le plugin"),
                 })),
 

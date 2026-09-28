@@ -19,6 +19,8 @@ namespace BIMaestro.ViewHover
         {
             ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
+            HoverPreviewCheckBox.IsChecked = ViewHoverPreviewPreferences.Enabled;
+            ViewHoverPreviewPreferences.Changed += OnHoverPreferencesChanged;
             _startHandler = startHandler;
             _startEvent = startEvent;
             DocumentText.Text = UiLanguage.T("Projet : ", "Project: ") +
@@ -38,6 +40,21 @@ namespace BIMaestro.ViewHover
             _displayTimer.Start();
 
             UpdateProgress(ViewHoverPreviewService.GetBatchProgress());
+        }
+
+        private void OnHoverPreferencesChanged()
+        {
+            HoverPreviewCheckBox.IsChecked = ViewHoverPreviewPreferences.Enabled;
+        }
+
+        private void HoverPreviewCheckBox_Click(object sender, RoutedEventArgs e)
+        {
+            if (!ViewHoverPreviewPreferences.SetEnabled(HoverPreviewCheckBox.IsChecked == true))
+            {
+                OnHoverPreferencesChanged();
+                MessageBox.Show(UiLanguage.T("Impossible d’enregistrer le réglage des miniatures au survol.",
+                    "Unable to save the hover thumbnail setting."), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         private void StartButton_Click(object sender, RoutedEventArgs e)
@@ -158,6 +175,7 @@ namespace BIMaestro.ViewHover
         private void OnClosed(object sender, EventArgs e)
         {
             _displayTimer.Stop();
+            ViewHoverPreviewPreferences.Changed -= OnHoverPreferencesChanged;
             ViewHoverPreviewService.BatchProgressChanged -=
                 OnBatchProgressChanged;
             _startHandler.StartFailed -= OnStartFailed;

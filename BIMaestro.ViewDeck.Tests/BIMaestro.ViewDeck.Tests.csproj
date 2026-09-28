@@ -20,6 +20,12 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
+    <Compile Include="..\BIMaestro\commands\vue en survol\ViewHoverPreviewPreferences.cs">
+      <Link>ViewHoverPreviewPreferences.cs</Link>
+    </Compile>
+    <Compile Include="..\BIMaestro\commands\vue en survol\SchedulePreviewImage.cs">
+      <Link>SchedulePreviewImage.cs</Link>
+    </Compile>
     <Compile Include="..\BIMaestro\commands\vue en survol\ViewDeckChangeJournal.cs">
       <Link>ViewDeckChangeJournal.cs</Link>
     </Compile>
