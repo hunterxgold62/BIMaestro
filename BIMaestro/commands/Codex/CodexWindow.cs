@@ -20,7 +20,7 @@ using System.Windows.Threading;
 
 namespace BIMaestro.Codex
 {
-    internal sealed class CodexWindow : Window
+    internal sealed partial class CodexWindow : Window
     {
         internal const string MepDeveloperInstructions =
             "Tu es l'assistant MEP plomberie de BIMaestro dans un projet Revit ouvert. Réponds en français. " +
@@ -209,10 +209,11 @@ namespace BIMaestro.Codex
             finally { publishing = false; if (!closed) UpdateControls(); }
         }
 
-        internal CodexWindow(CodexRevitBridge bridge, ResourceDictionary theme = null, bool mepMode = false)
+        internal CodexWindow(CodexRevitBridge bridge, ResourceDictionary theme = null, bool mepMode = false, string historyDirectory = null)
         {
             this.bridge = bridge;
             this.mepMode = mepMode;
+            InitializeHistory(historyDirectory);
             if (mepMode) mepDiagnostics = new CodexMepDiagnostics();
             allowedTools = new HashSet<string>(CodexRevitBridge.ToolDefinitions(mepMode)
                 .OfType<JObject>().Select(definition => (string)definition["name"]), StringComparer.Ordinal);
@@ -301,7 +302,7 @@ namespace BIMaestro.Codex
                   </ControlTemplate.Triggers>
                 </ControlTemplate>")));
             context.Style = changes.Style = direct.Style = internet.Style = permissionStyle;
-            foreach (var button in new[] { connect, disconnect, send, stop, reset, browse, claudeInstall, attach, pasteImage, showArtifact, openArtifact, community, shareArtifact, openDiagnostics })
+            foreach (var button in new[] { connect, disconnect, send, stop, reset, historyButton, browse, claudeInstall, attach, pasteImage, showArtifact, openArtifact, community, shareArtifact, openDiagnostics })
                 button.SetResourceReference(StyleProperty, "SecondaryButton");
             send.SetResourceReference(StyleProperty, "PrimaryButton");
             browse.MinWidth = 110;
@@ -362,6 +363,13 @@ namespace BIMaestro.Codex
             top.Children.Add(Card(session));
             provider.SelectionChanged += (_, __) =>
             {
+                if (!restoringHistory && discussion != null && discussion.Provider != provider.SelectedIndex)
+                {
+                    int previousProvider = discussion.Provider;
+                    if (!ReleaseHistory()) { provider.SelectedIndex = previousProvider; return; }
+                    threadId = turnId = null; claudeClient?.NewDiscussion(); lastArtifact = null;
+                    transcript.Clear(); input.Clear();
+                }
                 bool useClaude = provider.SelectedIndex == 1;
                 bridge.FamilyOutputRoot = useClaude ? CodexFamilyBuilder.ClaudeOutputRoot : CodexFamilyBuilder.OutputRoot;
                 connect.Content = useClaude ? "Connexion Claude" : "Connexion ChatGPT";
@@ -429,6 +437,7 @@ namespace BIMaestro.Codex
             if (mepMode) discussionActions.Children.Add(openDiagnostics);
             if (!mepMode) discussionActions.Children.Add(community);
             discussionActions.Children.Add(reset);
+            discussionActions.Children.Add(historyButton);
             DockPanel.SetDock(discussionActions, Dock.Right); discussionHeader.Children.Add(discussionActions);
             discussionHeader.Children.Add(Text("Discussion", "H2"));
             DockPanel.SetDock(discussionHeader, Dock.Top); conversation.Children.Add(discussionHeader);
@@ -445,7 +454,7 @@ namespace BIMaestro.Codex
             layout.Children.Add(middle);
             Append("BIMaestro", mepMode
                 ? "Sélectionnez les équipements déjà placés dans le projet et joignez votre P&ID. L'assistant compare les piquages Revit au schéma, propose les raccordements et un ou plusieurs trajets 3D, puis vérifie chaque trajet avant de créer les tuyaux. Il vous demandera uniquement les décisions qui restent ambiguës. Le premier pilote traite une liaison à la fois.\n\nExemple : Inspecte les pompes et l'échangeur sélectionnés. À partir du P&ID joint, propose les liaisons aller/retour et deux trajets possibles pour le premier raccordement. Signale les points à confirmer avant de modéliser."
-                : "Décrivez la famille à créer ou la modification souhaitée. Précisez les dimensions connues et joignez une image ou un PDF si utile.\n\nExemple de demande : Crée une famille Revit de table de bureau avec un plateau, quatre pieds et un tiroir sous le plateau. Dimensions initiales : largeur 1 200 mm, profondeur 600 mm et hauteur 750 mm. Rends paramétrables la largeur, la profondeur, la hauteur, l’épaisseur du plateau, la section et la position des pieds ainsi que la largeur, la hauteur et la profondeur du tiroir. Le tiroir et les pieds doivent rester correctement positionnés lorsque les dimensions changent. Ajoute un PC portable posé sur la table, avec un paramètre de visibilité Oui/Non nommé « Afficher_PC » pour l’afficher ou le masquer. Prévois deux niveaux de détail : en LOD 100, montre uniquement un volume simplifié représentant l’encombrement de la table ; en LOD 300, montre le plateau, les pieds, le tiroir avec sa façade et sa poignée, ainsi que le PC si « Afficher_PC » est activé. Vérifie que les paramètres et les deux niveaux de détail fonctionnent après modification des dimensions.");
+                : "Décrivez la famille à créer ou la modification souhaitée. Précisez les dimensions connues et joignez une image ou un PDF si utile.");
             if (mepMode) Append("Diagnostic", "Les erreurs de cette session portent un identifiant. Le bouton « Diagnostics » ouvre leur journal détaillé.");
 
             browse.Click += (_, __) =>
@@ -510,7 +519,7 @@ namespace BIMaestro.Codex
             disconnect.Click += async (_, __) => await LogoutAsync();
             send.Click += async (_, __) => await SendAsync();
             stop.Click += async (_, __) => await StopAsync();
-            reset.Click += (_, __) => { threadId = null; turnId = null; claudeClient?.NewDiscussion(); SelectPreferredModel(); direct.IsChecked = false; attachments.Clear(); pdfAttachments.Clear(); RefreshAttachments(); transcript.Clear(); Append("BIMaestro", "Nouvelle discussion. Les modifications déjà faites dans Revit et les fichiers créés sont conservés."); };
+            reset.Click += (_, __) => { if (!ReleaseHistory()) return; threadId = null; turnId = null; claudeClient?.NewDiscussion(); lastArtifact = null; lastLibraryCheck = null; input.Clear(); SelectPreferredModel(); direct.IsChecked = false; attachments.Clear(); pdfAttachments.Clear(); RefreshAttachments(); transcript.Clear(); Append("BIMaestro", "Nouvelle discussion. Les modifications déjà faites dans Revit et les fichiers créés sont conservés."); UpdateControls(); };
             input.PreviewKeyDown += async (_, e) =>
             {
                 if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Control) { e.Handled = true; await SendAsync(); }
@@ -528,8 +537,8 @@ namespace BIMaestro.Codex
             changes.Unchecked += (_, __) => { bridge.AllowChanges = false; direct.IsChecked = false; UpdateControls(); };
             direct.Checked += (_, __) => { bridge.ApplyDirectly = true; UpdateControls(); };
             direct.Unchecked += (_, __) => { bridge.ApplyDirectly = false; UpdateControls(); };
-            internet.Checked += (_, __) => { threadId = null; claudeClient?.NewDiscussion(); };
-            internet.Unchecked += (_, __) => { threadId = null; claudeClient?.NewDiscussion(); };
+            internet.Checked += (_, __) => ResetHistorySession();
+            internet.Unchecked += (_, __) => ResetHistorySession();
             context.IsChecked = true;
             changes.IsChecked = !mepMode;
             direct.IsChecked = !mepMode;
@@ -538,7 +547,8 @@ namespace BIMaestro.Codex
                 if (Environment.GetEnvironmentVariable("BIMAESTRO_FAMILY_PROVIDER") == "1") provider.SelectedIndex = 1;
                 Environment.SetEnvironmentVariable("BIMAESTRO_FAMILY_PROVIDER", null, EnvironmentVariableTarget.Process);
             }
-            Closed += (_, __) => { closed = true; activityTimer.Stop(); CancelRecovery(); CancelRevit(); claudeClient?.Dispose(); bridge.Dispose(); client?.Dispose(); dedicatedProcess?.Dispose(); };
+            Closing += (_, e) => { if (!SaveHistory()) { e.Cancel = true; MessageBox.Show(this, status.Text, "Sauvegarde de la discussion", MessageBoxButton.OK, MessageBoxImage.Warning); } };
+            Closed += (_, __) => { historyTimer.Stop(); discussionLock?.Dispose(); discussionLock = null; closed = true; activityTimer.Stop(); CancelRecovery(); CancelRevit(); claudeClient?.Dispose(); bridge.Dispose(); client?.Dispose(); dedicatedProcess?.Dispose(); };
             UpdateControls();
         }
 
@@ -811,6 +821,7 @@ namespace BIMaestro.Codex
             disconnect.IsEnabled = (client != null || claudeClient != null) && !connecting && !busy;
             disconnect.Visibility = client != null || claudeClient != null ? Visibility.Visible : Visibility.Collapsed;
             reset.IsEnabled = !busy && !connecting;
+            historyButton.IsEnabled = !busy && !connecting && !checkingLibrary && !separateRevitStarting;
             browse.IsEnabled = executable.IsEnabled = client == null && claudeClient == null && !connecting;
             provider.IsEnabled = client == null && claudeClient == null && !connecting && !busy;
             models.IsEnabled = ready && !busy;
@@ -871,8 +882,13 @@ namespace BIMaestro.Codex
             connecting = true; UpdateControls();
             try
             {
-                if (claudeClient == null) claudeClient = new ClaudeClient(executable.Text.Trim(),
-                    mepMode ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BIMaestro", "Claude", "MepAssistant") : null);
+                if (claudeClient == null)
+                {
+                    claudeClient = new ClaudeClient(executable.Text.Trim(),
+                        mepMode ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BIMaestro", "Claude", "MepAssistant") : null);
+                    claudeClient.SessionId = pendingHistorySession ?? (discussion?.Provider == 1 ? discussion.SessionId : null);
+                }
+                if (pendingHistorySession != null) { claudeClient.SessionId = pendingHistorySession; pendingHistorySession = null; }
                 if (await claudeClient.IsAuthenticatedAsync())
                 {
                     claudeLoginStarted = false;
@@ -900,7 +916,8 @@ namespace BIMaestro.Codex
             var recovery = new CodexToolRecovery(); toolRecovery = recovery;
             var cancellation = new CancellationTokenSource();
             string request = input.Text.Trim();
-            string prompt = request + PdfContext();
+            BeginHistory(request);
+            string prompt = request + PdfContext() + HistoryContext();
             var images = attachments.Concat(pdfAttachments.SelectMany(p => p.PageImages)).ToArray();
             busy = true; claudeCancellation = cancellation; UpdateControls();
             if (activityPanel.Visibility != Visibility.Visible) BeginActivity("Claude analyse la demande…");
@@ -940,6 +957,7 @@ namespace BIMaestro.Codex
                     },
                     message => { if (!closed) Append("Claude", message); }, cancellation.Token, IsDedicatedTarget, internet.IsChecked == true, recovery, mepMode);
                 status.Text = "Prêt";
+                historyContextPending = false;
             }
             catch (OperationCanceledException) { status.Text = "Réponse arrêtée"; }
             catch (Exception ex) { Error(ex, "claude.send"); }
@@ -952,6 +970,7 @@ namespace BIMaestro.Codex
                     if (!closed) UpdateControls();
                 }
                 cancellation.Dispose();
+                SaveHistory();
             }
         }
 
@@ -972,6 +991,7 @@ namespace BIMaestro.Codex
             } while (!string.IsNullOrEmpty(cursor));
             models.ItemsSource = choices;
             SelectPreferredModel();
+            RestoreHistoryModel();
             status.Text = "Connecté avec ChatGPT · " + (string)account["planType"];
             if (choices.Count == 0) status.Text += " · aucun modèle disponible.";
             connect.Content = "Actualiser les modèles";
@@ -1001,7 +1021,8 @@ namespace BIMaestro.Codex
             if (attachments.Count + pdfAttachments.Sum(p => p.PageImages.Length) > 0 && !model.SupportsImages)
             { Error(new InvalidOperationException("Ce modèle n'accepte pas d'images. Choisissez un modèle avec vision ou retirez les images et pages PDF."), "codex.model"); return; }
             string text = input.Text.Trim();
-            var messageInput = new List<object> { new { type = "text", text = text + PdfContext() } };
+            BeginHistory(text);
+            var messageInput = new List<object> { new { type = "text", text = text + PdfContext() + HistoryContext() } };
             messageInput.AddRange(attachments.Select(a => (object)new { type = "image", url = a.DataUrl }));
             messageInput.AddRange(pdfAttachments.SelectMany(p => p.PageImages).Select(a => (object)new { type = "image", url = a.DataUrl }));
             codexCancellation?.Dispose();
@@ -1019,12 +1040,12 @@ namespace BIMaestro.Codex
                 if (threadId == null)
                 {
                     completedCodexTurns.Clear();
-                    var thread = await client.RequestAsync("thread/start", new
+                    var threadOptions = JObject.FromObject(new
                     {
                         model = model.Id, modelProvider = "openai", cwd = mepMode ? Path.Combine(MepCodexDirectory, "workspace") : CodexClient.WorkDirectory,
                         sandbox = "read-only", approvalPolicy = "on-request", approvalsReviewer = "user",
                         config = new { web_search = internet.IsChecked == true ? "live" : "disabled" },
-                        ephemeral = true, environments = new object[0],
+                        ephemeral = false, environments = new object[0],
                         dynamicTools = CodexRevitBridge.ToolDefinitions(mepMode),
                         developerInstructions = (mepMode ? MepDeveloperInstructions : ((IsDedicatedTarget
                             ? "Session Revit dédiée à une NOUVELLE famille : aucun document du Revit d'origine n'est accessible. Ne demande pas la sélection, la géométrie ou les paramètres de ce projet. N'utilise pas d'outil de modification de projet. Crée un RFA indépendant avec load_into_project=false et place_at_origin=false ; l'utilisateur pourra le charger ensuite dans son projet. "
@@ -1073,12 +1094,34 @@ namespace BIMaestro.Codex
                                 ? "La recherche Web est autorisée pour cette discussion. Si l'utilisateur demande une vérification en ligne, utilise l'outil de recherche Web avant de conclure qu'Internet est indisponible. Cite les sources consultées. Si l'outil échoue, rapporte son erreur réelle. "
                                 : "La recherche Web est désactivée pour cette discussion. N'utilise pas le réseau. ")
                     });
-                    threadId = (string)thread["thread"]?["id"] ?? throw new InvalidOperationException("Codex n'a pas créé la discussion.");
+                    bool resuming = pendingHistorySession != null;
+                    if (resuming) { threadOptions["threadId"] = pendingHistorySession; threadOptions.Remove("ephemeral"); }
+                    JToken thread;
+                    try { thread = await client.RequestAsync(resuming ? "thread/resume" : "thread/start", threadOptions); }
+                    catch (InvalidOperationException ex) when (resuming &&
+                        ex.Message.StartsWith("no rollout found for thread id ", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // An empty/rejected turn may have left an id without a persisted
+                        // rollout. Recover only this explicit missing-session error, once.
+                        pendingHistorySession = null;
+                        if (discussion != null) discussion.SessionId = null;
+                        historyContextPending = true;
+                        messageInput[0] = new { type = "text", text = text + PdfContext() + HistoryContext() };
+                        Append("BIMaestro", "La session Codex précédente est introuvable. Reprise avec un extrait de la discussion ; l'historique complet et les fichiers Revit sont conservés.");
+                        threadOptions.Remove("threadId"); threadOptions["ephemeral"] = false;
+                        requestCancellation.Token.ThrowIfCancellationRequested();
+                        thread = await client.RequestAsync("thread/start", threadOptions);
+                    }
+                    threadId = (string)thread["thread"]?["id"] ?? throw new InvalidOperationException("Codex n'a pas créé ou repris la discussion.");
+                    pendingHistorySession = null;
+                    SaveHistory();
                 }
                 requestCancellation.Token.ThrowIfCancellationRequested();
                 Append("Vous", text + (attachments.Count > 0 ? "\n[" + attachments.Count + " image(s) jointe(s)]" : "") + PdfSummary());
                 await StartCodexTurnAsync(client, threadId, messageInput.ToArray(), requestCancellation);
+                historyContextPending = false;
                 input.Clear(); attachments.Clear(); pdfAttachments.Clear(); RefreshAttachments();
+                SaveHistory();
             }
             catch (OperationCanceledException) { if (!closed) { status.Text = "Réponse arrêtée"; FinishCodexResponse(); } }
             catch (Exception ex) { EndActivity(); DisconnectLocal(); Error(ex, "codex.send"); }
@@ -1400,6 +1443,7 @@ namespace BIMaestro.Codex
         {
             if (claudeClient != null)
             {
+                SaveHistory(); pendingHistorySession = claudeClient.SessionId;
                 claudeCancellation?.Cancel(); claudeClient.Dispose(); claudeClient = null;
                 claudeLoginStarted = false;
                 ready = false; busy = false; status.Text = "Déconnecté du panneau";
@@ -1411,6 +1455,8 @@ namespace BIMaestro.Codex
         }
         private void DisconnectLocal()
         {
+            SaveHistory();
+            if (discussion?.Provider == 0) pendingHistorySession = threadId ?? pendingHistorySession ?? discussion.SessionId;
             CancelRecovery();
             var old = client; client = null; old?.Dispose();
             CancelRevit(); ready = false; busy = false; threadId = turnId = null;

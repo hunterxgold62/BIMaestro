@@ -132,8 +132,17 @@ button { font:inherit; }
 @media (max-width: 700px) { .navigation-switch { top: auto; bottom: 80px; } .appearance-toolbar { top: 116px; } }
 
 .section-controls { position: absolute; z-index: 36; top: 104px; left: 14px; width: min(350px, calc(100% - 28px)); padding: 16px; border: 1px solid #9caebb; border-radius: 12px; background: #fff; color: #142636; box-shadow: 0 8px 30px #132e4333; display: grid; gap: 16px; max-height: calc(100% - 150px); overflow: auto; font-size: 14px; }
-.section-controls button[data-slot=button] { color: #142636; }
-.section-controls > button[data-slot=button], .section-controls .section-list button[aria-pressed=true] { color: #fff; }
+/* Light panels must not inherit the viewer's dark button background. Keep
+   foreground and background paired in resting, hover and disabled states. */
+:is(.markup-card, .markup-list, .markup-editor, .section-controls) [data-slot=button]:is([data-variant=outline], [data-variant=ghost]) {
+  background: #fff; color: #142636; border-color: #8196a5;
+}
+:is(.markup-card, .markup-list, .markup-editor, .section-controls) [data-slot=button]:is([data-variant=outline], [data-variant=ghost]):is(:hover, :focus-visible, [aria-expanded=true]):not(:disabled) {
+  background: #e8eff3; color: #142636;
+}
+:is(.markup-card, .markup-list, .markup-editor, .section-controls) [data-slot=button]:disabled {
+  background: #edf1f4; color: #526575; border-color: #c1ccd4; opacity: 1;
+}
 .section-heading, .section-controls label { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
 .section-orientations { display: flex; flex-wrap: wrap; gap: 6px; }
 .section-controls output { font-variant-numeric: tabular-nums; }

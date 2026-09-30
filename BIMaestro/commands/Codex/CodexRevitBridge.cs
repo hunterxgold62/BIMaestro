@@ -14,6 +14,7 @@ namespace BIMaestro.Codex
     {
         private Document document;
         private CodexFamilyArtifact lastCreated;
+        internal void ClearCreatedFamily() { lastCreated = null; }
         private readonly CodexSelectionGeometry selectionGeometry = new CodexSelectionGeometry();
         private readonly List<JObject> previewedMepRoutes = new List<JObject>();
         private readonly List<string> transactionFailures = new List<string>();

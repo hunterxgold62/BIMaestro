@@ -164,6 +164,8 @@ namespace BIMaestro.VideoGames
             catch (Exception exception)
             {
                 Debug.WriteLine("Publication MEP impossible : " + exception);
+                _state = GameMepPublishClient.Load(_scene.MepGraph);
+                ShowState();
                 StatusText.Text = "Publication impossible : " + exception.Message;
             }
             finally { SetBusy(false); }
@@ -186,7 +188,7 @@ namespace BIMaestro.VideoGames
         private async void RevokeButton_Click(object sender, RoutedEventArgs e)
         {
             if (MessageBox.Show(this,
-                    "Révoquer immédiatement les deux liens ?",
+                    "Supprimer la maquette publiée et révoquer immédiatement les deux liens ?",
                     "Révoquer le partage", MessageBoxButton.YesNo,
                     MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
             SetBusy(true);
@@ -196,10 +198,11 @@ namespace BIMaestro.VideoGames
                     _scene.MepGraph, _state, CancellationToken.None);
                 _state = new GameMepShareState();
                 ShowState();
-                StatusText.Text = "Le partage a été révoqué.";
+                PublishProgressBar.Value = 0;
+                StatusText.Text = "Maquette publiée supprimée et liens révoqués. Vous pouvez créer un nouveau partage.";
             }
             catch (Exception exception) { StatusText.Text = exception.Message; }
-            finally { SetBusy(false); }
+            finally { ShowState(); SetBusy(false); }
         }
 
         private void ShowState()
@@ -216,6 +219,7 @@ namespace BIMaestro.VideoGames
         private void SetBusy(bool busy)
         {
             _busy = busy;
+            LinksPanel.IsEnabled = !busy;
             LightenButton.IsEnabled = !busy && !_analyzing && _lighterSize < _originalSize;
             PublishButton.IsEnabled = !busy;
             PublicationNameTextBox.IsEnabled = !busy;

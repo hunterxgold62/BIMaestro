@@ -48,19 +48,23 @@ test('licensed upload verifies SHA-256 before storing a revision', async () => {
   globalThis.fetch = async (_url, options) => {
     assert.equal(options.headers.authorization, 'Bearer license');
     assert.equal(JSON.parse(options.body).action, 'r2-upload-authorize');
-    return Response.json({ publicationId: id, revision: 3, asset: { name: 'index.zip', bytes: 4, sha256 } });
+    return Response.json({ publicationId: id, publicationName: 'École Antibes', revision: 3, asset: { name: 'index.zip', bytes: 4, sha256 } });
   };
   try {
     const url = `https://pilot.example/upload?publicationId=${id}&revision=3&name=index.zip`;
     const env = { MODELS: { put: async (key, body, options) => {
-      writes.push({ key, bytes: [...new Uint8Array(body)], sha256: options.customMetadata.sha256 });
+      writes.push({ key, body, sha256: options?.customMetadata?.sha256 });
       return { size: body.byteLength };
     } } };
     const headers = { authorization: 'Bearer license' };
     assert.equal((await worker.fetch(new Request(url, { method: 'PUT', headers, body: bytes }), env)).status, 201);
-    assert.deepEqual(writes, [{ key: `${id}/3/index.zip`, bytes: [1, 2, 3, 4], sha256 }]);
+    assert.equal(writes[0].key, `${id}/3/index.zip`);
+    assert.deepEqual([...new Uint8Array(writes[0].body)], [1, 2, 3, 4]);
+    assert.equal(writes[0].sha256, sha256);
+    assert.equal(writes[1].key, `${id}/3/00 - Ecole Antibes.txt`);
+    assert.match(writes[1].body, /Maquette : École Antibes/);
     assert.equal((await worker.fetch(new Request(url, { method: 'PUT', headers, body: new Uint8Array([9, 2, 3, 4]) }), env)).status, 409);
-    assert.equal(writes.length, 1);
+    assert.equal(writes.length, 2);
   } finally { globalThis.fetch = original; }
 });
 
@@ -82,7 +86,10 @@ test('deletion requires server authorization for an inactive revision', async ()
   const original = globalThis.fetch;
   let deleted = 0;
   const body = JSON.stringify({ publicationId: id, revision: 1, names: ['index.zip'] });
-  const env = { MODELS: { delete: async keys => { assert.deepEqual(keys, [`${id}/1/index.zip`]); deleted++; } } };
+  const env = { MODELS: {
+    delete: async keys => { if (deleted === 0) assert.deepEqual(keys, [`${id}/1/index.zip`]); deleted++; },
+    list: async () => ({ objects: [{ key: `${id}/1/00 - Ecole Antibes.txt` }] }),
+  } };
   try {
     globalThis.fetch = async () => new Response('Denied', { status: 403 });
     assert.equal((await worker.fetch(new Request('https://pilot.example/delete', { method: 'POST',
@@ -91,6 +98,6 @@ test('deletion requires server authorization for an inactive revision', async ()
     globalThis.fetch = async () => Response.json({ publicationId: id, revision: 1, names: ['index.zip'] });
     assert.equal((await worker.fetch(new Request('https://pilot.example/delete', { method: 'POST',
       headers: { authorization: 'Bearer server', 'content-type': 'application/json' }, body }), env)).status, 204);
-    assert.equal(deleted, 1);
+    assert.equal(deleted, 2);
   } finally { globalThis.fetch = original; }
 });

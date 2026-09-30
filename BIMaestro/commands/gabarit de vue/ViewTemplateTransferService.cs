@@ -340,6 +340,8 @@ namespace BIMaestro.ViewTemplates
 
         private static FilterNodeSnapshot CaptureFilterNode(Document document, ElementFilter filter)
         {
+            // Revit can return no rule tree for a parameter filter without rules.
+            if (filter == null) return null;
             if (filter is LogicalAndFilter andFilter)
             {
                 return new FilterNodeSnapshot
@@ -373,6 +375,7 @@ namespace BIMaestro.ViewTemplates
 
         private static FilterRuleSnapshot CaptureRule(Document document, FilterRule rule)
         {
+            if (rule == null) return null;
             if (rule is FilterInverseRule inverse)
             {
                 return new FilterRuleSnapshot { Kind = "Inverse", InnerRule = CaptureRule(document, inverse.GetInnerRule()) };

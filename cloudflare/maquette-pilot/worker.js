@@ -38,6 +38,12 @@ function validTarget(id, revision, name) {
     /^(index\.zip|tile-\d{5}\.glb\.gz)$/.test(name || '');
 }
 
+function nameMarker(publicationName) {
+  const readable = String(publicationName || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z0-9._ -]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+  return `00 - ${readable || 'Maquette'}.txt`;
+}
+
 export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin') || '';
@@ -65,6 +71,10 @@ export default {
       const key = `${publicationId}/${revision}/${name}`;
       const stored = await env.MODELS.put(key, bytes, { customMetadata: { sha256: asset.sha256 } });
       if (!stored || stored.size !== asset.bytes) return failure(origin, 503, 'Envoi R2 incomplet');
+      if (name === 'index.zip' && typeof access.publicationName === 'string') {
+        const marker = `${publicationId}/${revision}/${nameMarker(access.publicationName)}`;
+        await env.MODELS.put(marker, `Maquette : ${access.publicationName}\nPublication : ${publicationId}\nRévision : ${revision}\n`);
+      }
       return new Response(null, { status: 201, headers: headers(origin) });
     }
     if (request.method === 'POST' && path === '/verify') {
@@ -98,6 +108,8 @@ export default {
       if (access.publicationId !== publicationId || access.revision !== revision || access.names?.length !== names.length ||
           names.some(name => !access.names.includes(name))) return failure(origin, 403, 'Manifeste invalide');
       await env.MODELS.delete(names.map(name => `${publicationId}/${revision}/${name}`));
+      const markers = await env.MODELS.list({ prefix: `${publicationId}/${revision}/00 - ` });
+      if (markers.objects.length) await env.MODELS.delete(markers.objects.map(object => object.key));
       return new Response(null, { status: 204, headers: headers(origin) });
     }
     if (request.method !== 'POST' || path !== '/asset') return failure(origin, 404, 'Introuvable');

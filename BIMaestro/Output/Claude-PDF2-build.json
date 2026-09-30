@@ -1,0 +1,10 @@
+{
+  "transport": "PDF-2",
+  "builtUtc": "2026-09-28T14:22:01.2919758Z",
+  "module": "c2b45c17-1d91-47b1-adca-bf74edd2c474",
+  "dllSHA256": "671C8CD18423716D97FA68CDC7AFBDB52B296C68A80AADDE7DDD0EF30ACD00CD",
+  "installer": "BIMaestroInstaller-Claude-PDF2.exe",
+  "installerSHA256": "DFCA70C85035E06E2FFF76FCCD84EB2E49149EC14912CDD246D39A33E95B38FD",
+  "cliTestVersion": "2.1.283",
+  "testScope": "Official Claude Code CLI; synthetic loopback API; .NET Framework 4.8 and .NET 8; three PNG pages (5,073,318 base64 characters), Unicode, native resume, API rejection, early exit and upload cancellation. No live Claude model inference."
+}

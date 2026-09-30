@@ -71,6 +71,7 @@ namespace BIMaestro.Codex
         internal Func<string, JObject, Task<object>> Handler = (tool, args) => Task.FromResult<object>(new { });
         internal Task<object> CallAsync(string tool, JObject args) => Handler(tool, args);
         internal int CancellationCount;
+        internal void ClearCreatedFamily() { }
         internal void CancelPending(string reason = null) { CancellationCount++; }
         public void Dispose() { }
     }
@@ -81,6 +82,8 @@ namespace BIMaestro.Codex
         private static int Main(string[] commandLine)
         {
             if (commandLine.Length > 0 && commandLine[0] == "app-server") return FakeServer();
+            if (commandLine.Length == 2 && commandLine[0] == "auth" && commandLine[1] == "status")
+            { Console.WriteLine("{\"loggedIn\":true,\"authMethod\":\"claude.ai\"}"); return 0; }
             if (commandLine.Contains("-p")) return FakeClaude(commandLine);
             try
             {
@@ -93,7 +96,7 @@ namespace BIMaestro.Codex
                 System.Windows.ResourceDictionary theme;
                 using (var source = System.IO.File.OpenRead("BIMaestro/Themes/BIMaestroTheme.xaml"))
                     theme = (System.Windows.ResourceDictionary)System.Windows.Markup.XamlReader.Load(source);
-                var window = new CodexWindow(bridge, theme);
+                var window = new CodexWindow(bridge, theme, historyDirectory: System.IO.Path.GetFullPath("tmp/codex-tests/history-" + Guid.NewGuid().ToString("N")));
                 if (!bridge.ShareContext || !bridge.AllowChanges || !bridge.ApplyDirectly || ((CheckBox)Get(window, "context")).IsChecked != true || ((CheckBox)Get(window, "changes")).IsChecked != true || ((CheckBox)Get(window, "direct")).IsChecked != true) throw new Exception("Requested initial permissions are not checked.");
                 var modelType = typeof(CodexWindow).GetNestedType("ModelChoice", BindingFlags.NonPublic);
                 Func<string, bool, object> model = (id, isDefault) => Activator.CreateInstance(modelType, BindingFlags.NonPublic | BindingFlags.Instance, null,
@@ -122,7 +125,7 @@ namespace BIMaestro.Codex
                 System.Windows.ResourceDictionary mepTheme;
                 using (var source = System.IO.File.OpenRead("BIMaestro/Themes/BIMaestroTheme.xaml"))
                     mepTheme = (System.Windows.ResourceDictionary)System.Windows.Markup.XamlReader.Load(source);
-                var mepWindow = new CodexWindow(mepBridge, mepTheme, mepMode: true);
+                var mepWindow = new CodexWindow(mepBridge, mepTheme, mepMode: true, historyDirectory: System.IO.Path.GetFullPath("tmp/codex-tests/history-mep-" + Guid.NewGuid().ToString("N")));
                 if (!mepBridge.ShareContext || mepBridge.AllowChanges || mepBridge.ApplyDirectly ||
                     ((CheckBox)Get(mepWindow, "changes")).IsChecked != false ||
                     ((CheckBox)Get(mepWindow, "direct")).IsChecked != false ||
@@ -237,6 +240,8 @@ namespace BIMaestro.Codex
                 TestClaudeStop(window);
                 TestAutomaticContinuation(window, bridge, astra);
                 TestClaudeAutomaticContinuation();
+                TestDiscussionHistory(theme, model("gpt-6-astra", true));
+                TestLargeDiscussionResume(theme, model("gpt-6-astra", true));
                 // Render the actual production layout without opening a native window.
                 Set(window, "ready", true); Set(window, "busy", false); Set(window, "lastArtifact", null);
                 typeof(CodexWindow).GetMethod("EndActivity", PrivateInstance).Invoke(window, new object[0]);
@@ -339,6 +344,147 @@ namespace BIMaestro.Codex
                 Set(window, "client", null); Set(window, "codexCancellation", null); Set(window, "turnId", null);
             }
         }
+        private static void TestDiscussionHistory(System.Windows.ResourceDictionary theme, object model)
+        {
+            string directory = System.IO.Path.GetFullPath("tmp/codex-tests/history-persistence-" + Guid.NewGuid().ToString("N"));
+            var store = new CodexDiscussionHistory(directory);
+            var first = new CodexWindow(new CodexRevitBridge { IsAttachedFamilyDocument = true }, theme, historyDirectory: directory);
+            typeof(CodexWindow).GetMethod("BeginHistory", PrivateInstance).Invoke(first, new object[] { "Grille de ventilation été" });
+            ((TextBox)Get(first, "transcript")).Text = "Vous\nCréer une grille\n\nCodex\nFamille créée : grille.rfa\n";
+            ((TextBox)Get(first, "input")).Text = "Augmente la largeur";
+            Set(first, "threadId", "stored-thread");
+            Set(first, "lastArtifact", new CodexFamilyArtifact { FilePath = "grille.rfa" });
+            typeof(CodexWindow).GetMethod("SaveHistory", PrivateInstance).Invoke(first, new object[0]);
+            var saved = store.List(false, out int invalid).Single();
+            if (invalid != 0 || saved.SessionId != "stored-thread" || saved.Families.Single() != "grille.rfa")
+                throw new Exception("Session or RFA reference not saved: " + ((TextBlock)Get(first, "status")).Text);
+            bool locked = false;
+            try { using (store.Acquire(saved.Id)) { } } catch (System.IO.IOException) { locked = true; }
+            if (!locked) throw new Exception("Concurrent edit was allowed.");
+            first.Close();
+            var reopened = new CodexWindow(new CodexRevitBridge { IsAttachedFamilyDocument = true }, theme, historyDirectory: directory);
+            typeof(CodexWindow).GetMethod("RestoreHistory", PrivateInstance).Invoke(reopened, new object[] { saved });
+            if (((TextBox)Get(reopened, "transcript")).Text != saved.Transcript ||
+                ((TextBox)Get(reopened, "input")).Text != "Augmente la largeur" ||
+                (string)Get(reopened, "pendingHistorySession") != "stored-thread" ||
+                ((CheckBox)Get(reopened, "direct")).IsChecked == true || Get(reopened, "client") != null)
+                throw new Exception("Offline restore lost content, draft, session or permissions.");
+            using (var client = new CodexClient(System.IO.Path.Combine(directory, "fake-codex")))
+            {
+                Pump(client.StartAsync(Assembly.GetExecutingAssembly().Location));
+                Set(reopened, "client", client); Set(reopened, "ready", true);
+                var picker = (ComboBox)Get(reopened, "models"); picker.ItemsSource = new[] { model }; picker.SelectedIndex = 0;
+                Pump((Task)typeof(CodexWindow).GetMethod("SendAsync", PrivateInstance).Invoke(reopened, new object[0]));
+                var stateTask = client.RequestAsync("test/state", new { }); Pump(stateTask);
+                if ((string)stateTask.Result["resumedThread"] != "stored-thread" ||
+                    !((string)stateTask.Result["lastPrompt"]).Contains("Inspecte l'état actuel"))
+                    throw new Exception("Codex history did not resume its saved session with current Revit context.");
+                Set(reopened, "busy", false);
+                ((Button)Get(reopened, "reset")).RaiseEvent(new System.Windows.RoutedEventArgs(Button.ClickEvent));
+                if (Get(reopened, "discussion") != null || Get(reopened, "pendingHistorySession") != null ||
+                    Get(reopened, "lastArtifact") != null || store.List(false, out _).Count != 1)
+                    throw new Exception("New discussion erased the archive or retained previous session state.");
+            }
+            reopened.Close();
+            var claudeSaved = new CodexDiscussion { Provider = 1, Title = "Claude grille", SessionId = "stored-claude", Transcript = "Claude\nGrille enregistrée", Model = "opus", Effort = "high" };
+            store.Save(claudeSaved);
+            var claudeWindow = new CodexWindow(new CodexRevitBridge { IsAttachedFamilyDocument = true }, theme, historyDirectory: directory);
+            typeof(CodexWindow).GetMethod("RestoreHistory", PrivateInstance).Invoke(claudeWindow, new object[] { claudeSaved });
+            string claudeStorage = System.IO.Path.Combine(directory, "claude-client");
+            string claudeWorkspace = System.IO.Path.Combine(claudeStorage, "workspace");
+            System.IO.Directory.CreateDirectory(claudeWorkspace);
+            string claudeState = System.IO.Path.Combine(claudeWorkspace, "fake-claude-state.json");
+            System.IO.File.WriteAllText(claudeState, new JObject { ["scenario"] = "history-resume", ["calls"] = new JArray() }.ToString());
+            using (var claude = new ClaudeClient(System.IO.Path.GetFullPath("tmp/codex-tests/claude-cli/claude.exe"), claudeStorage))
+            {
+                Set(claudeWindow, "claudeClient", claude);
+                Pump((Task)typeof(CodexWindow).GetMethod("ConnectClaudeAsync", PrivateInstance).Invoke(claudeWindow, new object[0]));
+                ((TextBox)Get(claudeWindow, "input")).Text = "Reprends la grille";
+                Pump((Task)typeof(CodexWindow).GetMethod("SendClaudeAsync", PrivateInstance).Invoke(claudeWindow, new object[0]));
+                var sent = JObject.Parse(System.IO.File.ReadAllText(claudeState))["calls"].Single();
+                if ((string)sent["resume"] != "stored-claude" || !((string)sent["prompt"]).Contains("Reprise d'une discussion") ||
+                    !store.Read(claudeSaved.Id).Transcript.Contains("Reprise Claude réussie"))
+                    throw new Exception("Claude history did not restore and persist its native session.");
+            }
+            claudeWindow.Close();
+            var historyDialog = (System.Windows.Window)typeof(CodexWindow).GetMethod("BuildHistoryDialog", PrivateInstance)
+                .Invoke(first, new object[] { store.List(false, out _), 0 });
+            var historyRoot = (System.Windows.FrameworkElement)historyDialog.Content;
+            historyDialog.Content = null;
+            Render(new Border { Background = System.Windows.Media.Brushes.White, Child = historyRoot }, "discussion-history.png", 880, 610);
+            var mep = new CodexDiscussion { Title = "MEP", Mep = true };
+            store.Save(mep);
+            System.IO.File.WriteAllText(System.IO.Path.Combine(directory, Guid.NewGuid().ToString("N") + ".json"), "bad json");
+            if (store.List(false, out invalid).Count != 2 || invalid != 1 || store.List(true, out _).Single().Id != mep.Id)
+                throw new Exception("Corrupt history or assistant-mode separation failed.");
+            bool traversalRejected = false;
+            try { store.Read("../escape"); } catch (System.IO.InvalidDataException) { traversalRejected = true; }
+            if (!traversalRejected) throw new Exception("History accepted an unsafe id.");
+            Console.WriteLine("PASS: discussion survives window closure, restores offline, resumes Codex, keeps RFA references and isolates concurrent windows/modes/corrupt entries");
+            Console.WriteLine("PASS: restored Claude discussion reconnects, passes --resume and saves its continued transcript");
+        }
+
+        private static void TestLargeDiscussionResume(System.Windows.ResourceDictionary theme, object model)
+        {
+            const string initial = "Vous\nCréer le filtre DN 400, conserver la cote imposée 1200 mm.\n";
+            const string recent = "\nCodex\nFamille créée et ouverte, DN et Variante en occurrence.\n";
+            const string request = "Corrige le piquage et détaille l'intérieur.";
+            // Escaping multiplies the size of control characters. Keep real Unicode
+            // at the excerpt boundaries too; the archive must stay byte-for-byte intact.
+            string journal = initial + string.Concat(Enumerable.Repeat("\"\\\n\tété 😀", 180000)) + recent;
+            foreach (string session in new[] { null, "missing-rollout", "native-large-history", "resume-denied" })
+            {
+                string directory = System.IO.Path.GetFullPath("tmp/codex-tests/large-history-" + Guid.NewGuid().ToString("N"));
+                var store = new CodexDiscussionHistory(directory);
+                var saved = new CodexDiscussion { Title = "Gros filtre", Transcript = journal, SessionId = session,
+                    Draft = request, Families = new System.Collections.Generic.List<string> { "filtre.rfa" } };
+                store.Save(saved);
+                var window = new CodexWindow(new CodexRevitBridge { IsAttachedFamilyDocument = true }, theme, historyDirectory: directory);
+                typeof(CodexWindow).GetMethod("RestoreHistory", PrivateInstance).Invoke(window, new object[] { saved });
+                using (var client = new CodexClient(System.IO.Path.Combine(directory, "fake-codex")))
+                {
+                    Pump(client.StartAsync(Assembly.GetExecutingAssembly().Location));
+                    Set(window, "client", client); Set(window, "ready", true);
+                    var picker = (ComboBox)Get(window, "models"); picker.ItemsSource = new[] { model }; picker.SelectedIndex = 0;
+                    if (session == "native-large-history")
+                    {
+                        Set(window, "threadId", session); Set(window, "pendingHistorySession", null);
+                        ((CheckBox)Get(window, "internet")).IsChecked = true;
+                        if ((string)Get(window, "pendingHistorySession") != session)
+                            throw new Exception("Internet configuration lost the native session.");
+                    }
+                    Pump((Task)typeof(CodexWindow).GetMethod("SendAsync", PrivateInstance).Invoke(window, new object[0]));
+                    if (session == "resume-denied")
+                    {
+                        if (((TextBox)Get(window, "input")).Text != request || store.Read(saved.Id).SessionId != session ||
+                            !((TextBox)Get(window, "transcript")).Text.Contains("Session access denied"))
+                            throw new Exception("An unrelated resume failure was hidden or discarded the draft.");
+                    }
+                    else
+                    {
+                        var state = client.RequestAsync("test/state", new { }); Pump(state);
+                        string prompt = (string)state.Result["lastPrompt"];
+                        if (state.Result.Value<int>("turnStarts") != 1 || prompt == null || prompt.Length > 350000 ||
+                            !prompt.StartsWith(request) || !prompt.Contains("filtre.rfa") ||
+                            ((TextBox)Get(window, "input")).Text.Length != 0)
+                            throw new Exception("Large discussion failed to send one bounded continuation with RFA context.");
+                        bool native = session == "native-large-history";
+                        if (native ? prompt.Contains("Historique partiel") :
+                            !prompt.Contains("Historique partiel") || !prompt.Contains("1200 mm") || !prompt.Contains("DN et Variante"))
+                            throw new Exception("Fallback omitted initial/recent context, or replayed history during native resume.");
+                        if (native ? (string)state.Result["resumedThread"] != session :
+                            state.Result.Value<int>("threadStarts") != 1 || store.Read(saved.Id).SessionId != "new-thread")
+                            throw new Exception("Missing-session recovery or native-session preservation failed.");
+                    }
+                    if (!store.Read(saved.Id).Transcript.StartsWith(journal) || !store.Read(saved.Id).Families.Contains("filtre.rfa"))
+                        throw new Exception("Large archive or family reference was truncated.");
+                    Set(window, "turnId", null); Set(window, "busy", false); Set(window, "client", null);
+                }
+                window.Close();
+            }
+            Console.WriteLine("PASS: multi-megabyte history remains intact, fallback is bounded, missing rollout recovers once, Internet preserves native context and unrelated errors remain visible");
+        }
+
         private static void TestClaudeAutomaticContinuation()
         {
             string cliDirectory = System.IO.Path.GetFullPath("tmp/codex-tests/claude-cli");
@@ -346,7 +492,7 @@ namespace BIMaestro.Codex
             string executable = System.IO.Path.Combine(cliDirectory, "claude.exe");
             System.IO.File.Copy(Assembly.GetExecutingAssembly().Location, executable, true);
             System.IO.File.Copy(typeof(JObject).Assembly.Location, System.IO.Path.Combine(cliDirectory, "Newtonsoft.Json.dll"), true);
-            foreach (string scenario in new[] { "recover", "refuse" })
+            foreach (string scenario in new[] { "recover", "refuse", "images" })
             {
                 string storage = System.IO.Path.GetFullPath("tmp/codex-tests/claude-" + scenario + "-" + Guid.NewGuid().ToString("N"));
                 string workspace = System.IO.Path.Combine(storage, "workspace");
@@ -358,7 +504,9 @@ namespace BIMaestro.Codex
                 var nativeWidths = new System.Collections.Generic.List<int>();
                 using (var claude = new ClaudeClient(executable, storage))
                 {
-                    var task = claude.AskAsync("Créer la famille de table.", Array.Empty<CodexImageAttachment>(), "test-model", "low",
+                    var images = scenario == "images" ? new[] { new CodexImageAttachment {
+                        Name = "fiche.pdf - page 1", DataUrl = "data:image/png;base64,cGFnZQ==" } } : Array.Empty<CodexImageAttachment>();
+                    var task = claude.AskAsync("Créer la famille de table.", images, "test-model", "low",
                         async (tool, arguments) =>
                         {
                             try
@@ -369,7 +517,7 @@ namespace BIMaestro.Codex
                                     nativeWidths.Add(width);
                                     if (scenario == "refuse")
                                         return Task.FromException<object>(new InvalidOperationException("Création refusée par l'utilisateur. Ne pas réessayer sans nouvelle demande."));
-                                    if (width == 0)
+                                    if (width == 0 && scenario != "images")
                                         return Task.FromException<object>(new InvalidOperationException("Pièce « pied » : largeur invalide."));
                                     return Task.FromResult<object>(new { saved = true, filePath = "claude-recovered.rfa" });
                                 }, _ => { }, CancellationToken.None);
@@ -384,7 +532,15 @@ namespace BIMaestro.Codex
                 if (calls.Count != expectedCalls || calls[0].Value<string>("resume") != null ||
                     calls.Skip(1).Any(call => call.Value<string>("resume") != "fake-claude-" + scenario))
                     throw new Exception("Claude lost its session or dispatched an unexpected follow-up for " + scenario + ".");
-                if (scenario == "recover")
+                if (scenario == "images")
+                {
+                    var sent = JObject.Parse((string)calls[0]["prompt"]);
+                    if ((string)sent["message"]["content"][1]["source"]["data"] != "cGFnZQ==" ||
+                        nativeWidths.Count != 1 || !messages.Contains("Famille corrigée et enregistrée."))
+                        throw new Exception("PDF image payload or streamed Revit roundtrip failed.");
+                    Console.WriteLine("PASS: PDF image uses streaming input/output, dispatches Revit tool and resumes with text result");
+                }
+                else if (scenario == "recover")
                 {
                     if (!nativeWidths.SequenceEqual(new[] { 0, 100 }) || !messages.Contains("Famille corrigée et enregistrée.") ||
                         messages.Contains("Je m'arrête après cet échec.") || !((string)calls[2]["prompt"]).Contains("pied"))
@@ -398,6 +554,53 @@ namespace BIMaestro.Codex
                     Console.WriteLine("PASS: real Claude client respects user refusal without an automatic follow-up");
                 }
             }
+            bool missingResultRejected = false;
+            try { ClaudeClient.ReadResult("{\"type\":\"system\"}\n", true); }
+            catch (InvalidOperationException) { missingResultRejected = true; }
+            if (!missingResultRejected) throw new Exception("Incomplete image stream was accepted.");
+
+            string errorStorage = System.IO.Path.Combine(cliDirectory, "early-exit");
+            System.IO.Directory.CreateDirectory(System.IO.Path.Combine(errorStorage, "workspace"));
+            System.IO.File.WriteAllText(System.IO.Path.Combine(errorStorage, "workspace", "fake-claude-state.json"),
+                new JObject { ["scenario"] = "early-exit", ["calls"] = new JArray() }.ToString());
+            using (var claude = new ClaudeClient(executable, errorStorage))
+            {
+                bool diagnosticPreserved = false;
+                try
+                {
+                    Pump(claude.AskAsync("PDF", new[] { new CodexImageAttachment {
+                        DataUrl = "data:image/png;base64," + new string('A', 2000000) } }, "test-model", "low",
+                        (_, __) => throw new Exception("No tool should run after a CLI failure."), _ => { }, CancellationToken.None));
+                }
+                catch (InvalidOperationException ex) { diagnosticPreserved = ex.Message.Contains("test CLI startup error"); }
+                if (!diagnosticPreserved) throw new Exception("Broken input pipe hid the Claude startup diagnostic.");
+                var diagnostic = JObject.Parse(System.IO.File.ReadAllText(claude.LastDiagnosticPath));
+                if ((string)diagnostic["transport"] != ClaudeClient.TransportRevision || diagnostic.Value<int>("inputUtf8Bytes") < 2000000 ||
+                    diagnostic.ToString().Contains("base64")) throw new Exception("Transport diagnostic missing or contains image payload.");
+                Console.WriteLine("PASS: early CLI exit during large PDF input preserves stderr diagnostic");
+            }
+            foreach (string scenario in new[] { "api-error", "stall-input" })
+            {
+                string storage = System.IO.Path.Combine(cliDirectory, scenario);
+                System.IO.Directory.CreateDirectory(System.IO.Path.Combine(storage, "workspace"));
+                System.IO.File.WriteAllText(System.IO.Path.Combine(storage, "workspace", "fake-claude-state.json"),
+                    new JObject { ["scenario"] = scenario, ["calls"] = new JArray() }.ToString());
+                using (var claude = new ClaudeClient(executable, storage))
+                using (var cancellation = new CancellationTokenSource(scenario == "stall-input" ? 500 : 5000))
+                {
+                    bool expected = false;
+                    try
+                    {
+                        Pump(claude.AskAsync("PDF privé", new[] { new CodexImageAttachment { DataUrl = "data:image/png;base64," + new string('A', 6000000) } },
+                            "test-model", "low", (_, __) => throw new Exception("No tool expected"), _ => { }, cancellation.Token));
+                    }
+                    catch (OperationCanceledException) { expected = scenario == "stall-input"; }
+                    catch (InvalidOperationException ex) { expected = scenario == "api-error" && ex.Message.Contains("Image rejected by provider") && !ex.Message.Contains("private-init-marker"); }
+                    if (!expected || typeof(ClaudeClient).GetField("running", PrivateInstance).GetValue(claude) != null)
+                        throw new Exception("Claude transport failed cancellation/cleanup/error extraction: " + scenario);
+                }
+            }
+            Console.WriteLine("PASS: blocked PDF upload cancels and releases process; streaming API failure shows result without init dump");
         }
         private static int FakeClaude(string[] commandLine)
         {
@@ -408,19 +611,40 @@ namespace BIMaestro.Codex
             string statePath = System.IO.Path.Combine(Environment.CurrentDirectory, "fake-claude-state.json");
             var state = JObject.Parse(System.IO.File.ReadAllText(statePath));
             string scenario = state.Value<string>("scenario");
+            if (scenario == "early-exit") { Console.Error.WriteLine("test CLI startup error"); return 1; }
+            if (scenario == "stall-input") { Thread.Sleep(30000); return 1; }
+            if (scenario == "api-error")
+            {
+                Console.In.ReadToEnd();
+                Console.WriteLine("{\"type\":\"system\",\"marker\":\"private-init-marker\"}");
+                Console.WriteLine("{\"type\":\"result\",\"is_error\":true,\"result\":\"Image rejected by provider\"}");
+                return 1;
+            }
             var calls = (JArray)state["calls"];
             int step = calls.Count;
+            bool streamed = scenario == "images" && step == 0;
+            int outputIndex = Array.IndexOf(commandLine, "--output-format");
+            if (streamed && (outputIndex < 0 || commandLine[outputIndex + 1] != "stream-json" ||
+                !commandLine.Contains("--verbose") || !commandLine.Contains("--input-format")))
+            { Console.Error.WriteLine("Image input requires streaming output and verbose mode."); return 1; }
             int resumeIndex = Array.IndexOf(commandLine, "--resume");
             calls.Add(new JObject { ["resume"] = resumeIndex < 0 ? null : commandLine[resumeIndex + 1], ["prompt"] = Console.In.ReadToEnd() });
             System.IO.File.WriteAllText(statePath, state.ToString());
+            if (scenario == "history-resume")
+            {
+                Console.WriteLine(new JObject { ["session_id"] = "stored-claude", ["structured_output"] = new JObject {
+                    ["reply"] = "Reprise Claude réussie", ["tool"] = "", ["arguments"] = new JObject(), ["done"] = true } }.ToString(Newtonsoft.Json.Formatting.None));
+                return 0;
+            }
             bool toolCall = step == 0 || scenario == "recover" && (step == 2 || step == 3);
             var answer = new JObject {
-                ["reply"] = toolCall ? "" : scenario == "refuse" ? "Création refusée, arrêt de la demande." : step == 1 ? "Je m'arrête après cet échec." : "Famille corrigée et enregistrée.",
+                ["reply"] = toolCall ? "" : scenario == "refuse" ? "Création refusée, arrêt de la demande." : step == 1 && scenario != "images" ? "Je m'arrête après cet échec." : "Famille corrigée et enregistrée.",
                 ["tool"] = toolCall ? "revit_create_family" : "",
                 ["arguments"] = toolCall ? new JObject { ["width_mm"] = step == 3 ? 100 : 0 } : new JObject(),
                 ["done"] = !toolCall
             };
-            Console.WriteLine(new JObject { ["session_id"] = "fake-claude-" + scenario, ["structured_output"] = answer }.ToString(Newtonsoft.Json.Formatting.None));
+            if (streamed) Console.WriteLine("{\"type\":\"system\",\"subtype\":\"init\"}\n{\"type\":\"assistant\",\"message\":{}}\n");
+            Console.WriteLine(new JObject { ["type"] = "result", ["session_id"] = "fake-claude-" + scenario, ["structured_output"] = answer }.ToString(Newtonsoft.Json.Formatting.None));
             return 0;
         }
         private static void Pump(Task task)
@@ -445,6 +669,8 @@ namespace BIMaestro.Codex
             Console.InputEncoding = System.Text.Encoding.UTF8;
             Console.OutputEncoding = new System.Text.UTF8Encoding(false);
             int turnStarts = 0;
+            int threadStarts = 0;
+            string resumedThread = null;
             string lastPrompt = null;
             string line;
             while ((line = Console.ReadLine()) != null)
@@ -460,10 +686,33 @@ namespace BIMaestro.Codex
                     continue;
                 }
                 if (method == "initialized") continue;
+                if (method == "account/read") { Reply(id, new JObject { ["account"] = new JObject { ["type"] = "chatgpt" } }); continue; }
+                if (method == "thread/resume")
+                {
+                    resumedThread = (string)request["params"]["threadId"];
+                    if (resumedThread == "missing-rollout" || resumedThread == "resume-denied")
+                    {
+                        Console.WriteLine(new JObject { ["id"] = id, ["error"] = new JObject { ["code"] = -32600,
+                            ["message"] = resumedThread == "missing-rollout" ? "no rollout found for thread id missing-rollout" : "Session access denied" } }.ToString(Newtonsoft.Json.Formatting.None));
+                        continue;
+                    }
+                    Reply(id, new JObject { ["thread"] = new JObject { ["id"] = resumedThread } }); continue;
+                }
+                if (method == "thread/start")
+                {
+                    threadStarts++;
+                    Reply(id, new JObject { ["thread"] = new JObject { ["id"] = "new-thread" } }); continue;
+                }
                 if (method == "turn/start")
                 {
-                    turnStarts++;
                     lastPrompt = (string)request["params"]?["input"]?.First?["text"];
+                    if (lastPrompt?.Length > 1048576)
+                    {
+                        Console.WriteLine(new JObject { ["id"] = id, ["error"] = new JObject { ["code"] = -32600,
+                            ["message"] = "Input exceeds the maximum length of 1048576 characters." } }.ToString(Newtonsoft.Json.Formatting.None));
+                        continue;
+                    }
+                    turnStarts++;
                     if (turnStarts == 3)
                     {
                         Console.WriteLine(new JObject { ["method"] = "turn/started", ["params"] = new JObject {
@@ -483,7 +732,7 @@ namespace BIMaestro.Codex
                         ["callId"] = success ? "successful-tool" : "failed-tool", ["arguments"] = new JObject { ["width_mm"] = success ? 100 : 0 } } }.ToString(Newtonsoft.Json.Formatting.None));
                     continue;
                 }
-                if (method == "test/state") { Reply(id, new JObject { ["turnStarts"] = turnStarts, ["lastPrompt"] = lastPrompt }); continue; }
+                if (method == "test/state") { Reply(id, new JObject { ["turnStarts"] = turnStarts, ["threadStarts"] = threadStarts, ["lastPrompt"] = lastPrompt, ["resumedThread"] = resumedThread }); continue; }
                 Reply(id, new JObject());
             }
             return 0;

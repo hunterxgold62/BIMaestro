@@ -78,7 +78,19 @@ namespace BIMaestro.VideoGames
             };
             progress?.Report(new GameMepPublishProgress
                 { Message = "Préparation du partage privé…", Percentage = 0.22 });
-            dynamic start = await PostAsync(startBody, cancellationToken);
+            dynamic start;
+            try { start = await PostAsync(startBody, cancellationToken); }
+            catch (PublicationRequestException exception) when (
+                exception.StatusCode == System.Net.HttpStatusCode.NotFound &&
+                !string.IsNullOrWhiteSpace(state.PublicationId))
+            {
+                // The publication may have been revoked from another window or device.
+                state = new GameMepShareState();
+                Save(scene.MepGraph, state);
+                var freshBody = Newtonsoft.Json.Linq.JObject.FromObject(startBody);
+                freshBody["publicationId"] = null;
+                start = await PostAsync(freshBody, cancellationToken);
+            }
             int revision = (int)start.revision;
             string publicationId = (string)start.publicationId;
             string viewerToken = start.viewerToken == null ? "" : (string)start.viewerToken;
@@ -198,13 +210,23 @@ namespace BIMaestro.VideoGames
             GameMepShareState state,
             CancellationToken cancellationToken)
         {
-            await PostAsync(new
+            try { await PostAsync(new
             {
                 action = "manage",
                 command = "revoke",
                 publicationId = state.PublicationId
-            }, cancellationToken);
-            Delete(graph);
+            }, cancellationToken); }
+            catch (PublicationRequestException exception) when (
+                exception.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                // Already deleted remotely: clearing the local share is still required.
+            }
+            state.PublicationId = string.Empty;
+            state.ViewerToken = string.Empty;
+            state.EditorToken = string.Empty;
+            state.Revision = 0;
+            state.ExpiresAtUtc = default;
+            Save(graph, state);
         }
 
         public static GameMepShareState Load(GameMepGraphData graph)
@@ -238,7 +260,7 @@ namespace BIMaestro.VideoGames
                 dynamic failure = JsonConvert.DeserializeObject(json);
                 string message = failure?.error == null ? json : (string)failure.error;
                 if ((int)response.StatusCode >= 500 || (int)response.StatusCode == 429 || (int)response.StatusCode == 408) throw new HttpRequestException(message);
-                throw new InvalidOperationException(message);
+                throw new PublicationRequestException(response.StatusCode, message);
             }
             return JsonConvert.DeserializeObject(json) ??
                 throw new InvalidOperationException("Réponse de publication vide.");
@@ -251,9 +273,12 @@ namespace BIMaestro.VideoGames
             File.WriteAllText(path, JsonConvert.SerializeObject(state, Formatting.Indented));
         }
 
-        private static void Delete(GameMepGraphData graph)
+        private sealed class PublicationRequestException : InvalidOperationException
         {
-            try { File.Delete(StatePath(graph)); } catch { }
+            public System.Net.HttpStatusCode StatusCode { get; }
+
+            public PublicationRequestException(System.Net.HttpStatusCode statusCode, string message)
+                : base(message) { StatusCode = statusCode; }
         }
 
         private static string StatePath(GameMepGraphData graph)

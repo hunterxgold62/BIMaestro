@@ -31,7 +31,10 @@ namespace BIMaestro.Codex
         });
         private Process running;
         private string sessionId;
+        internal string SessionId { get => sessionId; set => sessionId = value; }
         private readonly string storageDirectory;
+        internal const string TransportRevision = "PDF-2";
+        internal string LastDiagnosticPath => Path.Combine(storageDirectory, "last-transport.json");
 
         internal static string FindExecutable()
         {
@@ -145,14 +148,15 @@ namespace BIMaestro.Codex
             for (int step = 0; step < 30; step++)
             {
                 cancellation.ThrowIfCancellationRequested();
-                string args = "-p --output-format json --json-schema " + Quote(OutputSchema) +
+                bool hasImages = step == 0 && images != null && images.Length > 0;
+                string args = "-p --output-format " + (hasImages ? "stream-json --verbose" : "json") + " --json-schema " + Quote(OutputSchema) +
                     " --tools " + Quote(internetAccess ? "WebSearch,WebFetch" : "") + " --disallowedTools \"mcp__*\" --system-prompt-file " + Quote(systemPath) +
                     " --model " + Quote(model);
                 if (new[] { "low", "medium", "high", "xhigh", "max" }.Contains(effort))
                     args += " --effort " + effort;
                 if (sessionId != null) args += " --resume " + Quote(sessionId);
                 string input = prompt;
-                if (step == 0 && images != null && images.Length > 0)
+                if (hasImages)
                 {
                     args += " --input-format stream-json";
                     input = BuildImageMessage(prompt, images);
@@ -162,12 +166,15 @@ namespace BIMaestro.Codex
                 cancellation.ThrowIfCancellationRequested();
                 if (result.exitCode != 0)
                 {
-                    string detail = (string.IsNullOrWhiteSpace(result.error) ? result.output : result.error).Trim();
-                    if (string.IsNullOrWhiteSpace(detail) && step == 0 && images != null && images.Length > 0)
-                        detail = "Claude Code n'a pas accepté les images. Mettez Claude Code à jour, puis réessayez ou envoyez le PDF en texte seul.";
-                    throw new InvalidOperationException("Claude Code : " + detail);
+                    string detail = ProviderError(result.output, hasImages);
+                    if (string.IsNullOrWhiteSpace(detail)) detail = result.error;
+                    if (string.IsNullOrWhiteSpace(detail)) detail = "Le processus s'est arrêté sans renvoyer d'explication.";
+                    throw new InvalidOperationException("Claude Code : " + ShortDiagnostic(detail) +
+                        "\nTransport " + TransportRevision + " · code de sortie " + result.exitCode + "\nDiagnostic local : " + LastDiagnosticPath);
                 }
-                var envelope = JObject.Parse(result.output);
+                var envelope = ReadResult(result.output, hasImages);
+                if (envelope.Value<bool?>("is_error") == true)
+                    throw new InvalidOperationException("Claude Code : " + ((string)envelope["result"] ?? envelope["errors"]?.ToString(Formatting.None) ?? "La demande a échoué."));
                 sessionId = (string)envelope["session_id"] ?? sessionId;
                 var answer = envelope["structured_output"] as JObject;
                 if (answer == null)
@@ -192,6 +199,41 @@ namespace BIMaestro.Codex
                     "\nContinue la demande. Appelle un autre outil si nécessaire ou réponds à l'utilisateur.";
             }
             throw new InvalidOperationException("Claude a dépassé la limite de 30 opérations Revit pour cette demande.");
+        }
+
+        internal static JObject ReadResult(string output, bool streamed)
+        {
+            if (!streamed) return JObject.Parse(output);
+            JObject result = null;
+            using (var reader = new StringReader(output))
+            {
+                string line;
+                while ((line = reader.ReadLine()) != null)
+                {
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+                    var message = JObject.Parse(line);
+                    if ((string)message["type"] == "result") result = message;
+                }
+            }
+            return result ?? throw new InvalidOperationException("Claude Code n'a pas renvoyé de résultat final après l'envoi des images ou du PDF.");
+        }
+
+        private static string ProviderError(string output, bool streamed)
+        {
+            if (string.IsNullOrWhiteSpace(output)) return null;
+            try
+            {
+                var result = ReadResult(output, streamed);
+                return result.Value<bool?>("is_error") == true
+                    ? (string)result["result"] ?? result["errors"]?.ToString(Formatting.None) : null;
+            }
+            catch (Exception ex) when (ex is JsonException || ex is InvalidOperationException) { return null; }
+        }
+
+        private static string ShortDiagnostic(string value)
+        {
+            string text = System.Text.RegularExpressions.Regex.Replace(value.Trim(), @"(?i)\bsk-[a-z0-9_-]{12,}", "[masqué]");
+            return text.Length > 2000 ? text.Substring(0, 2000) + "…" : text;
         }
 
         private static string BuildImageMessage(string prompt, CodexImageAttachment[] images)
@@ -242,7 +284,12 @@ namespace BIMaestro.Codex
             // The account login is the only accepted credential source for this integration.
             foreach (string key in start.EnvironmentVariables.Keys.Cast<string>().ToArray())
                 if (key.StartsWith("ANTHROPIC_API_KEY", StringComparison.OrdinalIgnoreCase)) start.EnvironmentVariables.Remove(key);
-            using (var process = new Process { StartInfo = start })
+            var process = new Process { StartInfo = start };
+            string phase = "start", stdout = "", stderr = "";
+            Exception transportError = null;
+            int? exitCode = null;
+            var elapsed = Stopwatch.StartNew();
+            try
             {
                 running = process;
                 process.Start();
@@ -252,16 +299,110 @@ namespace BIMaestro.Codex
                     var error = process.StandardError.ReadToEndAsync();
                     if (input != null)
                     {
-                        byte[] utf8 = new UTF8Encoding(false).GetBytes(input);
-                        await process.StandardInput.BaseStream.WriteAsync(utf8, 0, utf8.Length);
-                        process.StandardInput.Close();
+                        phase = "write_input";
+                        try
+                        {
+                            // Own the encoder rather than inheriting Revit's console encoding.
+                            // .NET Framework has no ProcessStartInfo.StandardInputEncoding.
+                            var write = WriteInputAsync(process.StandardInput.BaseStream, input);
+                            if (await Task.WhenAny(write, Task.Delay(TimeSpan.FromSeconds(60), cancellation)).ConfigureAwait(false) != write)
+                            {
+                                TryStop(process);
+                                transportError = new TimeoutException("Claude Code ne lit pas la demande (délai d'envoi dépassé).");
+                            }
+                            await write.ConfigureAwait(false);
+                        }
+                        catch (Exception ex) when (ex is IOException || ex is ObjectDisposedException)
+                        {
+                            transportError = transportError ?? ex;
+                        }
+                        finally { CloseInput(process); }
                     }
-                    await Task.Run(() => process.WaitForExit());
+                    phase = transportError == null ? "wait_for_exit" : "input_failed";
+                    if (transportError != null && !await Task.Run(() => process.WaitForExit(3000)).ConfigureAwait(false)) TryStop(process);
+                    await Task.Run(() => process.WaitForExit()).ConfigureAwait(false);
+                    exitCode = process.ExitCode;
+                    try { stdout = await output.ConfigureAwait(false); }
+                    catch (IOException ex) { transportError = transportError ?? ex; phase = "read_output"; }
+                    try { stderr = await error.ConfigureAwait(false); }
+                    catch (IOException ex) { transportError = transportError ?? ex; phase = "read_error"; }
                     cancellation.ThrowIfCancellationRequested();
-                    running = null;
-                    return (process.ExitCode, await output, await error);
+                    if (transportError != null)
+                    {
+                        if (string.IsNullOrWhiteSpace(stderr))
+                            stderr = "Échec de communication à l'étape " + phase + " : " + transportError.Message;
+                        return (exitCode == 0 ? -1 : exitCode.Value, stdout, stderr);
+                    }
+                    phase = "completed";
+                    return (exitCode.Value, stdout, stderr);
                 }
             }
+            catch (OperationCanceledException) { phase = "cancelled"; throw; }
+            catch (Exception ex)
+            {
+                transportError = ex;
+                throw new InvalidOperationException("Claude Code : communication interrompue à l'étape " + phase +
+                    " (" + TransportRevision + ") : " + ex.Message + "\nDiagnostic local : " + LastDiagnosticPath, ex);
+            }
+            finally
+            {
+                if (ReferenceEquals(running, process)) running = null;
+                // Process.Dispose also disposes its StreamWriter. A second broken-pipe
+                // exception here must never replace the diagnostic collected above.
+                try { process.Dispose(); }
+                catch (IOException ex) { transportError = transportError ?? ex; }
+                catch (InvalidOperationException ex) { transportError = transportError ?? ex; }
+                try
+                {
+                    var diagnostic = new JObject {
+                        ["utc"] = DateTime.UtcNow.ToString("o"), ["transport"] = TransportRevision,
+                        ["module"] = typeof(ClaudeClient).Assembly.ManifestModule.ModuleVersionId.ToString(),
+                        ["runtime"] = Environment.Version.ToString(), ["executable"] = Executable,
+                        ["executableFileVersion"] = FileVersionInfo.GetVersionInfo(Executable).FileVersion,
+                        ["phase"] = phase, ["exitCode"] = exitCode, ["elapsedMs"] = elapsed.ElapsedMilliseconds,
+                        ["streamedInput"] = arguments.Contains("--input-format stream-json"),
+                        ["inputUtf8Bytes"] = input == null ? 0 : Encoding.UTF8.GetByteCount(input),
+                        ["outputCharacters"] = stdout.Length, ["errorCharacters"] = stderr.Length,
+                        ["exceptionType"] = transportError?.GetType().FullName,
+                        ["hresult"] = transportError == null ? null : "0x" + transportError.HResult.ToString("X8")
+                    };
+                    // No prompts, PDF contents, images, credentials or raw CLI output on disk.
+                    if (input != null) File.WriteAllText(LastDiagnosticPath, diagnostic.ToString(Formatting.Indented), new UTF8Encoding(false));
+                }
+                catch { /* A diagnostic write cannot change the request outcome. */ }
+            }
+        }
+
+        private static async Task WriteInputAsync(Stream stream, string input)
+        {
+            const int chunkSize = 8192;
+            var writer = new StreamWriter(stream, new UTF8Encoding(false), chunkSize, leaveOpen: true);
+            try
+            {
+                var buffer = new char[chunkSize];
+                for (int offset = 0; offset < input.Length; offset += chunkSize)
+                {
+                    int count = Math.Min(chunkSize, input.Length - offset);
+                    input.CopyTo(offset, buffer, 0, count);
+                    await writer.WriteAsync(buffer, 0, count).ConfigureAwait(false);
+                }
+                await writer.FlushAsync().ConfigureAwait(false);
+            }
+            finally { try { writer.Dispose(); } catch (IOException) { } catch (ObjectDisposedException) { } }
+        }
+
+        private static void CloseInput(Process process)
+        {
+            // Close the handle directly: never flush Process's unused, differently encoded writer.
+            try { process.StandardInput.BaseStream.Close(); }
+            catch (IOException) { }
+            catch (ObjectDisposedException) { }
+        }
+
+        private static void TryStop(Process process)
+        {
+            try { if (!process.HasExited) process.Kill(); }
+            catch (InvalidOperationException) { }
         }
 
         private static string Quote(string value) => "\"" + value.Replace("\"", "\\\"") + "\"";

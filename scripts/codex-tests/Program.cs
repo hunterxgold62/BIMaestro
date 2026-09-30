@@ -75,9 +75,18 @@ internal static class Program
                         dynamicTools = new JArray(CodexFamilyDesign.Tool(), CodexFamilyDesign.Tool(true), CodexFamilyDesign.ProjectTool(), CodexParametricDesign.Tool(), CodexParametricDesign.Tool(true))
                     });
                     Check(thread["thread"]?["id"] != null, "real Codex: ephemeral thread and dynamic tools accepted");
+                    bool oversizedRejected = false;
+                    try
+                    {
+                        await client.RequestAsync("turn/start", new { threadId = (string)thread["thread"]["id"],
+                            input = new[] { new { type = "text", text = new string('x', 1048577) } } });
+                    }
+                    catch (InvalidOperationException ex)
+                    { oversizedRejected = ex.Message.Contains("Input exceeds the maximum length of 1048576 characters"); }
+                    Check(oversizedRejected, "real Codex: oversized history reproduces the reported rejection before model execution");
                 }
             }
-            Console.WriteLine("All Codex protocol tests passed. No model turn or login was requested.");
+            Console.WriteLine("All Codex protocol tests passed. No accepted model turn or login was requested.");
             return 0;
         }
         catch (Exception ex) { Console.Error.WriteLine(ex.GetType().Name + ": " + ex.Message); return 1; }

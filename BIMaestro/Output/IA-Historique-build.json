@@ -1,0 +1,14 @@
+{
+  "correction": "Codex history input limit and missing rollout recovery",
+  "claudeTransport": "PDF-2",
+  "builtUtc": "2026-09-28T14:46:11.2182036Z",
+  "moduleMvid": "c1601008-5063-44ec-b63e-6b4934063af3",
+  "dllSha256": "8ECBB3088510B86758AA417D30E57B870C9C592CE579B88070318F88E52C7BA6",
+  "installerSha256": "7AC8B7F6982D4768F73AECE829D1B3A8F9EB15F74697DD329B87A014FD27D857",
+  "validation": [
+    "Run.ps1 -RealCodex: passed",
+    "MSBuild Release: passed",
+    "Revit2025 net8 Release: passed",
+    "Connected model and Revit family continuation: pending user validation"
+  ]
+}

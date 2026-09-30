@@ -580,11 +580,11 @@ async function r2PublishAccess(req: Request, body: any, verifyBatch: boolean) {
     const names = body.names;
     if (!Array.isArray(names) || names.length < 1 || names.length > 32 || new Set(names).size !== names.length ||
         names.some(name => typeof name !== "string" || !declared.has(name))) throw new HttpError(400, "Lot invalide");
-    return { publicationId: publication.id, revision, assets: names.map(name => declared.get(name)) };
+    return { publicationId: publication.id, publicationName: publication.name, revision, assets: names.map(name => declared.get(name)) };
   }
   const asset = declared.get(body.name);
   if (!asset) throw new HttpError(404, "Fichier inconnu");
-  return { publicationId: publication.id, revision, asset };
+  return { publicationId: publication.id, publicationName: publication.name, revision, asset };
 }
 
 async function r2DeleteAccess(req: Request, body: any) {

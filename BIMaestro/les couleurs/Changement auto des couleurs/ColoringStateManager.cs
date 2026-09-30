@@ -2360,9 +2360,10 @@ __BIMAESTRO_ATMOSPHERE_CSS__
       rows.forEach(row=>{
         const elementContext=rowContextByElement.get(row.wrap);
         const idContext=row.id?rowContextById.get(row.id):null;
-        const remembered=elementContext&&elementContext.name===row.name
-          ?elementContext
-          :idContext&&idContext.name===row.name?idContext:null;
+        const remembered=idContext&&idContext.name===row.name
+          ?idContext
+          :elementContext&&elementContext.id===row.id&&row.id&&
+            elementContext.name===row.name?elementContext:null;
         if(remembered&&(!currentBranch||!stack.length)){
           currentBranch=remembered.branch;
           stack.length=0;
@@ -2382,7 +2383,7 @@ __BIMAESTRO_ATMOSPHERE_CSS__
         row.ancestors=stack.slice();
         stack.push(row);
         if(row.branch){
-          const context={name:row.name,branch:row.branch,ancestors:row.ancestors.map(item=>({
+          const context={id:row.id,name:row.name,branch:row.branch,ancestors:row.ancestors.map(item=>({
             name:item.name,left:item.left,branch:item.branch
           }))};
           rowContextByElement.set(row.wrap,context);
@@ -2806,58 +2807,32 @@ __BIMAESTRO_ATMOSPHERE_CSS__
     const findVisibleActiveParent=()=>{
       if(!activeViewPath.length)return null;
       const rows=getVisibleViewRows();
-      if(activeParentNodeId){
-        const cachedParent=rows.find(
-          row=>row.id===activeParentNodeId);
-        if(cachedParent)return cachedParent;
-        activeParentNodeId='';
-      }
       const normalizedPath=activeViewPath.map(normalizeLabel);
-      const normalizedPathSet=new Set(normalizedPath);
+      // A folder label is only meaningful together with its complete lineage.
+      // Recheck it on every render: virtual rows and visible parents change on scroll.
+      const matchesPath=(row,level)=>{
+        if(row.branch!=='views'||row.name!==normalizedPath[level])
+          return false;
+        const lineage=(row.ancestors||[]).map(item=>item.name);
+        if(lineage.length&&/^(vues|views)(\s*\([^)]*\))?$/.test(lineage[0]))
+          lineage.shift();
+        return lineage.length===level&&
+          lineage.every((name,index)=>name===normalizedPath[index]);
+      };
       if(activeViewElementId){
-        const activeRow=rows.find(
-          row=>row.id===activeViewElementId);
+        const activeRow=rows.find(row=>row.id===activeViewElementId);
         if(activeRow){
-          const exactAncestors=activeRow.ancestors
-            .filter(row=>
-              normalizedPathSet.has(row.name)&&
-              row.branch!=='sheets');
-          if(exactAncestors.length)
-            return exactAncestors[
-              exactAncestors.length-1];
+          for(let level=normalizedPath.length-1;level>=0;level--){
+            const ancestor=activeRow.ancestors.find(row=>matchesPath(row,level));
+            if(ancestor&&rows.includes(ancestor))return ancestor;
+          }
         }
       }
-      let best=null;
-      for(let level=0;level<normalizedPath.length;level++){
-        const target=normalizedPath[level];
-        if(!target)continue;
-        rows
-          .filter(row=>row.name===target)
-          .forEach(row=>{
-            let expectedLevel=level-1;
-            let matchedAncestors=0;
-            for(let index=row.ancestors.length-1;
-                index>=0&&expectedLevel>=0;
-                index--){
-              if(row.ancestors[index].name===
-                 normalizedPath[expectedLevel]){
-                matchedAncestors++;
-                expectedLevel--;
-              }
-            }
-            const isVerifiedRoot=
-              level===0&&row.branch==='views';
-            if(!isVerifiedRoot&&matchedAncestors===0)
-              return;
-            const score=
-              matchedAncestors*10000+
-              level*1000+
-              Math.min(99,row.left);
-            if(!best||score>best.score)
-              best={row,score};
-          });
+      for(let level=normalizedPath.length-1;level>=0;level--){
+        const candidates=rows.filter(row=>matchesPath(row,level));
+        if(candidates.length===1)return candidates[0];
       }
-      return best?best.row:null;
+      return null;
     };
     const renderActiveParent=()=>{
       if(state.disposed||
