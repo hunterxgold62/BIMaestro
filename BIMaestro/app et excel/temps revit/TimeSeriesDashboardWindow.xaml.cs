@@ -1,1127 +1,353 @@
-﻿using Newtonsoft.Json;
-using NPOI.SS.UserModel;
-using BIMaestro.Localization;
-using NPOI.XSSF.UserModel;
-using OxyPlot;
-using OxyPlot.Axes;
-using OxyPlot.Series;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
-using OxyPlot.Wpf;
 using System.Linq;
-using System.Reflection;            // <-- IMPORTANT
+using System.Reflection;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
-using SWM = System.Windows.Media;
+using Microsoft.Win32;
+using NPOI.SS.UserModel;
+using NPOI.XSSF.UserModel;
+using OxyPlot;
+using OxyPlot.Axes;
+using OxyPlot.Series;
 
 namespace BIMaestro.Dashboard
 {
-    // Empêche le renommage/strip de la classe ET de ses membres (handlers XAML, champs x:Name, etc.)
     [Obfuscation(Exclude = true, ApplyToMembers = true, StripAfterObfuscation = false)]
     public partial class TimeSeriesDashboardWindow : Window
     {
-        private const string HelpUrl = "https://www.bimaestro.fr/analyse?outil=temps-par-projet";
-        // ===== FICHIERS =====
-        private readonly string _excelPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "RevitLogs", "Historique_Temps_Revit.xlsx");
-        private readonly string _prefsDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "RevitLogs", "SauvegardePréférence");
-        private string PrefsPath => Path.Combine(_prefsDir, "dashboard_prefs.json");
-
-        // ===== ÉTAT UI =====
-        private bool _uiReady = false;
-
-        // ===== OxyPlot =====
-        private PlotModel _plotModel;
-        private readonly HashSet<string> _hiddenBars = new(StringComparer.OrdinalIgnoreCase);
-
-        // Debounce recherche
-        private DispatcherTimer _searchDebounce;
-
-        private readonly string _currentDocumentPath;
-        private readonly List<VersionLegendItem> _revitLegendItems = new();
-
-        // ===== Data =====
-        private List<LogRow> _rows = new();
-        private List<ProjectItem> _projects = new();
-        private List<ProjectItem> _displayProjects = new();
-        private List<ProjectItem> _filteredProjects = new();
-        private Dictionary<string, double> _hoursByProject = new(StringComparer.Ordinal);
-
-        private const int DEFAULT_TOP_N = 20;
-        private const int TOP_N_MIN = 1;
-        private const int TOP_N_MAX = 100;
-
-        private enum AutoGran { Day, Week, Month }
-        private enum DocumentKind { Rvt, Rfa }
-
-        private Prefs _prefs = new();
+        private readonly string _excelPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "Historique_Temps_Revit.xlsx");
+        private List<Entry> _saved = new List<Entry>();
+        private List<Entry> _all = new List<Entry>();
+        private List<Entry> _detail = new List<Entry>();
+        private List<ModelChoice> _choices = new List<ModelChoice>();
+        private List<Total> _detailTotals = new List<Total>();
+        private readonly DispatcherTimer _timer;
+        private bool _ready, _batch;
+        private int _days = 7;
+        private int _invalidRows;
+        private string _loadError;
+        private static readonly string[] Palette = { "#2F80ED", "#27AE60", "#9B51E0", "#F2994A", "#EB5757", "#219EA6", "#64748B", "#B66B95" };
 
         public TimeSeriesDashboardWindow(string currentDocumentPath = null)
         {
             ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
-
-            _currentDocumentPath = currentDocumentPath;
-            Title = UiLanguage.T("BIMaestro — Temps par type de document", "BIMaestro — Time by Document Type");
-            AddHotkeys();
-
-            _searchDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(220) };
-            _searchDebounce.Tick += (s, e) => { _searchDebounce.Stop(); RefreshSearch(); };
-
-            _dpFrom.SelectedDate = DateTime.Today.AddMonths(-1);
-            _dpTo.SelectedDate = DateTime.Today;
-            _tgOverview.IsChecked = true;
-            _tgCompare.IsChecked = false;
-            _tgRvt.IsChecked = true;
-            _tgRfa.IsChecked = false;
-
-            _plotModel = new PlotModel { Title = UiLanguage.T("Temps passé", "Time Spent") };
-            _plotView.Model = _plotModel;
-
-            LoadData();
-            BuildProjectList();
-            LoadPrefs();
-            ApplyPrefsToUi();
-
-            _uiReady = true;
-            RefreshAll();
-            RefreshSearch();
-
-            Closing += (s, e) => SavePrefs();
+            From.SelectedDate = DateTime.Today.AddDays(-14);
+            To.SelectedDate = DateTime.Today;
+            Version.ItemsSource = new[] { "Toutes" };
+            Version.SelectedIndex = 0;
+            _ready = true;
+            Reload();
+            _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
+            _timer.Tick += (s, e) => Reload();
+            _timer.Start();
+            Closed += (s, e) => _timer.Stop();
         }
 
-        private void AddHotkeys()
-        {
-            InputBindings.Add(new KeyBinding(new RelayCommand(_ => FocusSearch()), new KeyGesture(Key.F, ModifierKeys.Control)));
-            InputBindings.Add(new KeyBinding(new RelayCommand(_ => ExportPng()), new KeyGesture(Key.E, ModifierKeys.Control)));
-            InputBindings.Add(new KeyBinding(new RelayCommand(_ => CopyChartToClipboard()), new KeyGesture(Key.C, ModifierKeys.Control)));
-            InputBindings.Add(new KeyBinding(new RelayCommand(_ => ResetFilters()), new KeyGesture(Key.R, ModifierKeys.Control)));
-        }
-
-        // ===== Handlers XAML (ils doivent garder leur NOM exact) =====
-        private void HelpButton_Click(object sender, RoutedEventArgs e)
+        private void Excel_Click(object s, RoutedEventArgs e)
         {
             try
             {
-                Process.Start(new ProcessStartInfo(HelpUrl) { UseShellExecute = true });
+                if (!File.Exists(_excelPath)) { MessageBox.Show(this, "Aucun historique Excel enregistré pour le moment.", "BIMaestro"); return; }
+                Process.Start(new ProcessStartInfo(_excelPath) { UseShellExecute = true });
             }
-            catch (Exception ex)
-            {
-                MessageBox.Show(UiLanguage.T("Impossible d’ouvrir la page d’aide : ", "Unable to open the help page: ") + ex.Message, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
+            catch (Exception ex) { MessageBox.Show(this, ex.Message, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Error); }
         }
-
-        private void OnDateChanged(object sender, SelectionChangedEventArgs e) { if (!_uiReady) return; RefreshAll(); }
-
-        private void Mode_Checked(object sender, RoutedEventArgs e)
-        {
-            if (!_uiReady) return;
-            if (sender == _tgOverview) _tgCompare.IsChecked = false;
-            if (sender == _tgCompare) _tgOverview.IsChecked = false;
-            DrawChart();
-        }
-
-        private void DocTypeToggle_Click(object sender, RoutedEventArgs e)
-        {
-            if (!_uiReady) return;
-            if (sender == _tgRvt)
-            {
-                _tgRvt.IsChecked = true;
-                _tgRfa.IsChecked = false;
-            }
-            else if (sender == _tgRfa)
-            {
-                _tgRfa.IsChecked = true;
-                _tgRvt.IsChecked = false;
-            }
-            RefreshAll();
-            RefreshSearch();
-        }
-
-        private void Legend_Checked(object sender, RoutedEventArgs e) { if (!_uiReady) return; DrawChart(); }
-
-        private void Search_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (!_uiReady) return;
-            if (e.Key == Key.Escape) { _tbSearch.Text = string.Empty; _tbSearch.Focus(); }
-        }
-        private void Search_TextChanged(object sender, TextChangedEventArgs e) { if (!_uiReady) return; _searchDebounce.Start(); }
-        private void ClearSearch_Click(object sender, RoutedEventArgs e) { if (!_uiReady) return; _tbSearch.Text = ""; _tbSearch.Focus(); }
-
-        private void OpenLocation_Click(object sender, RoutedEventArgs e)
-        {
-            if (!_uiReady) return;
-            TryOpenLocation();
-        }
-
-        private void Suggestion_Click(object sender, RoutedEventArgs e)
-        {
-            if (!_uiReady) return;
-            if (sender is Button btn)
-            {
-                if (btn.DataContext is ProjectItem item)
-                    _tbSearch.Text = item.BaseName ?? string.Empty;
-                else
-                    _tbSearch.Text = btn.Content?.ToString() ?? string.Empty;
-
-                string path = btn.Tag?.ToString();
-                TryOpenLocation(path);
-            }
-        }
-
-        private void Chip7_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; SetRange(DateTime.Today.AddDays(-7), DateTime.Today); }
-        private void Chip30_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; SetRange(DateTime.Today.AddDays(-30), DateTime.Today); }
-        private void ChipYtd_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; SetRange(new DateTime(DateTime.Today.Year, 1, 1), DateTime.Today); }
-        private void Chip12m_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; SetRange(DateTime.Today.AddYears(-1), DateTime.Today); }
-        private void ChipAll_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; SetRange(null, null); }
-
-        private void BtnTopNMinus_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; AdjustTopN(-1); }
-        private void BtnTopNPlus_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; AdjustTopN(+1); }
-        private void TopN_PreviewTextInput(object sender, TextCompositionEventArgs e) => e.Handled = !char.IsDigit(e.Text, 0);
-        private void TopN_TextChanged(object sender, TextChangedEventArgs e) { if (!_uiReady) return; if (int.TryParse(_tbTopN.Text, out int n)) SetTopN(n); }
-        private void ChipTop_Click(object sender, RoutedEventArgs e) { if (!_uiReady) return; if (sender is Button b && int.TryParse(b.Content?.ToString(), out int n)) SetTopN(n); }
-
-        private void OpenExcel_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; OpenExcel(); }
-        private void ExportPng_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; ExportPng(); }
-        private void Reset_Click(object s, RoutedEventArgs e) { if (!_uiReady) return; ResetFilters(); }
-
-        private void SetRange(DateTime? from, DateTime? to) { _dpFrom.SelectedDate = from; _dpTo.SelectedDate = to; RefreshAll(); }
-        private void FocusSearch() => _tbSearch.Focus();
-
-        // ===== DATA =====
-        private void LoadData()
-        {
-            _rows.Clear();
-            if (!File.Exists(_excelPath)) return;
-
-            using var stream = new FileStream(
-                _excelPath,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.ReadWrite | FileShare.Delete);
-            using var workbook = new XSSFWorkbook(stream);
-            var ws = workbook.GetSheet("Historique_Temps_Revit");
-            if (ws == null) return;
-
-            var formatter = new DataFormatter();
-            for (int r = ws.FirstRowNum + 1; r <= ws.LastRowNum; r++)
-            {
-                var row = ws.GetRow(r);
-                if (row == null) continue;
-
-                string ev = GetCellText(row.GetCell(0), formatter);
-                if (string.IsNullOrWhiteSpace(ev)) continue;
-                string docId = NormalizeDocumentId(GetCellText(row.GetCell(1), formatter));
-                string docName = GetCellText(row.GetCell(2), formatter);
-                string revitVer = GetCellText(row.GetCell(3), formatter);
-                string dateStr = GetCellText(row.GetCell(4), formatter);
-                string timeStr = GetCellText(row.GetCell(5), formatter);
-                object durObj = GetCellValue(row.GetCell(6), formatter);
-                _rows.Add(new LogRow
-                {
-                    Event = ev,
-                    DocumentId = docId,
-                    GroupId = docId,
-                    DocumentName = docName,
-                    RevitVersion = revitVer,
-                    When = ParseDateTimeFlexible(dateStr, timeStr),
-                    Duration = ParseDurationFlexible(durObj)
-                });
-            }
-        }
-
-        private static string GetCellText(ICell cell, DataFormatter formatter)
-        {
-            if (cell == null) return string.Empty;
-
-            try
-            {
-                return formatter.FormatCellValue(cell) ?? string.Empty;
-            }
-            catch
-            {
-                return cell.ToString() ?? string.Empty;
-            }
-        }
-
-        private static object GetCellValue(ICell cell, DataFormatter formatter)
-        {
-            if (cell == null) return null;
-
-            try
-            {
-                CellType type = cell.CellType == CellType.Formula
-                    ? cell.CachedFormulaResultType
-                    : cell.CellType;
-
-                switch (type)
-                {
-                    case CellType.Numeric:
-                        // La seule valeur lue ici est une durée Excel exprimée en jours.
-                        // La garder numérique préserve aussi les durées supérieures à 24 h.
-                        return cell.NumericCellValue;
-                    case CellType.Boolean:
-                        return cell.BooleanCellValue;
-                    case CellType.String:
-                        return cell.StringCellValue;
-                    case CellType.Blank:
-                        return null;
-                    default:
-                        return GetCellText(cell, formatter);
-                }
-            }
-            catch
-            {
-                return GetCellText(cell, formatter);
-            }
-        }
-
-        private DocumentKind GetActiveKind() => (_tgRfa?.IsChecked == true) ? DocumentKind.Rfa : DocumentKind.Rvt;
-
-        private static DocumentKind GetKind(string documentId, string documentName)
-        {
-            string id = (documentId ?? string.Empty).ToLowerInvariant();
-            string name = (documentName ?? string.Empty).ToLowerInvariant();
-            if (id.EndsWith(".rfa") || name.EndsWith(".rfa")) return DocumentKind.Rfa;
-            return DocumentKind.Rvt;
-        }
-
-        private bool MatchesDocumentKind(ProjectItem item) => MatchesDocumentKind(item?.LocationId ?? item?.DocumentId, item?.Name);
-
-        private bool MatchesDocumentKind(string documentId, string documentName)
-        {
-            var active = GetActiveKind();
-            return GetKind(documentId, documentName) == active;
-        }
-
-        private void BuildProjectList()
-        {
-            _projects = (_rows ?? Enumerable.Empty<LogRow>())
-                .Where(r => !string.IsNullOrWhiteSpace(r.GroupId))
-                .GroupBy(r => r.GroupId)
-                .Select(g =>
-                {
-                    var ordered = g.OrderByDescending(r => r.When)
-                        .ThenByDescending(r => GetEventPriority(r.Event))
-                        .ToList();
-
-                    var latestEntry = ordered.FirstOrDefault();
-                    var latestOpenEntry = ordered.FirstOrDefault(r =>
-                        string.Equals(r.Event, "Ouvert", StringComparison.OrdinalIgnoreCase));
-                    var versionSource = latestOpenEntry ?? latestEntry;
-
-                    string id = g.Key;
-                    string name = string.IsNullOrWhiteSpace(latestEntry?.DocumentName) ? UiLanguage.T("(sans nom)", "(unnamed)") : latestEntry.DocumentName;
-                    string locationId = latestEntry?.DocumentId ?? id;
-                    return new ProjectItem
-                    {
-                        DocumentId = id,
-                        LocationId = locationId,
-                        Name = name,
-                        BaseName = GetBaseName(name, locationId),
-                        Folder = GetLastFolder(locationId),
-                        Tail = SafeDocIdTail(locationId),
-                        RevitVersion = NormalizeRevitVersion(versionSource?.RevitVersion),
-                        RevitVersionLabel = BuildRevitVersionLabel(versionSource?.RevitVersion),
-                        RevitVersionBrush = GetVersionBrush(versionSource?.RevitVersion),
-                        Hours = 0,
-                        LastSeen = latestEntry?.When ?? DateTime.MinValue
-                    };
-                }).ToList();
-
-            BuildRevitLegendItems();
-        }
-
-        // ===== REFRESH =====
-        private void RefreshAll()
-        {
-            DateTime? d0 = _dpFrom.SelectedDate;
-            DateTime? d1 = _dpTo.SelectedDate?.AddDays(1).AddTicks(-1);
-
-            _hoursByProject = _rows
-                .Where(r => r.Event.Equals("Fermé", StringComparison.OrdinalIgnoreCase))
-                .Where(r => MatchesDocumentKind(r.DocumentId, r.DocumentName))
-                .Where(r => !d0.HasValue || r.When >= d0.Value)
-                .Where(r => !d1.HasValue || r.When <= d1.Value)
-                .GroupBy(r => r.GroupId)
-                .ToDictionary(g => g.Key, g => g.Sum(x => x.Duration.TotalHours), StringComparer.Ordinal);
-
-            BuildDisplayProjects();
-            DrawChart();
-            UpdateKpis();
-        }
-
-        private void BuildDisplayProjects()
-        {
-            IEnumerable<ProjectItem> seq = _projects ?? Enumerable.Empty<ProjectItem>();
-            seq = seq.Where(MatchesDocumentKind);
-
-            foreach (var p in seq)
-                p.Hours = _hoursByProject.TryGetValue(p.DocumentId, out double h) ? h : 0.0;
-
-            _displayProjects = seq.OrderByDescending(p => p.Hours)
-                                  .ThenBy(p => p.BaseName)
-                                  .ThenBy(p => p.Folder)
-                                  .ToList();
-        }
-
-
-        private void RefreshSearch()
-        {
-            string q = RemoveDiacritics((_tbSearch?.Text ?? "").Trim());
-            IEnumerable<ProjectItem> seq = (_projects ?? Enumerable.Empty<ProjectItem>()).Where(MatchesDocumentKind);
-
-            foreach (var p in seq)
-                p.Hours = _hoursByProject.TryGetValue(p.DocumentId, out double h) ? h : 0.0;
-
-            if (!string.IsNullOrEmpty(q))
-            {
-                seq = seq.Where(p =>
-                    RemoveDiacritics(p.BaseName ?? "").IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    RemoveDiacritics(p.Folder ?? "").IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    RemoveDiacritics(p.Tail ?? "").IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
-                         .OrderByDescending(p => p.LastSeen)
-                         .ThenByDescending(p => p.Hours)
-                         .ThenBy(p => p.BaseName);
-
-                _filteredProjects = seq.Take(30).ToList();
-                if (_lblCount != null) _lblCount.Text = _filteredProjects.Count + UiLanguage.T(" résultat(s)", " result(s)");
-                if (_icSuggestions != null) _icSuggestions.ItemsSource = _filteredProjects.Take(15).ToList();
-            }
-            else
-            {
-                _filteredProjects = new List<ProjectItem>();
-                if (_lblCount != null) _lblCount.Text = UiLanguage.T("Commencez à taper pour afficher des raccourcis", "Start typing to display shortcuts");
-                if (_icSuggestions != null) _icSuggestions.ItemsSource = null;
-            }
-        }
-
-        // ===== CHART =====
-        private void UpdateLegendLayout()
-        {
-            bool showLegend = _cbLegend?.IsChecked == true;
-
-            if (_legendBorder != null)
-                _legendBorder.Visibility = showLegend ? Visibility.Visible : Visibility.Collapsed;
-
-            if (_colLegend != null)
-                _colLegend.Width = showLegend ? new GridLength(1.1, GridUnitType.Star) : new GridLength(0);
-
-            if (_chartBorder != null)
-                _chartBorder.SetValue(Grid.ColumnSpanProperty, showLegend ? 1 : 2);
-        }
-
-        private void DrawChart()
-        {
-            if (_plotView == null) return;
-
-            UpdateLegendLayout();
-
-            var model = new PlotModel();
-
-
-            var selected = (_displayProjects?.Count > 0 ? _displayProjects : _projects.Where(MatchesDocumentKind)).ToList();
-
-            DateTime? d0 = _dpFrom.SelectedDate;
-            DateTime? d1 = _dpTo.SelectedDate?.AddDays(1).AddTicks(-1);
-
-            IEnumerable<LogRow> closed = _rows
-                .Where(r => r.Event.Equals("Fermé", StringComparison.OrdinalIgnoreCase))
-                .Where(r => MatchesDocumentKind(r.DocumentId, r.DocumentName));
-            if (d0.HasValue) closed = closed.Where(r => r.When >= d0.Value);
-            if (d1.HasValue) closed = closed.Where(r => r.When <= d1.Value);
-
-            int topN = GetTopN();
-            var gran = ChooseAutoGraninality(d0 ?? DateTime.MinValue, d1 ?? DateTime.MaxValue);
-
-            if (_tgOverview.IsChecked == true)
-            {
-                var totals = closed
-                    .Where(r => selected.Any(s => s.DocumentId == r.GroupId))
-                    .GroupBy(r => r.GroupId)
-                    .Select(g => new
-                    {
-                        DocId = g.Key,
-                        Hours = g.Sum(x => x.Duration.TotalHours),
-                        Name = _projects.FirstOrDefault(p => p.DocumentId == g.Key)?.BaseName ?? "(?)"
-                    })
-                    .OrderByDescending(x => x.Hours)
-                    .ToList();
-
-                var top = totals.Take(topN).ToList();
-                double others = Math.Max(0, totals.Skip(topN).Sum(x => x.Hours));
-                if (others > 0.0001) top.Add(new { DocId = "others", Hours = others, Name = UiLanguage.T("Autres", "Others") });
-
-                var shown = top.Where(t => !_hiddenBars.Contains(t.DocId ?? t.Name)).ToList();
-
-                var catAxis = new CategoryAxis { Position = AxisPosition.Bottom, Angle = -50 };
-                foreach (var t in shown) catAxis.Labels.Add(Short(t.Name));
-                model.Axes.Add(catAxis);
-
-                model.Axes.Add(new LinearAxis { Position = AxisPosition.Left, Title = UiLanguage.T("heures (total)", "hours (total)"), Minimum = 0 });
-                model.Title = UiLanguage.T($"Temps passé — Aperçu (Top {topN})", $"Time Spent — Overview (Top {topN})");
-
-                var rect = new RectangleBarSeries { Title = $"Top {topN}", StrokeThickness = 0.5, FillColor = GetOxyColor(0) };
-                for (int i = 0; i < shown.Count; i++)
-                {
-                    double v = Math.Round(shown[i].Hours, 2);
-                    rect.Items.Add(new RectangleBarItem(i - 0.4, 0, i + 0.4, v));
-                }
-                model.Series.Add(rect);
-
-                if (_cbLegend.IsChecked == true)
-                {
-                    var oc = GetOxyColor(0);
-                    var br = new SWM.SolidColorBrush(SWM.Color.FromArgb(oc.A, oc.R, oc.G, oc.B)); br.Freeze();
-                    var items = new List<LegendItemVM>();
-                    foreach (var t in top)
-                    {
-                        string hiddenKey = t.DocId ?? t.Name;
-                        bool currentlyShown = !_hiddenBars.Contains(hiddenKey);
-                        var legendItem = new LegendItemVM(t.Name, currentlyShown, () =>
-                        {
-                            if (_hiddenBars.Contains(hiddenKey)) _hiddenBars.Remove(hiddenKey);
-                            else _hiddenBars.Add(hiddenKey);
-                            DrawChart();
-                        })
-                        { Brush = br };
-
-                        items.Add(legendItem);
-                    }
-                    _legendList.ItemsSource = items;
-                }
-                else _legendList.ItemsSource = null;
-            }
-            else
-            {
-                Func<DateTime, DateTime> bucket = dt =>
-                {
-                    if (gran == AutoGran.Week) return StartOfIsoWeek(dt);
-                    if (gran == AutoGran.Month) return new DateTime(dt.Year, dt.Month, 1);
-                    return dt.Date;
-                };
-
-                var grouped = closed
-                    .Where(r => selected.Any(s => s.DocumentId == r.GroupId))
-                    .GroupBy(r => r.GroupId)
-                    .OrderByDescending(g => g.Sum(x => x.Duration.TotalHours))
-                    .Take(topN)
-                    .ToList();
-
-                var allBuckets = grouped
-                    .SelectMany(g => g.GroupBy(x => bucket(x.When)).Select(x => x.Key))
-                    .Distinct()
-                    .OrderBy(k => k)
-                    .ToList();
-
-                var labels = allBuckets.Select(k => FormatBucket(k, gran)).ToList();
-                var labelIndex = labels.Select((lab, i) => new { lab, i }).ToDictionary(x => x.lab, x => x.i);
-
-                model.Axes.Add(new CategoryAxis { Position = AxisPosition.Bottom, Angle = -50, ItemsSource = labels });
-                string granularity = gran == AutoGran.Day
-                    ? UiLanguage.T("jour", "day")
-                    : gran == AutoGran.Week ? UiLanguage.T("semaine", "week") : UiLanguage.T("mois", "month");
-                model.Axes.Add(new LinearAxis { Position = AxisPosition.Left, Title = UiLanguage.T("heures", "hours") + " / " + granularity, Minimum = 0 });
-                model.Title = UiLanguage.T($"Temps passé — Comparer (Top {topN})", $"Time Spent — Compare (Top {topN})");
-
-                int idx = 0;
-                var legendItems = new List<LegendItemVM>();
-
-                foreach (var g in grouped)
-                {
-                    var proj = _projects.FirstOrDefault(p => p.DocumentId == g.Key);
-                    string legend = proj != null ? (Short(proj.BaseName) + " — " + Short(proj.Folder)) : g.Key;
-
-                    var ls = new LineSeries
-                    {
-                        Title = legend,
-                        StrokeThickness = 2.5,
-                        MarkerType = MarkerType.Circle,
-                        MarkerSize = 3.5,
-                        Color = GetOxyColor(idx),
-                        TrackerFormatString = "{0}\n{1}: {2:0.00} h"
-                    };
-
-                    var byBucket = g.GroupBy(x => bucket(x.When))
-                                    .Select(x => new { L = FormatBucket(x.Key, gran), Hours = x.Sum(z => z.Duration.TotalHours) })
-                                    .OrderBy(x => labelIndex[x.L])
-                                    .ToList();
-
-                    foreach (var p in byBucket)
-                        ls.Points.Add(new DataPoint(labelIndex[p.L], Math.Round(p.Hours, 2)));
-
-                    model.Series.Add(ls);
-
-                    if (_cbLegend.IsChecked == true)
-                    {
-                        var oc = GetOxyColor(idx);
-                        var br = new SWM.SolidColorBrush(SWM.Color.FromArgb(oc.A, oc.R, oc.G, oc.B)); br.Freeze();
-                        legendItems.Add(new LegendItemVM(legend, ls.IsVisible, () => { ls.IsVisible = !ls.IsVisible; _plotView.InvalidatePlot(true); }) { Brush = br });
-                    }
-                    idx++;
-                }
-
-                _legendList.ItemsSource = (_cbLegend.IsChecked == true) ? legendItems : null;
-            }
-
-            _plotModel = model;
-            _plotView.Model = _plotModel;
-            _plotView.InvalidatePlot(true);
-        }
-
-        private OxyColor GetOxyColor(int index)
-        {
-            double hue = (index * 37) % 360;
-            var c = HslToColor(hue, 0.55, 0.60);
-            return OxyColor.FromArgb(c.A, c.R, c.G, c.B);
-        }
-
-        // ===== KPI =====
-        private void UpdateKpis()
-        {
-            var selectedItems = (_displayProjects?.Count > 0 ? _displayProjects : _projects.Where(MatchesDocumentKind)).ToList();
-            if (selectedItems.Count == 0) return;
-
-            var selected = new HashSet<string>(selectedItems.Select(p => p.DocumentId));
-            DateTime d0 = _dpFrom.SelectedDate ?? DateTime.MinValue;
-            DateTime d1 = _dpTo.SelectedDate.HasValue ? _dpTo.SelectedDate.Value.AddDays(1).AddTicks(-1) : DateTime.MaxValue;
-
-            var inRangeAll = _rows.Where(r => r.Event.Equals("Fermé", StringComparison.OrdinalIgnoreCase))
-                                  .Where(r => r.When >= d0 && r.When <= d1)
-                                  .Where(r => selected.Contains(r.GroupId));
-
-            var inRangeWeekdays = inRangeAll
-                .Where(r => r.When.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday)
-                .ToList();
-
-            double totalH = inRangeWeekdays.Sum(r => r.Duration.TotalHours);
-            int workedWeekdays = inRangeWeekdays.Select(r => r.When.Date).Distinct().Count();
-            double avg = workedWeekdays == 0 ? 0.0 : totalH / workedWeekdays;
-
-            int projects = selectedItems.Count;
-            _kpiHours.Text = totalH.ToString("0.0") + " h";
-            _kpiProjects.Text = projects.ToString();
-            _kpiAvg.Text = avg.ToString("0.0") + " h";
-        }
-
-        private void ExportPng()
-        {
-            var dlg = new Microsoft.Win32.SaveFileDialog { FileName = "dashboard_temps.png", Filter = "Image PNG|*.png" };
-            if (dlg.ShowDialog() != true) return;
-
-            _plotView.UpdateLayout();
-            _plotModel?.InvalidatePlot(true);
-
-            int width = (int)Math.Max(400, _plotView.ActualWidth > 0 ? _plotView.ActualWidth : _plotView.DesiredSize.Width);
-            int height = (int)Math.Max(260, _plotView.ActualHeight > 0 ? _plotView.ActualHeight : _plotView.DesiredSize.Height);
-
-            // Ensure a solid background while exporting with the resolution-only overload
-            var originalBackground = _plotModel?.Background;
-            if (_plotModel != null)
-            {
-                _plotModel.Background = OxyColors.White;
-            }
-
-            PngExporter.Export(_plotModel, dlg.FileName, width, height, 96);
-
-            if (_plotModel != null)
-            {
-                _plotModel.Background = (OxyColor)originalBackground;
-            }
-
-            MessageBox.Show(UiLanguage.T("Exporté : ", "Exported: ") + dlg.FileName);
-        }
-
-        private void CopyChartToClipboard()
-        {
-            var bmp = RenderVisualToBitmap(_plotView);
-            Clipboard.SetImage(bmp);
-        }
-
-        private void OpenExcel()
+        private void Reload_Click(object s, RoutedEventArgs e) => Reload();
+        private void Reload()
         {
             try
             {
+                var saved = new List<Entry>();
+                int invalid = 0;
                 if (File.Exists(_excelPath))
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = _excelPath, UseShellExecute = true });
-                else
-                    MessageBox.Show(UiLanguage.T("Fichier Excel introuvable : ", "Excel file not found: ") + _excelPath);
-            }
-            catch (Exception ex) { MessageBox.Show(ex.Message); }
-        }
-
-        private void TryOpenLocation(string preferredPath = null)
-        {
-            try
-            {
-                string path = null;
-                if (!string.IsNullOrWhiteSpace(preferredPath))
-                    path = preferredPath;
-                else
                 {
-                    var firstMatch = _filteredProjects?.FirstOrDefault();
-                    if (!string.IsNullOrWhiteSpace(_tbSearch?.Text) && firstMatch != null)
-                        path = firstMatch.LocationId;
-                    else if (!string.IsNullOrWhiteSpace(_currentDocumentPath))
-                        path = _currentDocumentPath;
-                }
-
-                if (string.IsNullOrWhiteSpace(path))
-                {
-                    MessageBox.Show(UiLanguage.T("Aucun chemin détecté pour ouvrir l'emplacement.", "No path was found to open the location."));
-                    return;
-                }
-
-                var candidateFolders = ExtractCandidateFolders(path).ToList();
-                var openedFolders = new List<string>();
-
-                foreach (var folder in candidateFolders)
-                {
-                    if (!openedFolders.Contains(folder, StringComparer.OrdinalIgnoreCase))
+                    using var stream = new FileStream(_excelPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                    using var book = new XSSFWorkbook(stream);
+                    var sheet = book.GetSheet("Historique_Temps_Revit");
+                    if (sheet == null) throw new InvalidDataException("La feuille Historique_Temps_Revit est absente.");
+                    var format = new DataFormatter();
+                    for (int i = sheet.FirstRowNum + 1; i <= sheet.LastRowNum; i++)
                     {
-                        Process.Start(new ProcessStartInfo { FileName = folder, UseShellExecute = true });
-                        openedFolders.Add(folder);
+                        var row = sheet.GetRow(i);
+                        if (row == null || !Cell(row, 0, format).Equals("Fermé", StringComparison.OrdinalIgnoreCase)) continue;
+                        if (!TryDate(Cell(row, 4, format), Cell(row, 5, format), out var when)) { invalid++; continue; }
+                        double hours = Hours(row.GetCell(6), format);
+                        if (double.IsNaN(hours) || double.IsInfinity(hours) || hours < 0) { invalid++; continue; }
+                        if (hours == 0) continue;
+                        saved.Add(new Entry { Id = Normalize(Cell(row, 1, format)), Name = Cell(row, 2, format), Version = Cell(row, 3, format), When = when, Hours = hours,
+                            Kind = Cell(row, 8, format), Path = First(Cell(row, 10, format), Cell(row, 11, format), Cell(row, 1, format)), Parameters = Cell(row, 17, format) });
                     }
                 }
-
-                if (openedFolders.Count == 0)
-                {
-                    MessageBox.Show(UiLanguage.T("Dossier introuvable pour : ", "Folder not found for: ") + path);
-                }
+                _saved = saved;
+                _invalidRows = invalid;
+                _loadError = null;
             }
-            catch (Exception ex)
+            catch (Exception ex) { _loadError = "Lecture de l’historique impossible : " + ex.Message; }
+            // Current-process open sessions are not yet present as closed rows in the workbook.
+            _all = _saved.Concat(ExcelLogger.GetDashboardEntries().Select(x => new Entry {
+                Id = Normalize(x.DocumentId), Name = x.Name, Version = x.Version, Kind = x.Kind,
+                Path = First(x.Path, x.DocumentId), Parameters = x.Parameters, When = x.When, Hours = x.Hours, Live = true
+            })).ToList();
+            var old = _choices.ToDictionary(x => x.Id, x => x.Selected, StringComparer.OrdinalIgnoreCase);
+            _choices = _all.GroupBy(x => x.Id, StringComparer.OrdinalIgnoreCase).Select(g => new ModelChoice {
+                Id = g.Key, Name = First(g.Last().Name, g.Key), Path = g.Last().Path,
+                Selected = !old.TryGetValue(g.Key, out bool value) || value
+            }).OrderBy(x => x.Name).ToList();
+            _batch = true;
+            var version = Version.SelectedItem as string;
+            Version.ItemsSource = new[] { "Toutes" }.Concat(_all.Select(x => x.Version).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().OrderBy(x => x)).ToList();
+            Version.SelectedItem = version ?? "Toutes";
+            if (Version.SelectedIndex < 0) Version.SelectedIndex = 0;
+            _batch = false;
+            Refresh();
+        }
+
+        private void Range_Click(object s, RoutedEventArgs e) { _days = int.Parse((string)((Button)s).Tag); Refresh(); }
+        private void Filter_Changed(object s, RoutedEventArgs e) { if (_ready && !_batch) Refresh(); }
+        private void Search_Changed(object s, TextChangedEventArgs e) { if (_ready && !_batch) Refresh(); }
+        private void Selection_Changed(object s, RoutedEventArgs e)
+        {
+            // Bindings update before the delayed refresh; ignore recycled CheckBox events.
+            if (_ready && !_batch) Dispatcher.BeginInvoke(new Action(RefreshDetail), DispatcherPriority.Background);
+        }
+        private void Tabs_Changed(object s, SelectionChangedEventArgs e) { if (_ready && ReferenceEquals(e.Source, Tabs)) Refresh(); }
+        private void SelectAll_Click(object s, RoutedEventArgs e) => SelectVisible(true);
+        private void ClearSelection_Click(object s, RoutedEventArgs e) => SelectVisible(false);
+        private void SelectVisible(bool value) { foreach (var item in Picker.Items.Cast<ModelChoice>()) item.Selected = value; RefreshDetail(); }
+        private void Overview_Open(object s, MouseButtonEventArgs e)
+        {
+            if (!(OverviewTable.SelectedItem is Total total)) return;
+            _batch = true;
+            From.SelectedDate = DateTime.Today.AddDays(1 - _days); To.SelectedDate = DateTime.Today;
+            Search.Text = ""; ParameterSearch.Text = ""; Kind.SelectedIndex = 0; Version.SelectedIndex = 0;
+            foreach (var item in _choices) item.Selected = string.Equals(item.Id, total.Id, StringComparison.OrdinalIgnoreCase);
+            Tabs.SelectedIndex = 1; _batch = false; Refresh();
+        }
+        private void Refresh()
+        {
+            if (!_ready || _batch) return;
+            DateTime start = DateTime.Today.AddDays(1 - _days);
+            var recent = _all.Where(x => x.When.Date >= start && x.When.Date <= DateTime.Today).ToList();
+            var totals = Totals(recent);
+            OverviewPeriod.Text = start.ToString("dd MMM") + " — " + DateTime.Today.ToString("dd MMM yyyy");
+            OverviewHours.Text = Duration(recent.Sum(x => x.Hours));
+            OverviewAverage.Text = Duration(recent.Sum(x => x.Hours) / Math.Max(1, recent.Select(x => x.When.Date).Distinct().Count()));
+            OverviewCount.Text = totals.Count.ToString();
+            Seven.FontWeight = _days == 7 ? FontWeights.Bold : FontWeights.Normal;
+            Fifteen.FontWeight = _days == 15 ? FontWeights.Bold : FontWeights.Normal;
+            OverviewPlot.Model = Chart(recent, start, DateTime.Today);
+            OverviewTable.ItemsSource = totals;
+            OverviewEmpty.Visibility = totals.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            _batch = true;
+            var available = new HashSet<string>(_all.Where(MatchesFilters).Select(x => x.Id), StringComparer.OrdinalIgnoreCase);
+            Picker.ItemsSource = _choices.Where(x => available.Contains(x.Id)).ToList();
+            _batch = false;
+            RefreshDetail();
+            Status.Text = _loadError ?? ("Temps actif enregistré · week-ends inclus · sessions ouvertes de cette instance incluses · actualisé à " + DateTime.Now.ToString("HH:mm") +
+                (_invalidRows > 0 ? " · " + _invalidRows + " ligne(s) illisible(s) ignorée(s)" : ""));
+        }
+        private bool MatchesFilters(Entry x)
+        {
+            string type = First(x.Kind, Path.GetExtension(x.Path ?? "").TrimStart('.')).ToUpperInvariant();
+            return (Kind.SelectedIndex == 0 || type == (Kind.SelectedIndex == 1 ? "RVT" : "RFA"))
+                && (Version.SelectedIndex <= 0 || x.Version == (string)Version.SelectedItem)
+                && Contains(x.Name + " " + x.Path, Search.Text)
+                && Contains(x.Parameters, ParameterSearch.Text);
+        }
+        private void RefreshDetail()
+        {
+            if (!_ready || _batch) return;
+            var ids = new HashSet<string>(_choices.Where(x => x.Selected).Select(x => x.Id), StringComparer.OrdinalIgnoreCase);
+            DateTime start = From.SelectedDate?.Date ?? DateTime.Today.AddDays(-14), end = To.SelectedDate?.Date ?? DateTime.Today;
+            bool valid = start <= end;
+            _detail = valid ? _all.Where(x => x.When.Date >= start && x.When.Date <= end && ids.Contains(x.Id) && MatchesFilters(x)).ToList() : new List<Entry>();
+            _detailTotals = Totals(_detail);
+            DetailTable.ItemsSource = _detailTotals;
+            DetailSummary.Text = valid ? Duration(_detail.Sum(x => x.Hours)) + " · " + _detailTotals.Count + " maquette(s) / famille(s) · " + _detail.Select(x => x.When.Date).Distinct().Count() + " jour(s) travaillé(s)" : "La date de début doit précéder la date de fin.";
+            SelectionCount.Text = Picker.Items.Cast<ModelChoice>().Count(x => x.Selected) + " document(s) coché(s) parmi les résultats";
+            DetailPlot.Model = valid ? Chart(_detail, start, end) : new PlotModel();
+            DetailEmpty.Visibility = valid && _detail.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            PdfButton.IsEnabled = valid && _detail.Count > 0 && _loadError == null;
+        }
+
+        private static List<Total> Totals(List<Entry> rows)
+        {
+            double sum = rows.Sum(x => x.Hours);
+            return rows.GroupBy(x => x.Id, StringComparer.OrdinalIgnoreCase).Select(g => new Total {
+                Id = g.Key, Name = First(g.Last().Name, g.Key), Path = g.Last().Path,
+                Hours = g.Sum(x => x.Hours), Days = g.Select(x => x.When.Date).Distinct().Count(), Last = g.Max(x => x.When),
+                Versions = string.Join(", ", g.Select(x => x.Version).Distinct()), Share = sum > 0 ? 100 * g.Sum(x => x.Hours) / sum : 0,
+                Brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(Palette[ColorIndex(g.Key)]))
+            }).OrderByDescending(x => x.Hours).ThenBy(x => x.Name).ToList();
+        }
+        private static int ColorIndex(string id) { unchecked { uint h = 2166136261; foreach (char c in id.ToUpperInvariant()) h = (h ^ c) * 16777619; return (int)(h % Palette.Length); } }
+        private static PlotModel Chart(List<Entry> rows, DateTime start, DateTime end)
+        {
+            var model = new PlotModel { PlotAreaBorderColor = OxyColor.FromRgb(210, 216, 225), TextColor = OxyColor.FromRgb(90, 105, 125) };
+            int days = (end - start).Days + 1;
+            int bucketDays = days <= 31 ? 1 : days <= 180 ? 7 : Math.Max(30, (int)Math.Ceiling(days / 60.0));
+            int count = (int)Math.Ceiling(days / (double)bucketDays);
+            var axis = new CategoryAxis { Position = AxisPosition.Bottom, GapWidth = 0.35, Angle = count > 15 ? -45 : 0 };
+            for (int i = 0; i < count; i++) axis.Labels.Add(start.AddDays(i * bucketDays).ToString(days > 365 ? "dd/MM/yy" : "dd/MM"));
+            model.Axes.Add(axis);
+            model.Axes.Add(new LinearAxis { Position = AxisPosition.Left, Minimum = 0, Title = bucketDays == 1 ? "Heures / jour" : "Heures / période de " + bucketDays + " jours", MajorGridlineStyle = LineStyle.Dot });
+            model.Legends.Add(new OxyPlot.Legends.Legend { LegendPosition = OxyPlot.Legends.LegendPosition.BottomCenter, LegendPlacement = OxyPlot.Legends.LegendPlacement.Outside, LegendOrientation = OxyPlot.Legends.LegendOrientation.Horizontal });
+            var totals = Totals(rows);
+            var top = new HashSet<string>(totals.Take(7).Select(x => x.Id), StringComparer.OrdinalIgnoreCase);
+            double[] baseline = new double[count];
+            foreach (var group in rows.GroupBy(x => top.Contains(x.Id) ? x.Id : "__others", StringComparer.OrdinalIgnoreCase))
             {
-                MessageBox.Show(ex.Message);
+                var total = totals.FirstOrDefault(x => string.Equals(x.Id, group.Key, StringComparison.OrdinalIgnoreCase));
+                var series = new RectangleBarSeries { Title = total?.Name ?? "Autres", FillColor = OxyColor.Parse(total == null ? "#94A3B8" : Palette[ColorIndex(group.Key)]), StrokeThickness = 0,
+                    TrackerFormatString = "{0}\n{1}: {2:0.00} h" };
+                var hours = group.GroupBy(x => (x.When.Date - start).Days / bucketDays).ToDictionary(x => x.Key, x => x.Sum(y => y.Hours));
+                for (int i = 0; i < count; i++) { hours.TryGetValue(i, out double h); if (h > 0) series.Items.Add(new RectangleBarItem(i - .34, baseline[i], i + .34, baseline[i] + h)); baseline[i] += h; }
+                model.Series.Add(series);
             }
+            return model;
         }
-
-        private static IEnumerable<string> ExtractCandidateFolders(string documentId)
+        private void Pdf_Click(object s, RoutedEventArgs e)
         {
-            if (string.IsNullOrWhiteSpace(documentId))
-                yield break;
-
-            var parts = documentId.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
-            foreach (var rawPart in parts)
-            {
-                string part = (rawPart ?? string.Empty).Trim();
-                if (string.IsNullOrWhiteSpace(part))
-                    continue;
-
-                string folder = Directory.Exists(part) ? part : Path.GetDirectoryName(part);
-                if (!string.IsNullOrWhiteSpace(folder) && Directory.Exists(folder))
-                    yield return folder;
-            }
-        }
-
-        private void ResetFilters()
-        {
-            _tbSearch.Text = "";
-            SetTopN(DEFAULT_TOP_N);
-            _dpFrom.SelectedDate = DateTime.Today.AddMonths(-1);
-            _dpTo.SelectedDate = DateTime.Today;
-            _tgOverview.IsChecked = true; _tgCompare.IsChecked = false;
-            _cbLegend.IsChecked = true;
-            _tgRvt.IsChecked = true; _tgRfa.IsChecked = false;
-            _hiddenBars.Clear();
-            RefreshAll();
-            RefreshSearch();
-        }
-
-        private void LoadPrefs()
-        {
+            if (!PdfButton.IsEnabled) return;
+            var dialog = new SaveFileDialog { Filter = "Rapport PDF (*.pdf)|*.pdf", FileName = "BIMaestro-Temps-" + DateTime.Today.ToString("yyyy-MM-dd") + ".pdf" };
+            if (dialog.ShowDialog(this) != true) return;
             try
             {
-                Directory.CreateDirectory(_prefsDir);
-                if (!File.Exists(PrefsPath)) return;
-                var json = File.ReadAllText(PrefsPath, Encoding.UTF8);
-                _prefs = JsonConvert.DeserializeObject<Prefs>(json) ?? new Prefs();
+                TimePdfReport.Write(dialog.FileName, From.SelectedDate?.Date ?? DateTime.Today.AddDays(-14), To.SelectedDate?.Date ?? DateTime.Today, _detail, _detailTotals,
+                    "Type : " + ((ComboBoxItem)Kind.SelectedItem).Content + " · Revit : " + Version.SelectedItem + " · Recherche : " + Search.Text + " · Paramètres : " + ParameterSearch.Text);
+                MessageBox.Show(this, "Rapport PDF enregistré.", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
             }
-            catch { _prefs = new Prefs(); }
+            catch (Exception ex) { MessageBox.Show(this, "Export PDF impossible : " + ex.Message, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Error); }
         }
-
-        private void ApplyPrefsToUi()
+        internal static string Duration(double hours) { long minutes = (long)Math.Round(hours * 60, MidpointRounding.AwayFromZero); return (minutes / 60) + " h " + (minutes % 60).ToString("00"); }
+        private static string Cell(IRow row, int i, DataFormatter format) => format.FormatCellValue(row.GetCell(i))?.Trim() ?? "";
+        private static string First(params string[] values) => values.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x)) ?? "";
+        private static string Normalize(string id) => (id ?? "").Split('|').Last().Trim();
+        private static bool Contains(string value, string query) => Fold(value).IndexOf(Fold(query), StringComparison.OrdinalIgnoreCase) >= 0;
+        private static string Fold(string value) => new string((value ?? "").Normalize(NormalizationForm.FormD).Where(c => CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark).ToArray());
+        private static bool TryDate(string date, string time, out DateTime result)
         {
-            try
-            {
-                if (_prefs.From.HasValue) _dpFrom.SelectedDate = _prefs.From.Value;
-                if (_prefs.To.HasValue) _dpTo.SelectedDate = _prefs.To.Value;
-                SetTopN(ClampInt(_prefs.TopN <= 0 ? DEFAULT_TOP_N : _prefs.TopN, TOP_N_MIN, TOP_N_MAX));
-                _tgOverview.IsChecked = _prefs.Mode != "Compare";
-                _tgCompare.IsChecked = _prefs.Mode == "Compare";
-                _cbLegend.IsChecked = _prefs.LegendShown;
-                _tgRfa.IsChecked = _prefs.DocType == "Rfa";
-                _tgRvt.IsChecked = _prefs.DocType != "Rfa";
-            }
-            catch { }
+            foreach (var culture in new[] { CultureInfo.InvariantCulture, CultureInfo.GetCultureInfo("fr-FR"), CultureInfo.CurrentCulture })
+                if (DateTime.TryParse(date + " " + time, culture, DateTimeStyles.AllowWhiteSpaces, out result)) return true;
+            result = default; return false;
         }
-
-        private void SavePrefs()
+        private static double Hours(ICell cell, DataFormatter format)
         {
-            try
-            {
-                Directory.CreateDirectory(_prefsDir);
-                _prefs.From = _dpFrom.SelectedDate;
-                _prefs.To = _dpTo.SelectedDate;
-                _prefs.TopN = GetTopN();
-                _prefs.Mode = _tgCompare.IsChecked == true ? "Compare" : "Overview";
-                _prefs.LegendShown = _cbLegend.IsChecked == true;
-                _prefs.DocType = GetActiveKind() == DocumentKind.Rfa ? "Rfa" : "Rvt";
-                File.WriteAllText(PrefsPath, JsonConvert.SerializeObject(_prefs, Formatting.Indented), Encoding.UTF8);
-            }
-            catch { }
+            if (cell == null) return 0;
+            if (cell.CellType == CellType.Numeric) return cell.NumericCellValue * 24;
+            string value = format.FormatCellValue(cell);
+            if (TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out var ts) || TimeSpan.TryParse(value, CultureInfo.GetCultureInfo("fr-FR"), out ts)) return ts.TotalHours;
+            if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double days) || double.TryParse(value, NumberStyles.Float, CultureInfo.GetCultureInfo("fr-FR"), out days)) return days * 24;
+            return double.NaN;
         }
-
-        private int GetTopN() { if (!int.TryParse(_tbTopN.Text, out int n)) n = DEFAULT_TOP_N; return ClampInt(n, TOP_N_MIN, TOP_N_MAX); }
-        private void SetTopN(int n) { _tbTopN.Text = ClampInt(n, TOP_N_MIN, TOP_N_MAX).ToString(); if (_uiReady) { DrawChart(); SavePrefs(); } }
-        private void AdjustTopN(int delta) => SetTopN(GetTopN() + delta);
-
-        // ===== Utils =====
-        private static string RemoveDiacritics(string text)
+        internal class Entry { public string Id, Name, Path, Version, Kind, Parameters; public DateTime When; public double Hours; public bool Live; }
+        [Obfuscation(Exclude = true, ApplyToMembers = true)]
+        internal class Total { public string Id { get; set; } public string Name { get; set; } public string Path { get; set; } public double Hours { get; set; } public string Duration => TimeSeriesDashboardWindow.Duration(Hours); public int Days { get; set; } public DateTime Last { get; set; } public string Versions { get; set; } public double Share { get; set; } public Brush Brush { get; set; } }
+        [Obfuscation(Exclude = true, ApplyToMembers = true)]
+        private class ModelChoice : INotifyPropertyChanged
         {
-            if (string.IsNullOrEmpty(text)) return text;
-            string normalized = text.Normalize(NormalizationForm.FormD);
-            var sb = new StringBuilder();
-            foreach (char c in normalized)
-                if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark) sb.Append(c);
-            return sb.ToString().Normalize(NormalizationForm.FormC);
+            public string Id { get; set; } public string Name { get; set; } public string Path { get; set; }
+            private bool _selected;
+            public bool Selected { get => _selected; set { _selected = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Selected))); } }
+            public event PropertyChangedEventHandler PropertyChanged;
         }
+    }
+}
 
-        private static AutoGran ChooseAutoGraninality(DateTime from, DateTime to)
+namespace BIMaestro.Dashboard
+{
+    // Small vector PDF writer, using the standard PDF Helvetica fonts (WinAnsi).
+    // No printer configuration or new runtime dependency is required.
+    internal static class TimePdfReport
+    {
+        private static readonly Encoding Encoding = System.Text.Encoding.GetEncoding(1252, EncoderFallback.ReplacementFallback, DecoderFallback.ReplacementFallback);
+        private static string Number(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
+        private static string Literal(string value) => (value ?? "").Replace("\\", "\\\\").Replace("(", "\\(").Replace(")", "\\)").Replace("\r", " ").Replace("\n", " ");
+        private static string Short(string value, int max) => string.IsNullOrEmpty(value) ? "—" : value.Length <= max ? value : value.Substring(0, max - 1) + "…";
+        private static void Text(StringBuilder page, string value, double x, double y, int size = 10, bool bold = false)
+            => page.Append("BT /").Append(bold ? "F2" : "F1").Append(' ').Append(size).Append(" Tf 0.12 0.18 0.26 rg ").Append(Number(x)).Append(' ').Append(Number(y)).Append(" Td (").Append(Literal(value)).Append(") Tj ET\n");
+        private static void Rect(StringBuilder page, double x, double y, double width, double height, string color)
+            => page.Append(color).Append(" rg ").Append(Number(x)).Append(' ').Append(Number(y)).Append(' ').Append(Number(width)).Append(' ').Append(Number(height)).Append(" re f\n");
+        internal static void Write(string path, DateTime start, DateTime end, List<TimeSeriesDashboardWindow.Entry> rows, List<TimeSeriesDashboardWindow.Total> totals, string filters)
         {
-            double span = (to - from).Duration().TotalDays;
-            if (span <= 60) return AutoGran.Day;
-            if (span <= 420) return AutoGran.Week;
-            return AutoGran.Month;
-        }
-
-        private static string GetBaseName(string docName, string docId)
-        {
-            string s = docName ?? "";
-            if (string.IsNullOrWhiteSpace(s) || s.IndexOf('.') < 0)
-            { try { s = Path.GetFileNameWithoutExtension(docId ?? ""); } catch { } }
-            else
-            { try { s = Path.GetFileNameWithoutExtension(s); } catch { } }
-            return string.IsNullOrWhiteSpace(s) ? UiLanguage.T("(sans nom)", "(unnamed)") : s;
-        }
-
-        private static string NormalizeDocumentId(string docId)
-        {
-            if (string.IsNullOrWhiteSpace(docId))
-                return docId;
-
-            var parts = docId.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries)
-                             .Select(p => p.Trim())
-                             .Where(p => !string.IsNullOrWhiteSpace(p))
-                             .ToArray();
-
-            return parts.Length > 1 ? parts[parts.Length - 1] : docId.Trim();
-        }
-
-
-
-        private static int GetEventPriority(string eventName)
-        {
-            if (string.Equals(eventName, "Ouvert", StringComparison.OrdinalIgnoreCase))
-                return 2;
-
-            if (string.Equals(eventName, "Fermé", StringComparison.OrdinalIgnoreCase))
-                return 1;
-
-            return 0;
-        }
-
-        private void BuildRevitLegendItems()
-        {
-            _revitLegendItems.Clear();
-
-            var items = (_projects ?? Enumerable.Empty<ProjectItem>())
-                .Select(p => NormalizeRevitVersion(p.RevitVersion))
-                .Where(v => !string.IsNullOrWhiteSpace(v))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(v => v, StringComparer.OrdinalIgnoreCase)
-                .Select(v => new VersionLegendItem
-                {
-                    Label = BuildRevitLegendLabel(v),
-                    Brush = GetVersionBrush(v)
-                })
-                .ToList();
-
-            if (items.Count == 0)
-            {
-                items.Add(new VersionLegendItem
-                {
-                    Label = UiLanguage.T("Inconnue", "Unknown"),
-                    Brush = GetVersionBrush(null)
-                });
-            }
-
-            _revitLegendItems.AddRange(items);
-
-            if (_icRevitLegend != null)
-                _icRevitLegend.ItemsSource = _revitLegendItems.ToList();
-        }
-
-        private static string NormalizeRevitVersion(string rawVersion)
-        {
-            if (string.IsNullOrWhiteSpace(rawVersion))
-                return string.Empty;
-
-            string text = rawVersion.Trim();
-            var digits = new string(text.Where(char.IsDigit).ToArray());
-            if (digits.Length >= 4)
-                return digits.Substring(0, 4);
-
-            return text;
-        }
-
-        private static string BuildRevitVersionLabel(string rawVersion)
-        {
-            string normalized = NormalizeRevitVersion(rawVersion);
-            return string.IsNullOrWhiteSpace(normalized) ? UiLanguage.T("Version inconnue", "Unknown version") : $"Revit {normalized}";
-        }
-
-        private static string BuildRevitLegendLabel(string rawVersion)
-        {
-            string normalized = NormalizeRevitVersion(rawVersion);
-            if (string.IsNullOrWhiteSpace(normalized))
-                return UiLanguage.T("Inconnue", "Unknown");
-
-            return normalized.Length >= 2 ? $"V{normalized.Substring(normalized.Length - 2)}" : $"V{normalized}";
-        }
-
-        private static Brush GetVersionBrush(string rawVersion)
-        {
-            string version = NormalizeRevitVersion(rawVersion);
-            string hex = version switch
-            {
-                "2023" => "#4F46E5",
-                "2024" => "#0891B2",
-                "2025" => "#16A34A",
-                "2026" => "#EA580C",
-                "2027" => "#7C3AED",
-                _ => "#6B7280"
+            var pages = new List<StringBuilder>();
+            StringBuilder page = null;
+            double y = 0;
+            Action newPage = () => {
+                page = new StringBuilder(); pages.Add(page);
+                Rect(page, 0, 785, 595, 57, "0.12 0.18 0.26");
+                page.Append("BT /F2 18 Tf 1 1 1 rg 36 806 Td (BIMaestro | Rapport de temps) Tj ET\n");
+                Text(page, start.ToString("dd/MM/yyyy") + " au " + end.ToString("dd/MM/yyyy") + " · temps actif", 36, 763, 11);
+                Text(page, "Maquette / famille", 36, 721, 10, true); Text(page, "Temps", 350, 721, 10, true); Text(page, "Jours", 432, 721, 10, true); Text(page, "Dernière activité", 477, 721, 9, true);
+                y = 699;
             };
-
-            return (Brush)new BrushConverter().ConvertFrom(hex);
-        }
-
-        private static string GetLastFolder(string id)
-        {
-            try
+            newPage();
+            Text(page, "Total : " + TimeSeriesDashboardWindow.Duration(rows.Sum(x => x.Hours)) + " · " + totals.Count + " document(s)", 36, y, 14, true); y -= 25;
+            Text(page, "Dont sessions ouvertes : " + TimeSeriesDashboardWindow.Duration(rows.Where(x => x.Live).Sum(x => x.Hours)), 36, y); y -= 18;
+            foreach (string line in Wrap(filters, 96)) { Text(page, line, 36, y, 9); y -= 14; }
+            Text(page, "Week-ends inclus · historique local et sessions ouvertes de cette instance.", 36, y, 9); y -= 30;
+            Text(page, "Répartition du temps par maquette", 36, y, 12, true); y -= 22;
+            double max = Math.Max(0.001, totals.Max(x => x.Hours));
+            foreach (var total in totals.Take(8))
             {
-                if (string.IsNullOrWhiteSpace(id)) return "";
-                string dir = Path.GetDirectoryName(id);
-                return string.IsNullOrEmpty(dir) ? "" : new DirectoryInfo(dir).Name;
+                Text(page, Short(total.Name, 44), 36, y, 9);
+                Rect(page, 272, y - 1, 190 * total.Hours / max, 8, "0.18 0.50 0.93");
+                Text(page, total.Duration, 477, y, 9); y -= 22;
             }
-            catch { return ""; }
-        }
-
-        private static string Short(string s) => string.IsNullOrWhiteSpace(s) ? s : (s.Length <= 28 ? s : s.Substring(0, 25) + "…");
-
-        private static string SafeDocIdTail(string id)
-        {
-            if (string.IsNullOrWhiteSpace(id)) return "(id)";
-            string s = id;
-
-            int i = s.LastIndexOf('|');
-            if (i >= 0 && i < s.Length - 1)
-                s = s.Substring(i + 1);
-
-            int j1 = s.LastIndexOf('\\');
-            int j2 = s.LastIndexOf('/');
-            int j = (j1 > j2) ? j1 : j2;
-            if (j >= 0 && j < s.Length - 1)
-                s = s.Substring(j + 1);
-
-            return s;
-        }
-
-
-        private static DateTime StartOfIsoWeek(DateTime dt)
-        {
-            DayOfWeek day = CultureInfo.InvariantCulture.Calendar.GetDayOfWeek(dt);
-            int delta = (day == DayOfWeek.Sunday) ? -6 : ((int)DayOfWeek.Monday - (int)day);
-            return dt.Date.AddDays(delta);
-        }
-        private static string FormatBucket(DateTime k, AutoGran gran)
-        {
-            if (gran == AutoGran.Week) return k.Year.ToString("0000") + "-S" + GetIsoWeekOfYear(k).ToString("00");
-            if (gran == AutoGran.Month) return k.ToString("yyyy-MM");
-            return k.ToString("yyyy-MM-dd");
-        }
-        private static int GetIsoWeekOfYear(DateTime time)
-        {
-            DayOfWeek day = CultureInfo.InvariantCulture.Calendar.GetDayOfWeek(time);
-            if (day >= DayOfWeek.Monday && day <= DayOfWeek.Wednesday) time = time.AddDays(3);
-            return CultureInfo.InvariantCulture.Calendar.GetWeekOfYear(time, CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday);
-        }
-        private static DateTime ParseDateTimeFlexible(string d, string t)
-        {
-            string[] formats = { "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd H:mm:ss", "dd/MM/yyyy HH:mm:ss", "dd/MM/yyyy H:mm:ss", "yyyy-MM-dd", "dd/MM/yyyy" };
-            CultureInfo[] cultures = { CultureInfo.InvariantCulture, new CultureInfo("fr-FR"), CultureInfo.CurrentCulture };
-            foreach (var c in cultures)
-                foreach (var f in formats)
-                    if (DateTime.TryParseExact(string.IsNullOrEmpty(t) ? d : (d + " " + t), f, c, DateTimeStyles.AssumeLocal, out DateTime dt)) return dt;
-
-            if (DateTime.TryParse(d + " " + t, CultureInfo.CurrentCulture, DateTimeStyles.AssumeLocal, out DateTime dt2)) return dt2;
-            return DateTime.Now;
-        }
-        private static TimeSpan ParseDurationFlexible(object o)
-        {
-            try
+            y -= 20;
+            Text(page, "Détail de la sélection", 36, y, 12, true); y -= 24;
+            foreach (var total in totals)
             {
-                if (o == null) return TimeSpan.Zero;
-                if (o is TimeSpan ts0) return ts0;
-
-                if (o is double d)
-                {
-                    if (double.IsNaN(d) || double.IsInfinity(d)) return TimeSpan.Zero;
-                    d = ClampDouble(d, -365000d, 365000d);
-                    return TimeSpan.FromDays(d);
-                }
-                if (o is DateTime dt)
-                {
-                    double oa = dt.ToOADate();
-                    double frac = oa - Math.Floor(oa);
-                    return TimeSpan.FromDays(frac);
-                }
-                string s = o.ToString().Trim();
-                if (TimeSpan.TryParse(s, out TimeSpan ts1)) return ts1;
-
-                if (double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out double dInv)
-                    || double.TryParse(s, NumberStyles.Any, new CultureInfo("fr-FR"), out dInv)
-                    || double.TryParse(s, NumberStyles.Any, CultureInfo.CurrentCulture, out dInv))
-                {
-                    dInv = ClampDouble(dInv, -365000d, 365000d);
-                    return TimeSpan.FromDays(dInv);
-                }
-                return TimeSpan.Zero;
+                var nameLines = Wrap(total.Name, 49).ToList();
+                var pathLines = Wrap(total.Path, 105).ToList();
+                int height = Math.Max(1, nameLines.Count) * 14 + pathLines.Count * 11 + 28;
+                // Long paths are split across pages rather than silently truncated.
+                if (y - Math.Min(height, 600) < 60) newPage();
+                double top = y;
+                foreach (string line in nameLines) { if (y < 60) newPage(); Text(page, line, 36, y, 10, true); y -= 14; }
+                Text(page, total.Duration, 350, top, 10); Text(page, total.Days.ToString(), 432, top, 10); Text(page, total.Last.ToString("dd/MM/yyyy"), 477, top, 9);
+                foreach (string line in pathLines) { if (y < 60) newPage(); Text(page, line, 36, y, 8); y -= 11; }
+                if (y < 60) newPage();
+                Text(page, "Revit : " + total.Versions, 36, y, 8); y -= 24;
             }
-            catch { return TimeSpan.Zero; }
-        }
-
-        private static System.Drawing.Color HslToColor(double h, double s, double l)
-        {
-            double c = (1 - Math.Abs(2 * l - 1)) * s, x = c * (1 - Math.Abs(((h / 60.0) % 2) - 1)), m = l - c / 2;
-            double r = 0, g = 0, b = 0;
-            if (h < 60) { r = c; g = x; }
-            else if (h < 120) { r = x; g = c; }
-            else if (h < 180) { g = c; b = x; }
-            else if (h < 240) { g = x; b = c; }
-            else if (h < 300) { r = x; b = c; }
-            else { r = c; b = x; }
-            int R = (int)Math.Round((r + m) * 255), G = (int)Math.Round((g + m) * 255), B = (int)Math.Round((b + m) * 255);
-            return System.Drawing.Color.FromArgb(255, R, G, B);
-        }
-        private static SWM.SolidColorBrush ToBrush(System.Drawing.Color c)
-        { var mc = SWM.Color.FromArgb(c.A, c.R, c.G, c.B); var br = new SWM.SolidColorBrush(mc); br.Freeze(); return br; }
-
-        private static int ClampInt(int value, int min, int max) { if (value < min) return min; if (value > max) return max; return value; }
-        private static double ClampDouble(double value, double min, double max) { if (value < min) return min; if (value > max) return max; return value; }
-
-        private static System.Windows.Media.Imaging.BitmapSource RenderVisualToBitmap(FrameworkElement element)
-        {
-            element.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-            element.Arrange(new Rect(element.DesiredSize));
-            int w = Math.Max(1, (int)Math.Round(element.ActualWidth > 0 ? element.ActualWidth : element.DesiredSize.Width));
-            int h = Math.Max(1, (int)Math.Round(element.ActualHeight > 0 ? element.ActualHeight : element.DesiredSize.Height));
-            var rtb = new System.Windows.Media.Imaging.RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
-            rtb.Render(element);
-            return rtb;
-        }
-        private static void SaveVisualToPng(FrameworkElement element, string path)
-        {
-            var bmp = RenderVisualToBitmap(element);
-            var enc = new System.Windows.Media.Imaging.PngBitmapEncoder();
-            enc.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bmp));
-            using var fs = new FileStream(path, FileMode.Create, FileAccess.Write);
-            enc.Save(fs);
-        }
-
-        // ===== Models & Prefs =====
-        // Ces classes sont utilisées par le XAML (Binding). Il FAUT conserver les noms publics.
-        [Obfuscation(Exclude = true, ApplyToMembers = true, StripAfterObfuscation = false)]
-        private class LogRow { public string Event, GroupId, DocumentId, DocumentName, RevitVersion; public DateTime When; public TimeSpan Duration; }
-
-        [Obfuscation(Exclude = true, ApplyToMembers = true, StripAfterObfuscation = false)]
-        private class ProjectItem
-        {
-            public string DocumentId { get; set; }
-            public string LocationId { get; set; }
-            public string Name { get; set; }
-            public string BaseName { get; set; }
-            public string Folder { get; set; }
-            public string Tail { get; set; }
-            public string RevitVersion { get; set; }
-            public string RevitVersionLabel { get; set; }
-            public Brush RevitVersionBrush { get; set; }
-            public double Hours { get; set; }
-            public DateTime LastSeen { get; set; }
-        }
-
-        [Obfuscation(Exclude = true, ApplyToMembers = true, StripAfterObfuscation = false)]
-        private class VersionLegendItem
-        {
-            public string Label { get; set; }
-            public Brush Brush { get; set; }
-        }
-
-        [Obfuscation(Exclude = true, ApplyToMembers = true, StripAfterObfuscation = false)]
-        private class LegendItemVM : System.ComponentModel.INotifyPropertyChanged
-        {
-            private bool _isChecked;
-            public string Label { get; set; }
-            public Action Toggle { get; set; }
-            public Brush Brush { get; set; } = Brushes.Black;
-            public bool IsChecked
+            for (int i = 0; i < pages.Count; i++) Text(pages[i], "Généré le " + DateTime.Now.ToString("dd/MM/yyyy HH:mm") + " · Page " + (i + 1) + " / " + pages.Count, 36, 30, 9);
+            var objects = new List<byte[]>();
+            Action<string> add = value => objects.Add(Encoding.GetBytes(value));
+            add("<< /Type /Catalog /Pages 2 0 R >>");
+            add("<< /Type /Pages /Count " + pages.Count + " /Kids [" + string.Join(" ", Enumerable.Range(0, pages.Count).Select(i => (5 + i * 2) + " 0 R")) + "] >>");
+            add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
+            add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
+            for (int i = 0; i < pages.Count; i++)
             {
-                get { return _isChecked; }
-                set
-                {
-                    if (_isChecked == value) return;
-                    _isChecked = value;
-                    PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsChecked)));
-                    Toggle?.Invoke();
-                }
+                add("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents " + (6 + i * 2) + " 0 R >>");
+                byte[] content = Encoding.GetBytes(pages[i].ToString());
+                add("<< /Length " + content.Length + " >>\nstream\n" + pages[i] + "endstream");
             }
-            public LegendItemVM(string label, bool isChecked, Action toggle)
-            {
-                Label = label;
-                Toggle = toggle;
-                _isChecked = isChecked;
-            }
-            public event System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
+            using var output = new MemoryStream();
+            Action<string> write = value => { var bytes = Encoding.GetBytes(value); output.Write(bytes, 0, bytes.Length); };
+            write("%PDF-1.4\n%âãÏÓ\n");
+            var offsets = new List<long>();
+            for (int i = 0; i < objects.Count; i++) { offsets.Add(output.Position); write((i + 1) + " 0 obj\n"); output.Write(objects[i], 0, objects[i].Length); write("\nendobj\n"); }
+            long xref = output.Position;
+            write("xref\n0 " + (objects.Count + 1) + "\n0000000000 65535 f \n");
+            foreach (long offset in offsets) write(offset.ToString("0000000000", CultureInfo.InvariantCulture) + " 00000 n \n");
+            write("trailer\n<< /Size " + (objects.Count + 1) + " /Root 1 0 R >>\nstartxref\n" + xref + "\n%%EOF\n");
+            File.WriteAllBytes(path, output.ToArray());
         }
-
-        [Obfuscation(Exclude = true, ApplyToMembers = true, StripAfterObfuscation = false)]
-        private class Prefs
+        private static IEnumerable<string> Wrap(string text, int width)
         {
-            public DateTime? From { get; set; }
-            public DateTime? To { get; set; }
-            public string Sort { get; set; } = "HoursDesc";
-            public int TopN { get; set; } = DEFAULT_TOP_N;
-            public string Mode { get; set; } = "Overview";
-            public bool LegendShown { get; set; } = true;
-            public string DocType { get; set; } = "Rvt";
-        }
-
-        [Obfuscation(Exclude = true, ApplyToMembers = true, StripAfterObfuscation = false)]
-        private class RelayCommand : ICommand
-        {
-            private readonly Action<object> _act; public RelayCommand(Action<object> act) { _act = act; }
-            public event EventHandler CanExecuteChanged { add { } remove { } }
-            public bool CanExecute(object p) => true;
-            public void Execute(object p) => _act(p);
+            text = (text ?? "").Replace("\r", " ").Replace("\n", " ");
+            for (int i = 0; i < text.Length; i += width) yield return text.Substring(i, Math.Min(width, text.Length - i));
         }
     }
 }
