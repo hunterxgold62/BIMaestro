@@ -22,7 +22,7 @@ public static class ReportChecks {
   var rows = Enumerable.Range(0,80).Select(i => new TimeSeriesDashboardWindow.Entry { Hours=2, Live=i==79 }).ToList();
   var totals = Enumerable.Range(0,80).Select(i => new TimeSeriesDashboardWindow.Total { Name="Maquette été ("+i+")", Path=@"C:\Projets\École\Maquette-"+i+".rvt", Hours=2, Days=1, Last=new DateTime(2026,10,2), Versions="2023" }).ToList();
   string path=System.IO.Path.Combine(folder,"time-report-pagination.pdf");
-  TimePdfReport.Write(path,new DateTime(2026,9,26),new DateTime(2026,10,2),rows,totals,"Paramètres : École");
+  TimePdfReport.Write(path,new DateTime(2026,9,26),new DateTime(2026,10,2),rows,totals,"Paramètres : École", "0.059 0.318 0.196");
   string pdf=Encoding.GetEncoding(1252).GetString(File.ReadAllBytes(path));
   if(!pdf.StartsWith("%PDF-1.4") || !pdf.EndsWith("%%EOF\n")) throw new Exception("Invalid PDF envelope");
   if(!pdf.Contains("Total : 160 h 00") || !pdf.Contains("Dont sessions ouvertes : 2 h 00")) throw new Exception("Totals or live hours incorrect");

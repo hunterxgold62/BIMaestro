@@ -9,7 +9,12 @@
   <Style TargetType="DataGrid"><Setter Property="AutoGenerateColumns" Value="False"/><Setter Property="IsReadOnly" Value="True"/><Setter Property="CanUserAddRows" Value="False"/><Setter Property="HeadersVisibility" Value="Column"/><Setter Property="RowHeight" Value="38"/><Setter Property="GridLinesVisibility" Value="None"/><Setter Property="Background" Value="{DynamicResource Surface}"/><Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/><Setter Property="AlternatingRowBackground" Value="{DynamicResource Surface.Subtle}"/><Setter Property="BorderThickness" Value="0"/></Style>
  </ResourceDictionary></Window.Resources>
  <Grid Margin="24"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-  <DockPanel Margin="0,0,0,18"><Button DockPanel.Dock="Right" Content="Actualiser" Click="Reload_Click"/><Button DockPanel.Dock="Right" Content="Ouvrir Excel" Click="Excel_Click"/><StackPanel><TextBlock Text="Votre temps dans Revit" Style="{StaticResource H1}"/><TextBlock Text="Du quotidien au détail de chaque maquette." Style="{StaticResource Hint}"/></StackPanel></DockPanel>
+  <Border Background="{DynamicResource Brand}" Margin="-24,-24,-24,18" Padding="24,20">
+   <DockPanel>
+    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center"><Button Content="Ouvrir Excel" Click="Excel_Click"/><Button Content="Actualiser" Click="Reload_Click"/></StackPanel>
+    <StackPanel><TextBlock Text="BIMaestro  /  ANALYSE" Foreground="White" Opacity="0.75" FontSize="11" FontWeight="SemiBold" Margin="0,0,0,8"/><TextBlock Text="Votre temps dans Revit" Style="{StaticResource H1}"/><TextBlock Text="Du quotidien au détail de chaque maquette." Foreground="White" Opacity="0.8" FontSize="12" Margin="0,6,0,0"/></StackPanel>
+   </DockPanel>
+  </Border>
   <TabControl x:Name="Tabs" Grid.Row="1" SelectionChanged="Tabs_Changed">
    <TabItem Header="Aperçu"><Grid Margin="0,16,0,0"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="2*"/><RowDefinition Height="*"/></Grid.RowDefinitions>
     <DockPanel><StackPanel DockPanel.Dock="Right" Orientation="Horizontal"><Button x:Name="Seven" Content="7 jours" Tag="7" Click="Range_Click"/><Button x:Name="Fifteen" Content="15 jours" Tag="15" Click="Range_Click"/></StackPanel><TextBlock x:Name="OverviewPeriod" Style="{StaticResource H2}" VerticalAlignment="Center"/></DockPanel>

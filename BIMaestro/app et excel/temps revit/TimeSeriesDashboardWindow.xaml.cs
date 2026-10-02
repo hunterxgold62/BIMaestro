@@ -145,6 +145,8 @@ namespace BIMaestro.Dashboard
             OverviewCount.Text = totals.Count.ToString();
             Seven.FontWeight = _days == 7 ? FontWeights.Bold : FontWeights.Normal;
             Fifteen.FontWeight = _days == 15 ? FontWeights.Bold : FontWeights.Normal;
+            Seven.SetResourceReference(Control.BorderBrushProperty, _days == 7 ? "Focus" : "Border");
+            Fifteen.SetResourceReference(Control.BorderBrushProperty, _days == 15 ? "Focus" : "Border");
             OverviewPlot.Model = Chart(recent, start, DateTime.Today);
             OverviewTable.ItemsSource = totals;
             OverviewEmpty.Visibility = totals.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -191,9 +193,16 @@ namespace BIMaestro.Dashboard
             }).OrderByDescending(x => x.Hours).ThenBy(x => x.Name).ToList();
         }
         private static int ColorIndex(string id) { unchecked { uint h = 2166136261; foreach (char c in id.ToUpperInvariant()) h = (h ^ c) * 16777619; return (int)(h % Palette.Length); } }
+        private static OxyColor ThemeColor(string key)
+        {
+            var brush = Application.Current.FindResource(key) as SolidColorBrush;
+            if (brush == null) throw new InvalidOperationException("Couleur du thème introuvable : " + key);
+            return OxyColor.FromArgb(brush.Color.A, brush.Color.R, brush.Color.G, brush.Color.B);
+        }
+        private static string PdfColor(OxyColor color) => string.Join(" ", new[] { color.R, color.G, color.B }.Select(x => (x / 255.0).ToString("0.###", CultureInfo.InvariantCulture)));
         private static PlotModel Chart(List<Entry> rows, DateTime start, DateTime end)
         {
-            var model = new PlotModel { PlotAreaBorderColor = OxyColor.FromRgb(210, 216, 225), TextColor = OxyColor.FromRgb(90, 105, 125) };
+            var model = new PlotModel { PlotAreaBorderColor = ThemeColor("Border"), TextColor = ThemeColor("Text.Secondary"), Background = ThemeColor("Surface") };
             int days = (end - start).Days + 1;
             int bucketDays = days <= 31 ? 1 : days <= 180 ? 7 : Math.Max(30, (int)Math.Ceiling(days / 60.0));
             int count = (int)Math.Ceiling(days / (double)bucketDays);
@@ -224,7 +233,7 @@ namespace BIMaestro.Dashboard
             try
             {
                 TimePdfReport.Write(dialog.FileName, From.SelectedDate?.Date ?? DateTime.Today.AddDays(-14), To.SelectedDate?.Date ?? DateTime.Today, _detail, _detailTotals,
-                    "Type : " + ((ComboBoxItem)Kind.SelectedItem).Content + " · Revit : " + Version.SelectedItem + " · Recherche : " + Search.Text + " · Paramètres : " + ParameterSearch.Text);
+                    "Type : " + ((ComboBoxItem)Kind.SelectedItem).Content + " · Revit : " + Version.SelectedItem + " · Recherche : " + Search.Text + " · Paramètres : " + ParameterSearch.Text, PdfColor(ThemeColor("Brand")));
                 MessageBox.Show(this, "Rapport PDF enregistré.", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex) { MessageBox.Show(this, "Export PDF impossible : " + ex.Message, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Error); }
@@ -278,14 +287,14 @@ namespace BIMaestro.Dashboard
             => page.Append("BT /").Append(bold ? "F2" : "F1").Append(' ').Append(size).Append(" Tf 0.12 0.18 0.26 rg ").Append(Number(x)).Append(' ').Append(Number(y)).Append(" Td (").Append(Literal(value)).Append(") Tj ET\n");
         private static void Rect(StringBuilder page, double x, double y, double width, double height, string color)
             => page.Append(color).Append(" rg ").Append(Number(x)).Append(' ').Append(Number(y)).Append(' ').Append(Number(width)).Append(' ').Append(Number(height)).Append(" re f\n");
-        internal static void Write(string path, DateTime start, DateTime end, List<TimeSeriesDashboardWindow.Entry> rows, List<TimeSeriesDashboardWindow.Total> totals, string filters)
+        internal static void Write(string path, DateTime start, DateTime end, List<TimeSeriesDashboardWindow.Entry> rows, List<TimeSeriesDashboardWindow.Total> totals, string filters, string brandColor)
         {
             var pages = new List<StringBuilder>();
             StringBuilder page = null;
             double y = 0;
             Action newPage = () => {
                 page = new StringBuilder(); pages.Add(page);
-                Rect(page, 0, 785, 595, 57, "0.12 0.18 0.26");
+                Rect(page, 0, 785, 595, 57, brandColor);
                 page.Append("BT /F2 18 Tf 1 1 1 rg 36 806 Td (BIMaestro | Rapport de temps) Tj ET\n");
                 Text(page, start.ToString("dd/MM/yyyy") + " au " + end.ToString("dd/MM/yyyy") + " · temps actif", 36, 763, 11);
                 Text(page, "Maquette / famille", 36, 721, 10, true); Text(page, "Temps", 350, 721, 10, true); Text(page, "Jours", 432, 721, 10, true); Text(page, "Dernière activité", 477, 721, 9, true);
