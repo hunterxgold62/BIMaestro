@@ -42,6 +42,13 @@ namespace Famille
         private string imagesFolder = @"\\intranet.cabinet-merlin.fr\groupe-merlin\Gerland-Energie\Affaires\0-Boîte à outils Revit\0-Bibliothèque\B-Famille Revit Image";
         private string previewSourceFolder;
         private string previewTargetFolder;
+        private string _tutorialOriginalFamiliesFolder;
+        private string _tutorialOriginalImagesFolder;
+        private bool _tutorialCatalogActive;
+        private readonly Dictionary<string, bool> _tutorialFavoriteOriginalStates =
+            new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        private bool _tutorialAwaitingPreviewClose;
+        private bool _tutorialRestoreWhenPreviewCompletes;
 
         private readonly string favoritesFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "SauvegardePréférence", "Favorites.txt");
         private readonly string configFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "SauvegardePréférence", "Config.txt");
@@ -228,7 +235,7 @@ namespace Famille
         private ObservableCollection<Collection> _collections = new();
         private Collection _selectedCollection;
 
-        public FamilyBrowserWindow()
+        public FamilyBrowserWindow(bool useTutorialCatalog = false)
         {
             ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
@@ -251,6 +258,8 @@ namespace Famille
 
             LoadSavedPaths();
             SetPreviewFolders(familiesFolder, imagesFolder);
+            if (useTutorialCatalog && !BeginTutorialCatalog())
+                throw new InvalidOperationException("Le catalogue de familles de formation est introuvable. Réinstalle BIMaestro avec les fichiers de démonstration.");
 
 
             _searchDebounce.Tick += async (s, e) =>
@@ -383,6 +392,7 @@ namespace Famille
             _activeFreshnessFolder = FreshnessFolderKind.None;
             currentFolderPath = tv.Tag.ToString();
             RefreshCurrentFolder();
+            ReportTutorialFolderNavigation();
         }
 
         // --- Comparateurs "tri naturel" façon Explorateur Windows ---
@@ -702,15 +712,89 @@ namespace Famille
             {
                 var favCol = GetFavoritesCollection();
                 Directory.CreateDirectory(Path.GetDirectoryName(favoritesFile));
-                File.WriteAllLines(favoritesFile, favCol.Paths);
+                File.WriteAllLines(favoritesFile, GetPersistentFavoritePaths(favCol));
             }
             catch { }
+        }
+
+        private bool IsTutorialFamilyPath(string path)
+        {
+            if (!_tutorialCatalogActive || string.IsNullOrWhiteSpace(path) ||
+                string.IsNullOrWhiteSpace(familiesFolder)) return false;
+            try
+            {
+                string root = Path.GetFullPath(familiesFolder)
+                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+                return Path.GetFullPath(path).StartsWith(root, StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return false; }
+        }
+
+        internal bool HasTutorialChaiseFavorite()
+        {
+            var favorites = _collections.FirstOrDefault(c => c.Id == FavoritesCollectionId);
+            return _tutorialCatalogActive &&
+                favorites?.Paths?.Any(p => IsTutorialFamilyPath(p) &&
+                    Path.GetFileNameWithoutExtension(p).IndexOf("chaise", StringComparison.OrdinalIgnoreCase) >= 0) == true;
+        }
+
+        // The radial menu can show the tutorial star without persisting its RFA
+        // path to the learner's personal favorites files.
+        internal Collection TryGetTutorialFavoritesForRosace()
+        {
+            if (!_tutorialCatalogActive || !BIMaestro.Tutorials.DemoTourService.IsActive(this)) return null;
+            var favorites = _collections.FirstOrDefault(c => c.Id == FavoritesCollectionId);
+            if (favorites == null) return null;
+            return new Collection
+            {
+                Id = favorites.Id,
+                Name = favorites.Name,
+                Paths = new List<string>(favorites.Paths)
+            };
+        }
+
+        private void TrackTutorialFavoriteChange(string path)
+        {
+            if (!IsTutorialFamilyPath(path) || _tutorialFavoriteOriginalStates.ContainsKey(path)) return;
+            _tutorialFavoriteOriginalStates[path] = GetFavoritesCollection().Paths
+                .Any(p => p.Equals(path, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private List<string> GetPersistentFavoritePaths(Collection favorites)
+        {
+            var paths = new List<string>(favorites.Paths);
+            foreach (var entry in _tutorialFavoriteOriginalStates)
+            {
+                bool currentlyPresent = paths.Any(p => p.Equals(entry.Key, StringComparison.OrdinalIgnoreCase));
+                if (entry.Value && !currentlyPresent)
+                    paths.Add(entry.Key);
+                else if (!entry.Value && currentlyPresent)
+                    paths.RemoveAll(p => p.Equals(entry.Key, StringComparison.OrdinalIgnoreCase));
+            }
+            return paths;
+        }
+
+        private void RestoreTutorialFavorites()
+        {
+            if (_tutorialFavoriteOriginalStates.Count == 0) return;
+            var favorites = GetFavoritesCollection();
+            var restoredPaths = GetPersistentFavoritePaths(favorites);
+            favorites.Paths.Clear();
+            favorites.Paths.AddRange(restoredPaths);
+            _tutorialFavoriteOriginalStates.Clear();
+            MarkFavoritesInView(displayedFamilies);
+            MarkFavoritesInView(allFamilies);
+            if (_selectedCollection?.Id == FavoritesCollectionId)
+                RefreshCollectionContent();
         }
 
         private void FavoriteButton_Click(object s, RoutedEventArgs e)
         {
             if (s is not Button btn || btn.DataContext is not FamilyItem fam) return;
             if (fam.IsFolder) return;
+
+            bool isTutorialFamily = IsTutorialFamilyPath(fam.Path);
+            if (isTutorialFamily) TrackTutorialFavoriteChange(fam.Path);
 
             // toggle visuel
             fam.IsFavorite = !fam.IsFavorite;
@@ -727,8 +811,16 @@ namespace Famille
                 favCol.Paths.RemoveAll(p => p.Equals(fam.Path, StringComparison.OrdinalIgnoreCase));
             }
 
-            SaveCollections();
-            ExportFavoritesCollectionToTxt();
+            if (!isTutorialFamily)
+            {
+                SaveCollections();
+                ExportFavoritesCollectionToTxt();
+            }
+            if (_selectedCollection?.Id == FavoritesCollectionId)
+                RefreshCollectionContent();
+            if (isTutorialFamily && fam.IsFavorite &&
+                fam.Name.IndexOf("chaise", StringComparison.OrdinalIgnoreCase) >= 0)
+                BIMaestro.Tutorials.DemoTourService.ReportAction(this, "favorite-added");
         }
 
         private void MarkFavoritesInView(IEnumerable<FamilyItem> items)
@@ -1015,6 +1107,14 @@ namespace Famille
             PlaceholderText.Visibility = string.IsNullOrEmpty(SearchBox.Text)
                 ? Visibility.Visible : Visibility.Collapsed;
             QueueSearch();
+            if (_tutorialCatalogActive)
+            {
+                string query = StripDiacritics(SearchBox.Text ?? string.Empty).Trim().ToLowerInvariant();
+                if (query.StartsWith("table", StringComparison.Ordinal))
+                    BIMaestro.Tutorials.DemoTourService.ReportAction(this, "search-table");
+                else if (query.StartsWith("chaise", StringComparison.Ordinal))
+                    BIMaestro.Tutorials.DemoTourService.ReportAction(this, "search-chaise");
+            }
         }
 
         private async void SearchBox_KeyDown(object sender, KeyEventArgs e)
@@ -1074,6 +1174,8 @@ namespace Famille
             }
 
             SetSearchScope(global, refresh: true);
+            if (global && _tutorialCatalogActive)
+                BIMaestro.Tutorials.DemoTourService.ReportAction(this, "search-all");
         }
 
         private void SetSearchScope(bool global, bool refresh)
@@ -3325,6 +3427,125 @@ namespace Famille
                     MessageBoxImage.Warning);
             }
         }
+
+        private void TutorialButton_Click(object sender, RoutedEventArgs e)
+        {
+            BIMaestro.Tutorials.DemoTourService.StartInWindow("family-browser", this);
+        }
+
+        // The tutorial changes the browser's catalogue only for this window.
+        // Never persist these temporary paths over the user's own selection.
+        internal bool BeginTutorialCatalog()
+        {
+            if (_tutorialCatalogActive)
+            {
+                _tutorialRestoreWhenPreviewCompletes = false;
+                return true;
+            }
+            string catalogue = FindTutorialCatalogue();
+            if (catalogue == null)
+            {
+                if (IsLoaded)
+                    MessageBox.Show(this, "Le catalogue de formation est introuvable. Vérifie que les familles de démonstration sont installées avec BIMaestro.",
+                        "BIMaestro · Formation", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+
+            try
+            {
+                string imageRoot = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "BIMaestro", "Formation", "NavigateurFamilles", "Images");
+                string previewSource = Path.Combine(catalogue, "Mobilier", "Bureau", "Salle de réunion");
+                string previewTarget = Path.Combine(imageRoot, "Mobilier", "Bureau", "Salle de réunion");
+                Directory.CreateDirectory(imageRoot);
+                Directory.CreateDirectory(previewTarget);
+
+                _tutorialOriginalFamiliesFolder = familiesFolder;
+                _tutorialOriginalImagesFolder = imagesFolder;
+                _tutorialCatalogActive = true;
+                if (_index == null)
+                {
+                    familiesFolder = rootFolderPath = catalogue;
+                    imagesFolder = imageRoot;
+                    NotifyPropertyChanged(nameof(RootFolderName));
+                }
+                else
+                    ApplySelectedFolders(catalogue, imageRoot, showSuccessMessage: false, persist: false);
+                SetPreviewFolders(previewSource, previewTarget);
+                FoldersTabItem.IsSelected = true;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _tutorialCatalogActive = false;
+                if (IsLoaded)
+                    MessageBox.Show(this, "Impossible d'ouvrir le catalogue de formation : " + ex.Message,
+                        "BIMaestro · Formation", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+        }
+
+        internal void EndTutorialCatalog()
+        {
+            if (!_tutorialCatalogActive) return;
+            if (_isGeneratingPreviews)
+            {
+                _tutorialRestoreWhenPreviewCompletes = true;
+                return;
+            }
+
+            string originalFamilies = _tutorialOriginalFamiliesFolder;
+            string originalImages = _tutorialOriginalImagesFolder;
+            RestoreTutorialFavorites();
+            _tutorialCatalogActive = false;
+            _tutorialOriginalFamiliesFolder = null;
+            _tutorialOriginalImagesFolder = null;
+            _tutorialAwaitingPreviewClose = false;
+            _tutorialRestoreWhenPreviewCompletes = false;
+            if (Directory.Exists(originalFamilies) && Directory.Exists(originalImages))
+                ApplySelectedFolders(originalFamilies, originalImages,
+                    showSuccessMessage: false, persist: false);
+        }
+
+        internal void PrepareTutorialStep(string target, string completionEvent)
+        {
+            if (!_tutorialCatalogActive) return;
+            if (completionEvent == "load-bureau-commun")
+            {
+                FoldersTabItem.IsSelected = true;
+                SetSearchScope(global: false, refresh: true);
+                if (SearchBox != null) SearchBox.Text = string.Empty;
+                NavigateToFolder(Path.Combine(familiesFolder, "Mobilier", "Bureau"));
+            }
+        }
+
+        private static string FindTutorialCatalogue()
+        {
+            string directory = Path.GetDirectoryName(typeof(FamilyBrowserWindow).Assembly.Location);
+            for (int depth = 0; depth < 7 && !string.IsNullOrEmpty(directory); depth++)
+            {
+                string candidate = Path.Combine(directory, "Demo", "NavigateurFamilles", "Familles");
+                if (File.Exists(Path.Combine(candidate, "Mobilier", "Bureau", "Bureau commun.rfa")) &&
+                    File.Exists(Path.Combine(candidate, "Mobilier", "Bureau", "Salle de réunion", "Table de réunion - 01.rfa")))
+                    return candidate;
+                directory = Directory.GetParent(directory)?.FullName;
+            }
+            return null;
+        }
+
+        private void ReportTutorialFolderNavigation()
+        {
+            if (!_tutorialCatalogActive || string.IsNullOrWhiteSpace(currentFolderPath)) return;
+            string relative = GetRelativePath(familiesFolder, currentFolderPath)
+                .Replace('/', Path.DirectorySeparatorChar).TrimEnd(Path.DirectorySeparatorChar);
+            string action = relative.Equals("Mobilier", StringComparison.OrdinalIgnoreCase)
+                ? "folder-mobilier" : relative.Equals(Path.Combine("Mobilier", "Bureau"), StringComparison.OrdinalIgnoreCase)
+                ? "folder-bureau" : relative.Equals(Path.Combine("Mobilier", "Bureau", "Salle de réunion"), StringComparison.OrdinalIgnoreCase)
+                ? "folder-reunion" : null;
+            if (action != null)
+                BIMaestro.Tutorials.DemoTourService.ReportAction(this, action);
+        }
         public class Preview3DHandler : IExternalEventHandler
         {
             public string FamilyPath { get; set; }
@@ -3379,6 +3600,13 @@ namespace Famille
             }
 
             if (e.ClickCount != 2) return;
+            if (FamilyBrowserCommand.uiapp?.ActiveUIDocument == null)
+            {
+                MessageBox.Show(this, "Ouvre d'abord un projet Revit pour charger et placer cette famille.",
+                    "BIMaestro · Navigateur de familles", MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
             TryLearnPendingSearch(fam);
             FamilyBrowserCommand.LoadFamilyHandlerInstance.FamilyPath = fam.Path;
             FamilyBrowserCommand.LoadFamilyEventInstance.Raise();
@@ -3423,6 +3651,7 @@ namespace Famille
             }
 
             RefreshCurrentFolder();
+            ReportTutorialFolderNavigation();
         }
 
         private void NavigateToFreshnessFolder(FreshnessFolderKind kind)
@@ -3643,6 +3872,7 @@ namespace Famille
 
             Famille.FamilyBrowserCommand.Preview3DHandlerInstance.FamilyPath = fam.Path;
             Famille.FamilyBrowserCommand.Preview3DEventInstance.Raise();
+            _tutorialAwaitingPreviewClose = _tutorialCatalogActive;
         }
 
         private void AllFamiliesButton_Click(object sender, RoutedEventArgs e)
@@ -4370,13 +4600,20 @@ namespace Famille
                 PreviewTargetTextBox.Text = previewTargetFolder ?? imagesFolder;
         }
 
-        private void ApplySelectedFolders(string newFamiliesFolder, string newImagesFolder, bool showSuccessMessage)
+        private void ApplySelectedFolders(string newFamiliesFolder, string newImagesFolder,
+            bool showSuccessMessage, bool persist = true)
         {
             familiesFolder = newFamiliesFolder;
             imagesFolder = newImagesFolder;
             rootFolderPath = familiesFolder;
 
-            SavePaths();
+            if (persist)
+            {
+                SavePaths();
+                _tutorialCatalogActive = false;
+                _tutorialOriginalFamiliesFolder = null;
+                _tutorialOriginalImagesFolder = null;
+            }
             NotifyPropertyChanged(nameof(RootFolderName));
             SetPreviewFolders(familiesFolder, imagesFolder);
 
@@ -4565,6 +4802,15 @@ namespace Famille
         }
         private void ChangePaths_Click(object sender, RoutedEventArgs e)
         {
+            if (_tutorialCatalogActive)
+            {
+                BIMaestro.Tutorials.DemoTourMessage.Show(
+                    new System.Windows.Interop.WindowInteropHelper(this).Handle,
+                    "Pika ! Tes chemins sont protégés",
+                    "Pendant le tutoriel, BIMaestro utilise un catalogue temporaire sans modifier tes chemins enregistrés. Termine ou quitte le guide, puis reviens dans Paramètres > Modifier les chemins… pour choisir ta propre bibliothèque.");
+                return;
+            }
+
             if (!TrySelectFolders(out var selectedFamilies, out var selectedImages))
                 return;
 
@@ -4812,6 +5058,7 @@ namespace Famille
             {
                 Entries = entries,
                 TargetRoot = previewTargetFolder,
+                IsTutorial = _tutorialCatalogActive && BIMaestro.Tutorials.DemoTourService.IsActive(this),
                 CancellationToken = _previewCts.Token,
                 ProgressCallback = OnPreviewProgress,
                 LogCallback = AppendPreviewLog
@@ -4867,7 +5114,11 @@ namespace Famille
                     bool wasRunning = _isGeneratingPreviews;
                     FinishPreviewExport(progress.IsCanceled);
                     if (wasRunning)
+                    {
                         AppendPreviewLog(progress.IsCanceled ? "Export annulé." : "Export terminé.");
+                        if (!progress.IsCanceled && _tutorialCatalogActive)
+                            BIMaestro.Tutorials.DemoTourService.ReportAction(this, "preview-export-complete");
+                    }
                 }
             }
 
@@ -4905,6 +5156,8 @@ namespace Famille
 
             if (PreviewProgressBar != null && (isCanceled || PreviewProgressBar.Value <= 0))
                 PreviewProgressBar.Visibility = Visibility.Collapsed;
+            if (_tutorialRestoreWhenPreviewCompletes)
+                EndTutorialCatalog();
         }
 
         #endregion
@@ -5032,7 +5285,23 @@ namespace Famille
 
         private void SaveCollections()
         {
-            CollectionStore.Save(new List<Collection>(_collections));
+            if (_tutorialFavoriteOriginalStates.Count == 0)
+            {
+                CollectionStore.Save(new List<Collection>(_collections));
+                return;
+            }
+
+            // Keep the example star visible during the guide, but never write
+            // its demo RFA path into the user's personal Collections.json.
+            var persisted = _collections.Select(c => new Collection
+            {
+                Id = c.Id,
+                Name = c.Name,
+                Paths = c.Id == FavoritesCollectionId
+                    ? GetPersistentFavoritePaths(c)
+                    : new List<string>(c.Paths)
+            }).ToList();
+            CollectionStore.Save(persisted);
         }
 
         private void CollectionCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -5170,7 +5439,10 @@ namespace Famille
                 updated = true;
 
                 if (_selectedCollection.Id == FavoritesCollectionId)
+                {
+                    TrackTutorialFavoriteChange(fam.Path);
                     fam.IsFavorite = true;
+                }
             }
 
             if (updated)
@@ -5189,6 +5461,9 @@ namespace Famille
         {
             if (_selectedCollection == null) return;
             if ((sender as Button)?.DataContext is not FamilyItem fam) return;
+
+            if (_selectedCollection.Id == FavoritesCollectionId)
+                TrackTutorialFavoriteChange(fam.Path);
 
             _selectedCollection.Paths.RemoveAll(p => p.Equals(fam.Path, StringComparison.OrdinalIgnoreCase));
             SaveCollections();
@@ -5218,6 +5493,13 @@ namespace Famille
         {
             if (!ReferenceEquals(sender, e.OriginalSource)) return;
             UpdateGhostFollowMode();
+            if (_tutorialCatalogActive && SettingsTabItem?.IsSelected == true)
+                BIMaestro.Tutorials.DemoTourService.ReportAction(this, "settings-open");
+            if (_tutorialCatalogActive && FavoritesTabItem?.IsSelected == true &&
+                HasTutorialChaiseFavorite())
+                BIMaestro.Tutorials.DemoTourService.ReportAction(this, "favorites-open");
+            if (_tutorialCatalogActive && FoldersTabItem?.IsSelected == true)
+                BIMaestro.Tutorials.DemoTourService.ReportAction(this, "folders-open");
         }
 
         private void UpdateGhostFollowMode()
@@ -5233,6 +5515,11 @@ namespace Famille
 
             void Apply()
             {
+                if (!isVisible && _tutorialAwaitingPreviewClose)
+                {
+                    _tutorialAwaitingPreviewClose = false;
+                    BIMaestro.Tutorials.DemoTourService.ReportAction(this, "preview-3d");
+                }
                 bool shouldSuspend = isVisible && _revitMajorVersion >= 2025;
                 AlwaysOnTopSwitch.SetTrackingSuspended(shouldSuspend);
             }

@@ -1323,8 +1323,14 @@ namespace Couleur
             {
                 Close();
                 if (guided)
-                    TaskDialog.Show("Pikachu - Couleurs et vues",
-                        "Tes réglages sont enregistrés. Regarde l'arborescence du projet : compare la couleur du fond et les icônes devant « Plans d'étage » et « Vues 3D ». Tu peux rouvrir Couleurs pour ajuster le résultat.");
+                {
+                    bool learnMore = BIMaestro.Tutorials.DemoTourMessage.Show(_mainWindowHandle,
+                        "Pika ! Couleurs enregistrées",
+                        "Tes réglages sont enregistrés. Regarde l'arborescence du projet : compare la couleur du fond et les icônes devant « Plans d'étage » et « Vues 3D ». Tu peux rouvrir Couleurs pour ajuster le résultat.",
+                        "Voir l'arborescence", "Approfondir les règles");
+                    if (learnMore)
+                        BIMaestro.Tutorials.DemoTourDeepDive.Show(_mainWindowHandle, "colors");
+                }
             });
         }
 

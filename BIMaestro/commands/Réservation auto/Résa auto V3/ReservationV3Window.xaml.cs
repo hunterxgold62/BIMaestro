@@ -1742,6 +1742,11 @@ namespace Modification
             }
         }
 
+        private void TutorialButton_Click(object sender, RoutedEventArgs e)
+        {
+            BIMaestro.Tutorials.DemoTourService.StartInWindow("reservation", this);
+        }
+
         private void HelpButton_Click(object sender, RoutedEventArgs e)
         {
             try

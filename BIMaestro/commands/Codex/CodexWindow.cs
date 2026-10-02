@@ -947,6 +947,7 @@ namespace BIMaestro.Codex
                         }
                         catch (Exception ex)
                         {
+                            documentLabel.Text = "Document : " + TargetDocumentTitle;
                             string detail = ex is TaskCanceledException ? "Opération annulée." : ex.Message;
                             string reference = MepErrorReference("revit.tool", ex,
                                 new CodexMepDiagnostics.CodexMepDiagnosticMetadata { Provider = "claude", Tool = tool });
@@ -1398,6 +1399,7 @@ namespace BIMaestro.Codex
                 }
                 catch (Exception ex)
                 {
+                    documentLabel.Text = "Document : " + TargetDocumentTitle;
                     string text = ex is TaskCanceledException ? "Opération annulée." : ex.Message;
                     status.Text = "Opération Revit échouée";
                     string tool = (string)data["tool"];

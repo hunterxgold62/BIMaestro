@@ -289,15 +289,42 @@ namespace ScheduleIO
 
         protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
+            var document = data.Application.ActiveUIDocument?.Document;
+            bool guidedExport = BIMaestro.Tutorials.DemoExcelExercise.NeedsExport(document);
+            bool guidedImport = BIMaestro.Tutorials.DemoExcelExercise.NeedsImport(document);
+            if (guidedExport || guidedImport)
+                Couleur.AppearanceOnboarding.ConsumeTourClick("excel");
             var td = new TaskDialog(UiLanguage.T("Nomenclature ↔ Excel", "Schedule ↔ Excel"));
-            td.MainInstruction = UiLanguage.T("Que veux-tu faire ?", "What would you like to do?");
+            td.MainInstruction = guidedExport ? "Pikachu · Étape 1/2 : exporter la nomenclature" :
+                guidedImport ? "Pikachu · Étape 2/2 : importer le fichier modifié" :
+                UiLanguage.T("Que veux-tu faire ?", "What would you like to do?");
             td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, UiLanguage.T("Exporter la nomenclature vers Excel", "Export the schedule to Excel"));
             td.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, UiLanguage.T("Importer les modifications depuis Excel", "Import changes from Excel"));
             td.CommonButtons = TaskDialogCommonButtons.Cancel;
             var choice = td.Show();
 
-            if (choice == TaskDialogResult.CommandLink1) return DoExport(data, ref message, elements);
-            if (choice == TaskDialogResult.CommandLink2) return DoImport(data, ref message, elements);
+            if (choice == TaskDialogResult.CommandLink1)
+            {
+                if (guidedImport)
+                {
+                    BIMaestro.Tutorials.DemoTourMessage.Show(data.Application.MainWindowHandle,
+                        "Pikachu attend l'import", "Le classeur est déjà exporté. Modifie au moins un numéro ou un secteur dans « Nomenclature », garde le repère intact, enregistre le fichier, puis choisis « Importer ».");
+                    Couleur.AppearanceOnboarding.StartIntro(data.Application.MainWindowHandle, "excel");
+                    return Result.Cancelled;
+                }
+                return DoExport(data, ref message, elements);
+            }
+            if (choice == TaskDialogResult.CommandLink2)
+            {
+                if (guidedExport)
+                {
+                    BIMaestro.Tutorials.DemoTourMessage.Show(data.Application.MainWindowHandle,
+                        "Pikachu attend l'export", "Commence par « Exporter la nomenclature vers Excel ».");
+                    Couleur.AppearanceOnboarding.StartIntro(data.Application.MainWindowHandle, "excel");
+                    return Result.Cancelled;
+                }
+                return DoImport(data, ref message, elements);
+            }
             return Result.Cancelled;
         }
 
@@ -390,6 +417,12 @@ namespace ScheduleIO
                 // Typage + éditabilité
                 ProbeTypesForColumns(all.FirstOrDefault()?.Document, all.FirstOrDefault(), cols);
                 AssessEditability(all.FirstOrDefault()?.Document, all, cols);
+                // Dans la nomenclature de formation, le repère est une référence fixe. L'en-tête
+                // verrouillé l'annonce dans Excel ; l'import le protège réellement.
+                if (schedule.Name == "BIMaestro - 08 Gestion Excel")
+                    foreach (var column in cols.Where(column => column.ParameterId != null &&
+                        column.ParameterId.GetIdLongValue() == (long)BuiltInParameter.ALL_MODEL_MARK))
+                        column.IsWritable = false;
 
                 // Données (utilise la valeur affichée fiabilisée pour Famille/Type)
                 // Données (utilise la valeur affichée fiabilisée pour Famille/Type)
@@ -443,6 +476,7 @@ namespace ScheduleIO
                 dlg.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, UiLanguage.T("Ouvrir le dossier", "Open the folder"));
                 dlg.CommonButtons = TaskDialogCommonButtons.Close;
                 var r = dlg.Show();
+                BIMaestro.Tutorials.DemoExcelExercise.Exported(data.Application, path);
                 try
                 {
                     if (r == TaskDialogResult.CommandLink1) Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });
@@ -489,6 +523,11 @@ namespace ScheduleIO
                     dataRows = ReadSheetToRows(ws, evaluator);
                 }
 
+                if (!BIMaestro.Tutorials.DemoExcelExercise.ValidateWorkbook(data.Application, guess, dataRows))
+                    return Result.Cancelled;
+
+                bool guidedImport = BIMaestro.Tutorials.DemoExcelExercise.NeedsImport(doc);
+
                 if (!dataRows.Any() || !dataRows[0].ContainsKey("UniqueId"))
                 {
                     TaskDialog.Show(UiLanguage.T("Import Excel", "Excel Import"), UiLanguage.T("Fichier invalide : aucune donnée ou 'UniqueId' manquant.", "Invalid file: no data or missing 'UniqueId'."));
@@ -512,17 +551,32 @@ namespace ScheduleIO
                             if (header.Equals("UniqueId", StringComparison.OrdinalIgnoreCase)) continue;
                             if (header.Equals("ElementId", StringComparison.OrdinalIgnoreCase)) continue;
 
-                            if (!mapByHeader.TryGetValue(header, out var cm)) continue;
-                            if (cm.ParameterId == ElementId.InvalidElementId) continue;
-
-                            var p = ParamUtils.GetParameterById(e, doc, cm, allowByName: true);
+                            Parameter p;
+                            if (guidedImport)
+                            {
+                                // Seuls les champs éditables de l'exercice sont réimportés.
+                                // Le repère ne passe jamais par un Parameter.Set.
+                                p = BIMaestro.Tutorials.DemoExcelExercise.ImportParameter(e as FamilyInstance, header);
+                            }
+                            else
+                            {
+                                if (!mapByHeader.TryGetValue(header, out var cm)) continue;
+                                if (cm.ParameterId == ElementId.InvalidElementId) continue;
+                                // Le repère du tableau de formation identifie chaque place.
+                                // Il reste fixe, y compris si l'on réimporte après le guide.
+                                if (schedule.Name == "BIMaestro - 08 Gestion Excel" &&
+                                    cm.ParameterId.GetIdLongValue() == (long)BuiltInParameter.ALL_MODEL_MARK)
+                                    continue;
+                                p = ParamUtils.GetParameterById(e, doc, cm, allowByName: true);
+                            }
                             if (p == null || p.IsReadOnly) continue;
 
                             var newText = kvp.Value ?? "";
 
                             try
                             {
-                                if (!string.IsNullOrWhiteSpace(newText))
+                                if (!string.IsNullOrWhiteSpace(newText) ||
+                                    (guidedImport && p.StorageType == StorageType.String))
                                 {
                                     if (p.StorageType == StorageType.String)
                                     {
@@ -573,8 +627,19 @@ namespace ScheduleIO
                     t.Commit();
                 }
 
-                TaskDialog.Show(UiLanguage.T("Import Excel", "Excel Import"), UiLanguage.T("Import terminé ✅", "Import completed ✅"));
+                if (BIMaestro.Tutorials.DemoExcelExercise.NeedsImport(doc))
+                    BIMaestro.Tutorials.DemoExcelExercise.Imported(data.Application);
+                else
+                    TaskDialog.Show(UiLanguage.T("Import Excel", "Excel Import"), UiLanguage.T("Import terminé ✅", "Import completed ✅"));
                 return Result.Succeeded;
+            }
+            catch (IOException ex)
+            {
+                if (BIMaestro.Tutorials.DemoExcelExercise.NeedsImport(data.Application.ActiveUIDocument?.Document))
+                    BIMaestro.Tutorials.DemoTourMessage.Show(data.Application.MainWindowHandle,
+                        "Pikachu attend le fichier", "Enregistre puis ferme le classeur Excel avant de relancer l'import. " + ex.Message);
+                message = ex.Message;
+                return Result.Failed;
             }
             catch (Exception ex) { message = ex.Message; return Result.Failed; }
         }
@@ -1176,6 +1241,8 @@ namespace ScheduleIO
             // Cacher UniqueId / ElementId
             sheet.SetColumnHidden(0, true);
             sheet.SetColumnHidden(1, true);
+            for (int column = 0; column < cols.Count; column++)
+                if (cols[column].IsHidden) sheet.SetColumnHidden(column + 2, true);
             sheet.CreateFreezePane(0, 1);
 
             int max = Math.Min(headers.Count, 30);

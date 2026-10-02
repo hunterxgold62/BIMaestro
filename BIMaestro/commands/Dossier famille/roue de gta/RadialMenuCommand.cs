@@ -45,7 +45,7 @@ namespace BIMaestro.UI
                     activeCollection = collections.FirstOrDefault(c => string.Equals(c.Id, state.ActiveCollectionId, StringComparison.OrdinalIgnoreCase));
                     if (activeCollection != null)
                     {
-                        activeData = BuildCollectionData(activeCollection);
+                        activeData = BuildCollectionData(WithTutorialFavorites(activeCollection));
                     }
                     else
                     {
@@ -72,7 +72,7 @@ namespace BIMaestro.UI
                         var selected = freshCollections.FirstOrDefault(c => string.Equals(c.Id, id, StringComparison.OrdinalIgnoreCase));
                         if (selected == null) return;
 
-                        var updated = BuildCollectionData(selected);
+                        var updated = BuildCollectionData(WithTutorialFavorites(selected));
                         state.UseCollection = true;
                         state.ActiveCollectionId = selected.Id;
                         state.LastCollectionId = selected.Id;
@@ -112,6 +112,7 @@ namespace BIMaestro.UI
 
                 win.Show();
                 win.Activate();
+                BIMaestro.Tutorials.DemoTourService.ReportExternalAction("radial-opened");
                 return Result.Succeeded;
             }
             catch (Exception ex)
@@ -185,6 +186,15 @@ namespace BIMaestro.UI
                 CollectionName = collection?.Name,
                 PageLabelFactory = CreateCollectionPageLabelFactory(collection?.Name)
             };
+        }
+
+        // The browser guide keeps its example favorite in memory. Show it in
+        // the radial menu while that guide is open without saving it to disk.
+        private static Collection WithTutorialFavorites(Collection collection)
+        {
+            if (collection == null || !string.Equals(collection.Id, "builtin_favoris", StringComparison.OrdinalIgnoreCase))
+                return collection;
+            return FamilyBrowserCommand.MainWindowRef?.TryGetTutorialFavoritesForRosace() ?? collection;
         }
 
         private static Func<int, int, string> CreateCollectionPageLabelFactory(string collectionName)

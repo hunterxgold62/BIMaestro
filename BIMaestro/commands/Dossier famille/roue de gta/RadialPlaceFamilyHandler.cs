@@ -67,6 +67,13 @@ namespace BIMaestro.UI
 
                 Famille.FamilyUsageManager.RegisterUse(FamilyPath);
                 Famille.FamilyRecentManager.RegisterUse(FamilyPath);
+                var tutorialFavorites = Famille.FamilyBrowserCommand.MainWindowRef?.TryGetTutorialFavoritesForRosace();
+                if (tutorialFavorites?.Paths?.Any(path =>
+                        string.Equals(path, FamilyPath, StringComparison.OrdinalIgnoreCase)) == true &&
+                    Path.GetFileNameWithoutExtension(FamilyPath)
+                        .IndexOf("chaise", StringComparison.OrdinalIgnoreCase) >= 0)
+                    BIMaestro.Tutorials.DemoTourService.ReportExternalAction("radial-tutorial-chaise-used");
+                BIMaestro.Tutorials.DemoTourService.ReportExternalAction("radial-family-used");
             }
             catch (Exception ex)
             {

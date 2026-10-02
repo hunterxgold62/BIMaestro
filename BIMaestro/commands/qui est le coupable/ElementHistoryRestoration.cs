@@ -14,6 +14,8 @@ namespace Analyse
         public HistoryRecipe Recipe { get; set; }
         public string CaptureFailure { get; set; }
         public string Category { get; set; }
+        public string SuperComponentUniqueId { get; set; }
+        public string FamilyTypeUniqueId { get; set; }
     }
 
     internal sealed class HistoryRestoreItem
@@ -24,6 +26,7 @@ namespace Analyse
         public string UniqueId { get; set; }
         public bool Created { get; set; }
         public bool Existing { get; set; }
+        public bool IncludedInParent { get; set; }
         public bool Repaired { get; set; }
         public string SourceUniqueId { get; set; }
         public string Category { get; set; }
@@ -34,7 +37,8 @@ namespace Analyse
         public List<HistoryRestoreItem> Items { get; } = new List<HistoryRestoreItem>();
         public int Created => Items.Count(i => i.Created);
         public int Existing => Items.Count(i => i.Existing);
-        public int Failed => Items.Count(i => !i.Created && !i.Existing);
+        public int IncludedInParent => Items.Count(i => i.IncludedInParent);
+        public int Failed => Items.Count(i => !i.Created && !i.Existing && !i.IncludedInParent);
         public int ConnectionsRestored { get; set; }
         public int ConnectionsExisting { get; set; }
         public List<string> ConnectionFailures { get; } = new List<string>();
@@ -182,6 +186,30 @@ namespace Analyse
                             result.Reason = "creation"; result.Detail = ex.Message;
                         }
                     }
+                }
+                // Nested instances are recreated by Revit with their parent. Verify that
+                // the parent and a child of the recorded type actually exist before
+                // removing their historical entries from the failure count.
+                var matchedNestedIds = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var request in selected.Where(r => r.Recipe == null
+                    && !string.IsNullOrEmpty(r.SuperComponentUniqueId)
+                    && !string.IsNullOrEmpty(r.FamilyTypeUniqueId)))
+                {
+                    var result = batch.Items.FirstOrDefault(i => i.SourceUniqueId == request.SourceUniqueId);
+                    if (result == null || result.Created || result.Existing) continue;
+                    var parentUid = Resolve(doc, index, request.SuperComponentUniqueId);
+                    var parent = ElementHistoryReconstruction.FindOriginal(doc, parentUid) as FamilyInstance;
+                    if (parent == null) continue;
+                    var child = parent.GetSubComponentIds()
+                        .Select(doc.GetElement).OfType<FamilyInstance>()
+                        .FirstOrDefault(i => i.Symbol?.UniqueId == request.FamilyTypeUniqueId
+                            && !matchedNestedIds.Contains(i.UniqueId));
+                    if (child == null) continue;
+                    matchedNestedIds.Add(child.UniqueId);
+                    result.IncludedInParent = true;
+                    result.UniqueId = child.UniqueId;
+                    result.Reason = null;
+                    result.Detail = "Sous-composant recréé avec sa famille parente.";
                 }
                 RepairRestoredFittings(doc, selected, index, batch);
                 Reconnect(doc, selected, index, batch);

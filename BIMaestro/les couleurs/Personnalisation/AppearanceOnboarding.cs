@@ -43,6 +43,12 @@ namespace Couleur
                 _projectReadyUtc = null;
                 return;
             }
+            if (Path.GetFileName(app.ActiveUIDocument.Document.PathName)
+                .StartsWith("BIMaestro_Apprentissage_", StringComparison.OrdinalIgnoreCase))
+            {
+                _projectReadyUtc = null;
+                return;
+            }
             if (!_projectReadyUtc.HasValue) _projectReadyUtc = DateTime.UtcNow;
             if (DateTime.UtcNow - _projectReadyUtc.Value < TimeSpan.FromSeconds(8)) return;
             if (GetForegroundWindow() != app.MainWindowHandle) return;
@@ -126,10 +132,21 @@ namespace Couleur
                 _owner = owner;
                 _tourId = tourId;
                 _buttonId = tourId == "reservation" ? "ResérvationAuto" :
-                    tourId == "history" ? "Qui a fait ça ?" : "Couleur de projet";
+                    tourId == "history" ? "Qui a fait ça ?" :
+                    tourId == "pipe-calculation" ? "PipeLengthByDiameterV2" :
+                    tourId == "organizer" ? "ElementRenamerButton" :
+                    tourId == "view-template" ? "ViewTemplateTransfer" :
+                    tourId == "family-browser" ? "FamilyBrowser" :
+                    tourId == "excel" ? "GestionExcelCmd" : "Couleur de projet";
                 _buttonLabel = tourId == "reservation" ? "Auto Réservation" :
-                    tourId == "history" ? "Qui a fait ça ?" : "Couleurs";
-                _menuId = tourId == "colors" ? "Changement de couleur" : null;
+                    tourId == "history" ? "Qui a fait ça ?" :
+                    tourId == "pipe-calculation" ? "Calcul des canalisations" :
+                    tourId == "organizer" ? "Organisateur" :
+                    tourId == "view-template" ? "Gabarit de vue" :
+                    tourId == "family-browser" ? "Navigateur de familles" :
+                    tourId == "excel" ? "Gestion Excel" : "Couleurs";
+                _menuId = tourId == "colors" ? "Changement de couleur" :
+                    tourId == "organizer" ? "OrganisateurSplit" : null;
                 Title = "BIMaestro — Guide " + _buttonLabel;
                 Width = 330; Height = 230;
                 WindowStartupLocation = WindowStartupLocation.Manual;
@@ -215,7 +232,9 @@ namespace Couleur
             private static FrameworkElement FindButton(DependencyObject root, string commandId, string menuId)
             {
                 var pending = new Stack<DependencyObject>(); pending.Push(root);
-                FrameworkElement split = null;
+                FrameworkElement splitExact = null;
+                FrameworkElement splitContaining = null;
+                FrameworkElement command = null;
                 int visited = 0;
                 while (pending.Count > 0 && visited++ < 25000)
                 {
@@ -229,19 +248,46 @@ namespace Couleur
                             if (model == null || !(model.GetType().Namespace ?? "")
                                 .StartsWith("Autodesk.Windows", StringComparison.Ordinal)) continue;
                             string id = model.GetType().GetProperty("Id")?.GetValue(model, null) as string;
-                            if (!string.IsNullOrEmpty(commandId) && id == commandId) return element;
+                            FrameworkElement surface = FindRibbonClickSurface(element, menuId != null);
+                            if (!string.IsNullOrEmpty(commandId) && id == commandId &&
+                                (command == null || surface.ActualWidth * surface.ActualHeight > command.ActualWidth * command.ActualHeight))
+                                command = surface;
                             if (menuId != null && id?.IndexOf(menuId, StringComparison.OrdinalIgnoreCase) >= 0 &&
-                                (split == null || element.ActualWidth * element.ActualHeight < split.ActualWidth * split.ActualHeight))
-                                split = element;
+                                (splitExact == null || surface.ActualWidth * surface.ActualHeight > splitExact.ActualWidth * splitExact.ActualHeight))
+                                splitExact = surface;
                             if (ContainsColorCommand(model, commandId, 0) &&
-                                (split == null || element.ActualWidth * element.ActualHeight < split.ActualWidth * split.ActualHeight))
-                                split = element;
+                                (splitContaining == null || surface.ActualWidth * surface.ActualHeight > splitContaining.ActualWidth * splitContaining.ActualHeight))
+                                splitContaining = surface;
                         }
                     }
                     int count = VisualTreeHelper.GetChildrenCount(node);
                     for (int i = 0; i < count; i++) pending.Push(VisualTreeHelper.GetChild(node, i));
                 }
-                return split;
+                return menuId != null ? splitExact ?? splitContaining ?? command : command ?? splitContaining;
+            }
+
+            private static FrameworkElement FindRibbonClickSurface(FrameworkElement element, bool preferSplit)
+            {
+                FrameworkElement button = null;
+                FrameworkElement split = null;
+                FrameworkElement fallback = element;
+                DependencyObject node = element;
+                for (int depth = 0; node != null && depth < 9; depth++, node = VisualTreeHelper.GetParent(node))
+                {
+                    if (!(node is FrameworkElement candidate) || !candidate.IsVisible) continue;
+                    string typeName = candidate.GetType().Name;
+                    if (candidate.ActualWidth <= 240 && candidate.ActualHeight <= 160 &&
+                        candidate.ActualWidth * candidate.ActualHeight > fallback.ActualWidth * fallback.ActualHeight &&
+                        (typeName.IndexOf("Button", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                         ReferenceEquals(candidate.DataContext, element.DataContext)))
+                        fallback = candidate;
+                    if (typeName.IndexOf("RibbonSplitButton", StringComparison.OrdinalIgnoreCase) >= 0)
+                        split = candidate;
+                    else if (typeName.Equals("RibbonButton", StringComparison.OrdinalIgnoreCase) ||
+                             typeName.Equals("RibbonToggleButton", StringComparison.OrdinalIgnoreCase))
+                        button = candidate;
+                }
+                return preferSplit ? split ?? button ?? fallback : button ?? split ?? fallback;
             }
 
             private static bool ContainsColorCommand(object model, string id, int depth)

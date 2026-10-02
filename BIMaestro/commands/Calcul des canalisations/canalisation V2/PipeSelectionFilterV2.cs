@@ -120,6 +120,13 @@ namespace Analyse
 
                 // Afficher la fenêtre WPF pour la sélection des options
                 PipeSystemTypeSelectionWindowV2 selectionWindow = new PipeSystemTypeSelectionWindowV2(systemTypes);
+                bool guidedExercise = BIMaestro.Tutorials.DemoTourService.AttachIfRequested("pipe-calculation", selectionWindow);
+                if (guidedExercise)
+                {
+                    selectionWindow.Width = 760;
+                    selectionWindow.Height = 520;
+                    selectionWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+                }
                 IntPtr mainWindowHandle = commandData.Application.MainWindowHandle;
                 WindowInteropHelper helper = new WindowInteropHelper(selectionWindow);
                 helper.Owner = mainWindowHandle;
@@ -594,12 +601,16 @@ namespace Analyse
                         Process.Start(new ProcessStartInfo(excelFilePath) { UseShellExecute = true });
                     }
                 }
-                ShowNetworkInteractionWindow(
-                   uidoc,
-                   mainWindowHandle,
-                   networkAggregates,
-                   networkColors,
-                   networkElementIds);
+                if (!guidedExercise)
+                    ShowNetworkInteractionWindow(
+                       uidoc,
+                       mainWindowHandle,
+                       networkAggregates,
+                       networkColors,
+                       networkElementIds);
+                if (guidedExercise)
+                    BIMaestro.Tutorials.DemoCalculationExercise.Verify(commandData.Application,
+                        selectedIds, includeDucts, pipeLengths, ductLengths, ductFittingLengths, elbowCounts);
                 return Result.Succeeded;
             }
             catch (Exception ex)
@@ -959,7 +970,7 @@ namespace Analyse
            IntPtr mainWindowHandle,
            Dictionary<string, NetworkAggregation> networkAggregates,
            Dictionary<string, System.Drawing.Color> networkColors,
-           Dictionary<string, HashSet<ElementId>> networkElementIds)
+            Dictionary<string, HashSet<ElementId>> networkElementIds)
         {
             var items = new List<PipeNetworkDisplayItem>();
 

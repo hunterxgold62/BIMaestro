@@ -193,6 +193,8 @@ public class BIMaestroApp : IExternalApplication
             _uiApp ??= sender as UIApplication;
             if (_uiApp == null) return;
 
+
+
             if (!_dedicatedFamilyLinkStarted && Environment.GetEnvironmentVariable("BIMAESTRO_FAMILY_DEDICATED") == "1")
             {
                 BIMaestro.Codex.CodexCommand.StartDedicatedLink(_uiApp);
@@ -207,7 +209,8 @@ public class BIMaestroApp : IExternalApplication
             RefreshProjectBrowserActiveViewWhenNeeded();
             BIMaestro.ViewHover.ViewHoverPreviewService.ProcessPending(_uiApp);
             BIMaestro.ViewHover.ViewDeckService.ProcessIdling(_uiApp);
-            Couleur.AppearanceOnboarding.ProcessIdling(_uiApp);
+            if (!BIMaestro.Tutorials.DemoTrainingInvitation.ProcessIdling(_uiApp))
+                Couleur.AppearanceOnboarding.ProcessIdling(_uiApp);
 
             if (!Couleur.ColoringStateManager.IsColoringActive)
             {
@@ -385,6 +388,7 @@ public class BIMaestroApp : IExternalApplication
         try
         {
             _uiApp ??= new UIApplication(e.Document.Application);
+            BIMaestro.Tutorials.DemoTrainingInvitation.OnDocumentOpened(e.Document);
             Analyse.ElementHistoryTracker.ScheduleDeferredPrime(e.Document);
             Analyse.ElementHistoryHoverInfoService.OnDocumentOpened(e.Document);
             ExcelLogger.OnDocumentOpened(e.Document, _uiApp);

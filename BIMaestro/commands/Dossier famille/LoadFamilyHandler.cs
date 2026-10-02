@@ -78,6 +78,10 @@ namespace Famille
             uidoc.PostRequestForElementTypePlacement(symbol);
             FamilyUsageManager.RegisterUse(FamilyPath);
             FamilyRecentManager.RegisterUse(FamilyPath);
+            if (string.Equals(Path.GetFileName(FamilyPath), "Bureau commun.rfa", StringComparison.OrdinalIgnoreCase) &&
+                FamilyBrowserCommand.MainWindowRef is FamilyBrowserWindow browser)
+                browser.Dispatcher.BeginInvoke(new Action(() =>
+                    BIMaestro.Tutorials.DemoTourService.ReportAction(browser, "load-bureau-commun")));
         }
 
         public string GetName() => "LoadFamilyHandler";

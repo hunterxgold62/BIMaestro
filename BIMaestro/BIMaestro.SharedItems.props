@@ -1,5 +1,9 @@
 ﻿<Project>
   <ItemGroup>
+    <Content Include="..\Demo\NavigateurFamilles\Familles\**\*.rfa">
+      <Link>Demo\NavigateurFamilles\Familles\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Compile Include="commands\Codex\CodexClient.cs" />
     <Compile Include="commands\Codex\CodexToolRecovery.cs" />
     <Compile Include="commands\Codex\CodexDedicatedRevitLink.cs" />

@@ -265,6 +265,11 @@ namespace Analyse
             return LoadWindowHistory(modelKeys, uniqueIds, MaxLoadedHistoryEvents);
         }
 
+        private void TutorialButton_Click(object sender, RoutedEventArgs e)
+        {
+            BIMaestro.Tutorials.DemoTourService.StartInWindow("history", this);
+        }
+
         private void HelpButton_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -1881,16 +1886,20 @@ namespace Analyse
 
         private static HistoryRestoreRequest ToRestoreRequest(ElementHistoryEvent ev)
         {
-            object source = null, raw = null, captureFailure = null;
+            object source = null, raw = null, captureFailure = null, parent = null, familyType = null;
             ev.Delta?.TryGetValue("deletedUniqueId", out source);
             ev.Delta?.TryGetValue("recipe", out raw);
             ev.Delta?.TryGetValue("captureFailure", out captureFailure);
+            ev.Delta?.TryGetValue("superComponentUniqueId", out parent);
+            ev.Delta?.TryGetValue("familyTypeUniqueId", out familyType);
             return new HistoryRestoreRequest
             {
                 SourceUniqueId = Convert.ToString(source),
                 Label = (ev.Family + " " + ev.TypeName).Trim() + " [" + ev.ElementId + "]",
                 Recipe = ElementHistoryReconstruction.ReadRecipe(raw),
-                CaptureFailure = captureFailure == null ? null : Convert.ToString(captureFailure), Category = ev.Category
+                CaptureFailure = captureFailure == null ? null : Convert.ToString(captureFailure), Category = ev.Category,
+                SuperComponentUniqueId = parent == null ? null : Convert.ToString(parent),
+                FamilyTypeUniqueId = familyType == null ? null : Convert.ToString(familyType)
             };
         }
 
@@ -1933,7 +1942,10 @@ namespace Analyse
                 message = UiLanguage.T(
                     $"{result.Created} élément(s) restauré(s).\n{result.Existing} déjà présent(s).\n{result.Failed} non restauré(s).",
                     $"{result.Created} element(s) restored.\n{result.Existing} already present.\n{result.Failed} not restored.");
-                var failures = result.Items.Where(i => !i.Created && !i.Existing).ToList();
+                var failures = result.Items.Where(i => !i.Created && !i.Existing && !i.IncludedInParent).ToList();
+                if (result.IncludedInParent > 0)
+                    message += UiLanguage.T($"\n{result.IncludedInParent} sous-composant(s) recréé(s) avec leur famille parente.",
+                        $"\n{result.IncludedInParent} nested component(s) recreated with their parent family.");
                 if (result.Repaired > 0 || result.RepairFailures.Count > 0)
                     message += UiLanguage.T($"\nParmi les éléments déjà présents : {result.Repaired} raccord(s) corrigé(s), {result.RepairFailures.Count} correction(s) impossible(s).",
                         $"\nAmong existing elements: {result.Repaired} fitting(s) repaired, {result.RepairFailures.Count} repair(s) failed.");
@@ -1972,7 +1984,7 @@ namespace Analyse
                 // Selection/navigation failures must not misreport a successful commit.
                 try
                 {
-                    var ids = result.Items.Where(i => i.Created || i.Existing).Select(i => _doc.GetElement(i.UniqueId)?.Id)
+                    var ids = result.Items.Where(i => i.Created || i.Existing || i.IncludedInParent).Select(i => _doc.GetElement(i.UniqueId)?.Id)
                         .Where(id => id != null).Distinct().ToList();
                     if (ids.Count > 0) { _uidoc.Selection.SetElementIds(ids); _uidoc.ShowElements(ids); }
                 }
@@ -1986,8 +1998,19 @@ namespace Analyse
             Dispatcher.BeginInvoke(new Action(() =>
             {
                 UpdateVisualizeButtonLabel();
-                if (restoredForTutorial) BIMaestro.Tutorials.DemoTourService.ReportRestoration(this);
-                MessageBox.Show(this, message, UiLanguage.T("Restaurer les éléments", "Restore elements"), MessageBoxButton.OK, MessageBoxImage.Information);
+                if (restoredForTutorial && BIMaestro.Tutorials.DemoTourService.IsActive(this))
+                {
+                    BIMaestro.Tutorials.DemoTourService.ReportRestoration(this);
+                    bool learnMore = BIMaestro.Tutorials.DemoTourMessage.Show(
+                        new System.Windows.Interop.WindowInteropHelper(this).Handle,
+                        "Pika ! Objets retrouvés", message, "Voir les objets restaurés",
+                        "Approfondir l'enquête");
+                    if (learnMore)
+                        BIMaestro.Tutorials.DemoTourDeepDive.Show(
+                            new System.Windows.Interop.WindowInteropHelper(this).Handle, "history");
+                }
+                else
+                    MessageBox.Show(this, message, UiLanguage.T("Restaurer les éléments", "Restore elements"), MessageBoxButton.OK, MessageBoxImage.Information);
             }));
         }
 

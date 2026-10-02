@@ -225,6 +225,11 @@ namespace Modification
                 StartNumber = "A";
             }
         }
+        private void TutorialButton_Click(object sender, RoutedEventArgs e)
+        {
+            BIMaestro.Tutorials.DemoTourService.StartInWindow("organizer", this);
+        }
+
         private void HelpButton_Click(object sender, RoutedEventArgs e)
         {
             try

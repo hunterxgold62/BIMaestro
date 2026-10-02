@@ -194,7 +194,7 @@ public class AppUI : IExternalApplication
                 {
                     ("Couleur de projet", "Couleurs", "Couleur.ToggleCombinedColoringCommand", "Couleur oui non.png","Clic : ouvre la personnalisation des couleurs. Double-clic : active ou désactive les panneaux colorés."),
                     ("RestartAppearanceGuide", "Guide couleurs", "Couleur.RestartAppearanceGuideCommand", "Miniature.png", "Relance le parcours guidé depuis l’onglet BIMaestro jusqu’aux réglages des couleurs."),
-                    ("DemoTours", "Parcours guidés", "BIMaestro.Tutorials.DemoToursCommand", "Miniature.png", "Crée la maquette de formation et découvre Auto résa, Qui a fait ça ? et Couleurs/vues avec Pikachu."),
+                    ("DemoTours", "Parcours guidés", "BIMaestro.Tutorials.DemoToursCommand", "Miniature.png", "Crée la maquette de formation et découvre Auto résa, Qui a fait ça ?, Couleurs/vues, Calcul des canalisations, Organisateur et Gabarit de vue avec Pikachu."),
                     ("Couleur de maquette", "Couleur reset", "Couleur.ResetTabItemRandomColorsCommand", "reset.png","Réinitialise les couleurs appliquées"),
                     ("papa Noël", "papa\nNoël", "Couleur.PapanoelCommand", "papa noel.png","Fait apparaître des couleurs comme des guirlandes\nDouble clic pour revenir à la normale.\n\nAttention désactiver <couleur Oui/Non> avant activation."),
                     ("ViewDeckToggle", "Onglets : OFF", "BIMaestro.ViewHover.ToggleViewDeckCommand", "Miniature.png", "ON : miniatures dans les onglets. OFF : onglets compacts.\r\nLes aperçus au survol se règlent dans Miniature ou Option > Miniatures."),

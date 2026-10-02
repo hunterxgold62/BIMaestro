@@ -77,7 +77,11 @@ namespace Couleur
             if (_appearanceGuideActionsConnected) return;
             _appearanceGuideActionsConnected = true;
             TutorialEnablePanels.Checked += (_, __) => CompleteAppearanceGuideStep(0);
-            TutorialPresetChoice.SelectionChanged += (_, __) => CompleteAppearanceGuideStep(1);
+            TutorialPresetChoice.SelectionChanged += (_, __) =>
+            {
+                if (IsRainbowPresetSelected())
+                    CompleteAppearanceGuideStep(1);
+            };
             TutorialApplyPreset.Click += (_, __) => CompleteAppearanceGuideStep(2);
             ViewsAndFoldersTab.PreviewMouseLeftButtonUp += (_, __) => CompleteAppearanceGuideStep(3);
             AppearanceTabs.SelectionChanged += (_, args) =>
@@ -93,7 +97,6 @@ namespace Couleur
                 if (BrowserFoldersTab.IsSelected) CompleteAppearanceGuideStep(7);
                 if (BrowserIconsTab.IsSelected) CompleteAppearanceGuideStep(8);
             };
-            TutorialGoToIconsFromFolders.Click += (_, __) => CompleteAppearanceGuideStep(8);
             TutorialBackgroundColor.SelectedColorChanged += (_, __) =>
             {
                 if (_appearanceGuideStep == 6 && BrowserPreferences.BackgroundColor != _appearanceBackgroundInitialColor)
@@ -130,6 +133,10 @@ namespace Couleur
             BrowserIcons.Rules.FirstOrDefault(rule => string.Equals(
                 rule.Name?.Trim(), name, StringComparison.OrdinalIgnoreCase));
 
+        private bool IsRainbowPresetSelected() => string.Equals(
+            (TutorialPresetChoice.SelectedItem as PresetMenuEntry)?.Name ?? SelectedPresetName,
+            "Arc-en-ciel", StringComparison.OrdinalIgnoreCase);
+
         private void CompleteAppearanceGuideStep(int expectedStep)
         {
             if (_appearanceGuideStep != expectedStep || _appearanceGuideStepCompleted) return;
@@ -160,13 +167,13 @@ namespace Couleur
                     AppearanceTabs.SelectedItem = MyPanelsTab;
                     target = TutorialEnablePanels;
                     title = "1/15 · Activer les couleurs";
-                    description = "Coche « Afficher les couleurs de mes panneaux » pour voir les styles sur les rubans BIMaestro. Tu peux aussi choisir de colorer tout le panneau.";
+                    description = "Coche « Afficher les couleurs de mes panneaux » : ce réglage agit sur les panneaux du ruban BIMaestro. Il est indépendant des couleurs de l'arborescence. Tu peux aussi choisir de colorer tout le panneau.";
                     break;
                 case 1:
                     AppearanceTabs.SelectedItem = MyPanelsTab;
                     target = TutorialPresetChoice;
                     title = "2/15 · Choisir un style";
-                    description = "Ouvre cette liste et choisis un style de départ. Tu y retrouveras les effets animés, dont Pokémon pixel. Cette sélection ne modifie pas encore les lignes.";
+                    description = "Ouvre « Style pour tous » et choisis « Arc-en-ciel » (sans « animé »). Ce style colore les panneaux de façon différente et facilite la comparaison. Les lignes ne changent qu'après « Utiliser ce style ».";
                     break;
                 case 2:
                     AppearanceTabs.SelectedItem = MyPanelsTab;
@@ -183,7 +190,7 @@ namespace Couleur
                     AppearanceTabs.SelectedItem = ViewsAndFoldersTab;
                     target = TutorialEnableBrowser;
                     title = "5/15 · Activer l’arborescence";
-                    description = "Coche « Personnalisation active » pour que le fond et les icônes puissent être appliqués dans Revit.";
+                    description = "Coche « Personnalisation active » : sans ce commutateur, tes règles de fond, dossiers et icônes restent enregistrées mais ne s'appliquent pas à l'arborescence Revit.";
                     break;
                 case 5:
                     target = BrowserBackgroundTab;
@@ -195,17 +202,17 @@ namespace Couleur
                     BrowserTabs.SelectedItem = BrowserBackgroundTab;
                     target = TutorialBackgroundColor;
                     title = "7/15 · Changer la couleur du fond";
-                    description = "Choisis une autre couleur dans « Fond principal » et regarde l’aperçu de l’arborescence. Le guide attend que la couleur change.";
+                    description = "Choisis une autre couleur dans « Fond principal ». L'aperçu montre l'effet avant l'enregistrement ; tu peux donc comparer la lisibilité des noms de vues avec ton nouveau fond. Le guide attend une vraie modification.";
                     break;
                 case 7:
                     target = BrowserFoldersTab;
                     title = "8/15 · Repérer les dossiers";
-                    description = "Ouvre « Dossiers ». Cet onglet sert à colorer les dossiers existants. Nous allons ensuite placer une icône sur « Plans d'étage ». Clique sur Suivant après avoir regardé.";
+                    description = "Ouvre « Dossiers ». Cet onglet colore les dossiers existants ; il ne crée aucune vue. Repère-le, puis clique sur Suivant : nous passerons directement par l'onglet « Icônes ».";
                     break;
                 case 8:
-                    target = TutorialGoToIconsFromFolders;
+                    target = BrowserIconsTab;
                     title = "9/15 · Passer aux icônes";
-                    description = "Clique sur « Ajouter une icône à un dossier… ». Nous allons ajouter une image devant « Plans d'étage » et « Vues 3D », sans créer de type de vue.";
+                    description = "Clique sur la bande « Icônes » en haut de cette section. Nous allons ajouter une image devant « Plans d'étage » et « Vues 3D », sans créer de type de vue.";
                     break;
                 case 9:
                     BrowserTabs.SelectedItem = BrowserIconsTab;
@@ -221,7 +228,7 @@ namespace Couleur
                 case 11:
                     target = TutorialIconRules;
                     title = "12/15 · Choisir son icône";
-                    description = "Dans la nouvelle ligne, saisis exactement « Plans d'étage », puis choisis une image dans la liste. Le nom doit correspondre à celui du dossier Revit.";
+                    description = "Pikachu se place en haut pour te laisser saisir dans la nouvelle ligne « Plans d'étage », puis choisir une image. Le nom doit correspondre au dossier Revit (accent et espace compris).";
                     break;
                 case 12:
                     target = TutorialAddIconRule;
@@ -231,7 +238,7 @@ namespace Couleur
                 case 13:
                     target = TutorialIconRules;
                     title = "14/15 · Choisir l’icône 3D";
-                    description = "Saisis exactement « Vues 3D » dans la seconde ligne, puis choisis son icône. La règle s’appliquera au nom du dossier existant.";
+                    description = "Pikachu laisse libre la nouvelle ligne : saisis exactement « Vues 3D », puis choisis son icône. Tu personnalises le dossier existant, pas un type de vue.";
                     break;
                 default:
                     target = TutorialSave;
@@ -241,9 +248,12 @@ namespace Couleur
             }
             AppearanceGuideTitle.Text = title;
             AppearanceGuideText.Text = description;
+            AppearanceGuideCard.VerticalAlignment = _appearanceGuideStep == 11 || _appearanceGuideStep == 13
+                ? VerticalAlignment.Top : VerticalAlignment.Bottom;
             AppearanceGuidePrevious.IsEnabled = _appearanceGuideStep > 0;
             AppearanceGuideNext.Content = "Suivant";
             _appearanceGuideStepCompleted = (_appearanceGuideStep == 0 && TutorialEnablePanels.IsChecked == true)
+                || (_appearanceGuideStep == 1 && IsRainbowPresetSelected())
                 || (_appearanceGuideStep == 3 && ViewsAndFoldersTab.IsSelected)
                 || (_appearanceGuideStep == 4 && TutorialEnableBrowser.IsChecked == true)
                 || (_appearanceGuideStep == 5 && BrowserBackgroundTab.IsSelected)
@@ -263,11 +273,37 @@ namespace Couleur
         private void HighlightAppearanceGuideTarget(FrameworkElement target, int expectedStep)
         {
             if (_appearanceGuideStep != expectedStep || !target.IsVisible || !IsVisible) return;
+            if (expectedStep == 11 || expectedStep == 13)
+                FocusNewestAppearanceIconName();
             AdornerLayer layer = AdornerLayer.GetAdornerLayer(target);
             if (layer == null) return;
             _appearanceGuideLayer = layer;
             _appearanceGuideHighlight = new AppearanceGuideAdorner(target);
             layer.Add(_appearanceGuideHighlight);
+        }
+
+        private void FocusNewestAppearanceIconName()
+        {
+            int index = BrowserIcons.Rules.Count - 1;
+            if (index < 0 || !string.IsNullOrWhiteSpace(BrowserIcons.Rules[index].Name)) return;
+            TutorialIconRules.UpdateLayout();
+            DependencyObject row = TutorialIconRules.ItemContainerGenerator.ContainerFromIndex(index);
+            TextBox nameBox = FindAppearanceIconTextBox(row);
+            if (nameBox == null) return;
+            nameBox.BringIntoView();
+            nameBox.Focus();
+        }
+
+        private static TextBox FindAppearanceIconTextBox(DependencyObject root)
+        {
+            if (root == null) return null;
+            if (root is TextBox box) return box;
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+            {
+                TextBox found = FindAppearanceIconTextBox(VisualTreeHelper.GetChild(root, i));
+                if (found != null) return found;
+            }
+            return null;
         }
 
         private void RemoveAppearanceGuideHighlight()

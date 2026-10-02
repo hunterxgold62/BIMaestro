@@ -20,12 +20,15 @@ namespace BIMaestro.Codex
         private readonly List<string> transactionFailures = new List<string>();
         private ExternalEvent externalEvent;
         private Func<UIApplication, object> operation;
+        private string creationTool;
         private TaskCompletionSource<object> pending;
         private bool disposed;
         private IEnumerator<CodexFamilyArtifact> creation;
         private bool cancelCreation;
         private string cancellationReason;
         private UIApplication creationApplication;
+        private Document creationActiveDocument;
+        private bool creationVisible;
         internal event Action<string> CreationProgress;
         private int creationStep;
         internal bool ShareContext { get; set; }
@@ -242,6 +245,7 @@ namespace BIMaestro.Codex
             if (pending != null) throw new InvalidOperationException("Une opération Revit est déjà en attente.");
             pending = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
             var result = pending.Task;
+            creationTool = tool;
             operation = app => Run(app, tool, args);
             try
             {
@@ -271,8 +275,32 @@ namespace BIMaestro.Codex
                 {
                     creation = steps.GetEnumerator();
                     creationApplication = app;
+                    creationActiveDocument = app.ActiveUIDocument?.Document;
+                    creationVisible = creationTool == "revit_create_family" || creationTool == "revit_create_parametric_family";
                     cancelCreation = false;
                     creationStep = 0;
+                    if (creationVisible)
+                    {
+                        // OpenAndActivateDocument is already used by this bridge in
+                        // ExternalEvent.Execute; Revit forbids it inside Idling.
+                        try
+                        {
+                            if (!creation.MoveNext() || creation.Current != null)
+                                throw new InvalidOperationException("La création visible n'a pas démarré correctement.");
+                            creationActiveDocument = app.ActiveUIDocument?.Document;
+                        }
+                        catch (Exception ex)
+                        {
+                            creation.Dispose();
+                            creation = null;
+                            creationApplication = null;
+                            creationActiveDocument = null;
+                            creationVisible = false;
+                            pending = null;
+                            completion.TrySetException(ex);
+                            return;
+                        }
+                    }
                     app.Idling += ContinueCreation;
                     return;
                 }
@@ -291,28 +319,51 @@ namespace BIMaestro.Codex
             try
             {
                 if (disposed || cancelCreation || !ShareContext || !AllowChanges)
-                    throw new OperationCanceledException("Création arrêtée entre deux étapes : " + (disposed ? "panneau fermé" : !ShareContext ? "partage du contexte désactivé" : !AllowChanges ? "modifications désactivées" : cancellationReason ?? "annulation demandée") + ". Aucun RFA partiel n'a été enregistré.");
-                if (document != null && (!document.IsValidObject || !document.Equals(creationApplication.ActiveUIDocument?.Document)))
+                    throw new OperationCanceledException("Création arrêtée entre deux étapes : " + (disposed ? "panneau fermé" : !ShareContext ? "partage du contexte désactivé" : !AllowChanges ? "modifications désactivées" : cancellationReason ?? "annulation demandée") +
+                        (creationVisible ? ". La famille visible reste ouverte ; son dernier état enregistré est conservé." : ". Aucun RFA partiel n'a été enregistré."));
+                if (creationActiveDocument != null && (!creationActiveDocument.IsValidObject || !creationActiveDocument.Equals(creationApplication.ActiveUIDocument?.Document)))
                     throw new InvalidOperationException("Le document actif a changé. Création arrêtée avant l'étape suivante.");
                 CreationProgress?.Invoke("Création Revit — étape " + (++creationStep));
                 if (!creation.MoveNext()) throw new InvalidOperationException("Création terminée sans résultat.");
+                creationActiveDocument = creationApplication.ActiveUIDocument?.Document;
                 result = creation.Current;
                 finished = result != null;
+                if (creationVisible && !finished)
+                    foreach (var view in creationApplication.ActiveUIDocument?.GetOpenUIViews() ?? new List<UIView>())
+                        if (view.ViewId == creationApplication.ActiveUIDocument.ActiveView.Id) { view.ZoomToFit(); break; }
                 // Return to Revit with every transaction closed. The next Idling
                 // callback continues the same temporary family, without rebuilding.
             }
             catch (Exception ex) { failure = ex; finished = true; }
-            if (!finished) { args.SetRaiseWithoutDelay(); return; }
+            if (!finished) { if (!creationVisible) args.SetRaiseWithoutDelay(); return; }
             creationApplication.Idling -= ContinueCreation;
+            var activeAfterCreation = creationApplication.ActiveUIDocument?.Document;
+            var expectedAfterCreation = creationActiveDocument;
+            bool wasVisible = creationVisible;
             try { creation.Dispose(); }
             catch (Exception ex) { if (failure == null) failure = ex; }
             creation = null;
             creationApplication = null;
+            creationActiveDocument = null;
+            creationVisible = false;
             pending = null;
+            if (wasVisible && activeAfterCreation?.IsFamilyDocument == true &&
+                activeAfterCreation.Equals(expectedAfterCreation))
+            {
+                // Keep the panel attached to the visible family even when a later
+                // step fails. The user can inspect or save the partial model.
+                document = activeAfterCreation;
+                DocumentTitle = document.Title;
+            }
             if (failure != null) completion?.TrySetException(failure);
             else
             {
                 if (result.FilePath != null) lastCreated = result;
+                if (result.FilePath != null && activeAfterCreation?.PathName == result.FilePath)
+                {
+                    document = activeAfterCreation;
+                    DocumentTitle = document.Title;
+                }
                 completion?.TrySetResult(result);
             }
         }
@@ -361,7 +412,7 @@ namespace BIMaestro.Codex
                 if (!Confirm("Créer une famille paramétrique « " + design.Metadata.Name + " »",
                     $"{design.Parts.Count} extrusions et {design.Arrays.Count} réseaux natifs ({design.SolidCount} solides au total).\nParamètres dimensionnels : {string.Join(", ", design.Parameters.Select(p => p.Name).Concat(design.Angles.Select(p => p.Name + " = " + p.Value + "°")))}.\nTests de dimensions, de nombre, de visibilité, de formules et d'angle puis restauration des valeurs initiales avant enregistrement dans un nouveau RFA.\nChargement : {design.Metadata.Load}. Placement à l'origine : {design.Metadata.Place}."))
                     throw new InvalidOperationException("Création refusée par l'utilisateur. Ne pas réessayer sans nouvelle demande.");
-                return CodexFamilyBuilder.CreateSteps(app, document, design.Metadata, false, design, outputRoot: FamilyOutputRoot);
+                return CodexFamilyBuilder.CreateSteps(app, document, design.Metadata, false, design, outputRoot: FamilyOutputRoot, showDuringCreation: true);
             }
             if (tool == "revit_create_family" || tool == "revit_validate_family")
             {
@@ -372,7 +423,7 @@ namespace BIMaestro.Codex
                 if (tool == "revit_validate_family") return CodexFamilyBuilder.CreateSteps(app, document, design, true, outputRoot: FamilyOutputRoot);
                 if (!Confirm("Créer la famille « " + design.Name + " »", $"{design.SolidCount} solides, {design.Materials.Count} matériaux.\nCatégorie : {design.Category}.\nUn nouveau fichier RFA sera enregistré dans le dossier des familles BIMaestro.\nChargement dans le projet : {design.Load}. Placement à l'origine : {design.Place}.\nHypothèses : " + string.Join(" ; ", design.Assumptions)))
                     throw new InvalidOperationException("Création de famille refusée. Ne pas réessayer sans nouvelle demande.");
-                return CodexFamilyBuilder.CreateSteps(app, document, design, outputRoot: FamilyOutputRoot);
+                return CodexFamilyBuilder.CreateSteps(app, document, design, outputRoot: FamilyOutputRoot, showDuringCreation: true);
             }
             // Revit may return another managed wrapper for the same native document.
             if (tool != "revit_open_created_family" && (document == null || !document.IsValidObject || activeDocument == null || !document.Equals(activeDocument)))

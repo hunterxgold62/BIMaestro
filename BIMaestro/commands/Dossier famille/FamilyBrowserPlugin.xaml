@@ -981,7 +981,29 @@
 
     <Grid Background="{DynamicResource BackgroundGradient}">
         <Grid Margin="8">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="36"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                <Button x:Name="TutorialButton"
+                        Width="64" MinWidth="0" Height="28" Padding="0"
+                        Margin="0,0,8,0"
+                        Content="TUTO"
+                        FontWeight="Bold"
+                        ToolTip="Suivre le parcours du navigateur de familles avec Pikachu"
+                        Style="{StaticResource SecondaryButton}"
+                        Click="TutorialButton_Click"/>
+                <Button x:Name="HelpButton"
+                        Width="32" MinWidth="0" Height="28" Padding="0"
+                        Content="?"
+                        FontWeight="Bold"
+                        ToolTip="Ouvrir l'aide en ligne"
+                        Style="{StaticResource SecondaryButton}"
+                        Click="HelpButton_Click"/>
+            </StackPanel>
             <TabControl
+                    Grid.Row="1"
                     Margin="0"
                     x:Name="MainTabControl"
                     Background="{DynamicResource TabBackground}"
@@ -1032,7 +1054,7 @@
                 </TabControl.Resources>
 
                 <!-- Onglet Dossiers -->
-                <TabItem Header="Dossiers" Background="{DynamicResource TabBackground}">
+                <TabItem x:Name="FoldersTabItem" Header="Dossiers" Background="{DynamicResource TabBackground}">
                     <Grid Margin="6" Background="Transparent">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="250"/>
@@ -1269,7 +1291,7 @@
                 </TabItem>
 
                 <!-- Onglet Favoris / Collections -->
-                <TabItem Header="Favoris" Background="{DynamicResource TabBackground}">
+                <TabItem x:Name="FavoritesTabItem" Header="Favoris" Background="{DynamicResource TabBackground}">
                 <Grid Margin="10" Background="Transparent">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -1521,7 +1543,7 @@
                         </Grid.ColumnDefinitions>
 
                         <!-- Bouton à gauche -->
-                        <Button Content="Modifier les chemins…" 
+                        <Button x:Name="ChangePathsButton" Content="Modifier les chemins…"
             Width="220" 
             HorizontalAlignment="Left"
             Margin="0,0,16,0"
@@ -1663,17 +1685,6 @@
             </TabItem>
 
         </TabControl>
-            <Button x:Name="HelpButton"
-                    HorizontalAlignment="Right"
-                    VerticalAlignment="Top"
-                    Width="32"
-                    Height="24"
-                    Margin="0,6,8,0"
-                    Content="?"
-                    FontWeight="Bold"
-                    ToolTip="Ouvrir l'aide en ligne"
-                    Style="{StaticResource SecondaryButton}"
-                    Click="HelpButton_Click"/>
         </Grid>
     </Grid>
 </Window>

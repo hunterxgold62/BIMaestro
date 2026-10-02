@@ -50,6 +50,8 @@ namespace Analyse
             public GhostMeshSnapshot GhostMesh { get; set; }
             public HistoryRecipe Recipe { get; set; }
             public string CaptureFailure { get; set; }
+            public string SuperComponentUniqueId { get; set; }
+            public string FamilyTypeUniqueId { get; set; }
             public bool DetailCaptureAttempted { get; set; }
             public Dictionary<string, string> Parameters { get; set; }
             public DateTime LastLogged { get; set; }
@@ -1291,6 +1293,8 @@ namespace Analyse
                 // Restoration data is independent of the visual preview mode.
                 Recipe = recipe,
                 CaptureFailure = captureFailure,
+                SuperComponentUniqueId = (el as FamilyInstance)?.SuperComponent?.UniqueId,
+                FamilyTypeUniqueId = (el as FamilyInstance)?.Symbol?.UniqueId,
                 Parameters = parameters
             };
 
@@ -1982,6 +1986,8 @@ namespace Analyse
                 ["deletedUniqueId"] = snapshot.UniqueId,
                 ["recipe"] = snapshot.Recipe,
                 ["captureFailure"] = snapshot.CaptureFailure,
+                ["superComponentUniqueId"] = snapshot.SuperComponentUniqueId,
+                ["familyTypeUniqueId"] = snapshot.FamilyTypeUniqueId,
                 ["lastKnown"] = snapshot.Location == null ? null : new { x = snapshot.Location.X, y = snapshot.Location.Y, z = snapshot.Location.Z },
                 ["bboxMin"] = snapshot.BBoxMin == null ? null : new { x = snapshot.BBoxMin.X, y = snapshot.BBoxMin.Y, z = snapshot.BBoxMin.Z },
                 ["bboxMax"] = snapshot.BBoxMax == null ? null : new { x = snapshot.BBoxMax.X, y = snapshot.BBoxMax.Y, z = snapshot.BBoxMax.Z },

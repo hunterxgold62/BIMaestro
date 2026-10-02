@@ -57,15 +57,17 @@
 
                 <TextBlock Grid.Column="0" Text="Réservations automatiques" Style="{StaticResource H1}"/>
 
-                <Button Grid.Column="1"
-                        Content="?"
-                        Width="28"
-                        Height="28"
-                        FontWeight="Bold"
-                        HorizontalAlignment="Right"
-                        VerticalAlignment="Top"
-                        ToolTip="Ouvrir l'aide en ligne"
-                        Click="HelpButton_Click"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                    <Button Content="TUTO"
+                            MinWidth="58" Height="28" Margin="0,0,8,0"
+                            FontWeight="Bold"
+                            ToolTip="Lancer le guide interactif de la réservation"
+                            Click="TutorialButton_Click"/>
+                    <Button Content="?"
+                            Width="28" Height="28" FontWeight="Bold"
+                            ToolTip="Ouvrir l'aide en ligne"
+                            Click="HelpButton_Click"/>
+                </StackPanel>
             </Grid>
         </Border>
 
@@ -117,7 +119,7 @@
                 </TabControl.Resources>
 
             <!-- ========= TAB 1 ========= -->
-            <TabItem Header="Exécution">
+            <TabItem x:Name="ReservationExecutionTab" Header="Exécution">
                 <ScrollViewer Margin="0,12,0,0"
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled">
@@ -774,7 +776,7 @@
             </TabItem>
 
             <!-- ========= TAB 2 ========= -->
-            <TabItem Header="Familles">
+            <TabItem x:Name="ReservationFamiliesTab" Header="Familles">
                 <ScrollViewer Margin="0,12,0,0"
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled">
@@ -971,7 +973,7 @@
             </TabItem>
 
             <!-- ========= TAB 3 ========= -->
-            <TabItem Header="Réglages">
+            <TabItem x:Name="ReservationSettingsTab" Header="Réglages">
                 <ScrollViewer Margin="0,12,0,0"
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled">

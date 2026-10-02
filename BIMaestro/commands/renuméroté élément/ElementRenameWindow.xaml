@@ -59,15 +59,16 @@
                                TextWrapping="Wrap"/>
                 </StackPanel>
 
-                <Button Grid.Column="1"
-                        x:Name="HelpButton"
-                        Content="?"
-                        Margin="12,0,0,0"
-                        VerticalAlignment="Top"
-                        HorizontalAlignment="Right"
-                        Style="{StaticResource HelpButtonStyle}"
-                        ToolTip="Ouvrir l’aide en ligne"
-                        Click="HelpButton_Click"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="12,0,0,0" VerticalAlignment="Top">
+                    <Button Content="TUTO" MinWidth="58" Height="34" Margin="0,0,8,0"
+                            FontWeight="Bold" ToolTip="Lancer le guide interactif de l'organisateur"
+                            Click="TutorialButton_Click"/>
+                    <Button x:Name="HelpButton"
+                            Content="?"
+                            Style="{StaticResource HelpButtonStyle}"
+                            ToolTip="Ouvrir l’aide en ligne"
+                            Click="HelpButton_Click"/>
+                </StackPanel>
             </Grid>
         </Border>
 
@@ -135,7 +136,8 @@
                     IsEnabled="{Binding CanReset}"
                     Click="OnResetClick"
                     ToolTip="Cliquez pour réinitialiser le paramètre sélectionné des éléments (vide le contenu)."/>
-            <Button Content="Renommer"
+            <Button x:Name="DemoRenameButton"
+                    Content="Renommer"
                     Width="150"
                     Style="{StaticResource PrimaryButton}"
                     Click="OnRenameClick"

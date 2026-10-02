@@ -39,6 +39,7 @@ namespace BIMaestro.ViewTemplates
                         "This Command Is Available in a Revit Project (.rvt), Not in a Family (.rfa)."));
                 return Result.Cancelled;
             }
+            BIMaestro.Tutorials.DemoViewTemplateGuide.OnCommandOpened(document);
 
             var dialog = new TaskDialog(UiLanguage.T("Transfert de gabarit de vue", "View Template Transfer"))
             {
@@ -63,7 +64,7 @@ namespace BIMaestro.ViewTemplates
             if (choice == TaskDialogResult.CommandLink1)
                 return Export(data, document, activeView);
             if (choice == TaskDialogResult.CommandLink2)
-                return Import(document, activeView);
+                return Import(data.Application, document, activeView);
             return Result.Cancelled;
         }
 
@@ -120,10 +121,11 @@ namespace BIMaestro.ViewTemplates
                     package.Categories.Count + " catégorie(s) et " + package.Filters.Count + " filtre(s).\n\n" + saveDialog.FileName,
                     "The Template Was Exported with " + package.Parameters.Count + " Parameter(s), " +
                     package.Categories.Count + " Category/Categories, and " + package.Filters.Count + " Filter(s).\n\n" + saveDialog.FileName));
+            BIMaestro.Tutorials.DemoViewTemplateGuide.OnExportCompleted(data.Application, saveDialog.FileName);
             return Result.Succeeded;
         }
 
-        private static Result Import(Document document, View activeView)
+        private static Result Import(UIApplication app, Document document, View activeView)
         {
             if (!CanUseView(activeView)) return ShowUnsupportedView();
 
@@ -134,6 +136,12 @@ namespace BIMaestro.ViewTemplates
                 CheckFileExists = true,
                 Multiselect = false
             };
+            string guidedFile = BIMaestro.Tutorials.DemoViewTemplateGuide.ExportedFileFor(document);
+            if (!string.IsNullOrWhiteSpace(guidedFile) && File.Exists(guidedFile))
+            {
+                openDialog.InitialDirectory = Path.GetDirectoryName(guidedFile);
+                openDialog.FileName = Path.GetFileName(guidedFile);
+            }
             if (openDialog.ShowDialog() != true) return Result.Cancelled;
 
             ViewTemplatePackage package;
@@ -227,6 +235,7 @@ namespace BIMaestro.ViewTemplates
             }
 
             TaskDialog.Show(UiLanguage.T("Import terminé", "Import Complete"), summary.ToString());
+            BIMaestro.Tutorials.DemoViewTemplateGuide.OnImportCompleted(document, app.MainWindowHandle);
             return Result.Succeeded;
         }
 

@@ -72,6 +72,9 @@ namespace Famille
         public bool EnableABCompareChoice { get; set; } = true;
         public int ABCompareBatchSize { get; set; } = 10;
         public string ABTempFolderName { get; set; } = "__BIMaestro_TMP_AB";
+
+        // The guided family-browser exercise explains the A/B choice in the dialog itself.
+        public bool IsTutorial { get; set; }
     }
 
     public sealed class PreviewEntry
@@ -105,12 +108,14 @@ namespace Famille
     {
         private readonly List<CompareItem> _items;
         private readonly Action<string> _log;
+        private readonly bool _isTutorial;
         public bool WasCanceled { get; private set; } = false;
 
-        public CompareChoiceWindow(List<CompareItem> items, IntPtr ownerHwnd, Action<string> log)
+        public CompareChoiceWindow(List<CompareItem> items, IntPtr ownerHwnd, Action<string> log, bool isTutorial)
         {
             _items = items ?? new List<CompareItem>();
             _log = log;
+            _isTutorial = isTutorial;
 
             Title = UiLanguage.T("BIMaestro – Choix des aperçus (A / B)", "BIMaestro – Preview Selection (A / B)");
             Width = 980;
@@ -151,6 +156,13 @@ namespace Famille
             DockPanel.SetDock(header, Dock.Top);
             root.Children.Add(header);
 
+            if (_isTutorial)
+            {
+                var tutorialHint = BuildTutorialHint();
+                DockPanel.SetDock(tutorialHint, Dock.Top);
+                root.Children.Add(tutorialHint);
+            }
+
             var footer = BuildFooter();
             DockPanel.SetDock(footer, Dock.Bottom);
             root.Children.Add(footer);
@@ -172,6 +184,55 @@ namespace Famille
 
             root.Children.Add(scroll);
             return root;
+        }
+
+        private static UIElement BuildTutorialHint()
+        {
+            var card = new Border
+            {
+                Background = new SolidColorBrush(Color.FromRgb(255, 243, 180)),
+                BorderBrush = Brushes.DarkOrange,
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(8),
+                Margin = new Thickness(12, 10, 12, 0),
+                Padding = new Thickness(10)
+            };
+            var layout = new Grid();
+            layout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            card.Child = layout;
+
+            var mascot = new Image
+            {
+                Source = Couleur.RibbonPanelColorScheme.CreateCompanionImage(),
+                Width = 42,
+                Height = 42,
+                Margin = new Thickness(0, 0, 12, 0),
+                VerticalAlignment = VerticalAlignment.Top
+            };
+            Grid.SetColumn(mascot, 0);
+            layout.Children.Add(mascot);
+
+            var words = new StackPanel();
+            Grid.SetColumn(words, 1);
+            layout.Children.Add(words);
+            words.Children.Add(new TextBlock
+            {
+                Text = UiLanguage.T("Pikachu · Choisis les aperçus", "Pikachu · Choose the previews"),
+                FontSize = 14,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = Brushes.Black
+            });
+            words.Children.Add(new TextBlock
+            {
+                Text = UiLanguage.T(
+                    "Compare chaque famille : A conserve sa vue existante, B utilise une vue harmonisée. Coche A ou B sous chaque image. « Tout en A » et « Tout en B » appliquent un choix global ; tu peux ensuite corriger chaque ligne. Termine par « Valider (garder les choix) » pour enregistrer les PNG.",
+                    "Compare each family: A keeps its existing view, B uses a standardized view. Select A or B below each image. All A and All B apply one choice to every family; you can then adjust individual rows. Finish with Confirm (Keep Selections) to save the PNG files."),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 4, 0, 0),
+                Foreground = Brushes.Black
+            });
+            return card;
         }
 
         private UIElement BuildFooter()
@@ -479,6 +540,12 @@ namespace Famille
 
         private PreviewOverwriteMode? _resolvedOverwriteMode = null;
         private bool _stopRequested = false;
+        private UIApplication _activeApplication;
+        private PreviewGenerationRequest _activeRequest;
+        private string _tempRoot;
+        private List<CompareItem> _pending;
+        private int _completed;
+        private bool _processing;
 
         public void Execute(UIApplication uiapp)
         {
@@ -486,91 +553,122 @@ namespace Famille
             if (uiapp == null || req == null || req.Entries == null || req.Entries.Count == 0)
                 return;
 
+            if (_activeRequest != null)
+                return;
+
             _stopRequested = false;
             _resolvedOverwriteMode = null;
-
-            if (req.TryForceThinLinesToggle)
-                TryToggleThinLines(uiapp, req.LogCallback);
-
-            int total = req.Entries.Count;
-            int done = 0;
-
-            string tempRoot = null;
-            var pending = new List<CompareItem>();
+            _activeApplication = uiapp;
+            _activeRequest = req;
+            _completed = 0;
+            _pending = new List<CompareItem>();
+            _tempRoot = null;
 
             try
             {
+                if (req.TryForceThinLinesToggle)
+                    TryToggleThinLines(uiapp, req.LogCallback);
+
                 if (req.EnableABCompareChoice)
                 {
                     if (string.IsNullOrWhiteSpace(req.TargetRoot))
                         throw new InvalidOperationException("TargetRoot non défini.");
 
-                    tempRoot = Path.Combine(req.TargetRoot, req.ABTempFolderName ?? "__BIMaestro_TMP_AB");
-                    TryDeleteDirectory(tempRoot);
-                    Directory.CreateDirectory(tempRoot);
-                    Directory.CreateDirectory(Path.Combine(tempRoot, "A"));
-                    Directory.CreateDirectory(Path.Combine(tempRoot, "B"));
+                    _tempRoot = Path.Combine(req.TargetRoot, req.ABTempFolderName ?? "__BIMaestro_TMP_AB");
+                    TryDeleteDirectory(_tempRoot);
+                    Directory.CreateDirectory(_tempRoot);
+                    Directory.CreateDirectory(Path.Combine(_tempRoot, "A"));
+                    Directory.CreateDirectory(Path.Combine(_tempRoot, "B"));
                 }
 
-                foreach (var entry in req.Entries)
-                {
-                    if (_stopRequested || req.CancellationToken.IsCancellationRequested)
-                    {
-                        PublishProgress(req, done, total, entry?.FamilyPath, isCanceled: true);
-                        break;
-                    }
-
-                    PublishProgress(req, done, total, entry?.FamilyPath);
-
-                    if (!TryProcessEntry(uiapp, entry, req, tempRoot, out CompareItem compareItem, out string error))
-                    {
-                        if (!string.IsNullOrWhiteSpace(error))
-                            SafeLog(req.LogCallback, $"⚠️ {Path.GetFileName(entry?.FamilyPath ?? "")} : {error}");
-                    }
-                    else
-                    {
-                        if (req.EnableABCompareChoice && compareItem != null)
-                        {
-                            pending.Add(compareItem);
-
-                            int batchSize = Math.Max(1, req.ABCompareBatchSize);
-                            if (pending.Count >= batchSize)
-                            {
-                                if (!ResolvePendingChoices(uiapp, req, pending))
-                                {
-                                    _stopRequested = true;
-                                    PublishProgress(req, done, total, entry?.FamilyPath, isCanceled: true);
-                                    break;
-                                }
-                                pending.Clear();
-                            }
-                        }
-                    }
-
-                    done++;
-                    PublishProgress(req, done, total, entry?.FamilyPath);
-                }
-
-                if (!_stopRequested && !req.CancellationToken.IsCancellationRequested)
-                {
-                    if (req.EnableABCompareChoice && pending.Count > 0)
-                    {
-                        ResolvePendingChoices(uiapp, req, pending);
-                        pending.Clear();
-                    }
-                }
+                // One family per Revit idle event lets WPF render progress and accept Cancel.
+                uiapp.Idling += ProcessNextPreviewOnIdle;
             }
             catch (Exception ex)
             {
                 SafeLog(req.LogCallback, $"⚠️ Export interrompu : {ex.Message}");
+                FinishActiveRequest();
+            }
+        }
+
+        private void ProcessNextPreviewOnIdle(object sender, Autodesk.Revit.UI.Events.IdlingEventArgs e)
+        {
+            if (_processing || _activeRequest == null)
+                return;
+
+            _processing = true;
+            try
+            {
+                var req = _activeRequest;
+                int total = req.Entries.Count;
+                if (_stopRequested || req.CancellationToken.IsCancellationRequested)
+                {
+                    FinishActiveRequest();
+                    return;
+                }
+
+                if (_completed >= total)
+                {
+                    if (req.EnableABCompareChoice && _pending.Count > 0 &&
+                        !ResolvePendingChoices(_activeApplication, req, _pending))
+                        _stopRequested = true;
+                    FinishActiveRequest();
+                    return;
+                }
+
+                var entry = req.Entries[_completed];
+                PublishProgress(req, _completed, total, entry?.FamilyPath);
+                if (!TryProcessEntry(_activeApplication, entry, req, _tempRoot, out CompareItem compareItem, out string error))
+                {
+                    if (!string.IsNullOrWhiteSpace(error))
+                        SafeLog(req.LogCallback, $"⚠️ {Path.GetFileName(entry?.FamilyPath ?? "")} : {error}");
+                }
+                else if (req.EnableABCompareChoice && compareItem != null)
+                {
+                    _pending.Add(compareItem);
+                    if (_pending.Count >= Math.Max(1, req.ABCompareBatchSize))
+                    {
+                        if (!ResolvePendingChoices(_activeApplication, req, _pending))
+                            _stopRequested = true;
+                        _pending.Clear();
+                    }
+                }
+
+                _completed++;
+                PublishProgress(req, _completed, total, entry?.FamilyPath);
+                if (_stopRequested || req.CancellationToken.IsCancellationRequested)
+                    FinishActiveRequest();
+            }
+            catch (Exception ex)
+            {
+                SafeLog(_activeRequest?.LogCallback, $"⚠️ Export interrompu : {ex.Message}");
+                _stopRequested = true;
+                FinishActiveRequest();
             }
             finally
             {
-                if (!string.IsNullOrWhiteSpace(tempRoot))
-                    TryDeleteDirectory(tempRoot);
-
-                PublishProgress(req, done, total, null, isCompleted: true, isCanceled: _stopRequested || req.CancellationToken.IsCancellationRequested);
+                _processing = false;
             }
+        }
+
+        private void FinishActiveRequest()
+        {
+            var req = _activeRequest;
+            if (req == null)
+                return;
+
+            if (_activeApplication != null)
+                _activeApplication.Idling -= ProcessNextPreviewOnIdle;
+            if (!string.IsNullOrWhiteSpace(_tempRoot))
+                TryDeleteDirectory(_tempRoot);
+
+            bool canceled = _stopRequested || req.CancellationToken.IsCancellationRequested;
+            _activeRequest = null;
+            _activeApplication = null;
+            _pending = null;
+            _tempRoot = null;
+            Request = null;
+            PublishProgress(req, _completed, req.Entries.Count, null, isCompleted: true, isCanceled: canceled);
         }
 
         public string GetName() => nameof(GeneratePreviewImagesHandler);
@@ -752,7 +850,7 @@ namespace Famille
                     WaitForFileReady(it.TempB, 4000);
                 }
 
-                var wnd = new CompareChoiceWindow(pending, uiapp.MainWindowHandle, req.LogCallback);
+                var wnd = new CompareChoiceWindow(pending, uiapp.MainWindowHandle, req.LogCallback, req.IsTutorial);
                 bool? ok = null;
                 try { ok = wnd.ShowDialog(); } catch { ok = false; }
 

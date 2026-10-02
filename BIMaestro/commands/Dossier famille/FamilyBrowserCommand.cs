@@ -34,6 +34,7 @@ namespace Famille
         protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
             uiapp = data.Application;
+            bool startTutorial = Couleur.AppearanceOnboarding.ConsumeTourClick("family-browser");
 
             if (MainWindowRef != null)
             {
@@ -42,6 +43,8 @@ namespace Famille
                 if (!MainWindowRef.IsVisible)
                     MainWindowRef.Show();
                 MainWindowRef.Activate();
+                if (startTutorial)
+                    BIMaestro.Tutorials.DemoTourService.StartInWindow("family-browser", MainWindowRef);
                 return Result.Succeeded;
             }
 
@@ -59,11 +62,13 @@ namespace Famille
 
             try
             {
-                var window = new FamilyBrowserWindow();
+                var window = new FamilyBrowserWindow(startTutorial);
                 MainWindowRef = window;
                 window.Closed += (s, e) => MainWindowRef = null;
                 window.Show();
                 window.Activate();
+                if (startTutorial)
+                    BIMaestro.Tutorials.DemoTourService.StartInWindow("family-browser", window);
                 return Result.Succeeded;
             }
             catch (Exception ex)

@@ -63,6 +63,13 @@ namespace Modification
 
             // Afficher la fenêtre de renommage avec les paramètres disponibles
             ElementRenamerWindow renamerWindow = new ElementRenamerWindow(textParameters);
+            bool guidedExercise = BIMaestro.Tutorials.DemoTourService.AttachIfRequested("organizer", renamerWindow);
+            if (guidedExercise)
+            {
+                renamerWindow.Width = 850;
+                renamerWindow.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterOwner;
+                new System.Windows.Interop.WindowInteropHelper(renamerWindow).Owner = data.Application.MainWindowHandle;
+            }
             if (renamerWindow.ShowDialog() == true)
             {
                 string selectedParameter = renamerWindow.SelectedParameter;
@@ -202,6 +209,8 @@ namespace Modification
                     }
                 }
 
+                if (guidedExercise)
+                    BIMaestro.Tutorials.DemoExerciseElements.VerifyParking(data.Application, selectedIds);
                 return Result.Succeeded;
             }
 

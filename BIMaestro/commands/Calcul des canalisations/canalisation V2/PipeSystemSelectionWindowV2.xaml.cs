@@ -31,6 +31,11 @@ namespace Analyse
             DeselectAllButton.Visibility = Visibility.Collapsed;
         }
 
+        private void TutorialButton_Click(object sender, RoutedEventArgs e)
+        {
+            BIMaestro.Tutorials.DemoTourService.StartInWindow("pipe-calculation", this);
+        }
+
         private void HelpButton_Click(object sender, RoutedEventArgs e)
         {
             try

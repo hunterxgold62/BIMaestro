@@ -51,7 +51,7 @@ namespace BIMaestro.Codex
         {
             return CreateSteps(app, source, design, validateOnly, parametric, testHostPlacement, inspect, outputRoot).Last(x => x != null);
         }
-        internal static IEnumerable<CodexFamilyArtifact> CreateSteps(UIApplication app, Document source, CodexFamilyDesign design, bool validateOnly = false, CodexParametricDesign parametric = null, bool testHostPlacement = false, Action<Document> inspect = null, string outputRoot = null)
+        internal static IEnumerable<CodexFamilyArtifact> CreateSteps(UIApplication app, Document source, CodexFamilyDesign design, bool validateOnly = false, CodexParametricDesign parametric = null, bool testHostPlacement = false, Action<Document> inspect = null, string outputRoot = null, bool showDuringCreation = false)
         {
             using var guard = new CodexCreationGuard(app.Application, design.Name);
             if (!validateOnly && design.Load && (source == null || source.IsFamilyDocument || source.IsReadOnly || source.IsModifiable))
@@ -73,6 +73,36 @@ namespace BIMaestro.Codex
                 family = app.Application.NewFamilyDocument(template);
                 CodexCreationGuard.Check("création du document temporaire");
                 if (family == null) throw new InvalidOperationException("Revit n'a pas créé le document de famille.");
+                if (showDuringCreation && !validateOnly)
+                {
+                    // Revit cannot display NewFamilyDocument directly. Save an initial
+                    // checkpoint, reopen it in the UI, then build in that visible document.
+                    // A crash leaves the last saved checkpoint available to the user.
+                    stage = "ouverture de la famille en cours de création";
+                    Directory.CreateDirectory(folder);
+                    string workingPath = Path.Combine(folder, fileName + ".rfa");
+                    using (var opening = new Transaction(family, "BIMaestro — vue de construction"))
+                    {
+                        opening.Start();
+                        var viewType = new FilteredElementCollector(family).OfClass(typeof(ViewFamilyType)).Cast<ViewFamilyType>()
+                            .First(t => t.ViewFamily == ViewFamily.ThreeDimensional);
+                        var liveView = View3D.CreateIsometric(family, viewType.Id);
+                        liveView.Name = "BIMaestro - Construction en cours";
+                        liveView.DisplayStyle = DisplayStyle.Shading;
+                        liveView.DetailLevel = ViewDetailLevel.Fine;
+                        if (opening.Commit() != TransactionStatus.Committed)
+                            throw new InvalidOperationException("La vue de construction n'a pas pu être créée.");
+                    }
+                    family.SaveAs(workingPath, new SaveAsOptions { OverwriteExistingFile = false });
+                    guard.Pause();
+                    if (!family.Close(false)) throw new InvalidOperationException("Revit n'a pas fermé le document de préparation.");
+                    family = app.OpenAndActivateDocument(workingPath)?.Document
+                        ?? throw new InvalidOperationException("Revit n'a pas affiché la famille en cours de création.");
+                    var constructionView = new FilteredElementCollector(family).OfClass(typeof(View3D)).Cast<View3D>()
+                        .First(v => v.Name == "BIMaestro - Construction en cours");
+                    app.ActiveUIDocument.RequestViewChange(constructionView);
+                    guard.Resume();
+                }
                 guard.Pause(); yield return null; guard.Resume();
                 stage = "préparation des barres imbriquées";
                 var prototypes = new Dictionary<string, FamilySymbol>();
@@ -256,7 +286,10 @@ namespace BIMaestro.Codex
                 Directory.CreateDirectory(folder);
                 string path = Path.Combine(folder, fileName + ".rfa");
                 var options = new SaveAsOptions { OverwriteExistingFile = false, Compact = true, MaximumBackups = 1, PreviewViewId = preview.Id };
-                family.SaveAs(path, options);
+                if (showDuringCreation)
+                    family.Save();
+                else
+                    family.SaveAs(path, options);
                 string previewPath = null;
                 string[] previewPaths = new string[0];
                 try

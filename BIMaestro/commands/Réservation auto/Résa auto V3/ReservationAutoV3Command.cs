@@ -23,9 +23,6 @@ namespace Modification
     {
         protected override string ButtonId => "ReservationAutoV3Command";
 
-        // Evite de spammer des warnings
-        private static bool _voidCutWarnShown = false;
-
         protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
             UIApplication uiApp = data.Application;
@@ -78,9 +75,9 @@ namespace Modification
                 }
 
                 if (guided && !win.AutomatiqueEnabled)
-                    TaskDialog.Show("BIMaestro - Formation",
+                    BIMaestro.Tutorials.DemoTourMessage.Show(uiApp.MainWindowHandle, "Pikachu te guide",
                         "Dans la vue 3D, clique d'abord sur la canalisation qui traverse le mur, puis sur ce mur. " +
-                        "BIMaestro placera ta réservation à leur croisement. Appuie sur Échap pour arrêter la sélection.");
+                        "BIMaestro placera ta réservation à leur croisement. Appuie sur Échap pour arrêter la sélection.", "Je choisis les éléments");
 
                 var reservationsBefore = guided
                     ? new HashSet<string>(FindInstances(doc, reservationSymbol.Id).Select(instance => instance.UniqueId))
@@ -125,9 +122,15 @@ namespace Modification
                         }
                     }
                     catch (Exception ex) { System.Diagnostics.Trace.WriteLine("BIMaestro tutorial focus: " + ex.Message); }
-                    TaskDialog.Show("BIMaestro - Formation", createdForTutorial > 0
-                        ? "Bravo ! Tu as créé " + createdForTutorial + " réservation(s). BIMaestro les a sélectionnées et cadrées dans la vue. Regarde leur position dans le mur, puis leurs dimensions dans Propriétés."
-                        : "Aucune réservation n'a été créée. Relance le parcours et sélectionne d'abord la canalisation, puis le mur qu'elle traverse.");
+                    bool learnMore = BIMaestro.Tutorials.DemoTourMessage.Show(uiApp.MainWindowHandle,
+                        createdForTutorial > 0 ? "Pika ! Mission accomplie" : "Pikachu t'aide à réessayer",
+                        createdForTutorial > 0
+                            ? "Tu as créé " + createdForTutorial + " réservation(s) ! BIMaestro les a sélectionnées et cadrées dans la vue. Regarde leur position dans le mur, puis leurs dimensions dans Propriétés."
+                            : "Aucune réservation n'a été créée. Relance le parcours et sélectionne d'abord la canalisation, puis le mur qu'elle traverse.",
+                        createdForTutorial > 0 ? "Voir ma réservation" : "Compris",
+                        createdForTutorial > 0 ? "Approfondir les réglages" : null);
+                    if (learnMore)
+                        BIMaestro.Tutorials.DemoTourDeepDive.Show(uiApp.MainWindowHandle, "reservation");
                 }
 
                 // Dynamo
@@ -1820,26 +1823,6 @@ namespace Modification
 
             if (TryForceVoidCut(doc, host, fi))
                 return;
-
-            if (!_voidCutWarnShown)
-            {
-                _voidCutWarnShown = true;
-                TaskDialog.Show("BIMaestro", UiLanguage.T(
-                    "Info découpe (familles 'vide') :\n" +
-                    "Certaines familles ne coupent pas si l’option famille n’est pas activée.\n\n" +
-                    "Vérifie dans l’éditeur de famille :\n" +
-                    "- 'Cut with Voids When Loaded'\n" +
-                    "- le vide est bien en 'Cut Geometry'\n" +
-                    "- la catégorie/support autorise la coupe.\n\n" +
-                    "Le plugin a tenté de forcer la coupe automatiquement.",
-                    "Void-cut information:\n" +
-                    "Some families do not cut their host unless the family option is enabled.\n\n" +
-                    "Check the Family Editor settings:\n" +
-                    "- 'Cut with Voids When Loaded' is enabled\n" +
-                    "- the void uses 'Cut Geometry'\n" +
-                    "- the category and host allow cutting.\n\n" +
-                    "BIMaestro attempted to force the cut automatically."));
-            }
         }
 
         private static bool TryForceVoidCut(Document doc, Element host, FamilyInstance fi)
