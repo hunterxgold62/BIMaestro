@@ -194,7 +194,9 @@ namespace BIMaestro.UI
         {
             if (collection == null || !string.Equals(collection.Id, "builtin_favoris", StringComparison.OrdinalIgnoreCase))
                 return collection;
-            return FamilyBrowserCommand.MainWindowRef?.TryGetTutorialFavoritesForRosace() ?? collection;
+            return BIMaestro.Tutorials.DemoTourService.GetTutorialFavoritesForRosace()
+                ?? FamilyBrowserCommand.MainWindowRef?.TryGetTutorialFavoritesForRosace()
+                ?? collection;
         }
 
         private static Func<int, int, string> CreateCollectionPageLabelFactory(string collectionName)

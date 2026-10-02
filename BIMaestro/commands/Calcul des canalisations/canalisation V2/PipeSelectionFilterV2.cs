@@ -121,6 +121,7 @@ namespace Analyse
                 // Afficher la fenêtre WPF pour la sélection des options
                 PipeSystemTypeSelectionWindowV2 selectionWindow = new PipeSystemTypeSelectionWindowV2(systemTypes);
                 bool guidedExercise = BIMaestro.Tutorials.DemoTourService.AttachIfRequested("pipe-calculation", selectionWindow);
+                selectionWindow.RequireDemoOptions = guidedExercise;
                 if (guidedExercise)
                 {
                     selectionWindow.Width = 760;
@@ -572,10 +573,11 @@ namespace Analyse
                     singleSystemType = selectedSystemTypes[0];
 
                 // Export vers Excel seulement si l'option est cochée
+                string excelFilePath = null;
                 if (exportToExcel)
                 {
                     // La méthode retourne le chemin complet du fichier généré
-                    string excelFilePath = ExportToExcel(
+                    excelFilePath = ExportToExcel(
                         doc.Title,
                         pipeLengths,
                         pipeFittingLengths,
@@ -594,8 +596,8 @@ namespace Analyse
                     // À la fin, proposer d'ouvrir le fichier
                     if (MessageBox.Show(
                             UiLanguage.T(
-                                "Les résultats ont été exportés vers Excel avec succès.\nVoulez-vous ouvrir le fichier ?",
-                                "The results were exported to Excel successfully.\nDo you want to open the file?"),
+                                $"Les résultats ont été exportés vers Excel.\n\nFichier : {excelFilePath}\n\nVoulez-vous l'ouvrir ?",
+                                $"The results were exported to Excel.\n\nFile: {excelFilePath}\n\nWould you like to open it?"),
                             UiLanguage.T("Succès", "Success"), MessageBoxButton.YesNo, MessageBoxImage.Information) == MessageBoxResult.Yes)
                     {
                         Process.Start(new ProcessStartInfo(excelFilePath) { UseShellExecute = true });
@@ -610,7 +612,8 @@ namespace Analyse
                        networkElementIds);
                 if (guidedExercise)
                     BIMaestro.Tutorials.DemoCalculationExercise.Verify(commandData.Application,
-                        selectedIds, includeDucts, pipeLengths, ductLengths, ductFittingLengths, elbowCounts);
+                        selectedIds, includeDucts, exportToExcel, excelFilePath,
+                        pipeLengths, ductLengths, ductFittingLengths, elbowCounts);
                 return Result.Succeeded;
             }
             catch (Exception ex)

@@ -3520,6 +3520,30 @@ namespace Famille
             }
         }
 
+        internal FrameworkElement FindTutorialFavoriteStar()
+        {
+            if (!_tutorialCatalogActive || GroupedFamilyListView == null) return null;
+            GroupedFamilyListView.UpdateLayout();
+            return FindTutorialFavoriteStar(GroupedFamilyListView);
+        }
+
+        private static FrameworkElement FindTutorialFavoriteStar(DependencyObject root)
+        {
+            if (root is Button button &&
+                string.Equals(button.Tag as string, "TutorialFavoriteStar", StringComparison.Ordinal) &&
+                button.DataContext is FamilyItem family &&
+                family.Name?.IndexOf("chaise", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                button.IsVisible)
+                return button;
+
+            for (int index = 0; index < VisualTreeHelper.GetChildrenCount(root); index++)
+            {
+                FrameworkElement found = FindTutorialFavoriteStar(VisualTreeHelper.GetChild(root, index));
+                if (found != null) return found;
+            }
+            return null;
+        }
+
         private static string FindTutorialCatalogue()
         {
             string directory = Path.GetDirectoryName(typeof(FamilyBrowserWindow).Assembly.Location);
@@ -3884,6 +3908,8 @@ namespace Famille
             }
 
             NavigateToFolder(rootFolderPath);
+            if (_tutorialCatalogActive)
+                BIMaestro.Tutorials.DemoTourService.ReportAction(this, "families-root-open");
         }
 
         private void CollectionActionsButton_Click(object sender, RoutedEventArgs e)
@@ -4562,12 +4588,14 @@ namespace Famille
             selectedFamilies = null;
             selectedImages = null;
 
+            var dialogOwner = new PreviewFolderDialogOwner(new System.Windows.Interop.WindowInteropHelper(this).Handle);
+
             var famDialog = new WinForms.FolderBrowserDialog
             {
                 Description = UiLanguage.T("Choisis le dossier avec les familles .rfa à exporter.", "Select the folder containing the .rfa families to export."),
                 SelectedPath = Directory.Exists(previewSourceFolder) ? previewSourceFolder : familiesFolder
             };
-            if (famDialog.ShowDialog() != WinForms.DialogResult.OK)
+            if (famDialog.ShowDialog(dialogOwner) != WinForms.DialogResult.OK)
                 return false;
 
             selectedFamilies = famDialog.SelectedPath;
@@ -4578,11 +4606,17 @@ namespace Famille
                 SelectedPath = Directory.Exists(previewTargetFolder) ? previewTargetFolder : selectedFamilies
             };
 
-            if (imgDialog.ShowDialog() != WinForms.DialogResult.OK)
+            if (imgDialog.ShowDialog(dialogOwner) != WinForms.DialogResult.OK)
                 return false;
 
             selectedImages = imgDialog.SelectedPath;
             return true;
+        }
+
+        private sealed class PreviewFolderDialogOwner : WinForms.IWin32Window
+        {
+            public PreviewFolderDialogOwner(IntPtr handle) => Handle = handle;
+            public IntPtr Handle { get; }
         }
 
         private void SetPreviewFolders(string families, string images)

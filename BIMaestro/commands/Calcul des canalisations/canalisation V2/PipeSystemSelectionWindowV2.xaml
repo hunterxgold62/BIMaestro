@@ -51,7 +51,8 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <TextBlock Grid.Column="0"
+                    <TextBlock x:Name="CalculationOptionsTitle"
+                               Grid.Column="0"
                                Text="Options de calcul"
                                Style="{StaticResource H2}"
                                VerticalAlignment="Center"

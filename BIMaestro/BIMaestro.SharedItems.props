@@ -205,6 +205,8 @@
     <Reference Include="Microsoft.VisualBasic" />
     <Reference Include="PresentationCore" />
     <Reference Include="PresentationFramework" />
+    <Reference Include="UIAutomationClient" />
+    <Reference Include="UIAutomationTypes" />
     <Reference Include="RevitAPI">
       <HintPath>$(RevitInstallDir)\RevitAPI.dll</HintPath>
       <Private>False</Private>
@@ -379,7 +381,9 @@
     <Compile Include="commands\vue en survol\ViewDeckService.cs" />
     <Compile Include="commands\vue en survol\TabCompanionService.cs" />
     <Compile Include="commands\Tutoriels\DemoProjectCommand.cs" />
+    <Compile Include="commands\Tutoriels\DemoOrganizerExercise.cs" />
     <Compile Include="commands\Tutoriels\DemoTourService.cs" />
+    <Compile Include="commands\Tutoriels\FamilyRibbonTutorialGuide.cs" />
     <Compile Include="commands\vue en survol\ViewDeckPreviewCache.cs" />
     <Compile Include="commands\vue en survol\ViewDeckPreviewMemory.cs" />
     <Compile Include="commands\vue en survol\ViewThumbnailBatchWindow.xaml.cs">

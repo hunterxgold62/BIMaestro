@@ -52,7 +52,7 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0">
-                    <TextBlock Text="Organisateur d'éléments" Style="{StaticResource H1}"/>
+                    <TextBlock x:Name="OrganizerHeaderTitle" Text="Organisateur d'éléments" Style="{StaticResource H1}"/>
                     <TextBlock Text="{Binding WindowSubtitle}"
                                Margin="0,6,0,0"
                                Foreground="#E7F6EE"

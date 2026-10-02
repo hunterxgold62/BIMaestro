@@ -16,6 +16,7 @@ namespace Analyse
         public bool FilterBySystemType { get; private set; }
         public List<string> SelectedSystemTypes { get; private set; }
         public bool ExportToExcel { get; private set; }
+        public bool RequireDemoOptions { get; set; }
 
         public PipeSystemTypeSelectionWindowV2(List<string> systemTypes)
         {
@@ -80,6 +81,16 @@ namespace Analyse
 
         private void OkButton_Click(object sender, RoutedEventArgs e)
         {
+            if (RequireDemoOptions &&
+                (IncludeDuctsCheckBox.IsChecked != true ||
+                 ExportToExcelCheckBox.IsChecked != true ||
+                 EnableSystemTypeFilterCheckBox.IsChecked == true))
+            {
+                MessageBox.Show(this,
+                    "Pika ! Pour cet exercice, coche « Inclure les gaines » et « Exporter les résultats vers Excel », puis laisse le filtre par système désactivé.",
+                    "BIMaestro · Pikachu", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
             if (FilterBySystemType)
             {
                 // Récupérer les Types de système sélectionnés

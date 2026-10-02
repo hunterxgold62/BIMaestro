@@ -340,6 +340,7 @@
 
                             <!-- ★ : Favoris -->
                             <Button Grid.Column="0" Content="★"
+                                Tag="TutorialFavoriteStar"
                                 Click="FavoriteButton_Click"
                                 ToolTip="Ajouter/retirer des Favoris"
                                 Background="Transparent"
@@ -577,6 +578,7 @@
                                         FocusVisualStyle="{x:Null}"
                                         Visibility="{Binding FamilyControlVisibility}"/>
                                     <Button Content="★"
+                                        Tag="TutorialFavoriteStar"
                                         Click="FavoriteButton_Click"
                                         ToolTip="Ajouter/retirer des Favoris"
                                         Background="Transparent"

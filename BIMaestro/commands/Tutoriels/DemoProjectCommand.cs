@@ -53,7 +53,7 @@ namespace BIMaestro.Tutorials
             if (template == null) throw new FileNotFoundException("Aucun gabarit de projet Revit n'a été trouvé pour " + version);
 
             string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                "BIMaestro", "Demo");
+                "RevitLogs");
             Directory.CreateDirectory(folder);
             string path = Path.Combine(folder, "BIMaestro_Apprentissage_" + version + ".rvt");
             if (File.Exists(path)) path = Path.Combine(folder,
@@ -132,8 +132,9 @@ namespace BIMaestro.Tutorials
                     });
                     CreateTrainingView(doc, viewType, "BIMaestro - 04 Calcul des canalisations",
                         new XYZ(M(-7), M(10), M(-0.5)), new XYZ(M(7), M(21), M(4)));
-                    CreateTrainingView(doc, viewType, "BIMaestro - 05 Organisateur",
-                        new XYZ(M(-8), M(21), M(-0.5)), new XYZ(M(8), M(29), M(4)));
+                    View3D organizerView = CreateTrainingView(doc, viewType, "BIMaestro - 05 Organisateur",
+                        OrganizerSectionMin(), OrganizerSectionMax());
+                    SetOrganizerInitialOrientation(organizerView);
                     CreateTrainingView(doc, viewType, "BIMaestro - 06 Gabarit source",
                         new XYZ(M(-8), M(10), M(-0.5)), new XYZ(M(8), M(29), M(4)));
                     CreateTrainingView(doc, viewType, "BIMaestro - 07 Gabarit cible",
@@ -288,30 +289,156 @@ namespace BIMaestro.Tutorials
                 new RoutingPreferenceRule(symbol.Id, "Coude maquette BIMaestro"));
         }
 
-        private static void AddOrganizerScene(Document doc, Level level)
+        private static XYZ OrganizerSectionMin() => new XYZ(M(-8), M(21), M(-0.5));
+
+        private static XYZ OrganizerSectionMax() => new XYZ(M(8), M(31), M(5.5));
+
+        private static void SetOrganizerInitialOrientation(View3D view)
         {
-            string parkingPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                "Revit", "A-Famille Revit", "Voiture-camion", "CML_Parking.rfa");
-            if (!File.Exists(parkingPath))
-                throw new FileNotFoundException("Famille CML_Parking nécessaire à Organisateur introuvable : " + parkingPath);
-            if (!doc.LoadFamily(parkingPath, out Family family) || family == null)
-                throw new InvalidOperationException("La famille CML_Parking n'a pas pu être chargée.");
+            XYZ center = new XYZ(0, M(25), M(1.5));
+            XYZ eye = center + new XYZ(M(12), M(-12), M(12));
+            XYZ forward = (center - eye).Normalize();
+            XYZ right = forward.CrossProduct(XYZ.BasisZ).Normalize();
+            XYZ up = right.CrossProduct(forward).Normalize();
+            view.SetOrientation(new ViewOrientation3D(eye, up, forward));
+        }
+
+        private static FamilySymbol OrganizerParkingSymbol(Document doc)
+        {
+            Family family = new FilteredElementCollector(doc).OfClass(typeof(Family)).Cast<Family>()
+                .FirstOrDefault(candidate => candidate.Name == "CML_Parking");
+            if (family == null)
+            {
+                string parkingPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                    "Revit", "A-Famille Revit", "Voiture-camion", "CML_Parking.rfa");
+                if (!File.Exists(parkingPath))
+                    throw new FileNotFoundException("Famille CML_Parking nécessaire à Organisateur introuvable : " + parkingPath);
+                if (!doc.LoadFamily(parkingPath, out family) || family == null)
+                    throw new InvalidOperationException("La famille CML_Parking n'a pas pu être chargée.");
+            }
             FamilySymbol symbol = family.GetFamilySymbolIds().Select(id => doc.GetElement(id) as FamilySymbol)
                 .FirstOrDefault(candidate => candidate != null);
             if (symbol == null) throw new InvalidOperationException("CML_Parking ne contient aucun type.");
             if (!symbol.IsActive) symbol.Activate();
             doc.Regenerate();
-            for (int index = 0; index < 4; index++)
+            return symbol;
+        }
+
+        private static Level OrganizerUpperLevel(Document doc, Level baseLevel)
+        {
+            Level upperLevel = new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>()
+                .FirstOrDefault(candidate => candidate.Name == "BIMaestro - Niveau 1");
+            if (upperLevel != null) return upperLevel;
+            upperLevel = Level.Create(doc, baseLevel.Elevation + M(3));
+            upperLevel.Name = "BIMaestro - Niveau 1";
+            return upperLevel;
+        }
+
+        private static void AddOrganizerScene(Document doc, Level baseLevel)
+        {
+            FamilySymbol symbol = OrganizerParkingSymbol(doc);
+            Level upperLevel = OrganizerUpperLevel(doc, baseLevel);
+            var existingMarks = new HashSet<string>(new FilteredElementCollector(doc)
+                .OfClass(typeof(FamilyInstance)).Cast<FamilyInstance>()
+                .Select(instance => instance.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString())
+                .Where(mark => !string.IsNullOrEmpty(mark)), StringComparer.Ordinal);
+            for (int index = 0; index < 8; index++)
             {
-                XYZ position = new XYZ(M(-4.5 + index * 3.0), M(24), 0);
+                int number = index + 1;
+                string mark = DemoPrefix + "ORGANISATEUR_" + number;
+                if (existingMarks.Contains(mark)) continue;
+                bool upperRow = index >= 4;
+                Level level = upperRow ? upperLevel : baseLevel;
+                XYZ position = new XYZ(M(-4.5 + (index % 4) * 3.0),
+                    M(upperRow ? 26.5 : 24), level.Elevation);
                 FamilyInstance parking = doc.Create.NewFamilyInstance(position, symbol, level,
                     StructuralType.NonStructural);
-                Parameter number = parking.LookupParameter("CML_Numéros de place");
-                if (number == null || number.IsReadOnly || number.StorageType != StorageType.String)
+                Parameter numberParameter = parking.LookupParameter("CML_Numéros de place");
+                if (numberParameter == null || numberParameter.IsReadOnly || numberParameter.StorageType != StorageType.String)
                     throw new InvalidOperationException("CML_Parking doit exposer « CML_Numéros de place » comme paramètre texte d'instance modifiable pour l'exercice Organisateur.");
-                number.Set("DEMO-" + (index + 1).ToString("00"));
-                parking.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.Set(
-                    DemoPrefix + "ORGANISATEUR_" + (index + 1));
+                string initialNumber = "DEMO-" + number.ToString("00");
+                numberParameter.Set(initialNumber);
+                parking.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.Set(initialNumber);
+                parking.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.Set(mark);
+            }
+        }
+
+        // Extend an older learning model in place; keep existing parking values and identifiers.
+        internal static void EnsureOrganizerScene(Document doc)
+        {
+            if (doc == null || !Path.GetFileName(doc.PathName)
+                    .StartsWith("BIMaestro_Apprentissage_", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Ouvre d'abord une maquette de formation BIMaestro.");
+            Level baseLevel = new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>()
+                .OrderBy(level => Math.Abs(level.Elevation)).FirstOrDefault();
+            if (baseLevel == null) throw new InvalidOperationException("Aucun niveau de base trouvé dans la maquette.");
+            View3D view = new FilteredElementCollector(doc).OfClass(typeof(View3D)).Cast<View3D>()
+                .FirstOrDefault(candidate => candidate.Name == "BIMaestro - 05 Organisateur");
+            var organizerPlaces = new FilteredElementCollector(doc)
+                .OfClass(typeof(FamilyInstance)).Cast<FamilyInstance>()
+                .Where(instance => (instance.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ?? "")
+                    .StartsWith(DemoPrefix + "ORGANISATEUR_", StringComparison.Ordinal))
+                .ToList();
+            var marks = new HashSet<string>(organizerPlaces
+                .Select(instance => instance.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString()),
+                StringComparer.Ordinal);
+            bool missingParking = Enumerable.Range(1, 8)
+                .Any(number => !marks.Contains(DemoPrefix + "ORGANISATEUR_" + number));
+            bool viewNeedsExpansion = view == null ||
+                view.GetSectionBox().Max.Z < M(5.5) - M(0.1) ||
+                view.GetSectionBox().Max.Y < M(31) - M(0.1);
+            bool commentsNeedSync = organizerPlaces.Any(place =>
+                (place.LookupParameter("CML_Numéros de place")?.AsString() ?? "") !=
+                (place.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.AsString() ?? ""));
+            if (!missingParking && !viewNeedsExpansion && !commentsNeedSync) return;
+            using (var tx = new Transaction(doc, "BIMaestro - Étendre la scène Organisateur"))
+            {
+                tx.Start();
+                if (missingParking) AddOrganizerScene(doc, baseLevel);
+                if (view == null)
+                {
+                    ViewFamilyType type = new FilteredElementCollector(doc).OfClass(typeof(ViewFamilyType))
+                        .Cast<ViewFamilyType>().FirstOrDefault(candidate => candidate.ViewFamily == ViewFamily.ThreeDimensional);
+                    if (type == null) throw new InvalidOperationException("Le gabarit ne contient pas de type de vue 3D.");
+                    view = CreateTrainingView(doc, type, "BIMaestro - 05 Organisateur",
+                        OrganizerSectionMin(), OrganizerSectionMax());
+                }
+                else if (viewNeedsExpansion)
+                {
+                    view.SetSectionBox(new BoundingBoxXYZ { Min = OrganizerSectionMin(), Max = OrganizerSectionMax() });
+                    view.IsSectionBoxActive = true;
+                    ConfigureTrainingView(view);
+                }
+                if (missingParking || viewNeedsExpansion) SetOrganizerInitialOrientation(view);
+                if (commentsNeedSync)
+                    foreach (FamilyInstance place in organizerPlaces)
+                    {
+                        Parameter cml = place.LookupParameter("CML_Numéros de place");
+                        Parameter comments = place.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS);
+                        if (cml == null || comments == null || comments.IsReadOnly ||
+                            comments.StorageType != StorageType.String) continue;
+                        comments.Set(cml.AsString() ?? "");
+                    }
+                tx.Commit();
+            }
+        }
+
+        internal static void ResetOrganizerViewOrientation(Document doc)
+        {
+            View3D view = new FilteredElementCollector(doc).OfClass(typeof(View3D)).Cast<View3D>()
+                .FirstOrDefault(candidate => candidate.Name == "BIMaestro - 05 Organisateur");
+            if (view == null)
+                throw new InvalidOperationException("La vue 05 Organisateur manque dans la maquette de formation.");
+            if (doc.IsModifiable)
+            {
+                SetOrganizerInitialOrientation(view);
+                return;
+            }
+            using (var tx = new Transaction(doc, "BIMaestro - Réorienter la vue Organisateur"))
+            {
+                tx.Start();
+                SetOrganizerInitialOrientation(view);
+                tx.Commit();
             }
         }
 
@@ -348,15 +475,17 @@ namespace BIMaestro.Tutorials
         private static bool HasExcelExerciseColumns(ViewSchedule schedule)
         {
             var fields = schedule.Definition.GetFieldOrder().Select(schedule.Definition.GetField).ToList();
-            bool hasReference = fields.Any(field => !field.IsHidden && field.HasSchedulableField &&
-                field.ParameterId.GetIdLongValue() == (long)BuiltInParameter.ALL_MODEL_MARK);
-            bool hasFamilyNumber = fields.Any(field => !field.IsHidden && field.GetName() == "CML_Numéros de place");
-            bool hasComments = fields.Any(field => !field.IsHidden && field.HasSchedulableField &&
-                field.ParameterId.GetIdLongValue() == (long)BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS);
-            bool commentsAvailable = schedule.Definition.GetSchedulableFields().Any(field =>
-                field.ParameterId.GetIdLongValue() == (long)BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS);
-            return hasReference && (!commentsAvailable || hasComments) &&
-                (hasFamilyNumber || fields.Count(field => !field.IsHidden) == 2);
+            var visible = fields.Where(field => !field.IsHidden).ToList();
+            bool familyNumberAvailable = schedule.Definition.GetSchedulableFields().Any(field =>
+                field.GetName(schedule.Document) == "CML_Numéros de place");
+            return visible.Count == 2 &&
+                visible.Any(field => field.HasSchedulableField &&
+                    field.ParameterId.GetIdLongValue() == (long)BuiltInParameter.ALL_MODEL_MARK) &&
+                (familyNumberAvailable
+                    ? visible.Any(field => field.GetName() == "CML_Numéros de place")
+                    : visible.Any(field => field.HasSchedulableField &&
+                        field.ParameterId.GetIdLongValue() ==
+                        (long)BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS));
         }
 
         private static ViewSchedule CreateExcelScene(Document doc, Level level)
@@ -383,7 +512,7 @@ namespace BIMaestro.Tutorials
                     throw new InvalidOperationException("CML_Numéros de place doit être un paramètre texte d'instance modifiable.");
                 number.Set("XL-" + index.ToString("D3"));
                 parking.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?
-                    .Set(index <= 2 ? "Secteur A" : "Secteur B");
+                    .Set("XL-" + index.ToString("D3"));
                 parking.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.Set(mark);
             }
 
@@ -417,20 +546,13 @@ namespace BIMaestro.Tutorials
             ScheduleField markColumn = existingFields.FirstOrDefault(field => field.HasSchedulableField &&
                 field.ParameterId.GetIdLongValue() == (long)BuiltInParameter.ALL_MODEL_MARK)
                 ?? definition.AddField(markField);
-            // Le repère reste visible : il identifie la place et sert de référence fixe
-            // pendant l'aller-retour Excel. Le parcours empêche son import si modifié.
+            // Deux colonnes utiles : le numéro affiché dans le modèle et le repère fixe.
+            // Une ancienne nomenclature à trois colonnes est migrée sans toucher aux valeurs.
+            foreach (ScheduleField field in definition.GetFieldOrder().Select(definition.GetField))
+                field.IsHidden = !field.FieldId.Equals(numberColumn.FieldId) &&
+                    !field.FieldId.Equals(markColumn.FieldId);
+            numberColumn.IsHidden = false;
             markColumn.IsHidden = false;
-            if (familyNumberField != null && commentsField != null && !existingFields.Any(field =>
-                field.HasSchedulableField && field.ParameterId.GetIdLongValue() ==
-                (long)BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS))
-                definition.AddField(commentsField);
-            if (familyNumberField == null)
-                foreach (FamilyInstance place in FindExcelParking(doc))
-                {
-                    string mark = place.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ?? "";
-                    string suffix = mark.Substring((DemoPrefix + "EXCEL_").Length);
-                    place.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.Set("XL-" + int.Parse(suffix).ToString("D3"));
-                }
             if (definition.GetFilterCount() == 0)
                 definition.AddFilter(new ScheduleFilter(markColumn.FieldId,
                     ScheduleFilterType.BeginsWith, DemoPrefix + "EXCEL_"));
@@ -444,8 +566,12 @@ namespace BIMaestro.Tutorials
         {
             var visible = schedule.Definition.GetFieldOrder().Select(schedule.Definition.GetField)
                 .Where(field => !field.IsHidden).ToList();
-            return (visible.FirstOrDefault(field => field.GetName() == "CML_Numéros de place") ??
-                visible.First()).GetName();
+            ScheduleField number = visible.FirstOrDefault(field => field.GetName() == "CML_Numéros de place") ??
+                visible.FirstOrDefault(field => field.HasSchedulableField &&
+                    field.ParameterId.GetIdLongValue() == (long)BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS);
+            if (number == null)
+                throw new InvalidOperationException("Le numéro de place est absent de la nomenclature Excel.");
+            return number.GetName();
         }
 
         internal static string ExcelReferenceField(ViewSchedule schedule) => schedule.Definition
@@ -454,17 +580,36 @@ namespace BIMaestro.Tutorials
                 field.ParameterId.GetIdLongValue() == (long)BuiltInParameter.ALL_MODEL_MARK)
             .GetName();
 
-        internal static string ExcelCommentsField(ViewSchedule schedule) =>
-            ExcelValueField(schedule) == "CML_Numéros de place"
-                ? schedule.Definition.GetFieldOrder().Select(schedule.Definition.GetField)
-                    .FirstOrDefault(field => !field.IsHidden && field.HasSchedulableField &&
-                        field.ParameterId.GetIdLongValue() == (long)BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)
-                    ?.GetName()
-                : null;
-
         internal static Parameter ExcelValueParameter(FamilyInstance place, string fieldName) =>
             fieldName == "CML_Numéros de place" ? place.LookupParameter(fieldName) :
             place.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS);
+
+        // La famille CML_Parking affiche son texte 3D à partir de Commentaires. Le
+        // numéro peut toutefois être exporté via son paramètre CML s'il est schedulable.
+        // Cette synchronisation ne touche jamais au Repère, utilisé comme clé fixe.
+        internal static void SynchronizeExcelParkingNumbers(IEnumerable<FamilyInstance> places,
+            string valueField, bool recoverLegacyValue = false)
+        {
+            bool cmlIsSource = valueField == "CML_Numéros de place";
+            foreach (FamilyInstance place in places)
+            {
+                Parameter cml = place.LookupParameter("CML_Numéros de place");
+                Parameter comments = place.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS);
+                if (cml == null || comments == null || cml.IsReadOnly || comments.IsReadOnly ||
+                    cml.StorageType != StorageType.String || comments.StorageType != StorageType.String)
+                    throw new InvalidOperationException("Les paramètres du numéro de place ne sont pas modifiables.");
+                string source = (cmlIsSource ? cml : comments).AsString() ?? "";
+                string other = (cmlIsSource ? comments : cml).AsString() ?? "";
+                // Les anciennes scènes utilisaient Commentaires pour « Secteur A/B ».
+                // Dans le mode de repli, récupérer le vrai numéro CML avant de masquer
+                // l'ancienne colonne de secteur.
+                if (recoverLegacyValue && (string.IsNullOrWhiteSpace(source) || (!cmlIsSource &&
+                    source.StartsWith("Secteur ", StringComparison.OrdinalIgnoreCase))))
+                    source = other;
+                if (cml.AsString() != source) cml.Set(source);
+                if (comments.AsString() != source) comments.Set(source);
+            }
+        }
 
         internal static XYZ HistoryFurniturePosition(int index) =>
             new XYZ(M(-2.9 + index * 1.5), M(6), 0);

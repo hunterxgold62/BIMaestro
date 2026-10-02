@@ -66,6 +66,7 @@ namespace Modification
             bool guidedExercise = BIMaestro.Tutorials.DemoTourService.AttachIfRequested("organizer", renamerWindow);
             if (guidedExercise)
             {
+                BIMaestro.Tutorials.DemoOrganizerExercise.ConfigureWindow(renamerWindow);
                 renamerWindow.Width = 850;
                 renamerWindow.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterOwner;
                 new System.Windows.Interop.WindowInteropHelper(renamerWindow).Owner = data.Application.MainWindowHandle;
@@ -210,7 +211,8 @@ namespace Modification
                 }
 
                 if (guidedExercise)
-                    BIMaestro.Tutorials.DemoExerciseElements.VerifyParking(data.Application, selectedIds);
+                    BIMaestro.Tutorials.DemoOrganizerExercise.Verify(data.Application, selectedIds,
+                        renamerWindow.IsSortByLevelEnabled, selectedParameter);
                 return Result.Succeeded;
             }
 

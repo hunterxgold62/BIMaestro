@@ -124,17 +124,10 @@ namespace Famille
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             Background = new SolidColorBrush(Color.FromRgb(245, 245, 245));
 
-            Loaded += (_, __) =>
-            {
-                try
-                {
-                    var helper = new WindowInteropHelper(this);
-                    helper.Owner = ownerHwnd;
-                }
-                catch { }
-            };
-
             Content = BuildUi();
+            // Assign ownership before ShowDialog creates the native window.
+            if (ownerHwnd != IntPtr.Zero)
+                new WindowInteropHelper(this).Owner = ownerHwnd;
         }
 
         private UIElement BuildUi()
@@ -850,7 +843,11 @@ namespace Famille
                     WaitForFileReady(it.TempB, 4000);
                 }
 
-                var wnd = new CompareChoiceWindow(pending, uiapp.MainWindowHandle, req.LogCallback, req.IsTutorial);
+                var browser = FamilyBrowserCommand.MainWindowRef;
+                var ownerHwnd = browser?.IsVisible == true
+                    ? new WindowInteropHelper(browser).Handle
+                    : uiapp.MainWindowHandle;
+                var wnd = new CompareChoiceWindow(pending, ownerHwnd, req.LogCallback, req.IsTutorial);
                 bool? ok = null;
                 try { ok = wnd.ShowDialog(); } catch { ok = false; }
 

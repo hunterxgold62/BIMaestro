@@ -66,24 +66,25 @@ namespace BIMaestro.Tutorials
             },
             ["pipe-calculation"] = new[]
             {
-                new DemoStep("Le périmètre", "Dans la vue 04, Pikachu a sélectionné les canalisations DN100 et DN50, leurs vrais coudes, ainsi qu'une gaine avec ses coudes. Le calcul ne compte que les éléments sélectionnés.", "IncludeDuctsCheckBox", true),
-                new DemoStep("Inclure les gaines", "Coche « Inclure les gaines » pour voir aussi la longueur de la gaine rectangulaire. Si tu décoches lors d'un second calcul, les canalisations resteront dans le résultat et les gaines disparaîtront.", "IncludeDuctsCheckBox"),
+                new DemoStep("Le périmètre", "Dans la vue 04, Pikachu a sélectionné les canalisations DN100 et DN50, leurs vrais coudes, ainsi qu'une gaine avec ses coudes. Le calcul ne compte que les éléments sélectionnés. Passe à l'étape suivante avant de modifier les options.", "CalculationOptionsTitle", true),
+                new DemoStep("Inclure les gaines", "Coche « Inclure les gaines » pour compter aussi la gaine rectangulaire et ses coudes. Si la case est déjà cochée, laisse-la ainsi et clique sur Suivant.", "IncludeDuctsCheckBox"),
                 new DemoStep("Filtrer par système", "Le filtre limite le résultat à certains types de systèmes. Laisse-le désactivé pour voir les deux diamètres de canalisations et la gaine ensemble.", "EnableSystemTypeFilterCheckBox", true),
-                new DemoStep("Exporter ou lire à l'écran", "Décoche l'export Excel pour consulter d'abord le résultat dans BIMaestro. Tu pourras relancer le calcul plus tard et exporter le tableau.", "ExportToExcelCheckBox"),
-                new DemoStep("Lancer le calcul", "Clique sur OK, puis compare les canalisations, les coudes et la gaine dans le récapitulatif. Pikachu vérifiera les valeurs et te guidera vers le second calcul sans gaines.", "OkButton")
+                new DemoStep("Voir aussi le fichier Excel", "Garde « Exporter les résultats vers Excel » coché. Après le récapitulatif dans Revit, BIMaestro créera le fichier et te proposera de l'ouvrir. Si la case est déjà cochée, clique sur Suivant.", "ExportToExcelCheckBox"),
+                new DemoStep("Lancer le calcul", "Clique sur OK. Lis le récapitulatif dans Revit, puis accepte l'ouverture du fichier Excel pour examiner les mêmes résultats. Pikachu vérifiera ce calcul unique.", "OkButton")
             },
             ["organizer"] = new[]
             {
-                new DemoStep("Les places à traiter", "Quatre places de la famille CML_Parking sont sélectionnées dans la vue 05. Organisateur modifiera uniquement ces places.", "ParameterComboBox", true),
+                new DemoStep("Deux niveaux à traiter", "Huit places CML_Parking sont sélectionnées : quatre sur le niveau de base et quatre sur « BIMaestro - Niveau 1 ». Organisateur modifiera uniquement ces places.", "OrganizerHeaderTitle", true),
                 new DemoStep("Le bon paramètre", "Choisis « CML_Numéros de place » dans la liste : ce paramètre texte d'instance porte le numéro visible de chaque place.", "ParameterComboBox"),
                 new DemoStep("Préfixe", "Saisis « PK- » : il sera ajouté avant chaque numéro.", "PrefixTextBox"),
                 new DemoStep("Format", "Choisis « 001,002,003... » pour numéroter les places sur trois chiffres.", "NumberFormatComboBox"),
-                new DemoStep("Sens de lecture", "La hauteur de bande regroupe les éléments par ligne de la vue. Les quatre parkings sont alignés ; garde 1 m pour cet essai.", "BandHeightTextBox", true),
-                new DemoStep("Appliquer", "Clique sur Renommer. Pikachu relira les quatre valeurs enregistrées dans « CML_Numéros de place » et cadrera les places dans la vue.", "DemoRenameButton")
+                new DemoStep("Hauteur de bande", "La hauteur de bande regroupe les éléments par lignes dans la vue. Garde 1 m pour distinguer les places de chaque rangée.", "BandHeightTextBox", true),
+                new DemoStep("D'abord par niveau", "Coche « Trier par niveau ». Le niveau de base recevra les quatre premiers numéros, puis le niveau supérieur les quatre suivants.", "SortByLevelCheckBox"),
+                new DemoStep("Premier passage", "Clique sur Renommer. Pikachu vérifiera les huit numéros visibles, puis tournera automatiquement cette vue 3D de 90° pour un second essai rapide.", "DemoRenameButton")
             },
             ["family-browser"] = new[]
             {
-                new DemoStep("Ton catalogue d'essai", "Pikachu a ouvert 35 familles de mobilier réparties en dossiers. C'est un catalogue temporaire : il ne remplace pas les chemins que tu as enregistrés pour ta bibliothèque.", "AllFamiliesButton", true),
+                new DemoStep("Ton catalogue d'essai", "Clique sur « Familles » dans la colonne de gauche. Pikachu a ouvert 35 familles de mobilier réparties en dossiers. Ce catalogue temporaire ne remplace pas les chemins que tu as enregistrés pour ta bibliothèque.", "AllFamiliesButton", completionEvent: "families-root-open"),
                 new DemoStep("Entrer dans Mobilier", "Dans l'arborescence, ouvre « Mobilier ». Le guide attend que ce dossier soit réellement affiché.", "FolderTreeView", completionEvent: "folder-mobilier"),
                 new DemoStep("Ouvrir Bureau", "Ouvre le dossier « Bureau ». Il contient cinq familles et un sous-dossier ; observe aussi les cartes de dossiers à droite.", "FolderTreeView", completionEvent: "folder-bureau"),
                 new DemoStep("Explorer le sous-dossier", "Ouvre « Salle de réunion » dans Bureau. Ses cinq familles montrent comment conserver ton classement actuel, même à plusieurs niveaux.", "FolderTreeView", completionEvent: "folder-reunion"),
@@ -91,7 +92,7 @@ namespace BIMaestro.Tutorials
                 new DemoStep("Chercher dans le dossier", "Saisis « Table » dans la recherche. Le mode « Dossier » limite les résultats au dossier ouvert.", "SearchBox", completionEvent: "search-table"),
                 new DemoStep("Étendre la recherche", "Clique sur « Tout ». BIMaestro efface la recherche « Table » et passe à l'ensemble du catalogue, y compris les autres sous-dossiers.", "SearchAllButton", completionEvent: "search-all"),
                 new DemoStep("Retrouver une famille", "Saisis « Chaise ». Les résultats doivent maintenant inclure des familles rangées hors de Salle de réunion.", "SearchBox", completionEvent: "search-chaise"),
-                new DemoStep("Mettre une famille en favori", "Clique sur l'étoile d'une carte « Chaise » dans les résultats. L'étoile orange signifie que la famille est dans Favoris ; un second clic l'en retire. Si une chaise est déjà étoilée, Pikachu la reconnaît sans modifier tes favoris personnels. Sinon, ton favori d'essai reste seulement en mémoire.", "GroupedFamilyListView", completionEvent: "favorite-added"),
+                new DemoStep("Mettre une famille en favori", "Clique sur l'étoile entourée en orange d'une carte « Chaise ». L'étoile orange signifie que la famille est dans Favoris ; un second clic l'en retire. Si une chaise est déjà étoilée, Pikachu la reconnaît sans modifier tes favoris personnels. Sinon, ton favori d'essai reste seulement en mémoire.", "TutorialFavoriteStar", completionEvent: "favorite-added"),
                 new DemoStep("Retrouver ses favoris", "Ouvre l'onglet « Favoris ». La famille étoilée doit apparaître dans la collection Favoris. Dans ta vraie bibliothèque, les favoris sont enregistrés et restent disponibles à la prochaine ouverture.", "FavoritesTabItem", completionEvent: "favorites-open"),
                 new DemoStep("Collections et chargement", "La liste « Collection » permet de regrouper plusieurs familles ; « Nouv. », « Ren. » et « Suppr. » gèrent ces groupes. Le bouton « Charger la collection » charge toutes ses familles dans Revit. La croix d'une carte retire seulement cette famille de la collection. La rosace peut aussi ouvrir une collection choisie, mais ses pages par défaut montrent les familles récentes et utilisées.", "CollectionCombo", true),
                 new DemoStep("Revenir aux dossiers", "Rouvre l'onglet des dossiers pour poursuivre l'exercice. Le favori d'essai sera retiré automatiquement quand tu quitteras le guide.", "FoldersTabItem", completionEvent: "folders-open"),
@@ -101,10 +102,12 @@ namespace BIMaestro.Tutorials
                 new DemoStep("Adapter à ta bibliothèque", "« Modifier les chemins… » permet de choisir ton propre dossier de familles RFA, puis un dossier d'images PNG. Leurs sous-dossiers doivent se correspondre. Pendant ce guide, tes chemins enregistrés sont protégés : quitte le tutoriel avant de choisir ta bibliothèque personnelle.", "ChangePathsButton", true),
                 new DemoStep("Autres actions d'une carte", "Sur une carte, le clic droit propose « Rentrer dans la famille » pour ouvrir le RFA source, « Charger la dernière version » pour recharger le fichier depuis le disque et « Ajouter à la collection active » pour classer plusieurs familles. Aucune de ces actions n'est nécessaire pour le placement d'essai.", "FamilyListView", true),
                 new DemoStep("Charger et placer une famille", "Pikachu revient au dossier Bureau. Double-clique sur la carte « Bureau commun » : le simple clic sélectionne la carte, le double-clic charge la famille dans Revit et lance son placement. Clique ensuite dans la vue pour la poser, puis appuie sur Échap pour sortir du mode placement.", "FamilyListView", completionEvent: "load-bureau-commun"),
-                new DemoStep("Trouver la rosace", "Dans le ruban BIMaestro, ouvre le bouton « Famille » puis repère son entrée « . » : c'est la rosace du navigateur. Elle s'ouvre près de la souris et donne accès aux familles récentes ou utilisées. Termine d'abord le placement avec Échap ; déplace ou réduis le navigateur si besoin pour voir le ruban Revit.", "FamilyListView", true),
-                new DemoStep("Ouvrir les raccourcis Revit", "Dans Revit 2024, va dans Vue > Fenêtres > Interface utilisateur > Raccourcis clavier. Dans la boîte, laisse le filtre sur « Tous » et cherche « Navigateur de Familles ». Ces raccourcis sont ceux de Revit, indépendants des réglages BIMaestro.", "FamilyListView", true),
-                new DemoStep("Attribuer un raccourci à la rosace", "Sélectionne précisément « Navigateur de Familles:. » dans BIMaestro > Spécifique aux familles, et non la ligne « Navigateur de Familles:Navigateur de Familles ». Clique dans « Appuyer sur de nouvelles touches » et tape B puis F comme exemple. Si BF est déjà pris dans ton profil, choisis un autre raccourci libre. Clique sur « Attribuer » puis « OK » ; les raccourcis déjà présents sur cette commande restent disponibles.", "FamilyListView", true),
-                new DemoStep("Utiliser ton raccourci", "Reviens dans une vue Revit, place la souris où tu veux ouvrir la rosace et tape BF, ou le raccourci libre que tu as attribué. Fais un clic droit au centre de la rosace, puis « Charger une collection » > « Favoris » : la chaise étoilée de l'exercice y apparaît temporairement avec tes favoris. Clique sur cette chaise pour lancer son placement ; Pikachu vérifiera que tu as utilisé cette famille depuis la rosace. Clique dans la vue pour la poser, puis Échap.", "FamilyListView", completionEvent: "radial-tutorial-chaise-used")
+                new DemoStep("Ouvrir Famille dans Revit", "Le navigateur se ferme et Pikachu revient dans Revit. Termine le placement précédent avec Échap, ouvre l'onglet BIMaestro si besoin, puis clique sur la petite flèche du bouton « Famille ». Le contour orange suit le bon bouton.", "RevitFamilySplit"),
+                new DemoStep("Choisir la rosace « . »", "Dans le menu « Famille », clique sur l'entrée « . ». Cette rosace s'ouvre près de la souris. Pikachu attend son ouverture avant de poursuivre.", "RevitRosace", completionEvent: "radial-opened"),
+                new DemoStep("Passer à l'onglet Vue", "Ferme la rosace avec Échap, puis clique sur l'onglet « Vue » du ruban Revit. Pikachu encadre l'onglet et suit ton choix.", "RevitViewTab"),
+                new DemoStep("Ouvrir Interface utilisateur", "Dans Vue, ouvre « Interface utilisateur » dans le panneau Fenêtres. Le contour orange passe du ruban BIMaestro au ruban Revit.", "RevitUserInterface"),
+                new DemoStep("Créer le raccourci dans Revit", "Dans Vue > Interface utilisateur, clique sur « Raccourcis clavier ». Une fois la fenêtre ouverte :\n1. Garde le filtre « Tous », cherche « Navigateur de Familles » et sélectionne « Navigateur de Familles:. » sous BIMaestro > Spécifique aux familles. La ligne qui ouvre le navigateur est différente.\n2. Clique dans « Appuyer sur de nouvelles touches », puis tape B et F. Si BF est pris, choisis une autre combinaison libre.\n3. Clique sur « Attribuer », puis sur « OK ».\nPendant cette fenêtre Revit, le bouton « Suivant » de Pikachu ne répond pas. Après fermeture avec OK, Pikachu avance seul ; sinon clique sur « Suivant ».", "RevitKeyboardShortcuts", true),
+                new DemoStep("Utiliser ton raccourci", "Reviens dans une vue Revit, place la souris où tu veux ouvrir la rosace et tape BF, ou le raccourci que tu as choisi. Fais un clic droit au centre de la rosace, puis « Charger une collection » > « Favoris ». Clique sur la chaise étoilée de l'exercice pour lancer son placement ; Pikachu le vérifiera. Clique dans la vue pour la poser, puis Échap.", "RevitUseShortcut", completionEvent: "radial-tutorial-chaise-used")
             },
             ["history"] = new[]
             {
@@ -117,6 +120,11 @@ namespace BIMaestro.Tutorials
                 new DemoStep("Visualiser avant d'agir", "« Visualiser » affiche un aperçu sans recréer l'élément. « Restaurer les éléments » le recrée durablement dans le projet. Si tu veux seulement enquêter, arrête-toi à l'aperçu.", "VisualizeDeletedButton", true),
                 new DemoStep("Faire réapparaître l'objet", "Clique sur « Restaurer les éléments » et confirme. La famille, le type et le niveau doivent encore être disponibles ; Pikachu attendra une restauration réussie avant de valider.", "RestoreDeletedButton")
             }
+        };
+
+        internal static readonly DemoStep[] OrganizerRotatedSteps =
+        {
+            new DemoStep("Relancer depuis la vue tournée", "La vue a tourné de 90°. CML_Numéros de place, PK- et le format 001 sont déjà préparés. « Trier par niveau » reste décoché : clique sur Renommer pour comparer l'ordre dicté par la vue aux numéros du premier passage.", "DemoRenameButton")
         };
 
         // A TUTO button may be pressed from an ordinary project, without the
@@ -134,16 +142,16 @@ namespace BIMaestro.Tutorials
                 },
                 ["pipe-calculation"] = new[]
                 {
-                    new DemoStep("Définir le périmètre", "Sélectionne dans la vue les canalisations et raccords à calculer. Le résultat dépend de cette sélection ; l'exercice guidé prépare un réseau complet dans la maquette de formation.", "IncludeDuctsCheckBox", true),
-                    new DemoStep("Inclure les gaines", "Coche cette option si la sélection contient aussi des gaines. Tu peux comparer les résultats avec et sans gaines.", "IncludeDuctsCheckBox", true),
-                    new DemoStep("Lire ou exporter", "Décoche l'export Excel pour examiner d'abord le récapitulatif à l'écran, ou garde-le pour produire un fichier.", "ExportToExcelCheckBox", true),
+                    new DemoStep("Définir le périmètre", "Sélectionne dans la vue les canalisations et raccords à calculer. Le résultat dépend de cette sélection ; l'exercice guidé prépare un réseau complet dans la maquette de formation.", "CalculationOptionsTitle", true),
+                    new DemoStep("Inclure les gaines", "Coche cette option si ta sélection contient aussi des gaines. Le calcul les ajoutera aux canalisations sélectionnées.", "IncludeDuctsCheckBox", true),
+                    new DemoStep("Lire et exporter", "Garde l'export Excel coché pour voir d'abord le récapitulatif dans Revit, puis recevoir un fichier que BIMaestro te proposera d'ouvrir.", "ExportToExcelCheckBox", true),
                     new DemoStep("Calculer", "Clique sur OK quand ta sélection et tes options sont prêtes. Le parcours de formation vérifie ensuite les résultats sur sa scène dédiée.", "OkButton", true)
                 },
                 ["organizer"] = new[]
                 {
-                    new DemoStep("Choisir les éléments", "Organisateur agit sur les éléments sélectionnés dans la vue. Pour l'essai vérifié, la maquette de formation utilise quatre places CML_Parking.", "ParameterComboBox", true),
+                    new DemoStep("Choisir les éléments", "Organisateur agit sur les éléments sélectionnés dans la vue. Pour l'essai vérifié, la maquette de formation utilise huit places CML_Parking sur deux niveaux.", "ParameterComboBox", true),
                     new DemoStep("Choisir le paramètre", "Sélectionne le paramètre d'instance à modifier. Sur les parkings de formation, il s'appelle « CML_Numéros de place » ; dans ton projet, le nom peut être différent.", "ParameterComboBox", true),
-                    new DemoStep("Régler le nom", "Le préfixe, le format et le sens de lecture déterminent les nouvelles valeurs. Vérifie l'aperçu avant d'appliquer.", "PrefixTextBox", true),
+                    new DemoStep("Régler le nom", "Le préfixe, le format et le sens de lecture déterminent les nouvelles valeurs. « Trier par niveau » sépare les étages ; sans cette coche, l'ordre suit l'orientation de la vue.", "PrefixTextBox", true),
                     new DemoStep("Appliquer", "Renommer écrit les valeurs dans le projet. Pour voir Pikachu contrôler chaque place, lance le parcours Organisateur depuis la maquette de formation.", "DemoRenameButton", true)
                 },
                 ["history"] = new[]
@@ -155,13 +163,6 @@ namespace BIMaestro.Tutorials
                 }
             };
 
-        internal static readonly DemoStep[] PipeCalculationWithoutDuctsSteps =
-        {
-            new DemoStep("Comparer les deux calculs", "Les mêmes canalisations et les mêmes coudes sont sélectionnés. Cette fois, retire les gaines du résultat pour voir exactement ce qui change.", "IncludeDuctsCheckBox", true),
-            new DemoStep("Sans les gaines", "Laisse « Inclure les gaines » décoché. Les longueurs DN100 et DN50 doivent rester identiques au premier passage.", "IncludeDuctsCheckBox", true),
-            new DemoStep("Lire le résultat", "Décoche l'export Excel, puis relance le calcul. Pikachu comparera les valeurs réelles des deux passages.", "ExportToExcelCheckBox"),
-            new DemoStep("Lancer le second calcul", "Clique sur OK. Pikachu vérifiera que les gaines ont disparu et que les canalisations n'ont pas changé.", "OkButton")
-        };
     }
 
     internal static class DemoHistoryScene
@@ -344,6 +345,22 @@ namespace BIMaestro.Tutorials
                 }
                 if (selectedChoice == "pipe-calculation")
                     DemoCalculationExercise.Begin(activeDocument.Document);
+                if (selectedChoice == "organizer")
+                {
+                    try
+                    {
+                        DemoProjectBuilder.EnsureOrganizerScene(activeDocument.Document);
+                        DemoProjectBuilder.ResetOrganizerViewOrientation(activeDocument.Document);
+                        DemoOrganizerExercise.Begin(activeDocument.Document);
+                    }
+                    catch (Exception ex)
+                    {
+                        message = ex.Message;
+                        DemoTourMessage.Show(uiApp.MainWindowHandle, "Pikachu a besoin d'aide",
+                            "Préparation d'Organisateur impossible : " + ex.Message);
+                        return Result.Failed;
+                    }
+                }
                 if (DemoTourCatalog.Views.TryGetValue(selectedChoice, out string viewName))
                 {
                     View tourView = new FilteredElementCollector(activeDocument.Document)
@@ -456,8 +473,12 @@ namespace BIMaestro.Tutorials
                 return false;
             }
             uiDocument.Selection.SetElementIds(ids);
+            if (tourId == "organizer")
+                try { uiDocument.ShowElements(ids); } catch { /* La sélection reste active. */ }
             DemoTourMessage.Show(app.MainWindowHandle, "Pika ! Sélection prête",
-                ids.Count + " éléments de la vue sont sélectionnés. Suis Pikachu jusqu'au bouton, puis dans la fenêtre de la commande.");
+                ids.Count + (tourId == "organizer"
+                    ? " places sur deux niveaux sont sélectionnées. Suis Pikachu jusqu'au bouton Organisateur, puis teste le tri par niveau."
+                    : " éléments de la vue sont sélectionnés. Suis Pikachu jusqu'au bouton, puis dans la fenêtre de la commande."));
             Couleur.AppearanceOnboarding.StartIntro(app.MainWindowHandle, tourId);
             return true;
         }
@@ -474,31 +495,22 @@ namespace BIMaestro.Tutorials
     internal static class DemoCalculationExercise
     {
         private static string _documentPath;
-        private static int _pass;
-        private static Dictionary<double, double> _pipeBaseline;
-        private static Dictionary<string, int> _elbowBaseline;
-        private static double _ductBaseline;
-        private static double _ductFittingsBaseline;
-
-        internal static bool IsSecondPass => _pass == 2;
+        private static bool _active;
 
         internal static void Begin(Document document)
         {
             _documentPath = document.PathName;
-            _pass = 1;
-            _pipeBaseline = null;
-            _elbowBaseline = null;
-            _ductBaseline = 0;
-            _ductFittingsBaseline = 0;
+            _active = true;
         }
 
         internal static void Verify(UIApplication app, ICollection<ElementId> selectedIds,
-            bool includeDucts, Dictionary<double, double> pipeLengths,
+            bool includeDucts, bool exportToExcel, string excelFilePath,
+            Dictionary<double, double> pipeLengths,
             Dictionary<string, double> ductLengths, Dictionary<string, double> ductFittingLengths,
             Dictionary<string, int> elbowCounts)
         {
             UIDocument uiDocument = app.ActiveUIDocument;
-            if (_pass == 0 || uiDocument == null ||
+            if (!_active || uiDocument == null ||
                 !string.Equals(uiDocument.Document.PathName, _documentPath, StringComparison.OrdinalIgnoreCase))
                 return;
 
@@ -514,40 +526,23 @@ namespace BIMaestro.Tutorials
                 return;
             }
 
-            if (_pass == 1)
+            double ductTotal = ductLengths.Values.Sum();
+            double ductFittingsTotal = ductFittingLengths.Values.Sum();
+            if (!includeDucts || ductTotal <= 0 || ductFittingLengths.Count == 0)
             {
-                double ductTotal = ductLengths.Values.Sum();
-                if (!includeDucts || ductTotal <= 0 || ductFittingLengths.Count == 0)
-                {
-                    Retry(app, uiDocument, "Le premier résultat doit contenir les gaines et leurs raccords. Coche « Inclure les gaines », puis relance le calcul.");
-                    return;
-                }
-                _pipeBaseline = new Dictionary<double, double>(pipeLengths);
-                _elbowBaseline = new Dictionary<string, int>(elbowCounts);
-                _ductBaseline = ductTotal;
-                _ductFittingsBaseline = ductFittingLengths.Values.Sum();
-                _pass = 2;
-                Reselect(uiDocument, demoIds);
-                DemoTourMessage.Show(app.MainWindowHandle, "Pika ! Premier calcul vérifié",
-                    $"Les canalisations DN100 et DN50 et {elbowCount} coudes sont présents. Les gaines ajoutent {ductTotal:F2} m et leurs raccords environ {_ductFittingsBaseline:F2} m. Pikachu a resélectionné la scène : relance Calcul des canalisations en laissant « Inclure les gaines » décoché.");
-                Couleur.AppearanceOnboarding.StartIntro(app.MainWindowHandle, "pipe-calculation");
+                Retry(app, uiDocument, "Le résultat doit contenir les gaines et leurs raccords. Coche « Inclure les gaines », puis relance le calcul.");
                 return;
             }
-
-            bool samePipes = _pipeBaseline != null && pipeLengths.Count == _pipeBaseline.Count &&
-                _pipeBaseline.All(pair => pipeLengths.TryGetValue(pair.Key, out double length) &&
-                    Math.Abs(pair.Value - length) <= 0.01);
-            bool sameElbows = _elbowBaseline != null && elbowCounts.Count == _elbowBaseline.Count &&
-                _elbowBaseline.All(pair => elbowCounts.TryGetValue(pair.Key, out int count) && count == pair.Value);
-            if (includeDucts || ductLengths.Count != 0 || ductFittingLengths.Count != 0 || !samePipes || !sameElbows)
+            if (!exportToExcel || string.IsNullOrEmpty(excelFilePath) ||
+                !System.IO.File.Exists(excelFilePath))
             {
-                Retry(app, uiDocument, "Le second résultat doit supprimer les gaines tout en gardant exactement les mêmes canalisations et coudes. Laisse « Inclure les gaines » décoché et réessaie.");
+                Retry(app, uiDocument, "Le fichier Excel manque. Garde « Exporter les résultats vers Excel » coché, puis relance le calcul.");
                 return;
             }
-            _pass = 0;
+            _active = false;
             Reselect(uiDocument, demoIds);
-            DemoTourMessage.Show(app.MainWindowHandle, "Pika ! Comparaison réussie",
-                $"Sans les gaines, {_ductBaseline:F2} m de gaine et environ {_ductFittingsBaseline:F2} m de raccords ont disparu du résultat. Les deux diamètres de canalisations et les {elbowCount} coudes sont restés identiques : Pikachu l'a vérifié sur les deux calculs.");
+            DemoTourMessage.Show(app.MainWindowHandle, "Pika ! Calcul et export réussis",
+                $"Pikachu a vérifié les canalisations DN100 et DN50, leurs {elbowCount} coudes, {ductTotal:F2} m de gaine et environ {ductFittingsTotal:F2} m de raccords de gaine. Le récapitulatif Revit et le fichier Excel viennent du même calcul.\n\nFichier : {excelFilePath}");
         }
 
         private static void Retry(UIApplication app, UIDocument uiDocument, string message)
@@ -574,32 +569,6 @@ namespace BIMaestro.Tutorials
                 .Select(element => element.Id).ToList();
         }
 
-        internal static void VerifyParking(UIApplication app, ICollection<ElementId> selectedIds)
-        {
-            UIDocument uiDocument = app.ActiveUIDocument;
-            if (uiDocument == null) return;
-            var ids = Find(uiDocument.Document, "ORGANISATEUR_");
-            var expected = new HashSet<string>(Enumerable.Range(1, 4).Select(i => "PK-" + i.ToString("D3")));
-            var values = ids.Select(id => uiDocument.Document.GetElement(id)?
-                .LookupParameter("CML_Numéros de place")?.AsString() ?? "(vide)").ToList();
-            bool valid = ids.Count == 4 && ids.All(id => selectedIds.Contains(id)) &&
-                new HashSet<string>(values, StringComparer.Ordinal).SetEquals(expected);
-            if (ids.Count > 0)
-            {
-                uiDocument.Selection.SetElementIds(ids);
-                try { uiDocument.ShowElements(ids); } catch { /* Selection still identifies the four places. */ }
-            }
-            if (valid)
-                DemoTourMessage.Show(app.MainWindowHandle, "Pika ! Quatre places vérifiées",
-                    "Pikachu a lu CML_Numéros de place dans la maquette : PK-001, PK-002, PK-003 et PK-004 sont bien présents. Les quatre places sont sélectionnées et cadrées ; clique sur chacune pour voir sa valeur dans les Propriétés.");
-            else
-            {
-                DemoTourMessage.Show(app.MainWindowHandle, "Pikachu vérifie les places",
-                    "Les quatre places doivent porter PK-001 à PK-004 dans CML_Numéros de place. Valeurs actuelles : " +
-                    string.Join(", ", values) + ". Pikachu les a sélectionnées pour un nouvel essai.");
-                Couleur.AppearanceOnboarding.StartIntro(app.MainWindowHandle, "organizer");
-            }
-        }
     }
 
     internal static class DemoExcelExercise
@@ -609,13 +578,10 @@ namespace BIMaestro.Tutorials
         private static ElementId _parkingViewId;
         private static string _workbookPath;
         private static string _fieldName;
-        private static string _commentsFieldName;
         private static string _referenceFieldName;
         private static Dictionary<string, string> _initialNumbers;
-        private static Dictionary<string, string> _initialComments;
         private static Dictionary<string, string> _references;
         private static Dictionary<string, string> _expectedNumbers;
-        private static Dictionary<string, string> _expectedComments;
         private static string _verifiedChanges;
         private static int _stage; // 1 export, 2 edit/import, 3 verified
         private static int _pendingAction; // 1 introduction, 2 focus the edited places
@@ -632,20 +598,12 @@ namespace BIMaestro.Tutorials
             if (places.Count != 4)
                 throw new InvalidOperationException("Les quatre places du parcours Excel sont introuvables.");
             _fieldName = DemoProjectBuilder.ExcelValueField(schedule);
-            _commentsFieldName = DemoProjectBuilder.ExcelCommentsField(schedule);
             _referenceFieldName = DemoProjectBuilder.ExcelReferenceField(schedule);
-            using (var tx = new Transaction(document, "BIMaestro - Réinitialiser les places Excel"))
+            using (var tx = new Transaction(document, "BIMaestro - Synchroniser les numéros visibles"))
             {
                 tx.Start();
-                foreach (FamilyInstance place in places)
-                {
-                    string mark = place.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ?? "";
-                    int index = int.Parse(mark.Substring((DemoProjectBuilder.DemoPrefix + "EXCEL_").Length));
-                    place.LookupParameter("CML_Numéros de place").Set("XL-" + index.ToString("D3"));
-                    place.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?
-                        .Set(_commentsFieldName == null ? "XL-" + index.ToString("D3") :
-                            (index <= 2 ? "Secteur A" : "Secteur B"));
-                }
+                DemoProjectBuilder.SynchronizeExcelParkingNumbers(places, _fieldName,
+                    recoverLegacyValue: true);
                 tx.Commit();
             }
             _documentPath = document.PathName;
@@ -657,10 +615,7 @@ namespace BIMaestro.Tutorials
                 place => place.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ?? "");
             _initialNumbers = places.ToDictionary(place => place.UniqueId,
                 place => DemoProjectBuilder.ExcelValueParameter(place, _fieldName)?.AsString() ?? "");
-            _initialComments = _commentsFieldName == null ? null : places.ToDictionary(place => place.UniqueId,
-                place => place.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.AsString() ?? "");
             _expectedNumbers = null;
-            _expectedComments = null;
             _verifiedChanges = null;
             _stage = 1;
             _pendingAction = 1;
@@ -686,9 +641,8 @@ namespace BIMaestro.Tutorials
             if (action == 1)
             {
                 DemoTourMessage.Show(app.MainWindowHandle, "Pika ! Gestion Excel",
-                    "Voici la nomenclature des quatre places. « " + _fieldName + " » est modifiable" +
-                    (_commentsFieldName == null ? "" : ", tout comme « " + _commentsFieldName + " »") +
-                    ". « " + _referenceFieldName + " » est la référence fixe de chaque place : ne la change pas. Suis Pikachu jusqu'à « Gestion Excel » et choisis « Exporter ».");
+                    "Voici la nomenclature des quatre places. « " + _fieldName + " » contient le numéro modifiable, visible sur chaque place en 3D. « " +
+                    _referenceFieldName + " » est la référence fixe : ne la change pas. Suis Pikachu jusqu'à « Gestion Excel » et choisis « Exporter ».");
                 Couleur.AppearanceOnboarding.StartIntro(app.MainWindowHandle, "excel");
             }
             else
@@ -699,7 +653,7 @@ namespace BIMaestro.Tutorials
                 try { uiDocument.ShowElements(ids); } catch { }
                 DemoTourMessage.Show(app.MainWindowHandle, "Pika ! Import vérifié",
                     "Pikachu a relu les quatre places dans Revit. Modifications vérifiées :\n" + _verifiedChanges +
-                    "\n\nLa référence « " + _referenceFieldName + " » est restée identique. Les places sont sélectionnées dans la vue 3D.");
+                    "\n\nLa référence « " + _referenceFieldName + " » est restée identique. Le numéro modifié est aussi affiché sur les places sélectionnées dans la vue 3D.");
             }
             return true;
         }
@@ -711,9 +665,9 @@ namespace BIMaestro.Tutorials
             _stage = 2;
             DemoTourMessage.Show(app.MainWindowHandle, "Pika ! À toi dans Excel",
                 "Le classeur est ici :\n" + path +
-                "\n\nDans l'onglet « Nomenclature », tu peux par exemple remplacer XL-003 par XL-103 dans « " + _fieldName + " ». Tu peux aussi modifier d'autres numéros" +
-                (_commentsFieldName == null ? "" : " et la colonne « " + _commentsFieldName + " » (secteur)") +
-                ". La colonne « " + _referenceFieldName + " » est une référence fixe : garde-la intacte. L'onglet « Edition » reprend tes modifications par formule pour l'import ; ne touche pas à ses identifiants cachés. Enregistre et ferme le fichier, puis reviens sur « Gestion Excel » et choisis « Importer ».");
+                "\n\nDans l'onglet « Nomenclature », modifie un ou plusieurs numéros dans « " + _fieldName +
+                " » (par exemple XL-003 → XL-103). La colonne « " + _referenceFieldName +
+                " » est une référence fixe : garde-la intacte. L'onglet « Edition » reprend tes modifications par formule pour l'import ; ne touche pas à ses identifiants cachés. Enregistre et ferme le fichier, puis reviens sur « Gestion Excel » et choisis « Importer ». Pikachu affichera les nouveaux numéros sur les places en 3D.");
             Couleur.AppearanceOnboarding.StartIntro(app.MainWindowHandle, "excel");
         }
 
@@ -733,7 +687,6 @@ namespace BIMaestro.Tutorials
                     "Le classeur doit contenir exactement les quatre places exportées. Repars de l'export du parcours, sans ajouter ni supprimer de ligne.");
 
             var numbers = new Dictionary<string, string>(StringComparer.Ordinal);
-            var comments = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (var row in rows)
             {
                 if (row == null || !row.TryGetValue("UniqueId", out string uid) ||
@@ -748,24 +701,15 @@ namespace BIMaestro.Tutorials
                     return RejectWorkbook(app, "Pikachu cherche les numéros",
                         "La colonne « " + _fieldName + " » manque. Repars du classeur exporté par le parcours.");
                 numbers.Add(uid, number ?? "");
-                if (_commentsFieldName != null)
-                {
-                    if (!row.TryGetValue(_commentsFieldName, out string comment))
-                        return RejectWorkbook(app, "Pikachu cherche les secteurs",
-                            "La colonne « " + _commentsFieldName + " » manque. Repars du classeur exporté par le parcours.");
-                    comments.Add(uid, comment ?? "");
-                }
             }
 
-            bool changed = numbers.Any(pair => !string.Equals(pair.Value, _initialNumbers[pair.Key], StringComparison.Ordinal)) ||
-                (_commentsFieldName != null && comments.Any(pair =>
-                    !string.Equals(pair.Value, _initialComments[pair.Key], StringComparison.Ordinal)));
+            bool changed = numbers.Any(pair =>
+                !string.Equals(pair.Value, _initialNumbers[pair.Key], StringComparison.Ordinal));
             if (!changed)
                 return RejectWorkbook(app, "Pikachu attend une modification",
-                    "Modifie au moins un numéro ou un secteur dans « Nomenclature » (par exemple XL-003 → XL-103), enregistre et ferme Excel, puis réessaie. « " + _referenceFieldName + " » reste fixe.");
+                    "Modifie au moins un numéro dans « Nomenclature » (par exemple XL-003 → XL-103), enregistre et ferme Excel, puis réessaie. « " + _referenceFieldName + " » reste fixe.");
 
             _expectedNumbers = numbers;
-            _expectedComments = _commentsFieldName == null ? null : comments;
             var changes = new List<string>();
             foreach (var pair in _references.OrderBy(pair => pair.Value))
             {
@@ -774,9 +718,6 @@ namespace BIMaestro.Tutorials
                 if (_initialNumbers[uid] != numbers[uid])
                     changes.Add("Place " + label + " · " + _fieldName + " : " +
                         DisplayExcelValue(_initialNumbers[uid]) + " → " + DisplayExcelValue(numbers[uid]));
-                if (_commentsFieldName != null && _initialComments[uid] != comments[uid])
-                    changes.Add("Place " + label + " · " + _commentsFieldName + " : " +
-                        DisplayExcelValue(_initialComments[uid]) + " → " + DisplayExcelValue(comments[uid]));
             }
             _verifiedChanges = string.Join("\n", changes);
             return true;
@@ -791,15 +732,12 @@ namespace BIMaestro.Tutorials
             return false;
         }
 
-        // L'import guidé accepte tous les changements des deux colonnes éditables,
-        // mais ne transmet jamais le repère (même si le paramètre Revit est modifiable).
+        // L'import guidé accepte chaque numéro modifié, jamais le repère fixe.
         internal static Parameter ImportParameter(FamilyInstance place, string header)
         {
             if (place == null || !NeedsImport(place.Document)) return null;
             if (string.Equals(header, _fieldName, StringComparison.OrdinalIgnoreCase))
                 return DemoProjectBuilder.ExcelValueParameter(place, _fieldName);
-            if (_commentsFieldName != null && string.Equals(header, _commentsFieldName, StringComparison.OrdinalIgnoreCase))
-                return place.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS);
             return null;
         }
 
@@ -814,16 +752,39 @@ namespace BIMaestro.Tutorials
                     expectedNumber, StringComparison.Ordinal) &&
                 _references.TryGetValue(place.UniqueId, out string reference) &&
                 string.Equals(place.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString(),
-                    reference, StringComparison.Ordinal) &&
-                (_commentsFieldName == null ||
-                    (_expectedComments.TryGetValue(place.UniqueId, out string expectedComment) &&
-                    string.Equals(place.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.AsString() ?? "",
-                        expectedComment, StringComparison.Ordinal))));
+                    reference, StringComparison.Ordinal));
             if (!valid)
             {
                 DemoTourMessage.Show(app.MainWindowHandle, "Pikachu vérifie l'import",
-                    "L'import s'est terminé, mais Revit ne correspond pas encore aux valeurs du classeur. Vérifie les numéros, les secteurs et la référence fixe, puis réessaie l'import.");
+                    "L'import s'est terminé, mais Revit ne correspond pas encore aux valeurs du classeur. Vérifie les numéros et la référence fixe, puis réessaie l'import.");
                 Couleur.AppearanceOnboarding.StartIntro(app.MainWindowHandle, "excel");
+                return;
+            }
+            try
+            {
+                using (var tx = new Transaction(uiDocument.Document,
+                    "BIMaestro - Afficher les numéros importés sur les parkings"))
+                {
+                    tx.Start();
+                    DemoProjectBuilder.SynchronizeExcelParkingNumbers(places, _fieldName);
+                    tx.Commit();
+                }
+            }
+            catch (Exception ex)
+            {
+                DemoTourMessage.Show(app.MainWindowHandle, "Pikachu vérifie l'affichage",
+                    "Les valeurs du classeur sont dans Revit, mais les numéros visibles n'ont pas pu être actualisés : " +
+                    ex.Message);
+                return;
+            }
+            if (!places.All(place => _expectedNumbers.TryGetValue(place.UniqueId, out string expectedNumber) &&
+                string.Equals(place.LookupParameter("CML_Numéros de place")?.AsString() ?? "",
+                    expectedNumber, StringComparison.Ordinal) &&
+                string.Equals(place.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.AsString() ?? "",
+                    expectedNumber, StringComparison.Ordinal)))
+            {
+                DemoTourMessage.Show(app.MainWindowHandle, "Pikachu vérifie l'affichage",
+                    "Le numéro importé ne correspond pas au texte affiché sur chaque place. Vérifie les paramètres des places avant de conclure l'exercice.");
                 return;
             }
             _stage = 3;
@@ -977,10 +938,10 @@ namespace BIMaestro.Tutorials
             AddTour(stack, "1 · Auto résa", "Créer une réservation sur le mur traversé par la canalisation.", "reservation");
             AddTour(stack, "2 · Qui a fait ça ?", "Retrouver et restaurer les meubles supprimés.", "history");
             AddTour(stack, "3 · Couleurs et vues", "Colorer l'arborescence et ajouter des icônes aux dossiers.", "colors");
-            AddTour(stack, "4 · Calcul des canalisations", "Comparer canalisations, coudes et gaines.", "pipe-calculation");
-            AddTour(stack, "5 · Organisateur", "Renuméroter quatre places CML_Parking.", "organizer");
+            AddTour(stack, "4 · Calcul des canalisations", "Calculer canalisations, coudes et gaines, puis lire le fichier Excel.", "pipe-calculation");
+            AddTour(stack, "5 · Organisateur", "Renuméroter huit places sur deux niveaux, puis tourner la vue.", "organizer");
             AddTour(stack, "6 · Gabarit de vue", "Exporter une vue, puis créer un gabarit dans une autre.", "view-template");
-            AddTour(stack, "7 · Gestion Excel", "Modifier numéros ou secteurs dans Excel, garder le repère fixe et vérifier leur retour dans Revit.", "excel");
+            AddTour(stack, "7 · Gestion Excel", "Modifier les numéros dans Excel, garder le repère fixe et voir les changements sur les places en 3D.", "excel");
             AddTour(stack, "8 · Navigateur de familles", "Explorer 35 familles, rechercher, voir en 3D et préparer les aperçus.", "family-browser");
             var later = new Button { Content = "Plus tard", HorizontalAlignment = HorizontalAlignment.Right,
                 Padding = new Thickness(12, 6, 12, 6), Margin = new Thickness(0, 10, 0, 0) };
@@ -1007,6 +968,8 @@ namespace BIMaestro.Tutorials
     internal static class DemoTourService
     {
         private static readonly Dictionary<Window, DemoWindowGuide> ActiveGuides = new Dictionary<Window, DemoWindowGuide>();
+        private static FamilyRibbonTutorialGuide _familyRibbonGuide;
+        private static Famille.Collection _familyTutorialFavorites;
 
         internal static bool AttachIfRequested(string id, Window window)
         {
@@ -1023,6 +986,7 @@ namespace BIMaestro.Tutorials
         {
             if (window?.Content is not Grid) return false;
             if (!DemoTourCatalog.Steps.TryGetValue(id, out DemoStep[] steps)) return false;
+            if (id == "family-browser") _familyRibbonGuide?.Close();
             if (ActiveGuides.TryGetValue(window, out DemoWindowGuide previous))
             {
                 if (previous.TourId == id && previous.IsPreparedExercise)
@@ -1033,8 +997,13 @@ namespace BIMaestro.Tutorials
                 !browser.BeginTutorialCatalog()) return false;
             if (!preparedExercise && DemoTourCatalog.StandaloneSteps.TryGetValue(id, out DemoStep[] standalone))
                 steps = standalone;
-            if (id == "pipe-calculation" && DemoCalculationExercise.IsSecondPass)
-                steps = preparedExercise ? DemoTourCatalog.PipeCalculationWithoutDuctsSteps : steps;
+            if (id == "organizer" && preparedExercise && DemoOrganizerExercise.IsRotatedPass)
+                steps = DemoTourCatalog.OrganizerRotatedSteps;
+            if (id == "pipe-calculation")
+            {
+                window.Width = Math.Max(window.Width, 760);
+                window.Height = Math.Max(window.Height, 520);
+            }
             ActiveGuides[window] = new DemoWindowGuide(window, steps, id, preparedExercise);
             return true;
         }
@@ -1049,8 +1018,53 @@ namespace BIMaestro.Tutorials
         // browser guide alive while the learner assigns and tries a shortcut.
         internal static void ReportExternalAction(string action)
         {
+            _familyRibbonGuide?.CompleteAction(action);
             foreach (var guide in ActiveGuides.Values.Where(g => g.TourId == "family-browser").ToArray())
                 guide.CompleteAction(action);
+        }
+
+        internal static Famille.Collection GetTutorialFavoritesForRosace()
+        {
+            if (_familyRibbonGuide == null || _familyTutorialFavorites == null) return null;
+            return new Famille.Collection
+            {
+                Id = _familyTutorialFavorites.Id,
+                Name = _familyTutorialFavorites.Name,
+                Paths = new List<string>(_familyTutorialFavorites.Paths)
+            };
+        }
+
+        internal static bool IsTutorialChaiseForRosace(string familyPath)
+        {
+            if (_familyRibbonGuide == null || _familyTutorialFavorites?.Paths == null ||
+                string.IsNullOrWhiteSpace(familyPath)) return false;
+            string catalogPart = System.IO.Path.DirectorySeparatorChar + "NavigateurFamilles" +
+                System.IO.Path.DirectorySeparatorChar + "Familles" +
+                System.IO.Path.DirectorySeparatorChar;
+            return familyPath.IndexOf(catalogPart, StringComparison.OrdinalIgnoreCase) >= 0 &&
+                System.IO.Path.GetFileNameWithoutExtension(familyPath)
+                    .IndexOf("chaise", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                _familyTutorialFavorites.Paths.Any(path =>
+                    string.Equals(path, familyPath, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static void ContinueFamilyGuideInRevit(DemoStep[] steps, Famille.FamilyBrowserWindow browser)
+        {
+            IntPtr owner = Famille.FamilyBrowserCommand.uiapp?.MainWindowHandle ?? IntPtr.Zero;
+            if (owner == IntPtr.Zero) return;
+            _familyRibbonGuide?.Close();
+            _familyTutorialFavorites = browser.TryGetTutorialFavoritesForRosace();
+            var guide = new FamilyRibbonTutorialGuide(owner, steps, 18, () =>
+            {
+                _familyTutorialFavorites = null;
+                _familyRibbonGuide = null;
+            });
+            _familyRibbonGuide = guide;
+            // The browser keeps the exercise favourites only in memory. Snapshot
+            // them first, then restore the learner's paths before closing it.
+            browser.EndTutorialCatalog();
+            browser.Close();
+            guide.Show();
         }
 
         internal static void ReportRestoration(Window window)
@@ -1144,6 +1158,12 @@ namespace BIMaestro.Tutorials
                 _detachAction = null;
                 RemoveHighlight();
                 if (_index < 0 || _index >= _steps.Length) return;
+                if (TourId == "family-browser" && _index == 18 &&
+                    _window is Famille.FamilyBrowserWindow familyBrowser)
+                {
+                    ContinueFamilyGuideInRevit(_steps, familyBrowser);
+                    return;
+                }
                 _completed = false;
                 DemoStep step = _steps[_index];
                 if (_window is Famille.FamilyBrowserWindow browser)
@@ -1163,9 +1183,14 @@ namespace BIMaestro.Tutorials
                 // Keep the guide opposite it so the learner can actually click it.
                 _card.HorizontalAlignment = step.Target == "DemoRunReservationButton" ||
                     step.Target == "cbVerticalReference" || step.Target == "btnApplyMapping" ||
-                    step.Target == "OkButton" || step.Target == "DemoRenameButton" ||
+                    (step.Target == "OkButton" && TourId != "pipe-calculation") ||
+                    step.Target == "DemoRenameButton" ||
                     step.Target == "FamilyListView" || step.Target == "GroupedFamilyListView"
                     ? HorizontalAlignment.Left : HorizontalAlignment.Right;
+                _card.VerticalAlignment = TourId == "pipe-calculation"
+                    ? VerticalAlignment.Center
+                    : TourId == "organizer" && step.Target == "SortByLevelCheckBox"
+                    ? VerticalAlignment.Top : VerticalAlignment.Bottom;
                 _title.Text = $"{_index + 1}/{_steps.Length} · {step.Title}";
                 _text.Text = step.Text;
                 _previous.IsEnabled = _index > 0;
@@ -1239,16 +1264,31 @@ namespace BIMaestro.Tutorials
                     textBox.TextChanged += handler;
                     _detachAction = () => textBox.TextChanged -= handler;
                 }
+                else if (target is CheckBox checkBox &&
+                    (targetName == "IncludeDuctsCheckBox" || targetName == "ExportToExcelCheckBox" ||
+                     targetName == "SortByLevelCheckBox"))
+                {
+                    // A checked option already satisfies this step. Clicking it again
+                    // must not force the learner to undo and redo the same choice.
+                    _completed = checkBox.IsChecked == true;
+                    _next.IsEnabled = _completed;
+                    RoutedEventHandler checkedHandler = (_, __) => CompleteStep(expectedIndex);
+                    RoutedEventHandler uncheckedHandler = (_, __) =>
+                    {
+                        _completed = false;
+                        _next.IsEnabled = false;
+                    };
+                    checkBox.Checked += checkedHandler;
+                    checkBox.Unchecked += uncheckedHandler;
+                    _detachAction = () =>
+                    {
+                        checkBox.Checked -= checkedHandler;
+                        checkBox.Unchecked -= uncheckedHandler;
+                    };
+                }
                 else if (target is ButtonBase button)
                 {
-                    RoutedEventHandler handler = (_, __) =>
-                    {
-                        if ((targetName != "ExportToExcelCheckBox" ||
-                             (button as CheckBox)?.IsChecked == false) &&
-                            (targetName != "IncludeDuctsCheckBox" ||
-                             (button as CheckBox)?.IsChecked == true))
-                            CompleteStep(expectedIndex);
-                    };
+                    RoutedEventHandler handler = (_, __) => CompleteStep(expectedIndex);
                     button.Click += handler;
                     _detachAction = () => button.Click -= handler;
                 }
@@ -1329,7 +1369,11 @@ namespace BIMaestro.Tutorials
             private void Highlight(string targetName, int expectedIndex)
             {
                 if (_index != expectedIndex || !_window.IsVisible) return;
-                if (!(_window.FindName(targetName) is FrameworkElement target) || !target.IsVisible) return;
+                FrameworkElement target = targetName == "TutorialFavoriteStar" &&
+                    _window is Famille.FamilyBrowserWindow browser
+                    ? browser.FindTutorialFavoriteStar()
+                    : _window.FindName(targetName) as FrameworkElement;
+                if (target == null || !target.IsVisible) return;
                 target.BringIntoView();
                 _layer = AdornerLayer.GetAdornerLayer(target);
                 if (_layer == null) return;
@@ -1441,13 +1485,13 @@ namespace BIMaestro.Tutorials
             AddCard(stack, "3 · Couleurs et vues",
                 "Personnalise l'arborescence sans renommer ni recréer les vues. Dans l'exercice, tu changes le fond et ajoutes des icônes aux dossiers Plans d'étage et Vues 3D.");
             AddCard(stack, "4 · Calcul des canalisations",
-                "Sélectionne deux réseaux de canalisations avec coudes et une gaine. Coche ou décoche les gaines pour voir leur effet sur le récapitulatif.");
+                "Sélectionne deux réseaux de canalisations avec coudes et une gaine. Un seul calcul affiche le récapitulatif Revit et crée le fichier Excel.");
             AddCard(stack, "5 · Organisateur",
-                "Renumérote le paramètre CML_Numéros de place de quatre places CML_Parking alignées, avec un préfixe et un format.");
+                "Numérote huit places CML_Parking sur deux niveaux, d'abord par niveau puis selon l'ordre de lecture d'une vue 3D tournée de 90°.");
             AddCard(stack, "6 · Gabarit de vue",
                 "Exporte les réglages d'une vue 3D, puis importe-les dans une seconde vue pour créer un vrai gabarit Revit nommé.");
             AddCard(stack, "7 · Gestion Excel",
-                "Exporte les places CML_Parking : numéro et secteur modifiables, repère fixe. Essaie par exemple XL-003 → XL-103, puis importe tes changements. Pikachu vérifie chaque valeur dans Revit.");
+                "Exporte les places CML_Parking : numéro modifiable et repère fixe. Essaie par exemple XL-003 → XL-103, puis importe tes changements. Pikachu vérifie chaque valeur et l'affiche sur la place en 3D.");
             AddCard(stack, "8 · Navigateur de familles",
                 "Explore un catalogue de 35 familles rangées en dossiers et sous-dossiers. Cherche une famille, prévisualise-la en 3D, découvre les photos automatiques et apprends à brancher ta propre bibliothèque.");
             stack.Children.Add(new TextBlock { Text = "Envie d'essayer dans la maquette ?",
