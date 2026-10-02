@@ -124,13 +124,32 @@ namespace BIMaestro.Dashboard
         private void SelectAll_Click(object s, RoutedEventArgs e) => SelectVisible(true);
         private void ClearSelection_Click(object s, RoutedEventArgs e) => SelectVisible(false);
         private void SelectVisible(bool value) { foreach (var item in Picker.Items.Cast<ModelChoice>()) item.Selected = value; RefreshDetail(); }
+        private void Analyze_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button button && button.Tag is string id) OpenAnalysis(id);
+        }
+        private void DetailRange_Click(object sender, RoutedEventArgs e)
+        {
+            if (!(sender is Button button) || !int.TryParse(button.Tag?.ToString(), out int days)) return;
+            _batch = true; From.SelectedDate = DateTime.Today.AddDays(1 - days); To.SelectedDate = DateTime.Today; _batch = false; Refresh();
+        }
+        private void ResetFilters_Click(object sender, RoutedEventArgs e)
+        {
+            _batch = true; Search.Text = ""; ParameterSearch.Text = ""; Kind.SelectedIndex = 0; Version.SelectedIndex = 0;
+            From.SelectedDate = DateTime.Today.AddDays(-14); To.SelectedDate = DateTime.Today;
+            foreach (var choice in _choices) choice.Selected = true;
+            _batch = false; Refresh();
+        }
         private void Overview_Open(object s, MouseButtonEventArgs e)
         {
-            if (!(OverviewTable.SelectedItem is Total total)) return;
+            if (OverviewTable.SelectedItem is Total total) OpenAnalysis(total.Id);
+        }
+        private void OpenAnalysis(string id)
+        {
             _batch = true;
             From.SelectedDate = DateTime.Today.AddDays(1 - _days); To.SelectedDate = DateTime.Today;
             Search.Text = ""; ParameterSearch.Text = ""; Kind.SelectedIndex = 0; Version.SelectedIndex = 0;
-            foreach (var item in _choices) item.Selected = string.Equals(item.Id, total.Id, StringComparison.OrdinalIgnoreCase);
+            foreach (var item in _choices) item.Selected = string.Equals(item.Id, id, StringComparison.OrdinalIgnoreCase);
             Tabs.SelectedIndex = 1; _batch = false; Refresh();
         }
         private void Refresh()
@@ -143,6 +162,11 @@ namespace BIMaestro.Dashboard
             OverviewHours.Text = Duration(recent.Sum(x => x.Hours));
             OverviewAverage.Text = Duration(recent.Sum(x => x.Hours) / Math.Max(1, recent.Select(x => x.When.Date).Distinct().Count()));
             OverviewCount.Text = totals.Count.ToString();
+            int workedDays = recent.Select(x => x.When.Date).Distinct().Count();
+            OverviewWorkedDays.Text = workedDays + " jour(s) avec activité";
+            double previous = _all.Where(x => x.When.Date >= start.AddDays(-_days) && x.When.Date < start).Sum(x => x.Hours);
+            double difference = recent.Sum(x => x.Hours) - previous;
+            OverviewTrend.Text = previous > 0 ? (difference >= 0 ? "+" : "−") + Duration(Math.Abs(difference)) + " vs les " + _days + " jours précédents" : "Pas d’activité sur la période précédente";
             Seven.FontWeight = _days == 7 ? FontWeights.Bold : FontWeights.Normal;
             Fifteen.FontWeight = _days == 15 ? FontWeights.Bold : FontWeights.Normal;
             Seven.SetResourceReference(Control.BorderBrushProperty, _days == 7 ? "Focus" : "Border");
@@ -155,7 +179,7 @@ namespace BIMaestro.Dashboard
             Picker.ItemsSource = _choices.Where(x => available.Contains(x.Id)).ToList();
             _batch = false;
             RefreshDetail();
-            Status.Text = _loadError ?? ("Temps actif enregistré · week-ends inclus · sessions ouvertes de cette instance incluses · actualisé à " + DateTime.Now.ToString("HH:mm") +
+            Status.Text = _loadError ?? ("Historique local · temps actif et sessions ouvertes · actualisé à " + DateTime.Now.ToString("HH:mm") +
                 (_invalidRows > 0 ? " · " + _invalidRows + " ligne(s) illisible(s) ignorée(s)" : ""));
         }
         private bool MatchesFilters(Entry x)
@@ -175,7 +199,9 @@ namespace BIMaestro.Dashboard
             _detail = valid ? _all.Where(x => x.When.Date >= start && x.When.Date <= end && ids.Contains(x.Id) && MatchesFilters(x)).ToList() : new List<Entry>();
             _detailTotals = Totals(_detail);
             DetailTable.ItemsSource = _detailTotals;
-            DetailSummary.Text = valid ? Duration(_detail.Sum(x => x.Hours)) + " · " + _detailTotals.Count + " maquette(s) / famille(s) · " + _detail.Select(x => x.When.Date).Distinct().Count() + " jour(s) travaillé(s)" : "La date de début doit précéder la date de fin.";
+            DetailSummary.Text = valid ? Duration(_detail.Sum(x => x.Hours)) : "Période invalide";
+            DetailContext.Text = valid ? _detailTotals.Count + " document(s) · " + _detail.Select(x => x.When.Date).Distinct().Count() + " jour(s) travaillé(s) · " + start.ToString("dd/MM/yyyy") + " au " + end.ToString("dd/MM/yyyy") : "La date de début doit précéder la date de fin.";
+            DetailChartTitle.Text = (end - start).Days < 31 ? "Temps actif par jour" : "Évolution du temps actif · périodes regroupées";
             SelectionCount.Text = Picker.Items.Cast<ModelChoice>().Count(x => x.Selected) + " document(s) coché(s) parmi les résultats";
             DetailPlot.Model = valid ? Chart(_detail, start, end) : new PlotModel();
             DetailEmpty.Visibility = valid && _detail.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -207,9 +233,9 @@ namespace BIMaestro.Dashboard
             int bucketDays = days <= 31 ? 1 : days <= 180 ? 7 : Math.Max(30, (int)Math.Ceiling(days / 60.0));
             int count = (int)Math.Ceiling(days / (double)bucketDays);
             var axis = new CategoryAxis { Position = AxisPosition.Bottom, GapWidth = 0.35, Angle = count > 15 ? -45 : 0 };
-            for (int i = 0; i < count; i++) axis.Labels.Add(start.AddDays(i * bucketDays).ToString(days > 365 ? "dd/MM/yy" : "dd/MM"));
+            for (int i = 0; i < count; i++) axis.Labels.Add(start.AddDays(i * bucketDays).ToString(days <= 15 ? "ddd dd" : days > 365 ? "dd/MM/yy" : "dd/MM", CultureInfo.GetCultureInfo("fr-FR")));
             model.Axes.Add(axis);
-            model.Axes.Add(new LinearAxis { Position = AxisPosition.Left, Minimum = 0, Title = bucketDays == 1 ? "Heures / jour" : "Heures / période de " + bucketDays + " jours", MajorGridlineStyle = LineStyle.Dot });
+            model.Axes.Add(new LinearAxis { Position = AxisPosition.Left, Minimum = 0, MaximumPadding = 0.2, Title = bucketDays == 1 ? "Heures / jour" : "Heures / période de " + bucketDays + " jours", MajorGridlineStyle = LineStyle.Dot });
             model.Legends.Add(new OxyPlot.Legends.Legend { LegendPosition = OxyPlot.Legends.LegendPosition.BottomCenter, LegendPlacement = OxyPlot.Legends.LegendPlacement.Outside, LegendOrientation = OxyPlot.Legends.LegendOrientation.Horizontal });
             var totals = Totals(rows);
             var top = new HashSet<string>(totals.Take(7).Select(x => x.Id), StringComparer.OrdinalIgnoreCase);
@@ -222,6 +248,15 @@ namespace BIMaestro.Dashboard
                 var hours = group.GroupBy(x => (x.When.Date - start).Days / bucketDays).ToDictionary(x => x.Key, x => x.Sum(y => y.Hours));
                 for (int i = 0; i < count; i++) { hours.TryGetValue(i, out double h); if (h > 0) series.Items.Add(new RectangleBarItem(i - .34, baseline[i], i + .34, baseline[i] + h)); baseline[i] += h; }
                 model.Series.Add(series);
+            }
+            if (days <= 15)
+            {
+                for (int i = 0; i < count; i++)
+                    if (baseline[i] > 0) model.Annotations.Add(new OxyPlot.Annotations.TextAnnotation {
+                        Text = Duration(baseline[i]), TextPosition = new DataPoint(i, baseline[i]),
+                        TextVerticalAlignment = OxyPlot.VerticalAlignment.Bottom, Stroke = OxyColors.Transparent,
+                        TextColor = ThemeColor("Text.Primary"), FontSize = 11
+                    });
             }
             return model;
         }
@@ -261,7 +296,7 @@ namespace BIMaestro.Dashboard
         }
         internal class Entry { public string Id, Name, Path, Version, Kind, Parameters; public DateTime When; public double Hours; public bool Live; }
         [Obfuscation(Exclude = true, ApplyToMembers = true)]
-        internal class Total { public string Id { get; set; } public string Name { get; set; } public string Path { get; set; } public double Hours { get; set; } public string Duration => TimeSeriesDashboardWindow.Duration(Hours); public int Days { get; set; } public DateTime Last { get; set; } public string Versions { get; set; } public double Share { get; set; } public Brush Brush { get; set; } }
+        internal class Total { public string Id { get; set; } public string Name { get; set; } public string Path { get; set; } public double Hours { get; set; } public string Duration => TimeSeriesDashboardWindow.Duration(Hours); public int Days { get; set; } public DateTime Last { get; set; } public string Versions { get; set; } public double Share { get; set; } public string ShareLabel => Share.ToString("0.#", CultureInfo.CurrentCulture) + " %"; public Brush Brush { get; set; } }
         [Obfuscation(Exclude = true, ApplyToMembers = true)]
         private class ModelChoice : INotifyPropertyChanged
         {

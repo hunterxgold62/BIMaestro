@@ -6,51 +6,54 @@
  <Window.Resources><ResourceDictionary>
   <ResourceDictionary.MergedDictionaries><ResourceDictionary Source="/BIMaestro;component/Themes/BIMaestroTheme.xaml"/></ResourceDictionary.MergedDictionaries>
   <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}"><Setter Property="MinWidth" Value="90"/><Setter Property="Margin" Value="0,0,8,0"/></Style>
-  <Style TargetType="DataGrid"><Setter Property="AutoGenerateColumns" Value="False"/><Setter Property="IsReadOnly" Value="True"/><Setter Property="CanUserAddRows" Value="False"/><Setter Property="HeadersVisibility" Value="Column"/><Setter Property="RowHeight" Value="38"/><Setter Property="GridLinesVisibility" Value="None"/><Setter Property="Background" Value="{DynamicResource Surface}"/><Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/><Setter Property="AlternatingRowBackground" Value="{DynamicResource Surface.Subtle}"/><Setter Property="BorderThickness" Value="0"/></Style>
+  <Style TargetType="DataGridColumnHeader"><Setter Property="Background" Value="{DynamicResource Surface.Subtle}"/><Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Padding" Value="8,10"/><Setter Property="BorderThickness" Value="0,0,0,1"/><Setter Property="BorderBrush" Value="{DynamicResource Divider}"/></Style>
+  <Style TargetType="DataGridCell"><Setter Property="BorderThickness" Value="0"/><Setter Property="Padding" Value="4,0"/><Setter Property="VerticalContentAlignment" Value="Center"/><Style.Triggers><Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="{DynamicResource Hover.Fill}"/><Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/></Trigger></Style.Triggers></Style>
+  <Style TargetType="DataGrid"><Setter Property="AutoGenerateColumns" Value="False"/><Setter Property="IsReadOnly" Value="True"/><Setter Property="CanUserAddRows" Value="False"/><Setter Property="HeadersVisibility" Value="Column"/><Setter Property="RowHeight" Value="46"/><Setter Property="GridLinesVisibility" Value="None"/><Setter Property="Background" Value="{DynamicResource Surface}"/><Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/><Setter Property="AlternatingRowBackground" Value="{DynamicResource Surface.Subtle}"/><Setter Property="BorderThickness" Value="0"/></Style>
  </ResourceDictionary></Window.Resources>
  <Grid Margin="24"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-  <Border Background="{DynamicResource Brand}" Margin="-24,-24,-24,18" Padding="24,20">
+  <Border Background="{DynamicResource Brand}" Margin="-24,-24,-24,18" Padding="24,16">
    <DockPanel>
     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center"><Button Content="Ouvrir Excel" Click="Excel_Click"/><Button Content="Actualiser" Click="Reload_Click"/></StackPanel>
-    <StackPanel><TextBlock Text="BIMaestro  /  ANALYSE" Foreground="White" Opacity="0.75" FontSize="11" FontWeight="SemiBold" Margin="0,0,0,8"/><TextBlock Text="Votre temps dans Revit" Style="{StaticResource H1}"/><TextBlock Text="Du quotidien au détail de chaque maquette." Foreground="White" Opacity="0.8" FontSize="12" Margin="0,6,0,0"/></StackPanel>
+    <StackPanel><TextBlock Text="BIMaestro  /  ANALYSE" Foreground="White" Opacity="0.75" FontSize="11" FontWeight="SemiBold" Margin="0,0,0,8"/><TextBlock Text="Temps par projet" Style="{StaticResource H1}"/><TextBlock Text="Votre activité Revit, du quotidien au détail." Foreground="White" Opacity="0.8" FontSize="12" Margin="0,6,0,0"/></StackPanel>
    </DockPanel>
   </Border>
   <TabControl x:Name="Tabs" Grid.Row="1" SelectionChanged="Tabs_Changed">
    <TabItem Header="Aperçu"><Grid Margin="0,16,0,0"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="2*"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-    <DockPanel><StackPanel DockPanel.Dock="Right" Orientation="Horizontal"><Button x:Name="Seven" Content="7 jours" Tag="7" Click="Range_Click"/><Button x:Name="Fifteen" Content="15 jours" Tag="15" Click="Range_Click"/></StackPanel><TextBlock x:Name="OverviewPeriod" Style="{StaticResource H2}" VerticalAlignment="Center"/></DockPanel>
+    <DockPanel><StackPanel DockPanel.Dock="Right" Orientation="Horizontal"><Button x:Name="Seven" Content="7 jours" Tag="7" Click="Range_Click"/><Button x:Name="Fifteen" Content="15 jours" Tag="15" Click="Range_Click"/></StackPanel><StackPanel><TextBlock Text="Votre activité récente" FontSize="20" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}"/><TextBlock x:Name="OverviewPeriod" Style="{StaticResource Hint}" Margin="0,4,0,0"/></StackPanel></DockPanel>
     <UniformGrid Grid.Row="1" Columns="3" Margin="0,12,0,14">
-     <Border Style="{StaticResource Card}" Margin="0,0,12,0"><StackPanel><TextBlock Text="Temps actif total" Style="{StaticResource Hint}"/><TextBlock x:Name="OverviewHours" FontSize="30" FontWeight="SemiBold"/></StackPanel></Border>
-     <Border Style="{StaticResource Card}" Margin="0,0,12,0"><StackPanel><TextBlock Text="Par jour travaillé" Style="{StaticResource Hint}"/><TextBlock x:Name="OverviewAverage" FontSize="30" FontWeight="SemiBold"/></StackPanel></Border>
-     <Border Style="{StaticResource Card}"><StackPanel><TextBlock Text="Maquettes et familles utilisées" Style="{StaticResource Hint}"/><TextBlock x:Name="OverviewCount" FontSize="30" FontWeight="SemiBold"/></StackPanel></Border>
+     <Border Style="{StaticResource Card}" Margin="0,0,12,0"><StackPanel><TextBlock Text="Temps actif total" Style="{StaticResource Hint}"/><TextBlock x:Name="OverviewHours" FontSize="30" FontWeight="SemiBold"/><TextBlock x:Name="OverviewTrend" Style="{StaticResource Hint}" Margin="0,8,0,0"/></StackPanel></Border>
+     <Border Style="{StaticResource Card}" Margin="0,0,12,0"><StackPanel><TextBlock Text="Par jour travaillé" Style="{StaticResource Hint}"/><TextBlock x:Name="OverviewAverage" FontSize="30" FontWeight="SemiBold"/><TextBlock x:Name="OverviewWorkedDays" Style="{StaticResource Hint}" Margin="0,8,0,0"/></StackPanel></Border>
+     <Border Style="{StaticResource Card}"><StackPanel><TextBlock Text="Documents utilisés" Style="{StaticResource Hint}"/><TextBlock x:Name="OverviewCount" FontSize="30" FontWeight="SemiBold"/><TextBlock Text="Maquettes et familles" Style="{StaticResource Hint}" Margin="0,8,0,0"/></StackPanel></Border>
     </UniformGrid>
-    <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,0,0,14"><Grid><oxy:PlotView x:Name="OverviewPlot"/><TextBlock x:Name="OverviewEmpty" Text="Aucune activité enregistrée sur cette période." HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/></Grid></Border>
-    <Border Grid.Row="3" Style="{StaticResource Card}"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition/></Grid.RowDefinitions><TextBlock Text="Vos maquettes · double-cliquez pour analyser" Style="{StaticResource H2}"/>
+    <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,0,0,14"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition/></Grid.RowDefinitions><TextBlock Text="Temps actif par jour" Style="{StaticResource H2}"/><oxy:PlotView x:Name="OverviewPlot" Grid.Row="1"/><TextBlock x:Name="OverviewEmpty" Grid.Row="1" Text="Aucune activité enregistrée sur cette période." HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/></Grid></Border>
+    <Border Grid.Row="3" Style="{StaticResource Card}"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition/></Grid.RowDefinitions><TextBlock Text="Répartition par document" Style="{StaticResource H2}"/>
      <DataGrid x:Name="OverviewTable" Grid.Row="1" MouseDoubleClick="Overview_Open"><DataGrid.Columns>
-      <DataGridTextColumn Header="Maquette / famille" Binding="{Binding Name}" Width="*"/>
-      <DataGridTemplateColumn Header="Part du temps" Width="220"><DataGridTemplateColumn.CellTemplate><DataTemplate><ProgressBar Value="{Binding Share}" Maximum="100" Height="8" Margin="0,12,12,12" Foreground="{Binding Brush}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
-      <DataGridTextColumn Header="Temps actif" Binding="{Binding Duration}" Width="130"/>
+      <DataGridTemplateColumn Header="Maquette / famille" SortMemberPath="Name" Width="*"><DataGridTemplateColumn.CellTemplate><DataTemplate><StackPanel Margin="8,4"><TextBlock Text="{Binding Name}" FontWeight="SemiBold"/><TextBlock Text="{Binding Path}" TextTrimming="CharacterEllipsis" FontSize="10" Foreground="{DynamicResource Text.Secondary}" ToolTip="{Binding Path}"/></StackPanel></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+      <DataGridTemplateColumn Header="Part du temps" Width="200"><DataGridTemplateColumn.CellTemplate><DataTemplate><DockPanel Margin="0,0,12,0"><TextBlock DockPanel.Dock="Right" Text="{Binding ShareLabel}" Width="44" TextAlignment="Right" VerticalAlignment="Center" FontSize="12"/><ProgressBar Value="{Binding Share}" Maximum="100" Height="6" Margin="0,0,8,0" VerticalAlignment="Center" Foreground="{Binding Brush}"/></DockPanel></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+      <DataGridTextColumn Header="Temps actif" Binding="{Binding Duration}" SortMemberPath="Hours" Width="110"/><DataGridTemplateColumn Header="" Width="95"><DataGridTemplateColumn.CellTemplate><DataTemplate><Button Content="Analyser" MinWidth="75" Height="30" Tag="{Binding Id}" Click="Analyze_Click"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
      </DataGrid.Columns></DataGrid></Grid></Border>
    </Grid></TabItem>
    <TabItem Header="Analyse détaillée"><Grid Margin="0,16,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="290"/><ColumnDefinition/></Grid.ColumnDefinitions>
     <Border Style="{StaticResource Card}" Margin="0,0,16,0"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-     <StackPanel><TextBlock Text="Période et maquettes" Style="{StaticResource H2}"/><TextBlock Text="Du" Style="{StaticResource Hint}"/><DatePicker x:Name="From" SelectedDateChanged="Filter_Changed"/><TextBlock Text="Au (inclus)" Style="{StaticResource Hint}" Margin="0,8,0,0"/><DatePicker x:Name="To" SelectedDateChanged="Filter_Changed"/>
-      <TextBlock Text="Rechercher un nom ou un chemin" Style="{StaticResource Hint}" Margin="0,12,0,4"/><TextBox x:Name="Search" TextChanged="Search_Changed"/>
-      <Expander Header="Filtres complémentaires" Margin="0,0,0,10"><StackPanel Margin="0,8,0,0">
+     <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="360"><StackPanel><TextBlock Text="Période et maquettes" Style="{StaticResource H2}"/><TextBlock Text="Du" Style="{StaticResource Hint}"/><DatePicker x:Name="From" SelectedDateChanged="Filter_Changed"/><TextBlock Text="Au (inclus)" Style="{StaticResource Hint}" Margin="0,8,0,0"/><DatePicker x:Name="To" SelectedDateChanged="Filter_Changed"/>
+      <WrapPanel Margin="0,12,0,8"><Button Content="7 j" Tag="7" MinWidth="65" Click="DetailRange_Click"/><Button Content="15 j" Tag="15" MinWidth="65" Click="DetailRange_Click"/><Button Content="30 j" Tag="30" MinWidth="65" Click="DetailRange_Click"/></WrapPanel><TextBlock Text="Rechercher un nom ou un chemin" Style="{StaticResource Hint}" Margin="0,12,0,4"/><TextBox x:Name="Search" TextChanged="Search_Changed"/>
+      <Expander x:Name="AdvancedFilters" Header="Filtres complémentaires" Margin="0,0,0,10"><StackPanel Margin="0,8,0,0">
        <TextBlock Text="Type de document" Style="{StaticResource Hint}"/><ComboBox x:Name="Kind" SelectedIndex="0" SelectionChanged="Filter_Changed"><ComboBoxItem Content="Maquettes et familles"/><ComboBoxItem Content="Maquettes (.rvt)"/><ComboBoxItem Content="Familles (.rfa)"/></ComboBox>
        <TextBlock Text="Version Revit" Style="{StaticResource Hint}"/><ComboBox x:Name="Version" SelectionChanged="Filter_Changed"/>
        <TextBlock Text="Paramètres du projet" Style="{StaticResource Hint}"/><TextBox x:Name="ParameterSearch" ToolTip="Rechercher un nom de paramètre ou une valeur enregistrée." TextChanged="Search_Changed"/>
       </StackPanel></Expander>
-     </StackPanel>
+      <Button Content="Réinitialiser les filtres" Click="ResetFilters_Click" Margin="0,0,0,10"/>
+     </StackPanel></ScrollViewer>
      <WrapPanel Grid.Row="1" Margin="0,0,0,8"><Button Content="Tout cocher" Click="SelectAll_Click"/><Button Content="Tout décocher" Click="ClearSelection_Click"/></WrapPanel>
      <ListBox x:Name="Picker" Grid.Row="2" BorderThickness="0" Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled"><ListBox.ItemTemplate><DataTemplate><CheckBox Content="{Binding Name}" ToolTip="{Binding Path}" IsChecked="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Checked="Selection_Changed" Unchecked="Selection_Changed"/></DataTemplate></ListBox.ItemTemplate></ListBox>
      <TextBlock Grid.Row="3" x:Name="SelectionCount" Style="{StaticResource Hint}" Margin="0,10,0,0"/>
     </Grid></Border>
     <Grid Grid.Column="1"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="2*"/><RowDefinition Height="3*"/></Grid.RowDefinitions>
      <DockPanel><Button x:Name="PdfButton" DockPanel.Dock="Right" Content="Exporter PDF" Style="{StaticResource PrimaryButton}" Click="Pdf_Click"/><TextBlock Text="Temps sur la sélection" Style="{StaticResource H2}"/></DockPanel>
-     <TextBlock x:Name="DetailSummary" Grid.Row="1" FontSize="20" FontWeight="SemiBold" Margin="0,12,0,12" TextWrapping="Wrap"/>
-     <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,0,0,14"><Grid><oxy:PlotView x:Name="DetailPlot"/><TextBlock x:Name="DetailEmpty" Text="Aucune activité pour cette sélection." HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/></Grid></Border>
+     <StackPanel Grid.Row="1" Margin="0,8,0,16"><TextBlock x:Name="DetailSummary" FontSize="30" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock x:Name="DetailContext" Style="{StaticResource Hint}" Margin="0,4,0,0"/></StackPanel>
+     <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,0,0,14"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition/></Grid.RowDefinitions><TextBlock x:Name="DetailChartTitle" Style="{StaticResource H2}"/><oxy:PlotView x:Name="DetailPlot" Grid.Row="1"/><TextBlock x:Name="DetailEmpty" Grid.Row="1" Text="Aucune activité pour cette sélection." HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/></Grid></Border>
      <Border Grid.Row="3" Style="{StaticResource Card}"><DataGrid x:Name="DetailTable"><DataGrid.Columns>
-      <DataGridTextColumn Header="Maquette / famille" Binding="{Binding Name}" Width="*"/>
+      <DataGridTemplateColumn Header="Maquette / famille" SortMemberPath="Name" Width="*"><DataGridTemplateColumn.CellTemplate><DataTemplate><StackPanel Margin="8,4"><TextBlock Text="{Binding Name}" FontWeight="SemiBold"/><TextBlock Text="{Binding Path}" TextTrimming="CharacterEllipsis" FontSize="10" Foreground="{DynamicResource Text.Secondary}" ToolTip="{Binding Path}"/></StackPanel></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
       <DataGridTextColumn Header="Temps actif" Binding="{Binding Duration}" SortMemberPath="Hours" Width="100"/>
       <DataGridTextColumn Header="Jours" Binding="{Binding Days}" Width="55"/>
       <DataGridTextColumn Header="Dernière activité" Binding="{Binding Last, StringFormat=dd/MM/yyyy}" Width="120"/>
@@ -59,6 +62,6 @@
     </Grid>
    </Grid></TabItem>
   </TabControl>
-  <TextBlock Grid.Row="2" x:Name="Status" Style="{StaticResource Hint}" Margin="0,14,0,0"/>
+  <TextBlock Grid.Row="2" x:Name="Status" ToolTip="Temps actif uniquement. Week-ends inclus. Les sessions ouvertes de cette instance Revit sont incluses." Style="{StaticResource Hint}" Margin="0,14,0,0"/>
  </Grid>
 </Window>
