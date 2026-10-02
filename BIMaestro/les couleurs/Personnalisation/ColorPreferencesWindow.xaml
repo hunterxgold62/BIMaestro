@@ -24,9 +24,11 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <TextBlock Style="{StaticResource H1}" Text="Apparence BIMaestro" />
+                <Button Grid.Column="1" Content="Revoir le guide" Click="RestartAppearanceTutorial_Click"
+                        Padding="10,4" ToolTip="Reprendre le guide pas à pas dans cette fenêtre" />
             </Grid>
         </Border>
-        <TabControl Grid.Row="1" Background="{DynamicResource TabBackground}" Foreground="{DynamicResource Text.Primary}">
+        <TabControl x:Name="AppearanceTabs" Grid.Row="1" Background="{DynamicResource TabBackground}" Foreground="{DynamicResource Text.Primary}">
             <TabControl.Resources>
                 <!-- Aligne les onglets de la fenêtre Couleurs sur ceux de la fenêtre Options. -->
                 <Style TargetType="TabItem">
@@ -71,7 +73,7 @@
                     </Style.Triggers>
                 </Style>
             </TabControl.Resources>
-            <TabItem Header="Mes panneaux BIMaestro">
+            <TabItem x:Name="MyPanelsTab" Header="Mes panneaux BIMaestro">
                 <Border Style="{StaticResource Card}">
                     <Grid>
                         <Grid.RowDefinitions>
@@ -84,7 +86,7 @@
                             <StackPanel>
                                 <Border MinWidth="235" Margin="0,0,0,12" Padding="13,9" VerticalAlignment="Center" Background="{DynamicResource Surface.Subtle}" BorderBrush="#70FFFFFF" BorderThickness="1" CornerRadius="10" HorizontalAlignment="Left">
                                     <StackPanel>
-                                        <CheckBox Foreground="{DynamicResource Text.Primary}" FontWeight="SemiBold" Content="Afficher les couleurs de mes panneaux" IsChecked="{Binding AreColoredPanelsEnabled, Mode=TwoWay}" />
+                                        <CheckBox x:Name="TutorialEnablePanels" Foreground="{DynamicResource Text.Primary}" FontWeight="SemiBold" Content="Afficher les couleurs de mes panneaux" IsChecked="{Binding AreColoredPanelsEnabled, Mode=TwoWay}" />
                                         <CheckBox Margin="0,8,0,0" Foreground="{DynamicResource Text.Primary}" FontWeight="SemiBold" Content="Colorer tout le panneau" IsEnabled="{Binding AreColoredPanelsEnabled}" IsChecked="{Binding UseFullPanelColoring, Mode=TwoWay}" />
                                     </StackPanel>
                                 </Border>
@@ -96,7 +98,7 @@
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}" Text="Style pour tous" />
-                                    <ComboBox Grid.Column="1" Height="34" Margin="14,0,8,0" VerticalContentAlignment="Center" ItemsSource="{Binding PresetEntries}" SelectedValuePath="Name" SelectedValue="{Binding SelectedPresetName, Mode=TwoWay}">
+                                    <ComboBox x:Name="TutorialPresetChoice" Grid.Column="1" Height="34" Margin="14,0,8,0" VerticalContentAlignment="Center" ItemsSource="{Binding PresetEntries}" SelectedValuePath="Name" SelectedValue="{Binding SelectedPresetName, Mode=TwoWay}">
                                         <ComboBox.ItemContainerStyle>
                                             <Style TargetType="ComboBoxItem">
                                                 <Style.Triggers>
@@ -132,7 +134,7 @@
                                             </DataTemplate>
                                         </ComboBox.ItemTemplate>
                                     </ComboBox>
-                                    <Button Grid.Column="2" Height="34" MinWidth="110" Style="{StaticResource SecondaryButton}" Content="Utiliser ce style" Click="ApplyPresetButton_Click" />
+                                    <Button x:Name="TutorialApplyPreset" Grid.Column="2" Height="34" MinWidth="110" Style="{StaticResource SecondaryButton}" Content="Utiliser ce style" Click="ApplyPresetButton_Click" />
                                     <TextBlock Grid.Column="3" Margin="14,0,0,0" VerticalAlignment="Center" Style="{StaticResource Hint}" Text="Ce choix remplit les lignes ci-dessous. Enregistrez ensuite vos réglages." />
                                 </Grid>
                             </StackPanel>
@@ -183,7 +185,7 @@
                     </Grid>
                 </Border>
             </TabItem>
-            <TabItem Header="Vues et dossiers">
+            <TabItem x:Name="ViewsAndFoldersTab" Header="Vues et dossiers">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <Border Margin="0,0,4,4" Style="{StaticResource Card}">
                         <Grid>
@@ -200,10 +202,10 @@
                                     <TextBlock Style="{StaticResource H2}" Text="Vues et dossiers" />
                                     <TextBlock Margin="0,4,0,0" Style="{StaticResource Hint}" Text="{Binding BrowserSourceLabel}" ToolTip="{Binding BrowserSourceStatus}" />
                                 </StackPanel>
-                                <CheckBox Grid.Column="1" Margin="18,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold" Content="Personnalisation active" IsChecked="{Binding BrowserPreferences.IsEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                <CheckBox x:Name="TutorialEnableBrowser" Grid.Column="1" Margin="18,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold" Content="Personnalisation active" IsChecked="{Binding BrowserPreferences.IsEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                             </Grid>
-                            <TabControl Grid.Row="1" Margin="0,14,0,0" SelectedIndex="2">
-                                <TabItem Header="Fond et aperçu">
+                            <TabControl x:Name="BrowserTabs" Grid.Row="1" Margin="0,14,0,0" SelectedIndex="2">
+                                <TabItem x:Name="BrowserBackgroundTab" Header="Fond et aperçu">
                                     <StackPanel Margin="0,8,0,0">
                                         <Grid Margin="0,16,0,0">
                                             <Grid.ColumnDefinitions>
@@ -477,7 +479,7 @@
                                                         <TextBlock Text="Aperçu fixe ici ; animation dans Revit." Style="{StaticResource Hint}" Margin="0,4,0,0" />
                                                     </StackPanel>
                                                     <TextBlock Margin="0,0,0,5" Style="{StaticResource Hint}" FontWeight="SemiBold" Text="Fond principal" />
-                                                    <ui:SimpleColorPicker HorizontalAlignment="Stretch" SelectedColor="{Binding BrowserPreferences.BackgroundColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                    <ui:SimpleColorPicker x:Name="TutorialBackgroundColor" HorizontalAlignment="Stretch" SelectedColor="{Binding BrowserPreferences.BackgroundColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                                     <Grid Margin="0,8,0,0">
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="*" />
@@ -498,7 +500,7 @@
                                         </Grid>
                                     </StackPanel>
                                 </TabItem>
-                                <TabItem Header="Types de vues">
+                                <TabItem x:Name="ViewTypesTab" Header="Types de vues">
                                     <StackPanel Margin="0,8,0,0">
                                         <Border Margin="0,14,0,0" Padding="16" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Brand}" BorderThickness="1" CornerRadius="10" IsEnabled="{Binding BrowserPreferences.IsEnabled}">
                                             <StackPanel>
@@ -512,7 +514,7 @@
                                                         <TextBlock Margin="0,5,24,0" Style="{StaticResource Hint}" TextWrapping="Wrap" Text="Activez les couleurs de vues ici. Les styles des dossiers se règlent séparément dans l’onglet Dossiers." />
                                                     </StackPanel>
                                                     <StackPanel Grid.Column="1" Margin="20,0,0,0">
-                                                        <CheckBox Margin="0,0,0,10" FontWeight="SemiBold" Content="Colorer les vues selon leur type" IsChecked="{Binding BrowserPreferences.IsViewTypeColoringEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                        <CheckBox x:Name="TutorialColorViewTypes" Margin="0,0,0,10" FontWeight="SemiBold" Content="Colorer les vues selon leur type" IsChecked="{Binding BrowserPreferences.IsViewTypeColoringEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                                         <Grid Margin="0,10,0,0" IsEnabled="{Binding BrowserPreferences.IsViewTypeColoringEnabled}">
                                                             <Grid.ColumnDefinitions>
                                                                 <ColumnDefinition Width="*" />
@@ -568,13 +570,16 @@
                                         </Border>
                                     </StackPanel>
                                 </TabItem>
-                                <TabItem Header="Dossiers">
+                                <TabItem x:Name="BrowserFoldersTab" Header="Dossiers">
                                     <StackPanel Margin="0,8,0,0">
                                         <Border Margin="0,14,0,0" Padding="18" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Brand}" BorderThickness="1" CornerRadius="10">
                                             <StackPanel>
                                                 <TextBlock FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}" Text="Colorer un dossier" />
                                                 <TextBlock Margin="0,5,0,14" Style="{StaticResource Hint}" Text="Choisissez-le dans votre arborescence et voyez le résultat avant de l’appliquer." />
                                                 <Button HorizontalAlignment="Left" MinWidth="220" Style="{StaticResource PrimaryButton}" Content="Choisir un dossier…" Click="ChooseBrowserFolderButton_Click" />
+                                                <Button x:Name="TutorialGoToIconsFromFolders" HorizontalAlignment="Left" Margin="0,8,0,0"
+                                                        MinWidth="220" Style="{StaticResource SecondaryButton}"
+                                                        Content="Ajouter une icône à un dossier…" Click="GoToBrowserIconsButton_Click" />
                                             </StackPanel>
                                         </Border>
                                         <Expander Margin="0,20,0,0" Header="Gérer les règles existantes et les options avancées" IsExpanded="False">
@@ -664,21 +669,21 @@
                                         </Expander>
                                     </StackPanel>
                                 </TabItem>
-                                <TabItem Header="Icônes">
+                                <TabItem x:Name="BrowserIconsTab" Header="Icônes">
                                     <StackPanel Margin="0,8,0,0">
                                         <Border Margin="0,14,0,0" Padding="16" Background="{DynamicResource Surface.Subtle}" BorderBrush="{DynamicResource Border}" BorderThickness="1" CornerRadius="10">
                                             <StackPanel>
                                                 <TextBlock FontSize="14" FontWeight="SemiBold" Text="Icônes devant les noms" Foreground="{DynamicResource Text.Primary}" />
                                                 <TextBlock Margin="0,6,0,10" Style="{StaticResource Hint}" TextWrapping="Wrap" Text="Revit 2024 à 2027 · Choisissez une image et indiquez le nom exact du groupe ou de la vue. Les noms du projet restent inchangés. La première règle correspondante est utilisée, sans distinction majuscules/minuscules." />
-                                                <CheckBox Content="Afficher mes icônes (indépendamment des couleurs)" IsChecked="{Binding BrowserIcons.Enabled, Mode=TwoWay}" />
+                                                <CheckBox x:Name="TutorialEnableIcons" Content="Afficher mes icônes (indépendamment des couleurs)" IsChecked="{Binding BrowserIcons.Enabled, Mode=TwoWay}" />
                                                 <Expander Margin="0,10,0,0" Header="Choisir les images et les noms" IsExpanded="True">
                                                     <StackPanel Margin="0,10,0,0">
                                                         <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap" Text="10 images créées par IA sont incluses. Symboles simples, affichés à 18 px. Vous pouvez aussi importer une image ; privilégiez un PNG transparent avec un seul symbole." />
                                                         <StackPanel Orientation="Horizontal" Margin="0,10,0,10">
-                                                            <Button Content="+ Ajouter un nom" Style="{StaticResource SecondaryButton}" Click="AddBrowserIconRule_Click" />
+                                                            <Button x:Name="TutorialAddIconRule" Content="+ Ajouter un nom" Style="{StaticResource SecondaryButton}" Click="AddBrowserIconRule_Click" />
                                                             <Button Content="Importer une image…" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}" Click="ImportBrowserIcon_Click" />
                                                         </StackPanel>
-                                                        <ItemsControl ItemsSource="{Binding BrowserIcons.Rules}">
+                                                        <ItemsControl x:Name="TutorialIconRules" ItemsSource="{Binding BrowserIcons.Rules}">
                                                             <ItemsControl.ItemTemplate>
                                                                 <DataTemplate>
                                                                     <Grid Margin="0,0,0,6">
@@ -828,6 +833,28 @@
                 </Border>
             </TabItem>
         </TabControl>
+        <Border x:Name="AppearanceGuideCard" Grid.Row="1" Panel.ZIndex="100" Visibility="Collapsed"
+                HorizontalAlignment="Right" VerticalAlignment="Bottom" Width="320" Margin="12"
+                Padding="15" CornerRadius="12" Background="{DynamicResource Surface.Subtle}"
+                BorderBrush="DarkOrange" BorderThickness="2">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <Image x:Name="AppearanceGuideSprite" Width="30" Height="30" Margin="0,0,8,0" />
+                    <TextBlock x:Name="AppearanceGuideTitle" VerticalAlignment="Center" FontSize="15"
+                               FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}"
+                               TextWrapping="Wrap" Width="245" />
+                </StackPanel>
+                <TextBlock x:Name="AppearanceGuideText" Margin="0,10,0,10" TextWrapping="Wrap"
+                           Foreground="{DynamicResource Text.Primary}" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button x:Name="AppearanceGuidePrevious" Content="Précédent" Click="AppearanceGuidePrevious_Click"
+                            Padding="8,4" Margin="0,0,6,0" />
+                    <Button x:Name="AppearanceGuideNext" Content="Suivant" Click="AppearanceGuideNext_Click"
+                            Padding="8,4" Margin="0,0,6,0" />
+                    <Button Content="Quitter" Click="AppearanceGuideQuit_Click" Padding="8,4" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
         <Grid Grid.Row="2" Margin="0,10,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
@@ -835,7 +862,7 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <Button Grid.Column="1" Margin="0,0,8,0" MinWidth="100" Style="{StaticResource SecondaryButton}" Content="Fermer sans enregistrer" ToolTip="Les actions déjà appliquées au projet restent en place." IsCancel="True" />
-            <Button Grid.Column="2" MinWidth="170" Style="{StaticResource PrimaryButton}" Content="Enregistrer mes réglages" IsDefault="True" Click="SaveButton_Click" />
+            <Button x:Name="TutorialSave" Grid.Column="2" MinWidth="170" Style="{StaticResource PrimaryButton}" Content="Enregistrer mes réglages" IsDefault="True" Click="SaveButton_Click" />
         </Grid>
     </Grid>
 </Window>

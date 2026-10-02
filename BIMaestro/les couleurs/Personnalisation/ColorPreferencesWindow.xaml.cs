@@ -1318,7 +1318,14 @@ namespace Couleur
 
         private void SaveButton_Click(object sender, RoutedEventArgs e)
         {
-            SaveSettingsAndContinue(Close);
+            bool guided = _appearanceGuideStep >= 0;
+            SaveSettingsAndContinue(() =>
+            {
+                Close();
+                if (guided)
+                    TaskDialog.Show("Pikachu - Couleurs et vues",
+                        "Tes réglages sont enregistrés. Regarde l'arborescence du projet : compare la couleur du fond et les icônes devant « Plans d'étage » et « Vues 3D ». Tu peux rouvrir Couleurs pour ajuster le résultat.");
+            });
         }
 
         private void SaveSettingsAndContinue(System.Action next)

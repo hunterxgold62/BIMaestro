@@ -105,8 +105,12 @@
                         </StackPanel>
                     </Grid>
 
+                    <TextBlock x:Name="CompanyLabel" Margin="2,12,0,6" Style="{StaticResource Label}"
+                               Text="Entreprise (facultatif — pour ma collection de cartes d’entreprise 😊)"/>
+                    <TextBox x:Name="CompanyBox" Height="40" Padding="12,4"/>
+
                     <TextBlock x:Name="PrivacyText" Margin="2,7,0,0" Style="{StaticResource TrustText}"
-                               Text="Votre adresse sert uniquement à vous tenir au courant de BIMaestro. Vous pourrez la retirer à tout moment dans Option."/>
+                               Text="Votre adresse sert uniquement à vous tenir au courant de BIMaestro. Ces informations sont modifiables ou supprimables depuis Options."/>
 
                     <Border Margin="0,14,0,0" Padding="12" CornerRadius="12"
                             Background="#FFFBEB" BorderBrush="#FDE68A" BorderThickness="1">

@@ -106,6 +106,7 @@ namespace BIMaestro.ViewHover
             if (activeDocument == null) { RestoreTabs(); return; }
             DependencyObject root = HwndSource.FromHwnd(app.MainWindowHandle)?.RootVisual;
             var nativeTabs = new HashSet<TabItem>(FindDocumentTabs(root));
+            TabCompanionService.Refresh(nativeTabs);
             foreach (TabItem removed in Tabs.Keys.Where(tab => !nativeTabs.Contains(tab)).ToList())
             {
                 Tabs[removed].Dispose();
@@ -215,6 +216,7 @@ namespace BIMaestro.ViewHover
 
         private static void RestoreTabs()
         {
+            TabCompanionService.Clear();
             foreach (ViewDeckTabPresentation tab in Tabs.Values) tab.Dispose();
             Tabs.Clear();
         }

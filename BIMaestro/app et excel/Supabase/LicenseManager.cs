@@ -170,6 +170,7 @@ namespace Licensing
             string email,
             string firstName,
             string lastName,
+            string company,
             string machineIdHash = null)
         {
             if (string.IsNullOrWhiteSpace(jwtLicenseToken))
@@ -180,6 +181,7 @@ namespace Licensing
             var normalizedEmail = string.IsNullOrWhiteSpace(email) ? null : email;
             var normalizedFirstName = string.IsNullOrWhiteSpace(firstName) ? null : firstName;
             var normalizedLastName = string.IsNullOrWhiteSpace(lastName) ? null : lastName;
+            var normalizedCompany = string.IsNullOrWhiteSpace(company) ? null : company.Trim();
 
             using var client = NetSupport.CreateHttpClient(TimeSpan.FromSeconds(15));
 
@@ -192,6 +194,7 @@ namespace Licensing
                 normalizedEmail,
                 normalizedFirstName,
                 normalizedLastName,
+                normalizedCompany,
                 machineIdHash,
                 UiLanguage.CurrentLanguageCode);
 
@@ -215,11 +218,12 @@ namespace Licensing
             string email,
             string firstName,
             string lastName,
+            string company,
             string machineIdHash = null)
         {
             try
             {
-                UpsertUserProfile(jwtLicenseToken, installId, email, firstName, lastName, machineIdHash);
+                UpsertUserProfile(jwtLicenseToken, installId, email, firstName, lastName, company, machineIdHash);
                 return true;
             }
             catch

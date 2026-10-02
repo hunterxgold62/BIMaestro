@@ -79,10 +79,12 @@
                 </StackPanel>
             </Border>
         </StackPanel>
-        <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+        <WrapPanel Grid.Row="6" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <Button x:Name="LocalExportButton" Content="Enregistrer les GLB en ZIP…" Click="LocalExportButton_Click"
+                    ToolTip="Enregistre les tuiles GLB et leurs propriétés sur votre poste, sans envoi sur Cloudflare."/>
             <Button Content="Fermer" Click="CloseButton_Click"/>
             <Button x:Name="PublishButton" Content="Partager sur le web" Background="#FF45D6D1" Foreground="#FF071315" FontWeight="SemiBold" Margin="0" Click="PublishButton_Click"/>
-        </StackPanel>
+        </WrapPanel>
     </Grid>
     </ScrollViewer>
 </Window>

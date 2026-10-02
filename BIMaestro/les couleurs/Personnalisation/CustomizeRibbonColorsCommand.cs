@@ -39,6 +39,7 @@ namespace Couleur
             if (_openWindow != null && _openWindow.IsVisible)
             {
                 _openWindow.Activate();
+                if (AppearanceOnboarding.ConsumeColorClick()) _openWindow.StartAppearanceTutorial();
                 return;
             }
             if (_openPreferencesEvent == null)
@@ -80,6 +81,7 @@ namespace Couleur
             if (_openWindow != null && _openWindow.IsVisible)
             {
                 _openWindow.Activate();
+                if (AppearanceOnboarding.ConsumeColorClick()) _openWindow.StartAppearanceTutorial();
                 return;
             }
 
@@ -101,6 +103,7 @@ namespace Couleur
             };
             window.Show();
             window.Activate();
+            if (AppearanceOnboarding.ConsumeColorClick()) window.StartAppearanceTutorial();
         }
 
         internal static void ReapplyColors(IntPtr mainWindowHandle)

@@ -1925,9 +1925,11 @@ namespace Analyse
         private void ExecuteRestoreDeleted(List<ElementHistoryEvent> events)
         {
             string message;
+            bool restoredForTutorial = false;
             try
             {
                 var result = ElementHistoryRestoration.Restore(_doc, events.Where(IsDeletion).Select(ToRestoreRequest));
+                restoredForTutorial = result.Created > 0;
                 message = UiLanguage.T(
                     $"{result.Created} élément(s) restauré(s).\n{result.Existing} déjà présent(s).\n{result.Failed} non restauré(s).",
                     $"{result.Created} element(s) restored.\n{result.Existing} already present.\n{result.Failed} not restored.");
@@ -1984,6 +1986,7 @@ namespace Analyse
             Dispatcher.BeginInvoke(new Action(() =>
             {
                 UpdateVisualizeButtonLabel();
+                if (restoredForTutorial) BIMaestro.Tutorials.DemoTourService.ReportRestoration(this);
                 MessageBox.Show(this, message, UiLanguage.T("Restaurer les éléments", "Restore elements"), MessageBoxButton.OK, MessageBoxImage.Information);
             }));
         }

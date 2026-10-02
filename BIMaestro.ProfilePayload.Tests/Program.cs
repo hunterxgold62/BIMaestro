@@ -35,6 +35,8 @@ namespace Licensing.Tests
                 $"Expected '{input}' to produce '{expected}'.");
             Assert((string)payload["install_id"] == "install-123",
                 "Existing profile fields must remain present.");
+            Assert((string)payload["company"] == "Analytical Engines",
+                "Company must be included in the profile payload.");
         }
 
         private static void AssertLanguageOmitted(string input)
@@ -47,7 +49,7 @@ namespace Licensing.Tests
         private static JObject CreatePayload(string language)
         {
             return ProfilePayload.Create(
-                "install-123", "user@example.com", "Ada", "Lovelace", "hash", language);
+                "install-123", "user@example.com", "Ada", "Lovelace", "Analytical Engines", "hash", language);
         }
 
         private static void Assert(bool condition, string message)

@@ -613,6 +613,21 @@ namespace Couleur
             }
         }
 
+        internal static DrawingImage CreateCompanionImage()
+        {
+            var drawing = new DrawingGroup();
+            AddPixelSprite(drawing, PikachuPixels, new Dictionary<char, Color>
+            {
+                ['K'] = Color.FromRgb(23, 24, 22),
+                ['Y'] = Color.FromRgb(253, 213, 30),
+                ['B'] = Color.FromRgb(154, 93, 51),
+                ['R'] = Color.FromRgb(227, 64, 63)
+            }, 0, 0, 1);
+            var image = new DrawingImage(drawing);
+            image.Freeze();
+            return image;
+        }
+
         private static readonly string[] PikachuPixels =
         {
             ".KK...............KK...",

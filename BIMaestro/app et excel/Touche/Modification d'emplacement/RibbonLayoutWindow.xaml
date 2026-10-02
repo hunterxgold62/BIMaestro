@@ -295,6 +295,9 @@
                                 </StackPanel>
                             </Grid>
 
+                            <TextBlock Style="{StaticResource Label}" Text="Entreprise (facultatif — pour ma collection de cartes d’entreprise 😊)"/>
+                            <TextBox x:Name="CompanyBox" Text="{Binding Company, UpdateSourceTrigger=PropertyChanged}"/>
+
                             <TextBlock Style="{StaticResource Hint}" Text="Ces informations restent modifiables à tout moment."/>
 
                             <Border Background="{DynamicResource Surface.Subtle}"

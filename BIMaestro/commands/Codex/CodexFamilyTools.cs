@@ -3,6 +3,9 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.IO;
+using System.Text;
+using System.Text.RegularExpressions;
 
 namespace BIMaestro.Codex
 {
@@ -12,6 +15,11 @@ namespace BIMaestro.Codex
             ["inputSchema"] = new JObject { ["type"] = "object", ["properties"] = properties, ["required"] = new JArray(properties.Properties().Select(p => p.Name)), ["additionalProperties"] = false } };
         internal static IEnumerable<JObject> Definitions()
         {
+            yield return Tool("revit_import_family_lookup_table", "Crée un CSV temporaire à partir de csv_text et importe une nouvelle table de consultation dans la famille OUVERTE. Le nom devient celui utilisé par size_lookup dans les formules. Lire revit_inspect_family avant ; ne remplace jamais une table homonyme. En-tête CSV Revit : première colonne vide, puis Nom##TYPE##UNITÉ (par exemple Diametre##LENGTH##MILLIMETERS). Autorisation de modification et confirmation habituelles ; une transaction annulable, sans sauvegarde automatique. Les formules se configurent ensuite avec revit_configure_family.", new JObject {
+                ["document_key"] = new JObject { ["type"] = "string", ["maxLength"] = 100 },
+                ["table_name"] = new JObject { ["type"] = "string", ["maxLength"] = 70 },
+                ["csv_text"] = new JObject { ["type"] = "string", ["maxLength"] = 100000 }
+            });
             yield return Tool("revit_family_program_contract", "Lit le contrat du moteur général de programmes API pour la famille ouverte. À consulter dès qu'un outil spécialisé ne couvre pas la géométrie ou l'édition demandée : profils libres, solides/vides, révolutions, balayages, familles imbriquées détaillées, réseaux natifs et contraintes. Ne pas conclure que seule une forme rectangulaire est possible sans examiner cette voie.", new JObject());
             yield return Tool("revit_family_api", "Recherche les types et signatures natifs réellement disponibles dans cette version Revit. type_name vide liste les types correspondant à member_name ; sinon nom CLR complet du type, member_name filtre ses membres. Pagination offset/limit. Utiliser avec le contrat de programmes avant de construire un appel inconnu.", new JObject {
                 ["type_name"] = new JObject { ["type"] = "string", ["maxLength"] = 200 }, ["member_name"] = new JObject { ["type"] = "string", ["maxLength"] = 100 },
@@ -54,7 +62,7 @@ namespace BIMaestro.Codex
                 family_categories = CodexFamilyDesign.Categories, edit_open_family_category = true,
                 live_family_element_inventory = true, edit_open_family_drawing_groups = true, edit_unassociated_extrusion_extents = true,
                 configure_existing_family_parameters = true, existing_family_formulas = true, existing_family_parameter_associations = true,
-                instance_visibility_switches_on_existing_elements = true, existing_family_named_types = true, native_family_programs = true, native_api_discovery = true, arbitrary_nested_geometry_programs = true },
+                instance_visibility_switches_on_existing_elements = true, existing_family_named_types = true, native_family_programs = true, native_api_discovery = true, arbitrary_nested_geometry_programs = true, family_lookup_table_import = true },
             native_validation = "Essais de variation pendant chaque création. Pas de certification générale de toutes les combinaisons par la seule compilation.",
             limitations = new[] { "Les limites de formes ci-dessous concernent les outils spécialisés ; revit_run_family_program expose une voie API générale pour les profils/solides/vides, modules imbriqués et réseaux natifs. Consulter le contrat et les signatures avant de refuser ou simplifier une demande.", "Extrusions selon X/Y/Z : profils rectangulaires ou polygonaux droits pilotés par leurs sommets ; barres arrays inclinables de 0 à 180 degrés.", "Les pièces cachées doivent rester géométriquement valides.", "Les paramètres existants compatibles sont réutilisés sans distinction de majuscules. Pour un paramètre partagé existant, fournir son GUID. Un conflit de type, de formule ou de portée non convertible exige un autre nom ; ne pas réessayer le même nom.",
                 "Connecteurs au centre d'une face d'une pièce pleine, avec section paramétrique. Les réglages électriques de puissance/tension ne sont pas exposés.",
@@ -66,13 +74,77 @@ namespace BIMaestro.Codex
                 "representation_2d : lignes/arcs/cercles symboliques ou de modèle, régions à un contour fermé simple (uni, hachure diagonale, masque). Coordonnées fixes, sans association aux dimensions ; symbolic_outlines reste disponible pour les rectangles paramétriques. Les lignes de modèle restent visibles en 3D.",
                 "Édition de familles existantes : dessins ajoutés/remplacés par groupes identifiés, sans masquage automatique de la 3D ; limites des extrusions non associées modifiables. Les outils spécialisés ne réécrivent pas les profils existants et dessins manuels ; utiliser le moteur de programmes lorsque les API natives le permettent. Paramètres, formules, portée et associations configurables par revit_configure_family. Les dessins libres restent fixes lors du redimensionnement.",
                 "Un FreeForm ne devient pas automatiquement paramétrique. Examiner les API de géométrie native et les contraintes dans le moteur de programmes avant de proposer une reconstruction." } };
+        internal static object ImportLookupTable(Document doc, JObject args, Func<string, string, bool> confirm,
+            Func<string, Transaction> newTransaction, Action<Transaction> commit)
+        {
+            CodexFamilyDesign.Keys(args, "document_key", "table_name", "csv_text");
+            string key = CodexFamilyDesign.String(args, "document_key", 100);
+            if (!doc.IsFamilyDocument || doc.OwnerFamily.UniqueId != key)
+                throw new InvalidOperationException("La famille active ne correspond pas à l'inventaire ; relire revit_inspect_family.");
+            string name = CodexFamilyDesign.String(args, "table_name", 70).Trim();
+            if (!Regex.IsMatch(name, @"^[\p{L}\p{N}_ -]{1,70}$"))
+                throw new InvalidOperationException("Nom de table invalide : lettres, chiffres, espaces, tirets et soulignés uniquement.");
+            string csv = args["csv_text"]?.Type == JTokenType.String ? (string)args["csv_text"] : null;
+            if (string.IsNullOrWhiteSpace(csv) || csv.Length > 100000 || csv.Any(c => char.IsControl(c) && c != '\r' && c != '\n'))
+                throw new InvalidOperationException("csv_text doit contenir au plus 100 000 caractères de CSV en lignes de texte.");
+            csv = csv.Replace("\r\n", "\n").Replace('\r', '\n');
+            var lines = csv.TrimEnd('\n').Split('\n');
+            if (lines.Length < 2 || lines.Length > 1001 || !lines[0].StartsWith(",", StringComparison.Ordinal) ||
+                lines[0].IndexOf("##", StringComparison.Ordinal) < 0 || lines.Any(line => line.Length == 0 || line.IndexOf('\0') >= 0))
+                throw new InvalidOperationException("CSV invalide : en-tête Revit commençant par une colonne vide, colonnes typées avec ##, puis 1 à 1000 lignes non vides.");
+            using (var existing = FamilySizeTableManager.GetFamilySizeTableManager(doc, doc.OwnerFamily.Id))
+                if (existing != null && existing.GetAllSizeTableNames().Any(table => string.Equals(table, name, StringComparison.OrdinalIgnoreCase)))
+                    throw new InvalidOperationException("Une table de ce nom existe déjà ; choisir un autre nom.");
+            if (!confirm("Ajouter la table de consultation « " + name + " »", (lines.Length - 1) + " lignes dans la famille « " + doc.Title + " ».\nAucune table existante ne sera remplacée. Un Ctrl+Z annule l'import. Aucun enregistrement automatique."))
+                throw new InvalidOperationException("Import refusé par l'utilisateur. Ne pas réessayer sans nouvelle demande.");
+            string folder = Path.Combine(Path.GetTempPath(), "BIMaestroLookup_" + Guid.NewGuid().ToString("N"));
+            string path = Path.Combine(folder, name + ".csv");
+            try
+            {
+                Directory.CreateDirectory(folder);
+                File.WriteAllText(path, csv, new UTF8Encoding(false));
+                using (var transaction = newTransaction("Codex — table de consultation " + name))
+                {
+                    var manager = FamilySizeTableManager.GetFamilySizeTableManager(doc, doc.OwnerFamily.Id);
+                    if (manager == null)
+                    {
+                        if (!FamilySizeTableManager.CreateFamilySizeTableManager(doc, doc.OwnerFamily.Id))
+                            throw new InvalidOperationException("Revit n'a pas pu créer le gestionnaire de tables de consultation.");
+                        manager = FamilySizeTableManager.GetFamilySizeTableManager(doc, doc.OwnerFamily.Id);
+                    }
+                    if (manager == null) throw new InvalidOperationException("Gestionnaire de tables de consultation indisponible.");
+                    using (manager)
+                    using (var error = new FamilySizeTableErrorInfo())
+                    {
+                        if (!manager.ImportSizeTable(doc, path, error))
+                            throw new InvalidOperationException("Import CSV refusé par Revit : " + error.FamilySizeTableErrorType +
+                                ", ligne " + error.InvalidRowIndex + ", colonne " + error.InvalidColumnIndex + ", en-tête « " + error.InvalidHeaderText + " ».");
+                        if (!manager.HasSizeTable(name))
+                            throw new InvalidOperationException("L'import n'a pas créé la table attendue ; transaction annulée.");
+                    }
+                    commit(transaction);
+                }
+                return new { imported = true, table_name = name, row_count = lines.Length - 1, saved = false,
+                    note = "Table intégrée à la famille ouverte. Les formules size_lookup peuvent maintenant la référencer. Un Ctrl+Z annule l'import." };
+            }
+            finally
+            {
+                try { if (File.Exists(path)) File.Delete(path); if (Directory.Exists(folder)) Directory.Delete(folder); }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+            }
+        }
         internal static object Read(Document doc)
         {
             if (!doc.IsFamilyDocument) throw new InvalidOperationException("Ouvrez une famille pour lire ses paramètres.");
             var manager = doc.FamilyManager; var type = manager.CurrentType;
             var family = doc.OwnerFamily;
+            string[] lookupTables;
+            using (var tableManager = FamilySizeTableManager.GetFamilySizeTableManager(doc, family.Id))
+                lookupTables = tableManager?.GetAllSizeTableNames().ToArray() ?? new string[0];
             var categoryCode = CodexFamilyDesign.Categories.FirstOrDefault(c => Category.GetCategory(doc, CodexFamilyBuilder.CategoryId(c))?.Id == family.FamilyCategory?.Id);
             return new { category = categoryCode, category_name = family.FamilyCategory?.Name,
+                lookup_tables = lookupTables,
                 placement_type = family.FamilyPlacementType.ToString(), hosting_behavior = family.get_Parameter(BuiltInParameter.FAMILY_HOSTING_BEHAVIOR)?.AsInteger(),
                 current_type = type?.Name, types = manager.Types.Cast<FamilyType>().Take(64).Select(t => t.Name).ToArray(),
                 parameters = manager.Parameters.Cast<FamilyParameter>().OrderBy(p => p.Definition.Name.StartsWith("BIM_", StringComparison.Ordinal) ? 1 : 0).Take(150).Select(p => new {

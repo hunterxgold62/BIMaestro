@@ -304,6 +304,7 @@
     <Compile Include="commands\Jeux vidéos\Maquette jouable\RevitGameWindow.MepImpact.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameSectionPlane.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\RevitGameWindow.Section.cs" />
+    <Compile Include="commands\Jeux vidéos\Maquette jouable\RevitGameWindow.MiniMap.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepDirectionExplanation.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepDiagnostics.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepFlowRenderer.cs" />
@@ -372,6 +373,9 @@
     <Compile Include="commands\vue en survol\ViewDeckTabPresentation.cs" />
     <Compile Include="commands\vue en survol\ViewDeckTabIdentity.cs" />
     <Compile Include="commands\vue en survol\ViewDeckService.cs" />
+    <Compile Include="commands\vue en survol\TabCompanionService.cs" />
+    <Compile Include="commands\Tutoriels\DemoProjectCommand.cs" />
+    <Compile Include="commands\Tutoriels\DemoTourService.cs" />
     <Compile Include="commands\vue en survol\ViewDeckPreviewCache.cs" />
     <Compile Include="commands\vue en survol\ViewDeckPreviewMemory.cs" />
     <Compile Include="commands\vue en survol\ViewThumbnailBatchWindow.xaml.cs">
@@ -600,6 +604,8 @@
     <Compile Include="les couleurs\Personnalisation\ColorPreferencesWindow.xaml.cs">
       <DependentUpon>ColorPreferencesWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="les couleurs\Personnalisation\ColorPreferencesWindow.Tutorial.cs" />
+    <Compile Include="les couleurs\Personnalisation\AppearanceOnboarding.cs" />
     <Compile Include="les couleurs\Personnalisation\CustomizeRibbonColorsCommand.cs" />
     <Compile Include="les couleurs\Personnalisation\RevitColorPreferencesWindow.xaml.cs">
       <DependentUpon>RevitColorPreferencesWindow.xaml</DependentUpon>

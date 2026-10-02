@@ -160,3 +160,19 @@ button { font:inherit; }
 @container (max-width: 900px) { .viewport .markup-list { top: 142px; bottom: 120px; } }
 @container (max-width: 450px) { .viewport .markup-list { top: 178px; bottom: 120px; } }
 @media (max-height: 600px) { .viewport .markup-list { top: 64px; bottom: 12px; z-index: 45; } }
+
+/* Stack the map below Isometric and above the unchanged appearance controls. */
+.viewer-left-column { position: absolute; left: 12px; top: 58px; z-index: 3; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; max-width: calc(100% - 24px); max-height: calc(100% - 130px); overflow-y: auto; overscroll-behavior: contain; }
+.viewer-mini-map-tools { width: 282px; max-width: 100%; flex-shrink: 0; }
+.viewport .viewer-left-column .appearance-toolbar { position: static; flex-shrink: 0; }
+.viewer-map-show, .viewer-mini-map header button { border: 1px solid #5e776c; border-radius: 6px; background: #102019ed; color: #f3faf6; padding: 7px 10px; font-size: 12px; cursor: pointer; }
+.viewer-mini-map-tools button:focus-visible { outline: 2px solid #f59e0b; outline-offset: 2px; }
+.viewer-map-show kbd { border: 1px solid #5e776c; padding: 1px 4px; border-radius: 3px; font: inherit; }
+.viewer-mini-map { border: 1px solid #5e776c; border-radius: 9px; background: #102019f5; color: #dcece4; overflow: hidden; }
+.viewer-mini-map[hidden] { display: none; }
+.viewer-mini-map header { padding: 5px 10px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; }
+.viewer-mini-map canvas { display: block; width: 100%; aspect-ratio: 1; }
+@container (max-width: 900px) { .viewer-left-column { top: 96px; max-height: calc(100% - 174px); } .viewer-left-column.with-mini-map { top: 142px; max-height: calc(100% - 220px); } .viewer-mini-map-tools { width: 242px; } }
+@media (max-width: 700px) { .viewer-left-column { top: 116px; max-height: calc(100% - 196px); } }
+@container (max-width: 450px) { .viewer-left-column { top: 132px; max-height: calc(100% - 204px); } .viewer-left-column.with-mini-map { top: 178px; max-height: calc(100% - 250px); } .viewer-mini-map-tools { width: 202px; } }
+@media (max-height: 650px) { .viewer-mini-map-tools { width: 202px; } }

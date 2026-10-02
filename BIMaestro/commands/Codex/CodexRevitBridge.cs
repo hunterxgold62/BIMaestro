@@ -564,7 +564,7 @@ namespace BIMaestro.Codex
                 }
                 finally { foreach (var curve in curves) curve.Dispose(); }
             }
-            if (tool != "revit_family_box" && tool != "revit_set_family_length" && tool != "revit_set_family_angle" && tool != "revit_family_shapes" && tool != "revit_set_family_parameters" && tool != "revit_set_family_category" && tool != "revit_edit_family_representation" && tool != "revit_edit_family_extrusion" && tool != "revit_configure_family" && tool != "revit_run_family_program") throw new InvalidOperationException("Outil Revit inconnu.");
+            if (tool != "revit_family_box" && tool != "revit_set_family_length" && tool != "revit_set_family_angle" && tool != "revit_family_shapes" && tool != "revit_set_family_parameters" && tool != "revit_set_family_category" && tool != "revit_edit_family_representation" && tool != "revit_edit_family_extrusion" && tool != "revit_configure_family" && tool != "revit_run_family_program" && tool != "revit_import_family_lookup_table") throw new InvalidOperationException("Outil Revit inconnu.");
             if (!AllowChanges) throw new InvalidOperationException("Mode lecture seule : l'utilisateur doit activer les modifications dans le panneau.");
             if (!document.IsFamilyDocument || document.IsReadOnly || document.IsModifiable)
                 throw new InvalidOperationException("Ouvrez une famille modifiable dans l'éditeur de familles, hors de toute autre commande.");
@@ -573,6 +573,7 @@ namespace BIMaestro.Codex
             if (tool == "revit_edit_family_representation") return CodexFamilyEditor.EditRepresentation(document, args, Confirm, NewTransaction, Commit);
             if (tool == "revit_edit_family_extrusion") return CodexFamilyEditor.EditExtrusion(document, args, Confirm, NewTransaction, Commit);
             if (tool == "revit_configure_family") return CodexFamilyConfiguration.Apply(document, args, Confirm, NewTransaction, Commit);
+            if (tool == "revit_import_family_lookup_table") return CodexFamilyTools.ImportLookupTable(document, args, Confirm, NewTransaction, Commit);
             if (tool == "revit_run_family_program") return CodexFamilyProgram.Run(app, document, args, Confirm);
 
             if (tool == "revit_family_shapes")

@@ -271,6 +271,47 @@ namespace BIMaestro.VideoGames
                 JsonSettings);
         }
 
+        public static void WriteLocalTilesZip(GameSceneData scene, string path, string name,
+            CancellationToken cancellation)
+        {
+            if (scene.WebTiles.Count == 0)
+                throw new InvalidOperationException("La géométrie web n'est plus disponible.");
+            using (var output = new FileStream(path, FileMode.CreateNew, FileAccess.Write))
+            using (var archive = new ZipArchive(output, ZipArchiveMode.Create))
+            {
+                foreach (var tile in scene.WebTiles)
+                {
+                    cancellation.ThrowIfCancellationRequested();
+                    string fileName = Path.GetFileNameWithoutExtension(tile.Name);
+                    using (var input = new MemoryStream(tile.Bytes))
+                    using (var gzip = new GZipStream(input, CompressionMode.Decompress))
+                    using (var target = archive.CreateEntry(fileName, CompressionLevel.Optimal).Open())
+                        gzip.CopyTo(target);
+                }
+                void WriteFile(string fileName, byte[] bytes)
+                {
+                    cancellation.ThrowIfCancellationRequested();
+                    using (var target = archive.CreateEntry(fileName, CompressionLevel.Optimal).Open())
+                        target.Write(bytes, 0, bytes.Length);
+                }
+                if (scene.WebOverviewGlb.Length > 0) WriteFile("overview.glb", scene.WebOverviewGlb);
+                WriteFile("properties.json", Encoding.UTF8.GetBytes(scene.WebPropertiesJson ?? "[]"));
+                WriteFile("manifest.json", Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new
+                {
+                    name, documentTitle = scene.MepGraph.DocumentTitle, viewName = scene.ViewName,
+                    createdUtc = DateTime.UtcNow, units = "revit-internal-feet",
+                    coordinateSystem = "right-handed-y-up",
+                    sourceDocumentId = scene.SourceDocumentId,
+                    sourceOrigin = new[] { scene.SourceOrigin.X, scene.SourceOrigin.Y, scene.SourceOrigin.Z },
+                    tiles = scene.WebTiles.Select(tile => new
+                    {
+                        name = Path.GetFileNameWithoutExtension(tile.Name),
+                        bounds = tile.Bounds, elements = tile.Elements, bytes = tile.DecodedBytes
+                    })
+                }, JsonSettings)));
+            }
+        }
+
         public static GameMepWebPackageResult Build(
             GameSceneData scene,
             string publicationName)

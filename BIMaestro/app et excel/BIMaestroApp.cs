@@ -168,6 +168,7 @@ public class BIMaestroApp : IExternalApplication
             BIMaestro.Codex.CodexCommunityCommand.Shutdown();
             BIMaestro.MepBooster.MepBoosterService.Shutdown();
             BIMaestro.ViewHover.ViewDeckService.Shutdown();
+            Couleur.AppearanceOnboarding.Shutdown();
             try { Telemetry.FlushAsync().GetAwaiter().GetResult(); }
             catch { }
             finally { Telemetry.Shutdown(); }
@@ -206,6 +207,7 @@ public class BIMaestroApp : IExternalApplication
             RefreshProjectBrowserActiveViewWhenNeeded();
             BIMaestro.ViewHover.ViewHoverPreviewService.ProcessPending(_uiApp);
             BIMaestro.ViewHover.ViewDeckService.ProcessIdling(_uiApp);
+            Couleur.AppearanceOnboarding.ProcessIdling(_uiApp);
 
             if (!Couleur.ColoringStateManager.IsColoringActive)
             {

@@ -18,6 +18,7 @@ namespace BIMaestro.Welcome
         public string Email => EmailBox?.Text?.Trim();
         public string FirstName => FirstNameBox?.Text?.Trim();
         public string LastName => LastNameBox?.Text?.Trim();
+        public string Company => CompanyBox?.Text?.Trim();
         private readonly bool communityProfileRequired;
 
         public WelcomeWindow() : this(false, null) { }
@@ -28,7 +29,7 @@ namespace BIMaestro.Welcome
             ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
             LogoImage.Source = LoadBitmapFromResource("BIMaestro.png");
-            if (existing != null) { EmailBox.Text = existing.Email ?? ""; FirstNameBox.Text = existing.FirstName ?? ""; LastNameBox.Text = existing.LastName ?? ""; }
+            if (existing != null) { EmailBox.Text = existing.Email ?? ""; FirstNameBox.Text = existing.FirstName ?? ""; LastNameBox.Text = existing.LastName ?? ""; CompanyBox.Text = existing.Company ?? ""; }
             if (communityProfileRequired)
             {
                 Title = "BIMaestro — Profil de la bibliothèque commune";

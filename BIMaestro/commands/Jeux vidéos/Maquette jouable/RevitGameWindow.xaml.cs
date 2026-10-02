@@ -320,6 +320,9 @@ namespace BIMaestro.VideoGames
         private void RevitGameWindow_Closed(object sender, EventArgs e)
         {
             _isClosing = true;
+            MiniMapImage2D.ImageStream = null;
+            _miniMapStream?.Dispose();
+            _miniMapStream = null;
             _sectionLines.Clear();
             _sectionMeshes.Clear();
             // Garantit que la toute dernière action est écrite même si Revit
@@ -945,6 +948,7 @@ namespace BIMaestro.VideoGames
                 cameraFootPosition.Z + _currentEyeHeight);
             _camera.LookDirection = look * 10.0;
             _camera.UpDirection = new Vector3D(0, 0, 1);
+            UpdateMiniMap(cameraFootPosition);
 
             if (_realisticLight)
                 HeadLight.Direction = look;
@@ -1110,6 +1114,13 @@ namespace BIMaestro.VideoGames
                 return;
 
             RegisterForwardDoubleTap(e.Key);
+
+            if (e.Key == Key.M)
+            {
+                MiniMapToggle_Click(this, new RoutedEventArgs());
+                e.Handled = true;
+                return;
+            }
 
             if (e.Key == Key.Space && !_flyMode && _grounded)
             {

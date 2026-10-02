@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -137,6 +138,49 @@ namespace BIMaestro.VideoGames
             return Math.Max(1, bytes / 1024).ToString() + " Ko";
         }
 
+        private async void LocalExportButton_Click(object sender, RoutedEventArgs e)
+        {
+            string name = PublicationNameTextBox.Text.Trim();
+            if (string.IsNullOrWhiteSpace(name)) name = "Maquette MEP";
+            string safeName = new string(name.Select(character =>
+                Path.GetInvalidFileNameChars().Contains(character) ? '_' : character).ToArray());
+            var dialog = new Microsoft.Win32.SaveFileDialog
+            {
+                Title = "Enregistrer les tuiles GLB en local",
+                Filter = "Archive ZIP (*.zip)|*.zip", DefaultExt = ".zip",
+                AddExtension = true, FileName = safeName + " - GLB.zip"
+            };
+            if (dialog.ShowDialog(this) != true) return;
+            var scene = ExportScene;
+            string temporaryPath = dialog.FileName + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            SetBusy(true);
+            _cancellation = new CancellationTokenSource();
+            var token = _cancellation.Token;
+            StatusText.Text = "Création du ZIP local…";
+            PublishProgressBar.Value = 0;
+            try
+            {
+                await Task.Run(() => GameMepWebPackage.WriteLocalTilesZip(scene, temporaryPath, name, token), token);
+                token.ThrowIfCancellationRequested();
+                if (File.Exists(dialog.FileName)) File.Replace(temporaryPath, dialog.FileName, null);
+                else File.Move(temporaryPath, dialog.FileName);
+                PublishProgressBar.Value = 100;
+                StatusText.Text = scene.WebTiles.Count + " tuiles GLB enregistrées : " + dialog.FileName;
+            }
+            catch (OperationCanceledException) { StatusText.Text = "Export local annulé."; }
+            catch (Exception exception)
+            {
+                Debug.WriteLine("Export GLB local impossible : " + exception);
+                StatusText.Text = "Export local impossible : " + exception.Message;
+            }
+            finally
+            {
+                try { if (File.Exists(temporaryPath)) File.Delete(temporaryPath); }
+                catch (Exception exception) { Debug.WriteLine(exception); }
+                SetBusy(false);
+            }
+        }
+
         private async void PublishButton_Click(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrWhiteSpace(PublicationNameTextBox.Text))
@@ -222,6 +266,7 @@ namespace BIMaestro.VideoGames
             LinksPanel.IsEnabled = !busy;
             LightenButton.IsEnabled = !busy && !_analyzing && _lighterSize < _originalSize;
             PublishButton.IsEnabled = !busy;
+            LocalExportButton.IsEnabled = !busy;
             PublicationNameTextBox.IsEnabled = !busy;
         }
 

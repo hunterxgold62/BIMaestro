@@ -152,6 +152,17 @@ namespace Modification
             OnCriteriaChanged(null, null);
         }
 
+        internal void PrepareManualTutorial()
+        {
+            // The guided exercise lets the learner pick the crossing in the model.
+            chkAutomatique.IsChecked = false;
+            chkDynamo.IsChecked = false;
+            chkDoubleLink.IsChecked = false;
+            chkMulti.IsChecked = false;
+            comboPipeSource.SelectedIndex = 0;
+            OnCriteriaChanged(null, null);
+        }
+
         private void RefreshProfilesSummary()
         {
             if (txtConfigProgress == null || txtSelectedConfigStatus == null)

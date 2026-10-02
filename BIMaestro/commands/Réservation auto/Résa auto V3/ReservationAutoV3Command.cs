@@ -43,6 +43,8 @@ namespace Modification
 
                 // UI
                 var win = new ReservationAutoV3Window(doc, cfg);
+                bool guided = BIMaestro.Tutorials.DemoTourService.AttachIfRequested("reservation", win);
+                if (guided) win.PrepareManualTutorial();
                 if (win.ShowDialog() != true)
                     return Result.Cancelled;
 
@@ -75,17 +77,57 @@ namespace Modification
                     return Result.Cancelled;
                 }
 
+                if (guided && !win.AutomatiqueEnabled)
+                    TaskDialog.Show("BIMaestro - Formation",
+                        "Dans la vue 3D, clique d'abord sur la canalisation qui traverse le mur, puis sur ce mur. " +
+                        "BIMaestro placera ta réservation à leur croisement. Appuie sur Échap pour arrêter la sélection.");
+
+                var reservationsBefore = guided
+                    ? new HashSet<string>(FindInstances(doc, reservationSymbol.Id).Select(instance => instance.UniqueId))
+                    : null;
+                int createdForTutorial = 0;
                 using (var t = new Transaction(doc, "Réservations Auto V3"))
                 {
                     t.Start();
                     if (!reservationSymbol.IsActive) reservationSymbol.Activate();
 
                     if (!win.AutomatiqueEnabled)
-                        RunManual(uiDoc, doc, win, cfg, prof, reservationSymbol);
+                        RunManual(uiDoc, doc, win, cfg, prof, reservationSymbol, guided);
                     else
                         RunAutomatic(doc, win, cfg, prof, reservationSymbol);
 
+                    if (guided)
+                    {
+                        doc.Regenerate();
+                        foreach (FamilyInstance instance in FindInstances(doc, reservationSymbol.Id)
+                            .Where(candidate => !reservationsBefore.Contains(candidate.UniqueId)))
+                        {
+                            Parameter mark = instance.get_Parameter(BuiltInParameter.ALL_MODEL_MARK);
+                            if (mark != null && !mark.IsReadOnly)
+                                mark.Set(BIMaestro.Tutorials.DemoProjectBuilder.DemoPrefix + "RESERVATION_CREEE");
+                            createdForTutorial++;
+                        }
+                    }
                     t.Commit();
+                }
+
+                if (guided)
+                {
+                    var createdInstances = FindInstances(doc, reservationSymbol.Id)
+                        .Where(instance => !reservationsBefore.Contains(instance.UniqueId)).ToList();
+                    try
+                    {
+                        var ids = createdInstances.Select(instance => instance.Id).ToList();
+                        if (ids.Count > 0)
+                        {
+                            uiDoc.Selection.SetElementIds(ids);
+                            uiDoc.ShowElements(ids);
+                        }
+                    }
+                    catch (Exception ex) { System.Diagnostics.Trace.WriteLine("BIMaestro tutorial focus: " + ex.Message); }
+                    TaskDialog.Show("BIMaestro - Formation", createdForTutorial > 0
+                        ? "Bravo ! Tu as créé " + createdForTutorial + " réservation(s). BIMaestro les a sélectionnées et cadrées dans la vue. Regarde leur position dans le mur, puis leurs dimensions dans Propriétés."
+                        : "Aucune réservation n'a été créée. Relance le parcours et sélectionne d'abord la canalisation, puis le mur qu'elle traverse.");
                 }
 
                 // Dynamo
@@ -100,6 +142,10 @@ namespace Modification
                 return Result.Failed;
             }
         }
+
+        private static List<FamilyInstance> FindInstances(Document doc, ElementId symbolId) =>
+            new FilteredElementCollector(doc).OfClass(typeof(FamilyInstance)).Cast<FamilyInstance>()
+                .Where(instance => instance.GetTypeId().Equals(symbolId)).ToList();
 
         // =========================
         // AUTO CONFIG (V1/V2 déjà dans maquette)
@@ -301,7 +347,8 @@ namespace Modification
             ReservationAutoV3Window win,
             ReservationAutoV3Config cfg,
             ProfileConfig prof,
-            FamilySymbol reservationSymbol)
+            FamilySymbol reservationSymbol,
+            bool guided)
         {
             bool isWall = win.SelectedHost == ReservationAutoV3Window.HostTarget.Mur;
             bool isRect = win.SelectedShape == ReservationAutoV3Window.ShapeTarget.Rectangulaire;
@@ -310,16 +357,17 @@ namespace Modification
                 ? UiLanguage.T(" Les deux éléments doivent appartenir à un lien.", " Both elements must belong to a linked model.")
                 : "";
             string hostLabel = isWall ? UiLanguage.T("mur", "wall") : UiLanguage.T("sol", "floor");
-            TaskDialog.Show("BIMaestro", UiLanguage.T(
-                $"Mode manuel : sélectionne l’objet, puis le {hostLabel}.{linkScope}\nECHAP pour arrêter.",
-                $"Manual mode: select the object, then the {hostLabel}.{linkScope}\nPress ESC to stop."));
+            if (!guided)
+                TaskDialog.Show("BIMaestro", UiLanguage.T(
+                    $"Mode manuel : sélectionne l’objet, puis le {hostLabel}.{linkScope}\nECHAP pour arrêter.",
+                    $"Manual mode: select the object, then the {hostLabel}.{linkScope}\nPress ESC to stop."));
 
             while (true)
             {
                 List<MepSelection> picked;
                 try
                 {
-                    picked = PickElements(uiDoc, doc, win, multi: win.MultiEnabled && isRect);
+                    picked = PickElements(uiDoc, doc, win, multi: win.MultiEnabled && isRect, guided: guided);
                 }
                 catch
                 {
@@ -423,15 +471,21 @@ namespace Modification
                             ? UiLanguage.T("Sélectionne le mur", "Select the wall")
                             : UiLanguage.T("Sélectionne le sol", "Select the floor"));
 
-                    var rHost = uiDoc.Selection.PickObject(ObjectType.Element,
-                        new LocalHostSelectionFilter(win.SelectedHost),
-                        hostPrompt + UiLanguage.T(" (ESC pour annuler)", " (press ESC to cancel)"));
-                    host = doc.GetElement(rHost);
+                    if (guided && isWall && !pickComesFromLink)
+                        host = PickGuidedWall(uiDoc, doc);
+                    else
+                    {
+                        var rHost = uiDoc.Selection.PickObject(ObjectType.Element,
+                            new LocalHostSelectionFilter(win.SelectedHost),
+                            hostPrompt + UiLanguage.T(" (ESC pour annuler)", " (press ESC to cancel)"));
+                        host = doc.GetElement(rHost);
+                    }
                 }
                 catch
                 {
                     break;
                 }
+                if (host == null) break;
 
                 if (isWall && host is not Wall)
                 {
@@ -641,8 +695,55 @@ namespace Modification
             public bool IsLinked { get; set; }
         }
 
-        private List<MepSelection> PickElements(UIDocument uiDoc, Document doc, ReservationAutoV3Window win, bool multi)
+        private static List<MepSelection> PickGuidedPipe(UIDocument uiDoc, Document doc)
         {
+            while (true)
+            {
+                Reference reference;
+                try
+                {
+                    reference = uiDoc.Selection.PickObject(ObjectType.Element,
+                        "Étape 1/2 : clique sur la canalisation qui traverse le mur (Échap pour arrêter)");
+                }
+                catch (Autodesk.Revit.Exceptions.OperationCanceledException) { return new List<MepSelection>(); }
+
+                Element element = doc.GetElement(reference);
+                if (element is Pipe)
+                    return new List<MepSelection> { new MepSelection
+                    {
+                        Element = element, TransformToCurrentDocument = Transform.Identity, IsLinked = false
+                    } };
+                TaskDialog.Show("Pikachu - Auto réservation", element is Wall
+                    ? "Tu as choisi le mur en premier. Commence par la canalisation qui le traverse ; nous choisirons le mur juste après."
+                    : "Ce n'est pas une canalisation. Clique sur le tuyau de démonstration qui traverse le mur.");
+            }
+        }
+
+        private static Element PickGuidedWall(UIDocument uiDoc, Document doc)
+        {
+            while (true)
+            {
+                Reference reference;
+                try
+                {
+                    reference = uiDoc.Selection.PickObject(ObjectType.Element,
+                        "Étape 2/2 : clique sur le mur traversé par la canalisation (Échap pour arrêter)");
+                }
+                catch (Autodesk.Revit.Exceptions.OperationCanceledException) { return null; }
+
+                Element element = doc.GetElement(reference);
+                if (element is Wall) return element;
+                TaskDialog.Show("Pikachu - Auto réservation", element is Pipe
+                    ? "Tu as sélectionné une autre canalisation. La première est mémorisée : clique maintenant sur le mur qu'elle traverse."
+                    : "Ce n'est pas un mur. Clique sur le mur que traverse la canalisation sélectionnée.");
+            }
+        }
+
+        private List<MepSelection> PickElements(UIDocument uiDoc, Document doc, ReservationAutoV3Window win, bool multi, bool guided = false)
+        {
+            if (guided && !multi && win.SelectedObject == ReservationAutoV3Window.ObjectType.Canalisation &&
+                win.SelectedPipeSource == ReservationAutoV3Window.PipeSource.Maquette && !win.DoubleLinkEnabled)
+                return PickGuidedPipe(uiDoc, doc);
             if (!multi)
             {
                 Reference r;

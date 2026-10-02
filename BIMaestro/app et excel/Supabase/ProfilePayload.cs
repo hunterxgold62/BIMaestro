@@ -10,6 +10,7 @@ namespace Licensing
             string email,
             string firstName,
             string lastName,
+            string company,
             string machineIdHash,
             string pluginLanguage)
         {
@@ -19,6 +20,7 @@ namespace Licensing
                 ["email"] = email,
                 ["first_name"] = firstName,
                 ["last_name"] = lastName,
+                ["company"] = company,
                 ["machine_id_hash"] = machineIdHash
             };
 

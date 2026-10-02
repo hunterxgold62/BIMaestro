@@ -23,6 +23,7 @@ namespace BIMaestro.RibbonLayout
         private string _email = string.Empty;
         private string _firstName = string.Empty;
         private string _lastName = string.Empty;
+        private string _company = string.Empty;
         private UiLanguageOption _selectedLanguage;
         private RadialHotkeyPreference _radialHotkey;
         private string _radialHotkeyText;
@@ -41,6 +42,7 @@ namespace BIMaestro.RibbonLayout
             Email = _welcomeState.Email ?? string.Empty;
             FirstName = _welcomeState.FirstName ?? string.Empty;
             LastName = _welcomeState.LastName ?? string.Empty;
+            Company = _welcomeState.Company ?? string.Empty;
             LanguageOptions = UiLanguage.Options;
             SelectedLanguage = LanguageOptions.First(option => option.Value == UiLanguage.Choice);
             _radialHotkey = RadialButtonsPreferencesManager.Load().Hotkey;
@@ -123,6 +125,17 @@ namespace BIMaestro.RibbonLayout
                 if (_lastName == value) return;
                 _lastName = value;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LastName)));
+            }
+        }
+
+        public string Company
+        {
+            get => _company;
+            set
+            {
+                if (_company == value) return;
+                _company = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Company)));
             }
         }
 
@@ -315,7 +328,7 @@ namespace BIMaestro.RibbonLayout
 
         private void SaveWelcomeProfile()
         {
-            WelcomeManager.UpdateProfileFromSettings(Email, FirstName, LastName);
+            WelcomeManager.UpdateProfileFromSettings(Email, FirstName, LastName, Company);
             _welcomeState = WelcomeStorage.LoadOrCreate();
         }
         private void OnRequestNavigate(object sender, RequestNavigateEventArgs e)

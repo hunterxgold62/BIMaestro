@@ -72,6 +72,8 @@ supabase/functions/.env.*
 # Ignorer les fichiers DLL et les fichiers Revit
 *.dll
 *.rvt
+!Demo/BIMaestro_Apprentissage_2023.rvt
+!Demo/BIMaestro_Apprentissage_2024.rvt
 
 # Ignorer le répertoire 'autre'
 /autre/

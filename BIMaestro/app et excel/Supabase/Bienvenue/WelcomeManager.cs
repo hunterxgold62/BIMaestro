@@ -104,7 +104,7 @@ namespace BIMaestro.Welcome
         /// <summary>
         /// Met à jour le profil depuis l'onglet Paramètres et tente la synchro Supabase si possible.
         /// </summary>
-        public static void UpdateProfileFromSettings(string email, string firstName, string lastName)
+        public static void UpdateProfileFromSettings(string email, string firstName, string lastName, string company)
         {
             lock (_sync)
             {
@@ -113,6 +113,7 @@ namespace BIMaestro.Welcome
                 _state.Email = NormalizeValue(email);
                 _state.FirstName = NormalizeValue(firstName);
                 _state.LastName = NormalizeValue(lastName);
+                _state.Company = NormalizeValue(company);
 
                 var hasEmail = !string.IsNullOrWhiteSpace(_state.Email);
                 _state.EmailOptIn = hasEmail;
@@ -147,7 +148,7 @@ namespace BIMaestro.Welcome
             lock (_sync)
             {
                 _state ??= WelcomeStorage.LoadOrCreate();
-                _state.Email = NormalizeValue(window.Email); _state.FirstName = NormalizeValue(window.FirstName); _state.LastName = NormalizeValue(window.LastName);
+                _state.Email = NormalizeValue(window.Email); _state.FirstName = NormalizeValue(window.FirstName); _state.LastName = NormalizeValue(window.LastName); _state.Company = NormalizeValue(window.Company);
                 _state.EmailOptIn = true; _state.OptInUtc ??= DateTime.UtcNow; _state.ProfilePending = true; _state.WelcomeShown = true;
                 WelcomeStorage.Save(_state);
             }
@@ -260,6 +261,7 @@ namespace BIMaestro.Welcome
                     _state.Email = win.Email;
                     _state.FirstName = win.FirstName;
                     _state.LastName = win.LastName;
+                    _state.Company = NormalizeValue(win.Company);
                     _state.OptInUtc = DateTime.UtcNow;
                     _state.ProfilePending = true;
                     _state.WelcomeShown = true;
@@ -331,6 +333,7 @@ namespace BIMaestro.Welcome
                 email: s.Email,
                 firstName: s.FirstName,
                 lastName: s.LastName,
+                company: s.Company,
                 machineIdHash: machineHash
             );
 

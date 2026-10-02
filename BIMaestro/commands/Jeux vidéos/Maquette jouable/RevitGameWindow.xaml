@@ -138,6 +138,8 @@
                              Width="1280"
                              Height="720"
                              IsHitTestVisible="False">
+                    <h2:ImageModel2D x:Name="MiniMapImage2D" Width="280" Height="280"
+                                     IsHitTestVisible="False"/>
                     <h2:TextModel2D x:Name="HoverLabel2D"
                                     Text=""
                                     Width="280"
@@ -1125,6 +1127,8 @@
                             Padding="14,7"
                             Margin="0,0,6,0"
                             Click="MepPanelButton_Click"/>
+                    <Button Style="{StaticResource GlassButton}"
+                            Content="Mini-carte · M" Click="MiniMapToggle_Click"/>
                     <Button Style="{StaticResource GlassButton}"
                             Content="Commandes"
                             Margin="0,0,8,0"
