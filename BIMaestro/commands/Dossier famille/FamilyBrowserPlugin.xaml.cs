@@ -3511,7 +3511,9 @@ namespace Famille
         internal void PrepareTutorialStep(string target, string completionEvent)
         {
             if (!_tutorialCatalogActive) return;
-            if (completionEvent == "load-bureau-commun")
+            if (completionEvent == "load-bureau-commun" ||
+                completionEvent == "search-metadata-manual" ||
+                completionEvent == "search-metadata-ai")
             {
                 FoldersTabItem.IsSelected = true;
                 SetSearchScope(global: false, refresh: true);
