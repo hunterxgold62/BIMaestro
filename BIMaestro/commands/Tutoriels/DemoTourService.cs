@@ -105,12 +105,13 @@ namespace BIMaestro.Tutorials
                 new DemoStep("Gagner du temps avec l'IA", "Sur « Bureau commun », rouvre « Mots-clés de recherche… » par clic droit. Le bouton « Proposer avec l’IA » suggère une description et des mots-clés à partir du nom de la famille, de son dossier et de sa catégorie lorsqu'elle est disponible. Relis et corrige les propositions avant d'enregistrer : l'IA ne vérifie pas ici la géométrie du RFA. L'appel démarre uniquement si tu cliques sur ce bouton ; tu peux passer cette étape si l'IA n'est pas disponible. Dans cet exercice, ferme avec « Annuler », puis clique sur « Suivant ». Dans ta bibliothèque, enregistre les termes retenus pour accélérer les prochaines recherches.", "FamilyListView", true, completionEvent: "search-metadata-ai"),
                 new DemoStep("Charger et placer une famille", "Pikachu revient au dossier Bureau. Trois favoris temporaires sont préparés pour la suite : un bureau, une table et une chaise. Ils seront disponibles dans la collection Favoris de la rosace. Double-clique sur la carte « Bureau commun » : le simple clic sélectionne la carte, le double-clic charge la famille dans Revit et lance son placement. Clique ensuite dans la vue pour la poser, puis appuie sur Échap pour sortir du mode placement.", "FamilyListView", completionEvent: "load-bureau-commun"),
                 new DemoStep("Ouvrir Famille dans Revit", "Le navigateur se ferme et Pikachu revient dans Revit. Termine le placement précédent avec Échap, ouvre l'onglet BIMaestro si besoin, puis clique sur la petite flèche du bouton « Famille ». Le contour orange suit le bon bouton.", "RevitFamilySplit"),
-                new DemoStep("Choisir la rosace « . »", "Dans le menu « Famille », clique sur l'entrée « . ». Cette rosace s'ouvre près de la souris. Pikachu attend son ouverture avant de poursuivre.", "RevitRosace", completionEvent: "radial-opened"),
+                new DemoStep("Choisir la rosace « . »", "Dans le menu « Famille », clique sur l'entrée « . ». Cette rosace s'ouvre près de la souris avec les 16 familles récentes simulées de l'exercice. Pikachu attend son ouverture avant de poursuivre.", "RevitRosace", completionEvent: "radial-opened"),
+                new DemoStep("Comprendre les familles récentes", "Pour l'exercice, la rosace affiche 16 familles du catalogue de formation, réparties sur deux pages de 8. Les noms sont réels, mais leur historique récent est simulé : ces exemples ne viennent pas de ton historique personnel. Hors tutoriel, la rosace propose une page Top-8 des familles les plus utilisées et deux pages des 16 familles récentes chargées ou utilisées depuis le navigateur et la rosace. Parcours les deux pages Récents démo et survole les cases pour lire les noms, puis clique sur Suivant.", "RevitUseShortcut", true),
                 new DemoStep("Afficher les favoris dans la rosace", "Fais un clic droit au centre de la rosace, puis choisis « Charger une collection » > « Favoris ». La rosace affiche les favoris d'essai : un bureau, une table et une chaise, ainsi que la chaise que tu as étoilée si elle est différente. Survole les cases pour identifier les familles. Pikachu attend que tu choisisses réellement Favoris. Nous créerons ensuite le raccourci clavier, puis tu placeras une chaise. Ces favoris d'exemple ne sont pas enregistrés dans ta bibliothèque personnelle.", "RevitUseShortcut", completionEvent: "radial-tutorial-favorites-selected"),
                 new DemoStep("Passer à l'onglet Vue", "Ferme la rosace avec Échap, puis clique sur l'onglet « Vue » du ruban Revit. Pikachu encadre l'onglet et suit ton choix.", "RevitViewTab"),
                 new DemoStep("Ouvrir Interface utilisateur", "Dans Vue, ouvre « Interface utilisateur » dans le panneau Fenêtres. Le contour orange passe du ruban BIMaestro au ruban Revit.", "RevitUserInterface"),
                 new DemoStep("Créer le raccourci dans Revit", "Dans Vue > Interface utilisateur, clique sur « Raccourcis clavier ». Une fois la fenêtre ouverte :\n1. Garde le filtre « Tous », cherche « Navigateur de Familles » et sélectionne « Navigateur de Familles:. » sous BIMaestro > Spécifique aux familles. La ligne qui ouvre le navigateur est différente.\n2. Clique dans « Appuyer sur de nouvelles touches », puis tape B et F. Si BF est pris, choisis une autre combinaison libre.\n3. Clique sur « Attribuer », puis sur « OK ».\nPendant cette fenêtre Revit, le bouton « Suivant » de Pikachu ne répond pas. Après fermeture avec OK, Pikachu avance seul ; sinon clique sur « Suivant ».", "RevitKeyboardShortcuts", true),
-                new DemoStep("Utiliser ton raccourci", "Reviens dans une vue Revit, place la souris où tu veux ouvrir la rosace et tape BF, ou le raccourci que tu as choisi. Fais un clic droit au centre de la rosace, puis « Charger une collection » > « Favoris ». Clique sur une chaise des favoris d'essai pour lancer son placement ; Pikachu le vérifiera. Clique dans la vue pour la poser, puis Échap.", "RevitUseShortcut", completionEvent: "radial-tutorial-chaise-used")
+                new DemoStep("Utiliser ton raccourci", "Reviens dans une vue Revit, place la souris où tu veux ouvrir la rosace et tape BF, ou le raccourci que tu as choisi. Fais un clic droit au centre de la rosace, puis « Charger une collection » > « Favoris ». Clique sur une chaise des favoris d'essai pour lancer son placement. Comme dans le navigateur, clique ensuite dans la vue pour la poser, puis appuie sur Échap. Pikachu attend la création réelle d'une chaise dans la maquette.", "RevitUseShortcut", completionEvent: "radial-tutorial-chaise-placed")
             },
             ["history"] = new[]
             {
@@ -973,6 +974,53 @@ namespace BIMaestro.Tutorials
         private static readonly Dictionary<Window, DemoWindowGuide> ActiveGuides = new Dictionary<Window, DemoWindowGuide>();
         private static FamilyRibbonTutorialGuide _familyRibbonGuide;
         private static Famille.Collection _familyTutorialFavorites;
+        private static List<string> _familyTutorialRecents;
+        private static Autodesk.Revit.ApplicationServices.Application _placementApplication;
+        private static EventHandler<Autodesk.Revit.DB.Events.DocumentChangedEventArgs> _placementWatcher;
+
+        internal static List<string> GetTutorialRecentFamiliesForRosace()
+            => _familyRibbonGuide == null || _familyTutorialRecents == null
+                ? null : new List<string>(_familyTutorialRecents);
+
+        internal static bool IsTutorialFamilyForRosace(string path)
+            => _familyRibbonGuide != null && !string.IsNullOrWhiteSpace(path) &&
+                ((_familyTutorialRecents?.Contains(path, StringComparer.OrdinalIgnoreCase) ?? false) ||
+                 (_familyTutorialFavorites?.Paths.Contains(path, StringComparer.OrdinalIgnoreCase) ?? false));
+
+        private static void StopTutorialPlacementWatch()
+        {
+            if (_placementApplication != null && _placementWatcher != null)
+                _placementApplication.DocumentChanged -= _placementWatcher;
+            _placementWatcher = null;
+            _placementApplication = null;
+        }
+
+        internal static void WatchTutorialFamilyPlacement(Document document, FamilySymbol symbol)
+        {
+            StopTutorialPlacementWatch();
+            if (_familyRibbonGuide == null || document == null || symbol == null) return;
+            ElementId symbolId = symbol.Id;
+            _placementApplication = document.Application;
+            _placementWatcher = (sender, args) =>
+            {
+                try
+                {
+                    Document changed = args.GetDocument();
+                    if (!ReferenceEquals(changed, document) && !changed.Equals(document)) return;
+                    bool placed = args.GetAddedElementIds().Any(id =>
+                        changed.GetElement(id) is FamilyInstance instance &&
+                        instance.Symbol.Id.Equals(symbolId));
+                    if (!placed) return;
+                    StopTutorialPlacementWatch();
+                    ReportExternalAction("radial-tutorial-chaise-placed");
+                }
+                catch (Autodesk.Revit.Exceptions.InvalidObjectException)
+                {
+                    StopTutorialPlacementWatch();
+                }
+            };
+            _placementApplication.DocumentChanged += _placementWatcher;
+        }
 
         internal static bool AttachIfRequested(string id, Window window)
         {
@@ -1057,11 +1105,14 @@ namespace BIMaestro.Tutorials
             if (owner == IntPtr.Zero) return;
             _familyRibbonGuide?.Close();
             _familyTutorialFavorites = browser.TryGetTutorialFavoritesForRosace();
+            _familyTutorialRecents = browser.GetTutorialRecentFamilyPaths();
             int ribbonStartIndex = Array.FindIndex(steps, step => step.Target == "RevitFamilySplit");
             if (ribbonStartIndex < 0) return;
             var guide = new FamilyRibbonTutorialGuide(owner, steps, ribbonStartIndex, () =>
             {
+                StopTutorialPlacementWatch();
                 _familyTutorialFavorites = null;
+                _familyTutorialRecents = null;
                 _familyRibbonGuide = null;
             });
             _familyRibbonGuide = guide;
@@ -1217,7 +1268,7 @@ namespace BIMaestro.Tutorials
                     _completed = true;
                     _next.IsEnabled = true;
                 }
-                if (step.CompletionEvent == "radial-tutorial-chaise-used" &&
+                if (step.CompletionEvent == "radial-tutorial-chaise-placed" &&
                     Famille.FamilyBrowserCommand.uiapp?.ActiveUIDocument == null)
                 {
                     _text.Text += " Aucun projet Revit n'est ouvert : ouvre une maquette pour essayer la rosace et placer une famille. Tu peux terminer ici et relancer TUTO plus tard.";
@@ -1236,7 +1287,7 @@ namespace BIMaestro.Tutorials
             internal void CompleteAction(string action)
             {
                 if (_index >= 0 && _index < _steps.Length &&
-                    _steps[_index].CompletionEvent == "radial-tutorial-chaise-used" &&
+                    _steps[_index].CompletionEvent == "radial-tutorial-chaise-placed" &&
                     action == "radial-opened")
                 {
                     _text.Text = "✓ La rosace est ouverte. Fais un clic droit au centre, choisis « Charger une collection » > « Favoris », puis clique sur une chaise des favoris d'essai. BIMaestro lancera son placement dans Revit.";
@@ -1359,8 +1410,8 @@ namespace BIMaestro.Tutorials
                         ? "✓ Le mobilier a réapparu. BIMaestro l'a sélectionné et cadré dans la vue : compare-le avec l'objet témoin, puis termine le parcours."
                         : _steps[_index].CompletionEvent == "load-bureau-commun"
                         ? "✓ Revit a chargé la famille et lancé son placement. Clique dans la vue pour la poser, ou appuie sur Échap si tu voulais seulement tester le chargement."
-                        : _steps[_index].CompletionEvent == "radial-tutorial-chaise-used"
-                        ? "✓ Tu as lancé ta chaise favorite depuis la rosace. Clique dans la vue pour la placer, puis appuie sur Échap pour quitter le mode placement. Ton favori d'essai et tes chemins personnels restent inchangés."
+                        : _steps[_index].CompletionEvent == "radial-tutorial-chaise-placed"
+                        ? "✓ Tu as posé une chaise depuis la rosace. Appuie sur Échap pour quitter le mode placement. Ton favori d'essai et tes chemins personnels restent inchangés."
                         : "✓ Action confirmée dans la maquette. Tu peux terminer ce parcours.";
                     _next.IsEnabled = true;
                 }
