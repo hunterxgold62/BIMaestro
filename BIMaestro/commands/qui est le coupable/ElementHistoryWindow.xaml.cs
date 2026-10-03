@@ -182,7 +182,11 @@ namespace Analyse
                     if (req.Type == UiRequestType.RestoreParameters)
                     {
                         var result = _owner.ExecuteRestoreParameters(req.Event);
-                        _owner.Dispatcher.BeginInvoke(new Action(() => _owner.ShowRestoreResult(result)));
+                        // Read the document in the Revit external-event context, before dispatching UI feedback.
+                        bool exerciseRestored = BIMaestro.Tutorials.DemoTourService.IsActive(_owner) &&
+                            BIMaestro.Tutorials.DemoHistoryScene.HasRestoredFurniture(_owner._doc) &&
+                            BIMaestro.Tutorials.DemoHistoryScene.HasRestoredParameters(_owner._doc);
+                        _owner.Dispatcher.BeginInvoke(new Action(() => _owner.ShowRestoreResult(result, exerciseRestored)));
                     }
                 }
                 catch
@@ -1935,10 +1939,13 @@ namespace Analyse
         {
             string message;
             bool restoredForTutorial = false;
+            bool furnitureRestored = false;
             try
             {
                 var result = ElementHistoryRestoration.Restore(_doc, events.Where(IsDeletion).Select(ToRestoreRequest));
-                restoredForTutorial = result.Created > 0;
+                restoredForTutorial = result.Created > 0 || result.Existing > 0;
+                if (BIMaestro.Tutorials.DemoTourService.IsActive(this))
+                    furnitureRestored = BIMaestro.Tutorials.DemoHistoryScene.HasRestoredFurniture(_doc);
                 message = UiLanguage.T(
                     $"{result.Created} élément(s) restauré(s).\n{result.Existing} déjà présent(s).\n{result.Failed} non restauré(s).",
                     $"{result.Created} element(s) restored.\n{result.Existing} already present.\n{result.Failed} not restored.");
@@ -2000,7 +2007,7 @@ namespace Analyse
                 UpdateVisualizeButtonLabel();
                 if (restoredForTutorial && BIMaestro.Tutorials.DemoTourService.IsActive(this))
                 {
-                    BIMaestro.Tutorials.DemoTourService.ReportRestoration(this);
+                    BIMaestro.Tutorials.DemoTourService.ReportRestoration(this, furnitureRestored);
                     bool learnMore = BIMaestro.Tutorials.DemoTourMessage.Show(
                         new System.Windows.Interop.WindowInteropHelper(this).Handle,
                         "Pika ! Objets retrouvés", message, "Voir les objets restaurés",
@@ -2660,9 +2667,11 @@ namespace Analyse
                 : text;
         }
 
-        private void ShowRestoreResult(RestoreResult result)
+        private void ShowRestoreResult(RestoreResult result, bool exerciseRestored)
         {
             if (result == null) return;
+            if (result.Applied > 0 && result.Failed == 0)
+                BIMaestro.Tutorials.DemoTourService.ReportParameterRestoration(this, exerciseRestored);
             MessageBox.Show(
                 result.Applied > 0
                     ? UiLanguage.T($"{result.Applied} valeur(s) restaurée(s).", $"{result.Applied} value(s) restored.") + (result.Failed > 0 ? UiLanguage.T($"\n{result.Failed} valeur(s) n'ont pas pu être restaurée(s).", $"\n{result.Failed} value(s) could not be restored.") : "")
