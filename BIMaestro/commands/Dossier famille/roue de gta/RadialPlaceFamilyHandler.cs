@@ -63,10 +63,16 @@ namespace BIMaestro.UI
                 }
 
                 uidoc.Selection.SetElementIds(new List<ElementId> { symbol.Id });
+                bool tutorialFamily = BIMaestro.Tutorials.DemoTourService.IsTutorialFamilyForRosace(FamilyPath);
+                if (BIMaestro.Tutorials.DemoTourService.IsTutorialChaiseForRosace(FamilyPath))
+                    BIMaestro.Tutorials.DemoTourService.WatchTutorialFamilyPlacement(doc, symbol);
                 uidoc.PostRequestForElementTypePlacement(symbol);
 
-                Famille.FamilyUsageManager.RegisterUse(FamilyPath);
-                Famille.FamilyRecentManager.RegisterUse(FamilyPath);
+                if (!tutorialFamily)
+                {
+                    Famille.FamilyUsageManager.RegisterUse(FamilyPath);
+                    Famille.FamilyRecentManager.RegisterUse(FamilyPath);
+                }
                 if (BIMaestro.Tutorials.DemoTourService.IsTutorialChaiseForRosace(FamilyPath))
                     BIMaestro.Tutorials.DemoTourService.ReportExternalAction("radial-tutorial-chaise-used");
                 BIMaestro.Tutorials.DemoTourService.ReportExternalAction("radial-family-used");
