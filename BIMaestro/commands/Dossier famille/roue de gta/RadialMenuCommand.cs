@@ -36,11 +36,12 @@ namespace BIMaestro.UI
                 var state = RadialMenuCollectionStateStore.Load();
                 var collections = CollectionStore.Load() ?? new List<Collection>();
 
+                bool tutorialMode = BIMaestro.Tutorials.DemoTourService.GetTutorialRecentFamiliesForRosace() != null;
                 var standardData = BuildStandardData();
                 RadialMenuData activeData = standardData;
                 Collection activeCollection = null;
 
-                if (state != null && state.UseCollection && !string.IsNullOrWhiteSpace(state.ActiveCollectionId))
+                if (!tutorialMode && state != null && state.UseCollection && !string.IsNullOrWhiteSpace(state.ActiveCollectionId))
                 {
                     activeCollection = collections.FirstOrDefault(c => string.Equals(c.Id, state.ActiveCollectionId, StringComparison.OrdinalIgnoreCase));
                     if (activeCollection != null)
@@ -51,7 +52,7 @@ namespace BIMaestro.UI
                     {
                         state.UseCollection = false;
                         state.ActiveCollectionId = null;
-                        RadialMenuCollectionStateStore.Save(state);
+                        if (!tutorialMode) RadialMenuCollectionStateStore.Save(state);
                     }
                 }
 
@@ -63,20 +64,26 @@ namespace BIMaestro.UI
                     () =>
                     {
                         var fresh = CollectionStore.Load() ?? new List<Collection>();
-                        return fresh.Select(c => (c.Id, c.Name)).ToList();
+                        var tutorialFavorites = BIMaestro.Tutorials.DemoTourService.GetTutorialFavoritesForRosace();
+                        return tutorialMode && tutorialFavorites != null
+                            ? new List<(string, string)> { (tutorialFavorites.Id, tutorialFavorites.Name) }
+                            : fresh.Select(c => (c.Id, c.Name)).ToList();
                     },
                     id =>
                     {
                         if (string.IsNullOrWhiteSpace(id)) return;
                         var freshCollections = CollectionStore.Load() ?? new List<Collection>();
-                        var selected = freshCollections.FirstOrDefault(c => string.Equals(c.Id, id, StringComparison.OrdinalIgnoreCase));
+                        var selected = tutorialMode
+                            ? BIMaestro.Tutorials.DemoTourService.GetTutorialFavoritesForRosace()
+                            : freshCollections.FirstOrDefault(c => string.Equals(c.Id, id, StringComparison.OrdinalIgnoreCase));
+                        if (tutorialMode && selected != null && !string.Equals(selected.Id, id, StringComparison.OrdinalIgnoreCase)) return;
                         if (selected == null) return;
 
                         var updated = BuildCollectionData(WithTutorialFavorites(selected));
                         state.UseCollection = true;
                         state.ActiveCollectionId = selected.Id;
                         state.LastCollectionId = selected.Id;
-                        RadialMenuCollectionStateStore.Save(state);
+                        if (!tutorialMode) RadialMenuCollectionStateStore.Save(state);
 
                         win.ReplaceItems(updated.Items);
                         win.SetPageLabelFactory(updated.PageLabelFactory);
@@ -89,7 +96,7 @@ namespace BIMaestro.UI
                     {
                         state.UseCollection = false;
                         state.ActiveCollectionId = null;
-                        RadialMenuCollectionStateStore.Save(state);
+                        if (!tutorialMode) RadialMenuCollectionStateStore.Save(state);
 
                         var updated = BuildStandardData();
                         win.ReplaceItems(updated.Items);
@@ -127,6 +134,19 @@ namespace BIMaestro.UI
 
         private static RadialMenuData BuildStandardData()
         {
+            var tutorialPaths = BIMaestro.Tutorials.DemoTourService.GetTutorialRecentFamiliesForRosace();
+            if (tutorialPaths != null)
+            {
+                InitRootsForPhotos(tutorialPaths);
+                return new RadialMenuData
+                {
+                    Items = BuildItems(tutorialPaths).ToList(),
+                    IsCollectionMode = false,
+                    PageLabelFactory = (index, count) => UiLanguage.T(
+                        $"Récents démo ({index + 1}/{count})",
+                        $"Demo recent ({index + 1}/{count})")
+                };
+            }
             var usage = FamilyUsageManager.Load();
             var top8 = usage.OrderByDescending(kv => kv.Value)
                             .Select(kv => kv.Key)
