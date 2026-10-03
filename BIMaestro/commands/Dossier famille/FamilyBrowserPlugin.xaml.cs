@@ -753,6 +753,14 @@ namespace Famille
             };
         }
 
+        internal List<string> GetTutorialRecentFamilyPaths()
+        {
+            if (!_tutorialCatalogActive) return null;
+            return Directory.EnumerateFiles(familiesFolder, "*.rfa", SearchOption.AllDirectories)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .Take(16).ToList();
+        }
+
         private void TrackTutorialFavoriteChange(string path)
         {
             if (!IsTutorialFamilyPath(path) || _tutorialFavoriteOriginalStates.ContainsKey(path)) return;
