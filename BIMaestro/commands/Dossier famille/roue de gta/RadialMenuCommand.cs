@@ -109,6 +109,7 @@ namespace BIMaestro.UI
                 {
                     if (!accepted || item == null || string.IsNullOrWhiteSpace(item.FamilyPath)) return;
                     s_placeHandler.FamilyPath = item.FamilyPath;
+                    s_placeHandler.SuppressUsageTracking = tutorialMode;
                     s_placeEvent.Raise();
                 };
 
