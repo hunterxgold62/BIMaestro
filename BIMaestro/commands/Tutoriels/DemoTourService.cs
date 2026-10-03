@@ -101,6 +101,8 @@ namespace BIMaestro.Tutorials
                 new DemoStep("Photos automatiques", "Pour l'essai, les cinq familles de « Salle de réunion » sont présélectionnées. « Lancer l'export 3D » ouvre le choix A/B : Pikachu t'expliquera comment garder la vue existante ou la vue normalisée. Valide ce choix, puis attends la fin de l'export pour revenir au guide. L'opération peut prendre du temps ; tu peux aussi la passer avec « Suivant ».", "StartPreviewButton", true, completionEvent: "preview-export-complete"),
                 new DemoStep("Adapter à ta bibliothèque", "« Modifier les chemins… » permet de choisir ton propre dossier de familles RFA, puis un dossier d'images PNG. Leurs sous-dossiers doivent se correspondre. Pendant ce guide, tes chemins enregistrés sont protégés : quitte le tutoriel avant de choisir ta bibliothèque personnelle.", "ChangePathsButton", true),
                 new DemoStep("Autres actions d'une carte", "Sur une carte, le clic droit propose « Rentrer dans la famille » pour ouvrir le RFA source, « Charger la dernière version » pour recharger le fichier depuis le disque et « Ajouter à la collection active » pour classer plusieurs familles. Aucune de ces actions n'est nécessaire pour le placement d'essai.", "FamilyListView", true),
+                new DemoStep("Ajouter du texte pour retrouver une famille", "Pikachu revient dans Bureau. Fais un clic droit sur « Bureau commun », puis choisis « Mots-clés de recherche… ». Dans « Description recherchable », décris son usage, par exemple « Poste de travail pour un espace partagé ». Ajoute dans « Mots-clés » : poste de travail, espace partagé, mobilier de bureau. Sépare les termes par des virgules. Dans ta bibliothèque personnelle, « Enregistrer » permet ensuite de retrouver la famille avec ces termes même s'ils ne figurent pas dans son nom, sans renommer le RFA. Pour cet essai, ferme avec « Annuler » afin de garder le catalogue de formation intact, puis clique sur « Suivant ».", "FamilyListView", true, completionEvent: "search-metadata-manual"),
+                new DemoStep("Gagner du temps avec l'IA", "Sur « Bureau commun », rouvre « Mots-clés de recherche… » par clic droit. Le bouton « Proposer avec l’IA » suggère une description et des mots-clés à partir du nom de la famille, de son dossier et de sa catégorie lorsqu'elle est disponible. Relis et corrige les propositions avant d'enregistrer : l'IA ne vérifie pas ici la géométrie du RFA. L'appel démarre uniquement si tu cliques sur ce bouton ; tu peux passer cette étape si l'IA n'est pas disponible. Dans cet exercice, ferme avec « Annuler », puis clique sur « Suivant ». Dans ta bibliothèque, enregistre les termes retenus pour accélérer les prochaines recherches.", "FamilyListView", true, completionEvent: "search-metadata-ai"),
                 new DemoStep("Charger et placer une famille", "Pikachu revient au dossier Bureau. Double-clique sur la carte « Bureau commun » : le simple clic sélectionne la carte, le double-clic charge la famille dans Revit et lance son placement. Clique ensuite dans la vue pour la poser, puis appuie sur Échap pour sortir du mode placement.", "FamilyListView", completionEvent: "load-bureau-commun"),
                 new DemoStep("Ouvrir Famille dans Revit", "Le navigateur se ferme et Pikachu revient dans Revit. Termine le placement précédent avec Échap, ouvre l'onglet BIMaestro si besoin, puis clique sur la petite flèche du bouton « Famille ». Le contour orange suit le bon bouton.", "RevitFamilySplit"),
                 new DemoStep("Choisir la rosace « . »", "Dans le menu « Famille », clique sur l'entrée « . ». Cette rosace s'ouvre près de la souris. Pikachu attend son ouverture avant de poursuivre.", "RevitRosace", completionEvent: "radial-opened"),
@@ -1054,7 +1056,9 @@ namespace BIMaestro.Tutorials
             if (owner == IntPtr.Zero) return;
             _familyRibbonGuide?.Close();
             _familyTutorialFavorites = browser.TryGetTutorialFavoritesForRosace();
-            var guide = new FamilyRibbonTutorialGuide(owner, steps, 18, () =>
+            int ribbonStartIndex = Array.FindIndex(steps, step => step.Target == "RevitFamilySplit");
+            if (ribbonStartIndex < 0) return;
+            var guide = new FamilyRibbonTutorialGuide(owner, steps, ribbonStartIndex, () =>
             {
                 _familyTutorialFavorites = null;
                 _familyRibbonGuide = null;
@@ -1158,7 +1162,7 @@ namespace BIMaestro.Tutorials
                 _detachAction = null;
                 RemoveHighlight();
                 if (_index < 0 || _index >= _steps.Length) return;
-                if (TourId == "family-browser" && _index == 18 &&
+                if (TourId == "family-browser" && _steps[_index].Target == "RevitFamilySplit" &&
                     _window is Famille.FamilyBrowserWindow familyBrowser)
                 {
                     ContinueFamilyGuideInRevit(_steps, familyBrowser);
