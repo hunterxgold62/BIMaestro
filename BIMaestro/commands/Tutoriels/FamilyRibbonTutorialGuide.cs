@@ -19,8 +19,8 @@ namespace BIMaestro.Tutorials
     // native ribbon/menu surfaces anew as Revit opens and closes each popup.
     internal sealed class FamilyRibbonTutorialGuide
     {
-        private const int FirstStep = 18;
-        private const int KeyboardShortcutStep = 22;
+        private readonly int FirstStep;
+        private int KeyboardShortcutStep => Array.FindIndex(_steps, step => step.Target == "RevitKeyboardShortcuts");
         private readonly IntPtr _revitHandle;
         private readonly DemoStep[] _steps;
         private readonly Action _closed;
@@ -58,6 +58,7 @@ namespace BIMaestro.Tutorials
         internal FamilyRibbonTutorialGuide(IntPtr revitHandle, DemoStep[] steps, int firstIndex, Action closed)
         {
             _revitHandle = revitHandle;
+            FirstStep = firstIndex;
             _steps = steps;
             _index = firstIndex;
             _closed = closed;
@@ -186,9 +187,9 @@ namespace BIMaestro.Tutorials
         internal void CompleteAction(string action)
         {
             if (_closing || _index < FirstStep || _index >= _steps.Length) return;
-            if (_steps[_index].CompletionEvent == "radial-tutorial-chaise-used" && action == "radial-opened")
+            if (_steps[_index].CompletionEvent == "radial-tutorial-chaise-placed" && action == "radial-opened")
             {
-                _text.Text = "✓ La rosace est ouverte. Clic droit au centre > « Charger une collection » > « Favoris », puis choisis ta chaise étoilée. Pikachu attend son placement.";
+                _text.Text = "✓ La rosace est ouverte. Clic droit au centre > « Charger une collection » > « Favoris », puis choisis une chaise des favoris d'essai. Clique ensuite dans la vue pour la poser ; Pikachu attend sa création réelle.";
                 return;
             }
             if (string.Equals(_steps[_index].CompletionEvent, action, StringComparison.Ordinal))
@@ -229,7 +230,7 @@ namespace BIMaestro.Tutorials
             {
                 if (_completed) return;
                 _completed = true;
-                _text.Text = "✓ Pikachu a vérifié le lancement de ta chaise favorite depuis la rosace. Clique dans la vue pour la poser, puis Échap. Ton catalogue personnel et tes favoris sont conservés.";
+                _text.Text = "✓ Pikachu a vérifié la création de ta chaise dans la maquette depuis la rosace. Appuie sur Échap pour quitter le placement. Ton catalogue personnel et tes favoris sont conservés.";
                 _next.IsEnabled = true;
             }
             else
@@ -250,7 +251,8 @@ namespace BIMaestro.Tutorials
             // All dialog instructions therefore live in one step, which resumes
             // after the dialog closes. Suivant remains available as a fallback
             // once Revit returns control to the card.
-            _completed = _index != _steps.Length - 1;
+            _completed = _index != _steps.Length - 1 &&
+                _steps[_index].CompletionEvent != "radial-tutorial-favorites-selected";
             _next.IsEnabled = _completed;
             if (_index == _steps.Length - 1 &&
                 Famille.FamilyBrowserCommand.uiapp?.ActiveUIDocument == null)
@@ -265,11 +267,11 @@ namespace BIMaestro.Tutorials
             if (_closing) return;
             try
             {
-                if (_index == 18 && FindTarget("RevitRosace").HasValue)
+                if (_steps[_index].Target == "RevitFamilySplit" && FindTarget("RevitRosace").HasValue)
                     CompleteStep();
-                else if (_index == 20 && IsTabActive("Vue", "View"))
+                else if (_steps[_index].Target == "RevitViewTab" && IsTabActive("Vue", "View"))
                     CompleteStep();
-                else if (_index == 21)
+                else if (_steps[_index].Target == "RevitUserInterface")
                 {
                     // A quick click can open the modal dialog between two ticks,
                     // before the menu item was ever observed on screen.

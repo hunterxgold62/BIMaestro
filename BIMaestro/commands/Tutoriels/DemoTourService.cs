@@ -101,24 +101,32 @@ namespace BIMaestro.Tutorials
                 new DemoStep("Photos automatiques", "Pour l'essai, les cinq familles de « Salle de réunion » sont présélectionnées. « Lancer l'export 3D » ouvre le choix A/B : Pikachu t'expliquera comment garder la vue existante ou la vue normalisée. Valide ce choix, puis attends la fin de l'export pour revenir au guide. L'opération peut prendre du temps ; tu peux aussi la passer avec « Suivant ».", "StartPreviewButton", true, completionEvent: "preview-export-complete"),
                 new DemoStep("Adapter à ta bibliothèque", "« Modifier les chemins… » permet de choisir ton propre dossier de familles RFA, puis un dossier d'images PNG. Leurs sous-dossiers doivent se correspondre. Pendant ce guide, tes chemins enregistrés sont protégés : quitte le tutoriel avant de choisir ta bibliothèque personnelle.", "ChangePathsButton", true),
                 new DemoStep("Autres actions d'une carte", "Sur une carte, le clic droit propose « Rentrer dans la famille » pour ouvrir le RFA source, « Charger la dernière version » pour recharger le fichier depuis le disque et « Ajouter à la collection active » pour classer plusieurs familles. Aucune de ces actions n'est nécessaire pour le placement d'essai.", "FamilyListView", true),
-                new DemoStep("Charger et placer une famille", "Pikachu revient au dossier Bureau. Double-clique sur la carte « Bureau commun » : le simple clic sélectionne la carte, le double-clic charge la famille dans Revit et lance son placement. Clique ensuite dans la vue pour la poser, puis appuie sur Échap pour sortir du mode placement.", "FamilyListView", completionEvent: "load-bureau-commun"),
+                new DemoStep("Ajouter du texte pour retrouver une famille", "Pikachu revient dans Bureau. Fais un clic droit sur « Bureau commun », puis choisis « Mots-clés de recherche… ». Dans « Description recherchable », décris son usage, par exemple « Poste de travail pour un espace partagé ». Ajoute dans « Mots-clés » : poste de travail, espace partagé, mobilier de bureau. Sépare les termes par des virgules. Dans ta bibliothèque personnelle, « Enregistrer » permet ensuite de retrouver la famille avec ces termes même s'ils ne figurent pas dans son nom, sans renommer le RFA. Pour cet essai, ferme avec « Annuler » afin de garder le catalogue de formation intact, puis clique sur « Suivant ».", "FamilyListView", true, completionEvent: "search-metadata-manual"),
+                new DemoStep("Gagner du temps avec l'IA", "Sur « Bureau commun », rouvre « Mots-clés de recherche… » par clic droit. Le bouton « Proposer avec l’IA » suggère une description et des mots-clés à partir du nom de la famille, de son dossier et de sa catégorie lorsqu'elle est disponible. Relis et corrige les propositions avant d'enregistrer : l'IA ne vérifie pas ici la géométrie du RFA. L'appel démarre uniquement si tu cliques sur ce bouton ; tu peux passer cette étape si l'IA n'est pas disponible. Dans cet exercice, ferme avec « Annuler », puis clique sur « Suivant ». Dans ta bibliothèque, enregistre les termes retenus pour accélérer les prochaines recherches.", "FamilyListView", true, completionEvent: "search-metadata-ai"),
+                new DemoStep("Charger et placer une famille", "Pikachu revient au dossier Bureau. Trois favoris temporaires sont préparés pour la suite : un bureau, une table et une chaise. Ils seront disponibles dans la collection Favoris de la rosace. Double-clique sur la carte « Bureau commun » : le simple clic sélectionne la carte, le double-clic charge la famille dans Revit et lance son placement. Clique ensuite dans la vue pour la poser, puis appuie sur Échap pour sortir du mode placement.", "FamilyListView", completionEvent: "load-bureau-commun"),
                 new DemoStep("Ouvrir Famille dans Revit", "Le navigateur se ferme et Pikachu revient dans Revit. Termine le placement précédent avec Échap, ouvre l'onglet BIMaestro si besoin, puis clique sur la petite flèche du bouton « Famille ». Le contour orange suit le bon bouton.", "RevitFamilySplit"),
-                new DemoStep("Choisir la rosace « . »", "Dans le menu « Famille », clique sur l'entrée « . ». Cette rosace s'ouvre près de la souris. Pikachu attend son ouverture avant de poursuivre.", "RevitRosace", completionEvent: "radial-opened"),
+                new DemoStep("Choisir la rosace « . »", "Dans le menu « Famille », clique sur l'entrée « . ». Cette rosace s'ouvre près de la souris avec les 16 familles récentes simulées de l'exercice. Pikachu attend son ouverture avant de poursuivre.", "RevitRosace", completionEvent: "radial-opened"),
+                new DemoStep("Comprendre les familles récentes", "Pour l'exercice, la rosace affiche 16 familles du catalogue de formation, réparties sur deux pages de 8. Les noms sont réels, mais leur historique récent est simulé : ces exemples ne viennent pas de ton historique personnel. Hors tutoriel, la rosace propose une page Top-8 des familles les plus utilisées et deux pages des 16 familles récentes chargées ou utilisées depuis le navigateur et la rosace. Garde la souris sur la rosace et tourne la molette pour passer d'une page de familles à l'autre. Affiche la seconde page Récents démo, puis reviens à la première. Survole les cases pour lire les noms, puis clique sur Suivant.", "RevitUseShortcut", true),
+                new DemoStep("Afficher les favoris dans la rosace", "Fais un clic droit au centre de la rosace, puis choisis « Charger une collection » > « Favoris ». La rosace affiche les favoris d'essai : un bureau, une table et une chaise, ainsi que la chaise que tu as étoilée si elle est différente. Survole les cases pour identifier les familles. Pikachu attend que tu choisisses réellement Favoris. Nous créerons ensuite le raccourci clavier, puis tu placeras une chaise. Ces favoris d'exemple ne sont pas enregistrés dans ta bibliothèque personnelle.", "RevitUseShortcut", completionEvent: "radial-tutorial-favorites-selected"),
                 new DemoStep("Passer à l'onglet Vue", "Ferme la rosace avec Échap, puis clique sur l'onglet « Vue » du ruban Revit. Pikachu encadre l'onglet et suit ton choix.", "RevitViewTab"),
                 new DemoStep("Ouvrir Interface utilisateur", "Dans Vue, ouvre « Interface utilisateur » dans le panneau Fenêtres. Le contour orange passe du ruban BIMaestro au ruban Revit.", "RevitUserInterface"),
                 new DemoStep("Créer le raccourci dans Revit", "Dans Vue > Interface utilisateur, clique sur « Raccourcis clavier ». Une fois la fenêtre ouverte :\n1. Garde le filtre « Tous », cherche « Navigateur de Familles » et sélectionne « Navigateur de Familles:. » sous BIMaestro > Spécifique aux familles. La ligne qui ouvre le navigateur est différente.\n2. Clique dans « Appuyer sur de nouvelles touches », puis tape B et F. Si BF est pris, choisis une autre combinaison libre.\n3. Clique sur « Attribuer », puis sur « OK ».\nPendant cette fenêtre Revit, le bouton « Suivant » de Pikachu ne répond pas. Après fermeture avec OK, Pikachu avance seul ; sinon clique sur « Suivant ».", "RevitKeyboardShortcuts", true),
-                new DemoStep("Utiliser ton raccourci", "Reviens dans une vue Revit, place la souris où tu veux ouvrir la rosace et tape BF, ou le raccourci que tu as choisi. Fais un clic droit au centre de la rosace, puis « Charger une collection » > « Favoris ». Clique sur la chaise étoilée de l'exercice pour lancer son placement ; Pikachu le vérifiera. Clique dans la vue pour la poser, puis Échap.", "RevitUseShortcut", completionEvent: "radial-tutorial-chaise-used")
+                new DemoStep("Utiliser ton raccourci", "Reviens dans une vue Revit, place la souris où tu veux ouvrir la rosace et tape BF, ou le raccourci que tu as choisi. Fais un clic droit au centre de la rosace, puis « Charger une collection » > « Favoris ». Clique sur une chaise des favoris d'essai pour lancer son placement. Comme dans le navigateur, clique ensuite dans la vue pour la poser, puis appuie sur Échap. Pikachu attend la création réelle d'une chaise dans la maquette.", "RevitUseShortcut", completionEvent: "radial-tutorial-chaise-placed")
             },
             ["history"] = new[]
             {
-                new DemoStep("Voir les suppressions", "Deux objets de la scène ont été supprimés au démarrage du parcours. Dans Action, filtre sur « Suppressions » pour distinguer une suppression d'une création ou modification.", "ActionFilterCombo"),
+                new DemoStep("Deux suppressions et une modification", "Pikachu a supprimé deux objets de la scène, puis modifié le repère et les commentaires du troisième. Nous allons faire réapparaître les deux objets, puis retrouver les anciennes valeurs du témoin. Dans Action, choisis « Suppressions ».", "ActionFilterCombo"),
                 new DemoStep("Filtrer par utilisateur", "Ce filtre isole les actions d'une personne. Il sert à comprendre qui a modifié la maquette, mais une absence de résultat peut aussi venir de la période chargée. Ne change rien pour retrouver les objets de la démo.", "UserFilterCombo", true),
                 new DemoStep("Recherche et période", "La recherche cible un élément ou une information précise. Les dates « Du » et « Au » limitent les événements chargés ; « Charger période » relit alors l'historique. Garde les filtres actuels pour l'exercice.", "SearchBox", true),
                 new DemoStep("Aperçu d'une suppression", "« Simple » montre vite un volume estimatif. « Détaillé » utilise la famille et le type encore présents pour les suppressions futures ; si les données manquent, l'aperçu reste simplifié. Cela ne restaure rien.", "DetailedMeshModeRadio", true),
                 new DemoStep("Choisir un objet", "Sélectionne une carte de mobilier supprimé. Le troisième objet resté dans la vue 02 sert de repère pour comparer sa position.", "VisualCardsList"),
                 new DemoStep("Examiner le contexte", "Ouvre Détails : vérifie l'auteur, la date, la catégorie et les informations enregistrées avant la suppression. Ce sont les éléments à confirmer avant toute restauration.", "DetailsButton"),
                 new DemoStep("Visualiser avant d'agir", "« Visualiser » affiche un aperçu sans recréer l'élément. « Restaurer les éléments » le recrée durablement dans le projet. Si tu veux seulement enquêter, arrête-toi à l'aperçu.", "VisualizeDeletedButton", true),
-                new DemoStep("Faire réapparaître l'objet", "Clique sur « Restaurer les éléments » et confirme. La famille, le type et le niveau doivent encore être disponibles ; Pikachu attendra une restauration réussie avant de valider.", "RestoreDeletedButton")
+                new DemoStep("Sélectionner les deux objets", "Passe à l'onglet « Données ». Sélectionne les deux lignes de suppression du mobilier de cet exercice en maintenant Ctrl. Tu peux aussi les restaurer une par une depuis la vue visuelle. La famille, le type et le niveau doivent encore être disponibles.", "HistoryTabs", true),
+                new DemoStep("Faire réapparaître les deux objets", "Clique sur « Restaurer les éléments » et confirme. Si tu n'as restauré qu'un objet, sélectionne la seconde suppression et recommence. Pikachu ne poursuivra que lorsque les deux objets seront présents dans la maquette.", "RestoreDeletedButton"),
+                new DemoStep("Retrouver la modification des paramètres", "Dans Action, choisis « Modification paramètres ». Retrouve la ligne du mobilier témoin dont le repère se termine par TEMOIN_MODIFIE. Garde la recherche vide et la période de l'exercice pour retrouver cet événement.", "ActionFilterCombo", true),
+                new DemoStep("Comparer les valeurs avant et après", "Sélectionne la ligne du témoin, puis ouvre « Détails ». Compare les anciennes et nouvelles valeurs du repère et des commentaires. Nous allons restaurer les valeurs enregistrées avant cette modification sur le même objet.", "DetailsButton", true),
+                new DemoStep("Revenir aux anciens paramètres", "Avec la ligne de modification du témoin sélectionnée, clique sur « Restaurer » et confirme. Ce bouton réapplique les anciennes valeurs de paramètres enregistrées pour cette ligne. Il est différent de « Restaurer les éléments », utilisé pour recréer les objets supprimés. Pikachu vérifiera le repère et les commentaires du témoin avant de terminer.", "RestoreParametersButton")
             }
         };
 
@@ -167,6 +175,43 @@ namespace BIMaestro.Tutorials
 
     internal static class DemoHistoryScene
     {
+        internal const string InitialComments = "Mobilier témoin : état initial";
+        internal const string ModifiedComments = "Mobilier témoin : paramètres modifiés";
+        internal static string ModifiedWitnessMark => DemoProjectBuilder.HistoryFurnitureMark(0) + "_MODIFIE";
+
+        private static bool IsLearningDocument(Document doc) =>
+            doc != null && System.IO.Path.GetFileName(doc.PathName)
+                .StartsWith("BIMaestro_Apprentissage_", StringComparison.OrdinalIgnoreCase);
+
+        private static FamilyInstance FindWitness(IEnumerable<FamilyInstance> furniture) =>
+            furniture.FirstOrDefault(instance =>
+            {
+                string mark = instance.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ?? "";
+                return mark == DemoProjectBuilder.HistoryFurnitureMark(0) || mark == ModifiedWitnessMark;
+            });
+
+        internal static bool HasRestoredFurniture(Document doc)
+        {
+            if (!IsLearningDocument(doc)) return false;
+            var marks = new FilteredElementCollector(doc).OfClass(typeof(FamilyInstance))
+                .Cast<FamilyInstance>()
+                .Select(instance => instance.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ?? "")
+                .ToList();
+            return marks.Contains(DemoProjectBuilder.HistoryFurnitureMark(1)) &&
+                marks.Contains(DemoProjectBuilder.HistoryFurnitureMark(2));
+        }
+
+        internal static bool HasRestoredParameters(Document doc)
+        {
+            if (!IsLearningDocument(doc)) return false;
+            FamilyInstance witness = FindWitness(new FilteredElementCollector(doc)
+                .OfClass(typeof(FamilyInstance)).Cast<FamilyInstance>());
+            return witness != null &&
+                witness.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ==
+                    DemoProjectBuilder.HistoryFurnitureMark(0) &&
+                witness.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.AsString() == InitialComments;
+        }
+
         internal static int Reset(Document doc, out int removedReservations)
         {
             removedReservations = 0;
@@ -176,9 +221,7 @@ namespace BIMaestro.Tutorials
 
             var furniture = new FilteredElementCollector(doc).OfClass(typeof(FamilyInstance))
                 .Cast<FamilyInstance>().ToList();
-            FamilyInstance witness = furniture.FirstOrDefault(instance =>
-                (instance.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ?? "")
-                == DemoProjectBuilder.HistoryFurnitureMark(0));
+            FamilyInstance witness = FindWitness(furniture);
             if (witness == null)
                 throw new InvalidOperationException("Cette maquette n'a pas la scène de mobilier. Crée une nouvelle maquette de formation.");
             Level level = doc.GetElement(witness.LevelId) as Level;
@@ -192,6 +235,8 @@ namespace BIMaestro.Tutorials
             using (var tx = new Transaction(doc, "BIMaestro - Recommencer les exercices"))
             {
                 tx.Start();
+                witness.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.Set(DemoProjectBuilder.HistoryFurnitureMark(0));
+                witness.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.Set(InitialComments);
                 if (reservations.Count > 0) doc.Delete(reservations);
                 removedReservations = reservations.Count;
 
@@ -235,20 +280,42 @@ namespace BIMaestro.Tutorials
 
             var furniture = new FilteredElementCollector(doc).OfClass(typeof(FamilyInstance))
                 .Cast<FamilyInstance>().ToList();
-            if (!furniture.Any(instance => (instance.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ?? "")
-                    == DemoProjectBuilder.DemoPrefix + "HISTORIQUE_TEMOIN"))
+            FamilyInstance witness = FindWitness(furniture);
+            if (witness == null)
                 throw new InvalidOperationException("Cette maquette utilise l'ancien scénario. Crée une nouvelle maquette de formation pour l'exercice de restauration.");
             var toRemove = furniture
                 .Where(instance => (instance.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ?? "")
                     .StartsWith(DemoProjectBuilder.DemoPrefix + "HISTORIQUE_A_RESTAURER_", StringComparison.Ordinal))
                 .Select(instance => instance.Id).ToList();
-            if (toRemove.Count == 0) return 0;
+            Parameter mark = witness.get_Parameter(BuiltInParameter.ALL_MODEL_MARK);
+            Parameter comments = witness.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS);
+            if (mark == null || comments == null || mark.IsReadOnly || comments.IsReadOnly ||
+                mark.StorageType != StorageType.String || comments.StorageType != StorageType.String)
+                throw new InvalidOperationException("Le mobilier témoin doit avoir un repère et des commentaires modifiables.");
 
+            // Normalize the exercise before taking the deletion/parameter snapshots.
+            using (var tx = new Transaction(doc, "BIMaestro - État initial du mobilier témoin"))
+            {
+                tx.Start();
+                mark.Set(DemoProjectBuilder.HistoryFurnitureMark(0));
+                comments.Set(InitialComments);
+                tx.Commit();
+            }
+            Analyse.ElementHistoryTracker.FlushPendingForHistory();
             Analyse.ElementHistoryTracker.PrimeDocument(doc);
             using (var tx = new Transaction(doc, "BIMaestro - Exercice historique : supprimer le mobilier"))
             {
                 tx.Start();
-                doc.Delete(toRemove);
+                if (toRemove.Count > 0) doc.Delete(toRemove);
+                tx.Commit();
+            }
+            Analyse.ElementHistoryTracker.FlushPendingForHistory();
+            // A separate transaction records both before/after values on the surviving instance.
+            using (var tx = new Transaction(doc, "BIMaestro - Exercice historique : modifier les paramètres du témoin"))
+            {
+                tx.Start();
+                mark.Set(ModifiedWitnessMark);
+                comments.Set(ModifiedComments);
                 tx.Commit();
             }
             Analyse.ElementHistoryTracker.FlushPendingForHistory();
@@ -400,8 +467,8 @@ namespace BIMaestro.Tutorials
                     {
                         int removed = DemoHistoryScene.Prepare(activeDocument.Document);
                         DemoTourMessage.Show(uiApp.MainWindowHandle, "Pikachu prépare l'enquête", removed > 0
-                            ? removed + " objets de la scène ont été supprimés et enregistrés dans l'historique. Le troisième reste visible. Suis Pikachu pour les restaurer."
-                            : "La scène est déjà préparée. Suis Pikachu pour retrouver les suppressions dans l'historique.");
+                            ? removed + " objets ont été supprimés, puis le repère et les commentaires du troisième ont été modifiés. Fais réapparaître les deux objets, puis rétablis les anciennes valeurs du témoin avec Qui a fait ça."
+                            : "Les suppressions sont déjà préparées et les paramètres du témoin ont été modifiés. Retrouve les deux suppressions, puis restaure les anciennes valeurs du témoin.");
                     }
                     catch (Exception ex)
                     {
@@ -936,7 +1003,7 @@ namespace BIMaestro.Tutorials
                 TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 14)
             });
             AddTour(stack, "1 · Auto résa", "Créer une réservation sur le mur traversé par la canalisation.", "reservation");
-            AddTour(stack, "2 · Qui a fait ça ?", "Retrouver et restaurer les meubles supprimés.", "history");
+            AddTour(stack, "2 · Qui a fait ça ?", "Restaurer deux meubles supprimés et les anciens paramètres du témoin.", "history");
             AddTour(stack, "3 · Couleurs et vues", "Colorer l'arborescence et ajouter des icônes aux dossiers.", "colors");
             AddTour(stack, "4 · Calcul des canalisations", "Calculer canalisations, coudes et gaines, puis lire le fichier Excel.", "pipe-calculation");
             AddTour(stack, "5 · Organisateur", "Renuméroter huit places sur deux niveaux, puis tourner la vue.", "organizer");
@@ -970,6 +1037,53 @@ namespace BIMaestro.Tutorials
         private static readonly Dictionary<Window, DemoWindowGuide> ActiveGuides = new Dictionary<Window, DemoWindowGuide>();
         private static FamilyRibbonTutorialGuide _familyRibbonGuide;
         private static Famille.Collection _familyTutorialFavorites;
+        private static List<string> _familyTutorialRecents;
+        private static Autodesk.Revit.ApplicationServices.Application _placementApplication;
+        private static EventHandler<Autodesk.Revit.DB.Events.DocumentChangedEventArgs> _placementWatcher;
+
+        internal static List<string> GetTutorialRecentFamiliesForRosace()
+            => _familyRibbonGuide == null || _familyTutorialRecents == null
+                ? null : new List<string>(_familyTutorialRecents);
+
+        internal static bool IsTutorialFamilyForRosace(string path)
+            => _familyRibbonGuide != null && !string.IsNullOrWhiteSpace(path) &&
+                ((_familyTutorialRecents?.Contains(path, StringComparer.OrdinalIgnoreCase) ?? false) ||
+                 (_familyTutorialFavorites?.Paths.Contains(path, StringComparer.OrdinalIgnoreCase) ?? false));
+
+        private static void StopTutorialPlacementWatch()
+        {
+            if (_placementApplication != null && _placementWatcher != null)
+                _placementApplication.DocumentChanged -= _placementWatcher;
+            _placementWatcher = null;
+            _placementApplication = null;
+        }
+
+        internal static void WatchTutorialFamilyPlacement(Document document, FamilySymbol symbol)
+        {
+            StopTutorialPlacementWatch();
+            if (_familyRibbonGuide == null || document == null || symbol == null) return;
+            ElementId symbolId = symbol.Id;
+            _placementApplication = document.Application;
+            _placementWatcher = (sender, args) =>
+            {
+                try
+                {
+                    Document changed = args.GetDocument();
+                    if (!ReferenceEquals(changed, document) && !changed.Equals(document)) return;
+                    bool placed = args.GetAddedElementIds().Any(id =>
+                        changed.GetElement(id) is FamilyInstance instance &&
+                        instance.Symbol.Id.Equals(symbolId));
+                    if (!placed) return;
+                    StopTutorialPlacementWatch();
+                    ReportExternalAction("radial-tutorial-chaise-placed");
+                }
+                catch (Autodesk.Revit.Exceptions.InvalidObjectException)
+                {
+                    StopTutorialPlacementWatch();
+                }
+            };
+            _placementApplication.DocumentChanged += _placementWatcher;
+        }
 
         internal static bool AttachIfRequested(string id, Window window)
         {
@@ -1054,9 +1168,14 @@ namespace BIMaestro.Tutorials
             if (owner == IntPtr.Zero) return;
             _familyRibbonGuide?.Close();
             _familyTutorialFavorites = browser.TryGetTutorialFavoritesForRosace();
-            var guide = new FamilyRibbonTutorialGuide(owner, steps, 18, () =>
+            _familyTutorialRecents = browser.GetTutorialRecentFamilyPaths();
+            int ribbonStartIndex = Array.FindIndex(steps, step => step.Target == "RevitFamilySplit");
+            if (ribbonStartIndex < 0) return;
+            var guide = new FamilyRibbonTutorialGuide(owner, steps, ribbonStartIndex, () =>
             {
+                StopTutorialPlacementWatch();
                 _familyTutorialFavorites = null;
+                _familyTutorialRecents = null;
                 _familyRibbonGuide = null;
             });
             _familyRibbonGuide = guide;
@@ -1067,10 +1186,16 @@ namespace BIMaestro.Tutorials
             guide.Show();
         }
 
-        internal static void ReportRestoration(Window window)
+        internal static void ReportRestoration(Window window, bool furnitureRestored)
         {
             if (ActiveGuides.TryGetValue(window, out DemoWindowGuide guide))
-                guide.CompleteRestoration();
+                guide.CompleteRestoration(furnitureRestored);
+        }
+
+        internal static void ReportParameterRestoration(Window window, bool exerciseRestored)
+        {
+            if (ActiveGuides.TryGetValue(window, out DemoWindowGuide guide))
+                guide.CompleteParameterRestoration(exerciseRestored);
         }
 
         internal static bool IsActive(Window window) => ActiveGuides.ContainsKey(window);
@@ -1158,7 +1283,7 @@ namespace BIMaestro.Tutorials
                 _detachAction = null;
                 RemoveHighlight();
                 if (_index < 0 || _index >= _steps.Length) return;
-                if (TourId == "family-browser" && _index == 18 &&
+                if (TourId == "family-browser" && _steps[_index].Target == "RevitFamilySplit" &&
                     _window is Famille.FamilyBrowserWindow familyBrowser)
                 {
                     ContinueFamilyGuideInRevit(_steps, familyBrowser);
@@ -1212,7 +1337,7 @@ namespace BIMaestro.Tutorials
                     _completed = true;
                     _next.IsEnabled = true;
                 }
-                if (step.CompletionEvent == "radial-tutorial-chaise-used" &&
+                if (step.CompletionEvent == "radial-tutorial-chaise-placed" &&
                     Famille.FamilyBrowserCommand.uiapp?.ActiveUIDocument == null)
                 {
                     _text.Text += " Aucun projet Revit n'est ouvert : ouvre une maquette pour essayer la rosace et placer une famille. Tu peux terminer ici et relancer TUTO plus tard.";
@@ -1231,10 +1356,10 @@ namespace BIMaestro.Tutorials
             internal void CompleteAction(string action)
             {
                 if (_index >= 0 && _index < _steps.Length &&
-                    _steps[_index].CompletionEvent == "radial-tutorial-chaise-used" &&
+                    _steps[_index].CompletionEvent == "radial-tutorial-chaise-placed" &&
                     action == "radial-opened")
                 {
-                    _text.Text = "✓ La rosace est ouverte. Fais un clic droit au centre, choisis « Charger une collection » > « Favoris », puis clique sur ta chaise étoilée. BIMaestro lancera son placement dans Revit.";
+                    _text.Text = "✓ La rosace est ouverte. Fais un clic droit au centre, choisis « Charger une collection » > « Favoris », puis clique sur une chaise des favoris d'essai. BIMaestro lancera son placement dans Revit.";
                     return;
                 }
                 if (_index >= 0 && _index < _steps.Length &&
@@ -1252,7 +1377,8 @@ namespace BIMaestro.Tutorials
             private void WatchAction(string targetName, int expectedIndex)
             {
                 if (_index != expectedIndex || !(_window.FindName(targetName) is FrameworkElement target)) return;
-                if (targetName == "RestoreDeletedButton") return; // Wait for a committed restoration.
+                if (targetName == "RestoreDeletedButton" || targetName == "RestoreParametersButton")
+                    return; // Wait for a committed and verified restoration.
                 if (target is System.Windows.Controls.TextBox textBox)
                 {
                     TextChangedEventHandler handler = (_, __) =>
@@ -1338,10 +1464,28 @@ namespace BIMaestro.Tutorials
                 }
             }
 
-            internal void CompleteRestoration()
+            internal void CompleteRestoration(bool furnitureRestored)
             {
-                if (_index == _steps.Length - 1 && _steps[_index].Target == "RestoreDeletedButton")
-                    CompleteStep(_index);
+                if (_index < 0 || _index >= _steps.Length || _steps[_index].Target != "RestoreDeletedButton")
+                    return;
+                if (TourId == "history" && IsPreparedExercise && !furnitureRestored)
+                {
+                    _text.Text = "Un objet a été restauré. Sélectionne l'autre suppression du mobilier et clique de nouveau sur « Restaurer les éléments ». Pikachu attend que les deux objets soient présents.";
+                    return;
+                }
+                CompleteStep(_index);
+            }
+
+            internal void CompleteParameterRestoration(bool exerciseRestored)
+            {
+                if (_index < 0 || _index >= _steps.Length || _steps[_index].Target != "RestoreParametersButton")
+                    return;
+                if (!exerciseRestored)
+                {
+                    _text.Text = "Le témoin n'a pas encore retrouvé ses deux anciennes valeurs. Choisis la modification qui contient le repère TEMOIN_MODIFIE et les commentaires « Mobilier témoin : paramètres modifiés », puis restaure cette ligne.";
+                    return;
+                }
+                CompleteStep(_index);
             }
 
             private void CompleteStep(int expectedIndex)
@@ -1350,12 +1494,14 @@ namespace BIMaestro.Tutorials
                 _completed = true;
                 if (_index + 1 == _steps.Length)
                 {
-                    _text.Text = _steps[_index].Target == "RestoreDeletedButton"
+                    _text.Text = _steps[_index].Target == "RestoreParametersButton"
+                        ? "✓ Les deux objets sont présents et le témoin a retrouvé son repère et ses commentaires initiaux. Sélectionne-le dans Revit pour vérifier ses Propriétés. Tu as recréé des objets supprimés et rétabli des paramètres depuis leur historique."
+                        : _steps[_index].Target == "RestoreDeletedButton"
                         ? "✓ Le mobilier a réapparu. BIMaestro l'a sélectionné et cadré dans la vue : compare-le avec l'objet témoin, puis termine le parcours."
                         : _steps[_index].CompletionEvent == "load-bureau-commun"
                         ? "✓ Revit a chargé la famille et lancé son placement. Clique dans la vue pour la poser, ou appuie sur Échap si tu voulais seulement tester le chargement."
-                        : _steps[_index].CompletionEvent == "radial-tutorial-chaise-used"
-                        ? "✓ Tu as lancé ta chaise favorite depuis la rosace. Clique dans la vue pour la placer, puis appuie sur Échap pour quitter le mode placement. Ton favori d'essai et tes chemins personnels restent inchangés."
+                        : _steps[_index].CompletionEvent == "radial-tutorial-chaise-placed"
+                        ? "✓ Tu as posé une chaise depuis la rosace. Appuie sur Échap pour quitter le mode placement. Ton favori d'essai et tes chemins personnels restent inchangés."
                         : "✓ Action confirmée dans la maquette. Tu peux terminer ce parcours.";
                     _next.IsEnabled = true;
                 }
@@ -1481,7 +1627,7 @@ namespace BIMaestro.Tutorials
             AddCard(stack, "1 · Auto réservation",
                 "Quand un réseau traverse un mur, BIMaestro place une famille de réservation au croisement. Dans l'exercice, tu choisis toi-même la canalisation puis le mur et tu examines le résultat.");
             AddCard(stack, "2 · Qui a fait ça ?",
-                "Retrouve l'auteur et le contexte d'une modification. Dans l'exercice, deux meubles sont supprimés, puis tu les fais réapparaître à partir de l'historique.");
+                "Retrouve l'auteur et le contexte d'une modification. Fais réapparaître deux meubles supprimés, puis restaure le repère et les commentaires initiaux du troisième à partir de l'historique.");
             AddCard(stack, "3 · Couleurs et vues",
                 "Personnalise l'arborescence sans renommer ni recréer les vues. Dans l'exercice, tu changes le fond et ajoutes des icônes aux dossiers Plans d'étage et Vues 3D.");
             AddCard(stack, "4 · Calcul des canalisations",
@@ -1665,7 +1811,8 @@ namespace BIMaestro.Tutorials
                         { "1. Réduire la recherche", "Filtre par action, utilisateur, texte ou période. Si l'événement manque, élargis d'abord la période et recharge l'historique avant de conclure qu'il n'existe pas." },
                         { "2. Lire la preuve", "Dans Détails, compare l'auteur, la date, la catégorie et les propriétés enregistrées. Une carte ou un aperçu aide à repérer l'élément, mais ne remplace pas ces informations." },
                         { "3. Prévisualiser", "« Visualiser » affiche l'emplacement estimé sans modifier le projet. L'aperçu détaillé dépend des familles et types encore présents ; il peut revenir à une représentation simple." },
-                        { "4. Restaurer avec prudence", "« Restaurer les éléments » recrée l'objet dans la maquette. La famille, le type, le niveau et parfois l'hôte doivent être disponibles. Vérifie le rapport si certains éléments échouent." }
+                        { "4. Recréer les objets", "« Restaurer les éléments » recrée les objets supprimés. La famille, le type, le niveau et parfois l'hôte doivent être disponibles. Dans l'exercice, vérifie que les deux meubles sont réapparus." },
+                        { "5. Rétablir des paramètres", "Sélectionne une ligne « Modification paramètres », compare l'avant/après dans Détails, puis clique sur « Restaurer ». Cette action réapplique les anciennes valeurs enregistrées pour cette ligne sur l'élément existant. Elle ne constitue pas une annulation générale de toutes les actions du projet." }
                     };
                     break;
                 default:
