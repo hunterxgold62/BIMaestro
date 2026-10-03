@@ -115,14 +115,18 @@ namespace BIMaestro.Tutorials
             },
             ["history"] = new[]
             {
-                new DemoStep("Voir les suppressions", "Deux objets de la scène ont été supprimés au démarrage du parcours. Dans Action, filtre sur « Suppressions » pour distinguer une suppression d'une création ou modification.", "ActionFilterCombo"),
+                new DemoStep("Deux suppressions et une modification", "Pikachu a supprimé deux objets de la scène, puis modifié le repère et les commentaires du troisième. Nous allons faire réapparaître les deux objets, puis retrouver les anciennes valeurs du témoin. Dans Action, choisis « Suppressions ».", "ActionFilterCombo"),
                 new DemoStep("Filtrer par utilisateur", "Ce filtre isole les actions d'une personne. Il sert à comprendre qui a modifié la maquette, mais une absence de résultat peut aussi venir de la période chargée. Ne change rien pour retrouver les objets de la démo.", "UserFilterCombo", true),
                 new DemoStep("Recherche et période", "La recherche cible un élément ou une information précise. Les dates « Du » et « Au » limitent les événements chargés ; « Charger période » relit alors l'historique. Garde les filtres actuels pour l'exercice.", "SearchBox", true),
                 new DemoStep("Aperçu d'une suppression", "« Simple » montre vite un volume estimatif. « Détaillé » utilise la famille et le type encore présents pour les suppressions futures ; si les données manquent, l'aperçu reste simplifié. Cela ne restaure rien.", "DetailedMeshModeRadio", true),
                 new DemoStep("Choisir un objet", "Sélectionne une carte de mobilier supprimé. Le troisième objet resté dans la vue 02 sert de repère pour comparer sa position.", "VisualCardsList"),
                 new DemoStep("Examiner le contexte", "Ouvre Détails : vérifie l'auteur, la date, la catégorie et les informations enregistrées avant la suppression. Ce sont les éléments à confirmer avant toute restauration.", "DetailsButton"),
                 new DemoStep("Visualiser avant d'agir", "« Visualiser » affiche un aperçu sans recréer l'élément. « Restaurer les éléments » le recrée durablement dans le projet. Si tu veux seulement enquêter, arrête-toi à l'aperçu.", "VisualizeDeletedButton", true),
-                new DemoStep("Faire réapparaître l'objet", "Clique sur « Restaurer les éléments » et confirme. La famille, le type et le niveau doivent encore être disponibles ; Pikachu attendra une restauration réussie avant de valider.", "RestoreDeletedButton")
+                new DemoStep("Sélectionner les deux objets", "Passe à l'onglet « Données ». Sélectionne les deux lignes de suppression du mobilier de cet exercice en maintenant Ctrl. Tu peux aussi les restaurer une par une depuis la vue visuelle. La famille, le type et le niveau doivent encore être disponibles.", "HistoryTabs", true),
+                new DemoStep("Faire réapparaître les deux objets", "Clique sur « Restaurer les éléments » et confirme. Si tu n'as restauré qu'un objet, sélectionne la seconde suppression et recommence. Pikachu ne poursuivra que lorsque les deux objets seront présents dans la maquette.", "RestoreDeletedButton"),
+                new DemoStep("Retrouver la modification des paramètres", "Dans Action, choisis « Modification paramètres ». Retrouve la ligne du mobilier témoin dont le repère se termine par TEMOIN_MODIFIE. Garde la recherche vide et la période de l'exercice pour retrouver cet événement.", "ActionFilterCombo", true),
+                new DemoStep("Comparer les valeurs avant et après", "Sélectionne la ligne du témoin, puis ouvre « Détails ». Compare les anciennes et nouvelles valeurs du repère et des commentaires. Nous allons restaurer les valeurs enregistrées avant cette modification sur le même objet.", "DetailsButton", true),
+                new DemoStep("Revenir aux anciens paramètres", "Avec la ligne de modification du témoin sélectionnée, clique sur « Restaurer » et confirme. Ce bouton réapplique les anciennes valeurs de paramètres enregistrées pour cette ligne. Il est différent de « Restaurer les éléments », utilisé pour recréer les objets supprimés. Pikachu vérifiera le repère et les commentaires du témoin avant de terminer.", "RestoreParametersButton")
             }
         };
 
@@ -171,6 +175,43 @@ namespace BIMaestro.Tutorials
 
     internal static class DemoHistoryScene
     {
+        internal const string InitialComments = "Mobilier témoin : état initial";
+        internal const string ModifiedComments = "Mobilier témoin : paramètres modifiés";
+        internal static string ModifiedWitnessMark => DemoProjectBuilder.HistoryFurnitureMark(0) + "_MODIFIE";
+
+        private static bool IsLearningDocument(Document doc) =>
+            doc != null && System.IO.Path.GetFileName(doc.PathName)
+                .StartsWith("BIMaestro_Apprentissage_", StringComparison.OrdinalIgnoreCase);
+
+        private static FamilyInstance FindWitness(IEnumerable<FamilyInstance> furniture) =>
+            furniture.FirstOrDefault(instance =>
+            {
+                string mark = instance.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ?? "";
+                return mark == DemoProjectBuilder.HistoryFurnitureMark(0) || mark == ModifiedWitnessMark;
+            });
+
+        internal static bool HasRestoredFurniture(Document doc)
+        {
+            if (!IsLearningDocument(doc)) return false;
+            var marks = new FilteredElementCollector(doc).OfClass(typeof(FamilyInstance))
+                .Cast<FamilyInstance>()
+                .Select(instance => instance.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ?? "")
+                .ToList();
+            return marks.Contains(DemoProjectBuilder.HistoryFurnitureMark(1)) &&
+                marks.Contains(DemoProjectBuilder.HistoryFurnitureMark(2));
+        }
+
+        internal static bool HasRestoredParameters(Document doc)
+        {
+            if (!IsLearningDocument(doc)) return false;
+            FamilyInstance witness = FindWitness(new FilteredElementCollector(doc)
+                .OfClass(typeof(FamilyInstance)).Cast<FamilyInstance>());
+            return witness != null &&
+                witness.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ==
+                    DemoProjectBuilder.HistoryFurnitureMark(0) &&
+                witness.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.AsString() == InitialComments;
+        }
+
         internal static int Reset(Document doc, out int removedReservations)
         {
             removedReservations = 0;
@@ -180,9 +221,7 @@ namespace BIMaestro.Tutorials
 
             var furniture = new FilteredElementCollector(doc).OfClass(typeof(FamilyInstance))
                 .Cast<FamilyInstance>().ToList();
-            FamilyInstance witness = furniture.FirstOrDefault(instance =>
-                (instance.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ?? "")
-                == DemoProjectBuilder.HistoryFurnitureMark(0));
+            FamilyInstance witness = FindWitness(furniture);
             if (witness == null)
                 throw new InvalidOperationException("Cette maquette n'a pas la scène de mobilier. Crée une nouvelle maquette de formation.");
             Level level = doc.GetElement(witness.LevelId) as Level;
@@ -196,6 +235,8 @@ namespace BIMaestro.Tutorials
             using (var tx = new Transaction(doc, "BIMaestro - Recommencer les exercices"))
             {
                 tx.Start();
+                witness.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.Set(DemoProjectBuilder.HistoryFurnitureMark(0));
+                witness.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.Set(InitialComments);
                 if (reservations.Count > 0) doc.Delete(reservations);
                 removedReservations = reservations.Count;
 
@@ -239,20 +280,42 @@ namespace BIMaestro.Tutorials
 
             var furniture = new FilteredElementCollector(doc).OfClass(typeof(FamilyInstance))
                 .Cast<FamilyInstance>().ToList();
-            if (!furniture.Any(instance => (instance.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ?? "")
-                    == DemoProjectBuilder.DemoPrefix + "HISTORIQUE_TEMOIN"))
+            FamilyInstance witness = FindWitness(furniture);
+            if (witness == null)
                 throw new InvalidOperationException("Cette maquette utilise l'ancien scénario. Crée une nouvelle maquette de formation pour l'exercice de restauration.");
             var toRemove = furniture
                 .Where(instance => (instance.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ?? "")
                     .StartsWith(DemoProjectBuilder.DemoPrefix + "HISTORIQUE_A_RESTAURER_", StringComparison.Ordinal))
                 .Select(instance => instance.Id).ToList();
-            if (toRemove.Count == 0) return 0;
+            Parameter mark = witness.get_Parameter(BuiltInParameter.ALL_MODEL_MARK);
+            Parameter comments = witness.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS);
+            if (mark == null || comments == null || mark.IsReadOnly || comments.IsReadOnly ||
+                mark.StorageType != StorageType.String || comments.StorageType != StorageType.String)
+                throw new InvalidOperationException("Le mobilier témoin doit avoir un repère et des commentaires modifiables.");
 
+            // Normalize the exercise before taking the deletion/parameter snapshots.
+            using (var tx = new Transaction(doc, "BIMaestro - État initial du mobilier témoin"))
+            {
+                tx.Start();
+                mark.Set(DemoProjectBuilder.HistoryFurnitureMark(0));
+                comments.Set(InitialComments);
+                tx.Commit();
+            }
+            Analyse.ElementHistoryTracker.FlushPendingForHistory();
             Analyse.ElementHistoryTracker.PrimeDocument(doc);
             using (var tx = new Transaction(doc, "BIMaestro - Exercice historique : supprimer le mobilier"))
             {
                 tx.Start();
-                doc.Delete(toRemove);
+                if (toRemove.Count > 0) doc.Delete(toRemove);
+                tx.Commit();
+            }
+            Analyse.ElementHistoryTracker.FlushPendingForHistory();
+            // A separate transaction records both before/after values on the surviving instance.
+            using (var tx = new Transaction(doc, "BIMaestro - Exercice historique : modifier les paramètres du témoin"))
+            {
+                tx.Start();
+                mark.Set(ModifiedWitnessMark);
+                comments.Set(ModifiedComments);
                 tx.Commit();
             }
             Analyse.ElementHistoryTracker.FlushPendingForHistory();
@@ -404,8 +467,8 @@ namespace BIMaestro.Tutorials
                     {
                         int removed = DemoHistoryScene.Prepare(activeDocument.Document);
                         DemoTourMessage.Show(uiApp.MainWindowHandle, "Pikachu prépare l'enquête", removed > 0
-                            ? removed + " objets de la scène ont été supprimés et enregistrés dans l'historique. Le troisième reste visible. Suis Pikachu pour les restaurer."
-                            : "La scène est déjà préparée. Suis Pikachu pour retrouver les suppressions dans l'historique.");
+                            ? removed + " objets ont été supprimés, puis le repère et les commentaires du troisième ont été modifiés. Fais réapparaître les deux objets, puis rétablis les anciennes valeurs du témoin avec Qui a fait ça."
+                            : "Les suppressions sont déjà préparées et les paramètres du témoin ont été modifiés. Retrouve les deux suppressions, puis restaure les anciennes valeurs du témoin.");
                     }
                     catch (Exception ex)
                     {
@@ -940,7 +1003,7 @@ namespace BIMaestro.Tutorials
                 TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 14)
             });
             AddTour(stack, "1 · Auto résa", "Créer une réservation sur le mur traversé par la canalisation.", "reservation");
-            AddTour(stack, "2 · Qui a fait ça ?", "Retrouver et restaurer les meubles supprimés.", "history");
+            AddTour(stack, "2 · Qui a fait ça ?", "Restaurer deux meubles supprimés et les anciens paramètres du témoin.", "history");
             AddTour(stack, "3 · Couleurs et vues", "Colorer l'arborescence et ajouter des icônes aux dossiers.", "colors");
             AddTour(stack, "4 · Calcul des canalisations", "Calculer canalisations, coudes et gaines, puis lire le fichier Excel.", "pipe-calculation");
             AddTour(stack, "5 · Organisateur", "Renuméroter huit places sur deux niveaux, puis tourner la vue.", "organizer");
@@ -1123,10 +1186,16 @@ namespace BIMaestro.Tutorials
             guide.Show();
         }
 
-        internal static void ReportRestoration(Window window)
+        internal static void ReportRestoration(Window window, bool furnitureRestored)
         {
             if (ActiveGuides.TryGetValue(window, out DemoWindowGuide guide))
-                guide.CompleteRestoration();
+                guide.CompleteRestoration(furnitureRestored);
+        }
+
+        internal static void ReportParameterRestoration(Window window, bool exerciseRestored)
+        {
+            if (ActiveGuides.TryGetValue(window, out DemoWindowGuide guide))
+                guide.CompleteParameterRestoration(exerciseRestored);
         }
 
         internal static bool IsActive(Window window) => ActiveGuides.ContainsKey(window);
@@ -1308,7 +1377,8 @@ namespace BIMaestro.Tutorials
             private void WatchAction(string targetName, int expectedIndex)
             {
                 if (_index != expectedIndex || !(_window.FindName(targetName) is FrameworkElement target)) return;
-                if (targetName == "RestoreDeletedButton") return; // Wait for a committed restoration.
+                if (targetName == "RestoreDeletedButton" || targetName == "RestoreParametersButton")
+                    return; // Wait for a committed and verified restoration.
                 if (target is System.Windows.Controls.TextBox textBox)
                 {
                     TextChangedEventHandler handler = (_, __) =>
@@ -1394,10 +1464,28 @@ namespace BIMaestro.Tutorials
                 }
             }
 
-            internal void CompleteRestoration()
+            internal void CompleteRestoration(bool furnitureRestored)
             {
-                if (_index == _steps.Length - 1 && _steps[_index].Target == "RestoreDeletedButton")
-                    CompleteStep(_index);
+                if (_index < 0 || _index >= _steps.Length || _steps[_index].Target != "RestoreDeletedButton")
+                    return;
+                if (TourId == "history" && IsPreparedExercise && !furnitureRestored)
+                {
+                    _text.Text = "Un objet a été restauré. Sélectionne l'autre suppression du mobilier et clique de nouveau sur « Restaurer les éléments ». Pikachu attend que les deux objets soient présents.";
+                    return;
+                }
+                CompleteStep(_index);
+            }
+
+            internal void CompleteParameterRestoration(bool exerciseRestored)
+            {
+                if (_index < 0 || _index >= _steps.Length || _steps[_index].Target != "RestoreParametersButton")
+                    return;
+                if (!exerciseRestored)
+                {
+                    _text.Text = "Le témoin n'a pas encore retrouvé ses deux anciennes valeurs. Choisis la modification qui contient le repère TEMOIN_MODIFIE et les commentaires « Mobilier témoin : paramètres modifiés », puis restaure cette ligne.";
+                    return;
+                }
+                CompleteStep(_index);
             }
 
             private void CompleteStep(int expectedIndex)
@@ -1406,7 +1494,9 @@ namespace BIMaestro.Tutorials
                 _completed = true;
                 if (_index + 1 == _steps.Length)
                 {
-                    _text.Text = _steps[_index].Target == "RestoreDeletedButton"
+                    _text.Text = _steps[_index].Target == "RestoreParametersButton"
+                        ? "✓ Les deux objets sont présents et le témoin a retrouvé son repère et ses commentaires initiaux. Sélectionne-le dans Revit pour vérifier ses Propriétés. Tu as recréé des objets supprimés et rétabli des paramètres depuis leur historique."
+                        : _steps[_index].Target == "RestoreDeletedButton"
                         ? "✓ Le mobilier a réapparu. BIMaestro l'a sélectionné et cadré dans la vue : compare-le avec l'objet témoin, puis termine le parcours."
                         : _steps[_index].CompletionEvent == "load-bureau-commun"
                         ? "✓ Revit a chargé la famille et lancé son placement. Clique dans la vue pour la poser, ou appuie sur Échap si tu voulais seulement tester le chargement."
@@ -1537,7 +1627,7 @@ namespace BIMaestro.Tutorials
             AddCard(stack, "1 · Auto réservation",
                 "Quand un réseau traverse un mur, BIMaestro place une famille de réservation au croisement. Dans l'exercice, tu choisis toi-même la canalisation puis le mur et tu examines le résultat.");
             AddCard(stack, "2 · Qui a fait ça ?",
-                "Retrouve l'auteur et le contexte d'une modification. Dans l'exercice, deux meubles sont supprimés, puis tu les fais réapparaître à partir de l'historique.");
+                "Retrouve l'auteur et le contexte d'une modification. Fais réapparaître deux meubles supprimés, puis restaure le repère et les commentaires initiaux du troisième à partir de l'historique.");
             AddCard(stack, "3 · Couleurs et vues",
                 "Personnalise l'arborescence sans renommer ni recréer les vues. Dans l'exercice, tu changes le fond et ajoutes des icônes aux dossiers Plans d'étage et Vues 3D.");
             AddCard(stack, "4 · Calcul des canalisations",
@@ -1721,7 +1811,8 @@ namespace BIMaestro.Tutorials
                         { "1. Réduire la recherche", "Filtre par action, utilisateur, texte ou période. Si l'événement manque, élargis d'abord la période et recharge l'historique avant de conclure qu'il n'existe pas." },
                         { "2. Lire la preuve", "Dans Détails, compare l'auteur, la date, la catégorie et les propriétés enregistrées. Une carte ou un aperçu aide à repérer l'élément, mais ne remplace pas ces informations." },
                         { "3. Prévisualiser", "« Visualiser » affiche l'emplacement estimé sans modifier le projet. L'aperçu détaillé dépend des familles et types encore présents ; il peut revenir à une représentation simple." },
-                        { "4. Restaurer avec prudence", "« Restaurer les éléments » recrée l'objet dans la maquette. La famille, le type, le niveau et parfois l'hôte doivent être disponibles. Vérifie le rapport si certains éléments échouent." }
+                        { "4. Recréer les objets", "« Restaurer les éléments » recrée les objets supprimés. La famille, le type, le niveau et parfois l'hôte doivent être disponibles. Dans l'exercice, vérifie que les deux meubles sont réapparus." },
+                        { "5. Rétablir des paramètres", "Sélectionne une ligne « Modification paramètres », compare l'avant/après dans Détails, puis clique sur « Restaurer ». Cette action réapplique les anciennes valeurs enregistrées pour cette ligne sur l'élément existant. Elle ne constitue pas une annulation générale de toutes les actions du projet." }
                     };
                     break;
                 default:
