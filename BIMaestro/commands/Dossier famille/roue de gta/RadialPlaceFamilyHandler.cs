@@ -11,6 +11,7 @@ namespace BIMaestro.UI
     internal sealed class RadialPlaceFamilyHandler : IExternalEventHandler
     {
         public string FamilyPath { get; set; }
+        public bool SuppressUsageTracking { get; set; }
 
         public void Execute(UIApplication uiapp)
         {
@@ -63,7 +64,7 @@ namespace BIMaestro.UI
                 }
 
                 uidoc.Selection.SetElementIds(new List<ElementId> { symbol.Id });
-                bool tutorialFamily = BIMaestro.Tutorials.DemoTourService.IsTutorialFamilyForRosace(FamilyPath);
+                bool tutorialFamily = SuppressUsageTracking || BIMaestro.Tutorials.DemoTourService.IsTutorialFamilyForRosace(FamilyPath);
                 if (BIMaestro.Tutorials.DemoTourService.IsTutorialChaiseForRosace(FamilyPath))
                     BIMaestro.Tutorials.DemoTourService.WatchTutorialFamilyPlacement(doc, symbol);
                 uidoc.PostRequestForElementTypePlacement(symbol);
