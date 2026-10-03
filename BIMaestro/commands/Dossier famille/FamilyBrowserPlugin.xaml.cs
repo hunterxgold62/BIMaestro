@@ -749,7 +749,7 @@ namespace Famille
             {
                 Id = favorites.Id,
                 Name = favorites.Name,
-                Paths = new List<string>(favorites.Paths)
+                Paths = favorites.Paths.Where(IsTutorialFamilyPath).ToList()
             };
         }
 
@@ -3508,9 +3508,33 @@ namespace Famille
                     showSuccessMessage: false, persist: false);
         }
 
+        private void PrepareTutorialRosaceFavorites()
+        {
+            if (!_tutorialCatalogActive) return;
+            var paths = new[]
+            {
+                Path.Combine(familiesFolder, "Mobilier", "Bureau", "Bureau commun.rfa"),
+                Path.Combine(familiesFolder, "Mobilier", "Bureau", "Salle de réunion", "Table de réunion - 01.rfa"),
+                Directory.EnumerateFiles(familiesFolder, "*.rfa", SearchOption.AllDirectories)
+                    .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                    .FirstOrDefault(path => Path.GetFileNameWithoutExtension(path)
+                        .IndexOf("chaise", StringComparison.OrdinalIgnoreCase) >= 0)
+            };
+            var favorites = GetFavoritesCollection();
+            foreach (var path in paths.Where(path => !string.IsNullOrWhiteSpace(path) && File.Exists(path)))
+            {
+                TrackTutorialFavoriteChange(path);
+                if (!favorites.Paths.Any(existing => string.Equals(existing, path, StringComparison.OrdinalIgnoreCase)))
+                    favorites.Paths.Add(path);
+            }
+            MarkFavoritesInView(displayedFamilies);
+            MarkFavoritesInView(allFamilies);
+        }
+
         internal void PrepareTutorialStep(string target, string completionEvent)
         {
             if (!_tutorialCatalogActive) return;
+            if (completionEvent == "load-bureau-commun") PrepareTutorialRosaceFavorites();
             if (completionEvent == "load-bureau-commun" ||
                 completionEvent == "search-metadata-manual" ||
                 completionEvent == "search-metadata-ai")
