@@ -187,9 +187,9 @@ namespace BIMaestro.Tutorials
         internal void CompleteAction(string action)
         {
             if (_closing || _index < FirstStep || _index >= _steps.Length) return;
-            if (_steps[_index].CompletionEvent == "radial-tutorial-chaise-used" && action == "radial-opened")
+            if (_steps[_index].CompletionEvent == "radial-tutorial-chaise-placed" && action == "radial-opened")
             {
-                _text.Text = "✓ La rosace est ouverte. Clic droit au centre > « Charger une collection » > « Favoris », puis choisis une chaise des favoris d'essai. Pikachu attend son placement.";
+                _text.Text = "✓ La rosace est ouverte. Clic droit au centre > « Charger une collection » > « Favoris », puis choisis une chaise des favoris d'essai. Clique ensuite dans la vue pour la poser ; Pikachu attend sa création réelle.";
                 return;
             }
             if (string.Equals(_steps[_index].CompletionEvent, action, StringComparison.Ordinal))
@@ -230,7 +230,7 @@ namespace BIMaestro.Tutorials
             {
                 if (_completed) return;
                 _completed = true;
-                _text.Text = "✓ Pikachu a vérifié le lancement de ta chaise favorite depuis la rosace. Clique dans la vue pour la poser, puis Échap. Ton catalogue personnel et tes favoris sont conservés.";
+                _text.Text = "✓ Pikachu a vérifié la création de ta chaise dans la maquette depuis la rosace. Appuie sur Échap pour quitter le placement. Ton catalogue personnel et tes favoris sont conservés.";
                 _next.IsEnabled = true;
             }
             else
