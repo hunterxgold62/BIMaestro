@@ -95,6 +95,7 @@ namespace BIMaestro.Tutorials
                 new DemoStep("Ouvrir Bureau", "Ouvre le dossier « Bureau ». Il contient cinq familles et un sous-dossier ; observe aussi les cartes de dossiers à droite.", "FolderTreeView", completionEvent: "folder-bureau"),
                 new DemoStep("Explorer le sous-dossier", "Clique sur la carte « Salle de réunion » dans la zone principale. Ses cinq familles montrent comment conserver ton classement actuel, même à plusieurs niveaux.", "TutorialMeetingFolderCard", completionEvent: "folder-reunion"),
                 new DemoStep("Lire les fiches", "Les cartes affichent le nom et un aperçu lorsqu'il existe. Une image PNG portant le même nom qu'une famille RFA peut être retrouvée dans un dossier miroir ; sans image, le navigateur peut utiliser une vignette native.", "FamilyListView", true),
+                new DemoStep("Autres actions d'une carte", "Sur une carte, le clic droit propose « Rentrer dans la famille » pour ouvrir le RFA source, « Charger la dernière version » pour recharger le fichier depuis le disque et « Ajouter à la collection active » pour classer plusieurs familles. Aucune de ces actions n'est nécessaire pour le placement d'essai.", "FamilyListView", true),
                 new DemoStep("Chercher dans le dossier", "Saisis « Table » dans la recherche. Le mode « Dossier » limite les résultats au dossier ouvert.", "SearchBox", completionEvent: "search-table"),
                 new DemoStep("Étendre la recherche", "Clique sur « Tout ». BIMaestro efface la recherche « Table » et passe à l'ensemble du catalogue, y compris les autres sous-dossiers.", "SearchAllButton", completionEvent: "search-all"),
                 new DemoStep("Retrouver une famille", "Saisis « Chaise ». Les résultats doivent maintenant inclure des familles rangées hors de Salle de réunion.", "SearchBox", completionEvent: "search-chaise"),
@@ -106,17 +107,16 @@ namespace BIMaestro.Tutorials
                 new DemoStep("Ouvrir les paramètres", "Clique sur « Paramètres » pour découvrir où se règlent les dossiers et où se créent les aperçus 3D en série.", "SettingsTabItem", completionEvent: "settings-open"),
                 new DemoStep("Photos automatiques", "Pour l'essai, les cinq familles de « Salle de réunion » sont présélectionnées. « Lancer l'export 3D » ouvre le choix A/B : Bulbizarre t'expliquera comment garder la vue existante ou la vue normalisée. Valide ce choix, puis attends la fin de l'export pour revenir au guide. L'opération peut prendre du temps ; tu peux aussi la passer avec « Suivant ».", "StartPreviewButton", true, completionEvent: "preview-export-complete"),
                 new DemoStep("Adapter à ta bibliothèque", "« Modifier les chemins… » permet de choisir ton propre dossier de familles RFA, puis un dossier d'images PNG. Leurs sous-dossiers doivent se correspondre. Pendant ce guide, tes chemins enregistrés sont protégés : quitte le tutoriel avant de choisir ta bibliothèque personnelle.", "ChangePathsButton", true),
-                new DemoStep("Autres actions d'une carte", "Sur une carte, le clic droit propose « Rentrer dans la famille » pour ouvrir le RFA source, « Charger la dernière version » pour recharger le fichier depuis le disque et « Ajouter à la collection active » pour classer plusieurs familles. Aucune de ces actions n'est nécessaire pour le placement d'essai.", "FamilyListView", true),
-                new DemoStep("Ouvrir les paramètres", "Ouvre l’onglet « Paramètres ». Nous allons utiliser l’assistant IA pour proposer des descriptions et des mots-clés aux familles.", "SettingsTabItem", true),
                 new DemoStep("Découvrir l’assistant IA", "Clique sur « Ouvrir l’assistant… » dans Mots-clés intelligents. Dans la fenêtre, coche une ou deux familles puis utilise le bouton « Proposer avec l’IA » encadré en vert. Relis les propositions : elles restent modifiables. Ferme ensuite l’assistant pour poursuivre le parcours. Tu peux passer cette étape si l’IA n’est pas disponible.", "SearchMetadataAssistantButton", true, completionEvent: "search-assistant-closed"),
                 new DemoStep("Charger et placer une famille", "Bulbizarre revient au dossier Bureau. Trois favoris temporaires sont préparés pour la suite : un bureau, une table et une chaise. Ils seront disponibles dans la collection Favoris de la rosace. Double-clique sur la carte « Bureau commun » : le simple clic sélectionne la carte, le double-clic charge la famille dans Revit et lance son placement. Clique ensuite dans la vue pour la poser, puis appuie sur Échap pour sortir du mode placement.", "FamilyListView", completionEvent: "load-bureau-commun"),
-                new DemoStep("Ouvrir Famille dans Revit", "Le navigateur se ferme et Bulbizarre revient dans Revit. Termine le placement précédent avec Échap, ouvre l'onglet BIMaestro si besoin, puis clique sur la petite flèche du bouton « Famille ». Le contour vert suit le bon bouton.", "RevitFamilySplit"),
-                new DemoStep("Choisir la rosace « . »", "Dans le menu « Famille », clique sur l'entrée « . ». Cette rosace s'ouvre près de la souris avec les 16 familles récentes simulées de l'exercice. Bulbizarre attend son ouverture avant de poursuivre.", "RevitRosace", completionEvent: "radial-opened"),
+                new DemoStep("Ouvrir Famille dans Revit", "Le navigateur se ferme et Bulbizarre revient dans Revit. Termine le placement précédent avec Échap, ouvre l'onglet BIMaestro si besoin, puis clique sur la petite flèche du bouton « Navigateur de Familles ». Le contour vert suit le bon bouton.", "RevitFamilySplit"),
+                new DemoStep("Choisir la rosace « . »", "Dans la liste ouverte par la flèche de « Navigateur de Familles », clique sur l'entrée « . ». Cette rosace s'ouvre près de la souris avec les 16 familles récentes simulées de l'exercice. Bulbizarre attend son ouverture avant de poursuivre.", "RevitRosace", completionEvent: "radial-opened"),
                 new DemoStep("Comprendre les familles récentes", "Pour l'exercice, la rosace affiche 16 familles du catalogue de formation, réparties sur deux pages de 8. Les noms sont réels, mais leur historique récent est simulé : ces exemples ne viennent pas de ton historique personnel. Hors tutoriel, la rosace propose une page Top-8 des familles les plus utilisées et deux pages des 16 familles récentes chargées ou utilisées depuis le navigateur et la rosace. Garde la souris sur la rosace et tourne la molette pour passer d'une page de familles à l'autre. Affiche la seconde page Récents démo, puis reviens à la première. Survole les cases pour lire les noms, puis clique sur Suivant.", "RevitUseShortcut", true),
-                new DemoStep("Afficher les favoris dans la rosace", "Fais un clic droit au centre de la rosace, puis choisis « Charger une collection » > « Favoris ». La rosace affiche les favoris d'essai : un bureau, une table et une chaise, ainsi que la chaise que tu as étoilée si elle est différente. Survole les cases pour identifier les familles. Bulbizarre attend que tu choisisses réellement Favoris. Nous créerons ensuite le raccourci clavier, puis tu placeras une chaise. Ces favoris d'exemple ne sont pas enregistrés dans ta bibliothèque personnelle.", "RevitUseShortcut", completionEvent: "radial-tutorial-favorites-selected"),
                 new DemoStep("Passer à l'onglet Vue", "Ferme la rosace avec Échap, puis clique sur l'onglet « Vue » du ruban Revit. Bulbizarre encadre l'onglet et suit ton choix.", "RevitViewTab"),
                 new DemoStep("Ouvrir Interface utilisateur", "Dans Vue, ouvre « Interface utilisateur » dans le panneau Fenêtres. Le contour vert passe du ruban BIMaestro au ruban Revit.", "RevitUserInterface"),
                 new DemoStep("Créer le raccourci dans Revit", "Dans Vue > Interface utilisateur, clique sur « Raccourcis clavier ». Une fois la fenêtre ouverte :\n1. Garde le filtre « Tous », cherche « Navigateur de Familles » et sélectionne « Navigateur de Familles:. » sous BIMaestro > Spécifique aux familles. La ligne qui ouvre le navigateur est différente.\n2. Clique dans « Appuyer sur de nouvelles touches », puis tape B et F. Si BF est pris, choisis une autre combinaison libre.\n3. Clique sur « Attribuer », puis sur « OK ».\nPendant cette fenêtre Revit, le bouton « Suivant » de Bulbizarre ne répond pas. Après fermeture avec OK, Bulbizarre avance seul ; sinon clique sur « Suivant ».", "RevitKeyboardShortcuts", true),
+                new DemoStep("Essayer ton raccourci", "Reviens dans la vue Revit, place la souris et tape BF, ou ton raccourci choisi. Bulbizarre attend l’ouverture de la rosace.", "RevitUseShortcut", completionEvent: "radial-opened"),
+                new DemoStep("Afficher les favoris dans la rosace", "Fais un clic droit au centre de la rosace, puis choisis « Charger une collection » > « Favoris ». La rosace affiche les favoris d'essai : un bureau, une table et une chaise, ainsi que la chaise que tu as étoilée si elle est différente. Survole les cases pour identifier les familles. Bulbizarre attend que tu choisisses réellement Favoris. Tu placeras ensuite une chaise. Ces favoris d'exemple ne sont pas enregistrés dans ta bibliothèque personnelle.", "RevitUseShortcut", completionEvent: "radial-tutorial-favorites-selected"),
                 new DemoStep("Utiliser ton raccourci", "Reviens dans une vue Revit, place la souris où tu veux ouvrir la rosace et tape BF, ou le raccourci que tu as choisi. Fais un clic droit au centre de la rosace, puis « Charger une collection » > « Favoris ». Clique sur une chaise des favoris d'essai pour lancer son placement. Comme dans le navigateur, clique ensuite dans la vue pour la poser, puis appuie sur Échap. Bulbizarre attend la création réelle d'une chaise dans la maquette.", "RevitUseShortcut", completionEvent: "radial-tutorial-chaise-placed")
             },
             ["history"] = new[]
@@ -509,7 +509,8 @@ namespace BIMaestro.Tutorials
                 }
                 if (selectedChoice == "view-template")
                 {
-                    DemoViewTemplateGuide.Begin(activeDocument.Document);
+                    try { DemoViewTemplateGuide.Begin(activeDocument.Document); }
+                    catch (Exception ex) { message = ex.ToString(); DemoTourMessage.Show(uiApp.MainWindowHandle, "Gabarit de vue", "Préparation impossible : " + ex.Message); return Result.Failed; }
                     DemoTourMessage.Show(uiApp.MainWindowHandle, "Bravo ! Gabarit de vue",
                         "Observe la vue source : canalisations et parkings rouges, traits épais et pointillés. Clique sur Gabarit de vue : les choix à suivre seront encadrés en vert. Après l’export, nous ouvrirons une cible bleue pour voir la différence.");
                 }
@@ -965,7 +966,7 @@ namespace BIMaestro.Tutorials
                     pattern = LinePatternElement.Create(document, definition);
                 }
                 var solidFill = new FilteredElementCollector(document).OfClass(typeof(FillPatternElement)).Cast<FillPatternElement>()
-                    .FirstOrDefault(item => item.GetFillPattern().IsSolidFill);
+                    .FirstOrDefault(item => item.GetFillPattern().IsSolidFill && item.GetFillPattern().Target == FillPatternTarget.Drafting);
                 foreach (View3D view in views)
                 {
                     bool source = view.Name == "BIMaestro - 06 Gabarit source";
@@ -1099,68 +1100,16 @@ namespace BIMaestro.Tutorials
         }
     }
 
-    internal sealed class DemoTrainingChoiceWindow : Window
+    internal sealed class DemoTrainingChoiceWindow : DemoDiscoveryWindow
     {
-        internal string SelectedTour { get; private set; }
-
-        internal DemoTrainingChoiceWindow()
-        {
-            Title = "BIMaestro · Choisir un tutoriel";
-            Width = 500; Height = 650; MinWidth = 420; MinHeight = 500;
-            WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            ShowInTaskbar = false; Background = Brushes.White;
-            var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-            var stack = new StackPanel { Margin = new Thickness(22) };
-            scroll.Content = stack;
-            Content = scroll;
-            var heading = new StackPanel { Orientation = Orientation.Horizontal,
-                Margin = new Thickness(0, 0, 0, 10) };
-            stack.Children.Add(heading);
-            heading.Children.Add(new Image { Source = Couleur.RibbonPanelColorScheme.CreateCompanionImage(),
-                Width = 42, Height = 42, Margin = new Thickness(0, 0, 12, 0) });
-            heading.Children.Add(new TextBlock { Text = "Quelle mission veux-tu suivre ?",
-                FontSize = 18, FontWeight = FontWeights.SemiBold,
-                VerticalAlignment = VerticalAlignment.Center });
-            stack.Children.Add(new TextBlock
-            {
-                Text = "La maquette de formation est ouverte. Choisis un tutoriel : Bulbizarre te placera dans la bonne vue et te guidera dans la commande.",
-                TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 14)
-            });
-            AddTour(stack, "1 · Auto résa", "Créer une réservation sur le mur traversé par la canalisation.", "reservation");
-            AddTour(stack, "2 · Qui a fait ça ?", "Restaurer deux meubles supprimés et les anciens paramètres du témoin.", "history");
-            AddTour(stack, "3 · Couleurs et vues", "Colorer l'arborescence et ajouter des icônes aux dossiers.", "colors");
-            AddTour(stack, "4 · Calcul des canalisations", "Calculer canalisations, coudes et gaines, puis lire le fichier Excel.", "pipe-calculation");
-            AddTour(stack, "5 · Organisateur", "Renuméroter huit places sur deux niveaux, puis tourner la vue.", "organizer");
-            AddTour(stack, "6 · Gabarit de vue", "Exporter une vue, puis créer un gabarit dans une autre.", "view-template");
-            AddTour(stack, "7 · Gestion Excel", "Modifier les numéros dans Excel, garder le repère fixe et voir les changements sur les places en 3D.", "excel");
-            AddTour(stack, "9 · MEP Booster", "Activer la pastille, prévisualiser et tourner les vannes raccordées.", "mep-booster");
-            AddTour(stack, "8 · Navigateur de familles", "Explorer 35 familles, rechercher, voir en 3D et préparer les aperçus.", "family-browser");
-            var later = new Button { Content = "Plus tard", HorizontalAlignment = HorizontalAlignment.Right,
-                Padding = new Thickness(12, 6, 12, 6), Margin = new Thickness(0, 10, 0, 0) };
-            later.Click += (_, __) => Close();
-            stack.Children.Add(later);
-        }
-
-        private void AddTour(Panel parent, string title, string description, string tourId)
-        {
-            var button = new Button { HorizontalContentAlignment = HorizontalAlignment.Left,
-                Background = Brushes.WhiteSmoke, BorderBrush = DemoTourPalette.Accent,
-                BorderThickness = new Thickness(1), Padding = new Thickness(12, 8, 12, 8),
-                Margin = new Thickness(0, 0, 0, 8) };
-            var body = new StackPanel();
-            body.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold });
-            body.Children.Add(new TextBlock { Text = description, TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 3, 0, 0) });
-            button.Content = body;
-            button.Click += (_, __) => { SelectedTour = tourId; Close(); };
-            parent.Children.Add(button);
-        }
+        internal DemoTrainingChoiceWindow() { Title = "BIMaestro · Choisir un tutoriel"; }
     }
 
     internal static class DemoTourService
     {
         private static readonly Dictionary<Window, DemoWindowGuide> ActiveGuides = new Dictionary<Window, DemoWindowGuide>();
         private static FamilyRibbonTutorialGuide _familyRibbonGuide;
+        internal static bool TutorialFavoritesSelected { get; private set; }
         private static Famille.Collection _familyTutorialFavorites;
         private static List<string> _familyTutorialRecents;
         private static Autodesk.Revit.ApplicationServices.Application _placementApplication;
@@ -1286,6 +1235,31 @@ namespace BIMaestro.Tutorials
             card.Show();
         }
 
+        internal static void ObserveHistoryResult(Window historyWindow, IntPtr owner, string heading, string text, Action confirmed)
+        {
+            if (!IsActive(historyWindow)) return;
+            historyWindow.Hide();
+            var card = new Window { Title = "BIMaestro — Observer le résultat", Width = 390,
+                SizeToContent = SizeToContent.Height, ShowInTaskbar = false, ResizeMode = ResizeMode.NoResize,
+                Background = Brushes.White, Left = SystemParameters.WorkArea.Right - 420, Top = SystemParameters.WorkArea.Bottom - 250 };
+            new WindowInteropHelper(card).Owner = owner;
+            var body = new StackPanel { Margin = new Thickness(18) };
+            card.Content = new Border { BorderBrush = DemoTourPalette.Accent, BorderThickness = new Thickness(2), Child = body };
+            body.Children.Add(new TextBlock { Text = heading, FontSize = 18, Foreground = DemoTourPalette.Accent, TextWrapping = TextWrapping.Wrap });
+            body.Children.Add(new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 12, 0, 12) });
+            var seen = new Button { Content = "J’ai vu le résultat · Continuer", Padding = new Thickness(10), Background = DemoTourPalette.Accent, Foreground = Brushes.White };
+            body.Children.Add(seen);
+            bool accepted = false;
+            seen.Click += (_, __) => { accepted = true; card.Close(); };
+            card.Closed += (_, __) => {
+                if (!IsActive(historyWindow)) return;
+                historyWindow.Show(); historyWindow.Activate();
+                if (accepted) confirmed();
+            };
+            historyWindow.Closed += (_, __) => card.Close();
+            card.Show();
+        }
+
         internal static void ReportAction(Window window, string action)
         {
             if (ActiveGuides.TryGetValue(window, out DemoWindowGuide guide))
@@ -1296,6 +1270,7 @@ namespace BIMaestro.Tutorials
         // browser guide alive while the learner assigns and tries a shortcut.
         internal static void ReportExternalAction(string action)
         {
+            if (action == "radial-tutorial-favorites-selected") TutorialFavoritesSelected = true;
             _familyRibbonGuide?.CompleteAction(action);
             foreach (var guide in ActiveGuides.Values.Where(g => g.TourId == "family-browser").ToArray())
                 guide.CompleteAction(action);
@@ -1331,6 +1306,7 @@ namespace BIMaestro.Tutorials
             IntPtr owner = Famille.FamilyBrowserCommand.uiapp?.MainWindowHandle ?? IntPtr.Zero;
             if (owner == IntPtr.Zero) return;
             _familyRibbonGuide?.Close();
+            TutorialFavoritesSelected = false;
             _familyTutorialFavorites = browser.TryGetTutorialFavoritesForRosace();
             _familyTutorialRecents = browser.GetTutorialRecentFamilyPaths();
             int ribbonStartIndex = Array.FindIndex(steps, step => step.Target == "RevitFamilySplit");
@@ -1447,6 +1423,7 @@ namespace BIMaestro.Tutorials
 
             private void OnLoaded(object sender, RoutedEventArgs args)
             {
+                _favoriteHighlightTimer?.Stop(); _favoriteHighlightTimer = null;
                 _window.Loaded -= OnLoaded;
                 ShowStep();
             }
@@ -1484,9 +1461,9 @@ namespace BIMaestro.Tutorials
                     step.Target == "cbVerticalReference" || step.Target == "btnApplyMapping" ||
                     (step.Target == "OkButton" && TourId != "pipe-calculation") ||
                     step.Target == "DemoRenameButton" ||
-                    step.Target == "FamilyListView" || step.Target == "GroupedFamilyListView"
+                    step.Target == "SearchMetadataAssistantButton" || step.Target == "FamilyListView" || step.Target == "GroupedFamilyListView"
                     ? HorizontalAlignment.Left : HorizontalAlignment.Right;
-                _card.VerticalAlignment = TourId == "pipe-calculation"
+                _card.VerticalAlignment = step.Target == "SearchMetadataAssistantButton" ? VerticalAlignment.Top : TourId == "pipe-calculation"
                     ? VerticalAlignment.Center
                     : TourId == "organizer" && step.Target == "SortByLevelCheckBox"
                     ? VerticalAlignment.Top : VerticalAlignment.Bottom;
@@ -1702,9 +1679,24 @@ namespace BIMaestro.Tutorials
                 }
             }
 
+            private DispatcherTimer _favoriteHighlightTimer;
+            private void RefreshFavoriteHighlight()
+            {
+                if (_favoriteHighlightTimer != null) return;
+                _favoriteHighlightTimer = new DispatcherTimer(DispatcherPriority.Loaded, _window.Dispatcher) { Interval = TimeSpan.FromMilliseconds(250) };
+                _favoriteHighlightTimer.Tick += (_, __) => {
+                    if (_index >= _steps.Length || _steps[_index].Target != "TutorialFavoriteStar") { _favoriteHighlightTimer.Stop(); _favoriteHighlightTimer = null; return; }
+                    if (_adorner != null) _layer?.Remove(_adorner);
+                    _adorner = null; _layer = null;
+                    Highlight("TutorialFavoriteStar", _index);
+                };
+                _favoriteHighlightTimer.Start();
+            }
             private void Highlight(string targetName, int expectedIndex, int attempt = 0)
             {
                 if (_index != expectedIndex || !_window.IsVisible) return;
+                if (targetName == "TutorialFavoriteStar") RefreshFavoriteHighlight();
+                RemoveHighlight();
                 FrameworkElement target;
                 if (_window is Famille.FamilyBrowserWindow browser && targetName == "TutorialFavoriteStar")
                     target = browser.FindTutorialFavoriteStar();
@@ -1726,6 +1718,7 @@ namespace BIMaestro.Tutorials
                     }
                     return;
                 }
+                if (targetName == "TutorialFavoriteStar") RefreshFavoriteHighlight();
                 target.BringIntoView();
                 _layer = AdornerLayer.GetAdornerLayer(target);
                 if (_layer == null) return;
@@ -1741,6 +1734,7 @@ namespace BIMaestro.Tutorials
 
             internal void Close()
             {
+                _favoriteHighlightTimer?.Stop(); _favoriteHighlightTimer = null;
                 _window.Loaded -= OnLoaded;
                 _detachAction?.Invoke();
                 _detachAction = null;
@@ -1841,7 +1835,7 @@ namespace BIMaestro.Tutorials
         }
     }
 
-    internal sealed class DemoDiscoveryWindow : Window
+    internal class DemoDiscoveryWindow : Window
     {
         internal string SelectedTour { get; private set; }
 
@@ -1855,9 +1849,9 @@ namespace BIMaestro.Tutorials
             Content = scroll;
             var stack = new StackPanel { Margin = new Thickness(22) };
             scroll.Content = stack;
-            stack.Children.Add(new TextBlock { Text = "BIMaestro en 2 minutes", FontSize = 21,
+            stack.Children.Add(new TextBlock { Text = "Choisir un parcours guidé", FontSize = 21,
                 FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 8) });
-            stack.Children.Add(new TextBlock { Text = "Voici les fonctions de la maquette de formation. Cette découverte ne modifie pas le projet ; tu choisiras ensuite si tu veux pratiquer.",
+            stack.Children.Add(new TextBlock { Text = "Choisis un tutoriel : clique directement sur sa carte pour commencer dans la maquette de formation.",
                 TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 16) });
             AddCard(stack, "1 · Auto réservation",
                 "Quand un réseau traverse un mur, BIMaestro place une famille de réservation au croisement. Dans l'exercice, tu choisis toi-même la canalisation puis le mur et tu examines le résultat.");
@@ -1875,21 +1869,7 @@ namespace BIMaestro.Tutorials
                 "Exporte les places CML_Parking : numéro modifiable et repère fixe. Essaie par exemple XL-003 → XL-103, puis importe tes changements. Bulbizarre vérifie chaque valeur et l'affiche sur la place en 3D.");
             AddCard(stack, "8 · Navigateur de familles",
                 "Explore un catalogue de 35 familles rangées en dossiers et sous-dossiers. Cherche une famille, prévisualise-la en 3D, découvre les photos automatiques et apprends à brancher ta propre bibliothèque.");
-            stack.Children.Add(new TextBlock { Text = "Envie d'essayer dans la maquette ?",
-                FontSize = 16, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 4, 0, 8) });
-            stack.Children.Add(new TextBlock { Text = "Choisis un exercice détaillé, ou termine ici et reviens plus tard.",
-                TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 10) });
-            var exercises = new WrapPanel { Margin = new Thickness(0, 0, 0, 8) };
-            stack.Children.Add(exercises);
-            AddExerciseButton(exercises, "Auto résa", "reservation");
-            AddExerciseButton(exercises, "Qui a fait ça ?", "history");
-            AddExerciseButton(exercises, "Couleurs et vues", "colors");
-            AddExerciseButton(exercises, "Calcul canalisations", "pipe-calculation");
-            AddExerciseButton(exercises, "Organisateur", "organizer");
-            AddExerciseButton(exercises, "MEP Booster", "mep-booster");
-            AddExerciseButton(exercises, "Gabarit de vue", "view-template");
-            AddExerciseButton(exercises, "Gestion Excel", "excel");
-            AddExerciseButton(exercises, "Navigateur de familles", "family-browser");
+            AddCard(stack, "9 · MEP Booster", "Tourne une vanne, observe le résultat et copie son orientation sur d’autres vannes raccordées.");
             var close = new Button { Content = "Terminer pour l'instant", Padding = new Thickness(12, 7, 12, 7),
                 HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 4, 0, 0) };
             close.Click += (_, __) => Close();
@@ -1904,16 +1884,25 @@ namespace BIMaestro.Tutorials
             parent.Children.Add(button);
         }
 
-        private static void AddCard(Panel parent, string title, string description)
+        private void AddCard(Panel parent, string title, string description)
         {
-            var card = new Border { Padding = new Thickness(14), Margin = new Thickness(0, 0, 0, 12),
-                CornerRadius = new CornerRadius(10), BorderBrush = DemoTourPalette.Accent,
-                BorderThickness = new Thickness(1), Background = Brushes.WhiteSmoke };
-            parent.Children.Add(card);
-            var body = new StackPanel(); card.Child = body;
-            body.Children.Add(new TextBlock { Text = title, FontSize = 16, FontWeight = FontWeights.SemiBold });
-            body.Children.Add(new TextBlock { Text = description, TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 7, 0, 10) });
+            string[] ids = { "reservation", "history", "colors", "pipe-calculation", "organizer", "view-template", "excel", "family-browser", "mep-booster" };
+            string[] icons = { "Auto réservation.png", "qui à fait ça (2).png", "Couleur oui non.png", "Calcul de canalisation.png", "Organisateur.png", "Gabarit de vue simple.png", "Gestion Excel.png", "maison famille (1).png", "MEP Booster vanne rotation.png" };
+            int index = int.Parse(title.Substring(0, 1)) - 1;
+            var row = new Grid(); row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(58) }); row.ColumnDefinitions.Add(new ColumnDefinition());
+            var image = new Image { Width = 42, Height = 42, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 4, 12, 0) };
+            using (var stream = typeof(DemoDiscoveryWindow).Assembly.GetManifestResourceStream(typeof(DemoDiscoveryWindow).Assembly.GetManifestResourceNames().First(name => name.EndsWith("." + icons[index], StringComparison.OrdinalIgnoreCase))))
+            {
+                if (stream != null) { var bitmap = new System.Windows.Media.Imaging.BitmapImage(); bitmap.BeginInit(); bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad; bitmap.StreamSource = stream; bitmap.EndInit(); bitmap.Freeze(); image.Source = bitmap; }
+            }
+            row.Children.Add(image);
+            var body = new StackPanel(); Grid.SetColumn(body, 1); row.Children.Add(body);
+            body.Children.Add(new TextBlock { Text = title, FontSize = 16, FontWeight = FontWeights.SemiBold, Foreground = DemoTourPalette.Accent });
+            body.Children.Add(new TextBlock { Text = description, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 7, 0, 8) });
+            body.Children.Add(new TextBlock { Text = "Commencer ce tutoriel →", FontWeight = FontWeights.SemiBold, Foreground = DemoTourPalette.Accent });
+            var button = new Button { Content = row, Padding = new Thickness(14), Margin = new Thickness(0, 0, 0, 12), HorizontalContentAlignment = HorizontalAlignment.Stretch, BorderBrush = DemoTourPalette.Accent, BorderThickness = new Thickness(1), Background = Brushes.White };
+            button.Click += (_, __) => { SelectedTour = ids[index]; Close(); };
+            parent.Children.Add(button);
         }
     }
 

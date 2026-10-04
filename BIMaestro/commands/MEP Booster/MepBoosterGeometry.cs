@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
@@ -78,10 +78,12 @@ namespace BIMaestro.MepBooster
             GeometryLoaded = true; _remainingPoints = pointBudget;
             try
             {
-                using (var options = new Options { DetailLevel = ViewDetailLevel.Coarse })
+                foreach (var detail in new[] { ViewDetailLevel.Fine, ViewDetailLevel.Medium, ViewDetailLevel.Coarse })
+                using (var options = new Options { DetailLevel = detail })
                 {
                     var shape = instance.get_Geometry(options);
                     if (shape != null) ReadEdges(shape);
+                    if (Edges.Count > 0) break;
                 }
             }
             catch { Edges.Clear(); } // Axes/arrows remain available if a family's geometry is unavailable.

@@ -258,6 +258,8 @@ namespace BIMaestro.Tutorials
             // once Revit returns control to the card.
             _completed = _index != _steps.Length - 1 &&
                 _steps[_index].CompletionEvent != "radial-tutorial-favorites-selected";
+            if (_steps[_index].CompletionEvent == "radial-tutorial-favorites-selected" && DemoTourService.TutorialFavoritesSelected) _completed = true;
+            if (_steps[_index].CompletionEvent == "radial-opened") _completed = false;
             _next.IsEnabled = _completed;
             if (_index == _steps.Length - 1 &&
                 Famille.FamilyBrowserCommand.uiapp?.ActiveUIDocument == null)
@@ -416,7 +418,7 @@ namespace BIMaestro.Tutorials
             if (target == "RevitFamilySplit")
                 return modelId.IndexOf("FamilyBrowser", StringComparison.OrdinalIgnoreCase) >= 0 ? 110 :
                     type.IndexOf("RibbonSplitButton", StringComparison.OrdinalIgnoreCase) >= 0 &&
-                    (Is(name, "Famille", "Family") || Is(content, "Famille", "Family")) ? 80 : 0;
+                    (Is(name, "Famille", "Family", "Navigateur de Familles", "Family Browser") || Is(content, "Famille", "Family", "Navigateur de Familles", "Family Browser")) ? 80 : 0;
             if (target == "RevitRosace")
                 return modelId.IndexOf("Rosace", StringComparison.OrdinalIgnoreCase) >= 0 ? 120 :
                     (Is(name, ".") || Is(content, ".")) &&
@@ -506,7 +508,7 @@ namespace BIMaestro.Tutorials
             {
                 "RevitBimTab" => new[] { "BIMaestro" },
                 "RevitViewTab" => new[] { "Vue", "View" },
-                "RevitFamilySplit" => new[] { "Famille", "Family" },
+                "RevitFamilySplit" => new[] { "Navigateur de Familles", "Family Browser", "Famille", "Family" },
                 "RevitRosace" => new[] { "." },
                 "RevitUserInterface" => new[] { "Interface utilisateur", "User Interface" },
                 "RevitKeyboardShortcuts" => new[] { "Raccourcis clavier", "Keyboard Shortcuts" },

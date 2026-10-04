@@ -49,6 +49,7 @@ namespace Famille
         private bool _tutorialCatalogActive;
         private readonly Dictionary<string, bool> _tutorialFavoriteOriginalStates =
             new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        private string _tutorialImageSessionFolder;
         private bool _tutorialAwaitingPreviewClose;
         private bool _tutorialRestoreWhenPreviewCompletes;
 
@@ -3466,7 +3467,9 @@ namespace Famille
             {
                 string imageRoot = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "BIMaestro", "Formation", "NavigateurFamilles", "Images");
+                    "BIMaestro", "Formation", "NavigateurFamilles", "Sessions", Guid.NewGuid().ToString("N"), "Images");
+                _tutorialImageSessionFolder = Path.GetDirectoryName(imageRoot);
+                _bitmapCache.Clear();
                 string previewSource = Path.Combine(catalogue, "Mobilier", "Bureau", "Salle de réunion");
                 string previewTarget = Path.Combine(imageRoot, "Mobilier", "Bureau", "Salle de réunion");
                 Directory.CreateDirectory(imageRoot);
@@ -3477,7 +3480,7 @@ namespace Famille
                     foreach (string source in Directory.EnumerateFiles(packagedImages, "*.png", SearchOption.AllDirectories))
                     {
                         string relative = source.Substring(packagedImages.Length + 1);
-                        // Leave the export exercise to the learner; retain their generated images.
+                        // Each tutorial owns a fresh image folder; the five export examples start without PNG.
                         if (relative.StartsWith(Path.Combine("Mobilier", "Bureau", "Salle de réunion") +
                             Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) continue;
                         string target = Path.Combine(imageRoot, relative);
@@ -3525,6 +3528,7 @@ namespace Famille
             string originalFamilies = _tutorialOriginalFamiliesFolder;
             string originalImages = _tutorialOriginalImagesFolder;
             RestoreTutorialFavorites();
+            _bitmapCache.Clear();
             _tutorialCatalogActive = false;
             _tutorialOriginalFamiliesFolder = null;
             _tutorialOriginalImagesFolder = null;
@@ -3533,6 +3537,11 @@ namespace Famille
             if (Directory.Exists(originalFamilies) && Directory.Exists(originalImages))
                 ApplySelectedFolders(originalFamilies, originalImages,
                     showSuccessMessage: false, persist: false);
+            string session = _tutorialImageSessionFolder;
+            _tutorialImageSessionFolder = null;
+            string sessionsRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BIMaestro", "Formation", "NavigateurFamilles", "Sessions") + Path.DirectorySeparatorChar;
+            if (!string.IsNullOrEmpty(session) && Path.GetFullPath(session).StartsWith(sessionsRoot, StringComparison.OrdinalIgnoreCase))
+                try { Directory.Delete(session, true); } catch { }
         }
 
         private void PrepareTutorialRosaceFavorites()
@@ -4346,6 +4355,12 @@ namespace Famille
                 try
                 {
                     const int SIZE = 256;
+
+                    if (_tutorialCatalogActive && fam.Path.IndexOf(Path.DirectorySeparatorChar + "Salle de réunion" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) >= 0 && !TryGetCatalogImagePath(fam.Path, out _))
+                    {
+                        Dispatcher.Invoke(() => fam.Icon = CreateSolidPlaceholder(180, 180));
+                        return;
+                    }
 
                     // 0) cache mémoire
                     if (_bitmapCache.TryGetValue(fam.Path, out var memCached))
@@ -5657,6 +5672,10 @@ namespace Famille
                 if (!isVisible && _tutorialAwaitingPreviewClose)
                 {
                     _tutorialAwaitingPreviewClose = false;
+                    Show();
+                    WindowState = WindowState.Normal;
+                    Activate();
+                    Topmost = true; Topmost = false;
                     BIMaestro.Tutorials.DemoTourService.ReportAction(this, "preview-3d");
                 }
                 bool shouldSuspend = isVisible && _revitMajorVersion >= 2025;

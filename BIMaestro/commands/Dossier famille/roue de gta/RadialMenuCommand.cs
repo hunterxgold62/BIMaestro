@@ -88,8 +88,7 @@ namespace BIMaestro.UI
                         win.ReplaceItems(updated.Items);
                         win.SetPageLabelFactory(updated.PageLabelFactory);
                         win.UpdateCollectionState(true, selected.Name, selected.Id);
-                        if (string.Equals(selected.Id, "builtin_favoris", StringComparison.OrdinalIgnoreCase) &&
-                            BIMaestro.Tutorials.DemoTourService.GetTutorialFavoritesForRosace() != null)
+                        if (tutorialMode && BIMaestro.Tutorials.DemoTourService.GetTutorialFavoritesForRosace() != null)
                             BIMaestro.Tutorials.DemoTourService.ReportExternalAction("radial-tutorial-favorites-selected");
                     },
                     () =>

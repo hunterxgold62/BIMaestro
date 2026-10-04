@@ -55,14 +55,14 @@ namespace BIMaestro.Tutorials
             };
             card.Closed += (_, __) => { if (ReferenceEquals(_card, card)) { _card = null; _document = null; MepBooster.MepBoosterService.TutorialActivation = null; MepBooster.MepBoosterService.TutorialProgress = null; MepBooster.MepBoosterService.TutorialCopy = null; Couleur.AppearanceOnboarding.ConsumeTourClick("mep-booster"); } };
             UpdateText();
-            _card.Show();
+            if (_step > 0) _card.Show();
             if (_step == 0) Couleur.AppearanceOnboarding.StartIntro(app.MainWindowHandle, "mep-booster");
         }
         internal static void Activation(bool enabled)
         {
             if (_card == null) return;
             Couleur.AppearanceOnboarding.ConsumeTourClick("mep-booster");
-            if (enabled) _step = Math.Max(_step, 1);
+            if (enabled) { _step = Math.Max(_step, 1); _card.Show(); }
             else _text.Text = "MEP Booster est OFF. Clique à nouveau sur le bouton pour l’activer, puis sélectionne une vanne dans la vue 09.";
             if (enabled) UpdateText();
         }
@@ -101,7 +101,7 @@ namespace BIMaestro.Tutorials
                 "3/7 · Survole la pastille puis un angle, par exemple 90°. Observe l’aperçu de rotation avant de cliquer. Les angles incompatibles avec les raccordements restent désactivés.",
                 "4/7 · Clique sur un angle disponible pour appliquer la rotation. Observe la poignée de la vanne : la rotation se fait autour de la canalisation, en conservant les raccordements.",
                 "5/7 · Première rotation appliquée ! Clique ailleurs que sur la rosace pour la fermer, puis sélectionne une autre vanne et applique une rotation disponible. Tu peux aussi sélectionner plusieurs vannes compatibles.",
-                "6/7 · Copier l’orientation : clique ailleurs pour fermer la rosace, puis sélectionne une seule vanne que tu viens de tourner. Dans sa rosace, clique sur la pipette de copie d’orientation. Sélectionne au moins deux autres vannes encore intactes, clique sur Terminer, observe l’aperçu vert puis confirme la copie.",
+                "6/7 · Copier l’orientation : clique ailleurs pour fermer la rosace, puis sélectionne une seule vanne que tu viens de tourner. Dans sa rosace, clique sur le bouton « Copier l’orientation ». Sélectionne au moins deux autres vannes encore intactes, clique sur Terminer, observe l’aperçu vert puis confirme la copie.",
                 "7/7 · Copie validée ! Au moins deux vannes encore intactes ont reçu l’orientation et le sens d’une vanne modifiée. Compare leurs poignées avec la référence. Clique hors de la rosace pour la fermer ; le bouton ON/OFF permet de désactiver MEP Booster."
             }[_step];
         }

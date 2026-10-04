@@ -182,6 +182,10 @@ namespace Analyse
                     if (req.Type == UiRequestType.RestoreParameters)
                     {
                         var result = _owner.ExecuteRestoreParameters(req.Event);
+                        if (result.Applied > 0 && BIMaestro.Tutorials.DemoTourService.IsActive(_owner)) {
+                            var witness = _owner._doc.GetElement(req.Event.UniqueId);
+                            if (witness != null) { _owner._uidoc.Selection.SetElementIds(new[] { witness.Id }); _owner._uidoc.ShowElements(witness.Id); _owner._uidoc.RefreshActiveView(); }
+                        }
                         // Read the document in the Revit external-event context, before dispatching UI feedback.
                         bool exerciseRestored = BIMaestro.Tutorials.DemoTourService.IsActive(_owner) &&
                             BIMaestro.Tutorials.DemoHistoryScene.HasRestoredFurniture(_owner._doc) &&
@@ -2009,10 +2013,9 @@ namespace Analyse
                 UpdateVisualizeButtonLabel();
                 if (restoredForTutorial && BIMaestro.Tutorials.DemoTourService.IsActive(this))
                 {
-                    BIMaestro.Tutorials.DemoTourService.ReportRestoration(this, furnitureRestored);
-                    BIMaestro.Tutorials.DemoTourMessage.Show(
-                        new System.Windows.Interop.WindowInteropHelper(this).Handle,
-                        "Objets restaurés", message + "\nPoursuis maintenant le guide pour restaurer les 4 chaises du témoin.", "Continuer le guide");
+                    BIMaestro.Tutorials.DemoTourService.ObserveHistoryResult(this, _uidoc.Application.MainWindowHandle,
+                        "Les meubles réapparaissent", "Observe les tables restaurées dans la vue 3D. Confirme lorsque tu as vu le résultat ; nous passerons ensuite aux paramètres du mobilier témoin.",
+                        () => BIMaestro.Tutorials.DemoTourService.ReportRestoration(this, furnitureRestored));
                 }
                 else
                     MessageBox.Show(this, message, UiLanguage.T("Restaurer les éléments", "Restore elements"), MessageBoxButton.OK, MessageBoxImage.Information);
@@ -2668,8 +2671,13 @@ namespace Analyse
         private void ShowRestoreResult(RestoreResult result, bool exerciseRestored)
         {
             if (result == null) return;
-            if (result.Applied > 0 && result.Failed == 0)
-                BIMaestro.Tutorials.DemoTourService.ReportParameterRestoration(this, exerciseRestored);
+            if (result.Applied > 0 && result.Failed == 0 && BIMaestro.Tutorials.DemoTourService.IsActive(this))
+            {
+                BIMaestro.Tutorials.DemoTourService.ObserveHistoryResult(this, _uidoc.Application.MainWindowHandle,
+                    "Le témoin retrouve ses 4 chaises", "Observe le mobilier dans la vue 3D : le nombre de chaises est revenu de 2 à 4. Confirme lorsque tu as vu la différence.",
+                    () => BIMaestro.Tutorials.DemoTourService.ReportParameterRestoration(this, exerciseRestored));
+                return;
+            }
             MessageBox.Show(
                 result.Applied > 0
                     ? UiLanguage.T($"{result.Applied} valeur(s) restaurée(s).", $"{result.Applied} value(s) restored.") + (result.Failed > 0 ? UiLanguage.T($"\n{result.Failed} valeur(s) n'ont pas pu être restaurée(s).", $"\n{result.Failed} value(s) could not be restored.") : "")
