@@ -5,17 +5,15 @@ using Licensing;
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Threading.Tasks;
-using System.Windows;
+using System.Windows.Interop;
+using System.Windows.Threading;
 
 namespace BIMaestro.Dashboard
 {
     [Transaction(TransactionMode.Manual)]
     public class ShowTimeDashboard : BaseTrackedCommand
     {
-        private static readonly object _clickLock = new object();
-        private static int _clickCount = 0;
-        private static DateTime _lastClickTime = DateTime.MinValue;
+        private static DispatcherTimer _pendingOpen;
         private const int DoubleClickThresholdMs = 300;
 
         protected override string ButtonId => "ShowTimeDashboard";
@@ -26,38 +24,38 @@ namespace BIMaestro.Dashboard
             {
                 string activePath = cdata.Application?.ActiveUIDocument?.Document?.PathName;
 
-                DateTime now = DateTime.Now;
-                lock (_clickLock)
+                if (_pendingOpen != null)
                 {
-                    _clickCount++;
-
-                    if ((now - _lastClickTime).TotalMilliseconds <= DoubleClickThresholdMs && _clickCount >= 2)
-                    {
-                        _clickCount = 0;
-                        OpenDocumentLocation(activePath);
-                        return Result.Succeeded;
-                    }
-
-                    _lastClickTime = now;
-
-                    Task.Delay(DoubleClickThresholdMs).ContinueWith(_ =>
-                    {
-                        lock (_clickLock)
-                        {
-                            if (_clickCount != 1)
-                            {
-                                return;
-                            }
-
-                            _clickCount = 0;
-                        }
-
-                        Application.Current?.Dispatcher?.Invoke(() =>
-                        {
-                            new TimeSeriesDashboardWindow(activePath).Show();
-                        });
-                    });
+                    _pendingOpen.Stop();
+                    _pendingOpen = null;
+                    OpenDocumentLocation(activePath);
+                    return Result.Succeeded;
                 }
+
+                // Revit may have no WPF Application.Current. Use its command UI thread.
+                var owner = cdata.Application.MainWindowHandle;
+                var timer = new DispatcherTimer(DispatcherPriority.Normal, Dispatcher.CurrentDispatcher)
+                {
+                    Interval = TimeSpan.FromMilliseconds(DoubleClickThresholdMs)
+                };
+                timer.Tick += (sender, args) =>
+                {
+                    timer.Stop();
+                    _pendingOpen = null;
+                    try
+                    {
+                        var window = new TimeSeriesDashboardWindow(activePath);
+                        new WindowInteropHelper(window).Owner = owner;
+                        window.Show();
+                        window.Activate();
+                    }
+                    catch (Exception ex)
+                    {
+                        TaskDialog.Show("Temps par projet", ex.ToString());
+                    }
+                };
+                _pendingOpen = timer;
+                timer.Start();
 
                 return Result.Succeeded;
             }

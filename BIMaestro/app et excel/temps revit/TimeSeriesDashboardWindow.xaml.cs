@@ -221,14 +221,14 @@ namespace BIMaestro.Dashboard
             }).OrderByDescending(x => x.Hours).ThenBy(x => x.Name).ToList();
         }
         private static int ColorIndex(string id) { unchecked { uint h = 2166136261; foreach (char c in id.ToUpperInvariant()) h = (h ^ c) * 16777619; return (int)(h % Palette.Length); } }
-        private static OxyColor ThemeColor(string key)
+        private OxyColor ThemeColor(string key)
         {
-            var brush = Application.Current.FindResource(key) as SolidColorBrush;
+            var brush = TryFindResource(key) as SolidColorBrush;
             if (brush == null) throw new InvalidOperationException("Couleur du thème introuvable : " + key);
             return OxyColor.FromArgb(brush.Color.A, brush.Color.R, brush.Color.G, brush.Color.B);
         }
         private static string PdfColor(OxyColor color) => string.Join(" ", new[] { color.R, color.G, color.B }.Select(x => (x / 255.0).ToString("0.###", CultureInfo.InvariantCulture)));
-        private static PlotModel Chart(List<Entry> rows, DateTime start, DateTime end)
+        private PlotModel Chart(List<Entry> rows, DateTime start, DateTime end)
         {
             var model = new PlotModel { PlotAreaBorderColor = ThemeColor("Border"), TextColor = ThemeColor("Text.Secondary"), Background = ThemeColor("Surface") };
             int days = (end - start).Days + 1;
