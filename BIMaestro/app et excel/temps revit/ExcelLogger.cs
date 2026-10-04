@@ -172,6 +172,26 @@ public static class ExcelLogger
         }
     }
 
+    // Detached values only: the dashboard never retains or accesses Revit documents.
+    public static List<TimeDashboardEntry> GetDashboardEntries()
+    {
+        lock (_stateLock)
+        {
+            return _sessions.SelectMany(pair => BuildClosedLogEntries(
+                pair.Key, pair.Value.DocumentName, pair.Value.RevitVersion,
+                pair.Value.GetActiveSlices(), pair.Value.GetTotalActiveDuration(),
+                pair.Value.Classification)).Select(entry => new TimeDashboardEntry
+                {
+                    DocumentId = entry.DocumentId, Name = entry.DocumentName,
+                    Version = entry.RevitVersion, When = entry.When,
+                    Hours = entry.Duration.TotalHours,
+                    Kind = entry.Classification?.DocumentKind,
+                    Parameters = entry.Classification?.ProjectInfoJson,
+                    Path = entry.Classification?.CentralPath ?? entry.Classification?.LocalPath
+                }).ToList();
+        }
+    }
+
     public static void Shutdown()
     {
         lock (_stateLock)
@@ -1297,6 +1317,13 @@ public static class ExcelLogger
         public TimeSpan Duration;
         public TimeLogMetadata Classification;
     }
+}
+
+public class TimeDashboardEntry
+{
+    public string DocumentId, Name, Version, Kind, Parameters, Path;
+    public DateTime When;
+    public double Hours;
 }
 
 public class TimeLogMetadata
