@@ -37,12 +37,13 @@ namespace BIMaestro.Dashboard
         private int _days = 7;
         private int _invalidRows;
         private string _loadError;
-        private static readonly string[] Palette = { "#2F80ED", "#27AE60", "#9B51E0", "#F2994A", "#EB5757", "#219EA6", "#64748B", "#B66B95" };
 
         public TimeSeriesDashboardWindow(string currentDocumentPath = null)
         {
             ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
+            OverviewPlot.SizeChanged += (s, e) => FitChart(OverviewPlot);
+            DetailPlot.SizeChanged += (s, e) => FitChart(DetailPlot);
             From.SelectedDate = DateTime.Today.AddDays(-14);
             To.SelectedDate = DateTime.Today;
             Version.ItemsSource = new[] { "Toutes" };
@@ -165,17 +166,20 @@ namespace BIMaestro.Dashboard
             OverviewAverage.Text = Duration(recent.Sum(x => x.Hours) / Math.Max(1, recent.Select(x => x.When.Date).Distinct().Count()));
             OverviewCount.Text = totals.Count.ToString();
             int workedDays = recent.Select(x => x.When.Date).Distinct().Count();
-            OverviewWorkedDays.Text = workedDays + " jour(s) avec activité";
+            OverviewWorkedDays.Text = workedDays + (workedDays == 1 ? " jour avec activité" : " jours avec activité");
             double previous = _all.Where(x => x.When.Date >= start.AddDays(-_days) && x.When.Date < start).Sum(x => x.Hours);
             double difference = recent.Sum(x => x.Hours) - previous;
-            OverviewTrend.Text = previous > 0 ? (difference >= 0 ? "+" : "−") + Duration(Math.Abs(difference)) + " vs les " + _days + " jours précédents" : "Pas d’activité sur la période précédente";
+            OverviewTrend.Text = previous > 0 ? (Math.Abs(difference) < 1.0 / 120 ? "Stable" : (difference >= 0 ? "+" : "−") + Duration(Math.Abs(difference))) + " sur la période précédente" : "Aucune activité sur la période précédente";
             Seven.FontWeight = _days == 7 ? FontWeights.Bold : FontWeights.Normal;
             Fifteen.FontWeight = _days == 15 ? FontWeights.Bold : FontWeights.Normal;
             Seven.SetResourceReference(Control.BorderBrushProperty, _days == 7 ? "Focus" : "Border");
             Fifteen.SetResourceReference(Control.BorderBrushProperty, _days == 15 ? "Focus" : "Border");
             OverviewPlot.Model = Chart(recent, start, DateTime.Today);
+            FitChart(OverviewPlot);
             OverviewTable.ItemsSource = totals;
             OverviewEmpty.Visibility = totals.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            OverviewPlot.Visibility = totals.Count == 0 ? Visibility.Hidden : Visibility.Visible;
+            OverviewDocumentsEmpty.Visibility = OverviewEmpty.Visibility;
             _batch = true;
             var available = new HashSet<string>(_all.Where(MatchesFilters).Select(x => x.Id), StringComparer.OrdinalIgnoreCase);
             Picker.ItemsSource = _choices.Where(x => available.Contains(x.Id)).ToList();
@@ -202,11 +206,14 @@ namespace BIMaestro.Dashboard
             _detailTotals = Totals(_detail);
             DetailTable.ItemsSource = _detailTotals;
             DetailSummary.Text = valid ? Duration(_detail.Sum(x => x.Hours)) : "Période invalide";
-            DetailContext.Text = valid ? _detailTotals.Count + " document(s) · " + _detail.Select(x => x.When.Date).Distinct().Count() + " jour(s) travaillé(s) · " + start.ToString("dd/MM/yyyy") + " au " + end.ToString("dd/MM/yyyy") : "La date de début doit précéder la date de fin.";
-            DetailChartTitle.Text = (end - start).Days < 31 ? "Temps actif par jour" : "Évolution du temps actif · périodes regroupées";
-            SelectionCount.Text = Picker.Items.Cast<ModelChoice>().Count(x => x.Selected) + " document(s) coché(s) parmi les résultats";
+            int activeDays = _detail.Select(x => x.When.Date).Distinct().Count();
+            DetailContext.Text = valid ? _detailTotals.Count + (_detailTotals.Count == 1 ? " document" : " documents") + " · " + activeDays + (activeDays == 1 ? " jour actif" : " jours actifs") + " · " + start.ToString("dd/MM/yyyy") + " au " + end.ToString("dd/MM/yyyy") : "La date de début doit précéder la date de fin.";
+            DetailChartTitle.Text = (end - start).Days < 31 ? "Voir le temps actif par jour" : "Voir l’évolution du temps actif · périodes regroupées";
+            SelectionCount.Text = Picker.Items.Cast<ModelChoice>().Count(x => x.Selected) + " / " + Picker.Items.Count + " documents sélectionnés";
             DetailPlot.Model = valid ? Chart(_detail, start, end) : new PlotModel();
+            FitChart(DetailPlot);
             DetailEmpty.Visibility = valid && _detail.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            DetailPlot.Visibility = _detail.Count == 0 ? Visibility.Hidden : Visibility.Visible;
             PdfButton.IsEnabled = valid && _detail.Count > 0 && _loadError == null;
         }
 
@@ -216,11 +223,9 @@ namespace BIMaestro.Dashboard
             return rows.GroupBy(x => x.Id, StringComparer.OrdinalIgnoreCase).Select(g => new Total {
                 Id = g.Key, Name = First(g.Last().Name, g.Key), Path = g.Last().Path,
                 Hours = g.Sum(x => x.Hours), Days = g.Select(x => x.When.Date).Distinct().Count(), Last = g.Max(x => x.When),
-                Versions = string.Join(", ", g.Select(x => x.Version).Distinct()), Share = sum > 0 ? 100 * g.Sum(x => x.Hours) / sum : 0,
-                Brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(Palette[ColorIndex(g.Key)]))
+                Versions = string.Join(", ", g.Select(x => x.Version).Distinct()), Share = sum > 0 ? 100 * g.Sum(x => x.Hours) / sum : 0
             }).OrderByDescending(x => x.Hours).ThenBy(x => x.Name).ToList();
         }
-        private static int ColorIndex(string id) { unchecked { uint h = 2166136261; foreach (char c in id.ToUpperInvariant()) h = (h ^ c) * 16777619; return (int)(h % Palette.Length); } }
         private OxyColor ThemeColor(string key)
         {
             var brush = TryFindResource(key) as SolidColorBrush;
@@ -228,34 +233,42 @@ namespace BIMaestro.Dashboard
             return OxyColor.FromArgb(brush.Color.A, brush.Color.R, brush.Color.G, brush.Color.B);
         }
         private static string PdfColor(OxyColor color) => string.Join(" ", new[] { color.R, color.G, color.B }.Select(x => (x / 255.0).ToString("0.###", CultureInfo.InvariantCulture)));
+        private static void FitChart(OxyPlot.Wpf.PlotView plot)
+        {
+            var vertical = plot.Model?.Axes.OfType<LinearAxis>().FirstOrDefault(axis => axis.Position == AxisPosition.Left);
+            if (vertical == null || plot.ActualHeight <= 0) return;
+            int intervals = Math.Max(1, Math.Min(5, (int)((plot.ActualHeight - 64) / 28)));
+            double desired = vertical.Maximum / intervals;
+            double unit = Math.Pow(10, Math.Floor(Math.Log10(desired)));
+            vertical.MajorStep = desired <= .25 ? .25 : desired <= .5 ? .5 : desired <= 1 ? 1 : new[] { 1.0, 2, 2.5, 5, 10 }.Select(x => x * unit).First(x => x >= desired);
+            plot.InvalidatePlot(false);
+        }
         private PlotModel Chart(List<Entry> rows, DateTime start, DateTime end)
         {
-            var model = new PlotModel { PlotAreaBorderColor = ThemeColor("Border"), TextColor = ThemeColor("Text.Secondary"), Background = ThemeColor("Surface") };
+            var model = new PlotModel { PlotAreaBorderColor = OxyColors.Transparent, TextColor = ThemeColor("Text.Secondary"), Background = ThemeColor("Surface"), IsLegendVisible = false, DefaultFontSize = 11, PlotMargins = new OxyThickness(58, 16, 12, 48) };
             int days = (end - start).Days + 1;
             int bucketDays = days <= 31 ? 1 : days <= 180 ? 7 : Math.Max(30, (int)Math.Ceiling(days / 60.0));
             int count = (int)Math.Ceiling(days / (double)bucketDays);
-            var axis = new CategoryAxis { Position = AxisPosition.Bottom, GapWidth = 0.35, Angle = count > 15 ? -45 : 0 };
-            for (int i = 0; i < count; i++) axis.Labels.Add(start.AddDays(i * bucketDays).ToString(days <= 15 ? "ddd dd" : days > 365 ? "dd/MM/yy" : "dd/MM", CultureInfo.GetCultureInfo("fr-FR")));
+            var axis = new CategoryAxis { Position = AxisPosition.Bottom, GapWidth = 0.35, Angle = count > 7 ? -45 : 0, MajorStep = Math.Max(1, (int)Math.Ceiling(count / 8.0)), TickStyle = TickStyle.None, IsZoomEnabled = false, IsPanEnabled = false };
+            for (int i = 0; i < count; i++) axis.Labels.Add(start.AddDays(i * bucketDays).ToString(days <= 7 ? "ddd\ndd" : days <= 15 ? "dd/MM" : days > 365 ? "dd/MM/yy" : "dd/MM", CultureInfo.GetCultureInfo("fr-FR")));
             model.Axes.Add(axis);
-            model.Axes.Add(new LinearAxis { Position = AxisPosition.Left, Minimum = 0, MaximumPadding = 0.2, Title = bucketDays == 1 ? "Heures / jour" : "Heures / période de " + bucketDays + " jours", MajorGridlineStyle = LineStyle.Dot });
-            model.Legends.Add(new OxyPlot.Legends.Legend { LegendPosition = OxyPlot.Legends.LegendPosition.BottomCenter, LegendPlacement = OxyPlot.Legends.LegendPlacement.Outside, LegendOrientation = OxyPlot.Legends.LegendOrientation.Horizontal });
-            var totals = Totals(rows);
-            var top = new HashSet<string>(totals.Take(7).Select(x => x.Id), StringComparer.OrdinalIgnoreCase);
-            double[] baseline = new double[count];
-            foreach (var group in rows.GroupBy(x => top.Contains(x.Id) ? x.Id : "__others", StringComparer.OrdinalIgnoreCase))
+            var hours = rows.GroupBy(x => (x.When.Date - start).Days / bucketDays).ToDictionary(x => x.Key, x => x.Sum(y => y.Hours));
+            double peak = hours.Count == 0 ? 0 : hours.Values.Max();
+            double step = peak <= 1 ? .25 : peak <= 2 ? .5 : peak <= 4 ? 1 : peak <= 8 ? 2 : Math.Pow(2, Math.Ceiling(Math.Log(peak / 4, 2)));
+            model.Axes.Add(new LinearAxis { Position = AxisPosition.Left, Minimum = 0, Maximum = Math.Max(step * 4, Math.Ceiling(peak * 1.25 / step) * step), MajorStep = step,
+                LabelFormatter = value => value == 0 ? "0" : value < 1 ? Math.Round(value * 60) + " min" : Duration(value).Replace(" h 00", " h"), MajorGridlineStyle = LineStyle.Solid, MajorGridlineColor = ThemeColor("Divider"), TickStyle = TickStyle.None, IsZoomEnabled = false, IsPanEnabled = false });
+            var series = new RectangleBarSeries { Title = "Temps actif", FillColor = ThemeColor("Brand"), StrokeThickness = 0, LabelFormatString = null, TrackerFormatString = "{0}\n{7}" };
+            for (int i = 0; i < count; i++)
             {
-                var total = totals.FirstOrDefault(x => string.Equals(x.Id, group.Key, StringComparison.OrdinalIgnoreCase));
-                var series = new RectangleBarSeries { Title = total?.Name ?? "Autres", FillColor = OxyColor.Parse(total == null ? "#94A3B8" : Palette[ColorIndex(group.Key)]), StrokeThickness = 0,
-                    TrackerFormatString = "{0}\n{1}: {2:0.00} h" };
-                var hours = group.GroupBy(x => (x.When.Date - start).Days / bucketDays).ToDictionary(x => x.Key, x => x.Sum(y => y.Hours));
-                for (int i = 0; i < count; i++) { hours.TryGetValue(i, out double h); if (h > 0) series.Items.Add(new RectangleBarItem(i - .34, baseline[i], i + .34, baseline[i] + h)); baseline[i] += h; }
-                model.Series.Add(series);
+                hours.TryGetValue(i, out double h);
+                if (h > 0) series.Items.Add(new RectangleBarItem(i - .3, 0, i + .3, h) { Title = start.AddDays(i * bucketDays).ToString("dd MMM yyyy", CultureInfo.GetCultureInfo("fr-FR")) + " · " + Duration(h) });
             }
+            model.Series.Add(series);
             if (days <= 15)
             {
                 for (int i = 0; i < count; i++)
-                    if (baseline[i] > 0) model.Annotations.Add(new OxyPlot.Annotations.TextAnnotation {
-                        Text = Duration(baseline[i]), TextPosition = new DataPoint(i, baseline[i]),
+                    if (hours.TryGetValue(i, out double h) && h > 0 && count <= 7) model.Annotations.Add(new OxyPlot.Annotations.TextAnnotation {
+                        Text = Duration(h), TextPosition = new DataPoint(i, h),
                         TextVerticalAlignment = OxyPlot.VerticalAlignment.Bottom, Stroke = OxyColors.Transparent,
                         TextColor = ThemeColor("Text.Primary"), FontSize = 11
                     });
@@ -298,7 +311,7 @@ namespace BIMaestro.Dashboard
         }
         internal class Entry { public string Id, Name, Path, Version, Kind, Parameters; public DateTime When; public double Hours; public bool Live; }
         [Obfuscation(Exclude = true, ApplyToMembers = true)]
-        internal class Total { public string Id { get; set; } public string Name { get; set; } public string Path { get; set; } public double Hours { get; set; } public string Duration => TimeSeriesDashboardWindow.Duration(Hours); public int Days { get; set; } public DateTime Last { get; set; } public string Versions { get; set; } public double Share { get; set; } public string ShareLabel => Share.ToString("0.#", CultureInfo.CurrentCulture) + " %"; public Brush Brush { get; set; } }
+        internal class Total { public string Id { get; set; } public string Name { get; set; } public string Path { get; set; } public double Hours { get; set; } public string Duration => TimeSeriesDashboardWindow.Duration(Hours); public int Days { get; set; } public DateTime Last { get; set; } public string Versions { get; set; } public double Share { get; set; } public string ShareLabel => Share.ToString("0.#", CultureInfo.CurrentCulture) + " %"; }
         [Obfuscation(Exclude = true, ApplyToMembers = true)]
         private class ModelChoice : INotifyPropertyChanged
         {
