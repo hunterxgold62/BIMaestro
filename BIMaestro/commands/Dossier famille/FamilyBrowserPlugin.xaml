@@ -340,7 +340,7 @@
 
                             <!-- ★ : Favoris -->
                             <Button Grid.Column="0" Content="★"
-                                Tag="TutorialFavoriteStar"
+                                Tag="TutorialFavoriteStar" MinWidth="28" MinHeight="28"
                                 Click="FavoriteButton_Click"
                                 ToolTip="Ajouter/retirer des Favoris"
                                 Background="Transparent"
@@ -578,7 +578,7 @@
                                         FocusVisualStyle="{x:Null}"
                                         Visibility="{Binding FamilyControlVisibility}"/>
                                     <Button Content="★"
-                                        Tag="TutorialFavoriteStar"
+                                        Tag="TutorialFavoriteStar" MinWidth="28" MinHeight="28"
                                         Click="FavoriteButton_Click"
                                         ToolTip="Ajouter/retirer des Favoris"
                                         Background="Transparent"
@@ -993,7 +993,7 @@
                         Margin="0,0,8,0"
                         Content="TUTO"
                         FontWeight="Bold"
-                        ToolTip="Suivre le parcours du navigateur de familles avec Pikachu"
+                        ToolTip="Suivre le parcours du navigateur de familles avec Bulbizarre"
                         Style="{StaticResource SecondaryButton}"
                         Click="TutorialButton_Click"/>
                 <Button x:Name="HelpButton"
@@ -1675,7 +1675,7 @@
                                            TextWrapping="Wrap"
                                            Text="Affiche l’aperçu, le nom, la description et les mots-clés proposés pour chaque famille. Vous pouvez tout corriger avant l’enregistrement."/>
                             </StackPanel>
-                            <Button Grid.Column="1"
+                            <Button x:Name="SearchMetadataAssistantButton" Grid.Column="1"
                                     Content="Ouvrir l’assistant…"
                                     Width="180" Height="34"
                                     VerticalAlignment="Center"

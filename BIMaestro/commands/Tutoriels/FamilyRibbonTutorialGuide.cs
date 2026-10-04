@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -15,7 +15,7 @@ using System.Windows.Threading;
 namespace BIMaestro.Tutorials
 {
     // The family exercise finishes in Revit, after the browser has been closed.
-    // Keep its little Pikachu card independent of the browser, and locate the
+    // Keep its little Bulbizarre card independent of the browser, and locate the
     // native ribbon/menu surfaces anew as Revit opens and closes each popup.
     internal sealed class FamilyRibbonTutorialGuide
     {
@@ -65,7 +65,7 @@ namespace BIMaestro.Tutorials
 
             _cardWindow = new Window
             {
-                Title = "BIMaestro · Pikachu · Rosace",
+                Title = "BIMaestro · Bulbizarre · Rosace",
                 Width = 390,
                 SizeToContent = SizeToContent.Height,
                 WindowStyle = WindowStyle.ToolWindow,
@@ -79,7 +79,7 @@ namespace BIMaestro.Tutorials
             var content = new Border
             {
                 Padding = new Thickness(14),
-                BorderBrush = Brushes.DarkOrange,
+                BorderBrush = DemoTourPalette.Accent,
                 BorderThickness = new Thickness(2),
                 Background = Brushes.White
             };
@@ -145,7 +145,7 @@ namespace BIMaestro.Tutorials
                 Topmost = true,
                 Content = new Border
                 {
-                    BorderBrush = Brushes.DarkOrange,
+                    BorderBrush = DemoTourPalette.Accent,
                     BorderThickness = new Thickness(4),
                     CornerRadius = new CornerRadius(5),
                     Background = Brushes.Transparent
@@ -189,7 +189,7 @@ namespace BIMaestro.Tutorials
             if (_closing || _index < FirstStep || _index >= _steps.Length) return;
             if (_steps[_index].CompletionEvent == "radial-tutorial-chaise-placed" && action == "radial-opened")
             {
-                _text.Text = "✓ La rosace est ouverte. Clic droit au centre > « Charger une collection » > « Favoris », puis choisis une chaise des favoris d'essai. Clique ensuite dans la vue pour la poser ; Pikachu attend sa création réelle.";
+                _text.Text = "✓ La rosace est ouverte. Clic droit au centre > « Charger une collection » > « Favoris », puis choisis une chaise des favoris d'essai. Clique ensuite dans la vue pour la poser ; Bulbizarre attend sa création réelle.";
                 return;
             }
             if (string.Equals(_steps[_index].CompletionEvent, action, StringComparison.Ordinal))
@@ -219,7 +219,12 @@ namespace BIMaestro.Tutorials
         private void Next()
         {
             if (!_completed) return;
-            if (_index == _steps.Length - 1) { Close(); return; }
+            if (_index == _steps.Length - 1)
+            {
+                Close();
+                DemoTourCompletion.Show(_revitHandle, "family-browser", "Tu as terminé le tutoriel Navigateur de familles, y compris le placement depuis la rosace.");
+                return;
+            }
             _index++;
             ShowStep();
         }
@@ -230,7 +235,7 @@ namespace BIMaestro.Tutorials
             {
                 if (_completed) return;
                 _completed = true;
-                _text.Text = "✓ Pikachu a vérifié la création de ta chaise dans la maquette depuis la rosace. Appuie sur Échap pour quitter le placement. Ton catalogue personnel et tes favoris sont conservés.";
+                _text.Text = "✓ Bulbizarre a vérifié la création de ta chaise dans la maquette depuis la rosace. Appuie sur Échap pour quitter le placement. Ton catalogue personnel et tes favoris sont conservés.";
                 _next.IsEnabled = true;
             }
             else

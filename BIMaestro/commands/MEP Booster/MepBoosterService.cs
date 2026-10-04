@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
@@ -27,6 +27,10 @@ namespace BIMaestro.MepBooster
     {
         private static MepBoosterService _instance;
         private static PushButton _button;
+        internal static bool IsEnabled => _instance?._enabled == true;
+        internal static Action<Document, ElementId, IEnumerable<ElementId>> TutorialCopy;
+        internal static Action<bool> TutorialActivation;
+        internal static Action<Document, IEnumerable<ElementId>, string, double> TutorialProgress;
         private static bool _startupStateRestored;
         private static readonly Dictionary<string, System.Windows.Media.Imaging.BitmapImage> _icons =
             new Dictionary<string, System.Windows.Media.Imaging.BitmapImage>();
@@ -113,6 +117,7 @@ namespace BIMaestro.MepBooster
                 service._timer.Stop(); service._mouse?.Dispose(); service._mouse = null;
             }
             UpdateButton();
+            TutorialActivation?.Invoke(service._enabled);
         }
         internal static void RestorePersistedState(UIApplication app)
         {
@@ -273,6 +278,7 @@ namespace BIMaestro.MepBooster
                 SetStatus("Affichage demandé — " + _selectedCount + " accessoire(s).");
                 _palette.ShowPill(_projection, _selectedCount, _unavailable == null && _parts.All(p => p.CanFlip), _unavailable,
                     (degrees, invert) => _parts != null && _parts.All(p => p.CanApply(degrees, invert)));
+                TutorialProgress?.Invoke(_document, _parts?.Select(part => part.Id), "pill", 0);
                 if (_owner != IntPtr.Zero && _mouse == null) _mouse = new BoosterNative.MouseObserver(MouseInput);
                 SetStatus("Pastille affichée — " + _selectedCount + " accessoire(s), x=" + _palette.Left.ToString("0")
                     + ", y=" + _palette.Top.ToString("0") + (_unavailable == null ? ". Survolez MEP." : ". " + _unavailable));
@@ -355,7 +361,8 @@ namespace BIMaestro.MepBooster
                 bool flip = _flip;
                 // Capture local references: DocumentChanged closes the palette during Commit.
                 var parts = _parts;
-                try { BoosterOperations.Apply(doc, parts, angle, flip); }
+                try { BoosterOperations.Apply(doc, parts, angle, flip);
+                    TutorialProgress?.Invoke(doc, parts.Select(part => part.Id), "applied", angle); }
                 catch (Exception ex)
                 {
                     Rearm();
@@ -386,6 +393,7 @@ namespace BIMaestro.MepBooster
                             foreach (var part in _parts)
                                 part.LoadEdges((FamilyInstance)doc.GetElement(part.Id), Math.Min(900, 5000 / _parts.Count));
                         _preview.Draw(projection, _parts, _angle.Value, _flip);
+                        TutorialProgress?.Invoke(doc, _parts.Select(part => part.Id), "preview", _angle.Value);
                     });
                 }
                 else _preview.Hide();

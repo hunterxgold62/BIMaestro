@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
@@ -776,6 +776,21 @@ namespace Couleur
                     (selected, completed) => ApplyBrowserRule(null, selected, completed),
                     UndoBrowserRule, _browserRuleUndo.Count > 0)
                     { Owner = this };
+                if (_appearanceGuideStep == 7)
+                {
+                    dialog.StartTextColorTutorial();
+                    AppearanceGuideCard.Visibility = Visibility.Collapsed;
+                    dialog.Closed += (_, __) =>
+                    {
+                        if (_appearanceGuideStep != 7) return;
+                        AppearanceGuideCard.Visibility = Visibility.Visible;
+                        if (dialog.TextColorTutorialCompleted)
+                        {
+                            CompleteAppearanceGuideStep(7);
+                            AppearanceGuideText.Text = "La couleur du texte a été appliquée au dossier choisi. Clique sur Suivant pour ajouter les icônes. Tu peux annuler cet essai avec « Annuler la dernière application » dans le choix des dossiers.";
+                        }
+                    };
+                }
                 dialog.Show();
             }, error =>
             {
@@ -1324,12 +1339,8 @@ namespace Couleur
                 Close();
                 if (guided)
                 {
-                    bool learnMore = BIMaestro.Tutorials.DemoTourMessage.Show(_mainWindowHandle,
-                        "Pika ! Couleurs enregistrées",
-                        "Tes réglages sont enregistrés. Regarde l'arborescence du projet : compare la couleur du fond et les icônes devant « Plans d'étage » et « Vues 3D ». Tu peux rouvrir Couleurs pour ajuster le résultat.",
-                        "Voir l'arborescence", "Approfondir les règles");
-                    if (learnMore)
-                        BIMaestro.Tutorials.DemoTourDeepDive.Show(_mainWindowHandle, "colors");
+                    BIMaestro.Tutorials.DemoTourCompletion.Show(_mainWindowHandle, "colors",
+                        "Tes couleurs et tes icônes sont enregistrées. Tu as terminé le tutoriel Couleurs et vues.");
                 }
             });
         }

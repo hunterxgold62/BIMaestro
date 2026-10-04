@@ -1,6 +1,7 @@
 ﻿using Autodesk.Revit.UI;
 using System;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Windows.Interop;
 using System.Windows;
@@ -10,7 +11,7 @@ namespace BIMaestro.Welcome
     public static class WelcomeManager
     {
         private static readonly TimeSpan DelayAfterFirstUse = TimeSpan.FromMinutes(1);
-        private static readonly TimeSpan SnoozeDuration = TimeSpan.FromDays(7);
+        private static readonly TimeSpan SnoozeDuration = TimeSpan.FromDays(1);
         private static readonly TimeSpan MinAttemptSpacing = TimeSpan.FromHours(6);
 
         private static readonly object _sync = new object();
@@ -19,15 +20,13 @@ namespace BIMaestro.Welcome
 
         private static Timer _timer;
         private static volatile bool _shouldShow;
+        private static bool _pendingDemoCreate;
         private static int _showing;
 
         private static UIApplication _lastUiApp;
 
         // JWT licence courant (pour sync)
         private static string _jwtLicenseToken;
-
-        // CommandId du bouton Guide (récupéré à la création du ruban)
-        private static RevitCommandId _guideCommandId;
 
         public static void Initialize(UIControlledApplication app)
         {
@@ -38,17 +37,8 @@ namespace BIMaestro.Welcome
 
                 _state = WelcomeStorage.LoadOrCreate();
                 app.Idling += App_Idling;
-            }
-        }
-
-        /// <summary>
-        /// À appeler quand tu crées le PushButton du guide : WelcomeManager.SetGuideCommandId(pb.CommandId)
-        /// </summary>
-        public static void SetGuideCommandId(RevitCommandId cmdId)
-        {
-            lock (_sync)
-            {
-                _guideCommandId = cmdId;
+                if (ShouldPromptForCurrentVersion(_state) || ShouldOfferTutorial(_state))
+                    _timer = new Timer(_ => _shouldShow = true, null, DelayAfterFirstUse, Timeout.InfiniteTimeSpan);
             }
         }
 
@@ -68,7 +58,7 @@ namespace BIMaestro.Welcome
 
                 _state ??= WelcomeStorage.LoadOrCreate();
 
-                if (!ShouldPromptForCurrentVersion(_state)) return;
+                if (!ShouldPromptForCurrentVersion(_state) && !ShouldOfferTutorial(_state)) return;
 
                 if (!_state.FirstCommandUtc.HasValue)
                 {
@@ -181,13 +171,30 @@ namespace BIMaestro.Welcome
 
         private static void App_Idling(object sender, Autodesk.Revit.UI.Events.IdlingEventArgs e)
         {
+            _lastUiApp ??= sender as UIApplication;
+            if (_pendingDemoCreate)
+            {
+                _pendingDemoCreate = false;
+                if (_lastUiApp != null)
+                {
+                    string message = null;
+                    BIMaestro.Tutorials.DemoToursCommand.RunChoice(_lastUiApp, "create", ref message);
+                }
+                return;
+            }
             if (!_shouldShow) return;
+            if (Application.Current?.Windows.Cast<Window>().Any(window => window.IsVisible) == true)
+                return;
 
+            bool showEmail;
+            bool showTutorial;
             lock (_sync)
             {
                 _state ??= WelcomeStorage.LoadOrCreate();
 
-                if (!ShouldPromptForCurrentVersion(_state)) { _shouldShow = false; return; }
+                showEmail = ShouldPromptForCurrentVersion(_state);
+                showTutorial = ShouldOfferTutorial(_state);
+                if (!showEmail && !showTutorial) { _shouldShow = false; return; }
                 if (_state.LastAttemptUtc.HasValue && DateTime.UtcNow - _state.LastAttemptUtc.Value < MinAttemptSpacing)
                 {
                     _shouldShow = false;
@@ -207,7 +214,7 @@ namespace BIMaestro.Welcome
             bool windowShown = false;
             try
             {
-                var win = new WelcomeWindow();
+                var win = new WelcomeWindow(showEmail, showTutorial);
 
                 // Fenêtre possédée par Revit : elle reste devant Revit sans bloquer son utilisation.
                 var hwnd = RevitWindowHandle.GetRevitMainWindowHandle();
@@ -242,18 +249,19 @@ namespace BIMaestro.Welcome
 
         private static void HandleWelcomeClosed(WelcomeWindow win)
         {
-            bool openGuide = false;
+            bool openDemo = false;
             bool syncProfile = false;
 
             lock (_sync)
             {
                 _state ??= WelcomeStorage.LoadOrCreate();
 
-                if (win.ResultAction == WelcomeResultAction.OpenGuide)
+                if (win.ResultAction == WelcomeResultAction.OpenDemo)
                 {
-                    _state.WelcomeShown = true;
-                    _state.LastWelcomePromptVersion = CurrentPluginVersion;
-                    openGuide = true;
+                    _state.TutorialOfferCompleted = true;
+                    _state.TutorialSnoozeUntilUtc = null;
+                    _state.SnoozeUntilUtc = DateTime.UtcNow + SnoozeDuration;
+                    openDemo = true;
                 }
                 else if (win.ResultAction == WelcomeResultAction.OptIn)
                 {
@@ -267,46 +275,38 @@ namespace BIMaestro.Welcome
                     _state.WelcomeShown = true;
                     _state.LastWelcomePromptVersion = CurrentPluginVersion;
                     syncProfile = true;
+                    SnoozeTutorialOffer(_state);
                 }
                 else if (win.ResultAction == WelcomeResultAction.Snooze)
                 {
                     _state.SnoozeUntilUtc = DateTime.UtcNow + SnoozeDuration;
+                    SnoozeTutorialOffer(_state);
                 }
                 else if (win.ResultAction == WelcomeResultAction.Dismiss)
                 {
                     _state.HardDismissed = true;
                     _state.LastWelcomePromptVersion = CurrentPluginVersion;
+                    SnoozeTutorialOffer(_state);
                 }
 
                 WelcomeStorage.Save(_state);
                 _shouldShow = false;
+                if (!_state.TutorialOfferCompleted ||
+                    (!_state.HardDismissed && string.IsNullOrWhiteSpace(_state.Email)))
+                {
+                    _timer?.Dispose();
+                    _timer = new Timer(_ => _shouldShow = true, null, SnoozeDuration, Timeout.InfiniteTimeSpan);
+                }
             }
 
             if (syncProfile) TryUpsertProfileNoThrow();
-            if (openGuide) PostGuideCommand();
+            if (openDemo) _pendingDemoCreate = true;
         }
 
-        private static void PostGuideCommand()
+        private static void SnoozeTutorialOffer(WelcomeState state)
         {
-            UIApplication uiapp;
-            RevitCommandId cmdId;
-
-            lock (_sync)
-            {
-                uiapp = _lastUiApp;
-                cmdId = _guideCommandId;
-            }
-
-            if (uiapp == null || cmdId == null) return;
-
-            try
-            {
-                uiapp.PostCommand(cmdId);
-            }
-            catch
-            {
-                // ignore volontairement
-            }
+            if (!state.TutorialOfferCompleted)
+                state.TutorialSnoozeUntilUtc = DateTime.UtcNow + SnoozeDuration;
         }
 
         private static void TryUpsertProfileNoThrow()
@@ -365,6 +365,10 @@ namespace BIMaestro.Welcome
                 CurrentPluginVersion,
                 StringComparison.OrdinalIgnoreCase);
         }
+
+        private static bool ShouldOfferTutorial(WelcomeState state) =>
+            state != null && !state.TutorialOfferCompleted &&
+            (!state.TutorialSnoozeUntilUtc.HasValue || state.TutorialSnoozeUntilUtc.Value <= DateTime.UtcNow);
     }
 
     /// <summary>

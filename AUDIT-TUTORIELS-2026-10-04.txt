@@ -1,0 +1,29 @@
+﻿AUDIT DES 9 TUTORIELS BIMAESTRO — 04/10/2026
+
+Périmètre : lecture du code des parcours, commandes associées, événements de validation, ressources et distribution. Compilation Release. Cet audit ne valide pas une session Revit complète ni le rendu natif.
+
+CORRECTIONS CONFIRMÉES DURANT CET AUDIT
+- Navigateur de familles : la fin du guide dans le ruban fermait le guide sans proposer le tutoriel suivant. Proposition ajoutée.
+- Qui a fait ça : une carte déjà sélectionnée à l'arrivée sur une étape pouvait laisser Suivant désactivé. La sélection existante permet maintenant de poursuivre.
+- Guides WPF : les textes longs pouvaient sortir de la fenêtre ou masquer les boutons. Texte placé dans une zone défilante, adaptée à la hauteur de la fenêtre.
+- MEP Booster : une rotation de 360 degrés était comptée comme une modification alors que la vanne retrouve la même orientation. Les tours complets ne valident plus cette action.
+- Enchaînement : une exception pendant le démarrage du prochain tutoriel pouvait remonter depuis Idling. Elle est maintenant interceptée et affichée.
+
+REVUE PAR PARCOURS / VALIDATION NATIVE ENCORE NÉCESSAIRE
+1. Auto réservation : étapes, choix de famille et fin de parcours contrôlés dans le code. À tester : deux sélections Revit, résultat géométrique et annulation sans faux succès.
+2. Qui a fait ça : snapshots 4 chaises avant passage à 2 ; événement vérifié dans le journal ; sous-composants de l'exercice filtrés ; validation des tables parentes par famille et position ; comparaison Simple/Détaillé et nettoyage avant restauration. À tester prioritairement : toute la séquence avec la famille réelle, exactitude du journal, restauration de 2 tables puis des 4 chaises. L'ancien historique reste sur le poste : les essais successifs peuvent produire plusieurs clusters.
+3. Couleurs et vues : guide parent et exercice dossier contrôlés ; la fin est proposée après sauvegarde. À tester : résultat réel dans l'arborescence, sélection d'un dossier et fermeture de sa fenêtre, enregistrement ou annulation.
+4. Calcul des canalisations : vérification des deux DN, coudes, deux vannes et gaines ; Excel provient du même calcul. À tester : dimensions/connexions de la famille de vanne et valeurs du récapitulatif. La scène MEP Booster est distincte et ne doit pas être incluse dans cette sélection.
+5. Organisateur : parkings sur deux niveaux, seconde vue tournée sans tri par niveau ; feuilles 3/4/5 vers 1/2/3, témoin 6 ; gestion des collisions et sélection contrôlée. À tester : encadrements des feuilles dans l'arborescence native (UI Automation, dépend de Revit et des éléments visibles), ordre réel de numérotation et reprise après annulation.
+6. Gabarit de vue : source rouge pointillée / cible bleue continue ; choix WPF recommandés encadrés ; vérification du vrai gabarit affecté. À tester : rendu des catégories/sous-catégories et des pointillés après import. Les dialogues système de choix de fichier ne disposent pas des cadres WPF du guide.
+7. Gestion Excel : comparaison des valeurs importées, repère fixe protégé, cadrage des places après import. À tester : modification puis import réel, fichier resté ouvert dans Excel, erreurs de classeur et annulation.
+8. Navigateur de familles : 35 RFA et 30 PNG ; seules 5 familles de Salle de réunion sont sans PNG à la livraison ; étoile ciblée dans la liste visible ; 2 favoris temporaires ; Paramètres vers assistant IA ; fin dans le ruban corrigée. À tester : restauration des favoris personnels après sortie, surlignages après recherche, génération des 5 PNG, export 3D long et erreurs/absence d'accès IA. Les PNG générés lors d'un précédent essai sont conservés : les 5 familles ne seront plus sans image à la deuxième exécution sur le même poste.
+9. MEP Booster : six vannes dans une vue dédiée ; progression liée aux événements réels, copie vers au moins deux vannes non modifiées ; les copies sans changement ne valident pas. À tester : sélection/aperçu/rotation/copie réels et cas d'angles désactivés. Un exercice relancé réutilise les orientations de la scène : il ne remet pas les vannes à leur orientation initiale.
+
+LIMITES DE LIVRAISON
+- Le fichier RVT de référence destiné à être copié à chaque essai n'est pas encore livré : le générateur reste utilisé. Sa création doit suivre la validation native de toutes les scènes.
+- Les ressources sont présentes dans la sortie Release et incluses par les scripts d'installation ; aucun nouvel EXE installateur n'a été construit durant cet audit.
+- La DLL installée ne peut être remplacée tant que Revit la verrouille. Les corrections de code ne sont pas actives dans une session Revit déjà ouverte.
+
+PRIORITÉ POUR LE PROCHAIN TEST
+Qui a fait ça (restauration réelle) ; vannes (création et connecteurs) ; gabarit (différence graphique) ; Organisateur (feuilles et cadre dans l'arborescence) ; puis enchaînement des neuf parcours.

@@ -50,6 +50,10 @@ RestartApplications=no
 Name: "french"; MessagesFile: "compiler:Languages\French.isl"
 
 [Files]
+; Le catalogue et ses PNG sont obligatoires dans la distribution.
+#if !FileExists("bin\Release\Demo\NavigateurFamilles\Images\Mobilier\Bureau\Bureau commun.png") || !FileExists("bin\Release\Demo\Maquette\Familles\CML_Parking.rfa") || !FileExists("bin\Release\Demo\Maquette\Familles\Coude - Générique.rfa")
+  #error Compilez Release avec toutes les ressources de formation avant de creer l'installateur.
+#endif
 #include "..\Installer\Navisworks.Files.iss"
 ; DLL principale et dépendances. Les symboles de débogage ne sont pas distribués.
 Source: "bin\Release\*.*"; DestDir: "{app}\Contents"; \

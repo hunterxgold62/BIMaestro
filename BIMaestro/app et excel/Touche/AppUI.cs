@@ -1,4 +1,4 @@
-﻿using Autodesk.Revit.DB;
+using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using BIMaestro.RibbonLayout;
 using BIMaestro.Localization;
@@ -194,14 +194,21 @@ public class AppUI : IExternalApplication
                 {
                     ("Couleur de projet", "Couleurs", "Couleur.ToggleCombinedColoringCommand", "Couleur oui non.png","Clic : ouvre la personnalisation des couleurs. Double-clic : active ou désactive les panneaux colorés."),
                     ("RestartAppearanceGuide", "Guide couleurs", "Couleur.RestartAppearanceGuideCommand", "Miniature.png", "Relance le parcours guidé depuis l’onglet BIMaestro jusqu’aux réglages des couleurs."),
-                    ("DemoTours", "Parcours guidés", "BIMaestro.Tutorials.DemoToursCommand", "Miniature.png", "Crée la maquette de formation et découvre Auto résa, Qui a fait ça ?, Couleurs/vues, Calcul des canalisations, Organisateur et Gabarit de vue avec Pikachu."),
                     ("Couleur de maquette", "Couleur reset", "Couleur.ResetTabItemRandomColorsCommand", "reset.png","Réinitialise les couleurs appliquées"),
                     ("papa Noël", "papa\nNoël", "Couleur.PapanoelCommand", "papa noel.png","Fait apparaître des couleurs comme des guirlandes\nDouble clic pour revenir à la normale.\n\nAttention désactiver <couleur Oui/Non> avant activation."),
                     ("ViewDeckToggle", "Onglets : OFF", "BIMaestro.ViewHover.ToggleViewDeckCommand", "Miniature.png", "ON : miniatures dans les onglets. OFF : onglets compacts.\r\nLes aperçus au survol se règlent dans Miniature ou Option > Miniatures."),
-                    ("TabCompanionToggle", "Compagnon : OFF", "BIMaestro.ViewHover.ToggleTabCompanionCommand", "Miniature.png", "Un Pikachu pixel suit la souris sur la barre des onglets. Cliquez pour activer ou désactiver."),
-                    ("WindowCompanionToggle", "Compagnon fenêtre : OFF", "BIMaestro.ViewHover.ToggleWindowCompanionCommand", "Miniature.png", "Test : Pikachu suit la souris dans toute la fenêtre principale Revit. Cliquez pour activer ou désactiver."),
+                    ("TabCompanionToggle", "Compagnon : OFF", "BIMaestro.ViewHover.ToggleTabCompanionCommand", "Miniature.png", "Un Bulbizarre pixel suit la souris sur la barre des onglets. Cliquez pour activer ou désactiver."),
+                    ("WindowCompanionToggle", "Compagnon fenêtre : OFF", "BIMaestro.ViewHover.ToggleWindowCompanionCommand", "Miniature.png", "Test : Bulbizarre suit la souris dans toute la fenêtre principale Revit. Cliquez pour activer ou désactiver."),
                     ("BIMaestro_Exemple", "Exemple", "Page.GuideCommand", "Exemple.png", "Page d'information sur le plugin"),
                 })),
+                new RibbonItemDefinition("CreateDemoProject", "Maquette d’essai", panel => AddPushButton(panel,
+                    "CreateDemoProject", "Maquette\nd’essai", assemblyPath,
+                    "BIMaestro.Tutorials.CreateDemoProjectCommand", "Exemple.png",
+                    "Crée et ouvre une nouvelle maquette d’essai BIMaestro dans Documents\\RevitLogs, puis propose les exercices guidés. Disponible à tout moment après l’accueil.")),
+                new RibbonItemDefinition("DemoTours", "Parcours guidés", panel => AddPushButton(panel,
+                    "DemoTours", "Parcours\nguidés", assemblyPath,
+                    "BIMaestro.Tutorials.DemoToursCommand", "Miniature.png",
+                    "Crée une maquette de formation et essaie les outils BIMaestro pas à pas.")),
 
                 new RibbonItemDefinition("InfoStack", "Infos empilées", panel => AddStackedInfoButtons(
                     panel,

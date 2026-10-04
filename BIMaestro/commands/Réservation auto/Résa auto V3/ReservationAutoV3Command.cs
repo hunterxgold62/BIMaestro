@@ -75,7 +75,7 @@ namespace Modification
                 }
 
                 if (guided && !win.AutomatiqueEnabled)
-                    BIMaestro.Tutorials.DemoTourMessage.Show(uiApp.MainWindowHandle, "Pikachu te guide",
+                    BIMaestro.Tutorials.DemoTourMessage.Show(uiApp.MainWindowHandle, "Bulbizarre te guide",
                         "Dans la vue 3D, clique d'abord sur la canalisation qui traverse le mur, puis sur ce mur. " +
                         "BIMaestro placera ta réservation à leur croisement. Appuie sur Échap pour arrêter la sélection.", "Je choisis les éléments");
 
@@ -122,15 +122,12 @@ namespace Modification
                         }
                     }
                     catch (Exception ex) { System.Diagnostics.Trace.WriteLine("BIMaestro tutorial focus: " + ex.Message); }
-                    bool learnMore = BIMaestro.Tutorials.DemoTourMessage.Show(uiApp.MainWindowHandle,
-                        createdForTutorial > 0 ? "Pika ! Mission accomplie" : "Pikachu t'aide à réessayer",
-                        createdForTutorial > 0
-                            ? "Tu as créé " + createdForTutorial + " réservation(s) ! BIMaestro les a sélectionnées et cadrées dans la vue. Regarde leur position dans le mur, puis leurs dimensions dans Propriétés."
-                            : "Aucune réservation n'a été créée. Relance le parcours et sélectionne d'abord la canalisation, puis le mur qu'elle traverse.",
-                        createdForTutorial > 0 ? "Voir ma réservation" : "Compris",
-                        createdForTutorial > 0 ? "Approfondir les réglages" : null);
-                    if (learnMore)
-                        BIMaestro.Tutorials.DemoTourDeepDive.Show(uiApp.MainWindowHandle, "reservation");
+                    if (createdForTutorial > 0)
+                        BIMaestro.Tutorials.DemoTourCompletion.Show(uiApp.MainWindowHandle, "reservation",
+                            "Tu as créé " + createdForTutorial + " réservation(s). Le tutoriel Auto réservation est terminé.");
+                    else
+                        BIMaestro.Tutorials.DemoTourMessage.Show(uiApp.MainWindowHandle, "Bulbizarre t’aide à réessayer",
+                            "Aucune réservation n’a été créée. Relance le parcours et sélectionne d’abord la canalisation, puis le mur.");
                 }
 
                 // Dynamo
@@ -716,7 +713,7 @@ namespace Modification
                     {
                         Element = element, TransformToCurrentDocument = Transform.Identity, IsLinked = false
                     } };
-                TaskDialog.Show("Pikachu - Auto réservation", element is Wall
+                TaskDialog.Show("Bulbizarre - Auto réservation", element is Wall
                     ? "Tu as choisi le mur en premier. Commence par la canalisation qui le traverse ; nous choisirons le mur juste après."
                     : "Ce n'est pas une canalisation. Clique sur le tuyau de démonstration qui traverse le mur.");
             }
@@ -736,7 +733,7 @@ namespace Modification
 
                 Element element = doc.GetElement(reference);
                 if (element is Wall) return element;
-                TaskDialog.Show("Pikachu - Auto réservation", element is Pipe
+                TaskDialog.Show("Bulbizarre - Auto réservation", element is Pipe
                     ? "Tu as sélectionné une autre canalisation. La première est mémorisée : clique maintenant sur le mur qu'elle traverse."
                     : "Ce n'est pas un mur. Clique sur le mur que traverse la canalisation sélectionnée.");
             }

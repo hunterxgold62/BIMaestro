@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -211,7 +211,7 @@ namespace Famille
             layout.Children.Add(words);
             words.Children.Add(new TextBlock
             {
-                Text = UiLanguage.T("Pikachu · Choisis les aperçus", "Pikachu · Choose the previews"),
+                Text = UiLanguage.T("Bulbizarre · Choisis les aperçus", "Bulbizarre · Choose the previews"),
                 FontSize = 14,
                 FontWeight = FontWeights.SemiBold,
                 Foreground = Brushes.Black

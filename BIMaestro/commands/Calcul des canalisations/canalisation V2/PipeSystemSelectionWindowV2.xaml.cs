@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -87,8 +87,8 @@ namespace Analyse
                  EnableSystemTypeFilterCheckBox.IsChecked == true))
             {
                 MessageBox.Show(this,
-                    "Pika ! Pour cet exercice, coche « Inclure les gaines » et « Exporter les résultats vers Excel », puis laisse le filtre par système désactivé.",
-                    "BIMaestro · Pikachu", MessageBoxButton.OK, MessageBoxImage.Information);
+                    "Bravo ! Pour cet exercice, coche « Inclure les gaines » et « Exporter les résultats vers Excel », puis laisse le filtre par système désactivé.",
+                    "BIMaestro · Bulbizarre", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
             if (FilterBySystemType)

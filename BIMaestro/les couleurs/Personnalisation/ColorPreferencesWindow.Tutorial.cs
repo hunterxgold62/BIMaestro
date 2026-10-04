@@ -94,7 +94,8 @@ namespace Couleur
             {
                 if (args.Source != BrowserTabs) return;
                 if (BrowserBackgroundTab.IsSelected) CompleteAppearanceGuideStep(5);
-                if (BrowserFoldersTab.IsSelected) CompleteAppearanceGuideStep(7);
+                if (BrowserFoldersTab.IsSelected && _appearanceGuideStep == 7)
+                    ShowAppearanceGuideStep();
                 if (BrowserIconsTab.IsSelected) CompleteAppearanceGuideStep(8);
             };
             TutorialBackgroundColor.SelectedColorChanged += (_, __) =>
@@ -184,7 +185,7 @@ namespace Couleur
                 case 3:
                     target = ViewsAndFoldersTab;
                     title = "4/15 · Passer aux vues";
-                    description = "Ouvre « Vues et dossiers ». Nous allons changer le fond, puis placer des icônes dans l’arborescence.";
+                    description = "Ouvre « Vues et dossiers ». Nous allons changer le fond, essayer une couleur de texte sur un dossier, puis placer des icônes dans l’arborescence.";
                     break;
                 case 4:
                     AppearanceTabs.SelectedItem = ViewsAndFoldersTab;
@@ -205,9 +206,18 @@ namespace Couleur
                     description = "Choisis une autre couleur dans « Fond principal ». L'aperçu montre l'effet avant l'enregistrement ; tu peux donc comparer la lisibilité des noms de vues avec ton nouveau fond. Le guide attend une vraie modification.";
                     break;
                 case 7:
-                    target = BrowserFoldersTab;
-                    title = "8/15 · Repérer les dossiers";
-                    description = "Ouvre « Dossiers ». Cet onglet colore les dossiers existants ; il ne crée aucune vue. Repère-le, puis clique sur Suivant : nous passerons directement par l'onglet « Icônes ».";
+                    if (!BrowserFoldersTab.IsSelected)
+                    {
+                        target = BrowserFoldersTab;
+                        title = "8/15 · Ouvrir Dossiers";
+                        description = "Clique sur l’onglet « Dossiers ». Nous ouvrirons ensuite « Choisir un dossier… » pour essayer une couleur de texte dans l’arborescence.";
+                    }
+                    else
+                    {
+                        target = TutorialChooseFolder;
+                        title = "8/15 · Colorer le texte d’un dossier";
+                        description = "Clique sur « Choisir un dossier… ». Bulbizarre te guidera pour sélectionner un dossier existant, choisir l’apparence « Texte », changer sa couleur puis l’appliquer à Revit. Ferme ensuite cette fenêtre pour poursuivre vers les icônes.";
+                    }
                     break;
                 case 8:
                     target = BrowserIconsTab;
@@ -228,7 +238,7 @@ namespace Couleur
                 case 11:
                     target = TutorialIconRules;
                     title = "12/15 · Choisir son icône";
-                    description = "Pikachu se place en haut pour te laisser saisir dans la nouvelle ligne « Plans d'étage », puis choisir une image. Le nom doit correspondre au dossier Revit (accent et espace compris).";
+                    description = "Bulbizarre se place en haut pour te laisser saisir dans la nouvelle ligne « Plans d'étage », puis choisir une image. Le nom doit correspondre au dossier Revit (accent et espace compris).";
                     break;
                 case 12:
                     target = TutorialAddIconRule;
@@ -238,12 +248,12 @@ namespace Couleur
                 case 13:
                     target = TutorialIconRules;
                     title = "14/15 · Choisir l’icône 3D";
-                    description = "Pikachu laisse libre la nouvelle ligne : saisis exactement « Vues 3D », puis choisis son icône. Tu personnalises le dossier existant, pas un type de vue.";
+                    description = "Bulbizarre laisse libre la nouvelle ligne : saisis exactement « Vues 3D », puis choisis son icône. Tu personnalises le dossier existant, pas un type de vue.";
                     break;
                 default:
                     target = TutorialSave;
                     title = "15/15 · Enregistrer";
-                    description = "Clique sur « Enregistrer mes réglages » pour appliquer le nouveau fond et les deux icônes. Vérifie ensuite l’arborescence dans Revit.";
+                    description = "Clique sur « Enregistrer mes réglages » pour appliquer le nouveau fond et les deux icônes. La couleur du texte du dossier a déjà été appliquée pendant l’exercice. Vérifie ensuite l’arborescence dans Revit.";
                     break;
             }
             AppearanceGuideTitle.Text = title;
@@ -257,7 +267,6 @@ namespace Couleur
                 || (_appearanceGuideStep == 3 && ViewsAndFoldersTab.IsSelected)
                 || (_appearanceGuideStep == 4 && TutorialEnableBrowser.IsChecked == true)
                 || (_appearanceGuideStep == 5 && BrowserBackgroundTab.IsSelected)
-                || (_appearanceGuideStep == 7 && BrowserFoldersTab.IsSelected)
                 || (_appearanceGuideStep == 8 && BrowserIconsTab.IsSelected)
                 || (_appearanceGuideStep == 9 && TutorialEnableIcons.IsChecked == true)
                 || (_appearanceGuideStep == 10 && FindAppearanceIconRule("Plans d'étage") != null)
@@ -325,7 +334,7 @@ namespace Couleur
             {
                 Rect bounds = new Rect(AdornedElement.RenderSize);
                 if (bounds.Width < 1 || bounds.Height < 1) return;
-                drawing.DrawRoundedRectangle(null, new Pen(Brushes.DarkOrange, 3),
+                drawing.DrawRoundedRectangle(null, new Pen(BIMaestro.Tutorials.DemoTourPalette.Accent, 3),
                     new Rect(-2, -2, bounds.Width + 4, bounds.Height + 4), 5, 5);
             }
         }

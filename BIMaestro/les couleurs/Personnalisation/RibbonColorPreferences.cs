@@ -513,13 +513,14 @@ namespace Couleur
                 pixelSize);
             AddPixelSprite(
                 sprites,
-                PikachuPixels,
+                BulbasaurPixels,
                 new Dictionary<char, Color>
                 {
-                    ['K'] = Color.FromRgb(23, 24, 22),
-                    ['Y'] = Color.FromRgb(253, 213, 30),
-                    ['B'] = Color.FromRgb(154, 93, 51),
-                    ['R'] = Color.FromRgb(227, 64, 63)
+                    ['K'] = Color.FromRgb(15, 23, 42),
+                    ['T'] = Color.FromRgb(124, 200, 163),
+                    ['R'] = Color.FromRgb(184, 54, 65),
+                    ['G'] = Color.FromRgb(15, 81, 50),
+                    ['D'] = Color.FromRgb(42, 125, 91)
                 },
                 291.375,
                 1,
@@ -616,45 +617,18 @@ namespace Couleur
         internal static DrawingImage CreateCompanionImage()
         {
             var drawing = new DrawingGroup();
-            AddPixelSprite(drawing, PikachuPixels, new Dictionary<char, Color>
+            AddPixelSprite(drawing, BulbasaurPixels, new Dictionary<char, Color>
             {
-                ['K'] = Color.FromRgb(23, 24, 22),
-                ['Y'] = Color.FromRgb(253, 213, 30),
-                ['B'] = Color.FromRgb(154, 93, 51),
-                ['R'] = Color.FromRgb(227, 64, 63)
+                ['K'] = Color.FromRgb(15, 23, 42),
+                ['T'] = Color.FromRgb(124, 200, 163),
+                ['R'] = Color.FromRgb(184, 54, 65),
+                ['G'] = Color.FromRgb(15, 81, 50),
+                ['D'] = Color.FromRgb(42, 125, 91)
             }, 0, 0, 1);
             var image = new DrawingImage(drawing);
             image.Freeze();
             return image;
         }
-
-        private static readonly string[] PikachuPixels =
-        {
-            ".KK...............KK...",
-            ".KKKK............KKK...",
-            ".KKYYK..........KYKK...",
-            "..KYYYK........KYYK....",
-            "..KYYYYKKKKKK.KYYYK..K.",
-            "...KYYYYYYYYYKYYYYK.KYK",
-            "....KYYYYYYYYYYYYK.KYYK",
-            "....KYYYYYYYYYYYK.KYYYK",
-            "...KYYK.YYYYYK.YKKYYYYK",
-            "...KYYKKYYYYYKKYYKYYYYK",
-            "...KYYYYYYKYYYYYYKYYYK.",
-            ".KKKRRRYKYYYKYRRRKYYK..",
-            "KYYKRRRYYKKKYYRRKYKY...",
-            "KYYYKKYYYYYYYYYK.YYKK..",
-            ".KYYYYYYYYYYYYYYKYYYKK.",
-            "..KYYYYYYYYYYYYYYKYKK..",
-            "...KKYYYYYYYYYYKYKBBK..",
-            "...KYYYYYYYYYKYKYKBK...",
-            "...KYYYYYYYYYKYKYKK....",
-            "...KYYYYYYYYYYKYYK.....",
-            "...KYYYYYYYYYYYYYK.....",
-            "....KYYYYYYYYYYYK......",
-            "...KYYYKKKKKKKYYYK.....",
-            "...KKKK.......KKKK....."
-        };
 
         private static readonly string[] CharmanderPixels =
         {

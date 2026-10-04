@@ -460,6 +460,8 @@ namespace Analyse
 
         private void Bind(List<ElementHistoryEvent> eventsData, string defaultAction = null, bool preserveFilters = false, bool showAllLoadedEvents = false, int maxLoadedEvents = MaxLoadedHistoryEvents)
         {
+            eventsData = (eventsData ?? new List<ElementHistoryEvent>())
+                .Where(item => !BIMaestro.Tutorials.DemoHistoryScene.IsNestedExerciseDeletion(_doc, item)).ToList();
             _isBinding = true;
             _showAllLoadedEvents = showAllLoadedEvents;
             _loadedHistoryEventLimit = showAllLoadedEvents ? int.MaxValue : Math.Max(1, maxLoadedEvents);
@@ -2008,13 +2010,9 @@ namespace Analyse
                 if (restoredForTutorial && BIMaestro.Tutorials.DemoTourService.IsActive(this))
                 {
                     BIMaestro.Tutorials.DemoTourService.ReportRestoration(this, furnitureRestored);
-                    bool learnMore = BIMaestro.Tutorials.DemoTourMessage.Show(
+                    BIMaestro.Tutorials.DemoTourMessage.Show(
                         new System.Windows.Interop.WindowInteropHelper(this).Handle,
-                        "Pika ! Objets retrouvés", message, "Voir les objets restaurés",
-                        "Approfondir l'enquête");
-                    if (learnMore)
-                        BIMaestro.Tutorials.DemoTourDeepDive.Show(
-                            new System.Windows.Interop.WindowInteropHelper(this).Handle, "history");
+                        "Objets restaurés", message + "\nPoursuis maintenant le guide pour restaurer les 4 chaises du témoin.", "Continuer le guide");
                 }
                 else
                     MessageBox.Show(this, message, UiLanguage.T("Restaurer les éléments", "Restore elements"), MessageBoxButton.OK, MessageBoxImage.Information);
@@ -2772,12 +2770,24 @@ namespace Analyse
                 _uidoc.Selection.SetElementIds(originals.Distinct().ToList());
                 _uidoc.ShowElements(originals.Distinct().ToList());
             }
+            var previewIds = GetPreviewElements(_doc).Select(element => element.Id).ToList();
+            if (previewIds.Count > 0)
+            {
+                try { _uidoc.ShowElements(previewIds); } catch { }
+                _uidoc.RefreshActiveView();
+                Dispatcher.BeginInvoke(new Action(() => BIMaestro.Tutorials.DemoTourService.ObserveHistoryPreview(this,
+                    new System.Windows.Interop.WindowInteropHelper(this).Owner)));
+            }
         }
 
         private void ExecuteCleanPreviews()
         {
             var ids = GetPreviewElements(_doc).Select(e => e.Id).ToList();
-            if (ids.Count == 0) return;
+            if (ids.Count == 0)
+            {
+                BIMaestro.Tutorials.DemoTourService.ReportAction(this, "history-preview-cleaned");
+                return;
+            }
 
             using (var t = new Transaction(_doc, "BIMaestro - Nettoyer previews historique"))
             {
@@ -2785,6 +2795,8 @@ namespace Analyse
                 _doc.Delete(ids);
                 t.Commit();
             }
+            _uidoc.RefreshActiveView();
+            Dispatcher.BeginInvoke(new Action(() => BIMaestro.Tutorials.DemoTourService.ReportAction(this, "history-preview-cleaned")));
         }
 
         private void ExecuteCaptureSelectedDetails()

@@ -73,7 +73,11 @@ namespace Famille
             }
             catch (Exception ex)
             {
-                TaskDialog.Show(UiLanguage.T("Erreur", "Error"), ex.Message);
+                if (startTutorial)
+                    BIMaestro.Tutorials.DemoTourMessage.Show(uiapp.MainWindowHandle,
+                        "Bulbizarre a besoin d’aide", ex.Message, "Fermer");
+                else
+                    TaskDialog.Show(UiLanguage.T("Erreur", "Error"), ex.Message);
                 return Result.Failed;
             }
         }

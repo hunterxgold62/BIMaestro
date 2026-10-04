@@ -1,4 +1,4 @@
-using BIMaestro.Localization;
+﻿using BIMaestro.Localization;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -35,6 +35,16 @@ namespace Famille
             ReviewGrid.ItemsSource = _rows;
             CollectionViewSource.GetDefaultView(_rows).Filter = FilterRow;
             SelectMissing();
+            UpdateSummary();
+        }
+
+        internal void PrepareTutorial()
+        {
+            foreach (var row in _rows) row.IsSelected = false;
+            foreach (var row in _rows.Take(2)) row.IsSelected = true;
+            GenerateButton.BorderBrush = BIMaestro.Tutorials.DemoTourPalette.Accent;
+            GenerateButton.BorderThickness = new Thickness(3);
+            GenerateButton.ToolTip = "Proposer une description et des mots-clés pour les familles cochées. Relis les propositions avant de les enregistrer.";
             UpdateSummary();
         }
 

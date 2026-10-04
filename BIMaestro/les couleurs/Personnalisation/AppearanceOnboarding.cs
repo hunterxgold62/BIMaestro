@@ -1,4 +1,4 @@
-using Autodesk.Revit.UI;
+﻿using Autodesk.Revit.UI;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Licensing;
@@ -57,24 +57,20 @@ namespace Couleur
             _askedThisSession = true;
             try
             {
-                var prompt = new TaskDialog("BIMaestro")
-                {
-                    MainInstruction = "Veux-tu être guidé dans la personnalisation des couleurs ?",
-                    MainContent = "Pikachu te montrera le bouton Couleurs, puis les réglages dans la fenêtre Apparence BIMaestro. Tu pourras quitter le guide à tout moment.",
-                    CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No,
-                    DefaultButton = TaskDialogResult.No
-                };
-                TaskDialogResult answer = prompt.Show();
+                bool accepted = BIMaestro.Tutorials.DemoTourMessage.Show(app.MainWindowHandle,
+                    "Personnalise tes couleurs",
+                    "Bulbizarre te guide pour choisir les couleurs de BIMaestro. Il te montrera le bouton Couleurs, puis les réglages dans la fenêtre Apparence BIMaestro.\n\nTu peux quitter le guide à tout moment.",
+                    "Démarrer le guide", "Plus tard", primaryButtonIsAction: true);
                 try
                 {
                     Directory.CreateDirectory(Path.GetDirectoryName(ChoiceFile));
-                    File.WriteAllText(ChoiceFile, answer == TaskDialogResult.Yes ? "Accepted" : "Declined");
+                    File.WriteAllText(ChoiceFile, accepted ? "Accepted" : "Declined");
                 }
                 catch (IOException ex)
                 {
                     System.Diagnostics.Trace.WriteLine("BIMaestro appearance guide choice: " + ex.Message);
                 }
-                if (answer == TaskDialogResult.Yes) StartIntro(app.MainWindowHandle);
+                if (accepted) StartIntro(app.MainWindowHandle);
             }
             catch (Exception ex)
             {
@@ -137,6 +133,7 @@ namespace Couleur
                     tourId == "organizer" ? "ElementRenamerButton" :
                     tourId == "view-template" ? "ViewTemplateTransfer" :
                     tourId == "family-browser" ? "FamilyBrowser" :
+                    tourId == "mep-booster" ? "MepBooster" :
                     tourId == "excel" ? "GestionExcelCmd" : "Couleur de projet";
                 _buttonLabel = tourId == "reservation" ? "Auto Réservation" :
                     tourId == "history" ? "Qui a fait ça ?" :
@@ -144,6 +141,7 @@ namespace Couleur
                     tourId == "organizer" ? "Organisateur" :
                     tourId == "view-template" ? "Gabarit de vue" :
                     tourId == "family-browser" ? "Navigateur de familles" :
+                    tourId == "mep-booster" ? "MEP Booster" :
                     tourId == "excel" ? "Gestion Excel" : "Couleurs";
                 _menuId = tourId == "colors" ? "Changement de couleur" :
                     tourId == "organizer" ? "OrganisateurSplit" : null;
@@ -164,7 +162,7 @@ namespace Couleur
                 layout.Children.Add(sprite);
                 layout.Children.Add(new TextBlock { Text = "Parcours : " + _buttonLabel, FontSize = 17,
                     FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 8, 0, 8) });
-                _hint = new TextBlock { Text = "Clique d’abord sur l’onglet BIMaestro. Pikachu te montrera ensuite " + _buttonLabel + ".",
+                _hint = new TextBlock { Text = "Clique d’abord sur l’onglet BIMaestro. Bulbizarre te montrera ensuite " + _buttonLabel + ".",
                     TextWrapping = TextWrapping.Wrap, MinHeight = 58 };
                 layout.Children.Add(_hint);
                 var quit = new Button { Content = "Quitter le guide", HorizontalAlignment = HorizontalAlignment.Right,
@@ -204,10 +202,10 @@ namespace Couleur
                         }
                     }
                     _hint.Text = !bimTabSelected
-                        ? "Clique sur l’onglet BIMaestro indiqué par Pikachu. Il te montrera ensuite " + _buttonLabel + "."
+                        ? "Clique sur l’onglet BIMaestro indiqué par Bulbizarre. Il te montrera ensuite " + _buttonLabel + "."
                         : target == null
                             ? "Dans BIMaestro, cherche « " + _buttonLabel + " ». Le guide continuera après le clic."
-                            : "Pikachu indique « " + _buttonLabel + " ». Clique dessus pour continuer le parcours.";
+                            : "Bulbizarre indique « " + _buttonLabel + " ». Clique dessus pour continuer le parcours.";
                 }
                 catch (Exception ex) { System.Diagnostics.Trace.WriteLine("BIMaestro guide ribbon: " + ex.Message); }
             }
@@ -319,7 +317,7 @@ namespace Couleur
             {
                 Rect bounds = new Rect(AdornedElement.RenderSize);
                 if (bounds.Width < 1 || bounds.Height < 1) return;
-                drawing.DrawRoundedRectangle(null, new Pen(Brushes.DarkOrange, 3),
+                drawing.DrawRoundedRectangle(null, new Pen(BIMaestro.Tutorials.DemoTourPalette.Accent, 3),
                     new Rect(-2, -2, bounds.Width + 4, bounds.Height + 4), 5, 5);
                 drawing.DrawImage(_sprite, new Rect(Math.Max(0, bounds.Width - 28), bounds.Height + 3, 28, 28));
             }

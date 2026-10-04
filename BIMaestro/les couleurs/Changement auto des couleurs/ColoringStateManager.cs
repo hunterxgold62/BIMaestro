@@ -2496,6 +2496,13 @@ __BIMAESTRO_ATMOSPHERE_CSS__
           target.every((part,offset)=>parts[index+offset+1-target.length]===part));
       }).sort((a,b)=>(a.path||'').length-(b.path||'').length);
     };
+    const getRowCategoryRules=row=>{
+      const mappedPath=resolveMappedViewPath(row);
+      const visibleRules=row.branch==='views'?getCategoryRules(row):[];
+      const mappedRules=mappedPath?getPlacedViewRules(row):[];
+      return Array.from(new Set(visibleRules.concat(mappedRules)))
+        .sort((a,b)=>(a.path||'').length-(b.path||'').length);
+    };
     const applyCategoryRules=(row,rules)=>{
       const effects=[];
       rules.forEach(rule=>{
@@ -2545,10 +2552,7 @@ __BIMAESTRO_ATMOSPHERE_CSS__
       const coloredRows=[];
       rows.filter(row=>row.branch==='views'||row.branch==='sheets')
         .forEach(row=>{
-          const mappedPath=resolveMappedViewPath(row);
-          const categoryRules=mappedPath!==null
-            ?getPlacedViewRules(row)
-            :row.branch==='views'?getCategoryRules(row):[];
+          const categoryRules=getRowCategoryRules(row);
           if(!hasViewTypes&&!categoryRules.length)return;
           const kind=resolveViewKind(row);
           if(hasViewTypes&&kind&&theme.viewColors[kind]){

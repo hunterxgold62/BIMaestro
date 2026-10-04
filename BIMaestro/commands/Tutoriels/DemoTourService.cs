@@ -1,4 +1,4 @@
-using Autodesk.Revit.Attributes;
+﻿using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Licensing;
@@ -18,6 +18,12 @@ using Panel = System.Windows.Controls.Panel;
 
 namespace BIMaestro.Tutorials
 {
+    internal static class DemoTourPalette
+    {
+        internal static readonly Brush Accent = new SolidColorBrush(System.Windows.Media.Color.FromRgb(15, 81, 50));
+        internal static readonly Brush Highlight = new SolidColorBrush(System.Windows.Media.Color.FromRgb(236, 253, 245));
+    }
+
     internal sealed class DemoStep
     {
         internal readonly string Title, Text, Target;
@@ -66,11 +72,11 @@ namespace BIMaestro.Tutorials
             },
             ["pipe-calculation"] = new[]
             {
-                new DemoStep("Le périmètre", "Dans la vue 04, Pikachu a sélectionné les canalisations DN100 et DN50, leurs vrais coudes, ainsi qu'une gaine avec ses coudes. Le calcul ne compte que les éléments sélectionnés. Passe à l'étape suivante avant de modifier les options.", "CalculationOptionsTitle", true),
+                new DemoStep("Le périmètre", "Dans la vue 04, Bulbizarre a sélectionné les canalisations DN100 et DN50, leurs coudes et deux vannes papillon, ainsi qu’une gaine avec ses coudes. Les vannes sont comptées comme accessoires, sans être ajoutées à la longueur des tuyaux. Passe à l’étape suivante avant de modifier les options.", "CalculationOptionsTitle", true),
                 new DemoStep("Inclure les gaines", "Coche « Inclure les gaines » pour compter aussi la gaine rectangulaire et ses coudes. Si la case est déjà cochée, laisse-la ainsi et clique sur Suivant.", "IncludeDuctsCheckBox"),
                 new DemoStep("Filtrer par système", "Le filtre limite le résultat à certains types de systèmes. Laisse-le désactivé pour voir les deux diamètres de canalisations et la gaine ensemble.", "EnableSystemTypeFilterCheckBox", true),
                 new DemoStep("Voir aussi le fichier Excel", "Garde « Exporter les résultats vers Excel » coché. Après le récapitulatif dans Revit, BIMaestro créera le fichier et te proposera de l'ouvrir. Si la case est déjà cochée, clique sur Suivant.", "ExportToExcelCheckBox"),
-                new DemoStep("Lancer le calcul", "Clique sur OK. Lis le récapitulatif dans Revit, puis accepte l'ouverture du fichier Excel pour examiner les mêmes résultats. Pikachu vérifiera ce calcul unique.", "OkButton")
+                new DemoStep("Lancer le calcul", "Clique sur OK. Lis le récapitulatif dans Revit, puis accepte l'ouverture du fichier Excel pour examiner les mêmes résultats. Bulbizarre vérifiera ce calcul unique.", "OkButton")
             },
             ["organizer"] = new[]
             {
@@ -80,59 +86,62 @@ namespace BIMaestro.Tutorials
                 new DemoStep("Format", "Choisis « 001,002,003... » pour numéroter les places sur trois chiffres.", "NumberFormatComboBox"),
                 new DemoStep("Hauteur de bande", "La hauteur de bande regroupe les éléments par lignes dans la vue. Garde 1 m pour distinguer les places de chaque rangée.", "BandHeightTextBox", true),
                 new DemoStep("D'abord par niveau", "Coche « Trier par niveau ». Le niveau de base recevra les quatre premiers numéros, puis le niveau supérieur les quatre suivants.", "SortByLevelCheckBox"),
-                new DemoStep("Premier passage", "Clique sur Renommer. Pikachu vérifiera les huit numéros visibles, puis tournera automatiquement cette vue 3D de 90° pour un second essai rapide.", "DemoRenameButton")
+                new DemoStep("Premier passage", "Clique sur Renommer. Bulbizarre vérifiera les huit numéros visibles, puis tournera automatiquement cette vue 3D de 90° pour un second essai rapide.", "DemoRenameButton")
             },
             ["family-browser"] = new[]
             {
-                new DemoStep("Ton catalogue d'essai", "Clique sur « Familles » dans la colonne de gauche. Pikachu a ouvert 35 familles de mobilier réparties en dossiers. Ce catalogue temporaire ne remplace pas les chemins que tu as enregistrés pour ta bibliothèque.", "AllFamiliesButton", completionEvent: "families-root-open"),
+                new DemoStep("Ton catalogue d'essai", "Clique sur « Familles » dans la colonne de gauche. Bulbizarre a ouvert 35 familles de mobilier réparties en dossiers. Ce catalogue temporaire ne remplace pas les chemins que tu as enregistrés pour ta bibliothèque.", "AllFamiliesButton", completionEvent: "families-root-open"),
                 new DemoStep("Entrer dans Mobilier", "Dans l'arborescence, ouvre « Mobilier ». Le guide attend que ce dossier soit réellement affiché.", "FolderTreeView", completionEvent: "folder-mobilier"),
                 new DemoStep("Ouvrir Bureau", "Ouvre le dossier « Bureau ». Il contient cinq familles et un sous-dossier ; observe aussi les cartes de dossiers à droite.", "FolderTreeView", completionEvent: "folder-bureau"),
-                new DemoStep("Explorer le sous-dossier", "Ouvre « Salle de réunion » dans Bureau. Ses cinq familles montrent comment conserver ton classement actuel, même à plusieurs niveaux.", "FolderTreeView", completionEvent: "folder-reunion"),
+                new DemoStep("Explorer le sous-dossier", "Clique sur la carte « Salle de réunion » dans la zone principale. Ses cinq familles montrent comment conserver ton classement actuel, même à plusieurs niveaux.", "TutorialMeetingFolderCard", completionEvent: "folder-reunion"),
                 new DemoStep("Lire les fiches", "Les cartes affichent le nom et un aperçu lorsqu'il existe. Une image PNG portant le même nom qu'une famille RFA peut être retrouvée dans un dossier miroir ; sans image, le navigateur peut utiliser une vignette native.", "FamilyListView", true),
                 new DemoStep("Chercher dans le dossier", "Saisis « Table » dans la recherche. Le mode « Dossier » limite les résultats au dossier ouvert.", "SearchBox", completionEvent: "search-table"),
                 new DemoStep("Étendre la recherche", "Clique sur « Tout ». BIMaestro efface la recherche « Table » et passe à l'ensemble du catalogue, y compris les autres sous-dossiers.", "SearchAllButton", completionEvent: "search-all"),
                 new DemoStep("Retrouver une famille", "Saisis « Chaise ». Les résultats doivent maintenant inclure des familles rangées hors de Salle de réunion.", "SearchBox", completionEvent: "search-chaise"),
-                new DemoStep("Mettre une famille en favori", "Clique sur l'étoile entourée en orange d'une carte « Chaise ». L'étoile orange signifie que la famille est dans Favoris ; un second clic l'en retire. Si une chaise est déjà étoilée, Pikachu la reconnaît sans modifier tes favoris personnels. Sinon, ton favori d'essai reste seulement en mémoire.", "TutorialFavoriteStar", completionEvent: "favorite-added"),
+                new DemoStep("Mettre une famille en favori", "Deux chaises sont déjà en favoris pour l’exemple : leurs étoiles sont orange. Clique sur l’étoile bleue encadrée en vert d’une autre chaise pour l’ajouter. Elle devient orange. Un second clic retire le favori. Ces favoris d’essai restent temporaires.", "TutorialFavoriteStar", completionEvent: "favorite-added"),
                 new DemoStep("Retrouver ses favoris", "Ouvre l'onglet « Favoris ». La famille étoilée doit apparaître dans la collection Favoris. Dans ta vraie bibliothèque, les favoris sont enregistrés et restent disponibles à la prochaine ouverture.", "FavoritesTabItem", completionEvent: "favorites-open"),
                 new DemoStep("Collections et chargement", "La liste « Collection » permet de regrouper plusieurs familles ; « Nouv. », « Ren. » et « Suppr. » gèrent ces groupes. Le bouton « Charger la collection » charge toutes ses familles dans Revit. La croix d'une carte retire seulement cette famille de la collection. La rosace peut aussi ouvrir une collection choisie, mais ses pages par défaut montrent les familles récentes et utilisées.", "CollectionCombo", true),
                 new DemoStep("Revenir aux dossiers", "Rouvre l'onglet des dossiers pour poursuivre l'exercice. Le favori d'essai sera retiré automatiquement quand tu quitteras le guide.", "FoldersTabItem", completionEvent: "folders-open"),
                 new DemoStep("Voir une famille en 3D", "Sur une carte de famille, clique sur le bouton « 3D », puis ferme l'aperçu pour revenir ici. Tu peux examiner le modèle avant de le charger.", "GroupedFamilyListView", completionEvent: "preview-3d"),
                 new DemoStep("Ouvrir les paramètres", "Clique sur « Paramètres » pour découvrir où se règlent les dossiers et où se créent les aperçus 3D en série.", "SettingsTabItem", completionEvent: "settings-open"),
-                new DemoStep("Photos automatiques", "Pour l'essai, les cinq familles de « Salle de réunion » sont présélectionnées. « Lancer l'export 3D » ouvre le choix A/B : Pikachu t'expliquera comment garder la vue existante ou la vue normalisée. Valide ce choix, puis attends la fin de l'export pour revenir au guide. L'opération peut prendre du temps ; tu peux aussi la passer avec « Suivant ».", "StartPreviewButton", true, completionEvent: "preview-export-complete"),
+                new DemoStep("Photos automatiques", "Pour l'essai, les cinq familles de « Salle de réunion » sont présélectionnées. « Lancer l'export 3D » ouvre le choix A/B : Bulbizarre t'expliquera comment garder la vue existante ou la vue normalisée. Valide ce choix, puis attends la fin de l'export pour revenir au guide. L'opération peut prendre du temps ; tu peux aussi la passer avec « Suivant ».", "StartPreviewButton", true, completionEvent: "preview-export-complete"),
                 new DemoStep("Adapter à ta bibliothèque", "« Modifier les chemins… » permet de choisir ton propre dossier de familles RFA, puis un dossier d'images PNG. Leurs sous-dossiers doivent se correspondre. Pendant ce guide, tes chemins enregistrés sont protégés : quitte le tutoriel avant de choisir ta bibliothèque personnelle.", "ChangePathsButton", true),
                 new DemoStep("Autres actions d'une carte", "Sur une carte, le clic droit propose « Rentrer dans la famille » pour ouvrir le RFA source, « Charger la dernière version » pour recharger le fichier depuis le disque et « Ajouter à la collection active » pour classer plusieurs familles. Aucune de ces actions n'est nécessaire pour le placement d'essai.", "FamilyListView", true),
-                new DemoStep("Ajouter du texte pour retrouver une famille", "Pikachu revient dans Bureau. Fais un clic droit sur « Bureau commun », puis choisis « Mots-clés de recherche… ». Dans « Description recherchable », décris son usage, par exemple « Poste de travail pour un espace partagé ». Ajoute dans « Mots-clés » : poste de travail, espace partagé, mobilier de bureau. Sépare les termes par des virgules. Dans ta bibliothèque personnelle, « Enregistrer » permet ensuite de retrouver la famille avec ces termes même s'ils ne figurent pas dans son nom, sans renommer le RFA. Pour cet essai, ferme avec « Annuler » afin de garder le catalogue de formation intact, puis clique sur « Suivant ».", "FamilyListView", true, completionEvent: "search-metadata-manual"),
-                new DemoStep("Gagner du temps avec l'IA", "Sur « Bureau commun », rouvre « Mots-clés de recherche… » par clic droit. Le bouton « Proposer avec l’IA » suggère une description et des mots-clés à partir du nom de la famille, de son dossier et de sa catégorie lorsqu'elle est disponible. Relis et corrige les propositions avant d'enregistrer : l'IA ne vérifie pas ici la géométrie du RFA. L'appel démarre uniquement si tu cliques sur ce bouton ; tu peux passer cette étape si l'IA n'est pas disponible. Dans cet exercice, ferme avec « Annuler », puis clique sur « Suivant ». Dans ta bibliothèque, enregistre les termes retenus pour accélérer les prochaines recherches.", "FamilyListView", true, completionEvent: "search-metadata-ai"),
-                new DemoStep("Charger et placer une famille", "Pikachu revient au dossier Bureau. Trois favoris temporaires sont préparés pour la suite : un bureau, une table et une chaise. Ils seront disponibles dans la collection Favoris de la rosace. Double-clique sur la carte « Bureau commun » : le simple clic sélectionne la carte, le double-clic charge la famille dans Revit et lance son placement. Clique ensuite dans la vue pour la poser, puis appuie sur Échap pour sortir du mode placement.", "FamilyListView", completionEvent: "load-bureau-commun"),
-                new DemoStep("Ouvrir Famille dans Revit", "Le navigateur se ferme et Pikachu revient dans Revit. Termine le placement précédent avec Échap, ouvre l'onglet BIMaestro si besoin, puis clique sur la petite flèche du bouton « Famille ». Le contour orange suit le bon bouton.", "RevitFamilySplit"),
-                new DemoStep("Choisir la rosace « . »", "Dans le menu « Famille », clique sur l'entrée « . ». Cette rosace s'ouvre près de la souris avec les 16 familles récentes simulées de l'exercice. Pikachu attend son ouverture avant de poursuivre.", "RevitRosace", completionEvent: "radial-opened"),
+                new DemoStep("Ouvrir les paramètres", "Ouvre l’onglet « Paramètres ». Nous allons utiliser l’assistant IA pour proposer des descriptions et des mots-clés aux familles.", "SettingsTabItem", true),
+                new DemoStep("Découvrir l’assistant IA", "Clique sur « Ouvrir l’assistant… » dans Mots-clés intelligents. Dans la fenêtre, coche une ou deux familles puis utilise le bouton « Proposer avec l’IA » encadré en vert. Relis les propositions : elles restent modifiables. Ferme ensuite l’assistant pour poursuivre le parcours. Tu peux passer cette étape si l’IA n’est pas disponible.", "SearchMetadataAssistantButton", true, completionEvent: "search-assistant-closed"),
+                new DemoStep("Charger et placer une famille", "Bulbizarre revient au dossier Bureau. Trois favoris temporaires sont préparés pour la suite : un bureau, une table et une chaise. Ils seront disponibles dans la collection Favoris de la rosace. Double-clique sur la carte « Bureau commun » : le simple clic sélectionne la carte, le double-clic charge la famille dans Revit et lance son placement. Clique ensuite dans la vue pour la poser, puis appuie sur Échap pour sortir du mode placement.", "FamilyListView", completionEvent: "load-bureau-commun"),
+                new DemoStep("Ouvrir Famille dans Revit", "Le navigateur se ferme et Bulbizarre revient dans Revit. Termine le placement précédent avec Échap, ouvre l'onglet BIMaestro si besoin, puis clique sur la petite flèche du bouton « Famille ». Le contour vert suit le bon bouton.", "RevitFamilySplit"),
+                new DemoStep("Choisir la rosace « . »", "Dans le menu « Famille », clique sur l'entrée « . ». Cette rosace s'ouvre près de la souris avec les 16 familles récentes simulées de l'exercice. Bulbizarre attend son ouverture avant de poursuivre.", "RevitRosace", completionEvent: "radial-opened"),
                 new DemoStep("Comprendre les familles récentes", "Pour l'exercice, la rosace affiche 16 familles du catalogue de formation, réparties sur deux pages de 8. Les noms sont réels, mais leur historique récent est simulé : ces exemples ne viennent pas de ton historique personnel. Hors tutoriel, la rosace propose une page Top-8 des familles les plus utilisées et deux pages des 16 familles récentes chargées ou utilisées depuis le navigateur et la rosace. Garde la souris sur la rosace et tourne la molette pour passer d'une page de familles à l'autre. Affiche la seconde page Récents démo, puis reviens à la première. Survole les cases pour lire les noms, puis clique sur Suivant.", "RevitUseShortcut", true),
-                new DemoStep("Afficher les favoris dans la rosace", "Fais un clic droit au centre de la rosace, puis choisis « Charger une collection » > « Favoris ». La rosace affiche les favoris d'essai : un bureau, une table et une chaise, ainsi que la chaise que tu as étoilée si elle est différente. Survole les cases pour identifier les familles. Pikachu attend que tu choisisses réellement Favoris. Nous créerons ensuite le raccourci clavier, puis tu placeras une chaise. Ces favoris d'exemple ne sont pas enregistrés dans ta bibliothèque personnelle.", "RevitUseShortcut", completionEvent: "radial-tutorial-favorites-selected"),
-                new DemoStep("Passer à l'onglet Vue", "Ferme la rosace avec Échap, puis clique sur l'onglet « Vue » du ruban Revit. Pikachu encadre l'onglet et suit ton choix.", "RevitViewTab"),
-                new DemoStep("Ouvrir Interface utilisateur", "Dans Vue, ouvre « Interface utilisateur » dans le panneau Fenêtres. Le contour orange passe du ruban BIMaestro au ruban Revit.", "RevitUserInterface"),
-                new DemoStep("Créer le raccourci dans Revit", "Dans Vue > Interface utilisateur, clique sur « Raccourcis clavier ». Une fois la fenêtre ouverte :\n1. Garde le filtre « Tous », cherche « Navigateur de Familles » et sélectionne « Navigateur de Familles:. » sous BIMaestro > Spécifique aux familles. La ligne qui ouvre le navigateur est différente.\n2. Clique dans « Appuyer sur de nouvelles touches », puis tape B et F. Si BF est pris, choisis une autre combinaison libre.\n3. Clique sur « Attribuer », puis sur « OK ».\nPendant cette fenêtre Revit, le bouton « Suivant » de Pikachu ne répond pas. Après fermeture avec OK, Pikachu avance seul ; sinon clique sur « Suivant ».", "RevitKeyboardShortcuts", true),
-                new DemoStep("Utiliser ton raccourci", "Reviens dans une vue Revit, place la souris où tu veux ouvrir la rosace et tape BF, ou le raccourci que tu as choisi. Fais un clic droit au centre de la rosace, puis « Charger une collection » > « Favoris ». Clique sur une chaise des favoris d'essai pour lancer son placement. Comme dans le navigateur, clique ensuite dans la vue pour la poser, puis appuie sur Échap. Pikachu attend la création réelle d'une chaise dans la maquette.", "RevitUseShortcut", completionEvent: "radial-tutorial-chaise-placed")
+                new DemoStep("Afficher les favoris dans la rosace", "Fais un clic droit au centre de la rosace, puis choisis « Charger une collection » > « Favoris ». La rosace affiche les favoris d'essai : un bureau, une table et une chaise, ainsi que la chaise que tu as étoilée si elle est différente. Survole les cases pour identifier les familles. Bulbizarre attend que tu choisisses réellement Favoris. Nous créerons ensuite le raccourci clavier, puis tu placeras une chaise. Ces favoris d'exemple ne sont pas enregistrés dans ta bibliothèque personnelle.", "RevitUseShortcut", completionEvent: "radial-tutorial-favorites-selected"),
+                new DemoStep("Passer à l'onglet Vue", "Ferme la rosace avec Échap, puis clique sur l'onglet « Vue » du ruban Revit. Bulbizarre encadre l'onglet et suit ton choix.", "RevitViewTab"),
+                new DemoStep("Ouvrir Interface utilisateur", "Dans Vue, ouvre « Interface utilisateur » dans le panneau Fenêtres. Le contour vert passe du ruban BIMaestro au ruban Revit.", "RevitUserInterface"),
+                new DemoStep("Créer le raccourci dans Revit", "Dans Vue > Interface utilisateur, clique sur « Raccourcis clavier ». Une fois la fenêtre ouverte :\n1. Garde le filtre « Tous », cherche « Navigateur de Familles » et sélectionne « Navigateur de Familles:. » sous BIMaestro > Spécifique aux familles. La ligne qui ouvre le navigateur est différente.\n2. Clique dans « Appuyer sur de nouvelles touches », puis tape B et F. Si BF est pris, choisis une autre combinaison libre.\n3. Clique sur « Attribuer », puis sur « OK ».\nPendant cette fenêtre Revit, le bouton « Suivant » de Bulbizarre ne répond pas. Après fermeture avec OK, Bulbizarre avance seul ; sinon clique sur « Suivant ».", "RevitKeyboardShortcuts", true),
+                new DemoStep("Utiliser ton raccourci", "Reviens dans une vue Revit, place la souris où tu veux ouvrir la rosace et tape BF, ou le raccourci que tu as choisi. Fais un clic droit au centre de la rosace, puis « Charger une collection » > « Favoris ». Clique sur une chaise des favoris d'essai pour lancer son placement. Comme dans le navigateur, clique ensuite dans la vue pour la poser, puis appuie sur Échap. Bulbizarre attend la création réelle d'une chaise dans la maquette.", "RevitUseShortcut", completionEvent: "radial-tutorial-chaise-placed")
             },
             ["history"] = new[]
             {
-                new DemoStep("Deux suppressions et une modification", "Pikachu a supprimé deux objets de la scène, puis modifié le repère et les commentaires du troisième. Nous allons faire réapparaître les deux objets, puis retrouver les anciennes valeurs du témoin. Dans Action, choisis « Suppressions ».", "ActionFilterCombo"),
+                new DemoStep("Deux suppressions et une modification", "Bulbizarre a supprimé deux objets de la scène, puis passé le troisième de 4 à 2 chaises. Nous allons faire réapparaître les deux objets, puis retrouver les anciennes valeurs du témoin. Dans Action, choisis « Suppressions ».", "ActionFilterCombo"),
                 new DemoStep("Filtrer par utilisateur", "Ce filtre isole les actions d'une personne. Il sert à comprendre qui a modifié la maquette, mais une absence de résultat peut aussi venir de la période chargée. Ne change rien pour retrouver les objets de la démo.", "UserFilterCombo", true),
                 new DemoStep("Recherche et période", "La recherche cible un élément ou une information précise. Les dates « Du » et « Au » limitent les événements chargés ; « Charger période » relit alors l'historique. Garde les filtres actuels pour l'exercice.", "SearchBox", true),
-                new DemoStep("Aperçu d'une suppression", "« Simple » montre vite un volume estimatif. « Détaillé » utilise la famille et le type encore présents pour les suppressions futures ; si les données manquent, l'aperçu reste simplifié. Cela ne restaure rien.", "DetailedMeshModeRadio", true),
-                new DemoStep("Choisir un objet", "Sélectionne une carte de mobilier supprimé. Le troisième objet resté dans la vue 02 sert de repère pour comparer sa position.", "VisualCardsList"),
-                new DemoStep("Examiner le contexte", "Ouvre Détails : vérifie l'auteur, la date, la catégorie et les informations enregistrées avant la suppression. Ce sont les éléments à confirmer avant toute restauration.", "DetailsButton"),
-                new DemoStep("Visualiser avant d'agir", "« Visualiser » affiche un aperçu sans recréer l'élément. « Restaurer les éléments » le recrée durablement dans le projet. Si tu veux seulement enquêter, arrête-toi à l'aperçu.", "VisualizeDeletedButton", true),
-                new DemoStep("Sélectionner les deux objets", "Passe à l'onglet « Données ». Sélectionne les deux lignes de suppression du mobilier de cet exercice en maintenant Ctrl. Tu peux aussi les restaurer une par une depuis la vue visuelle. La famille, le type et le niveau doivent encore être disponibles.", "HistoryTabs", true),
-                new DemoStep("Faire réapparaître les deux objets", "Clique sur « Restaurer les éléments » et confirme. Si tu n'as restauré qu'un objet, sélectionne la seconde suppression et recommence. Pikachu ne poursuivra que lorsque les deux objets seront présents dans la maquette.", "RestoreDeletedButton"),
-                new DemoStep("Retrouver la modification des paramètres", "Dans Action, choisis « Modification paramètres ». Retrouve la ligne du mobilier témoin dont le repère se termine par TEMOIN_MODIFIE. Garde la recherche vide et la période de l'exercice pour retrouver cet événement.", "ActionFilterCombo", true),
-                new DemoStep("Comparer les valeurs avant et après", "Sélectionne la ligne du témoin, puis ouvre « Détails ». Compare les anciennes et nouvelles valeurs du repère et des commentaires. Nous allons restaurer les valeurs enregistrées avant cette modification sur le même objet.", "DetailsButton", true),
-                new DemoStep("Revenir aux anciens paramètres", "Avec la ligne de modification du témoin sélectionnée, clique sur « Restaurer » et confirme. Ce bouton réapplique les anciennes valeurs de paramètres enregistrées pour cette ligne. Il est différent de « Restaurer les éléments », utilisé pour recréer les objets supprimés. Pikachu vérifiera le repère et les commentaires du témoin avant de terminer.", "RestoreParametersButton")
+                new DemoStep("Commencer en mode Simple", "Choisis « Simple ». Ce mode affiche des volumes rouges pour repérer rapidement les objets supprimés. Il est plus léger : garde-le par défaut si ton PC est peu performant.", "SimpleMeshModeRadio"),
+                new DemoStep("Choisir le cluster", "Sélectionne la carte contenant les deux meubles supprimés. Nous allons observer le même cluster dans les deux modes.", "VisualCardsList"),
+                new DemoStep("Observer l’aperçu Simple", "Clique sur « Visualiser cluster ». La fenêtre se mettra de côté pour te laisser observer les volumes rouges dans Revit.", "VisualizeDeletedButton", completionEvent: "history-preview-simple-observed"),
+                new DemoStep("Passer en mode Détaillé", "Choisis maintenant « Détaillé ». Il montre davantage la forme des tables et des chaises lorsque les données nécessaires sont disponibles. Il peut demander plus de temps et de ressources au PC.", "DetailedMeshModeRadio"),
+                new DemoStep("Comparer l’aperçu Détaillé", "Garde le même cluster sélectionné, puis clique à nouveau sur « Visualiser cluster ». L’aperçu détaillé remplacera les volumes simples : compare la forme des meubles dans Revit.", "VisualizeDeletedButton", completionEvent: "history-preview-detailed-observed"),
+                new DemoStep("Retirer l’aperçu rouge", "Tu as observé l’emplacement des objets supprimés. Clique maintenant sur « Nettoyer previews » pour retirer les silhouettes rouges avant de restaurer les objets.", "CleanPreviewsButton", completionEvent: "history-preview-cleaned"),
+                new DemoStep("Sélectionner le mobilier à restaurer", "Reste dans la vue visuelle. Sélectionne la carte du cluster contenant les deux suppressions de mobilier. Si elles apparaissent séparément, restaure une carte puis la seconde.", "VisualCardsList", true),
+                new DemoStep("Faire réapparaître les deux objets", "Clique sur « Restaurer les éléments » et confirme. Si tu n'as restauré qu'un objet, sélectionne la seconde suppression et recommence. Bulbizarre ne poursuivra que lorsque les deux objets seront présents dans la maquette.", "RestoreDeletedButton"),
+                new DemoStep("Retrouver la modification des paramètres", "Dans Action, choisis « Modification paramètres ». Retrouve la ligne du mobilier témoin dont le paramètre « Nombre chaises » est passé de 4 à 2. Garde la recherche vide et la période de l'exercice pour retrouver cet événement.", "ActionFilterCombo", true),
+                new DemoStep("Sélectionner la modification", "Dans la vue visuelle, sélectionne la carte du témoin dont « Nombre chaises » est passé de 4 à 2. Nous allons lui rendre ses 4 chaises avec la restauration des paramètres.", "VisualCardsList"),
+                new DemoStep("Revenir aux anciens paramètres", "Avec la ligne de modification du témoin sélectionnée, clique sur « Restaurer » et confirme. Ce bouton réapplique les anciennes valeurs de paramètres enregistrées pour cette ligne. Il est différent de « Restaurer les éléments », utilisé pour recréer les objets supprimés. Bulbizarre vérifiera le retour du témoin à 4 chaises avant de terminer.", "RestoreParametersButton")
             }
         };
 
         internal static readonly DemoStep[] OrganizerRotatedSteps =
         {
-            new DemoStep("Relancer depuis la vue tournée", "La vue a tourné de 90°. CML_Numéros de place, PK- et le format 001 sont déjà préparés. « Trier par niveau » reste décoché : clique sur Renommer pour comparer l'ordre dicté par la vue aux numéros du premier passage.", "DemoRenameButton")
+            new DemoStep("Comparer sans tri par niveau", "La vue de dessus a tourné de 90°. « Trier par niveau » est maintenant décoché pour numéroter selon l’ordre visible. Vérifie cette option puis clique sur Suivant.", "SortByLevelCheckBox", true),
+            new DemoStep("Relancer depuis la vue tournée", "CML_Numéros de place, PK- et le format 001 sont déjà préparés. Garde « Trier par niveau » décoché et clique sur Renommer pour comparer l'ordre dicté par la vue aux numéros du premier passage.", "DemoRenameButton")
         };
 
         // A TUTO button may be pressed from an ordinary project, without the
@@ -160,13 +169,14 @@ namespace BIMaestro.Tutorials
                     new DemoStep("Choisir les éléments", "Organisateur agit sur les éléments sélectionnés dans la vue. Pour l'essai vérifié, la maquette de formation utilise huit places CML_Parking sur deux niveaux.", "ParameterComboBox", true),
                     new DemoStep("Choisir le paramètre", "Sélectionne le paramètre d'instance à modifier. Sur les parkings de formation, il s'appelle « CML_Numéros de place » ; dans ton projet, le nom peut être différent.", "ParameterComboBox", true),
                     new DemoStep("Régler le nom", "Le préfixe, le format et le sens de lecture déterminent les nouvelles valeurs. « Trier par niveau » sépare les étages ; sans cette coche, l'ordre suit l'orientation de la vue.", "PrefixTextBox", true),
-                    new DemoStep("Appliquer", "Renommer écrit les valeurs dans le projet. Pour voir Pikachu contrôler chaque place, lance le parcours Organisateur depuis la maquette de formation.", "DemoRenameButton", true)
+                    new DemoStep("Appliquer", "Renommer écrit les valeurs dans le projet. Pour voir Bulbizarre contrôler chaque place, lance le parcours Organisateur depuis la maquette de formation.", "DemoRenameButton", true)
                 },
                 ["history"] = new[]
                 {
                     new DemoStep("Retrouver les actions", "Filtre l'historique par type d'action, utilisateur ou période. La maquette de formation prépare deux suppressions pour l'exercice complet.", "ActionFilterCombo", true),
-                    new DemoStep("Examiner un élément", "Sélectionne une carte et ouvre Détails pour vérifier l'auteur, la date et l'objet avant toute opération.", "VisualCardsList", true),
+                    new DemoStep("Examiner un élément", "Sélectionne une carte dans la vue visuelle pour identifier l’objet et son action.", "VisualCardsList", true),
                     new DemoStep("Visualiser", "L'aperçu permet de situer un élément supprimé sans le recréer dans la maquette.", "VisualizeDeletedButton", true),
+                    new DemoStep("Nettoyer l’aperçu", "Après avoir observé les objets dans Revit, clique sur Nettoyer previews pour retirer les silhouettes temporaires.", "CleanPreviewsButton", true),
                     new DemoStep("Restaurer si nécessaire", "Restaurer recrée l'élément dans le projet. Utilise cette action après avoir confirmé la suppression et la disponibilité de la famille correspondante.", "RestoreDeletedButton", true)
                 }
             };
@@ -175,8 +185,14 @@ namespace BIMaestro.Tutorials
 
     internal static class DemoHistoryScene
     {
-        internal const string InitialComments = "Mobilier témoin : état initial";
-        internal const string ModifiedComments = "Mobilier témoin : paramètres modifiés";
+        internal const string ChairCountParameter = "Nombre chaises";
+        internal static Parameter ChairCount(FamilyInstance instance)
+        {
+            Parameter parameter = instance?.LookupParameter(ChairCountParameter);
+            if (parameter == null || parameter.IsReadOnly || parameter.StorageType != StorageType.Integer)
+                throw new InvalidOperationException("Crée une nouvelle maquette avec la famille mise à jour : le paramètre d’occurrence entier « Nombre chaises » doit être modifiable.");
+            return parameter;
+        }
         internal static string ModifiedWitnessMark => DemoProjectBuilder.HistoryFurnitureMark(0) + "_MODIFIE";
 
         private static bool IsLearningDocument(Document doc) =>
@@ -193,12 +209,23 @@ namespace BIMaestro.Tutorials
         internal static bool HasRestoredFurniture(Document doc)
         {
             if (!IsLearningDocument(doc)) return false;
-            var marks = new FilteredElementCollector(doc).OfClass(typeof(FamilyInstance))
-                .Cast<FamilyInstance>()
-                .Select(instance => instance.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ?? "")
-                .ToList();
-            return marks.Contains(DemoProjectBuilder.HistoryFurnitureMark(1)) &&
-                marks.Contains(DemoProjectBuilder.HistoryFurnitureMark(2));
+            var tables = new FilteredElementCollector(doc).OfClass(typeof(FamilyInstance))
+                .Cast<FamilyInstance>().Where(instance => instance.SuperComponent == null &&
+                    instance.Symbol?.Family?.Name == "CML_Table ronde + chaise").ToList();
+            // Reconstruction deliberately omits Mark; identify the restored parent tables
+            // by their family and exercise positions instead of expecting copied marks.
+            return Enumerable.Range(1, 2).All(index => tables.Any(instance =>
+                (instance.Location as LocationPoint)?.Point.DistanceTo(DemoProjectBuilder.HistoryFurniturePosition(index)) <
+                    UnitUtils.ConvertToInternalUnits(0.15, UnitTypeId.Meters)));
+
+        }
+
+        internal static bool IsNestedExerciseDeletion(Document doc, Analyse.ElementHistoryEvent item)
+        {
+            return IsLearningDocument(doc) && item?.Action == "delete" &&
+                (item.Tx ?? "").StartsWith("BIMaestro - Exercice historique", StringComparison.Ordinal) &&
+                item.Delta != null && item.Delta.TryGetValue("superComponentUniqueId", out object parent) &&
+                !string.IsNullOrWhiteSpace(Convert.ToString(parent));
         }
 
         internal static bool HasRestoredParameters(Document doc)
@@ -209,7 +236,7 @@ namespace BIMaestro.Tutorials
             return witness != null &&
                 witness.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ==
                     DemoProjectBuilder.HistoryFurnitureMark(0) &&
-                witness.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.AsString() == InitialComments;
+                witness.LookupParameter(ChairCountParameter)?.AsInteger() == 4;
         }
 
         internal static int Reset(Document doc, out int removedReservations)
@@ -236,7 +263,7 @@ namespace BIMaestro.Tutorials
             {
                 tx.Start();
                 witness.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.Set(DemoProjectBuilder.HistoryFurnitureMark(0));
-                witness.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.Set(InitialComments);
+                ChairCount(witness).Set(4);
                 if (reservations.Count > 0) doc.Delete(reservations);
                 removedReservations = reservations.Count;
 
@@ -264,6 +291,7 @@ namespace BIMaestro.Tutorials
 
                     Parameter parameter = instance.get_Parameter(BuiltInParameter.ALL_MODEL_MARK);
                     if (parameter != null && !parameter.IsReadOnly) parameter.Set(mark);
+                    ChairCount(instance).Set(4);
                 }
                 tx.Commit();
             }
@@ -287,22 +315,20 @@ namespace BIMaestro.Tutorials
                 .Where(instance => (instance.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ?? "")
                     .StartsWith(DemoProjectBuilder.DemoPrefix + "HISTORIQUE_A_RESTAURER_", StringComparison.Ordinal))
                 .Select(instance => instance.Id).ToList();
-            Parameter mark = witness.get_Parameter(BuiltInParameter.ALL_MODEL_MARK);
-            Parameter comments = witness.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS);
-            if (mark == null || comments == null || mark.IsReadOnly || comments.IsReadOnly ||
-                mark.StorageType != StorageType.String || comments.StorageType != StorageType.String)
-                throw new InvalidOperationException("Le mobilier témoin doit avoir un repère et des commentaires modifiables.");
+            Parameter chairCount = ChairCount(witness);
 
             // Normalize the exercise before taking the deletion/parameter snapshots.
             using (var tx = new Transaction(doc, "BIMaestro - État initial du mobilier témoin"))
             {
                 tx.Start();
-                mark.Set(DemoProjectBuilder.HistoryFurnitureMark(0));
-                comments.Set(InitialComments);
+                chairCount.Set(4);
                 tx.Commit();
             }
             Analyse.ElementHistoryTracker.FlushPendingForHistory();
             Analyse.ElementHistoryTracker.PrimeDocument(doc);
+            Analyse.ElementHistoryTracker.PrimeExerciseElements(doc, toRemove.Concat(new[] { witness.Id }));
+            if (chairCount.AsInteger() != 4)
+                throw new InvalidOperationException("Le mobilier témoin doit avoir 4 chaises avant de préparer son historique.");
             using (var tx = new Transaction(doc, "BIMaestro - Exercice historique : supprimer le mobilier"))
             {
                 tx.Start();
@@ -310,16 +336,28 @@ namespace BIMaestro.Tutorials
                 tx.Commit();
             }
             Analyse.ElementHistoryTracker.FlushPendingForHistory();
+            DateTime changeStartedUtc = DateTime.UtcNow;
             // A separate transaction records both before/after values on the surviving instance.
             using (var tx = new Transaction(doc, "BIMaestro - Exercice historique : modifier les paramètres du témoin"))
             {
                 tx.Start();
-                mark.Set(ModifiedWitnessMark);
-                comments.Set(ModifiedComments);
+                chairCount.Set(2);
                 tx.Commit();
             }
+            if (ChairCount(witness).AsInteger() != 2)
+                throw new InvalidOperationException("Le mobilier témoin n’a pas conservé le passage à 2 chaises.");
             Analyse.ElementHistoryTracker.FlushPendingForHistory();
             doc.Save();
+            bool recorded = Analyse.ElementHistoryTracker.LoadElementHistory(
+                Analyse.ElementHistoryTracker.GetDocumentKeysForHistory(doc), witness.UniqueId, 20)
+                .Any(item => item.Ts >= changeStartedUtc && item.Action == "param_change" &&
+                    item.Delta != null && item.Delta.TryGetValue("parameters", out object values) &&
+                    Newtonsoft.Json.Linq.JArray.FromObject(values).OfType<Newtonsoft.Json.Linq.JObject>().Any(change =>
+                        string.Equals((string)(change["Name"] ?? change["name"]), ChairCountParameter, StringComparison.OrdinalIgnoreCase) &&
+                        (string)(change["OldValue"] ?? change["oldValue"]) == "4" &&
+                        (string)(change["NewValue"] ?? change["newValue"]) == "2"));
+            if (!recorded)
+                throw new InvalidOperationException("La modification Nombre chaises : 4 → 2 n’a pas été retrouvée dans l’historique. Le parcours ne peut pas démarrer sans cette information de restauration.");
             return toRemove.Count;
         }
     }
@@ -350,15 +388,12 @@ namespace BIMaestro.Tutorials
             {
                 try
                 {
-                    string path = DemoProjectBuilder.Create(uiApp);
-                    DemoTourMessage.Show(uiApp.MainWindowHandle, "Pika ! Maquette prête",
-                        "La maquette de formation est créée et ouverte :\n" + path,
-                        "Choisir un tutoriel");
+                    DemoProjectBuilder.Create(uiApp);
                 }
                 catch (Exception ex)
                 {
                     message = ex.Message;
-                    DemoTourMessage.Show(uiApp.MainWindowHandle, "Pikachu a besoin d'aide",
+                    DemoTourMessage.Show(uiApp.MainWindowHandle, "Bulbizarre a besoin d'aide",
                         "Création impossible : " + ex.Message);
                     return Result.Failed;
                 }
@@ -368,7 +403,7 @@ namespace BIMaestro.Tutorials
                 UIDocument activeDocument = uiApp.ActiveUIDocument;
                 if (activeDocument == null)
                 {
-                    DemoTourMessage.Show(uiApp.MainWindowHandle, "Pikachu attend une maquette",
+                    DemoTourMessage.Show(uiApp.MainWindowHandle, "Bulbizarre attend une maquette",
                         "Ouvre d'abord la maquette de formation ou un projet Revit.");
                     return Result.Cancelled;
                 }
@@ -378,7 +413,7 @@ namespace BIMaestro.Tutorials
                     {
                         int restored = DemoHistoryScene.Reset(activeDocument.Document, out int removed);
                         DemoProjectBuilder.UpdateTrainingViews(activeDocument.Document);
-                        DemoTourMessage.Show(uiApp.MainWindowHandle, "Pika ! Exercices prêts",
+                        DemoTourMessage.Show(uiApp.MainWindowHandle, "Bravo ! Exercices prêts",
                             "Exercices prêts à recommencer : " + restored + " meuble(s) remis en place et " +
                             removed + " réservation(s) du parcours retirée(s). Les couleurs personnelles restent inchangées.");
                         return Result.Succeeded;
@@ -386,12 +421,29 @@ namespace BIMaestro.Tutorials
                     catch (Exception ex)
                     {
                         message = ex.Message;
-                        DemoTourMessage.Show(uiApp.MainWindowHandle, "Pikachu a besoin d'aide",
+                        DemoTourMessage.Show(uiApp.MainWindowHandle, "Bulbizarre a besoin d'aide",
                             "Réinitialisation impossible : " + ex.Message);
                         return Result.Failed;
                     }
                 }
                 DemoProjectBuilder.UpdateTrainingViews(activeDocument.Document);
+                if (selectedChoice == "mep-booster")
+                {
+                    try
+                    {
+                        View3D view = DemoProjectBuilder.EnsureBoosterScene(activeDocument.Document);
+                        activeDocument.Selection.SetElementIds(new List<ElementId>());
+                        activeDocument.RequestViewChange(view);
+                        DemoBoosterExercise.Begin(uiApp);
+                        return Result.Succeeded;
+                    }
+                    catch (Exception ex)
+                    {
+                        message = ex.Message;
+                        DemoTourMessage.Show(uiApp.MainWindowHandle, "Bulbizarre a besoin d’aide", "Préparation MEP Booster impossible : " + ex.Message);
+                        return Result.Failed;
+                    }
+                }
                 if (selectedChoice == "excel")
                 {
                     try
@@ -405,7 +457,7 @@ namespace BIMaestro.Tutorials
                     catch (Exception ex)
                     {
                         message = ex.Message;
-                        DemoTourMessage.Show(uiApp.MainWindowHandle, "Pikachu a besoin d'aide",
+                        DemoTourMessage.Show(uiApp.MainWindowHandle, "Bulbizarre a besoin d'aide",
                             "Préparation de Gestion Excel impossible : " + ex.Message);
                         return Result.Failed;
                     }
@@ -423,7 +475,7 @@ namespace BIMaestro.Tutorials
                     catch (Exception ex)
                     {
                         message = ex.Message;
-                        DemoTourMessage.Show(uiApp.MainWindowHandle, "Pikachu a besoin d'aide",
+                        DemoTourMessage.Show(uiApp.MainWindowHandle, "Bulbizarre a besoin d'aide",
                             "Préparation d'Organisateur impossible : " + ex.Message);
                         return Result.Failed;
                     }
@@ -436,7 +488,7 @@ namespace BIMaestro.Tutorials
                     if (tourView == null && (selectedChoice == "pipe-calculation" ||
                         selectedChoice == "organizer" || selectedChoice == "view-template"))
                     {
-                        DemoTourMessage.Show(uiApp.MainWindowHandle, "Pikachu cherche la bonne vue",
+                        DemoTourMessage.Show(uiApp.MainWindowHandle, "Bulbizarre cherche la bonne vue",
                             "Cette maquette ne contient pas encore la scène de ce parcours. Crée une nouvelle maquette de formation avec le bouton dédié.");
                         return Result.Cancelled;
                     }
@@ -458,22 +510,22 @@ namespace BIMaestro.Tutorials
                 if (selectedChoice == "view-template")
                 {
                     DemoViewTemplateGuide.Begin(activeDocument.Document);
-                    DemoTourMessage.Show(uiApp.MainWindowHandle, "Pika ! Gabarit de vue",
-                        "Tu es dans « 06 Gabarit source ». Exporte ses réglages depuis le bouton Gabarit de vue. Ensuite, ouvre « 07 Gabarit cible », relance le bouton et importe le fichier en choisissant « Créer un vrai gabarit nommé ». Pikachu te guidera après l'export.");
+                    DemoTourMessage.Show(uiApp.MainWindowHandle, "Bravo ! Gabarit de vue",
+                        "Observe la vue source : canalisations et parkings rouges, traits épais et pointillés. Clique sur Gabarit de vue : les choix à suivre seront encadrés en vert. Après l’export, nous ouvrirons une cible bleue pour voir la différence.");
                 }
                 if (selectedChoice == "history")
                 {
                     try
                     {
                         int removed = DemoHistoryScene.Prepare(activeDocument.Document);
-                        DemoTourMessage.Show(uiApp.MainWindowHandle, "Pikachu prépare l'enquête", removed > 0
-                            ? removed + " objets ont été supprimés, puis le repère et les commentaires du troisième ont été modifiés. Fais réapparaître les deux objets, puis rétablis les anciennes valeurs du témoin avec Qui a fait ça."
+                        DemoTourMessage.Show(uiApp.MainWindowHandle, "Bulbizarre prépare l'enquête", removed > 0
+                            ? removed + " objets ont été supprimés, puis le troisième est passé de 4 à 2 chaises. Fais réapparaître les deux objets, puis rétablis les anciennes valeurs du témoin avec Qui a fait ça."
                             : "Les suppressions sont déjà préparées et les paramètres du témoin ont été modifiés. Retrouve les deux suppressions, puis restaure les anciennes valeurs du témoin.");
                     }
                     catch (Exception ex)
                     {
                         message = ex.Message;
-                        DemoTourMessage.Show(uiApp.MainWindowHandle, "Pikachu a besoin d'aide",
+                        DemoTourMessage.Show(uiApp.MainWindowHandle, "Bulbizarre a besoin d'aide",
                             "Préparation de l'exercice impossible : " + ex.Message);
                         return Result.Failed;
                     }
@@ -513,7 +565,7 @@ namespace BIMaestro.Tutorials
             {
                 if (DateTime.UtcNow < _deadlineUtc) return true;
                 Clear();
-                DemoTourMessage.Show(app.MainWindowHandle, "Pikachu attend la vue",
+                DemoTourMessage.Show(app.MainWindowHandle, "Bulbizarre attend la vue",
                     "Revit n'a pas activé la vue de formation. Ouvre-la dans l'arborescence, puis relance ce parcours.");
                 return true;
             }
@@ -535,17 +587,17 @@ namespace BIMaestro.Tutorials
                 .Select(element => element.Id).ToList();
             if (ids.Count == 0)
             {
-                DemoTourMessage.Show(app.MainWindowHandle, "Pikachu cherche la scène",
+                DemoTourMessage.Show(app.MainWindowHandle, "Bulbizarre cherche la scène",
                     "Les éléments de cet exercice manquent. Crée une nouvelle maquette de formation avec le bouton « Créer et ouvrir la maquette ».");
                 return false;
             }
             uiDocument.Selection.SetElementIds(ids);
             if (tourId == "organizer")
                 try { uiDocument.ShowElements(ids); } catch { /* La sélection reste active. */ }
-            DemoTourMessage.Show(app.MainWindowHandle, "Pika ! Sélection prête",
+            DemoTourMessage.Show(app.MainWindowHandle, "Bravo ! Sélection prête",
                 ids.Count + (tourId == "organizer"
-                    ? " places sur deux niveaux sont sélectionnées. Suis Pikachu jusqu'au bouton Organisateur, puis teste le tri par niveau."
-                    : " éléments de la vue sont sélectionnés. Suis Pikachu jusqu'au bouton, puis dans la fenêtre de la commande."));
+                    ? " places sur deux niveaux sont sélectionnées. Suis Bulbizarre jusqu'au bouton Organisateur, puis teste le tri par niveau."
+                    : " éléments de la vue sont sélectionnés. Suis Bulbizarre jusqu'au bouton, puis dans la fenêtre de la commande."));
             Couleur.AppearanceOnboarding.StartIntro(app.MainWindowHandle, tourId);
             return true;
         }
@@ -566,6 +618,7 @@ namespace BIMaestro.Tutorials
 
         internal static void Begin(Document document)
         {
+            DemoProjectBuilder.EnsureCalculationValves(document);
             _documentPath = document.PathName;
             _active = true;
         }
@@ -574,7 +627,7 @@ namespace BIMaestro.Tutorials
             bool includeDucts, bool exportToExcel, string excelFilePath,
             Dictionary<double, double> pipeLengths,
             Dictionary<string, double> ductLengths, Dictionary<string, double> ductFittingLengths,
-            Dictionary<string, int> elbowCounts)
+            Dictionary<string, int> elbowCounts, Dictionary<string, int> pipeAccessoryCounts)
         {
             UIDocument uiDocument = app.ActiveUIDocument;
             if (!_active || uiDocument == null ||
@@ -587,9 +640,11 @@ namespace BIMaestro.Tutorials
             bool bothDiameters = pipeLengths.Any(pair => Math.Abs(pair.Key - 100) < 1 && pair.Value > 0) &&
                 pipeLengths.Any(pair => Math.Abs(pair.Key - 50) < 1 && pair.Value > 0);
             int elbowCount = elbowCounts.Values.Sum();
-            if (!completeSelection || !bothDiameters || elbowCount < 5)
+            int valveCount = pipeAccessoryCounts.Where(pair => pair.Key == "Vanne papillon - 50-300 mm")
+                .Sum(pair => pair.Value);
+            if (!completeSelection || !bothDiameters || elbowCount < 5 || valveCount < 2)
             {
-                Retry(app, uiDocument, "Le résultat ne contient pas encore toute la scène : les deux diamètres, leurs cinq coudes et tous les éléments sélectionnés sont nécessaires. Pikachu les resélectionne pour réessayer.");
+                Retry(app, uiDocument, "Le résultat doit contenir les deux diamètres, leurs cinq coudes et les deux vannes papillon. Bulbizarre resélectionne tous les éléments pour réessayer.");
                 return;
             }
 
@@ -608,14 +663,14 @@ namespace BIMaestro.Tutorials
             }
             _active = false;
             Reselect(uiDocument, demoIds);
-            DemoTourMessage.Show(app.MainWindowHandle, "Pika ! Calcul et export réussis",
-                $"Pikachu a vérifié les canalisations DN100 et DN50, leurs {elbowCount} coudes, {ductTotal:F2} m de gaine et environ {ductFittingsTotal:F2} m de raccords de gaine. Le récapitulatif Revit et le fichier Excel viennent du même calcul.\n\nFichier : {excelFilePath}");
+            DemoTourCompletion.Show(app.MainWindowHandle, "pipe-calculation",
+                $"Bulbizarre a vérifié les canalisations DN100 et DN50, leurs {elbowCount} coudes, les {valveCount} vannes papillon, {ductTotal:F2} m de gaine et environ {ductFittingsTotal:F2} m de raccords de gaine. Le récapitulatif Revit et le fichier Excel viennent du même calcul.\n\nFichier : {excelFilePath}");
         }
 
         private static void Retry(UIApplication app, UIDocument uiDocument, string message)
         {
             Reselect(uiDocument, DemoExerciseElements.Find(uiDocument.Document, "CALCUL_"));
-            DemoTourMessage.Show(app.MainWindowHandle, "Pikachu a besoin d'un essai", message);
+            DemoTourMessage.Show(app.MainWindowHandle, "Bulbizarre a besoin d'un essai", message);
             Couleur.AppearanceOnboarding.StartIntro(app.MainWindowHandle, "pipe-calculation");
         }
 
@@ -699,7 +754,7 @@ namespace BIMaestro.Tutorials
             {
                 if (DateTime.UtcNow < _deadlineUtc) return true;
                 _pendingAction = 0;
-                DemoTourMessage.Show(app.MainWindowHandle, "Pikachu attend la bonne vue",
+                DemoTourMessage.Show(app.MainWindowHandle, "Bulbizarre attend la bonne vue",
                     "La vue du parcours Excel ne s'est pas ouverte. Relance le tutoriel depuis BIMaestro.");
                 return true;
             }
@@ -707,9 +762,9 @@ namespace BIMaestro.Tutorials
             _pendingAction = 0;
             if (action == 1)
             {
-                DemoTourMessage.Show(app.MainWindowHandle, "Pika ! Gestion Excel",
+                DemoTourMessage.Show(app.MainWindowHandle, "Bravo ! Gestion Excel",
                     "Voici la nomenclature des quatre places. « " + _fieldName + " » contient le numéro modifiable, visible sur chaque place en 3D. « " +
-                    _referenceFieldName + " » est la référence fixe : ne la change pas. Suis Pikachu jusqu'à « Gestion Excel » et choisis « Exporter ».");
+                    _referenceFieldName + " » est la référence fixe : ne la change pas. Suis Bulbizarre jusqu'à « Gestion Excel » et choisis « Exporter ».");
                 Couleur.AppearanceOnboarding.StartIntro(app.MainWindowHandle, "excel");
             }
             else
@@ -718,8 +773,8 @@ namespace BIMaestro.Tutorials
                     .Select(place => place.Id).ToList();
                 uiDocument.Selection.SetElementIds(ids);
                 try { uiDocument.ShowElements(ids); } catch { }
-                DemoTourMessage.Show(app.MainWindowHandle, "Pika ! Import vérifié",
-                    "Pikachu a relu les quatre places dans Revit. Modifications vérifiées :\n" + _verifiedChanges +
+                DemoTourCompletion.Show(app.MainWindowHandle, "excel",
+                    "Bulbizarre a relu les quatre places dans Revit. Modifications vérifiées :\n" + _verifiedChanges +
                     "\n\nLa référence « " + _referenceFieldName + " » est restée identique. Le numéro modifié est aussi affiché sur les places sélectionnées dans la vue 3D.");
             }
             return true;
@@ -730,11 +785,11 @@ namespace BIMaestro.Tutorials
             if (!NeedsExport(app.ActiveUIDocument?.Document)) return;
             _workbookPath = path;
             _stage = 2;
-            DemoTourMessage.Show(app.MainWindowHandle, "Pika ! À toi dans Excel",
+            DemoTourMessage.Show(app.MainWindowHandle, "Bravo ! À toi dans Excel",
                 "Le classeur est ici :\n" + path +
                 "\n\nDans l'onglet « Nomenclature », modifie un ou plusieurs numéros dans « " + _fieldName +
                 " » (par exemple XL-003 → XL-103). La colonne « " + _referenceFieldName +
-                " » est une référence fixe : garde-la intacte. L'onglet « Edition » reprend tes modifications par formule pour l'import ; ne touche pas à ses identifiants cachés. Enregistre et ferme le fichier, puis reviens sur « Gestion Excel » et choisis « Importer ». Pikachu affichera les nouveaux numéros sur les places en 3D.");
+                " » est une référence fixe : garde-la intacte. L'onglet « Edition » reprend tes modifications par formule pour l'import ; ne touche pas à ses identifiants cachés. Enregistre et ferme le fichier, puis reviens sur « Gestion Excel » et choisis « Importer ». Bulbizarre affichera les nouveaux numéros sur les places en 3D.");
             Couleur.AppearanceOnboarding.StartIntro(app.MainWindowHandle, "excel");
         }
 
@@ -744,13 +799,13 @@ namespace BIMaestro.Tutorials
             Document document = app.ActiveUIDocument?.Document;
             if (!IsActive(document)) return true;
             if (_stage != 2 || !string.Equals(path, _workbookPath, StringComparison.OrdinalIgnoreCase))
-                return RejectWorkbook(app, "Pikachu attend l'export",
+                return RejectWorkbook(app, "Bulbizarre attend l'export",
                     "Exporte d'abord la nomenclature du parcours, puis modifie et enregistre le classeur avant de l'importer.");
 
             // Contrôler les quatre identifiants ET le repère avant d'ouvrir une transaction.
             // Une ligne supplémentaire ou dupliquée ne doit jamais pouvoir modifier une autre place.
             if (rows == null || _references == null || _references.Count != 4 || rows.Count != 4)
-                return RejectWorkbook(app, "Pikachu vérifie les places",
+                return RejectWorkbook(app, "Bulbizarre vérifie les places",
                     "Le classeur doit contenir exactement les quatre places exportées. Repars de l'export du parcours, sans ajouter ni supprimer de ligne.");
 
             var numbers = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -758,14 +813,14 @@ namespace BIMaestro.Tutorials
             {
                 if (row == null || !row.TryGetValue("UniqueId", out string uid) ||
                     !_references.TryGetValue(uid ?? "", out string reference) || numbers.ContainsKey(uid))
-                    return RejectWorkbook(app, "Pikachu vérifie les places",
+                    return RejectWorkbook(app, "Bulbizarre vérifie les places",
                         "Un identifiant de place est absent, inconnu ou en double dans l'onglet « Edition ». Repars du classeur exporté.");
                 if (!row.TryGetValue(_referenceFieldName, out string workbookReference) ||
                     !string.Equals(workbookReference, reference, StringComparison.Ordinal))
-                    return RejectWorkbook(app, "Pikachu protège le repère",
+                    return RejectWorkbook(app, "Bulbizarre protège le repère",
                         "La colonne « " + _referenceFieldName + " » est une référence fixe. Restaure sa valeur d'origine dans « Nomenclature », puis enregistre le classeur avant l'import.");
                 if (!row.TryGetValue(_fieldName, out string number))
-                    return RejectWorkbook(app, "Pikachu cherche les numéros",
+                    return RejectWorkbook(app, "Bulbizarre cherche les numéros",
                         "La colonne « " + _fieldName + " » manque. Repars du classeur exporté par le parcours.");
                 numbers.Add(uid, number ?? "");
             }
@@ -773,7 +828,7 @@ namespace BIMaestro.Tutorials
             bool changed = numbers.Any(pair =>
                 !string.Equals(pair.Value, _initialNumbers[pair.Key], StringComparison.Ordinal));
             if (!changed)
-                return RejectWorkbook(app, "Pikachu attend une modification",
+                return RejectWorkbook(app, "Bulbizarre attend une modification",
                     "Modifie au moins un numéro dans « Nomenclature » (par exemple XL-003 → XL-103), enregistre et ferme Excel, puis réessaie. « " + _referenceFieldName + " » reste fixe.");
 
             _expectedNumbers = numbers;
@@ -822,7 +877,7 @@ namespace BIMaestro.Tutorials
                     reference, StringComparison.Ordinal));
             if (!valid)
             {
-                DemoTourMessage.Show(app.MainWindowHandle, "Pikachu vérifie l'import",
+                DemoTourMessage.Show(app.MainWindowHandle, "Bulbizarre vérifie l'import",
                     "L'import s'est terminé, mais Revit ne correspond pas encore aux valeurs du classeur. Vérifie les numéros et la référence fixe, puis réessaie l'import.");
                 Couleur.AppearanceOnboarding.StartIntro(app.MainWindowHandle, "excel");
                 return;
@@ -839,7 +894,7 @@ namespace BIMaestro.Tutorials
             }
             catch (Exception ex)
             {
-                DemoTourMessage.Show(app.MainWindowHandle, "Pikachu vérifie l'affichage",
+                DemoTourMessage.Show(app.MainWindowHandle, "Bulbizarre vérifie l'affichage",
                     "Les valeurs du classeur sont dans Revit, mais les numéros visibles n'ont pas pu être actualisés : " +
                     ex.Message);
                 return;
@@ -850,7 +905,7 @@ namespace BIMaestro.Tutorials
                 string.Equals(place.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.AsString() ?? "",
                     expectedNumber, StringComparison.Ordinal)))
             {
-                DemoTourMessage.Show(app.MainWindowHandle, "Pikachu vérifie l'affichage",
+                DemoTourMessage.Show(app.MainWindowHandle, "Bulbizarre vérifie l'affichage",
                     "Le numéro importé ne correspond pas au texte affiché sur chaque place. Vérifie les paramètres des places avant de conclure l'exercice.");
                 return;
             }
@@ -879,11 +934,67 @@ namespace BIMaestro.Tutorials
         internal static string ExportedFileFor(Document document) =>
             IsCurrent(document) && _waitingForImport ? _exportedFile : null;
 
+        internal static bool IsGuided(Document document) => IsCurrent(document);
+        internal static bool IsImportStage(Document document) => IsCurrent(document) && _waitingForImport;
+
         internal static void Begin(Document document)
         {
+            PrepareVisualComparison(document);
             _documentPath = document?.PathName;
             _exportedFile = null;
             _waitingForImport = false;
+        }
+
+        private static void PrepareVisualComparison(Document document)
+        {
+            var views = new FilteredElementCollector(document).OfClass(typeof(View3D)).Cast<View3D>()
+                .Where(view => view.Name == "BIMaestro - 06 Gabarit source" || view.Name == "BIMaestro - 07 Gabarit cible").ToList();
+            if (views.Count != 2) throw new InvalidOperationException("Les vues source et cible du tutoriel sont introuvables.");
+            using (var tx = new Transaction(document, "BIMaestro - Comparaison des gabarits"))
+            {
+                tx.Start();
+                const string patternName = "BIMaestro - Formation tirets";
+                var pattern = new FilteredElementCollector(document).OfClass(typeof(LinePatternElement)).Cast<LinePatternElement>()
+                    .FirstOrDefault(item => item.Name == patternName);
+                if (pattern == null)
+                {
+                    var definition = new LinePattern(patternName);
+                    definition.SetSegments(new List<LinePatternSegment> {
+                        new LinePatternSegment(LinePatternSegmentType.Dash, UnitUtils.ConvertToInternalUnits(4, UnitTypeId.Millimeters)),
+                        new LinePatternSegment(LinePatternSegmentType.Space, UnitUtils.ConvertToInternalUnits(2, UnitTypeId.Millimeters)) });
+                    pattern = LinePatternElement.Create(document, definition);
+                }
+                var solidFill = new FilteredElementCollector(document).OfClass(typeof(FillPatternElement)).Cast<FillPatternElement>()
+                    .FirstOrDefault(item => item.GetFillPattern().IsSolidFill);
+                foreach (View3D view in views)
+                {
+                    bool source = view.Name == "BIMaestro - 06 Gabarit source";
+                    view.ViewTemplateId = ElementId.InvalidElementId;
+                    view.DetailLevel = ViewDetailLevel.Fine;
+                    view.DisplayStyle = DisplayStyle.FlatColors;
+                    var color = source ? new Autodesk.Revit.DB.Color(220, 35, 45) : new Autodesk.Revit.DB.Color(25, 95, 220);
+                    var surface = source ? new Autodesk.Revit.DB.Color(255, 190, 190) : new Autodesk.Revit.DB.Color(175, 215, 255);
+                    var graphics = new OverrideGraphicSettings();
+                    graphics.SetProjectionLineColor(color);
+                    graphics.SetCutLineColor(color);
+                    graphics.SetProjectionLineWeight(source ? 5 : 2);
+                    graphics.SetCutLineWeight(source ? 5 : 2);
+                    graphics.SetProjectionLinePatternId(source ? pattern.Id : LinePatternElement.GetSolidPatternId());
+                    if (solidFill != null)
+                    {
+                        graphics.SetSurfaceForegroundPatternId(solidFill.Id);
+                        graphics.SetSurfaceForegroundPatternColor(surface);
+                        graphics.SetSurfaceForegroundPatternVisible(true);
+                    }
+                    foreach (BuiltInCategory category in new[] { BuiltInCategory.OST_PipeCurves, BuiltInCategory.OST_PipeFitting,
+                        BuiltInCategory.OST_PipeAccessory, BuiltInCategory.OST_DuctCurves, BuiltInCategory.OST_DuctFitting, BuiltInCategory.OST_Parking })
+                    {
+                        var id = new ElementId(category);
+                        if (view.IsCategoryOverridable(id)) view.SetCategoryOverrides(id, graphics);
+                    }
+                }
+                tx.Commit();
+            }
         }
 
         internal static void OnCommandOpened(Document document)
@@ -901,8 +1012,8 @@ namespace BIMaestro.Tutorials
             uiDocument.ActiveView = target;
             _exportedFile = path;
             _waitingForImport = true;
-            DemoTourMessage.Show(app.MainWindowHandle, "Pika ! Export réussi",
-                "La vue cible est ouverte. Relance « Gabarit de vue », choisis « Importer dans la vue active ». Le fichier exporté sera prérempli :\n" +
+            DemoTourMessage.Show(app.MainWindowHandle, "Bravo ! Export réussi",
+                "La vue cible est maintenant bleue, avec des traits continus fins. Compare-la à la source rouge et pointillée. Relance « Gabarit de vue », puis choisis l’import encadré en vert. Le fichier exporté sera prérempli :\n" +
                 path + "\n\nChoisis ensuite « Créer / mettre à jour un vrai gabarit nommé ».");
             Couleur.AppearanceOnboarding.StartIntro(app.MainWindowHandle, "view-template");
         }
@@ -910,11 +1021,23 @@ namespace BIMaestro.Tutorials
         internal static void OnImportCompleted(Document document, IntPtr owner)
         {
             if (!IsCurrent(document) || !_waitingForImport) return;
+            var target = new FilteredElementCollector(document).OfClass(typeof(View3D)).Cast<View3D>()
+                .FirstOrDefault(view => view.Name == "BIMaestro - 07 Gabarit cible");
+            View template = target == null ? null : document.GetElement(target.ViewTemplateId) as View;
+            var settings = template?.GetCategoryOverrides(new ElementId(BuiltInCategory.OST_PipeCurves));
+            var color = settings?.ProjectionLineColor;
+            if (template == null || color == null || !color.IsValid || color.Red != 220 || color.Green != 35 || color.Blue != 45 ||
+                settings.ProjectionLineWeight != 5 || settings.ProjectionLinePatternId == LinePatternElement.GetSolidPatternId())
+            {
+                DemoTourMessage.Show(owner, "Vérifie le gabarit importé", "La cible doit recevoir un vrai gabarit avec les traits rouges, épais et pointillés de la source. Relance l’import du fichier de cet exercice et choisis l’option encadrée en vert.");
+                return;
+            }
+            new UIDocument(document).RefreshActiveView();
             _documentPath = null;
             _exportedFile = null;
             _waitingForImport = false;
-            DemoTourMessage.Show(owner, "Pika ! Gabarit créé",
-                "Dans les Propriétés de la vue 07, vérifie le gabarit affecté. Tu peux maintenant comparer les vues 06 et 07 et réutiliser ce gabarit dans le projet.");
+            DemoTourCompletion.Show(owner, "view-template",
+                "La cible doit maintenant afficher les couleurs rouges et les traits pointillés épais de la source, au lieu du bleu et des traits continus. Dans Propriétés, retrouve le gabarit affecté. Compare les vues 06 et 07 pour constater le transfert.");
         }
 
         private static bool IsCurrent(Document document) => document != null &&
@@ -946,6 +1069,7 @@ namespace BIMaestro.Tutorials
         internal static bool ProcessIdling(UIApplication uiApp)
         {
             if (DemoTourPendingSelection.ProcessIdling(uiApp)) return true;
+            if (DemoTourCompletion.ProcessIdling(uiApp)) return true;
             if (DemoExcelExercise.ProcessIdling(uiApp)) return true;
             if (string.IsNullOrEmpty(_pendingPath) || uiApp?.ActiveUIDocument?.Document == null)
                 return false;
@@ -968,7 +1092,7 @@ namespace BIMaestro.Tutorials
             }
             catch (Exception ex)
             {
-                DemoTourMessage.Show(uiApp.MainWindowHandle, "Pikachu a besoin d'aide",
+                DemoTourMessage.Show(uiApp.MainWindowHandle, "Bulbizarre a besoin d'aide",
                     "Le tutoriel n'a pas pu démarrer : " + ex.Message);
             }
             return true;
@@ -999,7 +1123,7 @@ namespace BIMaestro.Tutorials
                 VerticalAlignment = VerticalAlignment.Center });
             stack.Children.Add(new TextBlock
             {
-                Text = "La maquette de formation est ouverte. Choisis un tutoriel : Pikachu te placera dans la bonne vue et te guidera dans la commande.",
+                Text = "La maquette de formation est ouverte. Choisis un tutoriel : Bulbizarre te placera dans la bonne vue et te guidera dans la commande.",
                 TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 14)
             });
             AddTour(stack, "1 · Auto résa", "Créer une réservation sur le mur traversé par la canalisation.", "reservation");
@@ -1009,6 +1133,7 @@ namespace BIMaestro.Tutorials
             AddTour(stack, "5 · Organisateur", "Renuméroter huit places sur deux niveaux, puis tourner la vue.", "organizer");
             AddTour(stack, "6 · Gabarit de vue", "Exporter une vue, puis créer un gabarit dans une autre.", "view-template");
             AddTour(stack, "7 · Gestion Excel", "Modifier les numéros dans Excel, garder le repère fixe et voir les changements sur les places en 3D.", "excel");
+            AddTour(stack, "9 · MEP Booster", "Activer la pastille, prévisualiser et tourner les vannes raccordées.", "mep-booster");
             AddTour(stack, "8 · Navigateur de familles", "Explorer 35 familles, rechercher, voir en 3D et préparer les aperçus.", "family-browser");
             var later = new Button { Content = "Plus tard", HorizontalAlignment = HorizontalAlignment.Right,
                 Padding = new Thickness(12, 6, 12, 6), Margin = new Thickness(0, 10, 0, 0) };
@@ -1019,7 +1144,7 @@ namespace BIMaestro.Tutorials
         private void AddTour(Panel parent, string title, string description, string tourId)
         {
             var button = new Button { HorizontalContentAlignment = HorizontalAlignment.Left,
-                Background = Brushes.WhiteSmoke, BorderBrush = Brushes.DarkOrange,
+                Background = Brushes.WhiteSmoke, BorderBrush = DemoTourPalette.Accent,
                 BorderThickness = new Thickness(1), Padding = new Thickness(12, 8, 12, 8),
                 Margin = new Thickness(0, 0, 0, 8) };
             var body = new StackPanel();
@@ -1113,6 +1238,12 @@ namespace BIMaestro.Tutorials
                 steps = standalone;
             if (id == "organizer" && preparedExercise && DemoOrganizerExercise.IsRotatedPass)
                 steps = DemoTourCatalog.OrganizerRotatedSteps;
+            if (id == "organizer" && preparedExercise && DemoOrganizerExercise.IsSheetPass)
+                steps = new[] {
+                    new DemoStep("Les feuilles sélectionnées", "Les trois feuilles d’essai A, B et C seront traitées. La feuille témoin 6 doit rester inchangée.", "OrganizerHeaderTitle", true),
+                    new DemoStep("Numéro de feuille", "Choisis Numéro de feuille. Garde le préfixe et le suffixe vides, le format 1,2,3 et le départ à 1. Trier par niveau doit rester décoché.", "ParameterComboBox", true),
+                    new DemoStep("Renuméroter les feuilles", "Clique sur Renommer : les feuilles 3, 4 et 5 deviennent 1, 2 et 3, dans l’ordre de leurs anciens numéros. Bulbizarre vérifiera aussi la feuille témoin.", "DemoRenameButton")
+                };
             if (id == "pipe-calculation")
             {
                 window.Width = Math.Max(window.Width, 760);
@@ -1120,6 +1251,39 @@ namespace BIMaestro.Tutorials
             }
             ActiveGuides[window] = new DemoWindowGuide(window, steps, id, preparedExercise);
             return true;
+        }
+
+        internal static void ObserveHistoryPreview(Window historyWindow, IntPtr owner)
+        {
+            if (!ActiveGuides.TryGetValue(historyWindow, out DemoWindowGuide guide)) return;
+            bool detailed = guide.WaitingFor("history-preview-detailed-observed");
+            if (!detailed && !guide.WaitingFor("history-preview-simple-observed")) return;
+            string observedAction = detailed ? "history-preview-detailed-observed" : "history-preview-simple-observed";
+            historyWindow.Hide();
+            var card = new Window { Title = "BIMaestro — Observer l’aperçu", Width = 390,
+                SizeToContent = SizeToContent.Height, ShowInTaskbar = false,
+                ResizeMode = ResizeMode.NoResize, Background = Brushes.White,
+                Left = SystemParameters.WorkArea.Right - 420, Top = SystemParameters.WorkArea.Bottom - 260 };
+            new WindowInteropHelper(card).Owner = owner;
+            var panel = new StackPanel { Margin = new Thickness(18) };
+            card.Content = new Border { BorderBrush = DemoTourPalette.Accent, BorderThickness = new Thickness(2), Child = panel };
+            panel.Children.Add(new TextBlock { Text = detailed ? "Aperçu Détaillé" : "Aperçu Simple", FontSize = 18, Foreground = DemoTourPalette.Accent });
+            panel.Children.Add(new TextBlock { Text = detailed
+                ? "Compare les tables et les chaises rouges aux volumes du mode Simple. Détaillé montre mieux leur forme quand les données sont disponibles, mais peut demander davantage de ressources. Ces objets restent des aperçus."
+                : "Observe les volumes rouges : ils indiquent l’emplacement et l’encombrement des meubles supprimés. Simple est rapide et léger. Nous allons ensuite les comparer au mode Détaillé.",
+                TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 12, 0, 12) });
+            var seen = new Button { Content = "J’ai vu l’aperçu · Continuer", Padding = new Thickness(10),
+                Background = DemoTourPalette.Accent, Foreground = Brushes.White };
+            panel.Children.Add(seen);
+            bool confirmed = false;
+            seen.Click += (_, __) => { confirmed = true; card.Close(); };
+            card.Closed += (_, __) => {
+                if (!ActiveGuides.ContainsKey(historyWindow)) return;
+                historyWindow.Show(); historyWindow.Activate();
+                if (confirmed) ReportAction(historyWindow, observedAction);
+            };
+            historyWindow.Closed += (_, __) => card.Close();
+            card.Show();
         }
 
         internal static void ReportAction(Window window, string action)
@@ -1228,7 +1392,7 @@ namespace BIMaestro.Tutorials
                 {
                     Width = 320, Padding = new Thickness(14), Margin = new Thickness(12),
                     CornerRadius = new CornerRadius(12), Background = Brushes.White,
-                    BorderBrush = Brushes.DarkOrange, BorderThickness = new Thickness(2),
+                    BorderBrush = DemoTourPalette.Accent, BorderThickness = new Thickness(2),
                     HorizontalAlignment = HorizontalAlignment.Right,
                     VerticalAlignment = VerticalAlignment.Bottom
                 };
@@ -1243,7 +1407,11 @@ namespace BIMaestro.Tutorials
                     Width = 245, TextWrapping = TextWrapping.Wrap };
                 heading.Children.Add(_title); stack.Children.Add(heading);
                 _text = new TextBlock { Margin = new Thickness(0, 9, 0, 12), TextWrapping = TextWrapping.Wrap };
-                stack.Children.Add(_text);
+                var textScroll = new ScrollViewer { Content = _text,
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    MaxHeight = 280 };
+                stack.Children.Add(textScroll);
+                window.SizeChanged += (_, __) => textScroll.MaxHeight = Math.Max(80, Math.Min(280, window.ActualHeight - 200));
                 var buttons = new StackPanel { Orientation = Orientation.Horizontal,
                     HorizontalAlignment = HorizontalAlignment.Right };
                 stack.Children.Add(buttons);
@@ -1251,7 +1419,13 @@ namespace BIMaestro.Tutorials
                 _next = AddButton(buttons, "Suivant", () =>
                 {
                     if (!_completed) return;
-                    if (_index + 1 == _steps.Length) { Close(); return; }
+                    if (_index + 1 == _steps.Length)
+                    {
+                        Close();
+                        DemoTourCompletion.Show(new WindowInteropHelper(_window).Owner, TourId,
+                            "Tu as terminé ce tutoriel.", () => _window.Close());
+                        return;
+                    }
                     _index++; ShowStep();
                 });
                 AddButton(buttons, "Quitter", Close);
@@ -1353,6 +1527,9 @@ namespace BIMaestro.Tutorials
                 }), DispatcherPriority.Loaded);
             }
 
+            internal bool WaitingFor(string action) => _index >= 0 && _index < _steps.Length &&
+                _steps[_index].CompletionEvent == action && !_completed;
+
             internal void CompleteAction(string action)
             {
                 if (_index >= 0 && _index < _steps.Length &&
@@ -1379,7 +1556,15 @@ namespace BIMaestro.Tutorials
                 if (_index != expectedIndex || !(_window.FindName(targetName) is FrameworkElement target)) return;
                 if (targetName == "RestoreDeletedButton" || targetName == "RestoreParametersButton")
                     return; // Wait for a committed and verified restoration.
-                if (target is System.Windows.Controls.TextBox textBox)
+                if (target is RadioButton radio && (targetName == "SimpleMeshModeRadio" || targetName == "DetailedMeshModeRadio"))
+                {
+                    _completed = radio.IsChecked == true;
+                    _next.IsEnabled = _completed;
+                    RoutedEventHandler handler = (_, __) => CompleteStep(expectedIndex);
+                    radio.Checked += handler;
+                    _detachAction = () => radio.Checked -= handler;
+                }
+                else if (target is System.Windows.Controls.TextBox textBox)
                 {
                     TextChangedEventHandler handler = (_, __) =>
                     {
@@ -1420,6 +1605,11 @@ namespace BIMaestro.Tutorials
                 }
                 else if (target is Selector selector)
                 {
+                    if (TourId == "history" && targetName == "VisualCardsList" && selector.SelectedItem != null)
+                    {
+                        _completed = true;
+                        _next.IsEnabled = true;
+                    }
                     SelectionChangedEventHandler handler = (_, __) =>
                     {
                         string selected = selector.SelectedItem?.ToString() ?? "";
@@ -1470,7 +1660,7 @@ namespace BIMaestro.Tutorials
                     return;
                 if (TourId == "history" && IsPreparedExercise && !furnitureRestored)
                 {
-                    _text.Text = "Un objet a été restauré. Sélectionne l'autre suppression du mobilier et clique de nouveau sur « Restaurer les éléments ». Pikachu attend que les deux objets soient présents.";
+                    _text.Text = "Les deux tables complètes ne sont pas encore présentes. Sélectionne le cluster « Mobilier » avec les tables, puis clique sur « Restaurer les éléments ». Les chaises imbriquées ne sont pas des objets à restaurer séparément.";
                     return;
                 }
                 CompleteStep(_index);
@@ -1482,7 +1672,7 @@ namespace BIMaestro.Tutorials
                     return;
                 if (!exerciseRestored)
                 {
-                    _text.Text = "Le témoin n'a pas encore retrouvé ses deux anciennes valeurs. Choisis la modification qui contient le repère TEMOIN_MODIFIE et les commentaires « Mobilier témoin : paramètres modifiés », puis restaure cette ligne.";
+                    _text.Text = "Le témoin n’a pas encore retrouvé ses 4 chaises. Choisis la modification « Nombre chaises » de 4 à 2, puis restaure cette ligne.";
                     return;
                 }
                 CompleteStep(_index);
@@ -1495,7 +1685,7 @@ namespace BIMaestro.Tutorials
                 if (_index + 1 == _steps.Length)
                 {
                     _text.Text = _steps[_index].Target == "RestoreParametersButton"
-                        ? "✓ Les deux objets sont présents et le témoin a retrouvé son repère et ses commentaires initiaux. Sélectionne-le dans Revit pour vérifier ses Propriétés. Tu as recréé des objets supprimés et rétabli des paramètres depuis leur historique."
+                        ? "✓ Les deux objets sont présents et le témoin a retrouvé ses 4 chaises initiales. Sélectionne-le dans Revit pour vérifier ses Propriétés. Tu as recréé des objets supprimés et rétabli des paramètres depuis leur historique."
                         : _steps[_index].Target == "RestoreDeletedButton"
                         ? "✓ Le mobilier a réapparu. BIMaestro l'a sélectionné et cadré dans la vue : compare-le avec l'objet témoin, puis termine le parcours."
                         : _steps[_index].CompletionEvent == "load-bureau-commun"
@@ -1512,14 +1702,30 @@ namespace BIMaestro.Tutorials
                 }
             }
 
-            private void Highlight(string targetName, int expectedIndex)
+            private void Highlight(string targetName, int expectedIndex, int attempt = 0)
             {
                 if (_index != expectedIndex || !_window.IsVisible) return;
-                FrameworkElement target = targetName == "TutorialFavoriteStar" &&
-                    _window is Famille.FamilyBrowserWindow browser
-                    ? browser.FindTutorialFavoriteStar()
-                    : _window.FindName(targetName) as FrameworkElement;
-                if (target == null || !target.IsVisible) return;
+                FrameworkElement target;
+                if (_window is Famille.FamilyBrowserWindow browser && targetName == "TutorialFavoriteStar")
+                    target = browser.FindTutorialFavoriteStar();
+                else if (_window is Famille.FamilyBrowserWindow folderBrowser && targetName == "TutorialMeetingFolderCard")
+                    target = folderBrowser.FindTutorialMeetingFolderCard();
+                else target = _window.FindName(targetName) as FrameworkElement;
+                if (target == null || !target.IsVisible)
+                {
+                    if ((targetName == "TutorialMeetingFolderCard" || targetName == "TutorialFavoriteStar") && attempt < 20)
+                    {
+                        var retry = new DispatcherTimer(DispatcherPriority.Loaded, _window.Dispatcher)
+                            { Interval = TimeSpan.FromMilliseconds(100) };
+                        retry.Tick += (_, __) =>
+                        {
+                            retry.Stop();
+                            Highlight(targetName, expectedIndex, attempt + 1);
+                        };
+                        retry.Start();
+                    }
+                    return;
+                }
                 target.BringIntoView();
                 _layer = AdornerLayer.GetAdornerLayer(target);
                 if (_layer == null) return;
@@ -1555,9 +1761,37 @@ namespace BIMaestro.Tutorials
             {
                 var bounds = new Rect(AdornedElement.RenderSize);
                 if (bounds.Width > 0 && bounds.Height > 0)
-                    drawing.DrawRoundedRectangle(null, new Pen(Brushes.DarkOrange, 3),
+                    drawing.DrawRoundedRectangle(null, new Pen(DemoTourPalette.Accent, 3),
                         new Rect(-2, -2, bounds.Width + 4, bounds.Height + 4), 5, 5);
             }
+        }
+    }
+
+    internal static class DemoTourCompletion
+    {
+        private static string _nextTour;
+        private static readonly string[] Order = { "reservation", "history", "colors", "pipe-calculation", "organizer", "view-template", "excel", "family-browser", "mep-booster" };
+        private static readonly string[] Labels = { "Auto réservation", "Qui a fait ça ?", "Couleurs et vues", "Calcul des canalisations", "Organisateur", "Gabarit de vue", "Gestion Excel", "Navigateur de familles", "MEP Booster" };
+        internal static void Show(IntPtr owner, string completed, string summary, Action beforeNext = null)
+        {
+            int index = Array.IndexOf(Order, completed);
+            int next = index < 0 || index + 1 == Order.Length ? 0 : index + 1;
+            bool continueTour = DemoTourMessage.Show(owner, "Tutoriel terminé",
+                summary + "\n\nD’autres tutoriels sont disponibles. Veux-tu passer au suivant : « " + Labels[next] + " » ?",
+                "Tutoriel suivant", "Terminer pour l’instant", primaryButtonIsAction: true);
+            if (!continueTour) return;
+            beforeNext?.Invoke();
+            _nextTour = Order[next];
+        }
+        internal static bool ProcessIdling(UIApplication app)
+        {
+            if (_nextTour == null) return false;
+            string tour = _nextTour;
+            _nextTour = null;
+            string message = null;
+            try { DemoToursCommand.RunChoice(app, tour, ref message); }
+            catch (Exception ex) { DemoTourMessage.Show(app.MainWindowHandle, "Le tutoriel n’a pas pu démarrer", ex.Message); }
+            return true;
         }
     }
 
@@ -1572,13 +1806,13 @@ namespace BIMaestro.Tutorials
             var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
             Content = scroll;
             var stack = new StackPanel { Margin = new Thickness(20) }; scroll.Content = stack;
-            stack.Children.Add(new TextBlock { Text = "Apprendre BIMaestro avec Pikachu", FontSize = 18,
+            stack.Children.Add(new TextBlock { Text = "Apprendre BIMaestro avec Bulbizarre", FontSize = 18,
                 FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 10) });
-            stack.Children.Add(new TextBlock { Text = "Découvre les commandes, puis essaie-les dans la maquette avec Pikachu.",
+            stack.Children.Add(new TextBlock { Text = "Découvre les commandes, puis essaie-les dans la maquette avec Bulbizarre.",
                 TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) });
             Button quick = AddChoice(stack, "Commencer la découverte · 2 min", "overview");
             quick.FontWeight = FontWeights.SemiBold;
-            quick.BorderBrush = Brushes.DarkOrange;
+            quick.BorderBrush = DemoTourPalette.Accent;
             quick.BorderThickness = new Thickness(2);
             AddChoice(stack, "Créer et ouvrir la maquette de formation", "create");
             var detailed = new Expander { Header = "Aller directement aux exercices détaillés",
@@ -1593,6 +1827,7 @@ namespace BIMaestro.Tutorials
             AddChoice(detailChoices, "5 · Organisateur", "organizer");
             AddChoice(detailChoices, "6 · Gabarit de vue", "view-template");
             AddChoice(detailChoices, "7 · Gestion Excel", "excel");
+            AddChoice(detailChoices, "9 · MEP Booster", "mep-booster");
             AddChoice(detailChoices, "8 · Navigateur de familles", "family-browser");
             AddChoice(stack, "Recommencer les exercices de la maquette", "reset");
         }
@@ -1627,7 +1862,7 @@ namespace BIMaestro.Tutorials
             AddCard(stack, "1 · Auto réservation",
                 "Quand un réseau traverse un mur, BIMaestro place une famille de réservation au croisement. Dans l'exercice, tu choisis toi-même la canalisation puis le mur et tu examines le résultat.");
             AddCard(stack, "2 · Qui a fait ça ?",
-                "Retrouve l'auteur et le contexte d'une modification. Fais réapparaître deux meubles supprimés, puis restaure le repère et les commentaires initiaux du troisième à partir de l'historique.");
+                "Retrouve l'auteur et le contexte d'une modification. Fais réapparaître deux meubles supprimés, puis restaure les 4 chaises du troisième à partir de l'historique.");
             AddCard(stack, "3 · Couleurs et vues",
                 "Personnalise l'arborescence sans renommer ni recréer les vues. Dans l'exercice, tu changes le fond et ajoutes des icônes aux dossiers Plans d'étage et Vues 3D.");
             AddCard(stack, "4 · Calcul des canalisations",
@@ -1637,7 +1872,7 @@ namespace BIMaestro.Tutorials
             AddCard(stack, "6 · Gabarit de vue",
                 "Exporte les réglages d'une vue 3D, puis importe-les dans une seconde vue pour créer un vrai gabarit Revit nommé.");
             AddCard(stack, "7 · Gestion Excel",
-                "Exporte les places CML_Parking : numéro modifiable et repère fixe. Essaie par exemple XL-003 → XL-103, puis importe tes changements. Pikachu vérifie chaque valeur et l'affiche sur la place en 3D.");
+                "Exporte les places CML_Parking : numéro modifiable et repère fixe. Essaie par exemple XL-003 → XL-103, puis importe tes changements. Bulbizarre vérifie chaque valeur et l'affiche sur la place en 3D.");
             AddCard(stack, "8 · Navigateur de familles",
                 "Explore un catalogue de 35 familles rangées en dossiers et sous-dossiers. Cherche une famille, prévisualise-la en 3D, découvre les photos automatiques et apprends à brancher ta propre bibliothèque.");
             stack.Children.Add(new TextBlock { Text = "Envie d'essayer dans la maquette ?",
@@ -1651,6 +1886,7 @@ namespace BIMaestro.Tutorials
             AddExerciseButton(exercises, "Couleurs et vues", "colors");
             AddExerciseButton(exercises, "Calcul canalisations", "pipe-calculation");
             AddExerciseButton(exercises, "Organisateur", "organizer");
+            AddExerciseButton(exercises, "MEP Booster", "mep-booster");
             AddExerciseButton(exercises, "Gabarit de vue", "view-template");
             AddExerciseButton(exercises, "Gestion Excel", "excel");
             AddExerciseButton(exercises, "Navigateur de familles", "family-browser");
@@ -1671,7 +1907,7 @@ namespace BIMaestro.Tutorials
         private static void AddCard(Panel parent, string title, string description)
         {
             var card = new Border { Padding = new Thickness(14), Margin = new Thickness(0, 0, 0, 12),
-                CornerRadius = new CornerRadius(10), BorderBrush = Brushes.DarkOrange,
+                CornerRadius = new CornerRadius(10), BorderBrush = DemoTourPalette.Accent,
                 BorderThickness = new Thickness(1), Background = Brushes.WhiteSmoke };
             parent.Children.Add(card);
             var body = new StackPanel(); card.Child = body;
@@ -1684,12 +1920,12 @@ namespace BIMaestro.Tutorials
     internal static class DemoTourMessage
     {
         internal static bool Show(IntPtr owner, string heading, string message,
-            string buttonLabel = "Continuer", string learnMoreLabel = null)
+            string buttonLabel = "Continuer", string learnMoreLabel = null, bool primaryButtonIsAction = false)
         {
             bool learnMore = false;
             var window = new Window
             {
-                Title = "BIMaestro · Pikachu",
+                Title = "BIMaestro · Bulbizarre",
                 Width = 480,
                 MinWidth = 380,
                 SizeToContent = SizeToContent.Height,
@@ -1706,8 +1942,8 @@ namespace BIMaestro.Tutorials
             window.Content = root;
             var header = new Border
             {
-                Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 231, 98)),
-                BorderBrush = Brushes.DarkOrange,
+                Background = DemoTourPalette.Highlight,
+                BorderBrush = DemoTourPalette.Accent,
                 BorderThickness = new Thickness(0, 0, 0, 2),
                 Padding = new Thickness(18, 14, 18, 14)
             };
@@ -1762,10 +1998,11 @@ namespace BIMaestro.Tutorials
                     Margin = new Thickness(0, 0, 10, 0),
                     FontWeight = FontWeights.SemiBold,
                     Background = Brushes.White,
-                    BorderBrush = Brushes.DarkOrange,
-                    BorderThickness = new Thickness(2)
+                    BorderBrush = DemoTourPalette.Accent,
+                    BorderThickness = new Thickness(2),
+                    IsCancel = primaryButtonIsAction
                 };
-                more.Click += (_, __) => { learnMore = true; window.Close(); };
+                more.Click += (_, __) => { learnMore = !primaryButtonIsAction; window.Close(); };
                 footer.Children.Add(more);
             }
             var close = new Button
@@ -1774,11 +2011,13 @@ namespace BIMaestro.Tutorials
                 MinWidth = 125,
                 Padding = new Thickness(14, 7, 14, 7),
                 FontWeight = FontWeights.SemiBold,
-                Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 231, 98)),
-                BorderBrush = Brushes.DarkOrange,
-                BorderThickness = new Thickness(2)
+                Background = primaryButtonIsAction ? DemoTourPalette.Accent : DemoTourPalette.Highlight,
+                Foreground = primaryButtonIsAction ? Brushes.White : Brushes.Black,
+                BorderBrush = DemoTourPalette.Accent,
+                BorderThickness = new Thickness(2),
+                IsDefault = primaryButtonIsAction
             };
-            close.Click += (_, __) => window.Close();
+            close.Click += (_, __) => { learnMore = primaryButtonIsAction; window.Close(); };
             footer.Children.Add(close);
             window.ShowDialog();
             return learnMore;
@@ -1829,7 +2068,7 @@ namespace BIMaestro.Tutorials
 
             var window = new Window
             {
-                Title = "BIMaestro · Pikachu approfondit",
+                Title = "BIMaestro · Bulbizarre approfondit",
                 Width = 600,
                 Height = 570,
                 MinWidth = 480,
@@ -1846,8 +2085,8 @@ namespace BIMaestro.Tutorials
             DockPanel.SetDock(footer, Dock.Bottom);
             root.Children.Add(footer);
             var close = new Button { Content = "Retour à la maquette", Padding = new Thickness(16, 8, 16, 8),
-                Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 231, 98)),
-                BorderBrush = Brushes.DarkOrange, BorderThickness = new Thickness(2) };
+                Background = DemoTourPalette.Highlight,
+                BorderBrush = DemoTourPalette.Accent, BorderThickness = new Thickness(2) };
             close.Click += (_, __) => window.Close();
             footer.Children.Add(close);
             var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
@@ -1864,7 +2103,7 @@ namespace BIMaestro.Tutorials
                 TextWrapping = TextWrapping.Wrap, MaxWidth = 490 });
             for (int i = 0; i < topics.GetLength(0); i++)
             {
-                var card = new Border { BorderBrush = Brushes.DarkOrange, BorderThickness = new Thickness(1),
+                var card = new Border { BorderBrush = DemoTourPalette.Accent, BorderThickness = new Thickness(1),
                     CornerRadius = new CornerRadius(10), Background = Brushes.WhiteSmoke,
                     Padding = new Thickness(14), Margin = new Thickness(0, 0, 0, 12) };
                 stack.Children.Add(card);

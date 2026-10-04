@@ -36,6 +36,12 @@ namespace Modification
                 .Select(doc.GetElement)
                 .Where(element => element != null)
                 .ToList();
+            if (selectedElements.Any(element => element is ViewSheet) &&
+                !selectedElements.All(element => element is ViewSheet))
+            {
+                TaskDialog.Show("Sélection", "Sélectionne uniquement des feuilles pour les renuméroter.");
+                return Result.Cancelled;
+            }
             int viewportCount = selectedElements.Count(element => element is Viewport);
 
             if (viewportCount > 0)
@@ -66,7 +72,13 @@ namespace Modification
             bool guidedExercise = BIMaestro.Tutorials.DemoTourService.AttachIfRequested("organizer", renamerWindow);
             if (guidedExercise)
             {
-                BIMaestro.Tutorials.DemoOrganizerExercise.ConfigureWindow(renamerWindow);
+                if (BIMaestro.Tutorials.DemoOrganizerExercise.IsSheetPass &&
+                    !BIMaestro.Tutorials.DemoOrganizerExercise.HasSheetSelection(uiDoc))
+                {
+                    BIMaestro.Tutorials.DemoOrganizerSheetGuide.Start(data.Application);
+                    return Result.Cancelled;
+                }
+                BIMaestro.Tutorials.DemoOrganizerExercise.ConfigureWindow(renamerWindow, commandData.Application);
                 renamerWindow.Width = 850;
                 renamerWindow.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterOwner;
                 new System.Windows.Interop.WindowInteropHelper(renamerWindow).Owner = data.Application.MainWindowHandle;
@@ -138,13 +150,24 @@ namespace Modification
                                 bandHeightMeters,
                                 UnitTypeId.Meters);
 
+                            // Sheets have no model position: preserve their existing numerical order.
+                            var sheets = selectedElements.OfType<ViewSheet>().ToList();
+                            bool renumberSheets = sheets.Count == selectedElements.Count;
+                            if (renumberSheets && renamerWindow.IsSortByLevelEnabled)
+                                throw new InvalidOperationException("Décoche Trier par niveau pour renuméroter des feuilles.");
                             // Obtenir les éléments avec leurs positions transformées selon la vue active
                             var elementLocations = GetElementsWithLocations(doc, selectedIds, uiDoc.ActiveView);
 
                             List<ElementLocation> sortedElements;
 
                             // Vérifier si le tri par niveau est activé
-                            if (renamerWindow.IsSortByLevelEnabled)
+                            if (renumberSheets)
+                            {
+                                sortedElements = sheets.OrderBy(sheet => sheet.SheetNumber,
+                                    Comparer<string>.Create(NaturalCompare)).ThenBy(sheet => sheet.Id.IntegerValue)
+                                    .Select(sheet => new ElementLocation { Element = sheet, Location = XYZ.Zero }).ToList();
+                            }
+                            else if (renamerWindow.IsSortByLevelEnabled)
                             {
                                 // Vérifier si tous les éléments ont un paramètre de niveau
                                 if (!AllElementsHaveLevel(elementLocations))
@@ -163,6 +186,19 @@ namespace Modification
                                 sortedElements = SortElementsByGridLocation(elementLocations, bandHeight);
                             }
 
+                            if (renumberSheets && selectedParameter == sheets[0].get_Parameter(BuiltInParameter.SHEET_NUMBER).Definition.Name)
+                            {
+                                var targets = Enumerable.Range(0, sheets.Count).Select(index => prefix +
+                                    (currentNumber + index).ToString(renamerWindow.SelectedNumberFormat == "001,002,003..." ? "D3" :
+                                        renamerWindow.SelectedNumberFormat == "0001,0002,0003..." ? "D4" : "D") + suffix).ToList();
+                                if (!isNumeric) throw new InvalidOperationException("Pour les numéros de feuilles, choisis un format numérique.");
+                                var selectedSet = new HashSet<ElementId>(selectedIds);
+                                if (new FilteredElementCollector(doc).OfClass(typeof(ViewSheet)).Cast<ViewSheet>()
+                                    .Any(sheet => !selectedSet.Contains(sheet.Id) && targets.Contains(sheet.SheetNumber)))
+                                    throw new InvalidOperationException("Un numéro demandé appartient déjà à une feuille hors sélection.");
+                                // Temporary unique values allow overlapping source/target sequences.
+                                foreach (ViewSheet sheet in sheets) sheet.SheetNumber = "BIMaestro-" + Guid.NewGuid().ToString("N");
+                            }
                             foreach (var elemLoc in sortedElements)
                             {
                                 Element element = elemLoc.Element;
@@ -217,6 +253,21 @@ namespace Modification
             }
 
             return Result.Cancelled;
+        }
+
+        private static int NaturalCompare(string left, string right)
+        {
+            string[] a = System.Text.RegularExpressions.Regex.Split(left ?? "", "([0-9]+)");
+            string[] b = System.Text.RegularExpressions.Regex.Split(right ?? "", "([0-9]+)");
+            for (int i = 0; i < Math.Min(a.Length, b.Length); i++)
+            {
+                int comparison;
+                if (long.TryParse(a[i], out long x) && long.TryParse(b[i], out long y))
+                    comparison = x.CompareTo(y);
+                else comparison = StringComparer.OrdinalIgnoreCase.Compare(a[i], b[i]);
+                if (comparison != 0) return comparison;
+            }
+            return a.Length.CompareTo(b.Length);
         }
 
         private Result RenameSelectedViewports(

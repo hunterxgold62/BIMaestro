@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
@@ -140,6 +140,8 @@ namespace BIMaestro.MepBooster
                     if (fresh[i].Flip != plans[i].Flip || Math.Abs(fresh[i].Angle - plans[i].Angle) > 1e-7)
                         throw new InvalidOperationException("L’orientation a changé depuis l’aperçu : recommencez la copie.");
                 Apply(doc, fresh);
+                MepBoosterService.TutorialCopy?.Invoke(doc, referenceId,
+                    fresh.Where(plan => plan.Flip || Math.Abs(plan.Angle) > 1e-7).Select(plan => plan.Part.Id));
             }
             finally { preview.Hide(); }
         }

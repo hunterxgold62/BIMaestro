@@ -576,7 +576,7 @@
                                             <StackPanel>
                                                 <TextBlock FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}" Text="Colorer un dossier" />
                                                 <TextBlock Margin="0,5,0,14" Style="{StaticResource Hint}" Text="Choisissez-le dans votre arborescence et voyez le résultat avant de l’appliquer." />
-                                                <Button HorizontalAlignment="Left" MinWidth="220" Style="{StaticResource PrimaryButton}" Content="Choisir un dossier…" Click="ChooseBrowserFolderButton_Click" />
+                                                <Button x:Name="TutorialChooseFolder" HorizontalAlignment="Left" MinWidth="220" Style="{StaticResource PrimaryButton}" Content="Choisir un dossier…" Click="ChooseBrowserFolderButton_Click" />
                                                 <Button x:Name="TutorialGoToIconsFromFolders" HorizontalAlignment="Left" Margin="0,8,0,0"
                                                         MinWidth="220" Style="{StaticResource SecondaryButton}"
                                                         Content="Ajouter une icône à un dossier…" Click="GoToBrowserIconsButton_Click" />
@@ -836,7 +836,7 @@
         <Border x:Name="AppearanceGuideCard" Grid.Row="1" Panel.ZIndex="100" Visibility="Collapsed"
                 HorizontalAlignment="Right" VerticalAlignment="Bottom" Width="320" Margin="12"
                 Padding="15" CornerRadius="12" Background="{DynamicResource Surface.Subtle}"
-                BorderBrush="DarkOrange" BorderThickness="2">
+                BorderBrush="#105638" BorderThickness="2">
             <StackPanel>
                 <StackPanel Orientation="Horizontal">
                     <Image x:Name="AppearanceGuideSprite" Width="30" Height="30" Margin="0,0,8,0" />

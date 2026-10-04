@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="BIMaestro — Bienvenue"
-        Width="610" Height="635"
+        Width="590" Height="715"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         WindowStyle="ToolWindow"
@@ -48,8 +48,7 @@
                     <Border.Background>
                         <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                             <GradientStop Color="#0F5132" Offset="0"/>
-                            <GradientStop Color="#188F69" Offset="0.72"/>
-                            <GradientStop Color="#D97706" Offset="1"/>
+                            <GradientStop Color="#188F69" Offset="1"/>
                         </LinearGradientBrush>
                     </Border.Background>
                     <Grid>
@@ -69,8 +68,30 @@
                     </Grid>
                 </Border>
 
-                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <ScrollViewer x:Name="WelcomeBody" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel Margin="22,18,30,14">
+                    <Border x:Name="TutorialOffer" Margin="0,0,0,16" Padding="18" CornerRadius="12"
+                            Background="#F3FAF6" BorderBrush="#C7E4D2" BorderThickness="1">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <Image x:Name="TutorialSprite" Width="40" Height="40" Margin="0,0,12,0"/>
+                                <TextBlock Text="Votre premier essai, avec Bulbizarre" FontSize="17"
+                                           FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <TextBlock Margin="0,10,0,16" Style="{StaticResource TrustText}"
+                                       FontSize="13.5" LineHeight="20"
+                                       Text="BIMaestro crée une maquette de formation séparée et l’ouvre dans Revit. Essayez les outils pas à pas ; vos projets restent intacts."/>
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="Commencer l’essai" Style="{StaticResource WelcomePrimaryButton}"
+                                        Click="OpenDemo_Click"/>
+                                <Button x:Name="TutorialLaterButton" Content="Me le rappeler demain"
+                                        Margin="10,0,0,0" Style="{StaticResource WelcomeSecondaryButton}"
+                                        Visibility="Collapsed" Click="Later_Click"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                    <StackPanel x:Name="EmailContent">
                     <TextBlock x:Name="IntroTitleText" Text="Souhaitez-vous rester informé ?" FontSize="18" FontWeight="SemiBold"
                                Foreground="{DynamicResource Text.Primary}"/>
                     <TextBlock x:Name="IntroText" Margin="0,5,0,0" Style="{StaticResource TrustText}"
@@ -128,10 +149,11 @@
                                     MinWidth="94" Height="34" Click="Contact_Click"/>
                         </Grid>
                     </Border>
+                    </StackPanel>
                 </StackPanel>
                 </ScrollViewer>
 
-                <Border Grid.Row="2" Padding="18,14" Background="{DynamicResource Surface.Subtle}"
+                <Border x:Name="WelcomeFooter" Grid.Row="2" Padding="18,14" Background="{DynamicResource Surface.Subtle}"
                         CornerRadius="0,0,18,18" BorderBrush="{DynamicResource Border}" BorderThickness="0,1,0,0">
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -141,7 +163,7 @@
                         </Grid.ColumnDefinitions>
                         <Button x:Name="NoThanksButton" Content="Continuer sans email" Style="{StaticResource WelcomeSecondaryButton}"
                                 Click="NoThanks_Click"/>
-                        <Button x:Name="LaterButton" Grid.Column="1" Content="Me le rappeler plus tard" Margin="10,0,0,0"
+                        <Button x:Name="LaterButton" Grid.Column="1" Content="Me le rappeler demain" Margin="10,0,0,0"
                                 HorizontalAlignment="Left" Style="{StaticResource WelcomeSecondaryButton}"
                                 Click="Later_Click"/>
                         <Button x:Name="PrimaryButton" Grid.Column="2" Content="Recevoir les nouveautés" Margin="10,0,0,0"

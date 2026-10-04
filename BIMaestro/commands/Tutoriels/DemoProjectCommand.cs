@@ -1,4 +1,4 @@
-using Autodesk.Revit.Attributes;
+﻿using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Plumbing;
 using Autodesk.Revit.DB.Mechanical;
@@ -21,17 +21,13 @@ namespace BIMaestro.Tutorials
         {
             try
             {
-                string path = DemoProjectBuilder.Create(data.Application);
-                DemoTourMessage.Show(data.Application.MainWindowHandle, "Pika ! Maquette prête",
-                    "Maquette de formation créée :\n" + path +
-                    "\n\nPikachu va te proposer les tutoriels disponibles.",
-                    "Choisir un tutoriel");
+                DemoProjectBuilder.Create(data.Application);
                 return Result.Succeeded;
             }
             catch (Exception ex)
             {
                 message = ex.Message;
-                DemoTourMessage.Show(data.Application.MainWindowHandle, "Pikachu a besoin d'aide",
+                DemoTourMessage.Show(data.Application.MainWindowHandle, "Bulbizarre a besoin d'aide",
                     "Création de la maquette impossible : " + ex.Message);
                 return Result.Failed;
             }
@@ -64,6 +60,7 @@ namespace BIMaestro.Tutorials
             bool saved = false;
             try
             {
+                CheckRequiredFamilies(doc);
                 using (var tx = new Transaction(doc, "BIMaestro - Construire la maquette de formation"))
                 {
                     tx.Start();
@@ -78,10 +75,6 @@ namespace BIMaestro.Tutorials
                         Line.CreateBound(new XYZ(M(-4), 0, 0), new XYZ(M(4), 0, 0)),
                         wallType.Id, level.Id, M(3), 0, false, false);
                     openingWall.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.Set(DemoPrefix + "RESERVATION_MUR");
-                    Wall historyWall = Wall.Create(doc,
-                        Line.CreateBound(new XYZ(M(-4), M(4), 0), new XYZ(M(1), M(4), 0)),
-                        wallType.Id, level.Id, M(3), 0, false, false);
-                    historyWall.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.Set(DemoPrefix + "HISTORIQUE_MODIFIER_MOI");
                     Wall.Create(doc, Line.CreateBound(new XYZ(M(-4), M(8), 0), new XYZ(M(1), M(8), 0)),
                         wallType.Id, level.Id, M(3), 0, false, false);
                     Wall.Create(doc, Line.CreateBound(new XYZ(M(-4), M(4), 0), new XYZ(M(-4), M(8), 0)),
@@ -90,7 +83,9 @@ namespace BIMaestro.Tutorials
                     PipingSystemType system = new FilteredElementCollector(doc)
                         .OfClass(typeof(PipingSystemType)).Cast<PipingSystemType>().FirstOrDefault();
                     PipeType pipeType = new FilteredElementCollector(doc)
-                        .OfClass(typeof(PipeType)).Cast<PipeType>().FirstOrDefault();
+                        .OfClass(typeof(PipeType)).Cast<PipeType>()
+                        .OrderByDescending(candidate => HasElbowRule(doc, candidate.RoutingPreferenceManager))
+                        .FirstOrDefault();
                     if (system == null || pipeType == null)
                         throw new InvalidOperationException("Le gabarit ne contient pas de canalisation MEP.");
                     EnsureElbowRule(doc, pipeType.RoutingPreferenceManager,
@@ -100,6 +95,7 @@ namespace BIMaestro.Tutorials
                     pipe.get_Parameter(BuiltInParameter.RBS_PIPE_DIAMETER_PARAM)?.Set(M(0.1));
                     pipe.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.Set(DemoPrefix + "RESERVATION_CANALISATION");
                     AddCalculationNetworks(doc, level, system, pipeType);
+                    AddBoosterScene(doc, level, system, pipeType);
                     AddOrganizerScene(doc, level);
                     CreateExcelScene(doc, level);
 
@@ -135,17 +131,16 @@ namespace BIMaestro.Tutorials
                     View3D organizerView = CreateTrainingView(doc, viewType, "BIMaestro - 05 Organisateur",
                         OrganizerSectionMin(), OrganizerSectionMax());
                     SetOrganizerInitialOrientation(organizerView);
+                    ConfigureOrganizerSceneView(doc, organizerView, level);
                     CreateTrainingView(doc, viewType, "BIMaestro - 06 Gabarit source",
                         new XYZ(M(-8), M(10), M(-0.5)), new XYZ(M(8), M(29), M(4)));
                     CreateTrainingView(doc, viewType, "BIMaestro - 07 Gabarit cible",
                         new XYZ(M(-8), M(10), M(-0.5)), new XYZ(M(8), M(29), M(4)));
                     StartingViewSettings.GetStartingViewSettings(doc).ViewId = mainView.Id;
 
-                    string familyPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                        "Revit", "Réservation", "CML_Réservation rectangulaire murale.rfa");
-                    if (!File.Exists(familyPath))
-                        throw new FileNotFoundException("Famille nécessaire à Auto résa introuvable : " + familyPath);
-                    if (!doc.LoadFamily(familyPath, out Family family) || family == null)
+                    string familyPath = TrainingFamilyPath("CML_Réservation rectangulaire murale");
+                    if (!HasFamily(doc, "CML_Réservation rectangulaire murale") &&
+                        (!doc.LoadFamily(familyPath, out Family family) || family == null))
                         throw new InvalidOperationException("La famille de réservation murale n'a pas pu être chargée.");
                     AddHistoryFurniture(doc, level);
                     tx.Commit();
@@ -198,6 +193,80 @@ namespace BIMaestro.Tutorials
             AddDuctRun(doc, level);
         }
 
+        internal static View3D EnsureBoosterScene(Document doc)
+        {
+            if (doc == null || !Path.GetFileName(doc.PathName).StartsWith("BIMaestro_Apprentissage_", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Ouvre la maquette de formation BIMaestro pour ce parcours.");
+            using (var tx = new Transaction(doc, "BIMaestro - Scène MEP Booster"))
+            {
+                tx.Start();
+                var level = new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>().OrderBy(item => Math.Abs(item.Elevation)).First();
+                var system = new FilteredElementCollector(doc).OfClass(typeof(PipingSystemType)).Cast<PipingSystemType>().First();
+                var type = new FilteredElementCollector(doc).OfClass(typeof(PipeType)).Cast<PipeType>()
+                    .OrderByDescending(item => HasElbowRule(doc, item.RoutingPreferenceManager)).First();
+                EnsureElbowRule(doc, type.RoutingPreferenceManager, Path.Combine("Pipe", "Fittings", "Generic", "M_Elbow - Welded - Generic.rfa"));
+                AddBoosterScene(doc, level, system, type);
+                tx.Commit();
+            }
+            return new FilteredElementCollector(doc).OfClass(typeof(View3D)).Cast<View3D>().First(view => view.Name == "BIMaestro - 09 MEP Booster");
+        }
+
+        private static void AddBoosterScene(Document doc, Level level, PipingSystemType system, PipeType type)
+        {
+            for (int row = 0; row < 2; row++)
+            {
+                string network = "BOOSTER_DN" + (row == 0 ? "100" : "50");
+                if (new FilteredElementCollector(doc).OfClass(typeof(Pipe)).Cast<Pipe>()
+                    .Any(pipe => (pipe.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ?? "").StartsWith(DemoPrefix + network)))
+                {
+                    AddBoosterExtraAccessories(doc, level, network, row == 0 ? 0.1 : 0.05);
+                    continue;
+                }
+                double y = 12 + row * 7;
+                double diameter = row == 0 ? 0.1 : 0.05;
+                AddPipeRun(doc, level, system, type, diameter, network, new[] {
+                    new XYZ(M(20), M(y), M(1.3)), new XYZ(M(26), M(y), M(1.3)),
+                    new XYZ(M(26), M(y + 4), M(1.3)), new XYZ(M(20), M(y + 4), M(1.3)) });
+                for (int segment = 2; segment <= 3; segment++)
+                {
+                    Pipe pipe = new FilteredElementCollector(doc).OfClass(typeof(Pipe)).Cast<Pipe>()
+                        .First(item => item.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() == DemoPrefix + network + "_" + segment);
+                    AddInlineTrainingValve(doc, level, pipe, diameter, network + "_ACCESSOIRE_" + segment);
+                }
+            }
+            foreach (string network in new[] { "BOOSTER_DN100", "BOOSTER_DN50" })
+                AddBoosterExtraAccessories(doc, level, network, network.EndsWith("100") ? 0.1 : 0.05);
+            if (!new FilteredElementCollector(doc).OfClass(typeof(View3D)).Cast<View3D>().Any(view => view.Name == "BIMaestro - 09 MEP Booster"))
+            {
+                var viewType = new FilteredElementCollector(doc).OfClass(typeof(ViewFamilyType)).Cast<ViewFamilyType>()
+                    .First(item => item.ViewFamily == ViewFamily.ThreeDimensional);
+                var view = CreateTrainingView(doc, viewType, "BIMaestro - 09 MEP Booster", new XYZ(M(18), M(10), M(0.5)), new XYZ(M(28), M(25), M(3)));
+                view.DetailLevel = ViewDetailLevel.Fine;
+                view.DisplayStyle = DisplayStyle.Shading;
+                XYZ forward = new XYZ(-1, 1, -0.8).Normalize();
+                XYZ right = forward.CrossProduct(XYZ.BasisZ).Normalize();
+                view.SetOrientation(new ViewOrientation3D(new XYZ(M(40), M(-15), M(35)), right.CrossProduct(forward).Normalize(), forward));
+            }
+        }
+
+        private static void AddBoosterExtraAccessories(Document doc, Level level, string network, double diameter)
+        {
+            var accessories = new[] {
+                new { Tag = "FILTRE", Family = "Filtre à tamis en Y - 50-500 mm - A brides", Segment = 1 },
+                new { Tag = "COMPTEUR", Family = "CML_Compteur d'eau à brides DN40-150", Segment = 3 }
+            };
+            foreach (var item in accessories)
+            {
+                string marker = network + "_" + item.Tag;
+                if (new FilteredElementCollector(doc).OfClass(typeof(FamilyInstance)).Cast<FamilyInstance>()
+                    .Any(instance => instance.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() == DemoPrefix + marker + "_VANNE")) continue;
+                var pipe = new FilteredElementCollector(doc).OfClass(typeof(Pipe)).Cast<Pipe>()
+                    .FirstOrDefault(element => element.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() == DemoPrefix + network + "_" + item.Segment);
+                if (pipe == null) throw new InvalidOperationException("Le tronçon prévu pour " + item.Family + " est introuvable.");
+                AddInlineTrainingValve(doc, level, pipe, diameter, marker, item.Family);
+            }
+        }
+
         private static void AddPipeRun(Document doc, Level level, PipingSystemType system,
             PipeType type, double diameter, string markPrefix, XYZ[] points)
         {
@@ -226,6 +295,117 @@ namespace BIMaestro.Tutorials
                 elbow.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.Set(
                     DemoPrefix + markPrefix + "_COUDE_" + index);
             }
+            AddInlineTrainingValve(doc, level, pipes[0], diameter, markPrefix);
+        }
+
+        internal static void EnsureCalculationValves(Document doc)
+        {
+            using (var transaction = new Transaction(doc, "BIMaestro - Ajouter les vannes de formation"))
+            {
+                transaction.Start();
+                foreach (string network in new[] { "CALCUL_DN100", "CALCUL_DN50" })
+                {
+                    string mark = DemoPrefix + network;
+                    if (new FilteredElementCollector(doc).OfClass(typeof(FamilyInstance)).Cast<FamilyInstance>()
+                        .Any(item => item.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() == mark + "_VANNE")) continue;
+                    Pipe pipe = new FilteredElementCollector(doc).OfClass(typeof(Pipe)).Cast<Pipe>()
+                        .FirstOrDefault(item => item.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() == mark + "_1");
+                    if (pipe == null) throw new InvalidOperationException("Le réseau " + network + " manque dans la maquette de formation.");
+                    AddInlineTrainingValve(doc, doc.GetElement(pipe.LevelId) as Level, pipe,
+                        network == "CALCUL_DN100" ? 0.1 : 0.05, network);
+                }
+                transaction.Commit();
+            }
+        }
+
+        private static void AddInlineTrainingValve(Document doc, Level level, Pipe pipe, double diameter, string network, string familyName = "Vanne papillon - 50-300 mm")
+        {
+            Family family = new FilteredElementCollector(doc).OfClass(typeof(Family)).Cast<Family>()
+                .FirstOrDefault(item => item.Name == familyName);
+            if (family == null && (!doc.LoadFamily(TrainingFamilyPath(familyName), out family) || family == null))
+                throw new InvalidOperationException("L’accessoire de formation n’a pas pu être chargé : " + familyName);
+            FamilySymbol source = family.GetFamilySymbolIds().Select(id => doc.GetElement(id) as FamilySymbol).First();
+            string typeName = "BIMaestro DN" + (diameter * 1000).ToString("0");
+            FamilySymbol symbol = family.GetFamilySymbolIds().Select(id => doc.GetElement(id) as FamilySymbol)
+                .FirstOrDefault(item => item.Name == typeName) ?? (FamilySymbol)source.Duplicate(typeName);
+            if (symbol.Category?.Id.GetIdValue() != (int)BuiltInCategory.OST_PipeAccessory)
+                throw new InvalidOperationException("La vanne doit appartenir à la catégorie Accessoires de canalisation.");
+            if (!symbol.IsActive) symbol.Activate();
+            string originalMark = pipe.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString();
+            XYZ middle = ((LocationCurve)pipe.Location).Curve.Evaluate(0.5, true);
+            FamilyInstance valve = doc.Create.NewFamilyInstance(middle, symbol, level, StructuralType.NonStructural);
+            foreach (Element element in new Element[] { symbol, valve })
+                foreach (string name in new[] { "Diamètre nominal", "Diamètre", "DN", "Diamètre Nominal", "Diamètre de raccordement", "Nominal Diameter", "Diameter" })
+                {
+                    Parameter parameter = element.LookupParameter(name);
+                    if (parameter != null && !parameter.IsReadOnly && parameter.StorageType == StorageType.Double &&
+                        (parameter.Definition.GetDataType() == SpecTypeId.Length ||
+                         parameter.Definition.GetDataType() == SpecTypeId.PipeSize)) parameter.Set(M(diameter));
+                }
+            doc.Regenerate();
+            var connectors = valve.MEPModel?.ConnectorManager?.Connectors.Cast<Connector>()
+                .Where(item => item.Domain == Domain.DomainPiping && item.ConnectorType == ConnectorType.End).ToList();
+            if (connectors == null || connectors.Count != 2)
+                throw new InvalidOperationException("L’accessoire " + familyName + " doit avoir deux connecteurs de canalisation.");
+            foreach (Connector connector in connectors)
+            {
+                if (Math.Abs(connector.Radius * 2 - M(diameter)) <= M(0.001)) continue;
+                if (!SetTrainingConnectorSize(valve, connector, BuiltInParameter.CONNECTOR_DIAMETER, M(diameter)))
+                    SetTrainingConnectorSize(valve, connector, BuiltInParameter.CONNECTOR_RADIUS, M(diameter) / 2);
+            }
+            doc.Regenerate();
+            connectors = valve.MEPModel.ConnectorManager.Connectors.Cast<Connector>()
+                .Where(item => item.Domain == Domain.DomainPiping && item.ConnectorType == ConnectorType.End).ToList();
+            if (connectors.Any(item => Math.Abs(item.Radius * 2 - M(diameter)) > M(0.001)))
+                throw new InvalidOperationException("Le diamètre des connecteurs de la vanne ne correspond pas au DN du réseau " + network +
+                    " (diamètres obtenus en mm : " + string.Join(", ", connectors.Select(item =>
+                        UnitUtils.ConvertFromInternalUnits(item.Radius * 2, UnitTypeId.Millimeters).ToString("0.##"))) + ").");
+            XYZ direction = (((LocationCurve)pipe.Location).Curve.GetEndPoint(1) -
+                ((LocationCurve)pipe.Location).Curve.GetEndPoint(0)).Normalize();
+            XYZ valveDirection = (connectors[1].Origin - connectors[0].Origin).Normalize();
+            double angle = Math.Atan2(valveDirection.CrossProduct(direction).Z, valveDirection.DotProduct(direction));
+            ElementTransformUtils.RotateElement(doc, valve.Id, Line.CreateBound(middle, middle + XYZ.BasisZ), angle);
+            doc.Regenerate();
+            ElementTransformUtils.MoveElement(doc, valve.Id, middle - (connectors[0].Origin + connectors[1].Origin) * 0.5);
+            doc.Regenerate();
+            connectors = connectors.OrderBy(item => item.Origin.DotProduct(direction)).ToList();
+            XYZ start = ((LocationCurve)pipe.Location).Curve.GetEndPoint(0);
+            XYZ end = ((LocationCurve)pipe.Location).Curve.GetEndPoint(1);
+            Pipe second = doc.GetElement(PlumbingUtils.BreakCurve(doc, pipe.Id, middle)) as Pipe;
+            Pipe first = pipe;
+            if (((LocationCurve)first.Location).Curve.GetEndPoint(0).DistanceTo(start) > M(0.01))
+            { first = second; second = pipe; }
+            ((LocationCurve)first.Location).Curve = Line.CreateBound(start, connectors[0].Origin);
+            ((LocationCurve)second.Location).Curve = Line.CreateBound(connectors[1].Origin, end);
+            first.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.Set(originalMark ?? DemoPrefix + network + "_1");
+            second.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.Set(DemoPrefix + network + "_VANNE_TRONCON");
+            valve.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.Set(DemoPrefix + network + "_VANNE");
+            doc.Regenerate();
+            NearestConnector(first, connectors[0].Origin).ConnectTo(connectors[0]);
+            NearestConnector(second, connectors[1].Origin).ConnectTo(connectors[1]);
+            doc.Regenerate();
+            if (!connectors[0].IsConnected || !connectors[1].IsConnected)
+                throw new InvalidOperationException("L’accessoire " + familyName + " n’est pas raccordé des deux côtés.");
+        }
+
+        private static bool SetTrainingConnectorSize(FamilyInstance valve, Connector connector,
+            BuiltInParameter connectorParameter, double value)
+        {
+            using (var info = connector.GetMEPConnectorInfo() as MEPFamilyConnectorInfo)
+            {
+                if (info == null) return false;
+                ElementId id = info.GetAssociateFamilyParameterId(new ElementId(connectorParameter));
+                if (id == ElementId.InvalidElementId) return false;
+                foreach (Element element in new Element[] { valve, valve.Symbol })
+                {
+                    Parameter parameter = element.Parameters.Cast<Parameter>().FirstOrDefault(item => item.Id == id);
+                    if (parameter == null && valve.Document.GetElement(id) is ParameterElement definition)
+                        parameter = element.get_Parameter(definition.GetDefinition());
+                    if (parameter != null && !parameter.IsReadOnly && parameter.StorageType == StorageType.Double)
+                        return parameter.Set(value);
+                }
+                return false;
+            }
         }
 
         private static void AddDuctRun(Document doc, Level level)
@@ -233,7 +413,9 @@ namespace BIMaestro.Tutorials
             MechanicalSystemType system = new FilteredElementCollector(doc)
                 .OfClass(typeof(MechanicalSystemType)).Cast<MechanicalSystemType>().FirstOrDefault();
             DuctType type = new FilteredElementCollector(doc).OfClass(typeof(DuctType))
-                .Cast<DuctType>().FirstOrDefault(candidate => candidate.Shape == ConnectorProfileType.Rectangular);
+                .Cast<DuctType>().Where(candidate => candidate.Shape == ConnectorProfileType.Rectangular)
+                .OrderByDescending(candidate => HasElbowRule(doc, candidate.RoutingPreferenceManager))
+                .FirstOrDefault();
             if (system == null || type == null)
                 throw new InvalidOperationException("Le gabarit MEP ne contient pas de système et de gaine rectangulaire pour l'exercice de calcul.");
             EnsureElbowRule(doc, type.RoutingPreferenceManager,
@@ -270,14 +452,34 @@ namespace BIMaestro.Tutorials
         private static void EnsureElbowRule(Document doc, RoutingPreferenceManager routing, string relativePath)
         {
             if (routing == null) throw new InvalidOperationException("Le type MEP n'a pas de préférences de routage.");
-            if (routing.GetNumberOfRules(RoutingPreferenceRuleGroupType.Elbows) > 0) return;
-            string root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Autodesk");
-            string familyPath = new[] { doc.Application.VersionNumber, "2023", "2022", "2021" }
-                .Distinct()
-                .Select(version => Path.Combine(root, "RVT " + version, "Libraries", "English", relativePath))
-                .FirstOrDefault(File.Exists);
+            if (HasElbowRule(doc, routing)) return;
+
+            // Un autre type du gabarit peut déjà référencer un coude utilisable.
+            bool isPipe = relativePath.StartsWith("Pipe", StringComparison.OrdinalIgnoreCase);
+            IEnumerable<MEPCurveType> otherTypes = isPipe
+                ? new FilteredElementCollector(doc).OfClass(typeof(PipeType)).Cast<MEPCurveType>()
+                : new FilteredElementCollector(doc).OfClass(typeof(DuctType)).Cast<DuctType>()
+                    .Where(candidate => candidate.Shape == ConnectorProfileType.Rectangular).Cast<MEPCurveType>();
+            FamilySymbol existingSymbol = otherTypes
+                .Select(candidate => ElbowSymbol(doc, candidate.RoutingPreferenceManager))
+                .FirstOrDefault(candidate => candidate != null);
+            if (existingSymbol != null)
+            {
+                routing.AddRule(RoutingPreferenceRuleGroupType.Elbows,
+                    new RoutingPreferenceRule(existingSymbol.Id, "Coude maquette BIMaestro"));
+                return;
+            }
+
+            string fileName = Path.GetFileName(relativePath);
+            string[] familyNames = isPipe
+                ? new[] { fileName, "Coude - Générique.rfa" }
+                : new[] { fileName, "Coude rectangulaire - En onglet.rfa" };
+            string packagedFolder = Path.Combine(Path.GetDirectoryName(typeof(DemoProjectBuilder).Assembly.Location),
+                "Demo", "Maquette", "Familles");
+            string familyPath = familyNames.Select(name => Path.Combine(packagedFolder, name)).FirstOrDefault(File.Exists);
             if (familyPath == null)
-                throw new FileNotFoundException("Famille de coude nécessaire à la scène MEP introuvable : " + relativePath);
+                throw new FileNotFoundException("Le coude de formation manque dans les ressources du plugin : " +
+                    string.Join(" ou ", familyNames) + ". Réinstallez BIMaestro avec le dossier Demo\\Maquette\\Familles.");
             Family family;
             if (!doc.LoadFamily(familyPath, out family) || family == null)
                 family = new FilteredElementCollector(doc).OfClass(typeof(Family)).Cast<Family>()
@@ -287,6 +489,44 @@ namespace BIMaestro.Tutorials
             if (symbol == null) throw new InvalidOperationException("La famille de coude n'a pas de type : " + familyPath);
             routing.AddRule(RoutingPreferenceRuleGroupType.Elbows,
                 new RoutingPreferenceRule(symbol.Id, "Coude maquette BIMaestro"));
+        }
+
+        private static bool HasFamily(Document doc, string name) =>
+            new FilteredElementCollector(doc).OfClass(typeof(Family)).Cast<Family>()
+                .Any(candidate => candidate.Name == name);
+
+        private static void CheckRequiredFamilies(Document doc)
+        {
+            string[] required = { "CML_Réservation rectangulaire murale", "CML_Parking", "CML_Table ronde + chaise" };
+            var missing = required.Where(name => !HasFamily(doc, name) && TrainingFamilyPath(name) == null).ToArray();
+            if (missing.Length > 0)
+                throw new FileNotFoundException("Des familles de la maquette d’essai manquent dans les ressources du plugin. " +
+                    "Réinstallez BIMaestro avec le dossier Demo\\Maquette\\Familles :\n" +
+                    string.Join("\n", missing));
+        }
+
+        private static string TrainingFamilyPath(string name)
+        {
+            string fileName = name + ".rfa";
+            string pluginFolder = Path.GetDirectoryName(typeof(DemoProjectBuilder).Assembly.Location);
+            string packaged = Path.Combine(pluginFolder, "Demo", "Maquette", "Familles", fileName);
+            if (File.Exists(packaged)) return packaged;
+            return null;
+        }
+
+        private static bool HasElbowRule(Document doc, RoutingPreferenceManager routing) =>
+            ElbowSymbol(doc, routing) != null;
+
+        private static FamilySymbol ElbowSymbol(Document doc, RoutingPreferenceManager routing)
+        {
+            if (routing == null) return null;
+            for (int index = 0; index < routing.GetNumberOfRules(RoutingPreferenceRuleGroupType.Elbows); index++)
+            {
+                RoutingPreferenceRule rule = routing.GetRule(RoutingPreferenceRuleGroupType.Elbows, index);
+                FamilySymbol symbol = doc.GetElement(rule.MEPPartId) as FamilySymbol;
+                if (symbol != null) return symbol;
+            }
+            return null;
         }
 
         private static XYZ OrganizerSectionMin() => new XYZ(M(-8), M(21), M(-0.5));
@@ -309,8 +549,7 @@ namespace BIMaestro.Tutorials
                 .FirstOrDefault(candidate => candidate.Name == "CML_Parking");
             if (family == null)
             {
-                string parkingPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                    "Revit", "A-Famille Revit", "Voiture-camion", "CML_Parking.rfa");
+                string parkingPath = TrainingFamilyPath("CML_Parking");
                 if (!File.Exists(parkingPath))
                     throw new FileNotFoundException("Famille CML_Parking nécessaire à Organisateur introuvable : " + parkingPath);
                 if (!doc.LoadFamily(parkingPath, out family) || family == null)
@@ -336,6 +575,7 @@ namespace BIMaestro.Tutorials
 
         private static void AddOrganizerScene(Document doc, Level baseLevel)
         {
+            DemoOrganizerExercise.EnsureSheets(doc);
             FamilySymbol symbol = OrganizerParkingSymbol(doc);
             Level upperLevel = OrganizerUpperLevel(doc, baseLevel);
             var existingMarks = new HashSet<string>(new FilteredElementCollector(doc)
@@ -390,7 +630,6 @@ namespace BIMaestro.Tutorials
             bool commentsNeedSync = organizerPlaces.Any(place =>
                 (place.LookupParameter("CML_Numéros de place")?.AsString() ?? "") !=
                 (place.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.AsString() ?? ""));
-            if (!missingParking && !viewNeedsExpansion && !commentsNeedSync) return;
             using (var tx = new Transaction(doc, "BIMaestro - Étendre la scène Organisateur"))
             {
                 tx.Start();
@@ -410,6 +649,7 @@ namespace BIMaestro.Tutorials
                     ConfigureTrainingView(view);
                 }
                 if (missingParking || viewNeedsExpansion) SetOrganizerInitialOrientation(view);
+                ConfigureOrganizerSceneView(doc, view, baseLevel);
                 if (commentsNeedSync)
                     foreach (FamilyInstance place in organizerPlaces)
                     {
@@ -421,6 +661,43 @@ namespace BIMaestro.Tutorials
                     }
                 tx.Commit();
             }
+        }
+
+        private static void ConfigureOrganizerSceneView(Document doc, View3D view, Level baseLevel)
+        {
+            var parking = new FilteredElementCollector(doc).OfClass(typeof(FamilyInstance))
+                .Cast<FamilyInstance>().Where(instance => instance.Symbol.Family.Name == "CML_Parking").ToList();
+            var places = parking.Where(instance =>
+                (instance.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ?? "")
+                .StartsWith(DemoPrefix + "ORGANISATEUR_", StringComparison.Ordinal)).ToList();
+            foreach (FamilyInstance place in places)
+            {
+                string mark = place.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString();
+                int index;
+                if (!int.TryParse(mark.Substring((DemoPrefix + "ORGANISATEUR_").Length), out index) ||
+                    !(place.Location is LocationPoint point)) continue;
+                double elevation = baseLevel.Elevation + (index > 4 ? M(3) : 0);
+                double delta = elevation - point.Point.Z;
+                if (Math.Abs(delta) > M(0.001))
+                    ElementTransformUtils.MoveElement(doc, place.Id, new XYZ(0, 0, delta));
+                if (place.IsHidden(view)) view.UnhideElements(new[] { place.Id });
+            }
+            doc.Regenerate();
+            var boxes = places.Select(place => place.get_BoundingBox(null)).Where(box => box != null).ToList();
+            if (boxes.Count > 0)
+            {
+                XYZ margin = new XYZ(M(0.75), M(0.75), M(0.75));
+                view.SetSectionBox(new BoundingBoxXYZ
+                {
+                    Min = new XYZ(boxes.Min(box => box.Min.X), boxes.Min(box => box.Min.Y), boxes.Min(box => box.Min.Z)) - margin,
+                    Max = new XYZ(boxes.Max(box => box.Max.X), boxes.Max(box => box.Max.Y), boxes.Max(box => box.Max.Z)) + margin
+                });
+            }
+            view.IsSectionBoxActive = true;
+            view.SetCategoryHidden(new ElementId(BuiltInCategory.OST_SectionBox), true);
+            var unrelated = parking.Except(places).Where(place => place.CanBeHidden(view) && !place.IsHidden(view))
+                .Select(place => place.Id).ToList();
+            if (unrelated.Count > 0) view.HideElements(unrelated);
         }
 
         internal static void ResetOrganizerViewOrientation(Document doc)
@@ -627,11 +904,15 @@ namespace BIMaestro.Tutorials
                     view.Name == "BIMaestro - 08 Parking Excel")
                 .Where(view => view.DetailLevel != ViewDetailLevel.Fine || view.DisplayStyle != DisplayStyle.FlatColors)
                 .ToList();
-            if (views.Count == 0) return;
+            var frontWalls = new FilteredElementCollector(doc).OfClass(typeof(Wall)).Cast<Wall>()
+                .Where(wall => wall.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() == DemoPrefix + "HISTORIQUE_MODIFIER_MOI")
+                .Select(wall => wall.Id).ToList();
+            if (views.Count == 0 && frontWalls.Count == 0) return;
 
             using (var tx = new Transaction(doc, "BIMaestro - Affichage des vues de formation"))
             {
                 tx.Start();
+                if (frontWalls.Count > 0) doc.Delete(frontWalls);
                 foreach (View3D view in views) ConfigureTrainingView(view);
                 tx.Commit();
             }
@@ -639,17 +920,16 @@ namespace BIMaestro.Tutorials
 
         private static void AddHistoryFurniture(Document doc, Level level)
         {
-            string documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-            string[] candidates =
+            Family furniture = new FilteredElementCollector(doc).OfClass(typeof(Family)).Cast<Family>()
+                .FirstOrDefault(candidate => candidate.Name == "CML_Table ronde + chaise");
+            if (furniture == null)
             {
-                Path.Combine(documents, "Revit", "CML_Table ronde + chaise.rfa"),
-                Path.Combine(documents, "Revit", "A-Famille Revit", "Mobilier", "CML_Table ronde + chaise.rfa")
-            };
-            string furniturePath = candidates.FirstOrDefault(File.Exists);
-            if (furniturePath == null)
-                throw new FileNotFoundException("Famille de mobilier nécessaire au parcours historique introuvable.");
-            if (!doc.LoadFamily(furniturePath, out Family furniture) || furniture == null)
-                throw new InvalidOperationException("La famille de mobilier n'a pas pu être chargée : " + furniturePath);
+                string furniturePath = TrainingFamilyPath("CML_Table ronde + chaise");
+                if (furniturePath == null)
+                    throw new FileNotFoundException("Famille de mobilier nécessaire au parcours historique introuvable.");
+                if (!doc.LoadFamily(furniturePath, out furniture) || furniture == null)
+                    throw new InvalidOperationException("La famille de mobilier n'a pas pu être chargée : " + furniturePath);
+            }
             FamilySymbol symbol = furniture.GetFamilySymbolIds().Select(id => doc.GetElement(id) as FamilySymbol)
                 .FirstOrDefault(candidate => candidate != null);
             if (symbol == null) throw new InvalidOperationException("La famille de mobilier ne contient aucun type.");
@@ -660,6 +940,7 @@ namespace BIMaestro.Tutorials
                 FamilyInstance instance = doc.Create.NewFamilyInstance(
                     HistoryFurniturePosition(i), symbol, level, StructuralType.NonStructural);
                 instance.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.Set(HistoryFurnitureMark(i));
+                DemoHistoryScene.ChairCount(instance).Set(4);
             }
         }
     }

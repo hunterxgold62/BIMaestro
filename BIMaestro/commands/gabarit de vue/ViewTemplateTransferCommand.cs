@@ -1,4 +1,4 @@
-using Autodesk.Revit.Attributes;
+﻿using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using BIMaestro.Localization;
@@ -60,12 +60,75 @@ namespace BIMaestro.ViewTemplates
                 UiLanguage.T("Importer dans la vue active", "Import into Active View"),
                 UiLanguage.T("Créer un vrai gabarit nommé ou appliquer les graphismes directement à la vue.", "Create a Named View Template or Apply Graphics Directly to the View."));
 
-            TaskDialogResult choice = dialog.Show();
+            TaskDialogResult choice = BIMaestro.Tutorials.DemoViewTemplateGuide.IsGuided(document)
+                ? GuidedChoice(data.Application.MainWindowHandle, "Gabarit de vue",
+                    BIMaestro.Tutorials.DemoViewTemplateGuide.IsImportStage(document) ? "La cible est bleue. Importe maintenant les réglages rouges de la source." : "La source est rouge et pointillée. Exporte ses réglages pour les transférer.",
+                    "Exporter la vue active", "Importer dans la vue active",
+                    BIMaestro.Tutorials.DemoViewTemplateGuide.IsImportStage(document) ? 2 : 1)
+                : dialog.Show();
             if (choice == TaskDialogResult.CommandLink1)
                 return Export(data, document, activeView);
             if (choice == TaskDialogResult.CommandLink2)
                 return Import(data.Application, document, activeView);
             return Result.Cancelled;
+        }
+
+        private static TaskDialogResult GuidedChoice(IntPtr owner, string title, string instruction,
+            string first, string second, int recommended)
+        {
+            var window = new System.Windows.Window { Title = "BIMaestro — " + title, Width = 560,
+                SizeToContent = System.Windows.SizeToContent.Height, ResizeMode = System.Windows.ResizeMode.NoResize,
+                ShowInTaskbar = false, WindowStartupLocation = System.Windows.WindowStartupLocation.CenterOwner,
+                Background = System.Windows.Media.Brushes.White };
+            new System.Windows.Interop.WindowInteropHelper(window).Owner = owner;
+            var panel = new System.Windows.Controls.StackPanel { Margin = new System.Windows.Thickness(22) };
+            window.Content = panel;
+            panel.Children.Add(new System.Windows.Controls.TextBlock { Text = title, FontSize = 22,
+                Foreground = BIMaestro.Tutorials.DemoTourPalette.Accent });
+            panel.Children.Add(new System.Windows.Controls.TextBlock { Text = instruction,
+                TextWrapping = System.Windows.TextWrapping.Wrap, Margin = new System.Windows.Thickness(0, 12, 0, 16) });
+            TaskDialogResult result = TaskDialogResult.Cancel;
+            for (int i = 1; i <= 2; i++)
+            {
+                int selected = i;
+                var button = new System.Windows.Controls.Button { Content = i == 1 ? first : second,
+                    Padding = new System.Windows.Thickness(14), HorizontalContentAlignment = System.Windows.HorizontalAlignment.Left,
+                    Margin = new System.Windows.Thickness(0, 5, 0, 5), Background = System.Windows.Media.Brushes.White,
+                    Foreground = BIMaestro.Tutorials.DemoTourPalette.Accent,
+                    BorderBrush = i == recommended ? BIMaestro.Tutorials.DemoTourPalette.Accent : System.Windows.Media.Brushes.LightGray,
+                    BorderThickness = new System.Windows.Thickness(i == recommended ? 3 : 1) };
+                button.Click += (_, __) => { result = selected == 1 ? TaskDialogResult.CommandLink1 : TaskDialogResult.CommandLink2; window.Close(); };
+                panel.Children.Add(button);
+            }
+            var cancel = new System.Windows.Controls.Button { Content = "Annuler", Padding = new System.Windows.Thickness(10),
+                HorizontalAlignment = System.Windows.HorizontalAlignment.Right, Margin = new System.Windows.Thickness(0, 10, 0, 0) };
+            cancel.Click += (_, __) => window.Close();
+            panel.Children.Add(cancel);
+            window.ShowDialog();
+            return result;
+        }
+
+        private static string GuidedName(IntPtr owner, string suggested)
+        {
+            var window = new System.Windows.Window { Title = "BIMaestro — Nom du gabarit", Width = 500,
+                SizeToContent = System.Windows.SizeToContent.Height, WindowStartupLocation = System.Windows.WindowStartupLocation.CenterOwner,
+                ShowInTaskbar = false, ResizeMode = System.Windows.ResizeMode.NoResize, Background = System.Windows.Media.Brushes.White };
+            new System.Windows.Interop.WindowInteropHelper(window).Owner = owner;
+            var panel = new System.Windows.Controls.StackPanel { Margin = new System.Windows.Thickness(22) };
+            window.Content = panel;
+            panel.Children.Add(new System.Windows.Controls.TextBlock { Text = "Donne un nom au gabarit", FontSize = 20,
+                Foreground = BIMaestro.Tutorials.DemoTourPalette.Accent });
+            var input = new System.Windows.Controls.TextBox { Text = suggested, Padding = new System.Windows.Thickness(10),
+                Margin = new System.Windows.Thickness(0, 14, 0, 14), BorderBrush = BIMaestro.Tutorials.DemoTourPalette.Accent,
+                BorderThickness = new System.Windows.Thickness(3) };
+            panel.Children.Add(input);
+            string result = null;
+            var apply = new System.Windows.Controls.Button { Content = "Créer et affecter à la cible", Padding = new System.Windows.Thickness(12),
+                Background = BIMaestro.Tutorials.DemoTourPalette.Accent, Foreground = System.Windows.Media.Brushes.White };
+            apply.Click += (_, __) => { if (!string.IsNullOrWhiteSpace(input.Text)) { result = input.Text.Trim(); window.Close(); } };
+            panel.Children.Add(apply);
+            window.ShowDialog();
+            return result;
         }
 
         private static Result Export(ExternalCommandData data, Document document, View activeView)
@@ -88,7 +151,10 @@ namespace BIMaestro.ViewTemplates
             filterDialog.AddCommandLink(
                 TaskDialogCommandLinkId.CommandLink2,
                 UiLanguage.T("Non, conserver les filtres du projet cible", "No, Keep Target Project Filters"));
-            TaskDialogResult filterChoice = filterDialog.Show();
+            TaskDialogResult filterChoice = BIMaestro.Tutorials.DemoViewTemplateGuide.IsGuided(document)
+                ? GuidedChoice(data.Application.MainWindowHandle, "Options d’export", "Choisis l’option encadrée pour inclure aussi les filtres dans le fichier.",
+                    "Oui, exporter les filtres", "Non, conserver les filtres du projet cible", 1)
+                : filterDialog.Show();
             if (filterChoice != TaskDialogResult.CommandLink1 && filterChoice != TaskDialogResult.CommandLink2)
                 return Result.Cancelled;
 
@@ -181,7 +247,10 @@ namespace BIMaestro.ViewTemplates
                 TaskDialogCommandLinkId.CommandLink2,
                 UiLanguage.T("Personnaliser uniquement la vue active", "Customize Only the Active View"),
                 UiLanguage.T("Le gabarit actuel sera détaché et les réglages deviendront propres à cette vue.", "The Current Template Will Be Detached and the Settings Will Become Specific to This View."));
-            TaskDialogResult mode = modeDialog.Show();
+            TaskDialogResult mode = BIMaestro.Tutorials.DemoViewTemplateGuide.IsGuided(document)
+                ? GuidedChoice(app.MainWindowHandle, "Mode d’import", "Choisis l’option encadrée : le gabarit sera enregistré dans le projet et affecté à la vue cible. Ses couleurs et ses traits doivent remplacer le style bleu.",
+                    "Créer / mettre à jour un vrai gabarit nommé", "Personnaliser uniquement la vue active", 1)
+                : modeDialog.Show();
             if (mode != TaskDialogResult.CommandLink1 && mode != TaskDialogResult.CommandLink2)
                 return Result.Cancelled;
 
@@ -189,7 +258,9 @@ namespace BIMaestro.ViewTemplates
             string templateName = package.SuggestedName;
             if (createTemplate)
             {
-                templateName = Microsoft.VisualBasic.Interaction.InputBox(
+                templateName = BIMaestro.Tutorials.DemoViewTemplateGuide.IsGuided(document)
+                    ? GuidedName(app.MainWindowHandle, "BIMaestro - Démo rouge pointillée")
+                    : Microsoft.VisualBasic.Interaction.InputBox(
                     UiLanguage.T("Nom du gabarit Revit à créer ou mettre à jour :", "Name of the Revit View Template to Create or Update:"),
                     UiLanguage.T("Nom du gabarit", "Template Name"),
                     string.IsNullOrWhiteSpace(package.SuggestedName) ? "Gabarit BIMaestro" : package.SuggestedName);

@@ -24,5 +24,7 @@ namespace BIMaestro.Welcome
         public bool ProfilePending { get; set; } = false;
 
         public string LastWelcomePromptVersion { get; set; } = null;
+        public bool TutorialOfferCompleted { get; set; } = false;
+        public DateTime? TutorialSnoozeUntilUtc { get; set; } = null;
     }
 }

@@ -21,14 +21,37 @@ namespace BIMaestro.Welcome
         public string Company => CompanyBox?.Text?.Trim();
         private readonly bool communityProfileRequired;
 
-        public WelcomeWindow() : this(false, null) { }
+        public WelcomeWindow() : this(false, null, true, true) { }
 
         internal WelcomeWindow(bool communityProfileRequired, WelcomeState existing)
+            : this(communityProfileRequired, existing, true, false) { }
+
+        internal WelcomeWindow(bool showEmail, bool showTutorial)
+            : this(false, null, showEmail, showTutorial) { }
+
+        private WelcomeWindow(bool communityProfileRequired, WelcomeState existing, bool showEmail, bool showTutorial)
         {
             this.communityProfileRequired = communityProfileRequired;
             ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
             LogoImage.Source = LoadBitmapFromResource("BIMaestro.png");
+            TutorialSprite.Source = Couleur.RibbonPanelColorScheme.CreateCompanionImage();
+            System.Windows.Media.RenderOptions.SetBitmapScalingMode(TutorialSprite,
+                System.Windows.Media.BitmapScalingMode.NearestNeighbor);
+            TutorialOffer.Visibility = showTutorial ? Visibility.Visible : Visibility.Collapsed;
+            EmailContent.Visibility = showEmail ? Visibility.Visible : Visibility.Collapsed;
+            if (showTutorial && showEmail)
+                PrimaryButton.Style = (Style)FindResource("WelcomeSecondaryButton");
+            if (!showEmail)
+            {
+                WelcomeFooter.Visibility = Visibility.Collapsed;
+                TutorialLaterButton.Visibility = Visibility.Visible;
+                TutorialOffer.Margin = new Thickness(0);
+                WelcomeBody.VerticalScrollBarVisibility = System.Windows.Controls.ScrollBarVisibility.Disabled;
+                SizeToContent = SizeToContent.Height;
+                Height = double.NaN;
+                HeadingSubtitleText.Text = "Prenez vos marques dans une maquette d’essai.";
+            }
             if (existing != null) { EmailBox.Text = existing.Email ?? ""; FirstNameBox.Text = existing.FirstName ?? ""; LastNameBox.Text = existing.LastName ?? ""; CompanyBox.Text = existing.Company ?? ""; }
             if (communityProfileRequired)
             {
@@ -89,6 +112,12 @@ namespace BIMaestro.Welcome
         private void Later_Click(object sender, RoutedEventArgs e)
         {
             ResultAction = WelcomeResultAction.Snooze;
+            Close();
+        }
+
+        private void OpenDemo_Click(object sender, RoutedEventArgs e)
+        {
+            ResultAction = WelcomeResultAction.OpenDemo;
             Close();
         }
 

@@ -44,6 +44,8 @@ namespace Famille
         private string previewTargetFolder;
         private string _tutorialOriginalFamiliesFolder;
         private string _tutorialOriginalImagesFolder;
+        private bool _tutorialFavoriteActionCompleted;
+        private bool _tutorialFavoriteExamplesPrepared;
         private bool _tutorialCatalogActive;
         private readonly Dictionary<string, bool> _tutorialFavoriteOriginalStates =
             new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
@@ -733,9 +735,7 @@ namespace Famille
         internal bool HasTutorialChaiseFavorite()
         {
             var favorites = _collections.FirstOrDefault(c => c.Id == FavoritesCollectionId);
-            return _tutorialCatalogActive &&
-                favorites?.Paths?.Any(p => IsTutorialFamilyPath(p) &&
-                    Path.GetFileNameWithoutExtension(p).IndexOf("chaise", StringComparison.OrdinalIgnoreCase) >= 0) == true;
+            return _tutorialCatalogActive && _tutorialFavoriteActionCompleted;
         }
 
         // The radial menu can show the tutorial star without persisting its RFA
@@ -828,7 +828,10 @@ namespace Famille
                 RefreshCollectionContent();
             if (isTutorialFamily && fam.IsFavorite &&
                 fam.Name.IndexOf("chaise", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                _tutorialFavoriteActionCompleted = true;
                 BIMaestro.Tutorials.DemoTourService.ReportAction(this, "favorite-added");
+            }
         }
 
         private void MarkFavoritesInView(IEnumerable<FamilyItem> items)
@@ -3468,9 +3471,25 @@ namespace Famille
                 string previewTarget = Path.Combine(imageRoot, "Mobilier", "Bureau", "Salle de réunion");
                 Directory.CreateDirectory(imageRoot);
                 Directory.CreateDirectory(previewTarget);
+                string packagedImages = Path.Combine(Path.GetDirectoryName(catalogue), "Images");
+                if (Directory.Exists(packagedImages))
+                {
+                    foreach (string source in Directory.EnumerateFiles(packagedImages, "*.png", SearchOption.AllDirectories))
+                    {
+                        string relative = source.Substring(packagedImages.Length + 1);
+                        // Leave the export exercise to the learner; retain their generated images.
+                        if (relative.StartsWith(Path.Combine("Mobilier", "Bureau", "Salle de réunion") +
+                            Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) continue;
+                        string target = Path.Combine(imageRoot, relative);
+                        Directory.CreateDirectory(Path.GetDirectoryName(target));
+                        if (!File.Exists(target)) File.Copy(source, target);
+                    }
+                }
 
                 _tutorialOriginalFamiliesFolder = familiesFolder;
                 _tutorialOriginalImagesFolder = imagesFolder;
+                _tutorialFavoriteActionCompleted = false;
+                _tutorialFavoriteExamplesPrepared = false;
                 _tutorialCatalogActive = true;
                 if (_index == null)
                 {
@@ -3542,6 +3561,34 @@ namespace Famille
         internal void PrepareTutorialStep(string target, string completionEvent)
         {
             if (!_tutorialCatalogActive) return;
+            if (completionEvent == "favorite-added" && !_tutorialFavoriteExamplesPrepared)
+            {
+                var chairs = displayedFamilies.Where(family => !family.IsFolder &&
+                    family.Name?.IndexOf("chaise", StringComparison.OrdinalIgnoreCase) >= 0)
+                    .OrderBy(family => family.Name, StringComparer.OrdinalIgnoreCase).ToList();
+                var examples = chairs.Skip(1).Take(2).ToList();
+                var favorites = GetFavoritesCollection();
+                if (chairs.Count > 0)
+                {
+                    string targetPath = chairs[0].Path;
+                    TrackTutorialFavoriteChange(targetPath);
+                    favorites.Paths.RemoveAll(path => string.Equals(path, targetPath, StringComparison.OrdinalIgnoreCase));
+                }
+                foreach (var family in examples)
+                {
+                    TrackTutorialFavoriteChange(family.Path);
+                    if (!favorites.Paths.Any(path => string.Equals(path, family.Path, StringComparison.OrdinalIgnoreCase)))
+                        favorites.Paths.Add(family.Path);
+                }
+                MarkFavoritesInView(displayedFamilies);
+                MarkFavoritesInView(allFamilies);
+                _tutorialFavoriteExamplesPrepared = examples.Count == 2;
+            }
+            if (target == "SearchMetadataAssistantButton")
+            {
+                SettingsTabItem.IsSelected = true;
+                SearchMetadataAssistantButton.BringIntoView();
+            }
             if (completionEvent == "load-bureau-commun") PrepareTutorialRosaceFavorites();
             if (completionEvent == "load-bureau-commun" ||
                 completionEvent == "search-metadata-manual" ||
@@ -3554,18 +3601,40 @@ namespace Famille
             }
         }
 
+        internal FrameworkElement FindTutorialMeetingFolderCard()
+        {
+            FamilyListView.UpdateLayout();
+            GroupedFamilyListView.UpdateLayout();
+            return FindTutorialMeetingFolderCard(FamilyListView) ??
+                FindTutorialMeetingFolderCard(GroupedFamilyListView);
+        }
+
+        private static FrameworkElement FindTutorialMeetingFolderCard(DependencyObject root)
+        {
+            if (root is Border border && border.IsVisible && border.DataContext is FamilyItem item &&
+                item.IsFolder && string.Equals(item.Name, "Salle de réunion", StringComparison.OrdinalIgnoreCase))
+                return border;
+            for (int index = 0; index < VisualTreeHelper.GetChildrenCount(root); index++)
+            {
+                FrameworkElement found = FindTutorialMeetingFolderCard(VisualTreeHelper.GetChild(root, index));
+                if (found != null) return found;
+            }
+            return null;
+        }
+
         internal FrameworkElement FindTutorialFavoriteStar()
         {
-            if (!_tutorialCatalogActive || GroupedFamilyListView == null) return null;
+            if (!_tutorialCatalogActive) return null;
+            FamilyListView.UpdateLayout();
             GroupedFamilyListView.UpdateLayout();
-            return FindTutorialFavoriteStar(GroupedFamilyListView);
+            return FindTutorialFavoriteStar(FamilyListView) ?? FindTutorialFavoriteStar(GroupedFamilyListView);
         }
 
         private static FrameworkElement FindTutorialFavoriteStar(DependencyObject root)
         {
             if (root is Button button &&
                 string.Equals(button.Tag as string, "TutorialFavoriteStar", StringComparison.Ordinal) &&
-                button.DataContext is FamilyItem family &&
+                button.DataContext is FamilyItem family && !family.IsFavorite &&
                 family.Name?.IndexOf("chaise", StringComparison.OrdinalIgnoreCase) >= 0 &&
                 button.IsVisible)
                 return button;
@@ -4874,7 +4943,7 @@ namespace Famille
             {
                 BIMaestro.Tutorials.DemoTourMessage.Show(
                     new System.Windows.Interop.WindowInteropHelper(this).Handle,
-                    "Pika ! Tes chemins sont protégés",
+                    "Bravo ! Tes chemins sont protégés",
                     "Pendant le tutoriel, BIMaestro utilise un catalogue temporaire sans modifier tes chemins enregistrés. Termine ou quitte le guide, puis reviens dans Paramètres > Modifier les chemins… pour choisir ta propre bibliothèque.");
                 return;
             }
@@ -4906,7 +4975,9 @@ namespace Famille
             }
 
             var review = new FamilySearchReviewWindow(entries, familiesFolder, imagesFolder) { Owner = this };
+            if (_tutorialCatalogActive) review.PrepareTutorial();
             review.ShowDialog();
+            if (_tutorialCatalogActive) BIMaestro.Tutorials.DemoTourService.ReportAction(this, "search-assistant-closed");
 
             if (review.SavedPaths.Count == 0)
                 return;

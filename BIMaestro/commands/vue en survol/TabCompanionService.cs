@@ -45,7 +45,7 @@ namespace BIMaestro.ViewHover
 
         internal static void UpdateButton() => AppUI.UpdatePushButtonPresentation(
             "TabCompanionToggle", _enabled ? "Compagnon : ON" : "Compagnon : OFF",
-            "Un Pikachu pixel suit la souris sur la barre des onglets. Cliquez pour activer ou désactiver.");
+            "Un Bulbizarre pixel suit la souris sur la barre des onglets. Cliquez pour activer ou désactiver.");
 
         internal static void ToggleWindowTest(IntPtr owner)
         {
@@ -67,7 +67,7 @@ namespace BIMaestro.ViewHover
 
         internal static void UpdateWindowButton() => AppUI.UpdatePushButtonPresentation(
             "WindowCompanionToggle", _windowCompanion != null ? "Compagnon fenêtre : ON" : "Compagnon fenêtre : OFF",
-            "Test : Pikachu suit la souris dans la fenêtre principale Revit, y compris au-dessus de la maquette. Désactivez pour retrouver le mode onglets.");
+            "Test : Bulbizarre suit la souris dans la fenêtre principale Revit, y compris au-dessus de la maquette. Désactivez pour retrouver le mode onglets.");
 
         internal static void Refresh(IEnumerable<TabItem> tabs)
         {

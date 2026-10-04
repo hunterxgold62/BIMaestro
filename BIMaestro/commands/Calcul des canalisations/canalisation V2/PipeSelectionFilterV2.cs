@@ -564,7 +564,13 @@ namespace Analyse
                     sb.AppendLine($"Total : {totalDuctFittingLength:F2} m");
                     sb.AppendLine();
                 }
-                // Remarque : Le tableau "Accessoires de canalisations (approximatif)" sera traité plus bas.
+                if (pipeAccessoryCounts.Count > 0)
+                {
+                    sb.AppendLine();
+                    sb.AppendLine(UiLanguage.T("Accessoires de canalisation (nombre par famille) :", "Pipe accessories (count by family):"));
+                    foreach (var accessory in pipeAccessoryCounts.OrderBy(pair => pair.Key))
+                        sb.AppendLine(accessory.Key + " : " + accessory.Value);
+                }
                 TaskDialog.Show(UiLanguage.T("Résultats", "Results"), sb.ToString());
 
                 // Déterminer le système unique pour le nom du fichier (si applicable)
@@ -613,7 +619,7 @@ namespace Analyse
                 if (guidedExercise)
                     BIMaestro.Tutorials.DemoCalculationExercise.Verify(commandData.Application,
                         selectedIds, includeDucts, exportToExcel, excelFilePath,
-                        pipeLengths, ductLengths, ductFittingLengths, elbowCounts);
+                        pipeLengths, ductLengths, ductFittingLengths, elbowCounts, pipeAccessoryCounts);
                 return Result.Succeeded;
             }
             catch (Exception ex)

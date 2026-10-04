@@ -19,6 +19,10 @@ Compression=lzma
 SolidCompression=yes
 
 [Files]
+; Le catalogue et ses PNG sont obligatoires dans la distribution.
+#if !FileExists("bin\Release\Demo\NavigateurFamilles\Images\Mobilier\Bureau\Bureau commun.png") || !FileExists("bin\Release\Demo\Maquette\Familles\CML_Parking.rfa") || !FileExists("bin\Release\Demo\Maquette\Familles\Coude - Générique.rfa")
+  #error Compilez Release avec toutes les ressources de formation avant de creer l'installateur.
+#endif
 ; Version de test : le module de base compilé avec l'API Revit 2023 est utilisé
 ; pour toutes les versions de Revit ciblées.
 Source: "bin\Release\*.*"; \

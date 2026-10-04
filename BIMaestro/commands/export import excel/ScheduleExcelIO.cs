@@ -1,4 +1,4 @@
-﻿// ScheduleExcelIO.cs
+// ScheduleExcelIO.cs
 // Revit 2023 & 2025 – Export/Import Nomenclature <-> Excel (NPOI 2.6.x)
 // v4.8
 // - Fix: "Famille" lisée depuis ElementType.FamilyName (ou Family.Name), "Type" depuis ElementType.Name
@@ -295,8 +295,8 @@ namespace ScheduleIO
             if (guidedExport || guidedImport)
                 Couleur.AppearanceOnboarding.ConsumeTourClick("excel");
             var td = new TaskDialog(UiLanguage.T("Nomenclature ↔ Excel", "Schedule ↔ Excel"));
-            td.MainInstruction = guidedExport ? "Pikachu · Étape 1/2 : exporter la nomenclature" :
-                guidedImport ? "Pikachu · Étape 2/2 : importer le fichier modifié" :
+            td.MainInstruction = guidedExport ? "Bulbizarre · Étape 1/2 : exporter la nomenclature" :
+                guidedImport ? "Bulbizarre · Étape 2/2 : importer le fichier modifié" :
                 UiLanguage.T("Que veux-tu faire ?", "What would you like to do?");
             td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, UiLanguage.T("Exporter la nomenclature vers Excel", "Export the schedule to Excel"));
             td.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, UiLanguage.T("Importer les modifications depuis Excel", "Import changes from Excel"));
@@ -308,7 +308,7 @@ namespace ScheduleIO
                 if (guidedImport)
                 {
                     BIMaestro.Tutorials.DemoTourMessage.Show(data.Application.MainWindowHandle,
-                        "Pikachu attend l'import", "Le classeur est déjà exporté. Modifie au moins un numéro ou un secteur dans « Nomenclature », garde le repère intact, enregistre le fichier, puis choisis « Importer ».");
+                        "Bulbizarre attend l'import", "Le classeur est déjà exporté. Modifie au moins un numéro ou un secteur dans « Nomenclature », garde le repère intact, enregistre le fichier, puis choisis « Importer ».");
                     Couleur.AppearanceOnboarding.StartIntro(data.Application.MainWindowHandle, "excel");
                     return Result.Cancelled;
                 }
@@ -319,7 +319,7 @@ namespace ScheduleIO
                 if (guidedExport)
                 {
                     BIMaestro.Tutorials.DemoTourMessage.Show(data.Application.MainWindowHandle,
-                        "Pikachu attend l'export", "Commence par « Exporter la nomenclature vers Excel ».");
+                        "Bulbizarre attend l'export", "Commence par « Exporter la nomenclature vers Excel ».");
                     Couleur.AppearanceOnboarding.StartIntro(data.Application.MainWindowHandle, "excel");
                     return Result.Cancelled;
                 }
@@ -637,7 +637,7 @@ namespace ScheduleIO
             {
                 if (BIMaestro.Tutorials.DemoExcelExercise.NeedsImport(data.Application.ActiveUIDocument?.Document))
                     BIMaestro.Tutorials.DemoTourMessage.Show(data.Application.MainWindowHandle,
-                        "Pikachu attend le fichier", "Enregistre puis ferme le classeur Excel avant de relancer l'import. " + ex.Message);
+                        "Bulbizarre attend le fichier", "Enregistre puis ferme le classeur Excel avant de relancer l'import. " + ex.Message);
                 message = ex.Message;
                 return Result.Failed;
             }

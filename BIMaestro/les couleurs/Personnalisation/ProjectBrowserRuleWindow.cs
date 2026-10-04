@@ -65,6 +65,10 @@ namespace Couleur
         private bool _suppressDraft;
         private bool _draftDirty;
         private ProjectBrowserCategoryColorRule _appliedRule;
+        private int _textColorGuideStep = -1;
+        private Color? _textColorGuideInitial;
+        private TextBlock _textColorGuideText;
+        internal bool TextColorTutorialCompleted { get; private set; }
 
         public ProjectBrowserRuleWindow(
             Document document,
@@ -219,7 +223,11 @@ namespace Couleur
             fields.Children.Add(new TextBlock { Text = "Couleur", FontWeight = FontWeights.SemiBold });
             _color.SelectedColor = Color.FromRgb(93, 159, 229);
             _color.Margin = new Thickness(0, 6, 0, 18);
-            _color.SelectedColorChanged += (_, __) => MarkDraftDirty();
+            _color.SelectedColorChanged += (_, __) =>
+            {
+                MarkDraftDirty();
+                UpdateTextColorTutorial();
+            };
             fields.Children.Add(_color);
 
             fields.Children.Add(new TextBlock { Text = "Où afficher cet effet ?", FontWeight = FontWeights.SemiBold });
@@ -291,6 +299,76 @@ namespace Couleur
             OnSelectionChanged();
             if (existing != null) LoadRuleIntoEditor(existing);
             UpdateTreePreview();
+        }
+
+        internal void StartTextColorTutorial()
+        {
+            var title = (StackPanel)((Grid)Content).Children[0];
+            var guide = new Border
+            {
+                Background = BIMaestro.Tutorials.DemoTourPalette.Highlight,
+                BorderBrush = BIMaestro.Tutorials.DemoTourPalette.Accent,
+                BorderThickness = new Thickness(2),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(12),
+                Margin = new Thickness(0, 12, 0, 0)
+            };
+            var row = new DockPanel();
+            guide.Child = row;
+            var sprite = new Image
+            {
+                Source = RibbonPanelColorScheme.CreateCompanionImage(),
+                Width = 42, Height = 42, Margin = new Thickness(0, 0, 12, 0)
+            };
+            RenderOptions.SetBitmapScalingMode(sprite, BitmapScalingMode.NearestNeighbor);
+            row.Children.Add(sprite);
+            _textColorGuideText = new TextBlock
+            {
+                FontSize = 14, TextWrapping = TextWrapping.Wrap,
+                Foreground = BIMaestro.Tutorials.DemoTourPalette.Accent,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            row.Children.Add(_textColorGuideText);
+            title.Children.Add(guide);
+            _textColorGuideStep = 0;
+            UpdateTextColorTutorial();
+        }
+
+        private void UpdateTextColorTutorial(bool resetColor = false)
+        {
+            if (_loading || _textColorGuideStep < 0 || _textColorGuideStep == 4) return;
+            if (DraftRule() == null) _textColorGuideStep = 0;
+            else if (SelectedEffect != "Texte") _textColorGuideStep = 1;
+            else
+            {
+                if (resetColor || _textColorGuideStep < 2)
+                    _textColorGuideInitial = _color.SelectedColor;
+                _textColorGuideStep = _color.SelectedColor.HasValue &&
+                    _color.SelectedColor != _textColorGuideInitial ? 3 : 2;
+            }
+            RenderTextColorTutorial();
+        }
+
+        private void RenderTextColorTutorial()
+        {
+            switch (_textColorGuideStep)
+            {
+                case 0:
+                    _textColorGuideText.Text = "1/4 · Choisis un dossier sous « Vues » dans l’arborescence à gauche, par exemple « Plans d’étage ».";
+                    break;
+                case 1:
+                    _textColorGuideText.Text = "2/4 · Dans « Apparence », à droite, choisis « Texte » pour changer la couleur des noms du dossier.";
+                    break;
+                case 2:
+                    _textColorGuideText.Text = "3/4 · Choisis une autre couleur dans « Couleur », par exemple un vert foncé sur fond clair. Compare le texte dans l’aperçu à gauche. Le guide attend une vraie modification.";
+                    break;
+                case 3:
+                    _textColorGuideText.Text = "4/4 · Choisis où afficher cet effet : le dossier seul ou toute sa branche. Clique ensuite sur « " + _applyButton.Content + " ». Ce bouton applique réellement ton choix ; tu peux l’annuler avec « Annuler la dernière application ».";
+                    break;
+                case 4:
+                    _textColorGuideText.Text = "La couleur du texte est appliquée. Clique sur « Fermer » pour revenir au guide et continuer vers les icônes.";
+                    break;
+            }
         }
 
         private void LoadBrowser(Document document)
@@ -489,6 +567,7 @@ namespace Couleur
                 ? _rules.FirstOrDefault(rule => string.Equals(rule.FolderPath, node.FolderPath,
                     StringComparison.OrdinalIgnoreCase)) : null;
             LoadRuleIntoEditor(saved);
+            UpdateTextColorTutorial(resetColor: true);
         }
 
         private void LoadRuleIntoEditor(ProjectBrowserCategoryColorRule rule)
@@ -521,6 +600,7 @@ namespace Couleur
             var saved = draft == null ? null : _rules.FirstOrDefault(rule => SameRule(rule, draft));
             if (saved != null) LoadRuleIntoEditor(saved);
             else MarkDraftDirty();
+            UpdateTextColorTutorial(resetColor: true);
         }
 
         private void MarkDraftDirty()
@@ -738,6 +818,8 @@ namespace Couleur
             }
             try
             {
+                bool completesTextColorTutorial = _textColorGuideStep == 3 && rule.Effect == "Texte" &&
+                    rule.Color != _textColorGuideInitial;
                 _isApplying = true;
                 _applyButton.IsEnabled = false;
                 _status.Text = _appliesToProject ? "Application au projet en cours…" : "Application en cours…";
@@ -760,6 +842,12 @@ namespace Couleur
                     _status.Text = _appliesToProject
                         ? "Appliqué à Revit et à la maquette. Enregistrez ou synchronisez le projet pour le partager."
                         : "Appliqué à Revit sur ce poste. La maquette n’a pas été modifiée.";
+                    if (completesTextColorTutorial)
+                    {
+                        TextColorTutorialCompleted = true;
+                        _textColorGuideStep = 4;
+                        RenderTextColorTutorial();
+                    }
                 });
             }
             catch (Exception error)
