@@ -18,6 +18,8 @@ using NPOI.XSSF.UserModel;
 using OxyPlot;
 using OxyPlot.Axes;
 using OxyPlot.Series;
+using FontWeights = System.Windows.FontWeights;
+using LineStyle = OxyPlot.LineStyle;
 
 namespace BIMaestro.Dashboard
 {
