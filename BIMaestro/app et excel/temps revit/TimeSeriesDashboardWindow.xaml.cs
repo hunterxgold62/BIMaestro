@@ -282,8 +282,11 @@ namespace BIMaestro.Dashboard
             if (dialog.ShowDialog(this) != true) return;
             try
             {
+                var filters = new List<string> { "Type : " + ((ComboBoxItem)Kind.SelectedItem).Content, "Revit : " + Version.SelectedItem };
+                if (!string.IsNullOrWhiteSpace(Search.Text)) filters.Add("Recherche : " + Search.Text);
+                if (!string.IsNullOrWhiteSpace(ParameterSearch.Text)) filters.Add("Paramètres : " + ParameterSearch.Text);
                 TimePdfReport.Write(dialog.FileName, From.SelectedDate?.Date ?? DateTime.Today.AddDays(-14), To.SelectedDate?.Date ?? DateTime.Today, _detail, _detailTotals,
-                    "Type : " + ((ComboBoxItem)Kind.SelectedItem).Content + " · Revit : " + Version.SelectedItem + " · Recherche : " + Search.Text + " · Paramètres : " + ParameterSearch.Text, PdfColor(ThemeColor("Brand")));
+                    string.Join(" · ", filters), PdfColor(ThemeColor("Brand")));
                 MessageBox.Show(this, "Rapport PDF enregistré.", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex) { MessageBox.Show(this, "Export PDF impossible : " + ex.Message, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Error); }
@@ -332,7 +335,21 @@ namespace BIMaestro.Dashboard
         private static readonly Encoding Encoding = System.Text.Encoding.GetEncoding(1252, EncoderFallback.ReplacementFallback, DecoderFallback.ReplacementFallback);
         private static string Number(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
         private static string Literal(string value) => (value ?? "").Replace("\\", "\\\\").Replace("(", "\\(").Replace(")", "\\)").Replace("\r", " ").Replace("\n", " ");
-        private static string Short(string value, int max) => string.IsNullOrEmpty(value) ? "—" : value.Length <= max ? value : value.Substring(0, max - 1) + "…";
+        // Standard Helvetica/Helvetica-Bold WinAnsi advances (1/1000 em).
+        // Use the same metrics as the PDF fonts, including accents, when wrapping.
+        private static readonly int[] RegularWidths = { 761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584,761,556,761,222,556,333,1000,556,556,333,1000,667,333,1000,761,611,761,761,222,222,333,333,350,556,1000,333,1000,500,333,944,761,500,667,278,333,556,556,556,556,260,556,333,737,370,556,584,333,737,333,400,584,333,333,333,556,537,278,333,333,365,556,834,834,834,611,667,667,667,667,667,667,1000,722,667,667,667,667,278,278,278,278,722,722,778,778,778,778,778,584,778,722,722,722,722,667,667,611,556,556,556,556,556,556,889,500,556,556,556,556,278,278,278,278,556,556,556,556,556,556,556,584,611,556,556,556,556,500,556,500 };
+        private static readonly int[] BoldWidths = { 761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,761,278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,333,278,333,584,556,333,556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,389,280,389,584,761,556,761,278,556,500,1000,556,556,333,1000,667,333,1000,761,611,761,761,278,278,500,500,350,556,1000,333,1000,556,333,944,761,500,667,278,333,556,556,556,556,280,556,333,737,370,556,584,333,737,333,400,584,333,333,333,611,556,278,333,333,365,556,834,834,834,611,722,722,722,722,722,722,1000,722,667,667,667,667,278,278,278,278,722,722,778,778,778,778,778,584,778,722,722,722,722,667,667,611,556,556,556,556,556,556,889,556,556,556,556,556,278,278,278,278,611,611,611,611,611,611,611,584,611,611,611,611,611,556,611,556 };
+        private static double Width(string value, int size, bool bold = false)
+            => Encoding.GetBytes(value ?? "").Sum(c => (bold ? BoldWidths : RegularWidths)[c]) * size / 1000.0;
+        private static string Short(string value, double width, int size, bool bold = false)
+        {
+            value = string.IsNullOrWhiteSpace(value) ? "-" : value;
+            if (Width(value, size, bold) <= width) return value;
+            while (value.Length > 0 && Width(value + "…", size, bold) > width) value = value.Substring(0, value.Length - 1);
+            return value + "…";
+        }
+        private static void RightText(StringBuilder page, string value, double right, double y, int size = 10, bool bold = false)
+            => Text(page, value, right - Width(value, size, bold), y, size, bold);
         private static void Text(StringBuilder page, string value, double x, double y, int size = 10, bool bold = false)
             => page.Append("BT /").Append(bold ? "F2" : "F1").Append(' ').Append(size).Append(" Tf 0.12 0.18 0.26 rg ").Append(Number(x)).Append(' ').Append(Number(y)).Append(" Td (").Append(Literal(value)).Append(") Tj ET\n");
         private static void Rect(StringBuilder page, double x, double y, double width, double height, string color)
@@ -347,37 +364,57 @@ namespace BIMaestro.Dashboard
                 Rect(page, 0, 785, 595, 57, brandColor);
                 page.Append("BT /F2 18 Tf 1 1 1 rg 36 806 Td (BIMaestro | Rapport de temps) Tj ET\n");
                 Text(page, start.ToString("dd/MM/yyyy") + " au " + end.ToString("dd/MM/yyyy") + " · temps actif", 36, 763, 11);
-                Text(page, "Maquette / famille", 36, 721, 10, true); Text(page, "Temps", 350, 721, 10, true); Text(page, "Jours", 432, 721, 10, true); Text(page, "Dernière activité", 477, 721, 9, true);
-                y = 699;
+                y = 724;
             };
+            Action detailHeading = () => {
+                Text(page, "Détail de la sélection", 36, y, 12, true); y -= 28;
+                Rect(page, 36, y - 9, 523, 25, "0.96 0.97 0.98");
+                Text(page, "Maquette / famille", 42, y, 9, true);
+                RightText(page, "Temps actif", 400, y, 9, true);
+                RightText(page, "Jours", 447, y, 9, true);
+                RightText(page, "Dernière activité", 553, y, 9, true);
+                y -= 30;
+            };
+            Action detailPage = () => { newPage(); detailHeading(); };
             newPage();
-            Text(page, "Total : " + TimeSeriesDashboardWindow.Duration(rows.Sum(x => x.Hours)) + " · " + totals.Count + " document(s)", 36, y, 14, true); y -= 25;
+            Text(page, "Total : " + TimeSeriesDashboardWindow.Duration(rows.Sum(x => x.Hours)) + " · " + totals.Count + (totals.Count == 1 ? " document" : " documents"), 36, y, 16, true); y -= 26;
             Text(page, "Dont sessions ouvertes : " + TimeSeriesDashboardWindow.Duration(rows.Where(x => x.Live).Sum(x => x.Hours)), 36, y); y -= 18;
-            foreach (string line in Wrap(filters, 96)) { Text(page, line, 36, y, 9); y -= 14; }
+            foreach (string line in Wrap(filters, 523, 9)) { if (y < 70) newPage(); Text(page, line, 36, y, 9); y -= 14; }
+            if (y < 110) newPage();
             Text(page, "Week-ends inclus · historique local et sessions ouvertes de cette instance.", 36, y, 9); y -= 30;
-            Text(page, "Répartition du temps par maquette", 36, y, 12, true); y -= 22;
-            double max = Math.Max(0.001, totals.Max(x => x.Hours));
+            Text(page, "Répartition du temps par document", 36, y, 12, true); y -= 22;
+            double max = Math.Max(0.001, totals.Select(x => x.Hours).DefaultIfEmpty(0).Max());
             foreach (var total in totals.Take(8))
             {
-                Text(page, Short(total.Name, 44), 36, y, 9);
-                Rect(page, 272, y - 1, 190 * total.Hours / max, 8, "0.18 0.50 0.93");
-                Text(page, total.Duration, 477, y, 9); y -= 22;
+                if (y < 70) { newPage(); Text(page, "Répartition du temps par document (suite)", 36, y, 12, true); y -= 26; }
+                Text(page, Short(total.Name, 224, 9), 36, y, 9);
+                Rect(page, 272, y - 1, 190 * total.Hours / max, 8, brandColor);
+                RightText(page, total.Duration, 559, y, 9); y -= 22;
             }
+            if (totals.Count > 8) { Text(page, "Les 8 documents les plus utilisés ; la liste complète figure ci-dessous.", 36, y, 9); y -= 18; }
+            if (totals.Count == 0) { Text(page, "Aucune activité sur cette sélection.", 36, y, 10); y -= 22; }
             y -= 20;
-            Text(page, "Détail de la sélection", 36, y, 12, true); y -= 24;
+            var first = totals.FirstOrDefault();
+            int firstHeight = first == null ? 0 : Wrap(string.IsNullOrWhiteSpace(first.Name) ? "Sans nom" : first.Name, 290, 10, true).Count() * 14
+                + (Wrap(first.Path, 523, 8).Count() + Wrap("Revit : " + first.Versions, 523, 8).Count()) * 11 + 14;
+            // Keep the section heading, column labels and first row together.
+            if (y - 58 - Math.Min(firstHeight, 606) < 60) newPage();
+            detailHeading();
             foreach (var total in totals)
             {
-                var nameLines = Wrap(total.Name, 49).ToList();
-                var pathLines = Wrap(total.Path, 105).ToList();
-                int height = Math.Max(1, nameLines.Count) * 14 + pathLines.Count * 11 + 28;
+                var nameLines = Wrap(string.IsNullOrWhiteSpace(total.Name) ? "Sans nom" : total.Name, 290, 10, true).ToList();
+                var pathLines = Wrap(total.Path, 523, 8).ToList();
+                var versionLines = Wrap("Revit : " + total.Versions, 523, 8).ToList();
+                int height = nameLines.Count * 14 + (pathLines.Count + versionLines.Count) * 11 + 14;
                 // Long paths are split across pages rather than silently truncated.
-                if (y - Math.Min(height, 600) < 60) newPage();
-                double top = y;
-                foreach (string line in nameLines) { if (y < 60) newPage(); Text(page, line, 36, y, 10, true); y -= 14; }
-                Text(page, total.Duration, 350, top, 10); Text(page, total.Days.ToString(), 432, top, 10); Text(page, total.Last.ToString("dd/MM/yyyy"), 477, top, 9);
-                foreach (string line in pathLines) { if (y < 60) newPage(); Text(page, line, 36, y, 8); y -= 11; }
-                if (y < 60) newPage();
-                Text(page, "Revit : " + total.Versions, 36, y, 8); y -= 24;
+                if (y - Math.Min(height, 606) < 60) detailPage();
+                RightText(page, total.Duration, 400, y, 10);
+                RightText(page, total.Days.ToString(), 447, y, 10);
+                RightText(page, total.Last.ToString("dd/MM/yyyy"), 559, y, 9);
+                foreach (string line in nameLines) { if (y < 60) detailPage(); Text(page, line, 36, y, 10, true); y -= 14; }
+                foreach (string line in pathLines.Concat(versionLines)) { if (y < 60) detailPage(); Text(page, line, 36, y, 8); y -= 11; }
+                Rect(page, 36, y - 3, 523, 0.5, "0.9 0.92 0.94");
+                y -= 14;
             }
             for (int i = 0; i < pages.Count; i++) Text(pages[i], "Généré le " + DateTime.Now.ToString("dd/MM/yyyy HH:mm") + " · Page " + (i + 1) + " / " + pages.Count, 36, 30, 9);
             var objects = new List<byte[]>();
@@ -403,10 +440,25 @@ namespace BIMaestro.Dashboard
             write("trailer\n<< /Size " + (objects.Count + 1) + " /Root 1 0 R >>\nstartxref\n" + xref + "\n%%EOF\n");
             File.WriteAllBytes(path, output.ToArray());
         }
-        private static IEnumerable<string> Wrap(string text, int width)
+        private static IEnumerable<string> Wrap(string text, double width, int size, bool bold = false)
         {
             text = (text ?? "").Replace("\r", " ").Replace("\n", " ");
-            for (int i = 0; i < text.Length; i += width) yield return text.Substring(i, Math.Min(width, text.Length - i));
+            while (text.Length > 0)
+            {
+                int length = 0;
+                double advance = 0;
+                int breakAt = 0;
+                while (length < text.Length)
+                {
+                    advance += Width(text.Substring(length, 1), size, bold);
+                    if (advance > width && length > 0) break;
+                    char c = text[length++];
+                    if (char.IsWhiteSpace(c) || c == '\\' || c == '/' || c == '_' || c == '-') breakAt = length;
+                }
+                if (length < text.Length && breakAt > 0) length = breakAt;
+                yield return text.Substring(0, length);
+                text = text.Substring(length);
+            }
         }
     }
 }
