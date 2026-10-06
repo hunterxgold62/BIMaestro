@@ -14,6 +14,7 @@ namespace BIMaestro.Dashboard
     public class ShowTimeDashboard : BaseTrackedCommand
     {
         private static DispatcherTimer _pendingOpen;
+        private static TimeSeriesDashboardWindow _window;
         private const int DoubleClickThresholdMs = 300;
 
         protected override string ButtonId => "ShowTimeDashboard";
@@ -44,10 +45,17 @@ namespace BIMaestro.Dashboard
                     _pendingOpen = null;
                     try
                     {
-                        var window = new TimeSeriesDashboardWindow(activePath);
-                        new WindowInteropHelper(window).Owner = owner;
-                        window.Show();
-                        window.Activate();
+                        if (_window == null)
+                        {
+                            var window = new TimeSeriesDashboardWindow(activePath);
+                            new WindowInteropHelper(window).Owner = owner;
+                            window.Closed += (s, e) => _window = null;
+                            window.Show();
+                            _window = window;
+                        }
+                        if (_window.WindowState == System.Windows.WindowState.Minimized)
+                            _window.WindowState = System.Windows.WindowState.Normal;
+                        _window.Activate();
                     }
                     catch (Exception ex)
                     {

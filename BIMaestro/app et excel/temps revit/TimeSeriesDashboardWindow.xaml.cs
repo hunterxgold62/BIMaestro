@@ -100,12 +100,8 @@ namespace BIMaestro.Dashboard
             _all = _saved.Concat(ExcelLogger.GetDashboardEntries().Select(x => new Entry {
                 Id = Normalize(x.DocumentId), Name = x.Name, Version = x.Version, Kind = x.Kind,
                 Path = First(x.Path, x.DocumentId), Parameters = x.Parameters, When = x.When, Hours = x.Hours, Live = true
-            })).ToList();
-            var old = _choices.ToDictionary(x => x.Id, x => x.Selected, StringComparer.OrdinalIgnoreCase);
-            _choices = _all.GroupBy(x => x.Id, StringComparer.OrdinalIgnoreCase).Select(g => new ModelChoice {
-                Id = g.Key, Name = First(g.Last().Name, g.Key), Path = g.Last().Path,
-                Selected = !old.TryGetValue(g.Key, out bool value) || value
-            }).OrderBy(x => x.Name).ToList();
+            })).Where(x => x.Hours > 0 && !double.IsNaN(x.Hours) && !double.IsInfinity(x.Hours)).ToList();
+            RebuildChoices();
             _batch = true;
             var version = Version.SelectedItem as string;
             Version.ItemsSource = new[] { "Toutes" }.Concat(_all.Select(x => x.Version).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().OrderBy(x => x)).ToList();
@@ -113,6 +109,15 @@ namespace BIMaestro.Dashboard
             if (Version.SelectedIndex < 0) Version.SelectedIndex = 0;
             _batch = false;
             Refresh();
+        }
+        private void RebuildChoices()
+        {
+            var old = _choices.ToDictionary(x => x.Id, x => x.Selected, StringComparer.OrdinalIgnoreCase);
+            bool selectNew = old.Count == 0 || old.Values.All(value => value);
+            _choices = _all.GroupBy(x => x.Id, StringComparer.OrdinalIgnoreCase).Select(g => new ModelChoice {
+                Id = g.Key, Name = First(g.Last().Name, g.Key), Path = g.Last().Path,
+                Selected = old.TryGetValue(g.Key, out bool value) ? value : selectNew
+            }).OrderBy(x => x.Name).ToList();
         }
 
         private void Range_Click(object s, RoutedEventArgs e) { _days = int.Parse((string)((Button)s).Tag); Refresh(); }
@@ -181,7 +186,8 @@ namespace BIMaestro.Dashboard
             OverviewPlot.Visibility = totals.Count == 0 ? Visibility.Hidden : Visibility.Visible;
             OverviewDocumentsEmpty.Visibility = OverviewEmpty.Visibility;
             _batch = true;
-            var available = new HashSet<string>(_all.Where(MatchesFilters).Select(x => x.Id), StringComparer.OrdinalIgnoreCase);
+            DateTime from = From.SelectedDate?.Date ?? DateTime.Today.AddDays(-14), to = To.SelectedDate?.Date ?? DateTime.Today;
+            var available = new HashSet<string>(_all.Where(x => x.When.Date >= from && x.When.Date <= to && MatchesFilters(x)).Select(x => x.Id), StringComparer.OrdinalIgnoreCase);
             Picker.ItemsSource = _choices.Where(x => available.Contains(x.Id)).ToList();
             _batch = false;
             RefreshDetail();
@@ -213,6 +219,8 @@ namespace BIMaestro.Dashboard
             DetailPlot.Model = valid ? Chart(_detail, start, end) : new PlotModel();
             FitChart(DetailPlot);
             DetailEmpty.Visibility = valid && _detail.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            DetailDocumentsEmpty.Text = !valid ? "Corrigez la période pour afficher les documents." : ids.Count == 0 ? "Cochez un document pour afficher son temps actif." : "Aucune activité pour cette période et ces filtres.";
+            DetailDocumentsEmpty.Visibility = _detail.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             DetailPlot.Visibility = _detail.Count == 0 ? Visibility.Hidden : Visibility.Visible;
             PdfButton.IsEnabled = valid && _detail.Count > 0 && _loadError == null;
         }
@@ -261,7 +269,11 @@ namespace BIMaestro.Dashboard
             for (int i = 0; i < count; i++)
             {
                 hours.TryGetValue(i, out double h);
-                if (h > 0) series.Items.Add(new RectangleBarItem(i - .3, 0, i + .3, h) { Title = start.AddDays(i * bucketDays).ToString("dd MMM yyyy", CultureInfo.GetCultureInfo("fr-FR")) + " · " + Duration(h) });
+                var bucketStart = start.AddDays(i * bucketDays);
+                var bucketEnd = end.AddDays(-Math.Max(0, (end - bucketStart).Days - bucketDays + 1));
+                string period = bucketStart.ToString("dd MMM yyyy", CultureInfo.GetCultureInfo("fr-FR"));
+                if (bucketDays > 1) period += " au " + bucketEnd.ToString("dd MMM yyyy", CultureInfo.GetCultureInfo("fr-FR"));
+                if (h > 0) series.Items.Add(new RectangleBarItem(i - .3, 0, i + .3, h) { Title = period + " · " + Duration(h) });
             }
             model.Series.Add(series);
             if (days <= 15)
@@ -278,14 +290,19 @@ namespace BIMaestro.Dashboard
         private void Pdf_Click(object s, RoutedEventArgs e)
         {
             if (!PdfButton.IsEnabled) return;
+            // SaveFileDialog runs a nested message loop: the refresh timer may fire.
+            var from = From.SelectedDate?.Date ?? DateTime.Today.AddDays(-14);
+            var to = To.SelectedDate?.Date ?? DateTime.Today;
+            var rows = _detail.ToList();
+            var totals = _detailTotals.ToList();
+            var filters = new List<string> { "Type : " + ((ComboBoxItem)Kind.SelectedItem).Content, "Revit : " + Version.SelectedItem };
+            if (!string.IsNullOrWhiteSpace(Search.Text)) filters.Add("Recherche : " + Search.Text);
+            if (!string.IsNullOrWhiteSpace(ParameterSearch.Text)) filters.Add("Paramètres : " + ParameterSearch.Text);
             var dialog = new SaveFileDialog { Filter = "Rapport PDF (*.pdf)|*.pdf", FileName = "BIMaestro-Temps-" + DateTime.Today.ToString("yyyy-MM-dd") + ".pdf" };
             if (dialog.ShowDialog(this) != true) return;
             try
             {
-                var filters = new List<string> { "Type : " + ((ComboBoxItem)Kind.SelectedItem).Content, "Revit : " + Version.SelectedItem };
-                if (!string.IsNullOrWhiteSpace(Search.Text)) filters.Add("Recherche : " + Search.Text);
-                if (!string.IsNullOrWhiteSpace(ParameterSearch.Text)) filters.Add("Paramètres : " + ParameterSearch.Text);
-                TimePdfReport.Write(dialog.FileName, From.SelectedDate?.Date ?? DateTime.Today.AddDays(-14), To.SelectedDate?.Date ?? DateTime.Today, _detail, _detailTotals,
+                TimePdfReport.Write(dialog.FileName, from, to, rows, totals,
                     string.Join(" · ", filters), PdfColor(ThemeColor("Brand")));
                 MessageBox.Show(this, "Rapport PDF enregistré.", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
             }
@@ -299,7 +316,7 @@ namespace BIMaestro.Dashboard
         private static string Fold(string value) => new string((value ?? "").Normalize(NormalizationForm.FormD).Where(c => CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark).ToArray());
         private static bool TryDate(string date, string time, out DateTime result)
         {
-            foreach (var culture in new[] { CultureInfo.InvariantCulture, CultureInfo.GetCultureInfo("fr-FR"), CultureInfo.CurrentCulture })
+            foreach (var culture in new[] { CultureInfo.GetCultureInfo("fr-FR"), CultureInfo.InvariantCulture, CultureInfo.CurrentCulture })
                 if (DateTime.TryParse(date + " " + time, culture, DateTimeStyles.AllowWhiteSpaces, out result)) return true;
             result = default; return false;
         }

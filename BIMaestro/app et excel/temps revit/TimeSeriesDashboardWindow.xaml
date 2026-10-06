@@ -314,6 +314,7 @@
                             </Expander>
                         </Border>
                         <Border Grid.Row="3" Style="{StaticResource Card}">
+                            <Grid>
                             <DataGrid x:Name="DetailTable">
                                 <DataGrid.Columns>
                                     <DataGridTemplateColumn Header="Maquette / famille" SortMemberPath="Name" Width="*">
@@ -332,6 +333,8 @@
                                     <DataGridTextColumn Header="Version" Binding="{Binding Versions}" Width="80" />
                                 </DataGrid.Columns>
                             </DataGrid>
+                            <TextBlock x:Name="DetailDocumentsEmpty" Style="{StaticResource Hint}" Margin="16,50,16,16" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
+                            </Grid>
                         </Border>
                     </Grid>
                 </Grid>

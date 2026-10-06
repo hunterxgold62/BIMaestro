@@ -1,6 +1,6 @@
-param([string]$Configuration = 'Debug', [switch]$WithApplication, [string]$PreviewFolder)
+param([string]$Configuration = 'Debug', [switch]$WithApplication, [string]$PreviewFolder, [string]$BinPath)
 $ErrorActionPreference = 'Stop'
-$bin = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "../BIMaestro/bin/$Configuration"))
+$bin = if ($BinPath) { [IO.Path]::GetFullPath($BinPath) } else { [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "../BIMaestro/bin/$Configuration")) }
 Add-Type -AssemblyName PresentationFramework
 Add-Type -AssemblyName PresentationCore
 Add-Type -AssemblyName WindowsBase
@@ -81,8 +81,54 @@ try {
         }
         [void]$type.GetMethod('OpenAnalysis', $flags).Invoke($window, [object[]]@('document-0'))
         if ($window.FindName('DetailTable').Items.Count -ne 1 -or $window.FindName('DetailSummary').Text -ne '0 h 56') { throw 'Analyze did not isolate the selected document.' }
+        $newEntry = [Activator]::CreateInstance($entryType)
+        $newEntry.Id = 'new-document'
+        $newEntry.Name = 'New document during analysis'
+        $newEntry.Path = 'C:\Projets\New.rvt'
+        $newEntry.When = [DateTime]::Today
+        $newEntry.Hours = .5
+        $all.Add($newEntry)
+        [void]$type.GetMethod('RebuildChoices', $flags).Invoke($window, $null)
+        $newChoices = $type.GetField('_choices', $flags).GetValue($window)
+        if (($newChoices | Where-Object Id -eq 'new-document').Selected) { throw 'Refresh added a new document to a targeted selection.' }
+        [void]$all.Remove($newEntry)
+        [void]$type.GetMethod('RebuildChoices', $flags).Invoke($window, $null)
         $window.FindName('Search').Text = 'no matching document'
         if ($window.FindName('DetailTable').Items.Count -ne 0 -or $window.FindName('PdfButton').IsEnabled) { throw 'Empty filtered selection did not disable export.' }
+        if ($window.FindName('DetailDocumentsEmpty').Visibility -ne 'Visible') { throw 'Empty detail table has no guidance.' }
+        $window.FindName('From').SelectedDate = [DateTime]::Today.AddDays(1)
+        $window.FindName('To').SelectedDate = [DateTime]::Today.AddDays(2)
+        if ($window.FindName('Picker').Items.Count -ne 0) { throw 'Picker includes documents outside the selected dates.' }
+        $window.FindName('From').SelectedDate = [DateTime]::Today.AddDays(3)
+        if ($window.FindName('PdfButton').IsEnabled -or $window.FindName('DetailDocumentsEmpty').Visibility -ne 'Visible') { throw 'Invalid dates allowed export or hid guidance.' }
+        [void]$type.GetMethod('ResetFilters_Click', $flags).Invoke($window, [object[]]@($null, $null))
+        [void]$type.GetMethod('ClearSelection_Click', $flags).Invoke($window, [object[]]@($null, $null))
+        if ($window.FindName('DetailTable').Items.Count -ne 0 -or $window.FindName('PdfButton').IsEnabled) { throw 'Clear selection did not clear totals.' }
+        [void]$type.GetMethod('SelectAll_Click', $flags).Invoke($window, [object[]]@($null, $null))
+        if ($window.FindName('DetailTable').Items.Count -ne 10) { throw 'Select all did not restore the visible documents.' }
+        $all[0].Parameters = ([char]0xC9) + 'cole'
+        $window.FindName('ParameterSearch').Text = 'ecole'
+        if ($window.FindName('DetailTable').Items.Count -ne 1) { throw 'Parameter search is not accent insensitive.' }
+        [void]$type.GetMethod('ResetFilters_Click', $flags).Invoke($window, [object[]]@($null, $null))
+        $all[9].Kind = 'RFA'
+        $all[9].Version = '2023'
+        $window.FindName('Kind').SelectedIndex = 2
+        if ($window.FindName('DetailTable').Items.Count -ne 1) { throw 'Family filter did not isolate family activity.' }
+        $window.FindName('Kind').SelectedIndex = 0
+        $window.FindName('Version').ItemsSource = @('Toutes', '2023', '2024')
+        $window.FindName('Version').SelectedIndex = 1
+        if ($window.FindName('DetailTable').Items.Count -ne 1) { throw 'Revit version filter did not isolate the selected version.' }
+        [void]$type.GetMethod('ResetFilters_Click', $flags).Invoke($window, [object[]]@($null, $null))
+        $dateMethod = $type.GetMethod('TryDate', [Reflection.BindingFlags]'Static,NonPublic')
+        foreach ($dateText in @('04/10/2026', '2026-10-04')) {
+            $arguments = [object[]]@($dateText, '10:30:00', [DateTime]::MinValue)
+            $parsed = $dateMethod.Invoke($null, $arguments)
+            if (!$parsed -or $arguments[2] -ne [DateTime]::new(2026, 10, 4, 10, 30, 0)) { throw "Ambiguous date was interpreted incorrectly: $dateText" }
+        }
+        $window.FindName('From').SelectedDate = [DateTime]::new(2000, 1, 1)
+        if ($window.FindName('DetailPlot').Model.Series[0].Items.Count -gt 60) { throw 'Long range chart has too many buckets.' }
+        $longHours = ($window.FindName('DetailPlot').Model.Series[0].Items | Measure-Object -Property Y1 -Sum).Sum
+        if ([Math]::Abs($longHours - ($all | Measure-Object -Property Hours -Sum).Sum) -gt .000001) { throw 'Long range chart lost hours.' }
         [void]$type.GetMethod('ResetFilters_Click', $flags).Invoke($window, [object[]]@($null, $null))
         $window.FindName('Tabs').SelectedIndex = 0
         $content.Width = 1180
