@@ -1,4 +1,4 @@
-using Autodesk.Revit.DB;
+﻿using Autodesk.Revit.DB;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -8,6 +8,12 @@ using BIMaestro.Localization;
 
 namespace Analyse
 {
+    public sealed class SmartDisplayChoice
+    {
+        public SmartDisplayChoice(string value) { Value = value; }
+        public string Value { get; }
+        public override string ToString() => UiLanguage.T(Value);
+    }
     public enum IssueKind
     {
         WallFloating,
@@ -16,6 +22,7 @@ namespace Analyse
         MepThroughWallNoSleeve,
         MepUnconnected,
         LinkPipeClash,
+        LocalClash,
     }
 
     public enum SmartAction
@@ -26,7 +33,14 @@ namespace Analyse
         FocusApply,     // Ensure3D + Focus + Zoom
         ShowAllApply,   // toggle ON/OFF
         MarkIgnored,
-        GenerateThumbnails
+        GenerateThumbnails,
+        ScanBatch,
+        RefreshSetup,
+        RestoreView,
+        CloseSession,
+        TutorialCorrect,
+        ToggleContext,
+        CreateReservation
     }
 
     public enum IssueSeverity
@@ -41,7 +55,7 @@ namespace Analyse
         public const string StatusActive = "Actif";
         public const string StatusToFix = "À corriger";
         public const string StatusIgnored = "À ignorer";
-        public const string StatusFixed = "OK";
+        public const string StatusFixed = "Traité";
         public const string StatusReview = "À revoir";
 
         private bool _ignored;
@@ -53,7 +67,7 @@ namespace Analyse
         private bool _thumbnailLoading;
 
         // Par défaut -> jamais null
-        public int ElementIdValue => ElementId.GetIdValue();
+        public long ElementIdValue => ElementId.GetIdLongValue();
         public ElementId ElementId { get; set; } = ElementId.InvalidElementId;  // élément principal (ex: MEP)
         public ElementId RelatedId { get; set; } = ElementId.InvalidElementId;  // élément lié (ex: mur traversé)
         public IssueKind Kind { get; set; }
@@ -64,6 +78,39 @@ namespace Analyse
         public string ElementTypeName { get; set; }
         public string LevelName { get; set; }
         public string LinkName { get; set; }
+        public ElementId LinkedElementId { get; set; } = ElementId.InvalidElementId;
+        public string ElementUniqueId { get; set; }
+        public string RelatedUniqueId { get; set; }
+        public string LinkUniqueId { get; set; }
+        public string RelatedTypeName { get; set; }
+        public string RelatedCategory { get; set; }
+        public string ElementLabel { get; set; }
+        public string ObstacleLabel { get; set; }
+        public string ScopeDescription { get; set; }
+        public bool IsApproximate { get; set; }
+        public bool CanCreateReservation { get; set; }
+        public double IntersectionVolumeMm3 { get; set; }
+        public string Fingerprint { get; set; }
+        [Newtonsoft.Json.JsonIgnore]
+        public SmartVisualScene VisualScene
+        {
+            get => _visualScene;
+            set { if (ReferenceEquals(_visualScene, value)) return; _visualScene = value; VisualPending = false; OnPropertyChanged(); }
+        }
+        private SmartVisualScene _visualScene;
+        [Newtonsoft.Json.JsonIgnore]
+        public bool VisualPending
+        {
+            get => _visualPending;
+            set { if (_visualPending == value) return; _visualPending = value; OnPropertyChanged(); OnPropertyChanged(nameof(VisualPlaceholder)); }
+        }
+        private bool _visualPending;
+        public string VisualPlaceholder => UiLanguage.T(VisualPending ? "Aperçu en préparation…" : "Aperçu indisponible");
+        public bool IsNew { get; set; }
+        public string PairTitle => string.IsNullOrWhiteSpace(ObstacleLabel) ? ElementLabel : ElementLabel + " ↔ " + ObstacleLabel;
+        public string ContextText => string.Join(" · ", new[] { LevelName, LinkName ?? "Maquette active", Category }.Where(s => !string.IsNullOrWhiteSpace(s)));
+        public string ConfidenceText => UiLanguage.T(IsApproximate ? "À vérifier en 3D" : Kind == IssueKind.MepUnconnected ? "Connecteur ouvert" : "Intersection confirmée");
+        public string NewText => IsNew ? UiLanguage.T("Nouveau") : string.Empty;
 
         public bool Ignored
         {
@@ -173,10 +220,11 @@ namespace Analyse
         {
             get
             {
-                if (Ignored) return IssueSeverity.Info;
+                if (IsApproximate) return IssueSeverity.Check;
                 switch (Kind)
                 {
                     case IssueKind.LinkPipeClash:
+                    case IssueKind.LocalClash:
                     case IssueKind.MepThroughWallNoSleeve:
                         return IssueSeverity.Critical;
                     case IssueKind.MepUnconnected:
@@ -192,7 +240,6 @@ namespace Analyse
         {
             get
             {
-                if (Ignored) return "OK";
                 switch (Severity)
                 {
                     case IssueSeverity.Critical: return "Critique";
@@ -216,8 +263,8 @@ namespace Analyse
             get
             {
                 if (!string.IsNullOrWhiteSpace(LinkName)) return LinkName;
-                return RelatedId != null && RelatedId != ElementId.InvalidElementId && RelatedId.GetIdValue() > 0
-                    ? UiLanguage.T("Lié à ", "Related to ") + RelatedId.GetIdValue()
+                return RelatedId != null && RelatedId != ElementId.InvalidElementId && RelatedId.GetIdLongValue() > 0
+                    ? UiLanguage.T("Lié à ", "Related to ") + RelatedId.GetIdLongValue()
                     : string.Empty;
             }
         }
@@ -241,7 +288,8 @@ namespace Analyse
                 switch (Kind)
                 {
                     case IssueKind.LinkPipeClash: return UiLanguage.T("Collision entre un réseau et un fichier lié.", "Clash between a network and a linked file.");
-                    case IssueKind.MepThroughWallNoSleeve: return UiLanguage.T("Traverse un mur sans réservation détectée.", "Passes through a wall with no detected opening.");
+                    case IssueKind.LocalClash: return "Intersection entre deux objets de la maquette active.";
+                    case IssueKind.MepThroughWallNoSleeve: return "Le réseau intersecte une paroi. La nécessité et le dimensionnement d'une réservation restent à vérifier.";
                     case IssueKind.MepUnconnected: return UiLanguage.T("Connecteur ouvert ou réseau non raccordé.", "Open connector or unconnected network.");
                     case IssueKind.WallFloating: return UiLanguage.T("Mur sans support détecté sous sa base.", "Wall with no support detected below its base.");
                     case IssueKind.WallOnWall: return UiLanguage.T("Mur posé directement sur un autre mur.", "Wall placed directly on another wall.");
@@ -258,7 +306,8 @@ namespace Analyse
                 switch (Kind)
                 {
                     case IssueKind.LinkPipeClash: return UiLanguage.T("Coordonner le tracé ou le lien.", "Coordinate the route or linked model.");
-                    case IssueKind.MepThroughWallNoSleeve: return UiLanguage.T("Créer une réservation ou corriger le passage.", "Create an opening or correct the penetration.");
+                    case IssueKind.LocalClash: return "Vérifier l'intersection et coordonner les deux objets.";
+                    case IssueKind.MepThroughWallNoSleeve: return "Vérifier le passage, la réservation et les exigences de la paroi.";
                     case IssueKind.MepUnconnected: return UiLanguage.T("Raccorder, boucher ou confirmer le cas.", "Connect, cap, or confirm the condition.");
                     case IssueKind.WallFloating: return UiLanguage.T("Vérifier niveau, contrainte et support.", "Check the level, constraint, and support.");
                     case IssueKind.WallOnWall: return UiLanguage.T("Contrôler les contraintes verticales.", "Check the vertical constraints.");
@@ -330,17 +379,26 @@ namespace Analyse
             ElementTypeName,
             LevelName,
             LinkName,
+            ObstacleLabel,
+            RelatedTypeName,
+            ConfidenceText,
             RelatedLabel,
             ElementIdValue.ToString(),
-            RelatedId?.GetIdValue().ToString()
+            RelatedId?.GetIdLongValue().ToString()
         });
 
         public string IssueKey
         {
             get
             {
-                var id = ElementId?.GetIdValue() ?? -1;
-                var related = RelatedId?.GetIdValue() ?? -1;
+                var id = ElementId?.GetIdLongValue() ?? -1;
+                var related = RelatedId?.GetIdLongValue() ?? -1;
+                if (!string.IsNullOrWhiteSpace(ElementUniqueId))
+                {
+                    var a = "host:" + ElementUniqueId;
+                    var b = string.IsNullOrWhiteSpace(RelatedUniqueId) ? "none" : (LinkUniqueId ?? "host") + ":" + RelatedUniqueId;
+                    return "v2|" + Kind + "|" + (string.CompareOrdinal(a, b) <= 0 ? a + "|" + b : b + "|" + a);
+                }
                 return $"{Kind}|{id}|{related}";
             }
         }

@@ -46,11 +46,24 @@ namespace BIMaestro.Tutorials
             ["pipe-calculation"] = "BIMaestro - 04 Calcul des canalisations",
             ["organizer"] = "BIMaestro - 05 Organisateur",
             ["view-template"] = "BIMaestro - 06 Gabarit source",
-            ["excel"] = "BIMaestro - 08 Gestion Excel"
+            ["excel"] = "BIMaestro - 08 Gestion Excel",
+            ["clash-3d"] = DemoClashExercise.ViewName
         };
 
         internal static readonly IReadOnlyDictionary<string, DemoStep[]> Steps = new Dictionary<string, DemoStep[]>
         {
+            ["clash-3d"] = new[]
+            {
+                new DemoStep("Trois tuyaux, deux conflits", "La scène contient un tuyau traversant un mur et deux tuyaux qui se croisent sans raccord. Les trois tuyaux sont sélectionnés. Le périmètre Sélection limite les objets de départ ; le mur voisin reste recherché comme obstacle.", "ScopeCombo", true),
+                new DemoStep("Choisir les contrôles", "Tuyaux et Collisions dans la maquette sont préparés pour cet essai. Les connecteurs ouverts sont désactivés : les extrémités libres sont volontaires. Dans ton projet, Collisions avec les liens compare aussi les liens chargés et cochés ; cet exercice ne contient pas de lien.", "LocalCheck", true),
+                new DemoStep("Un seuil de volume", "Garde 10 mm³. Ce seuil ignore les très petites intersections de solides : ce n'est ni une distance de sécurité ni un jeu autour du tuyau. Une simple touche sans volume n'est pas une collision confirmée. Une suspicion de maillage exige une vérification visuelle.", "VolumeBox", true),
+                new DemoStep("Vérifier les deux intersections", "Clique sur Analyser et attends la fin. Bulbizarre attend les deux intersections confirmées de cette scène, pas seulement un clic. Si tu changes les options, rétablis Sélection, Tuyaux, Collisions dans la maquette et 10 mm³.", "AnalyzeButton", completionEvent: "clash-scan-verified"),
+                new DemoStep("Comprendre le détail", "Le conflit entre les deux tuyaux est présélectionné. Clique sur Détail sélection pour examiner les deux objets et tourner l'aperçu avec la souris. Ferme le détail, puis clique sur Suivant. « Traité » enregistre une décision humaine : il ne déplace aucun objet et ne prouve pas que le conflit est résolu.", "TutorialInspectButton", completionEvent: "clash-detail-opened"),
+                new DemoStep("Observer dans Revit", "Clique sur Voir sélection en 3D. La fenêtre s'effacera après le cadrage pour te laisser observer le croisement : objet contrôlé orange, obstacle bleu. Confirme ensuite l'observation dans la petite carte pour revenir au guide.", "TutorialFocusButton", completionEvent: "clash-focus-observed"),
+                new DemoStep("Corriger le tuyau d'essai", "Clique sur Relever le tuyau d'essai : seul le tuyau transversal de cette scène sera déplacé de 300 mm vers le haut. Ce bouton sert à la formation. Dans ton projet, corrige le réseau avec les outils Revit en tenant compte de la pente et des raccordements.", "TutorialFixButton", completionEvent: "clash-corrected"),
+                new DemoStep("Prouver la disparition du conflit", "Relance Analyser avec les mêmes réglages et attends. Le conflit entre tuyaux doit disparaître ; la traversée du mur doit rester. Une traversée n'indique pas à elle seule qu'une réservation manque ou est incorrecte : examine la paroi et l'ouverture réelle avant de décider.", "AnalyzeButton", completionEvent: "clash-rescan-verified"),
+                new DemoStep("Exporter le résultat vérifié", "Garde Tous dans les statuts et aucune recherche pour afficher la traversée restante. Clique sur Exporter, choisis HTML pour le rapport autonome ou CSV pour le tableau, puis enregistre. Bulbizarre attend l'écriture du fichier ; annuler le dialogue ne valide pas l'étape. Les exports suivent les filtres affichés.", "ExportButton", completionEvent: "clash-export-written")
+            },
             ["reservation"] = new[]
             {
                 new DemoStep("Le support", "Choisis « Mur » : la réservation sera placée dans le mur traversé. « Sol » correspond à une autre configuration de famille et de dimensions.", "hostMurCard"),
@@ -150,6 +163,15 @@ namespace BIMaestro.Tutorials
         internal static readonly IReadOnlyDictionary<string, DemoStep[]> StandaloneSteps =
             new Dictionary<string, DemoStep[]>
             {
+                ["clash-3d"] = new[]
+                {
+                    new DemoStep("Définir le périmètre", "Maquette entière, Vue active ou Sélection définit les objets de départ. Les obstacles sont recherchés autour d'eux. Actualiser reprend la vue et la sélection actuelles. Pour un exercice avec deux conflits connus, lance Clash 3D depuis Parcours guidés dans la maquette de formation.", "ScopeCombo", true),
+                    new DemoStep("Choisir les contrôles", "Déplie Personnaliser l'analyse. Choisis les catégories et les contrôles utiles. Collisions avec les liens nécessite des liens chargés et cochés. Les connexions physiques directes entre réseaux sont exclues ; Connecteurs ouverts et Supports de murs sont des contrôles complémentaires.", "LocalCheck", true),
+                    new DemoStep("Comprendre le seuil", "Le seuil est en mm³ : il filtre un volume d'intersection, pas une distance de sécurité. Les contacts sans volume sont exclus. Une géométrie maillée ou indécidable peut produire une suspicion à examiner.", "VolumeBox", true),
+                    new DemoStep("Examiner les résultats", "Analyser travaille par étapes et peut être annulé. Attends la fin pour un bilan complet. Détail ouvre un aperçu manipulable ; Voir en 3D cadre les objets orange et bleu dans Revit. Une intersection de paroi ne valide pas automatiquement une réservation.", "AnalyzeButton", true),
+                    new DemoStep("Corriger, puis contrôler", "Corrige les objets avec les outils Revit, puis relance la même analyse. Le statut Traité est une décision manuelle. Une modification rend les anciens résultats périmés ; seule une nouvelle analyse vérifie la géométrie actuelle.", "ResultsList", true),
+                    new DemoStep("Exporter", "Exporter produit un rapport HTML autonome ou un CSV à partir des filtres affichés. Vérifie les statuts, le contrôle et la recherche avant d'enregistrer. Revenir à ma vue rétablit la vue et la sélection conservées avant le cadrage.", "ExportButton", true)
+                },
                 ["reservation"] = new[]
                 {
                     new DemoStep("Choisir le support", "Mur crée une réservation dans un mur traversé ; Sol correspond à un autre cas de famille. Pour pratiquer avec une scène prête, ouvre Parcours guidés puis la maquette de formation.", "hostMurCard", true),
@@ -427,6 +449,27 @@ namespace BIMaestro.Tutorials
                     }
                 }
                 DemoProjectBuilder.UpdateTrainingViews(activeDocument.Document);
+                if (selectedChoice == "clash-3d")
+                {
+                    try
+                    {
+                        View3D view = DemoClashExercise.Prepare(activeDocument.Document);
+                        activeDocument.Selection.SetElementIds(DemoClashExercise.Sources(activeDocument.Document));
+                        if (activeDocument.ActiveView.Id != view.Id)
+                        {
+                            activeDocument.RequestViewChange(view);
+                            DemoTourPendingSelection.Begin(activeDocument.Document, view.Id, selectedChoice);
+                            return Result.Succeeded;
+                        }
+                        return DemoTourPendingSelection.PrepareNow(uiApp, selectedChoice) ? Result.Succeeded : Result.Cancelled;
+                    }
+                    catch (Exception ex)
+                    {
+                        message = ex.Message;
+                        DemoTourMessage.Show(uiApp.MainWindowHandle, "Bulbizarre prépare Clash 3D", ex.Message);
+                        return Result.Failed;
+                    }
+                }
                 if (selectedChoice == "mep-booster")
                 {
                     try
@@ -494,7 +537,8 @@ namespace BIMaestro.Tutorials
                     }
                     if (tourView != null && activeDocument.ActiveView.Id != tourView.Id)
                     {
-                        activeDocument.RequestViewChange(tourView);
+                        if (selectedChoice == "view-template") activeDocument.ActiveView = tourView;
+                        else activeDocument.RequestViewChange(tourView);
                         if (selectedChoice == "pipe-calculation" || selectedChoice == "organizer")
                         {
                             DemoTourPendingSelection.Begin(activeDocument.Document, tourView.Id, selectedChoice);
@@ -580,10 +624,10 @@ namespace BIMaestro.Tutorials
         {
             UIDocument uiDocument = app.ActiveUIDocument;
             string marker = DemoProjectBuilder.DemoPrefix +
-                (tourId == "organizer" ? "ORGANISATEUR_" : "CALCUL_");
+                (tourId == "clash-3d" ? "CLASH_" : tourId == "organizer" ? "ORGANISATEUR_" : "CALCUL_");
             var ids = new FilteredElementCollector(uiDocument.Document)
                 .WhereElementIsNotElementType()
-                .Where(element => (element.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ?? "")
+                .Where(element => (tourId != "clash-3d" || element is Autodesk.Revit.DB.Plumbing.Pipe) && (element.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ?? "")
                     .StartsWith(marker, StringComparison.Ordinal))
                 .Select(element => element.Id).ToList();
             if (ids.Count == 0)
@@ -1033,6 +1077,17 @@ namespace BIMaestro.Tutorials
                 DemoTourMessage.Show(owner, "Vérifie le gabarit importé", "La cible doit recevoir un vrai gabarit avec les traits rouges, épais et pointillés de la source. Relance l’import du fichier de cet exercice et choisis l’option encadrée en vert.");
                 return;
             }
+            using (var tx = new Transaction(document, "BIMaestro - Afficher le gabarit importé"))
+            {
+                tx.Start();
+                foreach (BuiltInCategory category in new[] { BuiltInCategory.OST_PipeCurves, BuiltInCategory.OST_PipeFitting,
+                    BuiltInCategory.OST_PipeAccessory, BuiltInCategory.OST_DuctCurves, BuiltInCategory.OST_DuctFitting, BuiltInCategory.OST_Parking })
+                {
+                    var id = new ElementId(category);
+                    if (target.IsCategoryOverridable(id)) target.SetCategoryOverrides(id, new OverrideGraphicSettings());
+                }
+                tx.Commit();
+            }
             new UIDocument(document).RefreshActiveView();
             _documentPath = null;
             _exportedFile = null;
@@ -1198,6 +1253,8 @@ namespace BIMaestro.Tutorials
                 window.Width = Math.Max(window.Width, 760);
                 window.Height = Math.Max(window.Height, 520);
             }
+            if (id == "clash-3d" && window is Analyse.SmartCheckWindow clash)
+                clash.ConfigureTutorial(preparedExercise);
             ActiveGuides[window] = new DemoWindowGuide(window, steps, id, preparedExercise);
             return true;
         }
@@ -1235,9 +1292,9 @@ namespace BIMaestro.Tutorials
             card.Show();
         }
 
-        internal static void ObserveHistoryResult(Window historyWindow, IntPtr owner, string heading, string text, Action confirmed)
+        internal static Window ObserveHistoryResult(Window historyWindow, IntPtr owner, string heading, string text, Action confirmed)
         {
-            if (!IsActive(historyWindow)) return;
+            if (!IsActive(historyWindow)) return null;
             historyWindow.Hide();
             var card = new Window { Title = "BIMaestro — Observer le résultat", Width = 390,
                 SizeToContent = SizeToContent.Height, ShowInTaskbar = false, ResizeMode = ResizeMode.NoResize,
@@ -1258,6 +1315,7 @@ namespace BIMaestro.Tutorials
             };
             historyWindow.Closed += (_, __) => card.Close();
             card.Show();
+            return card;
         }
 
         internal static void ReportAction(Window window, string action)
@@ -1355,7 +1413,7 @@ namespace BIMaestro.Tutorials
             private Action _detachAction;
             private int _index;
             private bool _completed;
-            private bool _windowClosed;
+            private bool _windowClosed, _closed;
 
             internal DemoWindowGuide(Window window, DemoStep[] steps, string tourId, bool preparedExercise)
             {
@@ -1375,6 +1433,7 @@ namespace BIMaestro.Tutorials
                 Grid.SetRowSpan(_card, Math.Max(1, _root.RowDefinitions.Count));
                 Grid.SetColumnSpan(_card, Math.Max(1, _root.ColumnDefinitions.Count));
                 Panel.SetZIndex(_card, 1000);
+                if (tourId == "clash-3d") Grid.SetColumn(_card, 1);
                 var stack = new StackPanel(); _card.Child = stack;
                 var heading = new StackPanel { Orientation = Orientation.Horizontal };
                 heading.Children.Add(new Image { Source = Couleur.RibbonPanelColorScheme.CreateCompanionImage(),
@@ -1430,6 +1489,8 @@ namespace BIMaestro.Tutorials
 
             private void ShowStep()
             {
+                if (_closed) return;
+                _favoriteHighlightTimer?.Stop(); _favoriteHighlightTimer = null;
                 _detachAction?.Invoke();
                 _detachAction = null;
                 RemoveHighlight();
@@ -1442,6 +1503,7 @@ namespace BIMaestro.Tutorials
                 }
                 _completed = false;
                 DemoStep step = _steps[_index];
+                if (_window is Analyse.SmartCheckWindow clash) clash.PrepareTutorialStep(step.Target);
                 if (_window is Famille.FamilyBrowserWindow browser)
                     browser.PrepareTutorialStep(step.Target, step.CompletionEvent);
                 if (_window.FindName("ReservationFamiliesTab") is TabItem familiesTab &&
@@ -1468,11 +1530,18 @@ namespace BIMaestro.Tutorials
                     : TourId == "organizer" && step.Target == "SortByLevelCheckBox"
                     ? VerticalAlignment.Top : VerticalAlignment.Bottom;
                 _title.Text = $"{_index + 1}/{_steps.Length} · {step.Title}";
+                if (TourId == "clash-3d")
+                {
+                    _card.HorizontalAlignment = HorizontalAlignment.Center;
+                    _card.VerticalAlignment = VerticalAlignment.Top;
+                }
                 _text.Text = step.Text;
                 _previous.IsEnabled = _index > 0;
                 _next.Content = _index + 1 == _steps.Length ? "Terminer" : "Suivant";
                 _completed = step.IsExplanation;
                 _next.IsEnabled = step.IsExplanation;
+                if (_window is Analyse.SmartCheckWindow completedClash && completedClash.HasCompletedTutorialAction(step.CompletionEvent))
+                { _completed = true; _next.IsEnabled = true; }
                 if (step.CompletionEvent == "load-bureau-commun" &&
                     Famille.FamilyBrowserCommand.uiapp?.ActiveUIDocument == null)
                 {
@@ -1669,9 +1738,12 @@ namespace BIMaestro.Tutorials
                         ? "✓ Revit a chargé la famille et lancé son placement. Clique dans la vue pour la poser, ou appuie sur Échap si tu voulais seulement tester le chargement."
                         : _steps[_index].CompletionEvent == "radial-tutorial-chaise-placed"
                         ? "✓ Tu as posé une chaise depuis la rosace. Appuie sur Échap pour quitter le mode placement. Ton favori d'essai et tes chemins personnels restent inchangés."
+                        : _steps[_index].CompletionEvent == "clash-export-written"
+                        ? "✓ L'analyse a confirmé la disparition du conflit entre tuyaux et la conservation de la traversée du mur. Ton rapport a été enregistré. Tu peux terminer le parcours."
                         : "✓ Action confirmée dans la maquette. Tu peux terminer ce parcours.";
                     _next.IsEnabled = true;
                 }
+                else if (TourId == "clash-3d") _next.IsEnabled = true;
                 else
                 {
                     _index++;
@@ -1694,6 +1766,7 @@ namespace BIMaestro.Tutorials
             }
             private void Highlight(string targetName, int expectedIndex, int attempt = 0)
             {
+                if (_closed) return;
                 if (_index != expectedIndex || !_window.IsVisible) return;
                 if (targetName == "TutorialFavoriteStar") RefreshFavoriteHighlight();
                 RemoveHighlight();
@@ -1705,7 +1778,7 @@ namespace BIMaestro.Tutorials
                 else target = _window.FindName(targetName) as FrameworkElement;
                 if (target == null || !target.IsVisible)
                 {
-                    if ((targetName == "TutorialMeetingFolderCard" || targetName == "TutorialFavoriteStar") && attempt < 20)
+                    if (targetName == "TutorialMeetingFolderCard" && attempt < 20)
                     {
                         var retry = new DispatcherTimer(DispatcherPriority.Loaded, _window.Dispatcher)
                             { Interval = TimeSpan.FromMilliseconds(100) };
@@ -1734,6 +1807,7 @@ namespace BIMaestro.Tutorials
 
             internal void Close()
             {
+                _closed = true;
                 _favoriteHighlightTimer?.Stop(); _favoriteHighlightTimer = null;
                 _window.Loaded -= OnLoaded;
                 _detachAction?.Invoke();
@@ -1744,6 +1818,7 @@ namespace BIMaestro.Tutorials
                     ActiveGuides.Remove(_window);
                 if (!_windowClosed && _window is Famille.FamilyBrowserWindow browser)
                     browser.EndTutorialCatalog();
+                if (_window is Analyse.SmartCheckWindow clash) clash.EndTutorial();
             }
         }
 
@@ -1764,8 +1839,8 @@ namespace BIMaestro.Tutorials
     internal static class DemoTourCompletion
     {
         private static string _nextTour;
-        private static readonly string[] Order = { "reservation", "history", "colors", "pipe-calculation", "organizer", "view-template", "excel", "family-browser", "mep-booster" };
-        private static readonly string[] Labels = { "Auto réservation", "Qui a fait ça ?", "Couleurs et vues", "Calcul des canalisations", "Organisateur", "Gabarit de vue", "Gestion Excel", "Navigateur de familles", "MEP Booster" };
+        private static readonly string[] Order = { "reservation", "history", "colors", "pipe-calculation", "organizer", "view-template", "excel", "family-browser", "mep-booster", "clash-3d" };
+        private static readonly string[] Labels = { "Auto réservation", "Qui a fait ça ?", "Couleurs et vues", "Calcul des canalisations", "Organisateur", "Gabarit de vue", "Gestion Excel", "Navigateur de familles", "MEP Booster", "Clash 3D" };
         internal static void Show(IntPtr owner, string completed, string summary, Action beforeNext = null)
         {
             int index = Array.IndexOf(Order, completed);
@@ -1823,6 +1898,7 @@ namespace BIMaestro.Tutorials
             AddChoice(detailChoices, "7 · Gestion Excel", "excel");
             AddChoice(detailChoices, "9 · MEP Booster", "mep-booster");
             AddChoice(detailChoices, "8 · Navigateur de familles", "family-browser");
+            AddChoice(detailChoices, "10 · Clash 3D", "clash-3d");
             AddChoice(stack, "Recommencer les exercices de la maquette", "reset");
         }
         private Button AddChoice(Panel panel, string label, string id)
@@ -1870,6 +1946,7 @@ namespace BIMaestro.Tutorials
             AddCard(stack, "8 · Navigateur de familles",
                 "Explore un catalogue de 35 familles rangées en dossiers et sous-dossiers. Cherche une famille, prévisualise-la en 3D, découvre les photos automatiques et apprends à brancher ta propre bibliothèque.");
             AddCard(stack, "9 · MEP Booster", "Tourne une vanne, observe le résultat et copie son orientation sur d’autres vannes raccordées.");
+            AddCard(stack, "10 · Clash 3D", "Analyse deux intersections connues, examine le croisement en 3D, relève un tuyau d'essai puis vérifie le conflit restant et exporte le rapport.");
             var close = new Button { Content = "Terminer pour l'instant", Padding = new Thickness(12, 7, 12, 7),
                 HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 4, 0, 0) };
             close.Click += (_, __) => Close();
@@ -1886,9 +1963,9 @@ namespace BIMaestro.Tutorials
 
         private void AddCard(Panel parent, string title, string description)
         {
-            string[] ids = { "reservation", "history", "colors", "pipe-calculation", "organizer", "view-template", "excel", "family-browser", "mep-booster" };
-            string[] icons = { "Auto réservation.png", "qui à fait ça (2).png", "Couleur oui non.png", "Calcul de canalisation.png", "Organisateur.png", "Gabarit de vue simple.png", "Gestion Excel.png", "maison famille (1).png", "MEP Booster vanne rotation.png" };
-            int index = int.Parse(title.Substring(0, 1)) - 1;
+            string[] ids = { "reservation", "history", "colors", "pipe-calculation", "organizer", "view-template", "excel", "family-browser", "mep-booster", "clash-3d" };
+            string[] icons = { "Auto réservation.png", "qui à fait ça (2).png", "Couleur oui non.png", "Calcul de canalisation.png", "Organisateur.png", "Gabarit de vue simple.png", "Gestion Excel.png", "maison famille (1).png", "MEP Booster vanne rotation.png", "Clash 3D.png" };
+            int index = int.Parse(title.Substring(0, title.IndexOf('·')).Trim()) - 1;
             var row = new Grid(); row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(58) }); row.ColumnDefinitions.Add(new ColumnDefinition());
             var image = new Image { Width = 42, Height = 42, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 4, 12, 0) };
             using (var stream = typeof(DemoDiscoveryWindow).Assembly.GetManifestResourceStream(typeof(DemoDiscoveryWindow).Assembly.GetManifestResourceNames().First(name => name.EndsWith("." + icons[index], StringComparison.OrdinalIgnoreCase))))

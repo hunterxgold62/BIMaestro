@@ -14,9 +14,13 @@
     <Reference Include="RevitAPIUI"><HintPath>C:\Program Files\Autodesk\Revit 2025\RevitAPIUI.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="Newtonsoft.Json"><HintPath>../../BIMaestro/bin/Debug/Newtonsoft.Json.dll</HintPath></Reference>
     <Compile Include="HistoryNativeTests.cs" />
+    <Compile Include="NativeArchiveStore.cs" />
+    <Compile Include="../../BIMaestro/commands/qui est le coupable/ElementHistoryNativeArchive.cs" />
     <Compile Include="../../BIMaestro/commands/ElementIdExtensions.cs" />
     <Compile Include="../../BIMaestro/commands/qui est le coupable/ElementHistoryReconstruction.cs" />
+    <Compile Include="../../BIMaestro/commands/qui est le coupable/ElementHistoryReconstruction.Extended.cs" />
     <Compile Include="../../BIMaestro/commands/qui est le coupable/ElementHistoryRestoration.cs" />
     <Compile Include="../../BIMaestro/commands/qui est le coupable/ElementHistoryNetwork.cs" />
+    <Compile Include="../../BIMaestro/commands/qui est le coupable/ElementHistoryRelations.cs" />
   </ItemGroup>
 </Project>

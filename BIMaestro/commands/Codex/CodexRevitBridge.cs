@@ -152,6 +152,8 @@ namespace BIMaestro.Codex
         {
             if (mepMode) return new JArray(CodexMepTools.Definitions());
             var catalog = new JArray(
+            CodexFamilyProgram.CreationTool(),
+            Tool("revit_prepare_family", "Prépare une conception en une lecture : capacités, contrat paramétrique, contrat du moteur natif général et informations du gabarit. Réutiliser ces contrats dans la discussion ; relire le gabarit seulement si l'hébergement change. Aucun changement du projet.", new JObject { ["hosting"] = new JObject { ["type"] = "string", ["enum"] = new JArray("free", "wall", "floor", "ceiling", "face", "work_plane") } }),
             Tool("revit_family_template_info", "Lit dans un gabarit temporaire les épaisseurs et faces réelles des hôtes et les paramètres intégrés. À appeler avant une famille mur/sol : coordonnées en mm, sans présumer un mur de 150 mm. Ne modifie pas le projet.", new JObject { ["hosting"]=new JObject { ["type"]="string", ["enum"]=new JArray("free","wall","floor","ceiling","face","work_plane") } }),
             CodexFamilyDesign.Tool(),
             CodexFamilyDesign.Tool(true),
@@ -224,6 +226,13 @@ namespace BIMaestro.Codex
                 ["items"] = new JObject { ["type"] = "object", ["properties"] = properties,
                     ["required"] = new JArray(properties.Properties().Select(p => p.Name)), ["additionalProperties"] = false }
             };
+        }
+
+        private static void ShowFinalPreview(UIApplication app, Document family)
+        {
+            var preview = new FilteredElementCollector(family).OfClass(typeof(View3D)).Cast<View3D>()
+                .FirstOrDefault(v => !v.IsTemplate && v.Name == "BIMaestro - Aperçu");
+            if (preview != null) app.ActiveUIDocument.RequestViewChange(preview);
         }
 
         private static JObject Number(string description, double min, double max) => new JObject
@@ -400,8 +409,24 @@ namespace BIMaestro.Codex
                 return CodexNativeValidation.Run(app);
             }
             if (!ShareContext) throw new InvalidOperationException("Le partage du contexte Revit est désactivé par l'utilisateur.");
+            if (tool == "revit_prepare_family")
+            {
+                RequireKeys(args, "hosting");
+                return new { capabilities = CodexFamilyTools.Capabilities(app.Application.VersionNumber),
+                    parametric_schema = CodexParametricDesign.Tool()["inputSchema"],
+                    program_contract = CodexFamilyProgram.Contract(),
+                    template = CodexFamilyBuilder.TemplateInfo(app, CodexFamilyDesign.String(args, "hosting", 20)) };
+            }
             if (tool == "revit_family_template_info") { RequireKeys(args,"hosting"); return CodexFamilyBuilder.TemplateInfo(app,CodexFamilyDesign.String(args,"hosting",20)); }
             var activeDocument = app.ActiveUIDocument?.Document;
+            if (tool == "revit_create_family_program")
+            {
+                if (!AllowChanges) throw new InvalidOperationException("Activez les créations et modifications dans le panneau.");
+                if (args["validate_only"]?.Type != JTokenType.Boolean) throw new InvalidOperationException("validate_only doit être un booléen.");
+                if (!(bool)args["validate_only"] && !Confirm("Créer une famille native complète", CodexFamilyDesign.String(args, "description", 1000)))
+                    throw new InvalidOperationException("Création refusée par l'utilisateur. Ne pas réessayer sans nouvelle demande.");
+                return CodexFamilyProgram.CreateSteps(app, args, FamilyOutputRoot);
+            }
             if (tool == "revit_create_parametric_family" || tool == "revit_validate_parametric_family")
             {
                 if (!AllowChanges) throw new InvalidOperationException("Activez les créations et modifications dans le panneau.");
@@ -483,7 +508,7 @@ namespace BIMaestro.Codex
                 if (!File.Exists(descriptor) || new FileInfo(descriptor).Length > 4 * 1024 * 1024)
                     throw new InvalidOperationException("Description constructive absente ou trop volumineuse.");
                 var savedDesign = JObject.Parse(File.ReadAllText(descriptor));
-                return new { file = path, design = savedDesign, creation_tool = savedDesign["parameters"] == null ? "revit_create_family" : "revit_create_parametric_family",
+                return new { file = path, design = savedDesign, creation_tool = savedDesign["program_json"] != null ? "revit_create_family_program" : savedDesign["parameters"] == null ? "revit_create_family" : "revit_create_parametric_family",
                     note = "Description d'origine ; peut différer des modifications manuelles apportées depuis." };
             }
             if (tool == "revit_open_created_family")
@@ -495,6 +520,7 @@ namespace BIMaestro.Codex
                 if (existing != null && existing.Equals(app.ActiveUIDocument?.Document))
                 {
                     document = existing; DocumentTitle = document.Title;
+                    ShowFinalPreview(app, document);
                     return new { opened = true, already_active = true, file = path, document = DocumentTitle };
                 }
                 try
@@ -508,6 +534,7 @@ namespace BIMaestro.Codex
                     }
                     var opened = app.OpenAndActivateDocument(path);
                     document = opened.Document; DocumentTitle = document.Title;
+                    ShowFinalPreview(app, document);
                 }
                 catch (Exception ex)
                 {

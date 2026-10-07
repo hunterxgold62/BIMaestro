@@ -61,6 +61,11 @@ namespace BIMaestro.Codex
 
         internal (int Page, byte[] Png)[] RenderPages(int[] pageNumbers)
         {
+            return CodexPdfRenderIsolation.Render(SourcePath, FileSizeBytes, pageNumbers);
+        }
+
+        internal (int Page, byte[] Png)[] RenderPagesLocal(int[] pageNumbers)
+        {
             using (CodexPdfAssemblyResolver.EnterPdfOperation()) return RenderPagesCore(pageNumbers);
         }
 

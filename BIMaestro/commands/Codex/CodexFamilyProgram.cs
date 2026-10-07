@@ -24,6 +24,106 @@ namespace BIMaestro.Codex
         private readonly List<string> warnings = new List<string>();
         private sealed class Budget { internal int Steps; }
         private static readonly string[] Reserved = { "doc", "manager", "family", "factory" };
+        internal static JObject CreationTool()
+        {
+            var properties = new JObject {
+                ["name"] = new JObject { ["type"] = "string", ["minLength"] = 1, ["maxLength"] = 90 },
+                ["category"] = new JObject { ["type"] = "string", ["enum"] = new JArray(CodexFamilyDesign.Categories) },
+                ["hosting"] = new JObject { ["type"] = "string", ["enum"] = new JArray("free", "face", "work_plane", "wall", "floor", "ceiling") },
+                ["description"] = new JObject { ["type"] = "string", ["minLength"] = 1, ["maxLength"] = 1000 },
+                ["geometry_policy"] = CodexFamilyParameters.GeometryPolicySchema(),
+                ["program_json"] = new JObject { ["type"] = "string", ["maxLength"] = 200000 },
+                ["validate_only"] = new JObject { ["type"] = "boolean" } };
+            return new JObject { ["type"] = "function", ["name"] = "revit_create_family_program",
+                ["description"] = "Crée une nouvelle famille native complète dans un document temporaire via le contrat de programmes. doc/manager/family/factory sont déjà disponibles : aucun cube de départ, aucun document_key ni famille ouverte requis. Inclure toute la géométrie, les paramètres, contraintes, connecteurs et essais/assertions dans le programme. validate_only=true construit puis ferme sans RFA ; false enregistre uniquement après réussite complète. Pas de chargement/placement dans un projet. Pour une bride circulaire paramétrique, préférer cet outil aux extrusions rectangulaires provisoires. Un RFA provisoire n'est jamais livré.",
+                ["inputSchema"] = new JObject { ["type"] = "object", ["additionalProperties"] = false,
+                    ["properties"] = properties, ["required"] = new JArray(properties.Properties().Select(p => p.Name)) } };
+        }
+
+        internal static IEnumerable<CodexFamilyArtifact> CreateSteps(UIApplication app, JObject args, string outputRoot)
+        {
+            CodexFamilyDesign.Keys(args, "name", "category", "hosting", "description", "geometry_policy", "program_json", "validate_only");
+            string name = CodexFamilyDesign.String(args, "name", 90);
+            string category = CodexFamilyDesign.String(args, "category", 30);
+            var categoryId = CodexFamilyBuilder.CategoryId(category);
+            string hosting = CodexFamilyDesign.String(args, "hosting", 20);
+            if (!new[] { "free", "face", "work_plane", "wall", "floor", "ceiling" }.Contains(hosting))
+                throw new InvalidOperationException("Hébergement inconnu.");
+            if (args["validate_only"]?.Type != JTokenType.Boolean) throw new InvalidOperationException("validate_only doit être un booléen.");
+            bool validate = (bool)args["validate_only"];
+            CodexFamilyParameters.AllowsGeometryAlternatives(args);
+            string fileName = CodexFamilyBuilder.SafeName(name);
+            if (app.Application.Documents.Cast<Document>().Any(d => d.Title.Equals(fileName, StringComparison.OrdinalIgnoreCase)))
+                fileName += "_v" + Guid.NewGuid().ToString("N").Substring(0, 8);
+            string folder = System.IO.Path.Combine(outputRoot, fileName + "_" + Guid.NewGuid().ToString("N"));
+            Document family = null;
+            try
+            {
+                family = app.Application.NewFamilyDocument(CodexFamilyBuilder.FindTemplate(app, hosting));
+                if (family == null) throw new InvalidOperationException("Document de famille non créé.");
+                using (var setup = new Transaction(family, "BIMaestro — catégorie de la famille"))
+                {
+                    setup.Start();
+                    family.OwnerFamily.FamilyCategory = Category.GetCategory(family, categoryId);
+                    if (hosting == "work_plane")
+                    {
+                        var workPlane = family.OwnerFamily.get_Parameter(BuiltInParameter.FAMILY_WORK_PLANE_BASED);
+                        if (workPlane == null || workPlane.IsReadOnly) throw new InvalidOperationException("Gabarit incompatible avec le plan de travail.");
+                        workPlane.Set(1);
+                    }
+                    if (family.FamilyManager.CurrentType == null && !DeclaresInitialType(JObject.Parse((string)args["program_json"])["steps"] as JArray))
+                        family.FamilyManager.NewType("Standard");
+                    if (setup.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Initialisation de famille annulée.");
+                }
+                yield return null;
+                var request = new JObject { ["document_key"] = family.OwnerFamily.UniqueId,
+                    ["description"] = args["description"].DeepClone(), ["program_json"] = args["program_json"].DeepClone(),
+                    // The document itself is temporary, so execute assertions and
+                    // inspect actual model geometry before deciding whether to save.
+                    ["validate_only"] = false, ["geometry_policy"] = args["geometry_policy"].DeepClone() };
+                var programReport = Run(app, family, request, (_, __) => true);
+                var bounds = new CodexFamilyBuilder.Bounds();
+                int modelCount = 0;
+                foreach (var element in new FilteredElementCollector(family).WhereElementIsNotElementType()
+                    .Where(e => e is GenericForm form && form.IsSolid || e is FamilyInstance))
+                {
+                    var box = element.get_BoundingBox(null);
+                    if (box == null) continue;
+                    bounds.Include(box); modelCount++;
+                }
+                if (modelCount == 0) throw new InvalidOperationException("Le programme n'a produit aucun solide de modèle. Aucun RFA enregistré.");
+                if (validate)
+                {
+                    yield return new CodexFamilyArtifact { Report = new { validated = true, saved = false, model_elements = modelCount,
+                        program = programReport, next = "Appliquer le même programme complet avec validate_only=false." } };
+                    yield break;
+                }
+                yield return null;
+                View3D preview;
+                using (var final = new Transaction(family, "BIMaestro — résultat final"))
+                {
+                    final.Start();
+                    CodexFamilyBuilder.ApplyBranding(family.FamilyManager);
+                    preview = CodexFamilyBuilder.CreatePreview(family, bounds);
+                    if (final.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Finalisation annulée.");
+                }
+                System.IO.Directory.CreateDirectory(folder);
+                string path = System.IO.Path.Combine(folder, fileName + ".rfa");
+                family.SaveAs(path, new SaveAsOptions { OverwriteExistingFile = false, MaximumBackups = 1, PreviewViewId = preview.Id });
+                var report = new { saved = true, file = path, category, model_elements = modelCount, program = programReport,
+                    dimensions_mm = new[] { (bounds.Max.X - bounds.Min.X) * 304.8, (bounds.Max.Y - bounds.Min.Y) * 304.8, (bounds.Max.Z - bounds.Min.Z) * 304.8 } };
+                // Save the creation contract, not IDs from the temporary document.
+                // Revisions replay this program into a fresh document.
+                try
+                {
+                    System.IO.File.WriteAllText(System.IO.Path.Combine(folder, "construction.json"), args.ToString(Formatting.Indented));
+                    System.IO.File.WriteAllText(System.IO.Path.Combine(folder, "rapport.json"), JsonConvert.SerializeObject(report, Formatting.Indented));
+                }
+                catch (System.IO.IOException) { /* Preserve the successfully saved RFA. */ }
+                yield return new CodexFamilyArtifact { FilePath = path, Report = report };
+            }
+            finally { if (family != null && family.IsValidObject) family.Close(false); }
+        }
         private CodexFamilyProgram(UIApplication app, Document doc, Budget budget, int depth = 0)
         {
             this.app = app; this.doc = doc; this.budget = budget; this.depth = depth;
@@ -32,8 +132,11 @@ namespace BIMaestro.Codex
         }
         internal static object Contract() => new {
             version = 1,
+            geometry_policy = CodexFamilyParameters.GeometryPolicySchema(),
             purpose = "Programme général pour créer/modifier une famille ouverte via les objets natifs Revit. Pas de C#, Python, shell, fichiers ou réseau. Lire revit_family_api pour les signatures exactes de cette version.",
             document = "doc, manager, family et factory désignent uniquement la famille courante. Chaque nested possède son propre contexte et renvoie la Family chargée dans son parent. Les objets d'autres documents ne sont pas acceptés.",
+            family_types = "En création, appeler manager.NewType avant de fixer les valeurs. Quand steps déclare directement ce type, aucun type Standard vide supplémentaire n'est ajouté. Les formules sont évaluées sur tous les types : initialiser leurs dépendances partout, surtout les diviseurs. Valider un prototype et ses variations avant de développer toute une gamme.",
+            geometry_references = "Les sorties Curve exposent leurs extrémités réelles ; les Reference exposent l'élément et le type de référence. Ne pas déduire les côtés d'un profil de leur index. NewLinearDimension renvoie les références utilisées en cas d'erreur ; contrôler leurs directions et la vue, et régénérer après changement des contraintes.",
             format = "program_json est un objet JSON {steps:[...],outputs:['nom',...]}. Chaque étape a op et un id facultatif. Référence à un résultat : {ref:'nom'}. Littéraux : nombre/booléen/texte/null. Listes : op=list avec type du contenu et items. Noms complets Autodesk.Revit.DB ; types imbriqués au format CLR (+).",
             operations = new[] {
                 "new: {op:'new',id:'p',type:'Autodesk.Revit.DB.XYZ',args:[0,0,0]}",
@@ -44,6 +147,7 @@ namespace BIMaestro.Codex
                 "list: {op:'list',id:'loops',type:'Autodesk.Revit.DB.CurveLoop',items:[{ref:'loop'}]}. Opérations Add/Clear/Contains/Remove/get_Item/get_Count sur listes.",
                 "item: {op:'item',id:'first',target:{ref:'collection'},index:0}. foreach: {op:'foreach',target:{ref:'collection'},var:'entry',steps:[...]} ; au plus 200 itérations. Réutiliser les ids locaux dans le corps, variables du corps non exportées.",
                 "mm: {op:'mm',id:'length',value:900} convertit mm en pieds ; xyz_mm: {op:'xyz_mm',id:'p',args:[900,0,750]}. Toutes les autres API utilisent les UNITÉS INTERNES Revit (pieds/radians).",
+                "pipe_connectors: {op:'pipe_connectors',id:'ports',target:{ref:'corps_solide'},diameter:{ref:'parametre_DN_occurrence'},axis:{ref:'vecteur_axe'},center:{ref:'origine_axe'}}. Crée deux connecteurs de tuyauterie sur les faces réellement planes et opposées du corps local, centrés sur cet axe, diamètres associés au DN. Renvoie la liste des deux ConnectorElement. Ne valide pas le comportement au raccordement en projet, qui nécessite un essai distinct. Utiliser un corps natif direct, sans GeometryInstance.",
                 "math: {op:'math',id:'x',member:'add|subtract|multiply|divide|min|max|sin|cos|floor|abs|equal|less|greater',args:[...]} ; assert: {op:'assert',value:{ref:'ok'},message:'contrôle attendu'}.",
                 "range: {op:'range',id:'indices',args:[0,10,1]} renvoie 10 nombres à partir de 0, pas 1 (200 max). if: {op:'if',value:{ref:'condition'},then:[...],else:[...]} ; else facultatif. math equal accepte aussi deux textes ou deux booléens.",
                 "nested création: {op:'nested',id:'module',name:'Service complet',hosting:'free',steps:[...]}. Gabarits hosting free/wall/floor/ceiling/face/work_plane. Famille temporaire, géométrie arbitraire native, chargée sans fichier. Ajouter paramètres et contraintes dans steps. Refuse une famille homonyme.",
@@ -56,7 +160,10 @@ namespace BIMaestro.Codex
         };
         internal static object Run(UIApplication app, Document doc, JObject args, Func<string, string, bool> confirm)
         {
-            CodexFamilyDesign.Keys(args, "document_key", "description", "validate_only", "program_json");
+            var keys = new List<string> { "document_key", "description", "validate_only", "program_json" };
+            if (args["geometry_policy"] != null) keys.Add("geometry_policy");
+            CodexFamilyDesign.Keys(args, keys.ToArray());
+            bool alternatives = CodexFamilyParameters.AllowsGeometryAlternatives(args);
             if (doc == null || !doc.IsFamilyDocument || doc.IsReadOnly || doc.IsModifiable ||
                 CodexFamilyDesign.String(args, "document_key", 100) != doc.OwnerFamily.UniqueId)
                 throw new InvalidOperationException("Ouvrir une famille modifiable et relire revit_inspect_family avant le programme.");
@@ -84,6 +191,7 @@ namespace BIMaestro.Codex
                     engine.Steps((JArray)program["steps"]); engine.Commit();
                     var report = outputs.ToDictionary(name => name, name => engine.Describe(engine.Reference(name)));
                     var after = new HashSet<string>(new FilteredElementCollector(doc).WhereElementIsNotElementType().Select(e => e.UniqueId));
+                    if (!alternatives) ValidateSharedGeometry(doc, before);
                     int added = after.Count(id => !before.Contains(id)), removed = before.Count(id => !after.Contains(id));
                     if (validate) group.RollBack();
                     else if (group.Assimilate() != TransactionStatus.Committed) throw new InvalidOperationException("Programme annulé par Revit.");
@@ -95,6 +203,25 @@ namespace BIMaestro.Codex
                 finally { engine.Abort(); }
             }
         }
+        private static void ValidateSharedGeometry(Document doc, HashSet<string> before)
+        {
+            var manager = doc.FamilyManager;
+            var types = manager.Types.Cast<FamilyType>().ToArray();
+            if (types.Length < 2) return;
+            // Scope this check to newly added model components: existing user
+            // options and drawings must not prevent an unrelated modification.
+            foreach (var element in new FilteredElementCollector(doc).WhereElementIsNotElementType()
+                .Where(e => !before.Contains(e.UniqueId) && (e is GenericForm || e is FamilyInstance)))
+            {
+                var visible = element.get_Parameter(BuiltInParameter.IS_VISIBLE_PARAM);
+                var driver = visible == null ? null : manager.GetAssociatedFamilyParameter(visible);
+                if (driver == null) continue;
+                if (types.Select(t => t.AsInteger(driver)).Distinct().Count() > 1)
+                    throw new InvalidOperationException("Géométrie commune requise : le nouvel élément " + element.Id +
+                        " est sélectionné par visibilité selon le type (" + driver.Definition.Name +
+                        "). Piloter les mêmes formes par leurs dimensions ; ne pas construire une copie complète par DN. Pour une option/variante de forme explicitement demandée, déclarer geometry_policy alternatives avec reason.");
+            }
+        }
         private static readonly Dictionary<string, string[]> KeysByOp = new Dictionary<string, string[]> {
             ["new"] = new[] { "type", "args", "signature" }, ["static"] = new[] { "type", "member", "args", "signature" },
             ["call"] = new[] { "target", "member", "args", "signature" }, ["get"] = new[] { "target", "type", "member" },
@@ -102,7 +229,8 @@ namespace BIMaestro.Codex
             ["list"] = new[] { "type", "items" }, ["item"] = new[] { "target", "index" },
             ["foreach"] = new[] { "target", "var", "steps" }, ["nested"] = new[] { "name", "hosting", "source_family", "overwrite_parameter_values", "steps" },
             ["mm"] = new[] { "value" }, ["xyz_mm"] = new[] { "args" }, ["math"] = new[] { "member", "args" }, ["assert"] = new[] { "value", "message" },
-            ["range"] = new[] { "args" }, ["if"] = new[] { "value", "then", "else" }
+            ["range"] = new[] { "args" }, ["if"] = new[] { "value", "then", "else" },
+            ["pipe_connectors"] = new[] { "target", "diameter", "axis", "center" }
         };
         private static void ValidateSteps(JToken token, int depth, ref int count)
         {
@@ -193,6 +321,13 @@ namespace BIMaestro.Codex
                 return Enumerable.Range(0, (int)count).Select(i => Number(start + i * step)).ToList();
             }
             if (op == "nested") return Nested(s);
+            if (op == "pipe_connectors")
+            {
+                Start();
+                var body = Value(s["target"]) as Element;
+                if (body != null) CheckValue(body);
+                return CodexFamilyPipeConnectors.Create(doc, body, Value(s["diameter"]) as FamilyParameter, Value(s["axis"]) as XYZ, Value(s["center"]) as XYZ);
+            }
             if (op == "foreach")
             {
                 var entries = Sequence(Value(s["target"]), 200); string variable = Name(s["var"]);
@@ -247,6 +382,12 @@ namespace BIMaestro.Codex
                 return CodexCreationGuard.CreateLine((XYZ)arguments[0], (XYZ)arguments[1]);
             return Invoke(owner.GetMethods(flags).Where(m => m.Name == member).Cast<MethodBase>(), target, arguments, s);
         }
+        // A spare uninitialised type makes Revit evaluate formulas with zero
+        // divisors even when the authored type has valid values (e.g. 180° / N).
+        // Let programs that create their own initial type own the type table.
+        private static bool DeclaresInitialType(JArray steps) => steps != null && steps.OfType<JObject>().Any(s =>
+            (string)s["op"] == "call" && (string)s["member"] == "NewType" && (string)s["target"]?["ref"] == "manager");
+
         private object Nested(JObject s)
         {
             if (depth >= 3) throw new InvalidOperationException("Imbrication maximale : trois niveaux.");
@@ -277,7 +418,8 @@ namespace BIMaestro.Codex
             {
                 child = existing == null ? app.Application.NewFamilyDocument(CodexFamilyBuilder.FindTemplate(app, hosting)) : doc.EditFamily(existing);
                 engine = new CodexFamilyProgram(app, child, budget, depth + 1); engine.Start();
-                if (child.FamilyManager.CurrentType == null) child.FamilyManager.NewType("Standard");
+                if (child.FamilyManager.CurrentType == null && !DeclaresInitialType(s["steps"] as JArray))
+                    child.FamilyManager.NewType("Standard");
                 if (hosting == "work_plane") child.OwnerFamily.get_Parameter(BuiltInParameter.FAMILY_WORK_PLANE_BASED).Set(1);
                 engine.Steps(s["steps"] as JArray ?? throw new InvalidOperationException("steps manquant.")); engine.Commit();
                 warnings.AddRange(engine.warnings);
@@ -311,8 +453,29 @@ namespace BIMaestro.Codex
                 foreach (var pair in chosen.Item1.GetParameters().Select((p,i) => new { p, value = chosen.Item2[i] }))
                     if (pair.p.ParameterType == typeof(int) && pair.p.Name.IndexOf("number", StringComparison.OrdinalIgnoreCase) >= 0 && (int)pair.value > 200)
                         throw new InvalidOperationException("Réseau limité à 200 membres par opération.");
-            object result = chosen.Item1 is ConstructorInfo constructor ? constructor.Invoke(chosen.Item2) : ((MethodInfo)chosen.Item1).Invoke(target, chosen.Item2);
-            return result;
+            try { return chosen.Item1 is ConstructorInfo constructor ? constructor.Invoke(chosen.Item2) : ((MethodInfo)chosen.Item1).Invoke(target, chosen.Item2); }
+            catch (TargetInvocationException ex) when (chosen.Item1.Name == "NewLinearDimension" && ex.InnerException != null)
+            {
+                // Give the model the actual references instead of the same generic
+                // Revit exception on every attempt. Sketch profile order is not a
+                // reliable way to identify the parallel edges being dimensioned.
+                var details = new List<object>();
+                foreach (var references in chosen.Item2.OfType<ReferenceArray>())
+                    foreach (Reference reference in references) details.Add(DescribeReference(reference));
+                throw new InvalidOperationException(ex.InnerException.Message + " Références de cote : " + JsonConvert.SerializeObject(details) +
+                    ". Identifier les références par leur géométrie, pas par l'ordre du profil ; vérifier parallélisme, vue et ligne de cote. Régénérer après avoir modifié les contraintes.", ex.InnerException);
+            }
+        }
+        private object DescribeReference(Reference reference)
+        {
+            try
+            {
+                var element = doc.GetElement(reference.ElementId);
+                var curve = element?.GetGeometryObjectFromReference(reference) as Curve ?? (element as CurveElement)?.GeometryCurve;
+                return new { element_id = reference.ElementId.ToString(), reference_type = reference.ElementReferenceType.ToString(),
+                    geometry = curve == null ? null : Describe(curve) };
+            }
+            catch { return new { element_id = reference.ElementId.ToString(), reference_type = reference.ElementReferenceType.ToString() }; }
         }
         private object ConvertValue(object value, Type type)
         {
@@ -368,6 +531,8 @@ namespace BIMaestro.Codex
         private void CheckValue(object value)
         {
             if (value == null || value is string || value is bool || value is Guid) return;
+            if (value is Element staleElement && !staleElement.IsValidObject)
+                throw new InvalidOperationException("Référence d'élément Revit périmée. Après une variation du nombre d'un réseau ou une régénération, relire les membres actuels du réseau et leurs éléments via doc.GetElement ; ne pas réutiliser l'instance prototype mise en mémoire avant la variation.");
             if (value is double || value is float || value is int || value is long || value is byte || value is short || value is decimal) { Number(value); return; }
             if (value is Type apiType) { if (!AllowedType(apiType) && !ScalarTypes.Contains(apiType)) throw new InvalidOperationException("Type non accessible."); return; }
             if (value is Document document && !document.Equals(doc) || value is Element element && !element.Document.Equals(doc))
@@ -383,6 +548,9 @@ namespace BIMaestro.Codex
             if (value is Element e) return new { type = e.GetType().FullName, id = e.Id.ToString(), unique_id = e.UniqueId, name = e.Name };
             if (value is ElementId id) return id.ToString();
             if (value is XYZ point) return new { xyz_internal = new[] { point.X, point.Y, point.Z }, xyz_mm = new[] { point.X * 304.8, point.Y * 304.8, point.Z * 304.8 } };
+            if (value is Curve curve) return new { type = curve.GetType().FullName, bounded = curve.IsBound,
+                start = curve.IsBound ? Describe(curve.GetEndPoint(0)) : null, end = curve.IsBound ? Describe(curve.GetEndPoint(1)) : null };
+            if (value is Reference reference) return DescribeReference(reference);
             if (value is Type type) return new { api_type = TypeName(type) };
             if (value is Enum) return value.ToString();
             if (value is IEnumerable) return Sequence(value, 1000).Select(Describe).ToArray();
@@ -403,13 +571,13 @@ namespace BIMaestro.Codex
             if (type == null || !AllowedType(type)) throw new InvalidOperationException("Type API absent ou non exposé : " + name + ". Consulter revit_family_api.");
             return type;
         }
-        private static readonly string[] DocumentMembers = { "GetElement", "Delete", "Regenerate", "FamilyCreate", "FamilyManager", "OwnerFamily", "ActiveView", "Settings", "Title", "IsFamilyDocument", "GetUnits" };
+        private static readonly string[] DocumentMembers = { "GetElement", "Delete", "Regenerate", "CombineElements", "FamilyCreate", "FamilyManager", "OwnerFamily", "ActiveView", "Settings", "Title", "IsFamilyDocument", "GetUnits" };
         private static void CheckMember(Type type, string name, object target)
         {
             if (string.IsNullOrEmpty(name) || name == "GetType" || name == "Dispose" || name == "Finalize" || name == "GetHashCode" || name.StartsWith("add_", StringComparison.Ordinal) || name.StartsWith("remove_", StringComparison.Ordinal))
                 throw new InvalidOperationException("Membre non exposé.");
             if (typeof(Type).IsAssignableFrom(type)) throw new InvalidOperationException("La réflexion .NET n'est pas exposée.");
-            if (target is Document && !DocumentMembers.Contains(name)) throw new InvalidOperationException("Méthode Document non exposée : " + name + ". nested gère les familles temporaires ; aucune ouverture/sauvegarde/export n'est autorisée.");
+            if ((target is Document || typeof(Document).IsAssignableFrom(type)) && !DocumentMembers.Contains(name)) throw new InvalidOperationException("Méthode Document non exposée : " + name + ". nested gère les familles temporaires ; aucune ouverture/sauvegarde/export n'est autorisée.");
             if (!AllowedType(type) && !(target is IList && new[] { "Add", "Clear", "Contains", "Remove", "get_Item", "get_Count", "Count" }.Contains(name)))
                 throw new InvalidOperationException("Membre hors API du modèle.");
             if (new[] { "Save", "Load", "Open", "Close", "Export", "Import", "Write", "SubmitPrint" }.Any(prefix => name.StartsWith(prefix, StringComparison.Ordinal)) ||
@@ -439,6 +607,11 @@ namespace BIMaestro.Codex
                 entries.Add(new { name = property.Name, kind = "property", value_type = TypeName(property.PropertyType), writable = property.SetMethod?.IsPublic == true, is_static = property.GetMethod?.IsStatic == true });
             foreach (var field in type.GetFields(BindingFlags.Public | BindingFlags.Static)) entries.Add(new { name = field.Name, kind = "field", value_type = TypeName(field.FieldType) });
             var result = entries.Select(JObject.FromObject).Where(e => ((string)e["name"]).IndexOf(member, StringComparison.OrdinalIgnoreCase) >= 0).OrderBy(e => (string)e["name"]).ToArray();
+            foreach (var entry in result)
+            {
+                try { CheckMember(type, (string)entry["name"], null); entry["exposed"] = true; }
+                catch (InvalidOperationException error) { entry["exposed"] = false; entry["restriction"] = error.Message; }
+            }
             return new { type = name, members = result.Skip(offset).Take(limit).ToArray(), total = result.Length,
                 next_offset = offset + limit < result.Length ? (int?)(offset + limit) : null,
                 note = "Signatures de la version Revit en cours. Les limites d'accès du contrat s'appliquent même si un membre figure dans cette liste. signature utilise exactement les chaînes parameter_types." };

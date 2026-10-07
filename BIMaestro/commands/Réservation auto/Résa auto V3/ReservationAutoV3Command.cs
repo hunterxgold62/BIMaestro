@@ -19,7 +19,7 @@ using BIMaestro.Localization;
 namespace Modification
 {
     [Transaction(TransactionMode.Manual)]
-    public class ReservationAutoV3Command : BaseTrackedCommand
+    public partial class ReservationAutoV3Command : BaseTrackedCommand
     {
         protected override string ButtonId => "ReservationAutoV3Command";
 
@@ -801,6 +801,7 @@ namespace Modification
 
         private class WallScanCandidate
         {
+            public bool ForceUnhosted { get; set; }
             public Element Element { get; set; }
             public BoundingBoxXYZ BoundingBoxInCurrentDocument { get; set; }
             public Transform TransformToCurrentDocument { get; set; } = Transform.Identity;
@@ -810,7 +811,7 @@ namespace Modification
             public XYZ PickPointInCurrentDocument { get; set; }
             public bool IsFloorLike { get; set; }
 
-            public bool CanHost => !IsLinked && Element is Wall;
+            public bool CanHost => !ForceUnhosted && !IsLinked && Element is Wall;
         }
 
         private List<WallScanCandidate> GetAutomaticWallCandidates(Document doc)
@@ -1044,7 +1045,7 @@ namespace Modification
                 Autodesk.Revit.DB.Structure.StructuralType.NonStructural);
 
             AlignReservationOrientationIfNeeded(doc, fi, sym, host, center,
-                isWall ? GetWallDirectionXY(host as Wall) : GetElementDirectionXY(el, trToHost));
+                isWall ? GetWallDirectionXY(host as Wall) : objType == ReservationAutoV3Window.ObjectType.Autre ? XYZ.BasisX : GetElementDirectionXY(el, trToHost));
 
             ApplySizing(fi, host, bbInt, cfg, prof, objType, el, trToHost, isRect, normeEnabled);
 
@@ -1109,7 +1110,7 @@ namespace Modification
             }
 
             AlignReservationOrientationIfNeeded(doc, fi, sym, host.Element, center,
-                isWall ? host.AxisX : GetElementDirectionXY(selected.Element, selected.TransformToCurrentDocument));
+                isWall ? host.AxisX : objType == ReservationAutoV3Window.ObjectType.Autre ? XYZ.BasisX : GetElementDirectionXY(selected.Element, selected.TransformToCurrentDocument));
 
             ApplySizing(
                 fi,
@@ -1439,7 +1440,7 @@ namespace Modification
                 double len;
                 double hgt;
 
-                if (isPipeOrDuct && TryCalculateWallOpeningSizeFromSolidIntersection(
+                if (TryCalculateWallOpeningSizeFromSolidIntersection(
                         host,
                         hostTransformToCurrentDocument,
                         intersecting,

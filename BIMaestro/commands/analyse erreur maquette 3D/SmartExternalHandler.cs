@@ -1,589 +1,259 @@
 ﻿using Autodesk.Revit.DB;
+using Autodesk.Revit.DB.Events;
 using Autodesk.Revit.UI;
-using BIMaestro.Localization;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading;
 
 namespace Analyse
 {
-    public class SmartExternalHandler : IExternalEventHandler
+    public class SmartExternalHandler : IExternalEventHandler, IDisposable
     {
         private readonly UIApplication _uiapp;
-
-        public static volatile bool IsExecuting = false;
-
-        public SmartAction Action { get; set; } = SmartAction.SelectOnly;
-        public ElementId IssueId { get; set; } = ElementId.InvalidElementId;
-        public ElementId RelatedId { get; set; } = ElementId.InvalidElementId;
-        public IssueKind CurrentKind { get; set; } = IssueKind.WallFloating;
-        public BoundingBoxXYZ IssueBox { get; set; }
-
-        public IList<ElementId> AllIssueIds { get; set; } = new List<ElementId>();
-        public bool ShowAllMode { get; set; } = false;
-        public bool ShowAllEnabled { get; set; } = false;
-
-        public bool AutoSectionBox { get; set; } = true;
+        public Document OwnerDocument { get; }
+        public SmartAction Action { get; set; }
+        public SmartScanSession Session { get; set; }
+        public ModelIssue FocusIssue { get; set; }
+        public ModelIssue DisplayedIssue { get; private set; }
+        public bool ContextVisible { get; private set; }
+        public string ReservationMessage { get; private set; }
+        private BoundingBoxXYZ _focusBox;
+        public bool ShowAllEnabled { get; set; }
         public IList<ModelIssue> FocusIssues { get; set; } = new List<ModelIssue>();
-        public IList<ModelIssue> ThumbnailIssues { get; set; } = new List<ModelIssue>();
         public string ThumbnailFolder { get; set; }
-        public int ThumbnailLimit { get; set; } = 12;
-
-        public SmartExternalHandler(UIApplication app) { _uiapp = app; }
-        public string GetName() => "BIMaestro.SmartExternalHandler";
-
+        public event Action Completed;
+        public event Action<string> Failed;
+        public event Action<SmartScanSetup> SetupRefreshed;
+        public event Action ModelChanged;
+        private ElementId _originalView;
+        private IList<ElementId> _originalSelection;
+        private View3D _view;
+        private BoundingBoxXYZ _originalSection;
+        private bool _originalSectionActive;
+        private readonly Dictionary<ElementId, OverrideGraphicSettings> _overrides = new Dictionary<ElementId, OverrideGraphicSettings>();
+        private bool _disposed;
+        private bool _ownChanges;
+        public SmartExternalHandler(UIApplication app)
+        {
+            _uiapp = app; OwnerDocument = app.ActiveUIDocument.Document;
+            app.Application.DocumentChanged += DocumentChanged;
+        }
+        public string GetName() => "BIMaestro.Clash3D";
+        private void DocumentChanged(object sender, DocumentChangedEventArgs e)
+        {
+            if (_disposed || _ownChanges) return;
+            // Linked geometry can change between slices as well as host geometry.
+            if (!OwnerDocument.Equals(e.GetDocument()) && !e.GetDocument().IsLinked) return;
+            if (Session != null && !Session.Complete) Session.CancelRequested = true;
+            ModelChanged?.Invoke();
+        }
         public void Execute(UIApplication app)
         {
-            if (IsExecuting) return;
-            IsExecuting = true;
+            if (_disposed) return;
             try
             {
-                var uidoc = _uiapp.ActiveUIDocument;
-                var doc = uidoc.Document;
-
+                if (Action == SmartAction.CloseSession)
+                {
+                    // Event unsubscription must happen in a valid Revit API callback, before WPF closes.
+                    try
+                    {
+                        if (OwnerDocument.IsValidObject && OwnerDocument.Equals(app.ActiveUIDocument?.Document)) Restore(app.ActiveUIDocument);
+                        else if (OwnerDocument.IsValidObject && _view?.IsValidObject == true)
+                            Mutate(OwnerDocument, "Clash 3D · rétablir la vue", RestoreGraphics);
+                    }
+                    finally { Dispose(); }
+                    return;
+                }
+                if (!OwnerDocument.IsValidObject || !OwnerDocument.Equals(app.ActiveUIDocument?.Document))
+                    throw new InvalidOperationException("Revenez à la maquette de cette analyse pour poursuivre.");
+                var ui = app.ActiveUIDocument;
                 switch (Action)
                 {
-                    case SmartAction.Ensure3D:
-                        {
-                            var v = EnsureSmart3D(doc);
-                            uidoc.ActiveView = v;
-                            break;
-                        }
-
-                    case SmartAction.FocusApply:        // Ensure3D + Focus + Zoom
-                    case SmartAction.FocusIssue:        // legacy
-                        {
-                            var v = EnsureSmart3D(doc);
-                            uidoc.ActiveView = v;
-
-                            BoundingBoxXYZ focusBox = null;
-                            var focusIssues = (FocusIssues ?? new List<ModelIssue>())
-                                .Where(i => i != null)
-                                .ToList();
-                            using (var t = new Transaction(doc, "BIMaestro Focus"))
-                            {
-                                t.Start();
-                                if (!ShowAllMode) ClearOverrides(uidoc, v);
-                                focusBox = focusIssues.Count > 1
-                                    ? FocusIssuesIn3D(uidoc, v, focusIssues, AutoSectionBox)
-                                    : FocusIn3D(uidoc, v, IssueId, RelatedId, CurrentKind, IssueBox, AutoSectionBox);
-                                doc.Regenerate();
-                                t.Commit();
-                            }
-                            var fallbackId = focusIssues.Count > 1
-                                ? CleanIds(focusIssues.SelectMany(GetIssueFocusIds)).FirstOrDefault() ?? IssueId
-                                : IssueId;
-                            ZoomTo(uidoc, v, focusBox, fallbackId);
-                            TryRefresh(uidoc);
-                            break;
-                        }
-
-                    case SmartAction.ShowAllApply:
-                        {
-                            var v = EnsureSmart3D(doc);
-                            uidoc.ActiveView = v;
-
-                            using (var t = new Transaction(doc, "BIMaestro ShowAll APPLY"))
-                            {
-                                t.Start();
-                                TryDisableSectionBox(v);
-                                ClearOverrides(uidoc, v);
-                                if (ShowAllEnabled)
-                                    ShowAllIssues(uidoc, v, CleanIds(AllIssueIds));
-                                doc.Regenerate();
-                                t.Commit();
-                            }
-                            TryRefresh(uidoc);
-                            break;
-                        }
-
+                    case SmartAction.ScanBatch: Session?.Advance(); break;
+                    case SmartAction.RefreshSetup: SetupRefreshed?.Invoke(SmartScanSetup.Capture(ui)); break;
+                    case SmartAction.TutorialCorrect: BIMaestro.Tutorials.DemoClashExercise.Correct(OwnerDocument); break;
+                    case SmartAction.RestoreView: Restore(ui); break;
+                    case SmartAction.ToggleContext: ToggleContext(ui); break;
+                    case SmartAction.CreateReservation: CreateReservation(ui, FocusIssue); break;
                     case SmartAction.GenerateThumbnails:
-                        {
-                            GenerateThumbnails(uidoc, doc);
-                            break;
-                        }
-
-                    case SmartAction.MarkIgnored:
-                    case SmartAction.SelectOnly:
-                    default:
-                        {
-                            if (IsValidId(IssueId))
-                            {
-                                var el = doc.GetElement(IssueId);
-                                if (el != null)
-                                {
-                                    uidoc.Selection.SetElementIds(new List<ElementId> { el.Id });
-                                    var uiview = uidoc.GetOpenUIViews().FirstOrDefault(x => x.ViewId == uidoc.ActiveView.Id);
-                                    var bb = el.get_BoundingBox(uidoc.ActiveView) ?? el.get_BoundingBox(null);
-                                    if (uiview != null && bb != null) uiview.ZoomAndCenterRectangle(bb.Min, bb.Max);
-                                }
-                            }
-                            break;
-                        }
+                        Focus(ui, FocusIssue); CapturePreview(OwnerDocument, FocusIssue); break;
+                    case SmartAction.ShowAllApply:
+                        if (ShowAllEnabled) ShowAll(ui); else Restore(ui); break;
+                    default: Focus(ui, FocusIssue); break;
                 }
             }
             catch (Exception ex)
             {
-                TaskDialog.Show(UiLanguage.T("BIMaestro – SmartExternalHandler", "BIMaestro – Smart External Handler"), ex.Message);
+                if (Action == SmartAction.ScanBatch && Session != null) { Session.CancelRequested = true; Session.Advance(); }
+                Failed?.Invoke(ex.Message);
             }
-            finally
-            {
-                IsExecuting = false;
-            }
+            finally { Completed?.Invoke(); }
         }
-
-        // ---------- Helpers IDs ----------
-        private static bool IsValidId(ElementId id)
-            => id != null && id != ElementId.InvalidElementId && id.GetIdValue() > 0;
-
-        private static List<ElementId> CleanIds(IEnumerable<ElementId> ids)
-            => (ids ?? Enumerable.Empty<ElementId>()).Where(IsValidId).Distinct(new ElemIdCmp()).ToList();
-
-        private class ElemIdCmp : IEqualityComparer<ElementId>
+        private View3D EnsureView(UIDocument ui)
         {
-            public bool Equals(ElementId a, ElementId b) => (a?.GetIdValue() ?? int.MinValue) == (b?.GetIdValue() ?? int.MinValue);
-            public int GetHashCode(ElementId obj) => obj?.GetIdValue().GetHashCode() ?? 0;
-        }
-
-        // ---------- Vue 3D dédiée ----------
-        private View3D EnsureSmart3D(Document doc)
-        {
-            var v = new FilteredElementCollector(doc).OfClass(typeof(View3D)).Cast<View3D>()
-                .FirstOrDefault(x => !x.IsTemplate && x.Name.Equals(SmartClashCommand.Smart3DName, StringComparison.OrdinalIgnoreCase));
-
-            if (v == null)
+            var doc = ui.Document;
+            if (_originalView == null)
+            { _originalView = ui.ActiveView.Id; _originalSelection = ui.Selection.GetElementIds().ToList(); }
+            if (_view == null || !_view.IsValidObject)
             {
-                var vft = new FilteredElementCollector(doc).OfClass(typeof(ViewFamilyType)).Cast<ViewFamilyType>()
-                    .First(x => x.ViewFamily == ViewFamily.ThreeDimensional);
-                using (var t = new Transaction(doc, "Créer vue SmartCheck 3D"))
-                {
-                    t.Start();
-                    v = View3D.CreateIsometric(doc, vft.Id);
-                    v.Name = SmartClashCommand.Smart3DName;
-                    t.Commit();
-                }
-            }
-
-            using (var t2 = new Transaction(doc, "Réglages SmartCheck 3D"))
-            {
-                t2.Start();
-                try { v.ViewTemplateId = ElementId.InvalidElementId; } catch { }
-                try { v.DetailLevel = ViewDetailLevel.Fine; } catch { }
-                try { v.DisplayStyle = (DisplayStyle)Enum.Parse(typeof(DisplayStyle), "FlatColors", true); }
-                catch { try { v.DisplayStyle = DisplayStyle.Shading; } catch { } }
-                t2.Commit();
-            }
-
-            return v;
-        }
-
-        private static void TryEnableSectionBox(View3D v) { try { v.IsSectionBoxActive = true; } catch { } }
-        private static void TryDisableSectionBox(View3D v) { try { v.IsSectionBoxActive = false; } catch { } }
-        private static void TryRefresh(UIDocument uidoc) { try { uidoc.RefreshActiveView(); } catch { } }
-
-        private BoundingBoxXYZ FocusIn3D(UIDocument uidoc, View3D v,
-            ElementId id, ElementId related, IssueKind kind, BoundingBoxXYZ box, bool setSection)
-        {
-            var doc = uidoc.Document;
-
-            // Sélection — nettoyée
-            var ids = new List<ElementId>();
-            if (IsValidId(id)) ids.Add(id);
-            if (IsValidId(related)) ids.Add(related);
-            ids = CleanIds(ids);
-
-            if (ids.Count > 0)
-                uidoc.Selection.SetElementIds(ids);
-
-            // Boîte de focus : base sur les éléments en conflit, avec priorité à la box d'intersection
-            var pairBoxes = new List<BoundingBoxXYZ>();
-            foreach (var eid in ids)
-            {
-                var el = doc.GetElement(eid);
-                var ebb = el?.get_BoundingBox(v) ?? el?.get_BoundingBox(null);
-                if (ebb != null) pairBoxes.Add(ebb);
-            }
-
-            BoundingBoxXYZ focus = null;
-            if (kind == IssueKind.LinkPipeClash)
-            {
-                // Collision lien/tuyau : ne pas cadrer sur le lien complet, garder le focus sur le tuyau + zone de collision
-                var mainEl = IsValidId(id) ? doc.GetElement(id) : null;
-                var mainBox = mainEl?.get_BoundingBox(v) ?? mainEl?.get_BoundingBox(null);
-                focus = Union(new[] { box, mainBox });
-            }
-            else if (kind == IssueKind.MepThroughWallNoSleeve)
-            {
-                // Traversée MEP : garder les 2 éléments + box calculée
-                focus = Union(new[] { box, Union(pairBoxes) });
-            }
-            else if (kind == IssueKind.MepUnconnected)
-            {
-                // Raccord ouvert : se concentrer sur l'élément MEP principal, avec une taille mini de box
-                var mainEl = IsValidId(id) ? doc.GetElement(id) : null;
-                var mainBox = mainEl?.get_BoundingBox(v) ?? mainEl?.get_BoundingBox(null);
-                focus = EnsureMinimumBoxSize(mainBox ?? box, 300.0 / 304.8);
-            }
-            else
-            {
-                focus = Union(pairBoxes) ?? box;
-            }
-
-            // Section box compacte (+100 mm)
-            if (setSection)
-            {
-                if (focus != null)
-                {
-                    var pad = new XYZ(1, 1, 1) * (100.0 / 304.8);
-                    var b = new BoundingBoxXYZ { Min = focus.Min - pad, Max = focus.Max + pad };
-                    v.SetSectionBox(b);
-                    TryEnableSectionBox(v);
-                }
-                else
-                {
-                    // Évite de rester bloqué sur une section box précédente si aucune box fiable n'est trouvée
-                    TryDisableSectionBox(v);
-                }
-            }
-
-            // Overrides
-            var emphasize = new OverrideGraphicSettings();
-            emphasize.SetProjectionLineColor(new Color(255, 0, 0));
-#if REVIT2022_OR_LATER
-            emphasize.SetProjectionLineWeight(8);
-#endif
-            emphasize.SetSurfaceTransparency(0);
-
-            var fade = new OverrideGraphicSettings();
-            fade.SetSurfaceTransparency(85);
-            fade.SetHalftone(true);
-
-            if (ids.Count > 0)
-            {
-                foreach (var eid in ids) v.SetElementOverrides(eid, emphasize);
-
-                var allIds = CollectModelElementIds(doc);
-
-                var keep = new HashSet<ElementId>(ids, new ElemIdCmp());
-                foreach (var oid in allIds)
-                    if (!keep.Contains(oid))
-                        v.SetElementOverrides(oid, fade);
-            }
-            else
-            {
-                if (IsValidId(id))
-                    v.SetElementOverrides(id, emphasize);
-            }
-
-            return focus;
-        }
-
-        private BoundingBoxXYZ FocusIssuesIn3D(UIDocument uidoc, View3D v, IList<ModelIssue> issues, bool setSection)
-        {
-            var doc = uidoc.Document;
-            var ids = CleanIds(issues.SelectMany(GetIssueFocusIds));
-
-            if (ids.Count > 0)
-                uidoc.Selection.SetElementIds(ids);
-
-            var focus = Union(issues.Select(i => GetIssueFocusBox(doc, v, i)));
-
-            if (setSection)
-            {
-                if (focus != null)
-                {
-                    var pad = new XYZ(1, 1, 1) * (180.0 / 304.8);
-                    v.SetSectionBox(new BoundingBoxXYZ { Min = focus.Min - pad, Max = focus.Max + pad });
-                    TryEnableSectionBox(v);
-                }
-                else
-                {
-                    TryDisableSectionBox(v);
-                }
-            }
-
-            var emphasize = new OverrideGraphicSettings();
-            emphasize.SetProjectionLineColor(new Color(255, 0, 0));
-#if REVIT2022_OR_LATER
-            emphasize.SetProjectionLineWeight(8);
-#endif
-            emphasize.SetSurfaceTransparency(0);
-
-            var fade = new OverrideGraphicSettings();
-            fade.SetSurfaceTransparency(85);
-            fade.SetHalftone(true);
-
-            if (ids.Count > 0)
-            {
-                foreach (var eid in ids)
-                    v.SetElementOverrides(eid, emphasize);
-
-                var keep = new HashSet<ElementId>(ids, new ElemIdCmp());
-                foreach (var oid in CollectModelElementIds(doc))
-                    if (!keep.Contains(oid))
-                        v.SetElementOverrides(oid, fade);
-            }
-
-            return focus;
-        }
-
-        private static IEnumerable<ElementId> GetIssueFocusIds(ModelIssue issue)
-        {
-            if (issue == null) yield break;
-
-            if (IsValidId(issue.ElementId))
-                yield return issue.ElementId;
-
-            // Un lien complet casse la lecture d'un cluster de clashes: on garde les réseaux + boîtes de collision.
-            if (issue.Kind != IssueKind.LinkPipeClash && IsValidId(issue.RelatedId))
-                yield return issue.RelatedId;
-        }
-
-        private static BoundingBoxXYZ GetIssueFocusBox(Document doc, View3D view, ModelIssue issue)
-        {
-            if (doc == null || issue == null) return null;
-
-            var mainBox = GetElementBox(doc, view, issue.ElementId);
-            var relatedBox = issue.Kind == IssueKind.LinkPipeClash
-                ? null
-                : GetElementBox(doc, view, issue.RelatedId);
-
-            if (issue.Kind == IssueKind.MepUnconnected)
-                return EnsureMinimumBoxSize(mainBox ?? issue.BBox, 300.0 / 304.8);
-
-            return Union(new[] { issue.BBox, mainBox, relatedBox });
-        }
-
-        private static BoundingBoxXYZ GetElementBox(Document doc, View3D view, ElementId id)
-        {
-            if (!IsValidId(id)) return null;
-            var el = doc.GetElement(id);
-            return el?.get_BoundingBox(view) ?? el?.get_BoundingBox(null);
-        }
-
-        private void ZoomTo(UIDocument uidoc, View3D v, BoundingBoxXYZ focusBox, ElementId fallbackId)
-        {
-            var uiview = uidoc.GetOpenUIViews().FirstOrDefault(x => x.ViewId == v.Id)
-                      ?? uidoc.GetOpenUIViews().FirstOrDefault(x => x.ViewId == uidoc.ActiveView.Id);
-            if (uiview == null) return;
-
-            BoundingBoxXYZ bb = focusBox;
-            if (bb == null && IsValidId(fallbackId))
-            {
-                var el = uidoc.Document.GetElement(fallbackId);
-                bb = el?.get_BoundingBox(v) ?? el?.get_BoundingBox(null);
-            }
-            if (bb == null) return;
-
-            try { uiview.ZoomAndCenterRectangle(bb.Min, bb.Max); } catch { }
-        }
-
-        private void ShowAllIssues(UIDocument uidoc, View3D v, IList<ElementId> issueIds)
-        {
-            var doc = uidoc.Document;
-            var ids = CleanIds(issueIds);
-
-            var err = new OverrideGraphicSettings();
-            err.SetProjectionLineColor(new Color(255, 0, 0));
-#if REVIT2022_OR_LATER
-            err.SetProjectionLineWeight(8);
-#endif
-            err.SetSurfaceTransparency(0);
-            foreach (var id in ids)
-                v.SetElementOverrides(id, err);
-
-            var allIds = CollectModelElementIds(doc);
-            var set = new HashSet<ElementId>(ids, new ElemIdCmp());
-            var others = allIds.Where(i => !set.Contains(i)).ToList();
-
-            var fade = new OverrideGraphicSettings();
-            fade.SetSurfaceTransparency(85);
-            fade.SetHalftone(true);
-            foreach (var oid in others)
-                v.SetElementOverrides(oid, fade);
-
-            TryDisableSectionBox(v);
-        }
-
-        private void ClearOverrides(UIDocument uidoc, View3D v)
-        {
-            var doc = uidoc.Document;
-            var allIds = CollectModelElementIds(doc);
-            var neutral = new OverrideGraphicSettings();
-            foreach (var id in allIds) v.SetElementOverrides(id, neutral);
-        }
-
-        private static IList<ElementId> CollectModelElementIds(Document doc)
-        {
-            return new FilteredElementCollector(doc)
-                .WhereElementIsNotElementType()
-                .Where(e => e?.Category != null)
-                .Select(e => e.Id)
-                .ToList();
-        }
-
-        private void GenerateThumbnails(UIDocument uidoc, Document doc)
-        {
-            var queue = (ThumbnailIssues ?? new List<ModelIssue>())
-                .Where(i => i != null)
-                .Distinct()
-                .Take(Math.Max(1, ThumbnailLimit))
-                .ToList();
-            if (queue.Count == 0) return;
-
-            var folder = string.IsNullOrWhiteSpace(ThumbnailFolder)
-                ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "Clash3D", "Miniatures")
-                : ThumbnailFolder;
-            Directory.CreateDirectory(folder);
-
-            var v = EnsureSmart3D(doc);
-            uidoc.ActiveView = v;
-
-            foreach (var issue in queue)
-            {
-                var target = Path.Combine(folder, MakeSafeFileName(issue.IssueKey) + ".png");
-                if (File.Exists(target))
-                {
-                    issue.ThumbnailPath = target;
-                    issue.ThumbnailLoading = false;
-                    continue;
-                }
-
-                issue.ThumbnailLoading = true;
-                try
-                {
-                    BoundingBoxXYZ focusBox = null;
-                    using (var t = new Transaction(doc, "BIMaestro miniature Clash 3D"))
+                _view = new FilteredElementCollector(doc).OfClass(typeof(View3D)).Cast<View3D>()
+                    .FirstOrDefault(v => !v.IsTemplate && v.Name == SmartClashCommand.Smart3DName);
+                if (_view == null)
+                    Mutate(doc, "Clash 3D · vue de coordination", () =>
                     {
-                        t.Start();
-                        ClearOverrides(uidoc, v);
-                        focusBox = FocusIn3D(
-                            uidoc,
-                            v,
-                            issue.ElementId ?? ElementId.InvalidElementId,
-                            issue.RelatedId ?? ElementId.InvalidElementId,
-                            issue.Kind,
-                            issue.BBox,
-                            setSection: true);
-                        doc.Regenerate();
-                        t.Commit();
-                    }
-
-                    ZoomTo(uidoc, v, focusBox, issue.ElementId);
-                    var exported = ExportViewToPng(doc, v, target, 420);
-                    if (!string.IsNullOrWhiteSpace(exported) && File.Exists(exported))
-                        issue.ThumbnailPath = exported;
-                }
-                catch
-                {
-                    // Une miniature ratée ne doit pas interrompre tout le lot.
-                }
-                finally
-                {
-                    issue.ThumbnailLoading = false;
-                }
+                        var type = new FilteredElementCollector(doc).OfClass(typeof(ViewFamilyType)).Cast<ViewFamilyType>()
+                            .First(v => v.ViewFamily == ViewFamily.ThreeDimensional);
+                        _view = View3D.CreateIsometric(doc, type.Id); _view.Name = SmartClashCommand.Smart3DName;
+                        _view.DetailLevel = ViewDetailLevel.Fine; _view.DisplayStyle = DisplayStyle.FlatColors;
+                    });
+                _originalSectionActive = _view.IsSectionBoxActive; _originalSection = _view.GetSectionBox();
             }
-
-            TryRefresh(uidoc);
+            ui.ActiveView = _view;
+            return _view;
         }
-
-        private static string ExportViewToPng(Document doc, View3D view, string targetPng, int pixelSize)
+        private void Focus(UIDocument ui, ModelIssue issue)
         {
-            var outDir = Path.GetDirectoryName(targetPng);
-            if (string.IsNullOrWhiteSpace(outDir)) return null;
-            Directory.CreateDirectory(outDir);
-
-            var baseName = Path.GetFileNameWithoutExtension(targetPng);
-            var basePath = Path.Combine(outDir, baseName);
-            var before = new HashSet<string>(Directory.EnumerateFiles(outDir, "*.png"), StringComparer.OrdinalIgnoreCase);
-
-            var options = new ImageExportOptions
+            if (issue == null) return;
+            var doc = ui.Document;
+            var source = ResolveSource(doc, issue);
+            var related = !string.IsNullOrWhiteSpace(issue.LinkUniqueId) ? doc.GetElement(issue.LinkUniqueId)
+                : !string.IsNullOrWhiteSpace(issue.RelatedUniqueId) ? doc.GetElement(issue.RelatedUniqueId) : doc.GetElement(issue.RelatedId);
+            if (source == null) throw new InvalidOperationException("Cet objet a été supprimé. Relancez l'analyse.");
+            if (!string.IsNullOrWhiteSpace(issue.RelatedUniqueId) && related == null)
+                throw new InvalidOperationException("L'obstacle a été supprimé. Relancez l'analyse.");
+            if (related is RevitLinkInstance link && (link.GetLinkDocument() == null || link.GetLinkDocument().GetElement(issue.RelatedUniqueId) == null))
+                throw new InvalidOperationException("L'obstacle lié n'est plus disponible. Rechargez le lien et relancez l'analyse.");
+            var view = EnsureView(ui);
+            var box = Expand(issue.BBox ?? SmartGeometry.WorldBox(source.get_BoundingBox(null), Transform.Identity), 450 / 304.8);
+            if (box == null) throw new InvalidOperationException("La zone du conflit n'est plus disponible.");
+            Mutate(doc, "Clash 3D · voir le conflit", () =>
             {
-                ExportRange = ExportRange.SetOfViews,
-                FilePath = basePath,
-                HLRandWFViewsFileType = ImageFileType.PNG,
-                ShadowViewsFileType = ImageFileType.PNG,
-                ZoomType = ZoomFitType.FitToPage,
-                PixelSize = Math.Max(256, pixelSize),
-                FitDirection = FitDirectionType.Horizontal,
-                ImageResolution = ImageResolution.DPI_150
-            };
-
-            options.SetViewsAndSheets(new List<ElementId> { view.Id });
-            doc.ExportImage(options);
-
-            string picked = null;
-            var deadline = DateTime.UtcNow.AddMilliseconds(2500);
-            while (DateTime.UtcNow < deadline)
-            {
-                var after = Directory.EnumerateFiles(outDir, "*.png").ToList();
-                picked = after
-                    .Where(f => !before.Contains(f) || Path.GetFileName(f).StartsWith(baseName, StringComparison.OrdinalIgnoreCase))
-                    .OrderByDescending(File.GetLastWriteTimeUtc)
-                    .FirstOrDefault();
-                if (!string.IsNullOrWhiteSpace(picked)) break;
-                Thread.Sleep(100);
-            }
-
-            if (string.IsNullOrWhiteSpace(picked)) return null;
-
-            try
-            {
-                if (!string.Equals(picked, targetPng, StringComparison.OrdinalIgnoreCase))
-                {
-                    if (File.Exists(targetPng)) File.Delete(targetPng);
-                    File.Copy(picked, targetPng, overwrite: true);
-                }
-
-                return targetPng;
-            }
-            catch
-            {
-                return picked;
-            }
+                ClearOverrides(); view.IsSectionBoxActive = true; view.SetSectionBox(box);
+                var visible = new FilteredElementCollector(doc, view.Id).WhereElementIsNotElementType()
+                    .WherePasses(new BoundingBoxIntersectsFilter(new Outline(box.Min, box.Max)))
+                    .Where(e => e.Category?.CategoryType == CategoryType.Model).ToList();
+                var fade = new OverrideGraphicSettings().SetSurfaceTransparency(75).SetHalftone(true);
+                foreach (var e in visible) Override(e.Id, fade);
+                Override(source.Id, Highlight(doc, new Color(225, 89, 36)));
+                if (related != null) Override(related.Id, Highlight(doc, new Color(36, 109, 196)));
+            });
+            // Selecting a whole link would overwhelm the local highlight.
+            ui.Selection.SetElementIds(new List<ElementId> { source.Id });
+            Zoom(ui, box); ui.RefreshActiveView();
+            DisplayedIssue = issue; _focusBox = box; ContextVisible = false;
         }
-
-        private static string MakeSafeFileName(string value)
+        private void ToggleContext(UIDocument ui)
         {
-            var invalid = Path.GetInvalidFileNameChars();
-            var safe = new string((value ?? "issue").Select(ch => invalid.Contains(ch) ? '_' : ch).ToArray());
-            return safe.Length > 120 ? safe.Substring(0, 120) : safe;
-        }
-
-        private static BoundingBoxXYZ EnsureMinimumBoxSize(BoundingBoxXYZ bb, double minSizeFt)
-        {
-            if (bb == null) return null;
-
-            var cx = (bb.Min.X + bb.Max.X) * 0.5;
-            var cy = (bb.Min.Y + bb.Max.Y) * 0.5;
-            var cz = (bb.Min.Z + bb.Max.Z) * 0.5;
-
-            var hx = Math.Max((bb.Max.X - bb.Min.X) * 0.5, minSizeFt * 0.5);
-            var hy = Math.Max((bb.Max.Y - bb.Min.Y) * 0.5, minSizeFt * 0.5);
-            var hz = Math.Max((bb.Max.Z - bb.Min.Z) * 0.5, minSizeFt * 0.5);
-
-            return new BoundingBoxXYZ
+            var issue = DisplayedIssue;
+            if (issue == null || _focusBox == null) return;
+            if (ContextVisible) { Focus(ui, issue); return; }
+            var view = EnsureView(ui);
+            var source = ResolveSource(ui.Document, issue);
+            if (source == null) throw new InvalidOperationException("Cet objet a été supprimé. Relancez l'analyse.");
+            var related = !string.IsNullOrWhiteSpace(issue.LinkUniqueId) ? ui.Document.GetElement(issue.LinkUniqueId)
+                : !string.IsNullOrWhiteSpace(issue.RelatedUniqueId) ? ui.Document.GetElement(issue.RelatedUniqueId) : ui.Document.GetElement(issue.RelatedId);
+            Mutate(ui.Document, "Clash 3D · voir autour", () =>
             {
-                Min = new XYZ(cx - hx, cy - hy, cz - hz),
-                Max = new XYZ(cx + hx, cy + hy, cz + hz)
-            };
+                ClearOverrides(); view.IsSectionBoxActive = false;
+                Override(source.Id, Highlight(ui.Document, new Color(225, 89, 36)));
+                if (related != null) Override(related.Id, Highlight(ui.Document, new Color(36, 109, 196)));
+            });
+            Zoom(ui, Expand(_focusBox, 8000 / 304.8)); ui.RefreshActiveView(); ContextVisible = true;
         }
-
-        private static BoundingBoxXYZ Union(IEnumerable<BoundingBoxXYZ> bbs)
+        private void CreateReservation(UIDocument ui, ModelIssue issue)
         {
-            BoundingBoxXYZ u = null;
-            foreach (var bb in bbs.Where(b => b != null))
+            ReservationMessage = null;
+            if (issue == null || !issue.CanCreateReservation || issue.IsApproximate)
+                throw new InvalidOperationException("La réservation directe nécessite une intersection confirmée d'un objet avec un mur ou sol.");
+            var source = ResolveSource(ui.Document, issue);
+            var link = string.IsNullOrWhiteSpace(issue.LinkUniqueId) ? null : ui.Document.GetElement(issue.LinkUniqueId) as RevitLinkInstance;
+            if (!string.IsNullOrWhiteSpace(issue.LinkUniqueId) && link?.GetLinkDocument() == null)
+                throw new InvalidOperationException("Le lien n'est plus disponible. Rechargez-le et relancez l'analyse.");
+            var host = (link?.GetLinkDocument() ?? ui.Document).GetElement(issue.RelatedUniqueId);
+            if (source == null || host == null) throw new InvalidOperationException("Les objets ont changé. Relancez l'analyse.");
+            var instance = Modification.ReservationAutoV3Command.CreateForClash(ui.Document, source, host, link);
+            ReservationMessage = "Réservation créée · #" + instance.Id.GetIdLongValue()
+                + (link == null ? ". Relancez l'analyse pour vérifier la traversée." : " dans la maquette active. Le lien reste à coordonner ; relancez l'analyse.");
+        }
+        private static Element ResolveSource(Document doc, ModelIssue issue) => !string.IsNullOrWhiteSpace(issue.ElementUniqueId)
+            ? doc.GetElement(issue.ElementUniqueId) : doc.GetElement(issue.ElementId);
+        private void ShowAll(UIDocument ui)
+        {
+            DisplayedIssue = null; ContextVisible = false; _focusBox = null;
+            var issues = FocusIssues.Where(i => i != null).ToList(); if (issues.Count == 0) return;
+            var view = EnsureView(ui); var box = Expand(SmartGeometry.Union(issues.Select(i => i.BBox)), 600 / 304.8);
+            Mutate(ui.Document, "Clash 3D · vue d'ensemble", () =>
             {
-                if (u == null) u = new BoundingBoxXYZ { Min = bb.Min, Max = bb.Max };
-                else
-                {
-                    u.Min = new XYZ(Math.Min(u.Min.X, bb.Min.X), Math.Min(u.Min.Y, bb.Min.Y), Math.Min(u.Min.Z, bb.Min.Z));
-                    u.Max = new XYZ(Math.Max(u.Max.X, bb.Max.X), Math.Max(u.Max.Y, bb.Max.Y), Math.Max(u.Max.Z, bb.Max.Z));
-                }
-            }
-            return u;
+                ClearOverrides(); if (box != null) { view.IsSectionBoxActive = true; view.SetSectionBox(box); }
+                foreach (var issue in issues)
+                { var e = ResolveSource(ui.Document, issue); if (e != null) Override(e.Id, Highlight(ui.Document, new Color(225, 89, 36))); }
+            });
+            Zoom(ui, box); ui.RefreshActiveView();
+        }
+        private static OverrideGraphicSettings Highlight(Document doc, Color color)
+        {
+            var settings = new OverrideGraphicSettings().SetProjectionLineColor(color).SetProjectionLineWeight(5).SetSurfaceTransparency(0);
+            var fill = new FilteredElementCollector(doc).OfClass(typeof(FillPatternElement)).Cast<FillPatternElement>()
+                .FirstOrDefault(f => f.GetFillPattern().IsSolidFill);
+            if (fill != null) settings.SetSurfaceForegroundPatternId(fill.Id).SetSurfaceForegroundPatternColor(color)
+                .SetCutForegroundPatternId(fill.Id).SetCutForegroundPatternColor(color);
+            return settings;
+        }
+        private void Override(ElementId id, OverrideGraphicSettings settings)
+        {
+            if (!_overrides.ContainsKey(id)) _overrides[id] = _view.GetElementOverrides(id);
+            _view.SetElementOverrides(id, settings);
+        }
+        private void ClearOverrides()
+        {
+            foreach (var entry in _overrides) if (OwnerDocument.GetElement(entry.Key) != null) _view.SetElementOverrides(entry.Key, entry.Value);
+            _overrides.Clear();
+        }
+        private void Restore(UIDocument ui)
+        {
+            if (_view != null && _view.IsValidObject)
+                Mutate(ui.Document, "Clash 3D · rétablir la vue", RestoreGraphics);
+            if (_originalView != null && ui.Document.GetElement(_originalView) is View original && original.ViewType != ViewType.Internal) ui.ActiveView = original;
+            if (_originalSelection != null) ui.Selection.SetElementIds(_originalSelection.Where(id => ui.Document.GetElement(id) != null).ToList());
+            ui.RefreshActiveView(); _originalView = null; _originalSelection = null; _view = null;
+            DisplayedIssue = null; ContextVisible = false; _focusBox = null;
+        }
+        private void RestoreGraphics()
+        { ClearOverrides(); if (_originalSection != null) _view.SetSectionBox(_originalSection); _view.IsSectionBoxActive = _originalSectionActive; }
+        private void Mutate(Document doc, string name, Action action)
+        {
+            _ownChanges = true;
+            try { using (var t = new Transaction(doc, name))
+                { t.Start(); action(); if (t.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("La modification de la vue n'a pas été validée."); } }
+            finally { _ownChanges = false; }
+        }
+        private static BoundingBoxXYZ Expand(BoundingBoxXYZ box, double pad)
+        {
+            if (box == null) return null;
+            var p = new XYZ(pad, pad, pad); return new BoundingBoxXYZ { Min = box.Min - p, Max = box.Max + p };
+        }
+        private void Zoom(UIDocument ui, BoundingBoxXYZ box)
+        { if (box != null) ui.GetOpenUIViews().FirstOrDefault(v => v.ViewId == _view.Id)?.ZoomAndCenterRectangle(box.Min, box.Max); }
+        private void CapturePreview(Document doc, ModelIssue issue)
+        {
+            if (issue == null || _view == null) return;
+            Directory.CreateDirectory(ThumbnailFolder);
+            var path = Path.Combine(ThumbnailFolder, SmartClashReport.PreviewName(issue));
+            var opts = new ImageExportOptions { FilePath = Path.ChangeExtension(path, null), ExportRange = ExportRange.SetOfViews,
+                HLRandWFViewsFileType = ImageFileType.PNG, ShadowViewsFileType = ImageFileType.PNG,
+                ZoomType = ZoomFitType.FitToPage, PixelSize = 900, FitDirection = FitDirectionType.Horizontal };
+            opts.SetViewsAndSheets(new List<ElementId> { _view.Id }); doc.ExportImage(opts);
+            var exported = Directory.GetFiles(ThumbnailFolder, Path.GetFileNameWithoutExtension(path) + "*.png")
+                .OrderByDescending(File.GetLastWriteTimeUtc).FirstOrDefault();
+            if (exported != null) { if (exported != path) File.Copy(exported, path, true); issue.ThumbnailPath = path; }
+        }
+        public void Dispose()
+        {
+            // Call from an API callback. Closed only reaches here after CloseSession has disposed the handler.
+            if (_disposed) return; _disposed = true;
+            _uiapp.Application.DocumentChanged -= DocumentChanged;
+            Session?.Dispose(); _overrides.Clear();
         }
     }
 }

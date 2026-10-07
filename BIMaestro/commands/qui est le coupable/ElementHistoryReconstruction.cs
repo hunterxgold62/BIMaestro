@@ -1,5 +1,8 @@
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Structure;
+using Autodesk.Revit.DB.Plumbing;
+using Autodesk.Revit.DB.Mechanical;
+using Autodesk.Revit.DB.Electrical;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
 using System;
@@ -8,13 +11,30 @@ using System.Linq;
 
 namespace Analyse
 {
-    // Only recipes with a supported placement are captured. Complex hosts keep the
-    // historical mesh. These DTOs contain no live Revit objects or numeric element IDs.
+    // Persist native creation data, independently of category or preview mode.
+    // These DTOs contain no live Revit objects or numeric element IDs.
     [JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
     internal sealed class HistoryRecipe
     {
         public int Version { get; set; } = 1;
         public string Kind { get; set; }
+        public HistoryNativeArtifact Native { get; set; }
+        public string SystemName { get; set; }
+        public List<string> SystemMembers { get; set; }
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public int ElectricalSystemType { get; set; }
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public int ElectricalConnectionType { get; set; }
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public int ElectricalStartSlot { get; set; }
+        public string ElectricalCircuitNumber { get; set; }
+        public List<double[]> ElectricalPath { get; set; }
+        public List<HistoryCircuit> ElectricalCircuits { get; set; }
+        public List<HistoryGeometryRelation> GeometryRelations { get; set; }
+        [JsonIgnore]
+        internal string ExistingElectricalSystem { get; set; }
+        [JsonIgnore]
+        internal bool ElectricalChanged { get; set; }
         public string Type { get; set; }
         public string Level { get; set; }
         public string Host { get; set; }
@@ -41,6 +61,23 @@ namespace Analyse
         public List<string> CaptureWarnings { get; set; }
         public bool Mirrored { get; set; }
         public List<HistoryPort> Ports { get; set; }
+        public List<HistoryCurve> SketchCurves { get; set; }
+        public List<HistoryRoofEdge> RoofEdges { get; set; }
+        public string Placement { get; set; }
+        public string FaceReference { get; set; }
+        public double[] FaceNormal { get; set; }
+        public List<double[]> AdaptivePoints { get; set; }
+        public bool AdaptiveFlipped { get; set; }
+        public bool WorkPlaneFlipped { get; set; }
+        public bool WallProfile { get; set; }
+        public List<double[]> ShapePoints { get; set; }
+        public List<HistoryCurve> ShapeCreases { get; set; }
+    }
+
+    internal sealed class HistoryCircuit
+    {
+        public string SourceUniqueId { get; set; }
+        public HistoryRecipe Recipe { get; set; }
     }
 
     [JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
@@ -49,6 +86,15 @@ namespace Analyse
         public double[] Start { get; set; }
         public double[] End { get; set; }
         public double[] Mid { get; set; }
+        public string SourceUniqueId { get; set; }
+        public List<string> RestorationOrigins { get; set; }
+    }
+
+    internal sealed class HistoryRoofEdge
+    {
+        public bool DefinesSlope { get; set; }
+        public double Slope { get; set; }
+        public double Offset { get; set; }
     }
 
     [JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
@@ -64,12 +110,35 @@ namespace Analyse
         public string Reference { get; set; }
     }
 
-    internal static class ElementHistoryReconstruction
+    internal static partial class ElementHistoryReconstruction
     {
         internal static HistoryRecipe Capture(Element element, Action<string> diagnostic = null)
         {
             string detail = null;
-            var recipe = CaptureCore(element, message => detail = message);
+            var recipe = element != null && ElementHistoryNativeArchive.RequiresAggregate(element)
+                ? ElementHistoryNativeArchive.Capture(element) : CaptureCore(element, message => detail = message);
+            if (recipe == null && element != null)
+                try { recipe = ElementHistoryNativeArchive.Capture(element); } catch (Exception ex) { detail = ex.Message; }
+            if (recipe != null && (element is FamilyInstance || element is Group))
+            {
+                try
+                {
+                    var members = element is FamilyInstance family ? new[] { family }
+                        : ElementHistoryNativeArchive.Aggregate(element.Document, element).OfType<FamilyInstance>();
+                    var circuits = members.Where(f => f.MEPModel != null
+                            && !ElementHistoryRestoration.IsCalorifuge(f.Category?.Name, f.Symbol?.Family?.Name))
+                        .SelectMany(f => (f.MEPModel.GetElectricalSystems() ?? new HashSet<ElectricalSystem>())
+                            .Concat(f.MEPModel.GetAssignedElectricalSystems() ?? new HashSet<ElectricalSystem>()))
+                        .GroupBy(s => s.UniqueId).Select(g => g.First()).ToList();
+                    if (circuits.Count > 0) recipe.ElectricalCircuits = circuits.Select(s => new HistoryCircuit
+                        { SourceUniqueId = s.UniqueId, Recipe = CaptureCore(s, diagnostic) }).Where(c => c.Recipe != null).ToList();
+                }
+                catch (Exception ex)
+                {
+                    if (recipe.CaptureWarnings == null) recipe.CaptureWarnings = new List<string>();
+                    recipe.CaptureWarnings.Add("Circuits électriques non enregistrés : " + ex.Message);
+                }
+            }
             if (recipe == null)
             {
                 var instance = element as FamilyInstance;
@@ -83,6 +152,16 @@ namespace Analyse
                 catch { /* Diagnostics must not break snapshot capture. */ }
                 diagnostic?.Invoke(detail ?? ("Capture non prise en charge : " + context + "."));
             }
+            if (recipe != null)
+            {
+                var warnings = recipe.CaptureWarnings ?? new List<string>();
+                var members = ElementHistoryNativeArchive.RequiresAggregate(element)
+                    ? ElementHistoryNativeArchive.Aggregate(element.Document, element) : new[] { element };
+                recipe.GeometryRelations = members.SelectMany(member => ElementHistoryRelations.Capture(member, warnings))
+                    .GroupBy(ElementHistoryRelations.Key).Select(g => g.First()).ToList();
+                if (recipe.GeometryRelations.Count == 0) recipe.GeometryRelations = null;
+                if (warnings.Count > 0) recipe.CaptureWarnings = warnings;
+            }
             return recipe;
         }
 
@@ -91,8 +170,44 @@ namespace Analyse
             try
             {
                 var doc = element.Document;
+                if (element is ElectricalSystem electrical)
+                    return new HistoryRecipe { Kind = "electrical_system", Host = electrical.BaseEquipment?.UniqueId,
+                        ElectricalSystemType = (int)electrical.SystemType,
+                        ElectricalConnectionType = (int)electrical.CircuitConnectionType,
+                        ElectricalStartSlot = electrical.BaseEquipment == null ? 0 : electrical.StartSlot,
+                        ElectricalCircuitNumber = electrical.CircuitNumber,
+                        ElectricalPath = electrical.BaseEquipment != null && electrical.CircuitPathMode == ElectricalCircuitPathMode.Custom
+                            ? electrical.GetCircuitPath().Select(Pack).ToList() : null,
+                        RestorationOrigins = ElementHistoryRestoration.GetOrigins(element), RequiresMeshPreview = true,
+                        Parameters = CaptureParameters(element), SystemMembers = electrical.Elements.Cast<Element>().Select(e => e.UniqueId).OrderBy(id => id, StringComparer.Ordinal).ToList() };
+                if (element is PipingSystem pipeSystem)
+                    return new HistoryRecipe { Kind = "pipe_system", Type = doc.GetElement(pipeSystem.GetTypeId())?.UniqueId,
+                        RestorationOrigins = ElementHistoryRestoration.GetOrigins(element), RequiresMeshPreview = true,
+                        SystemName = pipeSystem.Name, SystemMembers = pipeSystem.PipingNetwork.Cast<Element>().Select(e => e.UniqueId).ToList() };
+                if (element is MechanicalSystem ductSystem)
+                    return new HistoryRecipe { Kind = "duct_system", Type = doc.GetElement(ductSystem.GetTypeId())?.UniqueId,
+                        RestorationOrigins = ElementHistoryRestoration.GetOrigins(element), RequiresMeshPreview = true,
+                        SystemName = ductSystem.Name, SystemMembers = ductSystem.DuctNetwork.Cast<Element>().Select(e => e.UniqueId).ToList() };
                 if (element is MEPCurve) return ElementHistoryNetwork.Capture(element);
-                if (doc.IsFamilyDocument || !(element is FamilyInstance || element is Wall || element is Floor)) return null;
+                if (doc.IsFamilyDocument) return null;
+                if (element is ModelCurve model && element.Category?.Id.GetIdLongValue() != (int)BuiltInCategory.OST_SketchLines)
+                {
+                    var curve = CaptureCurve(model.GeometryCurve);
+                    var curveLevel = new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>()
+                        .OrderBy(l => Math.Abs(l.ProjectElevation - model.GeometryCurve.GetEndPoint(0).Z)).FirstOrDefault();
+                    if (curve == null || curveLevel == null || model.IsReferenceLine || model.LineStyle == null) return null;
+                    var plane = model.SketchPlane.GetPlane();
+                    return new HistoryRecipe { Kind = "model_curve", Type = model.LineStyle.UniqueId, Level = curveLevel.UniqueId,
+                        Point = Pack(plane.Origin), BasisZ = Pack(plane.Normal),
+                        Loops = new List<List<HistoryCurve>> { new List<HistoryCurve> { curve } },
+                        RestorationOrigins = ElementHistoryRestoration.GetOrigins(model) };
+                }
+                if (element is FootPrintRoof || element is Ceiling)
+                    return CaptureSketchHost(element, diagnostic);
+                if (element is FamilyInstance extendedFamily && extendedFamily.Symbol.Family.FamilyPlacementType != FamilyPlacementType.OneLevelBased
+                    && extendedFamily.Symbol.Family.FamilyPlacementType != FamilyPlacementType.OneLevelBasedHosted)
+                    return CaptureExtendedFamily(extendedFamily, diagnostic);
+                if (!(element is FamilyInstance || element is Wall || element is Floor)) return null;
                 var type = doc.GetElement(element.GetTypeId());
                 var level = FindLevel(element);
                 if (type == null || level == null) { diagnostic?.Invoke("Type ou niveau de référence introuvable à la capture."); return null; }
@@ -136,16 +251,29 @@ namespace Analyse
                 }
                 else if (element is Wall wall)
                 {
-                    if (wall.WallType.Kind != WallKind.Basic || wall.SketchId != ElementId.InvalidElementId
+                    if (wall.WallType.Kind != WallKind.Basic
                         || Math.Abs(Value(wall, BuiltInParameter.WALL_SINGLE_SLANT_ANGLE_FROM_VERTICAL)) > 1e-8
                         || Integer(wall, BuiltInParameter.WALL_CROSS_SECTION) != (int)WallCrossSection.Vertical
                         || Integer(wall, BuiltInParameter.WALL_TOP_IS_ATTACHED) != 0
                         || Integer(wall, BuiltInParameter.WALL_BOTTOM_IS_ATTACHED) != 0
                         || !(wall.Location is LocationCurve location)) return null;
-                    var curve = CaptureCurve(location.Curve);
-                    if (curve == null) return null;
                     recipe.Kind = "wall";
-                    recipe.Loops = new List<List<HistoryCurve>> { new List<HistoryCurve> { curve } };
+                    if (wall.SketchId != ElementId.InvalidElementId)
+                    {
+                        var sketch = doc.GetElement(wall.SketchId) as Sketch;
+                        if (sketch == null || sketch.Profile.Size != 1) return null;
+                        recipe.WallProfile = true;
+                        recipe.BasisZ = Pack(wall.Orientation);
+                        recipe.Loops = sketch.Profile.Cast<CurveArray>().Select(l => l.Cast<Curve>().Select(CaptureCurve).ToList()).ToList();
+                        if (recipe.Loops.SelectMany(l => l).Any(c => c == null)) return null;
+                        recipe.SketchCurves = CaptureSketchCurves(doc, sketch);
+                    }
+                    else
+                    {
+                        var curve = CaptureCurve(location.Curve);
+                        if (curve == null) return null;
+                        recipe.Loops = new List<List<HistoryCurve>> { new List<HistoryCurve> { curve } };
+                    }
                     recipe.Height = Value(wall, BuiltInParameter.WALL_USER_HEIGHT_PARAM);
                     if (recipe.Height <= 0) return null;
                     recipe.Offset = Value(wall, BuiltInParameter.WALL_BASE_OFFSET);
@@ -156,9 +284,9 @@ namespace Analyse
                 }
                 else if (element is Floor floor)
                 {
-                    // Sloped/shape-edited floors retain their mesh, including their cut geometry.
+                    // Floors with a slope arrow need its placement data. Shape-edited
+                    // floors retain their editable vertices and user split lines.
                     if (Math.Abs(Value(floor, BuiltInParameter.ROOF_SLOPE)) > 1e-8
-                        || IsShapeEdited(floor)
                         || !(doc.GetElement(floor.SketchId) is Sketch sketch)) return null;
                     recipe.Kind = "floor";
                     recipe.Offset = Value(floor, BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM);
@@ -171,7 +299,7 @@ namespace Analyse
                         var curves = new List<HistoryCurve>();
                         foreach (Curve curve in loop)
                         {
-                            if (++count > 256) return null;
+                            count++;
                             var item = CaptureCurve(curve);
                             if (item == null) return null;
                             curves.Add(item);
@@ -179,6 +307,8 @@ namespace Analyse
                         recipe.Loops.Add(curves);
                     }
                     if (count == 0) return null;
+                    recipe.SketchCurves = CaptureSketchCurves(doc, sketch);
+                    if (IsShapeEdited(floor)) CaptureSlabShape(GetShapeEditor(floor), recipe);
                 }
                 else return null;
                 return recipe;
@@ -214,9 +344,14 @@ namespace Analyse
             try
             {
                 var recipe = raw as HistoryRecipe ?? (raw as JObject ?? JObject.FromObject(raw)).ToObject<HistoryRecipe>();
+                if (recipe?.Version == 1 && recipe.Kind == "native_archive" && recipe.Native != null) return recipe;
+                if (recipe?.Version == 1 && recipe.Kind == "electrical_system" && recipe.SystemMembers?.Count > 0
+                    && Enum.IsDefined(typeof(ElectricalSystemType), recipe.ElectricalSystemType)) return recipe;
+                if (recipe?.Version == 1 && (recipe.Kind == "pipe_system" || recipe.Kind == "duct_system")
+                    && !string.IsNullOrEmpty(recipe.Type) && recipe.SystemMembers != null) return recipe;
                 return recipe != null && recipe.Version == 1 && !string.IsNullOrEmpty(recipe.Type)
                     && !string.IsNullOrEmpty(recipe.Level)
-                    && new[] { "family", "wall", "floor", "network" }.Contains(recipe.Kind)
+                    && new[] { "family", "wall", "floor", "network", "roof", "ceiling", "model_curve" }.Contains(recipe.Kind)
                     ? recipe : null;
             }
             catch { return null; }
@@ -226,6 +361,7 @@ namespace Analyse
         // a mesh/DirectShape for a native element when the user requests restoration.
         internal static Element RestoreNative(Document doc, HistoryRecipe recipe)
         {
+            if (recipe.SystemMembers != null) return RestoreSystem(doc, recipe);
             string reason = null;
             var element = Create(doc, recipe, message => reason = message);
             if (element == null) throw new InvalidOperationException(reason ?? "Unsupported element placement.");
@@ -233,6 +369,115 @@ namespace Analyse
             if (element.get_BoundingBox(null) == null)
                 throw new InvalidOperationException("The restored element has no geometry.");
             return element;
+        }
+
+        private static Element RestoreSystem(Document doc, HistoryRecipe recipe)
+        {
+            if (recipe.Kind == "electrical_system") return RestoreElectricalSystem(doc, recipe);
+            var type = FindOriginal(doc, recipe.Type);
+            var domain = recipe.Kind == "pipe_system" ? Domain.DomainPiping : Domain.DomainHvac;
+            var ports = recipe.SystemMembers.Select(id => FindOriginal(doc,id)).Where(e => e != null)
+                .SelectMany(ElementHistoryNetwork.Ports).Where(p => p.Domain == domain && p.ConnectorType != ConnectorType.Logical).ToList();
+            if (ports.Count == 0 && recipe.SystemMembers.Count > 0) throw new InvalidOperationException("Aucun composant du système n’a pu être retrouvé.");
+            var systems = ports.Select(p => p.MEPSystem).Where(s => s != null && s.GetTypeId() == type.Id)
+                .GroupBy(s => s.UniqueId).Select(g => g.First()).ToList();
+            MEPSystem system = systems.Count == 1 ? systems[0] : recipe.Kind == "pipe_system"
+                ? (MEPSystem)PipingSystem.Create(doc,type.Id) : MechanicalSystem.Create(doc,type.Id);
+            var connectors = new ConnectorSet();
+            foreach(var port in ports.Where(p => p.MEPSystem == null || p.MEPSystem.Id != system.Id)) connectors.Insert(port);
+            if (connectors.Size > 0) system.Add(connectors);
+            if (!string.IsNullOrEmpty(recipe.SystemName)) system.Name = recipe.SystemName;
+            return system;
+        }
+
+        private static Element RestoreElectricalSystem(Document doc, HistoryRecipe recipe)
+        {
+            var members = recipe.SystemMembers.Select(id => FindOriginal(doc, id)).ToList();
+            if (members.Any(e => !(e is FamilyInstance)))
+                throw new InvalidOperationException("Un équipement du circuit électrique est absent. Restaurez tous ses équipements avant le circuit.");
+            var ids = new HashSet<ElementId>(members.Select(e => e.Id));
+            var kind = (ElectricalSystemType)recipe.ElectricalSystemType;
+            var existing = new FilteredElementCollector(doc).OfClass(typeof(ElectricalSystem)).Cast<ElectricalSystem>()
+                .Where(s => s.SystemType == kind && s.Elements.Cast<Element>().Any(e => ids.Contains(e.Id))).ToList();
+            var historical = FindOriginal(doc, recipe.ExistingElectricalSystem) as ElectricalSystem;
+            if (historical != null && !existing.Any(s => s.Id == historical.Id)) existing.Add(historical);
+            // Do not detach equipment from a surviving circuit or silently merge two circuits.
+            if (existing.Count > 1 || existing.Any(s => s.SystemType != kind ||
+                (s.Id == historical?.Id ? s.Elements.Cast<Element>().Any(e => !ids.Contains(e.Id))
+                    : !ids.SetEquals(s.Elements.Cast<Element>().Select(e => e.Id)))))
+                throw new InvalidOperationException("Des équipements appartiennent déjà à un autre circuit électrique.");
+            var system = existing.SingleOrDefault() ?? ElectricalSystem.Create(doc, ids.ToList(), kind);
+            if (system == null) throw new InvalidOperationException("Revit n’a pas pu recréer le circuit électrique.");
+            var before = historical == null ? null : JsonConvert.SerializeObject(CaptureCore(system, null));
+            var memberIds = new HashSet<ElementId>(system.Elements.Cast<Element>().Select(e => e.Id));
+            var additions = new ElementSet();
+            foreach (var member in members.Where(e => !memberIds.Contains(e.Id))) additions.Insert(member);
+            if (additions.Size > 0) system.AddToCircuit(additions);
+            if (historical != null)
+            {
+                // Restore missing membership without overwriting later user edits to
+                // the surviving circuit's load name, sizing, path or panel position.
+                if (!string.IsNullOrEmpty(recipe.Host))
+                {
+                    var panel = FindOriginal(doc, recipe.Host) as FamilyInstance;
+                    if (panel == null || (system.BaseEquipment != null && system.BaseEquipment.Id != panel.Id))
+                        throw new InvalidOperationException("Le tableau actuel du circuit ne correspond pas au tableau historique.");
+                    if (system.BaseEquipment == null) system.SelectPanel(panel);
+                }
+                if (!ids.SetEquals(system.Elements.Cast<Element>().Select(e => e.Id)))
+                    throw new InvalidOperationException("Revit n’a pas rétabli tous les équipements du circuit existant.");
+                recipe.ElectricalChanged = before != JsonConvert.SerializeObject(CaptureCore(system, null));
+                return system;
+            }
+            if (!string.IsNullOrEmpty(recipe.Host))
+            {
+                var panel = FindOriginal(doc, recipe.Host) as FamilyInstance;
+                if (panel == null) throw new InvalidOperationException("Le tableau électrique du circuit est absent.");
+                if (system.BaseEquipment != null && system.BaseEquipment.Id != panel.Id)
+                    throw new InvalidOperationException("Le circuit existant est raccordé à un autre tableau électrique.");
+                if (system.BaseEquipment == null) system.SelectPanel(panel);
+                ApplyParameters(doc, system, recipe.Parameters);
+                system.CircuitConnectionType = (CircuitConnectionType)recipe.ElectricalConnectionType;
+                doc.Regenerate();
+                if (recipe.ElectricalStartSlot > 0 && system.StartSlot != recipe.ElectricalStartSlot)
+                {
+                    var otherSlots = new FilteredElementCollector(doc).OfClass(typeof(ElectricalSystem)).Cast<ElectricalSystem>()
+                        .Where(s => s.Id != system.Id && s.BaseEquipment?.Id == panel.Id)
+                        .ToDictionary(s => s.UniqueId, s => s.StartSlot);
+                    var schedule = new FilteredElementCollector(doc).OfClass(typeof(PanelScheduleView)).Cast<PanelScheduleView>()
+                        .FirstOrDefault(v => !v.IsTemplate && v.GetPanel() == panel.Id);
+                    var temporary = schedule == null;
+                    if (temporary) schedule = PanelScheduleView.CreateInstanceView(doc, panel.Id);
+                    IList<int> rows, cols, targetRows, targetCols;
+                    schedule.GetCellsBySlotNumber(system.StartSlot, out rows, out cols);
+                    schedule.GetCellsBySlotNumber(recipe.ElectricalStartSlot, out targetRows, out targetCols);
+                    if (rows.Count == 0 || targetRows.Count == 0
+                        || targetRows.Select((r, i) => schedule.GetCircuitIdByCell(r, targetCols[i]))
+                            .Any(id => id != ElementId.InvalidElementId && id != system.Id)
+                        || !schedule.CanMoveSlotTo(rows[0], cols[0], targetRows[0], targetCols[0]))
+                        throw new InvalidOperationException("L’emplacement historique du circuit dans le tableau est indisponible.");
+                    schedule.MoveSlotTo(rows[0], cols[0], targetRows[0], targetCols[0]);
+                    if (temporary) doc.Delete(schedule.Id);
+                    doc.Regenerate();
+                    if (system.StartSlot != recipe.ElectricalStartSlot)
+                        throw new InvalidOperationException("L’emplacement historique du circuit n’a pas pu être rétabli.");
+                    if (otherSlots.Any(pair => ((ElectricalSystem)doc.GetElement(pair.Key)).StartSlot != pair.Value))
+                        throw new InvalidOperationException("Le déplacement affecterait un autre circuit du tableau.");
+                }
+                if (recipe.ElectricalPath != null) system.SetCircuitPath(recipe.ElectricalPath.Select(Unpack).ToList());
+                if (!string.IsNullOrEmpty(recipe.ElectricalCircuitNumber) && system.CircuitNumber != recipe.ElectricalCircuitNumber)
+                    throw new InvalidOperationException("La numérotation actuelle du tableau ne permet pas de rétablir le numéro historique du circuit.");
+            }
+            else
+            {
+                if (system.BaseEquipment != null)
+                    throw new InvalidOperationException("Le circuit existant est déjà raccordé à un tableau.");
+                ApplyParameters(doc, system, recipe.Parameters);
+            }
+            if (!ids.SetEquals(system.Elements.Cast<Element>().Select(e => e.Id)))
+                throw new InvalidOperationException("Revit n’a pas rétabli tous les équipements du circuit.");
+            recipe.ElectricalChanged = before != null && before != JsonConvert.SerializeObject(CaptureCore(system, null));
+            return system;
         }
 
         // The enclosing visualization transaction owns the eventual DirectShape only.
@@ -272,12 +517,20 @@ namespace Analyse
             var level = doc.GetElement(recipe.Level) as Level;
             if (type == null || level == null) { diagnostic?.Invoke("Type or level is missing."); return null; }
             double offset = recipe.Offset + recipe.LevelElevation - level.ProjectElevation;
+            if (recipe.Kind == "model_curve")
+            {
+                var plane = SketchPlane.Create(doc, Plane.CreateByNormalAndOrigin(Unpack(recipe.BasisZ), Unpack(recipe.Point)));
+                var curve = doc.Create.NewModelCurve(RestoreCurve(recipe.Loops.Single().Single()), plane);
+                curve.LineStyle = type;
+                return curve;
+            }
             if (recipe.Kind == "network") return ElementHistoryNetwork.Create(doc, recipe);
             if (recipe.Kind == "family" && type is FamilySymbol symbol)
             {
                 var host = string.IsNullOrEmpty(recipe.Host) ? null : doc.GetElement(recipe.Host);
                 if (!string.IsNullOrEmpty(recipe.Host) && host == null) { diagnostic?.Invoke("Host is missing."); return null; }
                 if (!symbol.IsActive) { symbol.Activate(); doc.Regenerate(); }
+                if (!string.IsNullOrEmpty(recipe.Placement)) return CreateExtendedFamily(doc, symbol, level, recipe);
                 XYZ point = Unpack(recipe.Point);
                 var instance = host == null
                     ? doc.Create.NewFamilyInstance(point, symbol, level, (StructuralType)recipe.StructuralType)
@@ -313,12 +566,15 @@ namespace Analyse
             }
             if (recipe.Kind == "wall" && type is WallType)
             {
-                Curve curve = RestoreCurve(recipe.Loops.Single().Single());
-                var wall = Wall.Create(doc, curve, type.Id, level.Id, recipe.Height, offset, recipe.Flipped, recipe.WallStructural);
+                Curve curve = recipe.WallProfile ? null : RestoreCurve(recipe.Loops.Single().Single());
+                var wall = recipe.WallProfile
+                    ? Wall.Create(doc, recipe.Loops.Single().Select(RestoreCurve).ToList(), type.Id, level.Id, recipe.WallStructural, Unpack(recipe.BasisZ))
+                    : Wall.Create(doc, curve, type.Id, level.Id, recipe.Height, offset, recipe.Flipped, recipe.WallStructural);
                 WallUtils.DisallowWallJoinAtEnd(wall, 0);
                 WallUtils.DisallowWallJoinAtEnd(wall, 1);
                 wall.get_Parameter(BuiltInParameter.WALL_KEY_REF_PARAM).Set(recipe.LocationLine);
-                ((LocationCurve)wall.Location).Curve = curve;
+                if (recipe.WallProfile) { if (wall.Flipped != recipe.Flipped) wall.Flip(); }
+                else ((LocationCurve)wall.Location).Curve = curve;
                 return wall;
             }
             if (recipe.Kind == "floor" && type is FloorType)
@@ -327,8 +583,10 @@ namespace Analyse
                 var floor = Floor.Create(doc, loops, type.Id, level.Id);
                 floor.get_Parameter(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM).Set(offset);
                 floor.get_Parameter(BuiltInParameter.FLOOR_PARAM_IS_STRUCTURAL)?.Set(recipe.FloorStructural ? 1 : 0);
+                if (recipe.ShapePoints != null) RestoreSlabShape(doc, GetShapeEditor(floor), recipe);
                 return floor;
             }
+            if (recipe.Kind == "roof" || recipe.Kind == "ceiling") return CreateSketchHost(doc, type as ElementType, level, recipe);
             return null;
         }
 
@@ -339,23 +597,33 @@ namespace Analyse
             {
                 if (!parameter.HasValue || parameter.StorageType == StorageType.None) continue;
                 long id = parameter.Id.GetIdLongValue();
+                // Attachment-dependent parameters do not exist on an unattached
+                // column. The relation pass restores these through ColumnAttachment.
+                if (id < 0 && ((BuiltInParameter)id).ToString().StartsWith("COLUMN_", StringComparison.Ordinal)
+                    && ((BuiltInParameter)id).ToString().Contains("ATTACHMENT")) continue;
                 // Connected fittings can expose their instance dimensions as read-only.
                 // Retain custom numeric values; replay only if writable on the new,
                 // disconnected instance. Derived/formula values remain read-only.
-                if (parameter.IsReadOnly && !(element is FamilyInstance && id >= 0 && parameter.StorageType == StorageType.Double)) continue;
+                if (parameter.IsReadOnly && !(element is FamilyInstance family && id >= 0
+                    && parameter.StorageType == StorageType.Double
+                    && (!(family.MEPModel is ElectricalEquipment) || IsGeometricParameter(parameter)))) continue;
                 // Instance identity and host/level placement are handled separately.
                 if (id == (int)BuiltInParameter.ALL_MODEL_MARK || id == (int)BuiltInParameter.ELEM_TYPE_PARAM
                     || id == (int)BuiltInParameter.FAMILY_LEVEL_PARAM) continue;
+                var projectDefinition = id >= 0 ? element.Document.GetElement(parameter.Id) as ParameterElement : null;
+                if (projectDefinition?.GetDefinition()?.Name != parameter.Definition.Name) projectDefinition = null;
                 var value = new HistoryParameter
                 {
                     BuiltIn = id < 0 ? checked((int)id) : 0,
                     Shared = parameter.IsShared ? parameter.GUID.ToString() : null,
-                    Definition = id >= 0 ? element.Document.GetElement(parameter.Id)?.UniqueId : null,
+                    // Family-local parameter IDs can collide with unrelated project
+                    // elements. Only a real ParameterElement defines a project parameter.
+                    Definition = projectDefinition?.UniqueId,
                     Storage = (int)parameter.StorageType
                 };
                 // Non-shared family parameters have no project ParameterElement.
                 // Their name is scoped to this exact FamilySymbol, never to all families.
-                if (value.BuiltIn == 0 && value.Shared == null && value.Definition == null)
+                if (value.BuiltIn == 0 && value.Shared == null && (value.Definition == null || element is FamilyInstance))
                     value.Name = parameter.Definition.Name;
                 switch (parameter.StorageType)
                 {
@@ -381,15 +649,31 @@ namespace Analyse
             return values;
         }
 
+        private static bool IsGeometricParameter(Parameter parameter)
+        {
+            // Electrical panel load-classification totals appear only after circuits
+            // exist. They are computed values, unlike solver-controlled fitting sizes.
+            try
+            {
+                var units = UnitUtils.GetValidUnits(parameter.Definition.GetDataType());
+                return units.Contains(UnitTypeId.Feet) || units.Contains(UnitTypeId.Radians)
+                    || units.Contains(UnitTypeId.SquareFeet) || units.Contains(UnitTypeId.CubicFeet);
+            }
+            catch { return false; }
+        }
+
         internal static void ApplyParameters(Document doc, Element element, List<HistoryParameter> values)
         {
-            foreach (var value in values ?? new List<HistoryParameter>())
+            foreach (var value in (values ?? new List<HistoryParameter>())
+                .OrderBy(v => v.BuiltIn == (int)BuiltInParameter.RBS_FAMILY_CONTENT_DISTRIBUTION_SYSTEM ? 0 : 1))
             {
                 Parameter parameter = value.Shared != null ? element.get_Parameter(new Guid(value.Shared))
                     : value.BuiltIn < 0 ? element.get_Parameter((BuiltInParameter)value.BuiltIn)
-                    : value.Name != null ? element.GetParameters(value.Name).SingleOrDefault()
-                    : (doc.GetElement(value.Definition) is ParameterElement definition ? element.get_Parameter(definition.GetDefinition()) : null);
-                if (parameter == null) throw new InvalidOperationException("Historical parameter is missing.");
+                    : (!string.IsNullOrEmpty(value.Definition) && doc.GetElement(value.Definition) is ParameterElement definition
+                        ? element.get_Parameter(definition.GetDefinition()) : null);
+                if (parameter == null && value.Name != null) parameter = element.GetParameters(value.Name).SingleOrDefault();
+                if (parameter == null) throw new InvalidOperationException("Paramètre historique absent : "
+                    + (value.Name ?? (value.BuiltIn < 0 ? ((BuiltInParameter)value.BuiltIn).ToString() : value.Definition ?? value.Shared)) + ".");
                 if (parameter.IsReadOnly) continue;
                 switch ((StorageType)value.Storage)
                 {
@@ -411,6 +695,7 @@ namespace Analyse
                         if (id == null) throw new InvalidOperationException("Historical parameter reference is missing.");
                         if (parameter.AsElementId() != id && !parameter.Set(id))
                             throw new InvalidOperationException("Historical reference could not be restored.");
+                        if (value.BuiltIn == (int)BuiltInParameter.RBS_FAMILY_CONTENT_DISTRIBUTION_SYSTEM) doc.Regenerate();
                         break;
                 }
             }
@@ -449,20 +734,25 @@ namespace Analyse
 
         private static bool IsShapeEdited(Floor floor)
         {
+            return GetShapeEditor(floor)?.IsEnabled == true;
+        }
+
+        private static SlabShapeEditor GetShapeEditor(Floor floor)
+        {
 #if REVIT2024 || REVIT2025_OR_GREATER
-            return floor.GetSlabShapeEditor()?.IsEnabled == true;
+            return floor.GetSlabShapeEditor();
 #else
-            return floor.SlabShapeEditor?.IsEnabled == true;
+            return floor.SlabShapeEditor;
 #endif
         }
 
-        private static HistoryCurve CaptureCurve(Curve curve)
+        internal static HistoryCurve CaptureCurve(Curve curve)
         {
             if (!(curve is Line) && !(curve is Arc) || !curve.IsBound) return null;
             return new HistoryCurve { Start = Pack(curve.GetEndPoint(0)), End = Pack(curve.GetEndPoint(1)),
                 Mid = curve is Arc ? Pack(curve.Evaluate(0.5, true)) : null };
         }
-        private static Curve RestoreCurve(HistoryCurve curve) => curve.Mid == null
+        internal static Curve RestoreCurve(HistoryCurve curve) => curve.Mid == null
             ? (Curve)Line.CreateBound(Unpack(curve.Start), Unpack(curve.End))
             : Arc.Create(Unpack(curve.Start), Unpack(curve.End), Unpack(curve.Mid));
         private static double[] Pack(XYZ p) => new[] { p.X, p.Y, p.Z };

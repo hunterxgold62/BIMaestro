@@ -162,7 +162,7 @@ public class AppUI : IExternalApplication
                    ("Suivi maquette collaboratif", "Suivi\nmaquette", "Analyse.CollaborativeModelTrackerCommand", "suivie maquette.png", "BETA - Suivi collaboratif des maquettes.\r\n\r\nCe que fait le bouton :\r\n- crée et consulte un registre JSON + Excel des maquettes ouvertes,\r\n- journalise automatiquement les ouvertures/fermetures quand BIMaestro est chargé,\r\n- identifie le premier ouvreur comme créateur de référence si la maquette n'est pas encore connue,\r\n- affiche le dossier de stockage actif et permet de choisir un dossier commun serveur si le chemin partagé est indisponible.\r\n\r\nImportant : si aucun dossier commun n'est configuré et que le lecteur partagé est inaccessible, les données sont enregistrées en local dans Documents/RevitLogs/SuiviMaquettesCollaboratif.")
                 })),
 
-                new RibbonItemDefinition("Clash 3D", "Clash 3D", panel => AddPushButton(panel, "Clash 3D", "Clash\n3D", assemblyPath, "Analyse.SmartClashCommand", "Clash 3D.png", "Vérifie les éléments 3D sélectionnés pour détecter les incohérences."))
+                new RibbonItemDefinition("Clash 3D", "Clash 3D", panel => AddPushButton(panel, "Clash 3D", "Clash\n3D", assemblyPath, "Analyse.SmartClashCommand", "Clash 3D.png", "Analyse les conflits entre réseaux, bâtiment et liens. Choisissez la maquette, la vue active ou une sélection, puis examinez chaque résultat en 3D."))
             }),
             
                 new RibbonPanelDefinition("Spécifique aux familles", new List<RibbonItemDefinition>

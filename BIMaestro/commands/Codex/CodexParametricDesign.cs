@@ -28,6 +28,7 @@ namespace BIMaestro.Codex
             root["name"] = validateOnly ? "revit_validate_parametric_family" : "revit_create_parametric_family";
             root["description"] = "Crée une NOUVELLE famille paramétrique : extrusions rectangulaires natives, ouvertures, cotes et paramètres de type ou d'occurrence via family_options. Les réseaux arrays peuvent incliner leurs barres via angles et rotation (X, Y ou Z, 0 à 180 degrés), avec dimensions et nombre également réglables sans Codex. Les pièces parts acceptent aussi profile_uv : un contour polygonal simple, sans trous, piloté par des coordonnées de longueur. Vérifie dimensions, positions, nombres et inclinaisons lors d'essais de variation, puis restaure les valeurs initiales avant sauvegarde. Ne convertit pas automatiquement les FreeFormElement existants. Connecteurs natifs via connectors, contours 2D via symbolic_outlines. Pas de loft paramétrique.";
             var properties = (JObject)root["inputSchema"]["properties"];
+            properties["geometry_policy"] = CodexFamilyParameters.GeometryPolicySchema();
             root["description"] = (string)root["description"] + " arrays permet aussi des réseaux natifs de barres imbriquées, avec nombre entier calculé à partir de la longueur utile et du pas. Les calculs de longueur sont simplifiés et partagés pour limiter les paramètres internes.";
             properties.Remove("target_dimensions_mm");
             properties["connectors"] = FamilyConnectorSpec.Schema();
@@ -85,6 +86,7 @@ namespace BIMaestro.Codex
             source = CodexParametricInput.Normalize(source);
             var keys = new List<string> { "name", "category", "assumptions", "materials", "parameters", "parts", "load_into_project", "place_at_origin" };
             if (source?["family_options"] != null) keys.Add("family_options");
+            if (source?["geometry_policy"] != null) keys.Add("geometry_policy");
             if (source?["connectors"] != null) keys.Add("connectors");
             if (source?["symbolic_outlines"] != null) keys.Add("symbolic_outlines");
             if (source?["hosting"] != null) keys.Add("hosting");
@@ -101,6 +103,7 @@ namespace BIMaestro.Codex
             metadata.Remove("connectors"); metadata.Remove("component_grids");
             metadata.Remove("symbolic_outlines");
             metadata.Remove("host_opening");
+            metadata.Remove("geometry_policy");
             metadata["target_dimensions_mm"] = new JArray(0, 0, 0);
             metadata["parts"] = new JArray(new JObject { ["name"] = "Metadata", ["material"] = CodexFamilyDesign.String(firstMaterial, "name", 70),
                 ["geometry"] = new JObject { ["kind"] = "box", ["size_mm"] = new JArray(1, 1, 1), ["position_mm"] = new JArray(0, 0, 0), ["rotation_deg"] = new JArray(0, 0, 0), ["profile_mm"] = new JArray() },
@@ -192,6 +195,8 @@ namespace BIMaestro.Codex
             CodexProfileDesign.ValidateConstraintBudget(design.Parts);
             design.Metadata.HostOpening = FamilyHostOpeningSpec.Parse(source, design.Hosting, design.Metadata.Category, names);
             var used = design.Parts.SelectMany(p => p.Expressions).Concat(design.Arrays.SelectMany(a => a.Expressions)).Concat(design.Metadata.HostOpening?.Expressions ?? Enumerable.Empty<LengthExpression>()).SelectMany(e => e.Terms.Keys).ToHashSet();
+            if (design.Parameters.Count > 0 && used.Count == 0 && !design.Arrays.Any(a => !string.IsNullOrEmpty(a.QuantityParameter) || !string.IsNullOrEmpty(a.AngleParameter)))
+                throw new InvalidOperationException("Les paramètres dimensionnels ne pilotent aucune géométrie. Une base provisoire ou un cube fixe ne constitue pas une famille paramétrique terminée. Pour une construction circulaire ou générale, utiliser revit_create_family_program directement dans un document temporaire, sans enregistrer de bloc de départ.");
             if (design.Registry == null && source["connectors"] == null && design.Parameters.Any(p => !used.Contains(p.Name))) throw new InvalidOperationException("Chaque paramètre doit piloter au moins une coordonnée de géométrie.");
             if (design.Registry == null && design.Angles.Any(p => !design.Arrays.Any(a => a.AngleParameter == p.Name))) throw new InvalidOperationException("Chaque angle doit piloter la rotation d'un réseau.");
             if (design.Registry != null)
@@ -202,6 +207,7 @@ namespace BIMaestro.Codex
                 if (design.Registry == null && !design.TestCases().Any(v => array.Count(v) != array.Count(design.Initial))) throw new InvalidOperationException("Le test doit modifier le nombre de barres du réseau « " + array.Name + " » via span ou pitch.");
             design.Connectors = FamilyConnectorSpec.Parse(source, design);
             design.Symbols = FamilySymbolicSpec.Parse(source, design);
+            if (!CodexFamilyParameters.AllowsGeometryAlternatives(source)) design.Registry?.ValidateSharedGeometry();
             return design;
         }
         private static LengthExpression[] ReadExpressions(JObject value, string key, int count, HashSet<string> names) => CodexFamilyDesign.Items(value, key, count, count).Select(t => LengthExpression.Parse(t as JObject, names)).ToArray();

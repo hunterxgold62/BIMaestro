@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <EnableDefaultItems>false</EnableDefaultItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="VisualProbe.cs" />
+    <Compile Include="../../BIMaestro/commands/analyse erreur maquette 3D/SmartClashVisual.cs" />
+  </ItemGroup>
+</Project>

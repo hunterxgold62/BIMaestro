@@ -77,6 +77,8 @@ internal static class ToolRecoveryTests
         await Call(recovery, "revit_validate_parametric_family", new JObject(), Success);
         await Call(recovery, "revit_open_created_family", new JObject(), Success);
         Check(recovery.TryTakeContinuation(out string prompt) && prompt.Contains(Create) && prompt.Contains("Pied invalide"), "reads and validation do not conceal failed creation");
+        await Call(recovery, "revit_prepare_family", new JObject(), Success);
+        Check(recovery.TryTakeContinuation(out prompt) && prompt.Contains("Pied invalide"), "bundled preparation is a read and cannot conceal failed creation");
         await Error(() => Call(recovery, "revit_family_template_info", new JObject(), () => Fail(new InvalidOperationException("Gabarit inconnu."))));
         await Error(() => Call(recovery, "revit_validate_parametric_family", new JObject { ["other"] = 1 }, () => Fail(new InvalidOperationException("Validation partielle invalide."))));
         await Call(recovery, "revit_validate_parametric_family", new JObject { ["other"] = 2 }, Success);

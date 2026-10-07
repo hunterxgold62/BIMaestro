@@ -1,1226 +1,476 @@
-using Autodesk.Revit.DB;
-using Autodesk.Revit.Exceptions;
+﻿using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
-using ContextMenu = System.Windows.Controls.ContextMenu;
-using MenuItem = System.Windows.Controls.MenuItem;
+using TextBox = System.Windows.Controls.TextBox;
+using ComboBox = System.Windows.Controls.ComboBox;
+using WpfVisibility = System.Windows.Visibility;
+using Microsoft.Win32;
+using Modification;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Net;
 using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
-using Modification;
-using BIMaestro.Localization;
+using System.Windows.Threading;
 
 namespace Analyse
 {
     public partial class SmartCheckWindow : Window
     {
-        private const string HelpUrl = "https://www.bimaestro.fr/analyse?outil=clash-3d";
-        private static readonly string[] StatusFilters =
-        {
-            "Tous",
-            "Actives",
-            ModelIssue.StatusActive,
-            ModelIssue.StatusToFix,
-            ModelIssue.StatusReview,
-            ModelIssue.StatusFixed,
-            ModelIssue.StatusIgnored
-        };
-
-        private readonly ExternalEvent _extEvent;
+        private readonly ExternalEvent _externalEvent;
         private readonly SmartExternalHandler _handler;
-
-        private readonly List<ModelIssue> _all;
-        private readonly List<ModelIssue> _mepNoSleeve;
-        private readonly List<ModelIssue> _linkClashes;
-        private readonly List<ModelIssue> _openConnectors;
-        private readonly string _docKey;
-        private readonly string _thumbnailFolder;
-
+        private SmartScanSetup _setup;
+        private List<ModelIssue> _all = new List<ModelIssue>();
         private List<ModelIssue> _filtered = new List<ModelIssue>();
-        private List<IssueCard> _visualCards = new List<IssueCard>();
-        private int _cursor = -1;
-        private bool _suppressAutoFocus;
-        private bool _isBindingFilters;
-
-        public SmartCheckWindow(IEnumerable<ModelIssue> issues, ExternalEvent extEvent, SmartExternalHandler handler, string docKey)
+        private readonly ObservableCollection<ModelIssue> _visible = new ObservableCollection<ModelIssue>();
+        private readonly HashSet<string> _categories = new HashSet<string>();
+        private Action<IEnumerable<ModelIssue>> _restoreResults;
+        private string _thumbnailFolder;
+        private int _publishedCount, _activeCount, _confirmedCount, _approximateCount;
+        private bool Scanning => _session != null && !_session.Complete;
+        private SmartScanSession _session;
+        private string _previousSignature;
+        private string _currentSignature;
+        private HashSet<string> _previousKeys;
+        private bool _ready, _busy, _stale, _binding, _closing, _closeConfirmed;
+        private bool _startAfterRefresh;
+        private SmartAction? _queuedAction;
+        private readonly DispatcherTimer _queueTimer;
+        private SmartIssueInspector _inspector;
+        public Document OwnerDocument => _setup.Document;
+        public SmartCheckWindow(ExternalEvent externalEvent, SmartExternalHandler handler, SmartScanSetup setup)
         {
-            ThemeManager.EnsureThemeLoaded();
-            InitializeComponent();
-            _extEvent = extEvent;
-            _handler = handler;
-            _docKey = docKey;
-            _thumbnailFolder = SmartCheckState.GetThumbnailFolder(docKey);
-
-            _all = (issues ?? Enumerable.Empty<ModelIssue>()).ToList();
-            _mepNoSleeve = _all.Where(i => i.Kind == IssueKind.MepThroughWallNoSleeve).ToList();
-            _linkClashes = _all.Where(i => i.Kind == IssueKind.LinkPipeClash).ToList();
-            _openConnectors = _all.Where(i => i.Kind == IssueKind.MepUnconnected).ToList();
-
-            RestoreCachedThumbnails();
-            PopulateFilters();
-            Bind();
-
-            GridAll.MouseDoubleClick += (s, e) => FocusFromGrid(GridAll);
-            GridMEP.MouseDoubleClick += (s, e) => FocusFromGrid(GridMEP);
-            GridLinks.MouseDoubleClick += (s, e) => FocusFromGrid(GridLinks);
-            GridOpen.MouseDoubleClick += (s, e) => FocusFromGrid(GridOpen);
-
-            GridAll.SelectionChanged += OnGridSelectionChanged;
-            GridMEP.SelectionChanged += OnGridSelectionChanged;
-            GridLinks.SelectionChanged += OnGridSelectionChanged;
-            GridOpen.SelectionChanged += OnGridSelectionChanged;
-
-            GridAll.PreviewMouseRightButtonDown += OnGridRightClick;
-            GridMEP.PreviewMouseRightButtonDown += OnGridRightClick;
-            GridLinks.PreviewMouseRightButtonDown += OnGridRightClick;
-            GridOpen.PreviewMouseRightButtonDown += OnGridRightClick;
+            ThemeManager.EnsureThemeLoaded(); InitializeComponent();
+            _externalEvent = externalEvent; _handler = handler; _setup = setup;
+            ResultsList.ItemsSource = _visible;
+            ScopeCombo.ItemsSource = Choices(new[] { "Maquette entière", "Vue active", "Sélection" });
+            ScopeCombo.SelectedIndex = setup.Selection.Count > 0 ? 2 : 0;
+            StatusCombo.ItemsSource = Choices(new[] { "À traiter", "Tous", ModelIssue.StatusToFix, ModelIssue.StatusReview, ModelIssue.StatusFixed, ModelIssue.StatusIgnored });
+            StatusCombo.SelectedIndex = 0;
+            CategoryCombo.ItemsSource = Choices(new[] { "Tous les contrôles" }); CategoryCombo.SelectedIndex = 0;
+            LinksList.ItemsSource = setup.Links;
+            var preferences = SmartCheckState.LoadPreferences();
+            if (preferences != null)
+            {
+                PipesCheck.IsChecked = preferences.Pipes; DuctsCheck.IsChecked = preferences.Ducts;
+                TraysCheck.IsChecked = preferences.CableTrays; ConduitsCheck.IsChecked = preferences.Conduits;
+                FittingsCheck.IsChecked = preferences.Fittings; EquipmentCheck.IsChecked = preferences.Equipment;
+                GenericCheck.IsChecked = preferences.GenericModels; LocalCheck.IsChecked = preferences.LocalClashes;
+                LinksCheck.IsChecked = preferences.LinkedClashes; InsulationCheck.IsChecked = preferences.IncludeInsulation;
+                ConnectorsCheck.IsChecked = preferences.OpenConnectors; WallsCheck.IsChecked = preferences.WallSupports;
+                VolumeBox.Text = preferences.MinimumVolumeMm3.ToString("G", System.Globalization.CultureInfo.CurrentCulture);
+            }
+            _queueTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(35) };
+            _queueTimer.Tick += Queue_Tick;
+            _handler.Completed += Handler_Completed;
+            _handler.Failed += Handler_Failed;
+            _handler.SetupRefreshed += Setup_Refreshed;
+            _handler.ModelChanged += Model_Changed;
+            _ready = true; UpdateDocumentText();
+            BIMaestro.Tutorials.DemoTourService.AttachIfRequested("clash-3d", this);
+            Closed += (s, e) =>
+            {
+                _queueTimer.Stop(); _inspector?.Close();
+                _handler.Completed -= Handler_Completed; _handler.Failed -= Handler_Failed;
+                _handler.SetupRefreshed -= Setup_Refreshed; _handler.ModelChanged -= Model_Changed;
+                _handler.Dispose(); _externalEvent.Dispose();
+            };
         }
-
-        private void HelpButton_Click(object sender, RoutedEventArgs e)
+        private void UpdateDocumentText() => DocumentText.Text = _setup.Title + " · " + _setup.Selection.Count + " objet(s) sélectionné(s) · "
+            + _setup.Links.Count(l => l.Loaded) + " lien(s) ou import(s) disponible(s)";
+        private SmartScanOptions ReadOptions()
+        {
+            double volume;
+            if (!double.TryParse(VolumeBox.Text.Replace(',', '.'), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out volume) || double.IsNaN(volume) || double.IsInfinity(volume) || volume < 0 || volume > 1000000000)
+                throw new InvalidOperationException("Le seuil doit être un nombre compris entre 0 et 1 000 000 000 mm³.");
+            var options = new SmartScanOptions
+            {
+                Scope = (SmartScanScope)ScopeCombo.SelectedIndex,
+                Pipes = PipesCheck.IsChecked == true, Ducts = DuctsCheck.IsChecked == true,
+                CableTrays = TraysCheck.IsChecked == true, Conduits = ConduitsCheck.IsChecked == true,
+                Fittings = FittingsCheck.IsChecked == true, Equipment = EquipmentCheck.IsChecked == true,
+                GenericModels = GenericCheck.IsChecked == true, LocalClashes = LocalCheck.IsChecked == true,
+                LinkedClashes = LinksCheck.IsChecked == true, IncludeInsulation = InsulationCheck.IsChecked == true,
+                OpenConnectors = ConnectorsCheck.IsChecked == true, WallSupports = WallsCheck.IsChecked == true,
+                MinimumVolumeMm3 = volume, LinkIds = _setup.Links.Where(l => l.Selected).Select(l => l.Id).ToList()
+            };
+            if (options.SourceCategories().Count == 0 && !options.WallSupports) throw new InvalidOperationException("Choisissez au moins une catégorie à contrôler.");
+            if (!options.LocalClashes && !options.LinkedClashes && !options.OpenConnectors && !options.WallSupports)
+                throw new InvalidOperationException("Activez au moins un contrôle.");
+            if (options.Scope == SmartScanScope.Selection && _setup.Selection.Count == 0)
+                throw new InvalidOperationException("La sélection est vide. Sélectionnez des objets dans Revit et cliquez sur Actualiser.");
+            if (options.Scope == SmartScanScope.ActiveView && !_setup.ViewSupported)
+                throw new InvalidOperationException("Cette vue ne permet pas l'analyse. Choisissez une vue de modèle puis cliquez sur Actualiser.");
+            return options;
+        }
+        private void Analyze_Click(object sender, RoutedEventArgs e)
+        {
+            if (_busy || _queuedAction.HasValue || Scanning) return;
+            // Read the current selection/view in a valid API callback, including changes made after opening this window.
+            _startAfterRefresh = true;
+            RunText.Text = "Actualisation du périmètre avant l'analyse…";
+            Queue(SmartAction.RefreshSetup);
+        }
+        private void StartScan()
         {
             try
             {
-                Process.Start(new ProcessStartInfo(HelpUrl) { UseShellExecute = true });
+                var options = ReadOptions();
+                if (!_tutorialPrepared) SmartCheckState.SavePreferences(options);
+                _tutorialActionFailed = false;
+                SettingsExpander.IsExpanded = false;
+                _inspector?.Close(); _inspector = null;
+                _previousKeys = _session != null && _session.Complete && !_session.Cancelled && _session.Error == null && !_stale
+                    ? new HashSet<string>(_all.Select(i => i.IssueKey)) : null;
+                // Model edits make the old result stale, but it remains a valid previous comparison snapshot.
+                if (_session != null && _session.Complete && !_session.Cancelled && _session.Error == null)
+                    _previousKeys = new HashSet<string>(_all.Select(i => i.IssueKey));
+                _currentSignature = options.Signature + "|" + (options.Scope == SmartScanScope.ActiveView ? _setup.ViewId.GetIdLongValue().ToString()
+                    : options.Scope == SmartScanScope.Selection ? string.Join(",", _setup.Selection.Select(id => id.GetIdLongValue()).OrderBy(id => id)) : "model");
+                _session?.Dispose(); _session = new SmartScanSession(_setup, options); _handler.Session = _session;
+                _all = new List<ModelIssue>(); _filtered = new List<ModelIssue>(); _visible.Clear(); _categories.Clear();
+                ResultsList.ItemsSource = _visible;
+                _publishedCount = _activeCount = _confirmedCount = _approximateCount = 0;
+                _restoreResults = SmartCheckState.CreateRestorer(_setup.DocumentKey);
+                _thumbnailFolder = SmartCheckState.GetThumbnailFolder(_setup.DocumentKey);
+                UpdateCategories();
+                _stale = false; StaleText.Visibility = WpfVisibility.Collapsed;
+                SummaryText.Text = "Bilan provisoire · analyse en cours"; FilterPanel.Visibility = WpfVisibility.Visible;
+                ResultCountText.Text = "Les résultats apparaissent au fur et à mesure.";
+                EmptyPanel.Visibility = WpfVisibility.Visible; EmptyTitle.Text = "Analyse en cours";
+                EmptyDescription.Text = "Préparation des objets et des liens. Les résultats apparaîtront dès leur détection, puis leurs aperçus.";
+                RunProgress.Visibility = WpfVisibility.Visible; RunProgress.IsIndeterminate = true;
+                SetScanning(true); Queue(SmartAction.ScanBatch);
             }
-            catch (Exception ex)
-            {
-                MessageBox.Show(UiLanguage.T($"Impossible d’ouvrir la page d’aide : {ex.Message}", $"Unable to open the help page: {ex.Message}"), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
+            catch (Exception ex) { RunText.Text = ex.Message; SettingsExpander.IsExpanded = true; }
         }
-
-        private void PopulateFilters()
+        private void Cancel_Click(object sender, RoutedEventArgs e)
+        { if (_session != null) { _session.CancelRequested = true; RunText.Text = "Annulation demandée…"; CancelButton.IsEnabled = false; } }
+        private void RefreshScope_Click(object sender, RoutedEventArgs e) => Queue(SmartAction.RefreshSetup);
+        private void Setup_Refreshed(SmartScanSetup next)
         {
-            _isBindingFilters = true;
+            // Focusing a clash selects one pipe in Revit. The prepared exercise
+            // must keep analysing its three pipes when that live selection changes.
+            if (_tutorialPrepared) next.Selection = BIMaestro.Tutorials.DemoClashExercise.Sources(OwnerDocument);
+            var selected = new HashSet<long>(_setup.Links.Where(l => l.Selected).Select(l => l.Id.GetIdLongValue()));
+            foreach (var link in next.Links) link.Selected = selected.Contains(link.Id.GetIdLongValue()) && link.Loaded;
+            _setup = next; LinksList.ItemsSource = next.Links; UpdateDocumentText();
+            RunText.Text = "Vue, sélection et liens actualisés. Choisissez le périmètre puis lancez l'analyse.";
+        }
+        private void Model_Changed()
+        {
+            if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(new Action(Model_Changed)); return; }
+            _stale = true; StaleText.Visibility = WpfVisibility.Visible;
+            _inspector?.MarkStale();
+            UpdateFocusActions();
+            if (_session != null && !_session.Complete) RunText.Text = "La maquette a changé pendant l'analyse. Annulation et conservation des résultats partiels.";
+        }
+        private void Queue(SmartAction action)
+        {
+            if (_busy || _queuedAction.HasValue) return;
+            _tutorialActionFailed = false;
+            _queuedAction = action; _queueTimer.Start();
+            UpdateFocusActions();
+        }
+        private void Queue_Tick(object sender, EventArgs e)
+        {
+            if (_busy || !_queuedAction.HasValue) return;
+            _handler.Action = _queuedAction.Value;
             try
             {
-                SeverityFilterCombo.ItemsSource = ToFilterOptions(new[] { "Toutes", "Critique", "À vérifier", "Info", "OK" });
-                SeverityFilterCombo.SelectedIndex = 0;
-
-                TypeFilterCombo.ItemsSource = ToFilterOptions(ValuesWithAll(_all.Select(i => i.Category), "Tous"));
-                TypeFilterCombo.SelectedIndex = 0;
-
-                StateFilterCombo.ItemsSource = ToFilterOptions(StatusFilters);
-                StateFilterCombo.SelectedIndex = 0;
-
-                LevelFilterCombo.ItemsSource = ToFilterOptions(ValuesWithAll(_all.Select(i => i.LevelName), "Tous"));
-                LevelFilterCombo.SelectedIndex = 0;
-
-                LinkFilterCombo.ItemsSource = ToFilterOptions(ValuesWithAll(_all.Select(i => i.LinkName), "Tous"));
-                LinkFilterCombo.SelectedIndex = 0;
-
-                ElementCategoryFilterCombo.ItemsSource = ToFilterOptions(ValuesWithAll(_all.Select(i => i.ElementCategory), "Toutes"));
-                ElementCategoryFilterCombo.SelectedIndex = 0;
-
-                VisualModeCombo.ItemsSource = ToFilterOptions(new[] { "Groupes intelligents", "Anomalies" });
-                VisualModeCombo.SelectedIndex = 0;
+                var request = _externalEvent.Raise();
+                if (request == ExternalEventRequest.Accepted) { _busy = true; _queuedAction = null; _queueTimer.Stop(); }
+                else if (request != ExternalEventRequest.Pending) { _queuedAction = null; _queueTimer.Stop(); Handler_Failed("Revit n'a pas accepté l'action. Réessayez après avoir fermé ses dialogues."); }
             }
-            finally
+            catch (Exception ex) { _queuedAction = null; _queueTimer.Stop(); Handler_Failed(ex.Message); }
+        }
+        private void Handler_Failed(string message)
+        {
+            _startAfterRefresh = false;
+            _tutorialActionFailed = true;
+            if (_tutorialPrepared) TutorialFixButton.IsEnabled = !_tutorialCorrected;
+            RunText.Text = message;
+            _inspector?.SetActionMessage(message);
+            if (_session != null && !_session.Complete) { _session.CancelRequested = true; _session.Advance(); }
+        }
+        private void Handler_Completed()
+        {
+            _busy = false;
+            if (_handler.Action == SmartAction.RefreshSetup && _startAfterRefresh)
             {
-                _isBindingFilters = false;
+                _startAfterRefresh = false;
+                if (!_closing) StartScan();
             }
-        }
-
-        private static List<string> ValuesWithAll(IEnumerable<string> values, string allLabel)
-        {
-            var list = (values ?? Enumerable.Empty<string>())
-                .Where(s => !string.IsNullOrWhiteSpace(s))
-                .Distinct(StringComparer.CurrentCultureIgnoreCase)
-                .OrderBy(s => s)
-                .ToList();
-            list.Insert(0, allLabel);
-            return list;
-        }
-
-        private sealed class FilterOption
-        {
-            public FilterOption(string value)
+            if (_handler.Action == SmartAction.ScanBatch)
             {
-                Value = value;
-                Label = UiLanguage.T(value);
+                RunProgress.IsIndeterminate = _session.SourceCount == 0 || _session.ProcessedSources == 0;
+                RunProgress.Value = _session.Progress;
+                RunText.Text = _session.Stage + " · " + _session.ProcessedSources + "/" + _session.SourceCount + " objet(s) · "
+                    + _session.CandidateCount + " obstacle(s) · " + _session.Issues.Count + " résultat(s) · " + _session.Seconds.ToString("F1") + " s";
+                PublishResults();
+                _inspector?.RefreshPreview(); _inspector?.SetScanning(Scanning);
+                if (!_session.Complete) { Queue(SmartAction.ScanBatch); return; }
+                FinishScan();
             }
-
-            public string Value { get; }
-            public string Label { get; }
-            public override string ToString() => Label;
+            _inspector?.RefreshPreview();
+            UpdateFocusActions();
+            if (_handler.Action == SmartAction.CreateReservation && !string.IsNullOrWhiteSpace(_handler.ReservationMessage))
+            { RunText.Text = _handler.ReservationMessage; _inspector?.SetActionMessage(_handler.ReservationMessage); }
+            if (!_closing) TutorialActionCompleted();
+            if (_closing)
+            {
+                if (_handler.Action == SmartAction.CloseSession)
+                {
+                    _closeConfirmed = true;
+                    // Dispose the ExternalEvent only after its Execute callback has returned.
+                    Dispatcher.BeginInvoke(new Action(Close), DispatcherPriority.ApplicationIdle);
+                }
+                else Queue(SmartAction.CloseSession);
+            }
         }
-
-        private static List<FilterOption> ToFilterOptions(IEnumerable<string> values)
-            => (values ?? Enumerable.Empty<string>()).Select(value => new FilterOption(value)).ToList();
-
-        private void Bind()
+        private void FinishScan()
         {
+            PublishResults();
+            SetScanning(false); RunProgress.Visibility = WpfVisibility.Collapsed;
+            int absent = 0;
+            if (_previousKeys != null && _previousSignature == _currentSignature && !_session.Cancelled && _session.Error == null)
+            {
+                var current = new HashSet<string>(_all.Select(i => i.IssueKey)); absent = _previousKeys.Count(k => !current.Contains(k));
+            }
+            if (!_session.Cancelled && _session.Error == null) _previousSignature = _currentSignature;
+            var partial = _session.Cancelled || _session.Error != null;
+            RunText.Text = (partial ? "Analyse interrompue · résultats partiels" : _session.Stage) + " · " + _session.SourceCount + " objet(s) · " + _session.Seconds.ToString("F1") + " s"
+                + (_session.Diagnostics.Count > 0 ? " · " + _session.Diagnostics.Count + " point(s) à consulter dans le bilan" : "");
+            if (_session.Error != null) RunText.Text += " · " + _session.Error;
+            if (absent > 0) RunText.Text += " · " + absent + " résultat(s) absent(s) depuis la précédente analyse du même périmètre";
+            UpdateCategories();
+            FilterPanel.Visibility = WpfVisibility.Visible; DiagnosticsButton.IsEnabled = true;
             ApplyFilters();
-            UpdateIssueCount();
+            TutorialScanCompleted();
         }
-
+        private void PublishResults()
+        {
+            if (_session == null) return;
+            bool categoriesChanged = false;
+            if (_publishedCount < _session.Issues.Count)
+            {
+                var batch = _session.Issues.GetRange(_publishedCount, _session.Issues.Count - _publishedCount);
+                if (_restoreResults == null) _restoreResults = SmartCheckState.CreateRestorer(_setup.DocumentKey);
+                _restoreResults(batch);
+                if (_thumbnailFolder == null) _thumbnailFolder = SmartCheckState.GetThumbnailFolder(_setup.DocumentKey);
+                foreach (var issue in batch)
+                {
+                    var preview = Path.Combine(_thumbnailFolder, SmartClashReport.PreviewName(issue));
+                    if (File.Exists(preview)) issue.ThumbnailPath = preview;
+                    if (_previousKeys != null && _previousSignature == _currentSignature) issue.IsNew = !_previousKeys.Contains(issue.IssueKey);
+                    _all.Add(issue);
+                    if (!issue.Ignored) _activeCount++;
+                    if (!issue.IsApproximate && issue.Kind != IssueKind.MepUnconnected) _confirmedCount++;
+                    if (issue.IsApproximate) _approximateCount++;
+                    if (_categories.Add(issue.Category)) categoriesChanged = true;
+                    if (MatchesFilters(issue)) { _filtered.Add(issue); _visible.Add(issue); }
+                }
+                _publishedCount = _session.Issues.Count;
+            }
+            if (categoriesChanged) UpdateCategories();
+            UpdateResultText();
+        }
+        private void UpdateCategories()
+        {
+            _binding = true;
+            var category = SelectedValue(CategoryCombo);
+            var categories = new[] { "Tous les contrôles" }.Concat(_categories.OrderBy(s => s));
+            var categoryChoices = Choices(categories);
+            CategoryCombo.ItemsSource = categoryChoices;
+            CategoryCombo.SelectedItem = categoryChoices.FirstOrDefault(c => c.Value == category) ?? categoryChoices[0];
+            _binding = false;
+        }
+        private void SetScanning(bool scanning)
+        {
+            ScopePanel.IsEnabled = !scanning; SettingsExpander.IsEnabled = !scanning; AnalyzeButton.IsEnabled = !scanning;
+            CancelButton.Visibility = scanning ? WpfVisibility.Visible : WpfVisibility.Collapsed; CancelButton.IsEnabled = scanning;
+            OverviewButton.IsEnabled = !scanning && _filtered.Count > 0; ExportButton.IsEnabled = !scanning && _session != null;
+            DiagnosticsButton.IsEnabled = !scanning && _session != null;
+            RestoreButton.IsEnabled = !scanning; ResultsList.Tag = !scanning;
+            _inspector?.SetScanning(scanning);
+        }
+        private void Filter_Changed(object sender, RoutedEventArgs e) { if (_ready && !_binding) ApplyFilters(); }
         private void ApplyFilters()
         {
-            if (GridAll == null) return;
-
-            IEnumerable<ModelIssue> query = _all;
-
-            var severity = SelectedText(SeverityFilterCombo, "Toutes");
-            if (severity == "OK")
-                query = query.Where(i => i.Ignored);
-            else if (severity != "Toutes")
-                query = query.Where(i => !i.Ignored && string.Equals(i.SeverityText, severity, StringComparison.CurrentCultureIgnoreCase));
-
-            var type = SelectedText(TypeFilterCombo, "Tous");
-            if (type != "Tous")
-                query = query.Where(i => string.Equals(i.Category, type, StringComparison.CurrentCultureIgnoreCase));
-
-            var state = SelectedText(StateFilterCombo, "Tous");
-            if (state == "Actives")
-                query = query.Where(i => !i.Ignored);
-            else if (state != "Tous")
-                query = query.Where(i => string.Equals(i.StatusText, state, StringComparison.CurrentCultureIgnoreCase));
-
-            var level = SelectedText(LevelFilterCombo, "Tous");
-            if (level != "Tous")
-                query = query.Where(i => string.Equals(i.LevelName, level, StringComparison.CurrentCultureIgnoreCase));
-
-            var link = SelectedText(LinkFilterCombo, "Tous");
-            if (link != "Tous")
-                query = query.Where(i => string.Equals(i.LinkName, link, StringComparison.CurrentCultureIgnoreCase));
-
-            var category = SelectedText(ElementCategoryFilterCombo, "Toutes");
-            if (category != "Toutes")
-                query = query.Where(i => string.Equals(i.ElementCategory, category, StringComparison.CurrentCultureIgnoreCase));
-
-            var search = SearchBox?.Text?.Trim();
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                var tokens = search.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                query = query.Where(i =>
-                {
-                    var text = i.SearchText ?? string.Empty;
-                    return tokens.All(t => text.IndexOf(t, StringComparison.CurrentCultureIgnoreCase) >= 0);
-                });
-            }
-
-            _filtered = query
-                .OrderBy(i => i.PriorityRank)
-                .ThenBy(i => StatusSort(i.StatusText))
-                .ThenBy(i => i.LevelName)
-                .ThenBy(i => i.LinkName)
-                .ThenBy(i => i.Category)
-                .ThenBy(i => i.ElementIdValue)
-                .ToList();
-
-            BindGrid(GridAll, _filtered);
-            BindGrid(GridMEP, _filtered.Where(i => i.Kind == IssueKind.MepThroughWallNoSleeve));
-            BindGrid(GridLinks, _filtered.Where(i => i.Kind == IssueKind.LinkPipeClash));
-            BindGrid(GridOpen, _filtered.Where(i => i.Kind == IssueKind.MepUnconnected));
-
-            RebuildVisualCards();
-            EmptyStateText.Visibility = _filtered.Count == 0 ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
-
+            var selected = ResultsList.SelectedItem as ModelIssue;
+            var matches = _all.Where(MatchesFilters);
+            _filtered = (Scanning ? matches : matches.OrderBy(i => i.PriorityRank).ThenBy(i => i.LevelName).ThenBy(i => i.ElementIdValue)).ToList();
+            _visible.Clear(); foreach (var issue in _filtered) _visible.Add(issue);
+            if (selected != null && _filtered.Contains(selected)) ResultsList.SelectedItem = selected;
+            _activeCount = _all.Count(i => !i.Ignored);
+            _confirmedCount = _all.Count(i => !i.IsApproximate && i.Kind != IssueKind.MepUnconnected);
+            _approximateCount = _all.Count(i => i.IsApproximate);
             UpdateResultText();
-            UpdateActiveFilterText();
-            UpdateIssueCount();
-            UpdateBackToGroupsButton();
         }
-
-        private void RebuildVisualCards()
+        private bool MatchesFilters(ModelIssue issue)
         {
-            foreach (var card in _visualCards)
-                card.Dispose();
-
-            var mode = SelectedText(VisualModeCombo, "Groupes intelligents");
-            if (mode == "Anomalies")
-            {
-                _visualCards = _filtered.Select(i => new IssueCard(new[] { i })).ToList();
-            }
-            else
-            {
-                _visualCards = _filtered
-                    .GroupBy(i => i.GroupKey)
-                    .Select(g => new IssueCard(g.ToList()))
-                    .OrderBy(c => c.PriorityRank)
-                    .ThenByDescending(c => c.ActiveCount)
-                    .ThenBy(c => c.VisualTitle)
-                    .ToList();
-            }
-
-            VisualIssuesList.ItemsSource = null;
-            VisualIssuesList.ItemsSource = _visualCards;
+            var search = (SearchBox.Text ?? "").Trim(); var status = SelectedValue(StatusCombo); var category = SelectedValue(CategoryCombo);
+            return (status == "Tous" || status == "À traiter" && !issue.Ignored || issue.StatusText == status)
+                && (category == "Tous les contrôles" || issue.Category == category)
+                && (search.Length == 0 || issue.SearchText.IndexOf(search, StringComparison.CurrentCultureIgnoreCase) >= 0);
         }
-
-        private void UpdateIssueCount()
-        {
-            var ignored = _all.Count(i => i.Ignored);
-            var active = _all.Count - ignored;
-            TotalStatText.Text = _all.Count.ToString();
-            CriticalStatText.Text = _all.Count(i => !i.Ignored && i.Severity == IssueSeverity.Critical).ToString();
-            CheckStatText.Text = _all.Count(i => !i.Ignored && i.Severity == IssueSeverity.Check).ToString();
-            OkStatText.Text = ignored.ToString();
-            ActiveStatText.Text = active.ToString();
-        }
-
         private void UpdateResultText()
         {
-            if (ResultText == null) return;
-            var cardLabel = UiLanguage.IsEnglish
-                ? (_visualCards.Count == 1 ? "card" : "cards")
-                : (_visualCards.Count > 1 ? "cartes" : "carte");
-            ResultText.Text = UiLanguage.T(
-                $"{_filtered.Count} / {_all.Count} anomalies - {_visualCards.Count} {cardLabel}",
-                $"{_filtered.Count} / {_all.Count} issues - {_visualCards.Count} {cardLabel}");
-        }
-
-        private void UpdateActiveFilterText()
-        {
-            if (ActiveFilterText == null) return;
-
-            var parts = new List<string>();
-            AddFilterPart(parts, SelectedText(SeverityFilterCombo, "Toutes"), "Toutes");
-            AddFilterPart(parts, SelectedText(TypeFilterCombo, "Tous"), "Tous");
-            AddFilterPart(parts, SelectedText(StateFilterCombo, "Tous"), "Tous");
-            AddFilterPart(parts, SelectedText(LevelFilterCombo, "Tous"), "Tous");
-            AddFilterPart(parts, SelectedText(LinkFilterCombo, "Tous"), "Tous");
-            AddFilterPart(parts, SelectedText(ElementCategoryFilterCombo, "Toutes"), "Toutes");
-
-            var search = SearchBox?.Text?.Trim();
-            if (!string.IsNullOrWhiteSpace(search)) parts.Add(UiLanguage.T($"Recherche : {search}", $"Search: {search}"));
-
-            ActiveFilterText.Text = parts.Count == 0
-                ? UiLanguage.T("Aucun filtre actif", "No Active Filter")
-                : UiLanguage.T("Filtre actif : ", "Active Filter: ") + string.Join(" · ", parts);
-        }
-
-        private static void AddFilterPart(ICollection<string> parts, string value, string allValue)
-        {
-            if (!string.IsNullOrWhiteSpace(value) && value != allValue)
-                parts.Add(UiLanguage.T(value));
-        }
-
-        private static int StatusSort(string status)
-        {
-            if (status == ModelIssue.StatusToFix) return 0;
-            if (status == ModelIssue.StatusReview) return 1;
-            if (status == ModelIssue.StatusActive) return 2;
-            if (status == ModelIssue.StatusFixed) return 8;
-            if (status == ModelIssue.StatusIgnored) return 9;
-            return 5;
-        }
-
-        private static string SelectedText(System.Windows.Controls.ComboBox combo, string fallback)
-            => combo?.SelectedItem is FilterOption option ? option.Value : combo?.SelectedItem as string ?? fallback;
-
-        private static void BindGrid(DataGrid grid, IEnumerable<ModelIssue> source)
-        {
-            grid.ItemsSource = null;
-            grid.ItemsSource = source.ToList();
-        }
-
-        private static bool IsValidId(ElementId id)
-            => id != null && id != ElementId.InvalidElementId && id.GetIdValue() > 0;
-
-        private IEnumerable<ModelIssue> IssuesForCurrentTab()
-            => _filtered.Where(i => !i.Ignored);
-
-        private IssueCard CurrentCard()
-            => VisualIssuesList?.SelectedItem as IssueCard;
-
-        private ModelIssue CurrentSelection()
-        {
-            return CurrentCard()?.PrimaryIssue
-                ?? GridAll?.SelectedItem as ModelIssue
-                ?? GridMEP?.SelectedItem as ModelIssue
-                ?? GridLinks?.SelectedItem as ModelIssue
-                ?? GridOpen?.SelectedItem as ModelIssue;
-        }
-
-        private List<ModelIssue> ResolveIssuesFromSender(object sender)
-        {
-            object candidate = null;
-            if (sender is MenuItem menu)
+            SummaryText.Text = (Scanning ? "Bilan provisoire · " : _session != null && (_session.Cancelled || _session.Error != null) ? "Bilan partiel · " : "")
+                + _activeCount + " à traiter · " + _confirmedCount + " intersection(s) confirmée(s) · " + _approximateCount + " suspicion(s)";
+            ResultCountText.Text = _filtered.Count + " / " + _all.Count + " résultat(s)" + (Scanning ? " · affichage progressif · Entrée : détail" : " · Entrée : détail");
+            EmptyPanel.Visibility = _filtered.Count == 0 ? WpfVisibility.Visible : WpfVisibility.Collapsed;
+            if (_filtered.Count == 0)
             {
-                candidate = menu.CommandParameter;
-                if (candidate == null && menu.Parent is ContextMenu cm && cm.PlacementTarget is FrameworkElement target)
-                    candidate = target.DataContext;
+                bool partial = _session == null || _session.Cancelled || _session.Error != null;
+                EmptyTitle.Text = _all.Count > 0 ? "Aucun résultat avec ces filtres" : Scanning ? "Analyse en cours" : partial ? "Aucun résultat disponible" : "Aucun conflit détecté dans ce périmètre";
+                EmptyDescription.Text = _all.Count > 0 ? "Changez le statut ou le contrôle, ou effacez la recherche." : Scanning
+                    ? "Les objets et les liens sont préparés, puis les résultats apparaissent dès leur détection. Le bilan reste provisoire jusqu'à la fin."
+                    : partial
+                    ? "Lancez une analyse complète pour obtenir un bilan." : _session.SourceCount == 0
+                    ? "Aucun objet des catégories choisies n'a été trouvé. Ajustez les catégories ou le périmètre."
+                    : "Consultez le bilan pour connaître les catégories, les liens et les éventuelles limites de l'analyse.";
             }
-            else
+            OverviewButton.IsEnabled = !Scanning && _filtered.Count > 0; ExportButton.IsEnabled = !Scanning && _session != null;
+        }
+        private ModelIssue IssueFrom(object sender) => (sender as FrameworkElement)?.DataContext as ModelIssue ?? ResultsList.SelectedItem as ModelIssue;
+        private void Focus_Click(object sender, RoutedEventArgs e) => Focus(IssueFrom(sender));
+        private void Context_Click(object sender, RoutedEventArgs e) => ToggleContext();
+        private void ToggleContext()
+        {
+            if (Scanning || _busy || _queuedAction.HasValue || _handler.DisplayedIssue == null) return;
+            Queue(SmartAction.ToggleContext);
+        }
+        private void Reservation_Click(object sender, RoutedEventArgs e) => CreateReservation(_handler.DisplayedIssue);
+        private void CreateReservation(ModelIssue issue)
+        {
+            if (issue == null || !issue.CanCreateReservation || issue.IsApproximate || Scanning || _busy || _queuedAction.HasValue || _stale) return;
+            _handler.FocusIssue = issue; RunText.Text = "Création de la réservation avec les réglages d'Autoréservation…";
+            Queue(SmartAction.CreateReservation);
+        }
+        private void UpdateFocusActions()
+        {
+            var issue = _handler.DisplayedIssue;
+            FocusBar.Visibility = issue == null ? WpfVisibility.Collapsed : WpfVisibility.Visible;
+            FocusBarText.Text = _handler.ContextVisible ? "Contexte sans coupe" : "Conflit isolé dans Revit";
+            ContextButton.Content = _handler.ContextVisible ? "Isoler le conflit" : "Voir autour";
+            ContextButton.IsEnabled = !Scanning && !_busy && !_queuedAction.HasValue;
+            ReservationButton.Visibility = issue?.CanCreateReservation == true && !issue.IsApproximate ? WpfVisibility.Visible : WpfVisibility.Collapsed;
+            ReservationButton.IsEnabled = !Scanning && !_busy && !_queuedAction.HasValue && !_stale;
+            _inspector?.SetActions(issue, _handler.ContextVisible, Scanning || _busy || _queuedAction.HasValue, _stale);
+        }
+        private void Focus(ModelIssue issue)
+        {
+            if (issue == null || _busy || _queuedAction.HasValue || _session != null && !_session.Complete) return;
+            _handler.FocusIssue = issue; Queue(SmartAction.FocusApply);
+        }
+        private void Results_SelectionChanged(object sender, SelectionChangedEventArgs e) { }
+        private void Results_DoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            var node = e.OriginalSource as DependencyObject;
+            while (node != null)
             {
-                candidate = (sender as FrameworkElement)?.DataContext;
+                if (node is System.Windows.Controls.Primitives.ButtonBase) return;
+                node = node is System.Windows.Media.Visual ? System.Windows.Media.VisualTreeHelper.GetParent(node) : LogicalTreeHelper.GetParent(node);
             }
-
-            if (candidate is IssueCard card) return card.Issues.ToList();
-            if (candidate is ModelIssue issue) return new List<ModelIssue> { issue };
-
-            var selectedCard = CurrentCard();
-            if (selectedCard != null) return selectedCard.Issues.ToList();
-
-            var selected = CurrentSelection();
-            return selected == null ? new List<ModelIssue>() : new List<ModelIssue> { selected };
+            Focus(ResultsList.SelectedItem as ModelIssue);
         }
-
-        private ModelIssue ResolveIssueFromSender(object sender)
-            => ResolveIssuesFromSender(sender).FirstOrDefault();
-
-        private void FocusFromGrid(DataGrid grid)
-        {
-            var issue = grid.SelectedItem as ModelIssue;
-            HandleSmartDoubleClick(issue);
-        }
-
-        private void OnGridSelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (_suppressAutoFocus) return;
-
-            var issue = (sender as DataGrid)?.SelectedItem as ModelIssue;
-            if (issue == null) return;
-
-            UpdateSelection(issue);
-
-            if (ChkAutoFocus?.IsChecked == true && !issue.Ignored)
-                DoFocus(issue, keepShowAll: BtnShowAll.IsChecked == true);
-        }
-
-        private void VisualIssuesList_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (_suppressAutoFocus) return;
-
-            var card = CurrentCard();
-            var issue = card?.PrimaryIssue;
-            if (issue == null) return;
-
-            UpdateSelection(issue);
-
-            if (!card.IsGroup && ChkAutoFocus?.IsChecked == true && !issue.Ignored)
-                DoFocus(issue, keepShowAll: BtnShowAll.IsChecked == true);
-        }
-
-        private void VisualIssuesList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
-        {
-            var card = CurrentCard();
-            if (card == null) return;
-
-            if (card.IsGroup)
-                ApplyGroupFilter(card);
-            else
-                HandleSmartDoubleClick(card.PrimaryIssue);
-        }
-
-        private void OnGridRightClick(object sender, MouseButtonEventArgs e)
-        {
-            if (!(e.OriginalSource is DependencyObject source)) return;
-
-            var row = FindAncestor<DataGridRow>(source);
-            if (!(row?.Item is ModelIssue issue)) return;
-
-            UpdateSelection(issue);
-            var menu = BuildIssueContextMenu(issue);
-            row.ContextMenu = menu;
-            menu.PlacementTarget = row;
-            menu.IsOpen = true;
-            e.Handled = true;
-        }
-
-        private ContextMenu BuildIssueContextMenu(ModelIssue issue)
-        {
-            var menu = new ContextMenu();
-            menu.Items.Add(BuildMenuItem("Voir ce type d'erreur", issue, QuickFilterKind_Click));
-            menu.Items.Add(BuildMenuItem("Voir cet élément", issue, QuickFilterElement_Click));
-            menu.Items.Add(BuildMenuItem("Voir les erreurs liées", issue, QuickFilterRelated_Click));
-            menu.Items.Add(new Separator());
-            menu.Items.Add(BuildStatusMenu(issue));
-            menu.Items.Add(BuildMenuItem("Ajouter commentaire", issue, CommentStatus_Click));
-            menu.Items.Add(new Separator());
-            menu.Items.Add(BuildMenuItem("Marquer OK / Annuler OK", issue, QuickMarkOk_Click));
-            menu.Items.Add(BuildMenuItem("Réinitialiser les filtres", issue, QuickFilterReset_Click));
-            return menu;
-        }
-
-        private static MenuItem BuildMenuItem(string header, object parameter, RoutedEventHandler handler)
-        {
-            var item = new MenuItem
-            {
-                Header = UiLanguage.T(header),
-                CommandParameter = parameter
-            };
-            item.Click += handler;
-            return item;
-        }
-
-        private MenuItem BuildStatusMenu(object parameter)
-        {
-            var menu = new MenuItem { Header = UiLanguage.T("Statut", "Status") };
-            foreach (var status in new[] { ModelIssue.StatusActive, ModelIssue.StatusToFix, ModelIssue.StatusReview, ModelIssue.StatusFixed, ModelIssue.StatusIgnored })
-            {
-                var item = new MenuItem
-                {
-                    Header = UiLanguage.T(status),
-                    Tag = status,
-                    CommandParameter = parameter
-                };
-                item.Click += StatusMenu_Click;
-                menu.Items.Add(item);
-            }
-
-            return menu;
-        }
-
-        private static T FindAncestor<T>(DependencyObject current) where T : DependencyObject
-        {
-            while (current != null)
-            {
-                if (current is T typed) return typed;
-                current = VisualTreeHelper.GetParent(current);
-            }
-
-            return null;
-        }
-
-        private void HandleSmartDoubleClick(ModelIssue issue)
+        private void Details_Click(object sender, RoutedEventArgs e) => Inspect(IssueFrom(sender));
+        private void Inspect(ModelIssue issue)
         {
             if (issue == null) return;
-
-            if (issue.Ignored)
-            {
-                ShowIssueDetails(issue);
-                return;
-            }
-
-            switch (issue.Kind)
-            {
-                case IssueKind.LinkPipeClash:
-                case IssueKind.MepThroughWallNoSleeve:
-                    DoFocus(issue, keepShowAll: false, forceSectionBox: true);
-                    break;
-                case IssueKind.MepUnconnected:
-                    DoFocus(issue, keepShowAll: BtnShowAll.IsChecked == true, forceSectionBox: false);
-                    break;
-                default:
-                    if (IsValidId(issue.ElementId))
-                        DoFocus(issue, keepShowAll: BtnShowAll.IsChecked == true, forceSectionBox: false);
-                    else
-                        ShowIssueDetails(issue);
-                    break;
-            }
+            _inspector?.Close();
+            _inspector = new SmartIssueInspector(issue, Focus, SaveDecision, CapturePreview, Navigate, ToggleContext, CreateReservation) { Owner = this };
+            _inspector.SetScanning(Scanning);
+            if (_stale) _inspector.MarkStale();
+            _inspector.Show();
+            UpdateFocusActions();
+            if (_tutorialPrepared && IsTutorialCrossing(issue))
+            { _tutorialDetailOpened = true; BIMaestro.Tutorials.DemoTourService.ReportAction(this, "clash-detail-opened"); }
         }
-
-        private void ShowIssueDetails(ModelIssue issue)
+        private bool SaveDecision(ModelIssue issue, string status, string comment)
         {
-            var related = IsValidId(issue.RelatedId) ? issue.RelatedId.GetIdValue().ToString() : "-";
-            var localizedStatus = UiLanguage.T(issue.StatusText);
-            var statusInfo = string.IsNullOrWhiteSpace(issue.StatusUpdatedText)
-                ? localizedStatus
-                : localizedStatus + " (" + issue.StatusUpdatedText + ")";
-            var comment = string.IsNullOrWhiteSpace(issue.StatusComment) ? string.Empty : UiLanguage.T("\nCommentaire : ", "\nComment: ") + issue.StatusComment;
-
-            TaskDialog.Show(
-                UiLanguage.T("Clash 3D - détail", "3D Clash - Details"),
-                UiLanguage.T("Gravité : ", "Severity: ") + UiLanguage.T(issue.SeverityText) + "\n" +
-                UiLanguage.T("Statut : ", "Status: ") + statusInfo + "\n" +
-                UiLanguage.T("Type : ", "Type: ") + UiLanguage.T(issue.Category) + "\n" +
-                UiLanguage.T("Niveau : ", "Level: ") + EmptyDash(issue.LevelName) + "\n" +
-                UiLanguage.T("Catégorie : ", "Category: ") + EmptyDash(issue.ElementCategory) + "\n" +
-                UiLanguage.T("Lien : ", "Link: ") + EmptyDash(issue.LinkName) + "\n" +
-                UiLanguage.T("Élément : ", "Element: ") + issue.ElementIdValue + "\n" +
-                UiLanguage.T("Élément lié : ", "Related Element: ") + related + "\n\n" +
-                $"{issue.WhyText}\n{issue.AdviceText}\n\n" +
-                $"{issue.Message}{comment}");
-        }
-
-        private void OnEnsure3D(object sender, RoutedEventArgs e)
-        {
-            _handler.Action = SmartAction.Ensure3D;
-            SafeRaise();
-        }
-
-        private void OnShowAll(object sender, RoutedEventArgs e)
-        {
-            var ids = IssuesForCurrentTab()
-                .Select(i => i.ElementId)
-                .Where(IsValidId)
-                .Distinct(new IdCmp())
-                .ToList();
-
-            _handler.AllIssueIds = ids;
-            _handler.ShowAllEnabled = (BtnShowAll.IsChecked == true);
-
-            _handler.Action = SmartAction.ShowAllApply;
-            SafeRaise();
-        }
-
-        private class IdCmp : IEqualityComparer<ElementId>
-        {
-            public bool Equals(ElementId a, ElementId b) => (a?.GetIdValue() ?? int.MinValue) == (b?.GetIdValue() ?? int.MinValue);
-            public int GetHashCode(ElementId obj) => obj?.GetIdValue().GetHashCode() ?? 0;
-        }
-
-        private void OnPrev(object sender, RoutedEventArgs e)
-        {
-            var list = IssuesForCurrentTab().ToList();
-            if (list.Count == 0) return;
-            _cursor = (_cursor <= 0 || _cursor >= list.Count) ? list.Count - 1 : _cursor - 1;
-            DoFocus(list[_cursor], keepShowAll: BtnShowAll.IsChecked == true);
-        }
-
-        private void OnNext(object sender, RoutedEventArgs e)
-        {
-            var list = IssuesForCurrentTab().ToList();
-            if (list.Count == 0) return;
-            _cursor = (_cursor < 0 || _cursor >= list.Count) ? 0 : (_cursor + 1) % list.Count;
-            DoFocus(list[_cursor], keepShowAll: BtnShowAll.IsChecked == true);
-        }
-
-        private void DoFocus(ModelIssue issue, bool keepShowAll, bool forceSectionBox = false)
-        {
-            DoFocus(new[] { issue }, keepShowAll, forceSectionBox);
-        }
-
-        private void DoFocus(IEnumerable<ModelIssue> issues, bool keepShowAll, bool forceSectionBox = false)
-        {
-            var list = (issues ?? Enumerable.Empty<ModelIssue>())
-                .Where(i => i != null)
-                .ToList();
-            if (list.Count == 0) return;
-
-            var first = list[0];
-            UpdateSelection(first);
-
-            _handler.Action = SmartAction.FocusApply;
-            _handler.FocusIssues = list;
-            _handler.IssueId = first.ElementId ?? ElementId.InvalidElementId;
-            _handler.RelatedId = first.RelatedId ?? ElementId.InvalidElementId;
-            _handler.CurrentKind = first.Kind;
-            _handler.IssueBox = first.BBox;
-            _handler.ShowAllMode = keepShowAll;
-            _handler.AutoSectionBox = forceSectionBox;
-            SafeRaise();
-
-            UpdateCursor(first);
-        }
-
-        private void OnFocus(object sender, RoutedEventArgs e)
-        {
-            var issues = ResolveIssuesFromSender(sender);
-            DoFocus(issues, keepShowAll: BtnShowAll.IsChecked == true);
-        }
-
-        private void OnFocusIsolate(object sender, RoutedEventArgs e)
-        {
-            var issues = ResolveIssuesFromSender(sender);
-            DoFocus(issues, keepShowAll: false, forceSectionBox: true);
-        }
-
-        private void OnIgnore(object sender, RoutedEventArgs e)
-        {
-            ToggleIgnored(ResolveIssuesFromSender(sender));
-        }
-
-        private void ToggleIgnored(IEnumerable<ModelIssue> issues)
-        {
-            var list = (issues ?? Enumerable.Empty<ModelIssue>()).Where(i => i != null).ToList();
-            if (list.Count == 0) return;
-
-            var allResolved = list.All(i => i.Ignored);
-            ApplyStatus(list, allResolved ? ModelIssue.StatusActive : ModelIssue.StatusFixed, keepComment: true);
-        }
-
-        private void StatusMenu_Click(object sender, RoutedEventArgs e)
-        {
-            var status = (sender as MenuItem)?.Tag as string;
-            if (string.IsNullOrWhiteSpace(status)) return;
-            ApplyStatus(ResolveIssuesFromSender(sender), status, keepComment: true);
-        }
-
-        private void CommentStatus_Click(object sender, RoutedEventArgs e)
-        {
-            var list = ResolveIssuesFromSender(sender).Where(i => i != null).ToList();
-            if (list.Count == 0) return;
-
-            var existing = list.Count == 1 ? list[0].StatusComment ?? string.Empty : string.Empty;
-            var comment = Microsoft.VisualBasic.Interaction.InputBox(
-                UiLanguage.T("Commentaire optionnel pour ce statut :", "Optional comment for this status:"),
-                UiLanguage.T("Clash 3D - commentaire", "3D Clash - Comment"),
-                existing);
-
-            if (comment == null) return;
-            foreach (var issue in list)
-            {
-                SmartCheckState.SetIssueStatus(_docKey, issue, issue.StatusText, comment, Environment.UserName);
-            }
-
+            if (_stale) { MessageBox.Show(this, "Relancez l'analyse avant d'enregistrer une décision sur une maquette modifiée.", "Clash 3D"); return false; }
+            SmartCheckState.SetIssueStatus(_setup.DocumentKey, issue, status, comment, Environment.UserName);
             ApplyFilters();
-            UpdateSelection(list[0]);
+            if (!Scanning) RunText.Text = SmartCheckState.LastSaveError == null ? "Décision enregistrée. « Traité » reste une décision manuelle, sans correction automatique de la maquette."
+                : "Décision mise à jour dans cette session, mais non sauvegardée : " + SmartCheckState.LastSaveError;
+            return SmartCheckState.LastSaveError == null;
         }
-
-        private void ApplyStatus(IEnumerable<ModelIssue> issues, string status, bool keepComment)
+        private void CapturePreview(ModelIssue issue)
         {
-            var list = (issues ?? Enumerable.Empty<ModelIssue>()).Where(i => i != null).ToList();
-            if (list.Count == 0) return;
-
-            foreach (var issue in list)
-            {
-                var comment = keepComment ? issue.StatusComment : null;
-                SmartCheckState.SetIssueStatus(_docKey, issue, status, comment, Environment.UserName);
-            }
-
-            _handler.IssueId = list[0].ElementId ?? ElementId.InvalidElementId;
-            _handler.Action = SmartAction.MarkIgnored;
-            SafeRaise();
-
-            ApplyFilters();
-            UpdateSelection(list[0]);
+            if (Scanning || _busy || _queuedAction.HasValue) return;
+            _handler.FocusIssue = issue; _handler.ThumbnailFolder = SmartCheckState.GetThumbnailFolder(_setup.DocumentKey);
+            Queue(SmartAction.GenerateThumbnails);
         }
-
-        private void UpdateSelection(ModelIssue issue)
+        private void Navigate(ModelIssue current, int offset)
         {
-            if (issue == null) return;
-
-            _suppressAutoFocus = true;
+            int index = _filtered.IndexOf(current); if (_filtered.Count == 0) return;
+            index = Math.Max(0, Math.Min(_filtered.Count - 1, index + offset)); ResultsList.SelectedItem = _filtered[index];
+            ResultsList.ScrollIntoView(_filtered[index]); Inspect(_filtered[index]);
+        }
+        private void Overview_Click(object sender, RoutedEventArgs e)
+        { _handler.FocusIssues = _filtered; _handler.ShowAllEnabled = true; Queue(SmartAction.ShowAllApply); }
+        private void Restore_Click(object sender, RoutedEventArgs e) => Queue(SmartAction.RestoreView);
+        private void Diagnostics_Click(object sender, RoutedEventArgs e)
+        {
+            if (_session == null) return;
+            var text = "Périmètre : " + _session.Options.Scope + "\nObjets de départ : " + _session.SourceCount + "\nObstacles indexés : " + _session.CandidateCount
+                + "\nPaires examinées : " + _session.TestedPairs + "\nSeuil : " + _session.Options.MinimumVolumeMm3 + " mm³\n"
+                + "\nLes contacts simples ne sont pas des intersections. Les connexions physiques directes sont exclues. Les maillages et géométries partielles produisent des suspicions."
+                + "\nLes réservations ne sont pas validées par nom de famille ; les intersections de parois restent à coordonner."
+                + "\n\n" + (_session.Error ?? "") + "\n" + (_session.Diagnostics.Count == 0 ? "Aucune anomalie de lecture signalée." : string.Join("\n", _session.Diagnostics));
+            var win = new Window { Title = "Clash 3D · bilan de l'analyse", Owner = this, Width = 680, Height = 520, MinWidth = 420, MinHeight = 300, WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Content = new TextBox { Text = text, IsReadOnly = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Padding = new Thickness(20), BorderThickness = new Thickness(0) } };
+            win.Show();
+        }
+        private void Export_Click(object sender, RoutedEventArgs e)
+        {
+            if (_session == null) return;
+            var dialog = new SaveFileDialog { Title = "Exporter les résultats affichés", FileName = "Clash3D_" + DateTime.Now.ToString("yyyyMMdd_HHmmss"),
+                Filter = "Rapport autonome (*.html)|*.html|Tableau CSV (*.csv)|*.csv", AddExtension = true };
+            if (dialog.ShowDialog(this) != true) return;
             try
             {
-                SelectInList(VisualIssuesList, issue);
-                SelectInGrid(GridAll, issue);
-                SelectInGrid(GridMEP, issue);
-                SelectInGrid(GridLinks, issue);
-                SelectInGrid(GridOpen, issue);
+                WriteExport(dialog.FileName, dialog.FilterIndex == 2);
+                Process.Start(new ProcessStartInfo(dialog.FileName) { UseShellExecute = true });
             }
-            finally
-            {
-                _suppressAutoFocus = false;
-            }
+            catch (Exception ex) { RunText.Text = "Export : " + ex.Message; }
         }
-
-        private static void SelectInList(ListBox list, ModelIssue issue)
+        internal void WriteExport(string path, bool csv)
         {
-            if (list?.ItemsSource == null) return;
-
-            foreach (var item in list.ItemsSource)
-            {
-                if (item is IssueCard card && card.Contains(issue))
-                {
-                    list.SelectedItem = card;
-                    list.ScrollIntoView(card);
-                    return;
-                }
-            }
-
-            list.SelectedItem = null;
+            if (_session == null) throw new InvalidOperationException("Lancez une analyse avant d'exporter.");
+            var text = csv ? SmartClashReport.Csv(_filtered)
+                : SmartClashReport.Html(_setup.Title, _filtered, _session, _stale, StatusCombo.SelectedItem + " · " + CategoryCombo.SelectedItem + " · " + SearchBox.Text);
+            File.WriteAllText(path, text, new UTF8Encoding(csv));
+            RunText.Text = "Export terminé : " + path;
+            if (_tutorialPrepared && !_stale && DemoClashExerciseExportReady())
+            { _tutorialExportWritten = true; BIMaestro.Tutorials.DemoTourService.ReportAction(this, "clash-export-written"); }
         }
-
-        private static void SelectInGrid(DataGrid grid, ModelIssue issue)
+        private void Help_Click(object sender, RoutedEventArgs e)
         {
-            if (grid?.ItemsSource == null) return;
-
-            if (ContainsIssue(grid.ItemsSource, issue))
-            {
-                grid.SelectedItem = issue;
-                grid.ScrollIntoView(issue);
-            }
-            else
-            {
-                grid.SelectedItem = null;
-            }
+            try { Process.Start(new ProcessStartInfo("https://www.bimaestro.fr/analyse?outil=clash-3d") { UseShellExecute = true }); }
+            catch (Exception ex) { RunText.Text = ex.Message; }
         }
-
-        private static bool ContainsIssue(System.Collections.IEnumerable source, ModelIssue issue)
+        private void Window_KeyDown(object sender, KeyEventArgs e)
         {
-            foreach (var item in source)
-            {
-                if (ReferenceEquals(item, issue)) return true;
-            }
-            return false;
+            if (e.Key == Key.Enter && !(e.OriginalSource is TextBox) && ResultsList.SelectedItem is ModelIssue issue) { Inspect(issue); e.Handled = true; }
+            if (e.Key == Key.Escape) { if (_session != null && !_session.Complete) Cancel_Click(sender, e); else Close(); e.Handled = true; }
         }
-
-        private void UpdateCursor(ModelIssue issue)
+        private void Window_Closing(object sender, CancelEventArgs e)
         {
-            if (issue == null) return;
-            var list = IssuesForCurrentTab().ToList();
-            var idx = list.IndexOf(issue);
-            if (idx >= 0) _cursor = idx;
+            if (_closeConfirmed) return;
+            e.Cancel = true; _closing = true;
+            if (_session != null && !_session.Complete) { _session.CancelRequested = true; if (!_busy && !_queuedAction.HasValue) Queue(SmartAction.ScanBatch); }
+            else if (!_busy && !_queuedAction.HasValue) Queue(SmartAction.CloseSession);
         }
-
-        private void Filter_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (_isBindingFilters) return;
-            ApplyFilters();
-        }
-
-        private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            if (_isBindingFilters) return;
-            ApplyFilters();
-        }
-
-        private void QuickFilterKind_Click(object sender, RoutedEventArgs e)
-        {
-            var issue = ResolveIssueFromSender(sender);
-            if (issue == null || string.IsNullOrWhiteSpace(issue.Category)) return;
-
-            ResetFilterBinding(() =>
-            {
-                SeverityFilterCombo.SelectedIndex = 0;
-                StateFilterCombo.SelectedIndex = 0;
-                SearchBox.Text = string.Empty;
-                SelectComboValue(TypeFilterCombo, issue.Category, "Tous");
-            });
-        }
-
-        private void QuickFilterElement_Click(object sender, RoutedEventArgs e)
-        {
-            var issue = ResolveIssueFromSender(sender);
-            if (issue == null) return;
-            ApplySearchFilter(issue.ElementIdValue.ToString());
-        }
-
-        private void QuickFilterRelated_Click(object sender, RoutedEventArgs e)
-        {
-            var issue = ResolveIssueFromSender(sender);
-            if (issue == null) return;
-
-            var id = IsValidId(issue.RelatedId)
-                ? issue.RelatedId.GetIdValue().ToString()
-                : issue.ElementIdValue.ToString();
-            ApplySearchFilter(id);
-        }
-
-        private void QuickFilterGroup_Click(object sender, RoutedEventArgs e)
-        {
-            var card = ResolveCardFromSender(sender);
-            if (card != null)
-                ApplyGroupFilter(card);
-        }
-
-        private IssueCard ResolveCardFromSender(object sender)
-        {
-            if (sender is MenuItem menu)
-            {
-                if (menu.CommandParameter is IssueCard card) return card;
-                if (menu.Parent is ContextMenu cm && cm.PlacementTarget is FrameworkElement target && target.DataContext is IssueCard targetCard)
-                    return targetCard;
-            }
-
-            return (sender as FrameworkElement)?.DataContext as IssueCard ?? CurrentCard();
-        }
-
-        private void ApplyGroupFilter(IssueCard card)
-        {
-            if (card == null || card.PrimaryIssue == null) return;
-            if (!card.IsGroup) return;
-            var issue = card.PrimaryIssue;
-
-            ResetFilterBinding(() =>
-            {
-                SearchBox.Text = string.Empty;
-                SeverityFilterCombo.SelectedIndex = 0;
-                StateFilterCombo.SelectedIndex = 0;
-                SelectComboValue(TypeFilterCombo, issue.Category, "Tous");
-                SelectComboValue(LevelFilterCombo, issue.LevelName, "Tous");
-                SelectComboValue(LinkFilterCombo, issue.LinkName, "Tous");
-                SelectComboValue(ElementCategoryFilterCombo, issue.ElementCategory, "Toutes");
-                SelectComboValue(VisualModeCombo, "Anomalies", "Anomalies");
-            });
-        }
-
-        private void OnBackToGroups(object sender, RoutedEventArgs e)
-        {
-            ResetFilterBinding(() =>
-            {
-                SeverityFilterCombo.SelectedIndex = 0;
-                TypeFilterCombo.SelectedIndex = 0;
-                StateFilterCombo.SelectedIndex = 0;
-                LevelFilterCombo.SelectedIndex = 0;
-                LinkFilterCombo.SelectedIndex = 0;
-                ElementCategoryFilterCombo.SelectedIndex = 0;
-                SearchBox.Text = string.Empty;
-                SelectComboValue(VisualModeCombo, "Groupes intelligents", "Groupes intelligents");
-            });
-        }
-
-        private void UpdateBackToGroupsButton()
-        {
-            if (BackToGroupsButton == null) return;
-
-            BackToGroupsButton.Visibility = SelectedText(VisualModeCombo, "Groupes intelligents") == "Anomalies"
-                ? System.Windows.Visibility.Visible
-                : System.Windows.Visibility.Collapsed;
-        }
-
-        private void QuickMarkOk_Click(object sender, RoutedEventArgs e)
-        {
-            ToggleIgnored(ResolveIssuesFromSender(sender));
-        }
-
-        private void QuickFilterReset_Click(object sender, RoutedEventArgs e)
-        {
-            ResetFilterBinding(() =>
-            {
-                SeverityFilterCombo.SelectedIndex = 0;
-                TypeFilterCombo.SelectedIndex = 0;
-                StateFilterCombo.SelectedIndex = 0;
-                LevelFilterCombo.SelectedIndex = 0;
-                LinkFilterCombo.SelectedIndex = 0;
-                ElementCategoryFilterCombo.SelectedIndex = 0;
-                SearchBox.Text = string.Empty;
-            });
-        }
-
-        private void ApplySearchFilter(string text)
-        {
-            ResetFilterBinding(() =>
-            {
-                SeverityFilterCombo.SelectedIndex = 0;
-                TypeFilterCombo.SelectedIndex = 0;
-                StateFilterCombo.SelectedIndex = 0;
-                LevelFilterCombo.SelectedIndex = 0;
-                LinkFilterCombo.SelectedIndex = 0;
-                ElementCategoryFilterCombo.SelectedIndex = 0;
-                SearchBox.Text = text ?? string.Empty;
-            });
-        }
-
-        private void ResetFilterBinding(Action action)
-        {
-            _isBindingFilters = true;
-            try
-            {
-                action?.Invoke();
-            }
-            finally
-            {
-                _isBindingFilters = false;
-            }
-            ApplyFilters();
-        }
-
-        private static void SelectComboValue(System.Windows.Controls.ComboBox combo, string value, string fallback)
-        {
-            if (combo == null) return;
-            var desired = combo.Items.OfType<FilterOption>()
-                .FirstOrDefault(option => string.Equals(option.Value, value, StringComparison.CurrentCultureIgnoreCase));
-            if (desired == null)
-                desired = combo.Items.OfType<FilterOption>()
-                    .FirstOrDefault(option => string.Equals(option.Value, fallback, StringComparison.CurrentCultureIgnoreCase));
-            if (desired != null)
-                combo.SelectedItem = desired;
-            else if (combo.Items.Count > 0)
-                combo.SelectedIndex = 0;
-        }
-
-        private void GenerateThumbnails_Click(object sender, RoutedEventArgs e)
-        {
-            var issues = ResolveIssuesFromSender(sender);
-            GenerateThumbnailsFor(issues);
-        }
-
-        private void OnGenerateThumbnails(object sender, RoutedEventArgs e)
-        {
-            var card = CurrentCard();
-            var issues = card != null
-                ? card.Issues
-                : _filtered.Where(i => !i.HasThumbnail).Take(12).ToList();
-            GenerateThumbnailsFor(issues);
-        }
-
-        private void GenerateThumbnailsFor(IEnumerable<ModelIssue> issues)
-        {
-            var list = (issues ?? Enumerable.Empty<ModelIssue>())
-                .Where(i => i != null && !i.HasThumbnail && !i.ThumbnailLoading)
-                .OrderBy(i => i.PriorityRank)
-                .Take(12)
-                .ToList();
-
-            if (list.Count == 0) return;
-
-            Directory.CreateDirectory(_thumbnailFolder);
-            foreach (var issue in list)
-                issue.ThumbnailLoading = true;
-
-            _handler.ThumbnailFolder = _thumbnailFolder;
-            _handler.ThumbnailLimit = 12;
-            _handler.ThumbnailIssues = list;
-            _handler.Action = SmartAction.GenerateThumbnails;
-            SafeRaise();
-        }
-
-        private void RestoreCachedThumbnails()
-        {
-            if (!Directory.Exists(_thumbnailFolder)) return;
-
-            foreach (var issue in _all)
-            {
-                var path = Path.Combine(_thumbnailFolder, MakeSafeFileName(issue.IssueKey) + ".png");
-                if (File.Exists(path))
-                    issue.ThumbnailPath = path;
-            }
-        }
-
-        private void OnExportReport(object sender, RoutedEventArgs e)
-        {
-            var path = ExportHtmlReportV2(_filtered.Count > 0 ? _filtered : _all);
-            if (string.IsNullOrWhiteSpace(path)) return;
-
-            try
-            {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = path,
-                    UseShellExecute = true
-                });
-            }
-            catch
-            {
-                TaskDialog.Show(UiLanguage.T("Clash 3D", "3D Clash"), UiLanguage.T("Rapport exporté :\n", "Report exported:\n") + path);
-            }
-        }
-
-        private string ExportHtmlReportV2(IEnumerable<ModelIssue> issues)
-        {
-            var list = (issues ?? Enumerable.Empty<ModelIssue>()).ToList();
-            if (list.Count == 0) return null;
-
-            var folder = SmartCheckState.GetReportFolder();
-            Directory.CreateDirectory(folder);
-            var file = Path.Combine(folder, "Clash3D_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".html");
-
-            var groups = list.GroupBy(i => i.GroupTitle)
-                .OrderByDescending(g => g.Count(i => !i.Ignored))
-                .ThenBy(g => g.Key)
-                .ToList();
-
-            var sb = new StringBuilder();
-            sb.AppendLine("<!doctype html><html><head><meta charset=\"utf-8\"><title>Rapport Clash 3D</title>");
-            sb.AppendLine("<style>");
-            sb.AppendLine("body{font-family:Segoe UI,Arial,sans-serif;margin:0;color:#111827;background:#eef2f7}.page{max-width:1280px;margin:0 auto;padding:28px}.top{background:#115c3a;color:white;border-radius:18px;padding:24px;margin-bottom:18px}.top h1{margin:0 0 8px;font-size:30px}.top p{margin:0;color:#e7f6ee}.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:22px}.stat{background:white;border:1px solid #dbe3ea;border-radius:12px;padding:14px 16px}.stat strong{font-size:25px;display:block}.section-title{margin:24px 0 12px;font-size:21px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(265px,1fr));gap:16px}.card{background:white;border:1px solid #dbe3ea;border-radius:14px;overflow:hidden;box-shadow:0 8px 22px rgba(15,23,42,.06)}.visual{height:156px;background:#e8f1ed;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden}.thumb{width:100%;height:100%;object-fit:cover}.initials{font-size:42px;font-weight:800;color:#115c3a;opacity:.36}.badge{display:inline-block;border-radius:999px;padding:5px 10px;color:white;font-size:12px;font-weight:700}.badge-count{position:absolute;right:10px;top:10px;background:#111827;color:white;border-radius:999px;padding:6px 10px;font-weight:700;font-size:12px}.badge-kind{position:absolute;left:10px;top:10px}.crit{background:#d83030}.check{background:#e28a00}.info{background:#64748b}.ok{background:#278d42}.card-body{padding:14px}.card h3{margin:8px 0 7px;font-size:16px;line-height:1.25}.meta{color:#64748b;font-size:12px;margin:4px 0}.advice{color:#374151;font-size:13px;line-height:1.35}.button{display:inline-block;margin-top:10px;background:#115c3a;color:white;text-decoration:none;border-radius:8px;padding:8px 11px;font-size:12px;font-weight:700}.detail{background:white;border:1px solid #dbe3ea;border-radius:14px;margin:18px 0 0;overflow:hidden}.detail-head{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:15px 16px;background:#f8fafc;border-bottom:1px solid #e5e7eb}.detail-head h3{margin:0;font-size:17px}.detail-body{padding:0 16px 16px}table{border-collapse:collapse;width:100%;background:white;margin-top:14px}td,th{border-bottom:1px solid #e5e7eb;padding:9px 7px;text-align:left;font-size:12px;vertical-align:top}th{background:#f8fafc;color:#334155;font-weight:700}.message{min-width:280px}.comment{color:#64748b}.small{font-size:12px;color:#64748b}@media print{body{background:white}.page{padding:0}.button{display:none}.card{break-inside:avoid}.detail{break-inside:avoid}}");
-            sb.AppendLine("</style></head><body><div class=\"page\">");
-            sb.AppendLine("<div class=\"top\"><h1>Rapport Clash 3D</h1><p>BIMaestro - " + Html(DateTime.Now.ToString("dd/MM/yyyy HH:mm")) + " - " + list.Count + " anomalie(s), " + groups.Count + " groupe(s)</p></div>");
-            sb.AppendLine("<div class=\"stats\">");
-            AddStat(sb, "Anomalies", list.Count);
-            AddStat(sb, "Groupes", groups.Count);
-            AddStat(sb, "Critiques", list.Count(i => !i.Ignored && i.Severity == IssueSeverity.Critical));
-            AddStat(sb, "À corriger", list.Count(i => i.StatusText == ModelIssue.StatusToFix));
-            AddStat(sb, "À revoir", list.Count(i => i.StatusText == ModelIssue.StatusReview));
-            AddStat(sb, "OK / ignorées", list.Count(i => i.Ignored));
-            sb.AppendLine("</div>");
-            sb.AppendLine("<h2 class=\"section-title\">Vue par vignettes</h2><div class=\"grid\">");
-
-            for (int index = 0; index < groups.Count; index++)
-            {
-                var group = groups[index];
-                var first = group.OrderBy(i => i.PriorityRank).First();
-                var anchor = "detail-" + index.ToString("000");
-                var image = group.Select(i => i.ThumbnailPath).FirstOrDefault(IsUsableImagePath);
-
-                sb.AppendLine("<div class=\"card\"><div class=\"visual\">");
-                if (!string.IsNullOrWhiteSpace(image))
-                    sb.AppendLine("<img class=\"thumb\" src=\"" + HtmlAttr(ToFileUrl(image)) + "\" alt=\"Aperçu " + HtmlAttr(first.VisualTitle) + "\">");
-                else
-                    sb.AppendLine("<div class=\"initials\">" + Html(first.VisualInitials) + "</div>");
-                sb.AppendLine("<span class=\"badge badge-kind " + SeverityClass(first) + "\">" + Html(first.SeverityText) + "</span>");
-                sb.AppendLine("<span class=\"badge-count\">" + group.Count() + "</span>");
-                sb.AppendLine("</div><div class=\"card-body\">");
-                sb.AppendLine("<div class=\"meta\">" + Html(EmptyDash(first.LevelName)) + " · " + Html(EmptyDash(first.LinkName)) + "</div>");
-                sb.AppendLine("<h3>" + Html(group.Key) + "</h3>");
-                sb.AppendLine("<div class=\"advice\">" + Html(first.WhyText) + "<br>" + Html(first.AdviceText) + "</div>");
-                sb.AppendLine("<a class=\"button\" href=\"#" + anchor + "\">Voir le détail</a>");
-                sb.AppendLine("</div></div>");
-            }
-
-            sb.AppendLine("</div><h2 class=\"section-title\">Détail des groupes</h2>");
-            for (int index = 0; index < groups.Count; index++)
-            {
-                var group = groups[index];
-                var first = group.OrderBy(i => i.PriorityRank).First();
-                var anchor = "detail-" + index.ToString("000");
-
-                sb.AppendLine("<section class=\"detail\" id=\"" + anchor + "\">");
-                sb.AppendLine("<div class=\"detail-head\"><div><h3>" + Html(group.Key) + "</h3><div class=\"small\">" + group.Count() + " anomalie(s), " + group.Count(i => !i.Ignored) + " active(s)</div></div><span class=\"badge " + SeverityClass(first) + "\">" + Html(first.SeverityText) + "</span></div>");
-                sb.AppendLine("<div class=\"detail-body\"><table><thead><tr><th>Statut</th><th>Type</th><th>Niveau</th><th>Catégorie</th><th>Lien</th><th>Élément</th><th>Lié</th><th class=\"message\">Message</th><th>Commentaire</th></tr></thead><tbody>");
-                foreach (var issue in group.OrderBy(i => i.PriorityRank).ThenBy(i => i.ElementIdValue))
-                {
-                    var related = IsValidId(issue.RelatedId) ? issue.RelatedId.GetIdValue().ToString() : "-";
-                    sb.AppendLine("<tr><td>" + Html(issue.StatusText) + "</td><td>" + Html(issue.Category) + "</td><td>" + Html(EmptyDash(issue.LevelName)) + "</td><td>" + Html(EmptyDash(issue.ElementCategory)) + "</td><td>" + Html(EmptyDash(issue.LinkName)) + "</td><td>" + issue.ElementIdValue + "</td><td>" + Html(related) + "</td><td class=\"message\">" + Html(issue.Message) + "</td><td class=\"comment\">" + Html(issue.StatusComment) + "</td></tr>");
-                }
-                sb.AppendLine("</tbody></table></div></section>");
-            }
-
-            sb.AppendLine("</div></body></html>");
-            File.WriteAllText(file, sb.ToString(), Encoding.UTF8);
-            return file;
-        }
-
-        private string ExportHtmlReport(IEnumerable<ModelIssue> issues)
-        {
-            var list = (issues ?? Enumerable.Empty<ModelIssue>()).ToList();
-            if (list.Count == 0) return null;
-
-            var folder = SmartCheckState.GetReportFolder();
-            Directory.CreateDirectory(folder);
-            var file = Path.Combine(folder, "Clash3D_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".html");
-
-            var groups = list.GroupBy(i => i.GroupTitle)
-                .OrderByDescending(g => g.Count(i => !i.Ignored))
-                .ThenBy(g => g.Key)
-                .ToList();
-
-            var sb = new StringBuilder();
-            sb.AppendLine("<!doctype html><html><head><meta charset=\"utf-8\"><title>Rapport Clash 3D</title>");
-            sb.AppendLine("<style>body{font-family:Segoe UI,Arial,sans-serif;margin:28px;color:#111827;background:#f8fafc}.top{background:#115c3a;color:white;border-radius:16px;padding:22px;margin-bottom:18px}.stats{display:flex;gap:12px;flex-wrap:wrap}.stat{background:white;border:1px solid #e5e7eb;border-radius:10px;padding:12px 16px;min-width:120px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}.card{background:white;border:1px solid #e5e7eb;border-radius:12px;padding:14px}.badge{display:inline-block;border-radius:999px;padding:4px 9px;color:white;font-size:12px;font-weight:700}.crit{background:#d83030}.check{background:#e28a00}.info{background:#64748b}.ok{background:#278d42}.thumb{width:100%;height:150px;object-fit:cover;background:#eef2f7;border-radius:10px;margin:10px 0}table{border-collapse:collapse;width:100%;background:white;margin-top:22px}td,th{border:1px solid #e5e7eb;padding:7px;text-align:left;font-size:12px}th{background:#f1f5f9}</style></head><body>");
-            sb.AppendLine("<div class=\"top\"><h1>Rapport Clash 3D</h1><div>BIMaestro - " + Html(DateTime.Now.ToString("dd/MM/yyyy HH:mm")) + "</div></div>");
-            sb.AppendLine("<div class=\"stats\">");
-            AddStat(sb, "Total", list.Count);
-            AddStat(sb, "Critiques", list.Count(i => !i.Ignored && i.Severity == IssueSeverity.Critical));
-            AddStat(sb, "À corriger", list.Count(i => i.StatusText == ModelIssue.StatusToFix));
-            AddStat(sb, "À revoir", list.Count(i => i.StatusText == ModelIssue.StatusReview));
-            AddStat(sb, "OK", list.Count(i => i.Ignored));
-            sb.AppendLine("</div><h2>Groupes</h2><div class=\"grid\">");
-
-            foreach (var group in groups)
-            {
-                var first = group.OrderBy(i => i.PriorityRank).First();
-                sb.AppendLine("<div class=\"card\">");
-                sb.AppendLine("<span class=\"badge " + SeverityClass(first) + "\">" + Html(first.SeverityText) + "</span>");
-                sb.AppendLine("<h3>" + Html(group.Key) + "</h3>");
-                sb.AppendLine("<div>" + group.Count() + " anomalie(s), " + group.Count(i => !i.Ignored) + " active(s)</div>");
-                sb.AppendLine("<p>" + Html(first.WhyText) + "<br>" + Html(first.AdviceText) + "</p>");
-                sb.AppendLine("</div>");
-            }
-
-            sb.AppendLine("</div><h2>Détail</h2><table><thead><tr><th>Gravité</th><th>Statut</th><th>Type</th><th>Niveau</th><th>Catégorie</th><th>Lien</th><th>Élément</th><th>Message</th><th>Commentaire</th></tr></thead><tbody>");
-            foreach (var issue in list.OrderBy(i => i.PriorityRank).ThenBy(i => i.Category))
-            {
-                sb.AppendLine("<tr><td>" + Html(issue.SeverityText) + "</td><td>" + Html(issue.StatusText) + "</td><td>" + Html(issue.Category) + "</td><td>" + Html(issue.LevelName) + "</td><td>" + Html(issue.ElementCategory) + "</td><td>" + Html(issue.LinkName) + "</td><td>" + issue.ElementIdValue + "</td><td>" + Html(issue.Message) + "</td><td>" + Html(issue.StatusComment) + "</td></tr>");
-            }
-
-            sb.AppendLine("</tbody></table></body></html>");
-            File.WriteAllText(file, sb.ToString(), Encoding.UTF8);
-            return file;
-        }
-
-        private static void AddStat(StringBuilder sb, string label, int value)
-            => sb.AppendLine("<div class=\"stat\"><strong>" + value + "</strong><br>" + Html(label) + "</div>");
-
-        private static string SeverityClass(ModelIssue issue)
-        {
-            if (issue.Ignored) return "ok";
-            if (issue.Severity == IssueSeverity.Critical) return "crit";
-            if (issue.Severity == IssueSeverity.Check) return "check";
-            return "info";
-        }
-
-        private static string Html(string value)
-            => WebUtility.HtmlEncode(value ?? string.Empty);
-
-        private static string HtmlAttr(string value)
-            => Html(value);
-
-        private static string EmptyDash(string value)
-            => string.IsNullOrWhiteSpace(value) ? "-" : value;
-
-        private static bool IsUsableImagePath(string path)
-            => !string.IsNullOrWhiteSpace(path) && File.Exists(path);
-
-        private static string ToFileUrl(string path)
-        {
-            try { return new Uri(Path.GetFullPath(path)).AbsoluteUri; }
-            catch { return path ?? string.Empty; }
-        }
-
-        private static string MakeSafeFileName(string value)
-        {
-            var invalid = Path.GetInvalidFileNameChars();
-            var safe = new string((value ?? "issue").Select(ch => invalid.Contains(ch) ? '_' : ch).ToArray());
-            return safe.Length > 120 ? safe.Substring(0, 120) : safe;
-        }
-
-        private async void SafeRaise()
-        {
-            int tries = 0;
-            while (SmartExternalHandler.IsExecuting && tries < 20)
-            {
-                await Task.Delay(25);
-                tries++;
-            }
-
-            try
-            {
-                _extEvent.Raise();
-            }
-            catch (ExternalApplicationException)
-            {
-                await Task.Delay(50);
-                try { _extEvent.Raise(); } catch { }
-            }
-            catch { }
-        }
-
-        private sealed class IssueCard : INotifyPropertyChanged, IDisposable
-        {
-            public IssueCard(IEnumerable<ModelIssue> issues)
-            {
-                Issues = (issues ?? Enumerable.Empty<ModelIssue>())
-                    .OrderBy(i => i.PriorityRank)
-                    .ThenBy(i => i.ElementIdValue)
-                    .ToList();
-                PrimaryIssue = Issues.FirstOrDefault();
-
-                foreach (var issue in Issues)
-                    issue.PropertyChanged += Issue_PropertyChanged;
-            }
-
-            public List<ModelIssue> Issues { get; }
-            public ModelIssue PrimaryIssue { get; }
-            public bool IsGroup => Issues.Count > 1;
-            public int Count => Issues.Count;
-            public int ActiveCount => Issues.Count(i => !i.Ignored);
-            public int PriorityRank => Issues.Count == 0 ? 99 : Issues.Min(i => i.PriorityRank);
-            public string VisualTitle => IsGroup ? $"{Count} × {PrimaryIssue?.GroupTitle}" : PrimaryIssue?.VisualTitle;
-            public string VisualSubtitle => IsGroup ? $"{ActiveCount} actives - {PrimaryIssue?.WhyText}" : PrimaryIssue?.VisualSubtitle;
-            public string WhyText => PrimaryIssue?.WhyText;
-            public string AdviceText => PrimaryIssue?.AdviceText;
-            public string SeverityText => PrimaryIssue?.SeverityText;
-            public string IssueStateText => IsGroup ? $"{ActiveCount}/{Count} actives" : PrimaryIssue?.IssueStateText;
-            public string VisualInitials => PrimaryIssue?.VisualInitials;
-            public string IssueFamily => IsGroup ? PrimaryIssue?.ElementCategory : PrimaryIssue?.IssueFamily;
-            public string RelatedLabel => IsGroup ? PrimaryIssue?.LevelName : PrimaryIssue?.RelatedLabel;
-            public string ThumbnailPath => PrimaryIssue?.ThumbnailPath;
-            public string ThumbnailStateText => PrimaryIssue?.ThumbnailStateText;
-            public bool ThumbnailLoading => Issues.Any(i => i.ThumbnailLoading);
-            public System.Windows.Visibility ThumbnailVisibility => string.IsNullOrWhiteSpace(ThumbnailPath) ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
-            public System.Windows.Visibility InitialsVisibility => string.IsNullOrWhiteSpace(ThumbnailPath) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
-            public System.Windows.Visibility DetailActionVisibility => IsGroup ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
-            public string GroupBadgeText => IsGroup ? Count + " anomalies" : "1 anomalie";
-
-            public bool Contains(ModelIssue issue)
-                => Issues.Any(i => ReferenceEquals(i, issue));
-
-            public event PropertyChangedEventHandler PropertyChanged;
-
-            public void Dispose()
-            {
-                foreach (var issue in Issues)
-                    issue.PropertyChanged -= Issue_PropertyChanged;
-            }
-
-            private void Issue_PropertyChanged(object sender, PropertyChangedEventArgs e)
-            {
-                OnPropertyChanged(nameof(SeverityText));
-                OnPropertyChanged(nameof(IssueStateText));
-                OnPropertyChanged(nameof(ThumbnailPath));
-                OnPropertyChanged(nameof(ThumbnailStateText));
-                OnPropertyChanged(nameof(ThumbnailLoading));
-                OnPropertyChanged(nameof(ThumbnailVisibility));
-                OnPropertyChanged(nameof(InitialsVisibility));
-                OnPropertyChanged(nameof(ActiveCount));
-                OnPropertyChanged(nameof(VisualSubtitle));
-            }
-
-            private void OnPropertyChanged(string propertyName)
-                => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
+        private static List<SmartDisplayChoice> Choices(IEnumerable<string> values) => values.Select(v => new SmartDisplayChoice(v)).ToList();
+        private static string SelectedValue(ComboBox combo) => (combo.SelectedItem as SmartDisplayChoice)?.Value;
     }
 }

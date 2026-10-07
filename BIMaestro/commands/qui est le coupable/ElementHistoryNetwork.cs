@@ -40,6 +40,7 @@ namespace Analyse
     }
     internal sealed class HistoryConnection
     {
+        public string SourceMember { get; set; }
         public HistoryPort Port { get; set; }
         public string Peer { get; set; }
         public HistoryPort PeerPort { get; set; }

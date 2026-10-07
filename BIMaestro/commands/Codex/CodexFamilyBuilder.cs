@@ -5,6 +5,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -54,6 +55,8 @@ namespace BIMaestro.Codex
         internal static IEnumerable<CodexFamilyArtifact> CreateSteps(UIApplication app, Document source, CodexFamilyDesign design, bool validateOnly = false, CodexParametricDesign parametric = null, bool testHostPlacement = false, Action<Document> inspect = null, string outputRoot = null, bool showDuringCreation = false)
         {
             using var guard = new CodexCreationGuard(app.Application, design.Name);
+            var operationClock = Stopwatch.StartNew();
+            var timings = new Dictionary<string, double>();
             if (!validateOnly && design.Load && (source == null || source.IsFamilyDocument || source.IsReadOnly || source.IsModifiable))
                 throw new InvalidOperationException("Le chargement nécessite un projet actif modifiable, hors d'une autre commande.");
             string template = FindTemplate(app, parametric?.Hosting ?? design.Hosting);
@@ -120,6 +123,9 @@ namespace BIMaestro.Codex
                 CodexHostOpeningBuilder hostOpening = null;
                 View3D preview;
                 var previewViews = new List<View3D>();
+                int constructionTransactions = 0;
+                int batchSize = 0;
+                var batchClock = Stopwatch.StartNew();
                 using (var transaction = new Transaction(family, "BIMaestro — famille depuis description"))
                 {
                     transaction.Start();
@@ -152,11 +158,17 @@ namespace BIMaestro.Codex
                         foreach (var buildStep in parametricBuilder.BuildSteps(materials, prototypes))
                         {
                             buildStep();
+                            CodexCreationGuard.Check();
+                            // Keep required Regenerate calls inside each step. Bound batches
+                            // by work AND time so cancellation/UI yielding remain available.
+                            if (++batchSize < 8 && batchClock.ElapsedMilliseconds < 250) continue;
                             if (transaction.Commit() != TransactionStatus.Committed)
                                 throw new InvalidOperationException("Étape de construction annulée : " + string.Join(" ; ", warnings.Take(5)));
+                            constructionTransactions++;
                             guard.Pause(); yield return null; guard.Resume();
                             transaction.Start();
                             transaction.SetFailureHandlingOptions(transaction.GetFailureHandlingOptions().SetFailuresPreprocessor(new Failures(warnings)).SetClearAfterRollback(true));
+                            batchSize = 0; batchClock.Restart();
                         }
                         createdElements.AddRange(parametricBuilder.CreatedElements());
                     }
@@ -193,11 +205,15 @@ namespace BIMaestro.Codex
                         }
                         catch (Exception ex) { throw new InvalidOperationException("Pièce « " + part.Name + " » : " + ex.Message, ex); }
                         finally { baseSolid?.Dispose(); }
+                        CodexCreationGuard.Check();
+                        if (++batchSize < 8 && batchClock.ElapsedMilliseconds < 250) continue;
                         if (transaction.Commit() != TransactionStatus.Committed)
                             throw new InvalidOperationException("Pièce annulée : " + part.Name);
+                        constructionTransactions++;
                         guard.Pause(); yield return null; guard.Resume();
                         transaction.Start();
                         transaction.SetFailureHandlingOptions(transaction.GetFailureHandlingOptions().SetFailuresPreprocessor(new Failures(warnings)).SetClearAfterRollback(true));
+                        batchSize = 0; batchClock.Restart();
                     }
                     stage = "découpe de l'hôte";
                     hostOpening = parametricBuilder?.HostOpening;
@@ -235,8 +251,11 @@ namespace BIMaestro.Codex
                     family.Regenerate();
                     if (transaction.Commit() != TransactionStatus.Committed)
                         throw new InvalidOperationException("Famille annulée par Revit : " + string.Join(" ; ", warnings.Take(5)));
+                    constructionTransactions++;
                 }
                 stage = "tests de variation des paramètres";
+                timings["preparation_and_construction_seconds"] = operationClock.Elapsed.TotalSeconds;
+                operationClock.Restart();
                 CodexCreationGuard.Check(stage);
                 guard.Pause(); yield return null; guard.Resume();
                 var flexReports = new List<object>();
@@ -247,6 +266,8 @@ namespace BIMaestro.Codex
                         guard.Pause(); yield return null; guard.Resume();
                     }
                 object[] flexTests = flexReports.ToArray();
+                timings["flex_tests_seconds"] = operationClock.Elapsed.TotalSeconds;
+                operationClock.Restart();
                 hostOpening?.Check(parametric?.Initial ?? new Dictionary<string, double>());
                 object representationReport = null;
                 if (design.Representation != null)
@@ -282,6 +303,8 @@ namespace BIMaestro.Codex
                 guard.Pause(); yield return null; guard.Resume();
                 // No partial RFA is saved when any geometry creation failed.
                 stage = "enregistrement du nouveau RFA";
+                timings["representation_and_final_checks_seconds"] = operationClock.Elapsed.TotalSeconds;
+                operationClock.Restart();
                 CodexCreationGuard.Check(stage);
                 Directory.CreateDirectory(folder);
                 string path = Path.Combine(folder, fileName + ".rfa");
@@ -290,6 +313,8 @@ namespace BIMaestro.Codex
                     family.Save();
                 else
                     family.SaveAs(path, options);
+                timings["save_seconds"] = operationClock.Elapsed.TotalSeconds;
+                operationClock.Restart();
                 string previewPath = null;
                 string[] previewPaths = new string[0];
                 try
@@ -304,6 +329,8 @@ namespace BIMaestro.Codex
                     if (previewPath == null) warnings.Add("Aucun aperçu PNG renvoyé par Revit.");
                 }
                 catch (Exception ex) { warnings.Add("RFA enregistré, aperçu non disponible : " + ex.Message); }
+                timings["preview_export_seconds"] = operationClock.Elapsed.TotalSeconds;
+                operationClock.Restart();
 
                 string loadedId = null, placedId = null;
                 object loadFailure = null;
@@ -352,9 +379,12 @@ namespace BIMaestro.Codex
                         warnings.Add("RFA enregistré mais non chargé : " + ex.Message);
                     }
                 }
+                timings["project_load_seconds"] = operationClock.Elapsed.TotalSeconds;
                 var report = new
                 {
                     file = path, load_failure = loadFailure, category = design.Category, solidCount = parametric?.SolidCount ?? design.SolidCount, materialCount = design.Materials.Count,
+                    construction_transactions = constructionTransactions,
+                    timings_seconds = timings,
                     dimensions_mm = new[] { Mm(bounds.Max.X - bounds.Min.X), Mm(bounds.Max.Y - bounds.Min.Y), Mm(bounds.Max.Z - bounds.Min.Z) },
                     requested_dimensions_mm = design.TargetDimensions,
                     geometry = parametric == null ? "Solides Revit à géométrie fixe ; matériaux paramétrés. Encombrements calculés non pilotants." : "Extrusions natives contraintes et réseaux de barres imbriquées. Dimensions, nombres et inclinaisons des barres pilotés dans Revit sans Codex. Pas de connecteurs MEP.",
@@ -471,7 +501,7 @@ namespace BIMaestro.Codex
             var parameter = CodexParameterBuilder.NewInternal(manager, name, GroupTypeId.Geometry, SpecTypeId.Length, false);
             manager.SetFormula(parameter, Mm(value).ToString("0.######", System.Globalization.CultureInfo.InvariantCulture) + " mm");
         }
-        private static View3D CreatePreview(Document doc, Bounds bounds, string name = "BIMaestro - Aperçu", XYZ direction = null)
+        internal static View3D CreatePreview(Document doc, Bounds bounds, string name = "BIMaestro - Aperçu", XYZ direction = null)
         {
             var type = new FilteredElementCollector(doc).OfClass(typeof(ViewFamilyType)).Cast<ViewFamilyType>().First(t => t.ViewFamily == ViewFamily.ThreeDimensional);
             var view = View3D.CreateIsometric(doc, type.Id); view.Name = name;

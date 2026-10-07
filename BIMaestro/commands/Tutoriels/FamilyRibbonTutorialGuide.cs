@@ -239,7 +239,11 @@ namespace BIMaestro.Tutorials
                 _next.IsEnabled = true;
             }
             else
+            {
+                _completed = true;
+                _next.IsEnabled = true;
                 Next();
+            }
         }
 
         private void ShowStep()

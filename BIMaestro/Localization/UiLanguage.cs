@@ -1414,6 +1414,60 @@ namespace BIMaestro.Localization
                 , ["Flux lumineux : connexion établie  •  Gris : isolé  •  Ambre : indéterminé\nVannes : anneau vert ouverte  •  croix rouge fermée  •  ambre incertaine  •  blanc sélectionnée"] = "Bright flow: connected  •  Gray: isolated  •  Amber: undetermined\nValves: green ring open  •  red cross closed  •  amber uncertain  •  white selected"
             };
 
+        static UiTextCatalog()
+        {
+            var clash = new Dictionary<string, string>
+            {
+                ["BIMaestro · Clash 3D"] = "BIMaestro · 3D Clash",
+                ["Clash 3D · inspection"] = "3D Clash · inspection",
+                ["Repérez les conflits. Comprenez-les en 3D. Décidez de la suite."] = "Find clashes. Understand them in 3D. Decide what happens next.",
+                ["Maquette entière"] = "Entire model",
+                ["Personnaliser l'analyse"] = "Customize the analysis",
+                ["Objets à contrôler"] = "Objects to check",
+                ["Raccords et accessoires"] = "Fittings and accessories",
+                ["Modèles génériques"] = "Generic models",
+                ["Contrôles"] = "Checks",
+                ["Collisions dans la maquette"] = "Clashes within the model",
+                ["Collisions avec les liens"] = "Clashes with links",
+                ["Inclure isolants et revêtements"] = "Include insulation and lining",
+                ["Supports de murs (indicatif)"] = "Wall supports (indicative)",
+                ["Ignorer les intersections inférieures à"] = "Ignore intersections smaller than",
+                ["Liens et imports à comparer"] = "Links and imports to compare",
+                ["À traiter"] = "Pending",
+                ["Traité"] = "Reviewed",
+                ["Tous les contrôles"] = "All checks",
+                ["Intersection réseau / paroi"] = "Network / wall intersection",
+                ["Intersection confirmée"] = "Confirmed intersection",
+                ["À vérifier en 3D"] = "Check in 3D",
+                ["Connecteur ouvert"] = "Open connector",
+                ["Voir en 3D"] = "View in 3D",
+                ["Vue d'ensemble"] = "Overview",
+                ["Revenir à ma vue"] = "Return to my view",
+                ["Bilan"] = "Summary",
+                ["Un contrôle clair, à votre rythme"] = "A clear check, at your own pace",
+                ["Choisissez le périmètre et lancez l'analyse. Chaque résultat vous mènera directement à sa zone dans Revit."] = "Choose the scope and start the analysis. Each result takes you directly to its location in Revit.",
+                ["Prêt à analyser les réseaux de votre maquette."] = "Ready to check your model's networks.",
+                ["La maquette a changé. Relancez l'analyse pour actualiser les résultats."] = "The model has changed. Run the analysis again to update the results.",
+                ["Capturer un aperçu"] = "Capture a preview",
+                ["Capture Revit (facultative)"] = "Revit screenshot (optional)",
+                ["Objet orange"] = "Orange object",
+                ["Obstacle bleu"] = "Blue obstacle",
+                ["Recentrer"] = "Reset view",
+                ["Centre de la zone détectée"] = "Centre of the detected area",
+                ["Aperçu indisponible"] = "Preview unavailable",
+                ["Aperçu indisponible. Utilisez « Voir en 3D » pour retrouver les objets dans Revit."] = "Preview unavailable. Use View in 3D to locate the objects in Revit.",
+                ["Glissez pour tourner · Molette pour zoomer · Repère : centre de la zone détectée"] = "Drag to rotate · Scroll to zoom · Marker: centre of the detected area",
+                ["Vue locale des formes réelles, coupées au bord du cadrage. Le repère ne représente pas le volume exact de l'intersection."] = "Local view of actual shapes, cropped at the frame boundary. The marker does not show the exact intersection volume.",
+                ["Objet contrôlé · orange"] = "Checked object · orange",
+                ["Obstacle · bleu"] = "Obstacle · blue",
+                ["Suite conseillée"] = "Suggested next step",
+                ["Décision"] = "Decision",
+                ["Enregistrer la décision"] = "Save the decision",
+                ["Obstacles : murs, sols, toitures, poutres, poteaux, fondations, escaliers, réseaux, équipements et modèles génériques. Les connexions physiques directes entre réseaux sont exclues. Les maillages produisent des suspicions à vérifier."] = "Obstacles: walls, floors, roofs, beams, columns, foundations, stairs, networks, equipment and generic models. Direct physical connections between networks are excluded. Mesh geometry produces suspicions to check."
+            };
+            foreach (var pair in clash) English[pair.Key] = pair.Value;
+        }
+
         internal static bool TryGetEnglish(string french, out string english)
         {
             return English.TryGetValue(french, out english);

@@ -50,15 +50,26 @@ RestartApplications=no
 Name: "french"; MessagesFile: "compiler:Languages\French.isl"
 
 [Files]
-; Le catalogue et ses PNG sont obligatoires dans la distribution.
-#if !FileExists("bin\Release\Demo\NavigateurFamilles\Images\Mobilier\Bureau\Bureau commun.png") || !FileExists("bin\Release\Demo\Maquette\Familles\CML_Parking.rfa") || !FileExists("bin\Release\Demo\Maquette\Familles\Coude - Générique.rfa")
-  #error Compilez Release avec toutes les ressources de formation avant de creer l'installateur.
+#ifndef Revit2025Bin
+  #define Revit2025Bin "bin\Revit2025\Release"
 #endif
+#if !FileExists(Revit2025Bin + "\BIMaestro.dll")
+  #error Compilez le binaire .NET 8 pour Revit 2025 avant de creer le bundle.
+#endif
+; La base de formation accompagne chacun des deux binaires Revit.
+#define TrainingBin "bin\Release"
+#include "..\Installer\TrainingResources.Checks.iss"
+#undef TrainingBin
+#define TrainingBin Revit2025Bin
+#include "..\Installer\TrainingResources.Checks.iss"
+#undef TrainingBin
 #include "..\Installer\Navisworks.Files.iss"
 ; DLL principale et dépendances. Les symboles de débogage ne sont pas distribués.
 Source: "bin\Release\*.*"; DestDir: "{app}\Contents"; \
   Flags: ignoreversion recursesubdirs createallsubdirs; \
   Excludes: "*.pdb,BIMaestro - Copie.dll,BIMaestro.Updater.*"
+Source: "{#Revit2025Bin}\*.*"; DestDir: "{app}\Contents\Revit2025"; \
+  Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.pdb,BIMaestro.Updater.*"
 
 ; Ressources publiques du paquet Autodesk.
 Source: "Resources\OLD\BIMaestro.png"; DestDir: "{app}\Contents"; \
@@ -120,12 +131,18 @@ begin
     '    Url="https://www.bimaestro.fr/"' + #13#10 +
     '    Email="bimaestro.plugin@gmail.com"' + #13#10 +
     '    Phone="" />' + #13#10 +
-    '  <Components Description="BIMaestro pour Revit 2022 à 2027">' + #13#10 +
-    '    <RuntimeRequirements OS="Win64" Platform="Revit" SeriesMin="R2022" SeriesMax="R2027" />' + #13#10 +
+    '  <Components Description="BIMaestro pour Revit 2022 à 2024">' + #13#10 +
+    '    <RuntimeRequirements OS="Win64" Platform="Revit" SeriesMin="R2022" SeriesMax="R2024" />' + #13#10 +
     '    <ComponentEntry AppName="BIMaestro"' + #13#10 +
     '      Version="{#AppVersion}"' + #13#10 +
     '      ModuleName="./Contents/BIMaestro.addin"' + #13#10 +
     '      AppDescription="Suite d''outils BIMaestro pour Revit" />' + #13#10 +
+    '  </Components>' + #13#10 +
+    '  <Components Description="BIMaestro .NET 8 pour Revit 2025">' + #13#10 +
+    '    <RuntimeRequirements OS="Win64" Platform="Revit" SeriesMin="R2025" SeriesMax="R2025" />' + #13#10 +
+    '    <ComponentEntry AppName="BIMaestro" Version="{#AppVersion}"' + #13#10 +
+    '      ModuleName="./Contents/Revit2025/BIMaestro.addin"' + #13#10 +
+    '      AppDescription="Suite d''outils BIMaestro pour Revit 2025" />' + #13#10 +
     '  </Components>' + #13#10 +
     '</ApplicationPackage>';
 end;
@@ -155,6 +172,8 @@ begin
 
   if not SaveStringToFile(AddinPath, BuildBundleAddinXml(), False) then
     RaiseException('Impossible de créer BIMaestro.addin.');
+  if not SaveStringToFile(ExpandConstant('{app}\Contents\Revit2025\BIMaestro.addin'), BuildBundleAddinXml(), False) then
+    RaiseException('Impossible de créer le manifeste Revit 2025.');
 end;
 
 [UninstallDelete]

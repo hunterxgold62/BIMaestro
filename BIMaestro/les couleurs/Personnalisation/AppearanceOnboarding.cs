@@ -92,6 +92,7 @@ namespace Couleur
         }
 
         internal static bool ConsumeColorClick() => ConsumeTourClick("colors");
+        internal static bool IsTourPending(string tourId) => _intro != null && _introTourId == tourId;
 
         internal static bool ConsumeTourClick(string tourId)
         {
@@ -134,6 +135,7 @@ namespace Couleur
                     tourId == "view-template" ? "ViewTemplateTransfer" :
                     tourId == "family-browser" ? "FamilyBrowser" :
                     tourId == "mep-booster" ? "MepBooster" :
+                    tourId == "clash-3d" ? "Clash 3D" :
                     tourId == "excel" ? "GestionExcelCmd" : "Couleur de projet";
                 _buttonLabel = tourId == "reservation" ? "Auto Réservation" :
                     tourId == "history" ? "Qui a fait ça ?" :
@@ -142,6 +144,7 @@ namespace Couleur
                     tourId == "view-template" ? "Gabarit de vue" :
                     tourId == "family-browser" ? "Navigateur de familles" :
                     tourId == "mep-booster" ? "MEP Booster" :
+                    tourId == "clash-3d" ? "Clash 3D" :
                     tourId == "excel" ? "Gestion Excel" : "Couleurs";
                 _menuId = tourId == "colors" ? "Changement de couleur" :
                     tourId == "organizer" ? "OrganisateurSplit" : null;

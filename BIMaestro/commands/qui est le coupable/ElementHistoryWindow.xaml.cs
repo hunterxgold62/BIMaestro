@@ -210,6 +210,7 @@ namespace Analyse
         private bool _detailsVisible;
         private bool _syncingSelection;
         private bool _restoringDeleted;
+        private bool _isClosed;
         private int _loadVersion;
         private string _scopeFilter = "model";
         private bool _showAllLoadedEvents;
@@ -292,6 +293,7 @@ namespace Analyse
 
         protected override void OnClosed(EventArgs e)
         {
+            _isClosed = true;
             _loadVersion++;
             try { _externalEvent?.Dispose(); } catch { }
             base.OnClosed(e);
@@ -1938,7 +1940,20 @@ namespace Analyse
             if (confirm != MessageBoxResult.Yes) return;
             _restoringDeleted = true;
             UpdateVisualizeButtonLabel();
-            RaiseRequest(new UiRequest { Type = UiRequestType.RestoreDeleted, Events = events });
+            // Hide before dispatching the Revit event so the reconstruction is
+            // visible from the very first element. Keep this window and its state.
+            Hide();
+            try
+            {
+                if (RaiseRequest(new UiRequest { Type = UiRequestType.RestoreDeleted, Events = events })) return;
+            }
+            catch { _pendingRequest = null; }
+            _restoringDeleted = false;
+            Show();
+            UpdateVisualizeButtonLabel();
+            MessageBox.Show(this, UiLanguage.T("Revit n’a pas pu démarrer la restauration. Réessayez lorsque Revit est disponible.",
+                "Revit could not start restoration. Try again when Revit is available."),
+                UiLanguage.T("Restaurer les éléments", "Restore elements"), MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
         private void ExecuteRestoreDeleted(List<ElementHistoryEvent> events)
@@ -1948,7 +1963,8 @@ namespace Analyse
             bool furnitureRestored = false;
             try
             {
-                var result = ElementHistoryRestoration.Restore(_doc, events.Where(IsDeletion).Select(ToRestoreRequest));
+                var result = ElementHistoryRestoration.Restore(_doc, events.Where(IsDeletion).Select(ToRestoreRequest),
+                    () => _uidoc.RefreshActiveView());
                 restoredForTutorial = result.Created > 0 || result.Existing > 0;
                 if (BIMaestro.Tutorials.DemoTourService.IsActive(this))
                     furnitureRestored = BIMaestro.Tutorials.DemoHistoryScene.HasRestoredFurniture(_doc);
@@ -1957,8 +1973,8 @@ namespace Analyse
                     $"{result.Created} element(s) restored.\n{result.Existing} already present.\n{result.Failed} not restored.");
                 var failures = result.Items.Where(i => !i.Created && !i.Existing && !i.IncludedInParent).ToList();
                 if (result.IncludedInParent > 0)
-                    message += UiLanguage.T($"\n{result.IncludedInParent} sous-composant(s) recréé(s) avec leur famille parente.",
-                        $"\n{result.IncludedInParent} nested component(s) recreated with their parent family.");
+                    message += UiLanguage.T($"\n{result.IncludedInParent} composant(s) recréé(s) avec leur élément parent.",
+                        $"\n{result.IncludedInParent} component(s) recreated with their parent element.");
                 if (result.Repaired > 0 || result.RepairFailures.Count > 0)
                     message += UiLanguage.T($"\nParmi les éléments déjà présents : {result.Repaired} raccord(s) corrigé(s), {result.RepairFailures.Count} correction(s) impossible(s).",
                         $"\nAmong existing elements: {result.Repaired} fitting(s) repaired, {result.RepairFailures.Count} repair(s) failed.");
@@ -1967,6 +1983,10 @@ namespace Analyse
                     $"\n\nConnexions : {result.ConnectionsRestored} rétablie(s), {result.ConnectionsExisting} déjà présente(s), {result.ConnectionFailures.Count} non rétablie(s).",
                     $"\n\nConnections: {result.ConnectionsRestored} restored, {result.ConnectionsExisting} already present, {result.ConnectionFailures.Count} not restored.");
                 foreach (var failure in result.ConnectionFailures.Take(3)) message += "\n" + ShortRestoreDetail(failure);
+                if (result.RelationsRestored > 0 || result.RelationsExisting > 0 || result.RelationFailures.Count > 0)
+                    message += UiLanguage.T($"\n\nRelations géométriques : {result.RelationsRestored} rétablies, {result.RelationsExisting} déjà présentes, {result.RelationFailures.Count} non rétablies.",
+                        $"\n\nGeometry relations: {result.RelationsRestored} restored, {result.RelationsExisting} already present, {result.RelationFailures.Count} not restored.");
+                foreach (var failure in result.RelationFailures.Take(3)) message += "\n" + ShortRestoreDetail(failure);
                 foreach (var failure in failures.Take(4))
                     message += "\n\n" + failure.Label + (string.IsNullOrWhiteSpace(failure.Category) ? "" : " (" + failure.Category + ")") + " : " + RestoreFailureText(failure.Reason)
                         + (string.IsNullOrWhiteSpace(failure.Detail) ? "" : "\n" + ShortRestoreDetail(failure.Detail));
@@ -1974,8 +1994,8 @@ namespace Analyse
                 var warnings = result.Items.Where(i => i.Created && !string.IsNullOrWhiteSpace(i.Detail)).Select(i => i.Detail).Distinct().Take(4).ToList();
                 if (warnings.Count > 0) message += "\n\n" + string.Join("\n", warnings);
                 if (result.CaptureWarnings.Count > 0)
-                    message += UiLanguage.T("\n\nCertaines connexions n’avaient pas pu être enregistrées : voir le rapport complet.",
-                        "\n\nSome connections could not be recorded: see the full report.");
+                    message += UiLanguage.T("\n\nCertaines informations de reconstruction n’avaient pas pu être enregistrées : voir le rapport complet.",
+                        "\n\nSome reconstruction data could not be recorded: see the full report.");
                 // Preserve every failure, not only the twelve shown in the summary.
                 // Report I/O must never turn a successful restore into a reported rollback.
                 try
@@ -2010,6 +2030,8 @@ namespace Analyse
             _restoringDeleted = false;
             Dispatcher.BeginInvoke(new Action(() =>
             {
+                if (_isClosed) return;
+                Show();
                 UpdateVisualizeButtonLabel();
                 if (restoredForTutorial && BIMaestro.Tutorials.DemoTourService.IsActive(this))
                 {
@@ -2027,6 +2049,7 @@ namespace Analyse
             switch (reason)
             {
                 case "identity": case "recipe": return UiLanguage.T("Données de reconstruction absentes ou forme non prise en charge.", "Reconstruction data missing or unsupported shape.");
+                case "archive": return UiLanguage.T("Archive native indisponible.", "Native archive unavailable.");
                 case "type": return UiLanguage.T("La famille ou le type n’est plus présent dans le projet.", "The family or type is no longer in the project.");
                 case "level": return UiLanguage.T("Le niveau d’origine n’est plus présent.", "The original level is no longer present.");
                 case "host": return UiLanguage.T("Le support manque : restaurer aussi le mur, sol, tuyau, gaine ou raccord concerné.", "The host is missing: also restore the corresponding wall, floor, pipe, duct or fitting.");
@@ -2236,13 +2259,16 @@ namespace Analyse
             return selected;
         }
 
-        private void RaiseRequest(UiRequest request)
+        private bool RaiseRequest(UiRequest request)
         {
             // Do not replace a confirmed restoration with a subsequent focus/preview
             // click while Revit is waiting to dispatch the external event.
-            if (_pendingRequest?.Type == UiRequestType.RestoreDeleted) return;
+            if (_pendingRequest?.Type == UiRequestType.RestoreDeleted) return false;
             _pendingRequest = request;
-            _externalEvent?.Raise();
+            var status = _externalEvent?.Raise();
+            if (status == ExternalEventRequest.Accepted || status == ExternalEventRequest.Pending) return true;
+            _pendingRequest = null;
+            return false;
         }
 
         private void UpdateDetails()

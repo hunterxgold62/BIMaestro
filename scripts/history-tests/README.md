@@ -1,15 +1,21 @@
 # Aperçus historiques reconstruits
 
 Tous les modes conservent une recette versionnée pour les instances ponctuelles
-sur un niveau (libres ou hébergées), les murs de base verticaux sans profil modifié,
-et les sols plats définis par des lignes/arcs, avec leurs boucles intérieures.
+sur un niveau (libres ou hébergées), les murs de base verticaux, y compris à profil
+modifié à une boucle, et les sols définis par des lignes/arcs, avec leurs boucles
+intérieures et leurs points/lignes de modification de forme.
 Les identités des types, niveaux, hôtes et références de paramètres sont des UniqueId.
 Les unités numériques sont les unités internes Revit.
 
 La recette d'un mur/sol hôte peut aussi être conservée lorsqu'il est joint ou découpé,
 avec un maillage séparé pour l'aperçu détaillé. Les formes non prises en charge
-(familles en place, familles adaptatives/sur face/sur deux niveaux, murs
-inclinés/attachés/à profil modifié, sols modifiés par points) restent sur l'ancien aperçu.
+(familles en place, familles sur plan de travail sans face enregistrée, murs
+inclinés/attachés ou à plusieurs boucles de profil, sols avec flèche de pente) restent
+sur l'ancien aperçu. Les toitures par tracé, plafonds plats, familles sur face,
+sur deux niveaux, basées sur une courbe et adaptatives possèdent désormais des
+recettes natives ; les références de face sont vérifiées géométriquement après
+reconstruction du support. Les formes restent signalées en erreur quand les données
+requises manquent ; aucun maillage ne se substitue à une restauration native.
 La recette utilise le type dans son état actuel et ne sauvegarde pas sa définition.
 
 Une sous-transaction crée brièvement l'élément, copie les coordonnées des triangles
@@ -38,18 +44,33 @@ restaurer le voisin manquant ultérieurement ; ses références retrouvent les �
 déjà restaurés via leurs marqueurs d'origine. Aucun raccord de remplacement n'est
 inventé lorsqu'une connexion directe ne peut pas être rétablie.
 
-À la demande de l'utilisateur, le calorifuge est exclu de la restauration et des
-comptages d'erreurs, y compris pour les anciens historiques. Les catégories natives
-d'isolants et les libellés contenant « calorifuge » sont filtrés. Les tuyaux,
-raccords et accessoires restent traités et leurs erreurs restent visibles.
+Le calorifuge reste exclu à la demande explicite de l'utilisateur, confirmée le
+6 octobre 2026 : ni les isolants natifs de tuyau/gaine, ni les familles nommées
+« calorifuge » ne sont restaurés ou comptés comme échecs. Les modèles
+génériques suivent le placement réel de leur famille ; les lignes/arcs de modèle
+autonomes enregistrent leur géométrie, plan et style de ligne.
 Les familles ponctuelles admissibles en miroir conservent désormais leur repère
 réfléchi ; une rotation seule ne peut pas reproduire une symétrie.
 
-Cela ne constitue pas une sauvegarde intégrale du réseau : pièces de fabrication,
-circuits électriques logiques, familles sur face,
-jonctions et relations non enregistrées ne sont pas reconstitués. Le type de système
-est conservé, mais Revit recalcule les systèmes à partir des connexions ; leur ancien
-identifiant/nom n'est pas garanti. Les types/familles doivent rester dans le projet.
+Les objets de modèle qui ne possèdent pas de recette géométrique passent désormais
+par une archive RVT native, sans liste limitative de classes : escaliers, garde-corps,
+groupes imbriqués, murs rideaux, familles en place, objets importés et autres formes
+complexes utilisent les capacités de copie de Revit. Les composants sont archivés
+avec leur parent et retrouvent leur identité historique après la copie. Les groupes
+sont recomposés avec leurs composants utiles, en excluant le calorifuge ; les types
+de groupe sont isolés pour préserver les autres occurrences. Le calorifuge natif
+hébergé est retiré uniquement dans le document d'archive. Les connexions d'un groupe
+MEP vers l'extérieur sont enregistrées sur leurs composants et rétablies séparément.
+Les systèmes logiques de tuyauterie/gaine ont une recette dédiée qui conserve leur
+type, nom et membres après la reconstruction des connexions physiques.
+
+Les archives sont produites pendant Idling, hors transaction du modèle source,
+et enregistrées de manière immutable dans `native-history` sous le dossier
+d'historique actif. Les fichiers suivent le dossier partagé même lorsque sa lettre
+de lecteur change. Une modification invalide le cache courant et programme une
+nouvelle capture, sans réécrire les archives historiques. Un refus de copie Revit
+est enregistré avec son diagnostic exact ; il ne produit ni faux succès ni substitut
+en maillage. Une archive doit être enregistrée avant la suppression concernée.
 
 Un marqueur Extensible Storage persistant associe les éléments restaurés à leurs
 origines : un second clic ne crée pas de doublon. Une nouvelle suppression permet
@@ -61,6 +82,11 @@ Pour une restauration définitive, aucun maillage ne remplace un élément natif
 Les événements antérieurs sans recette, les formes non prises en charge et les
 types/niveaux/hôtes manquants sont explicitement signalés comme non restaurés.
 La capture de la recette ne dépend plus du choix Simple/Détaillé.
+L'ordre de restauration suit désormais les dépendances sélectionnées (supports,
+parents, références de paramètres), et pas seulement « murs avant familles ».
+Les lignes d'esquisse enregistrées avec un sol, plafond, mur à profil ou toit sont
+identifiées sur leur parent recréé et portent un marqueur d'origine persistant :
+elles ne sont pas comptées comme échecs ni recréées une deuxième fois.
 Le préchargement en arrière-plan fonctionne aussi en mode Simple. Les limites de
 temps/nombre des aperçus ne tronquent plus les recettes d'une grande sélection ni
 les suppressions en lot ; les éléments ajoutés/modifiés hors budget détaillé ont
@@ -79,6 +105,32 @@ de lignes), ainsi que leurs catégories/identifiants. Une erreur d'écriture du
 rapport ne remet pas en cause une restauration déjà validée.
 
 ## Banc natif
+
+Validation du 6 octobre 2026 dans des processus Revit 2025 distincts, sur des
+maquettes de test : `2025-history-all-model-v5/result.json` contient 34 contrôles
+réussis (régression complète et extension). `2025-history-all-model-v6/result.json`
+contient 10 contrôles réussis, dont une deuxième suppression/restauration, la
+résolution des anciennes identités d'esquisse et l'exclusion du calorifuge.
+Ces résultats se trouvent sous `tmp/codex-native-validation/`.
+`2025-history-native-archive-final/result.json` contient 50 contrôles réussis :
+régression complète, archives natives, escaliers/volées, garde-corps, murs rideaux/
+panneaux, groupes imbriqués avec calorifuge exclu, groupe MEP relié à un voisin
+existant, systèmes logiques tuyauterie/gaine, deuxième suppression/restauration
+et conservation des anciennes identités. Le banc compile également pour Revit 2024.
+La DLL Revit 2025 Release a également été compilée après les dernières corrections.
+Les recettes n'ajoutent pas une copie complète du modèle au RVT : elles sont
+sérialisées dans l'historique JSONL existant. Exemples mesurés, en JSON indenté :
+mur 764–899 octets, famille environ 1,7–2 Ko, toiture simple 2 947 octets,
+sol avec ouverture 4 119 octets. Ce sont des tailles de recette uniquement,
+hors enveloppe d'événement, éventuel maillage d'aperçu et compression d'archive.
+L'extension native produit en plus des fichiers RVT externes pour les objets
+complexes. Dans cette validation, huit fichiers (deux séries de captures) totalisent
+4 001 792 octets, entre 487 424 et 528 384 octets par fichier. Ces mesures concernent
+des petites maquettes de test ; la taille dépend des géométries et définitions
+nécessaires, et les anciennes archives restent conservées pour les anciennes
+suppressions. Les objets ordinaires continuent d'utiliser seulement leurs recettes.
+Les nouvelles recettes ne peuvent pas reconstituer rétroactivement la géométrie
+absente d'une suppression déjà enregistrée.
 
 Depuis la racine du dépôt :
 
@@ -177,5 +229,105 @@ Validation du correctif :
 - `2025-history-routing-regression/result.json` : 30 scénarios acier réussis.
 - Compilations complètes Debug Revit 2024 et Revit 2025 réussies.
 
-Le calorifuge reste exclu. Les quatre systèmes logiques en échec du rapport ne
-sont pas masqués ni traités par ce correctif ciblant les six objets visibles.
+Le calorifuge reste exclu. Les systèmes logiques ont ensuite été pris en charge
+par les recettes dédiées aux systèmes de tuyauterie, ventilation et circuits électriques.
+
+### Circuits électriques
+
+La recette `electrical_system` enregistre les identités des équipements, le tableau,
+le type de circuit, les paramètres modifiables, le type de connexion au tableau,
+l'emplacement et le numéro du circuit, ainsi que son chemin personnalisé.
+Les équipements et le tableau sont restaurés avant le circuit. Un circuit existant
+est réutilisé uniquement si son type et tous ses membres correspondent exactement.
+Chaque équipement conserve également ses circuits dans sa recette : sa restauration
+peut rétablir ses appartenances même quand le circuit a survécu à la suppression.
+Dans ce cas, un circuit identifié par son identité historique peut recevoir les
+membres restaurés manquants, sans retirer ses membres ni fusionner d'autres circuits.
+Un membre ou tableau absent, un autre circuit utilisant les équipements, un
+emplacement occupé ou une numérotation incompatible provoque un échec explicite et
+l'annulation de la transaction du circuit. Les circuits voisins ne sont pas déplacés.
+Les anciennes suppressions dépourvues de cette recette ne peuvent pas retrouver
+ces relations rétroactivement.
+
+Le système de distribution du tableau est appliqué avant les paramètres qui en
+dépendent. Les totaux électriques calculés en lecture seule ne sont pas rejoués
+comme des dimensions de famille : Revit les recalcule à partir des circuits.
+Les dimensions géométriques en lecture seule des raccords restent capturées.
+Pour les paramètres non partagés de famille, le nom conservé dans la recette
+permet une résolution dans la famille si la définition de projet n'est pas accessible.
+
+Le fichier `electrical-only.txt` dans le répertoire de sortie sélectionne les tests
+électriques : circuits de données et de puissance, restauration du circuit seul et
+des équipements avec le tableau, paramètres, emplacement, chemin personnalisé,
+absence de doublons, équipements manquants, tableau manquant et circuits concurrents.
+
+Validation Revit 2025 : `2025-history-electrical-final-v2/result.json`, 64 contrôles
+réussis, dont 14 scénarios électriques (7 données et 7 puissance). Le test de
+puissance contrôle aussi la tension, les pôles, le numéro et le déplacement vers
+l'emplacement historique, ainsi que le chemin personnalisé. Une restauration
+répétée n'ajoute aucun objet et ne signale aucune réparation superflue.
+Les DLL complètes compilent pour Revit 2023, 2024 et 2025 ; le banc compile aussi
+contre l'API Revit 2024. L'exécution native de cette validation a lieu dans Revit 2025.
+
+## Jonctions, découpes et attaches
+
+Les nouvelles recettes conservent les relations géométriques par identité historique :
+jonctions et ordre de l'élément qui coupe, découpes par vide, découpes entre solides,
+autorisation et type de nettoyage des extrémités de murs, attaches hautes/basses des
+murs et poteaux. Pour les poteaux, le style de découpe, la justification et le
+décalage sont conservés. Les supports enregistrent aussi les attaches entrantes :
+restaurer uniquement un sol peut réattacher un mur ou poteau resté présent.
+Les poutres et contreventements admissibles sont également reconnus comme supports.
+
+Le rétablissement intervient après les éléments physiques. Il résout les identités
+originales et celles des restaurations précédentes, sans écraser une attache concurrente.
+Une référence manquante ou une relation refusée apparaît séparément dans le bilan
+et le rapport JSON. Les relations déjà correctes évitent une transaction vide.
+Les découpes automatiques des attaches de poteaux sont gérées par l'attache elle-même.
+Les familles adaptatives sans points de placement utilisent l'archive native pour
+conserver leur transformation, nécessaire au rétablissement de leurs découpes.
+
+Les attaches de murs utilisent une API disponible depuis Revit 2025.2, résolue
+dynamiquement pour préserver la compatibilité avec Revit 2023/2024. Une attache de
+mur dont la cible ne peut pas être capturée sur une version antérieure est signalée.
+Le calorifuge reste exclu. Les relations ajoutent des identifiants et réglages au
+JSON existant, sans une seconde copie de la géométrie pour chaque relation.
+
+Le marqueur `relations-only.txt` sélectionne les scénarios dédiés.
+Validation Revit 2025 : `2025-history-relations-v9/result.json`, 11 scénarios réussis :
+jonction avec un mur survivant et ordre/volume conservés, extrémité désactivée,
+absence de doublons, attaches de murs et poteaux avec restauration du support seul
+ou du propriétaire seul, références restaurées auparavant, référence absente,
+découpes par vide et entre solides avec contrôle du volume et de l'ordre.
+
+Régression complète : `2025-history-relations-full-v2/result.json`, 75 contrôles
+réussis, dont les 11 scénarios de relations et les 14 scénarios électriques.
+Les versions complètes Revit 2023, 2024 et 2025 compilent après ces ajouts ;
+le banc de scénarios compile également contre l'API Revit 2024.
+
+## Charge de l'historique au repos
+
+L'invalidation native ne réarchive que les racines déjà enregistrées ou en attente.
+Une modification d'un mur ou tuyau restaurable directement ne crée plus une nouvelle
+archive native après l'initialisation du premier fallback. Le scénario de régression
+contrôle le nombre réel de fichiers RVT produits, ainsi que l'absence de recettes
+natives pour ces objets.
+
+L'index des attaches conserve les propriétaires et un accès direct par support.
+Les changements mettent à jour les propriétaires concernés et les attaches d'un
+support supprimé, plutôt que de reparcourir tous les murs/poteaux à chaque transaction.
+Les relations déjà capturées sont réutilisées dans le suivi des éléments voisins.
+
+La préparation initiale et l'archivage au repos attendent au moins 1,5 seconde sans
+entrée clavier/souris. Les petits lots de préparation sont espacés d'au moins 300 ms ;
+les vagues d'archives d'au moins deux secondes. La pause augmente jusqu'à neuf fois
+la durée du dernier lot pour laisser la priorité au travail dans la maquette. Il s'agit d'une
+régulation entre opérations : la création/copie/sauvegarde d'un document Revit
+reste indivisible et doit s'exécuter dans son contexte API principal.
+Le chemin d'archivage explicite utilisé par les tests reste disponible sans attente.
+
+Validation intermédiaire : `2025-history-idle-fix-full/result.json`, 76 contrôles
+réussis, dont le scénario empêchant l'archivage inutile des murs et tuyaux.
+Validation finale : `2025-history-idle-fix-final/result.json`, 77 contrôles réussis,
+dont la suppression/réapplication d'une attache avec mise à jour incrémentale du cache.
+Les DLL complètes Revit 2023, 2024 et 2025 et le banc Revit 2024 compilent.

@@ -67,6 +67,38 @@ namespace BIMaestro.Codex
             var type = Obj(new JObject { ["name"] = Text(70), ["values"] = List(Obj(new JObject { ["parameter"] = Text(40), ["value"] = value.DeepClone() }), 64) });
             return Obj(new JObject { ["parameters"] = List(parameter, 64), ["types"] = List(type, 16), ["representations"] = List(display, 100) });
         }
+        internal static JObject GeometryPolicySchema() => new JObject {
+            ["type"] = "object", ["additionalProperties"] = false,
+            ["properties"] = new JObject {
+                ["mode"] = new JObject { ["type"] = "string", ["enum"] = new JArray("shared", "alternatives") },
+                ["reason"] = new JObject { ["type"] = "string", ["maxLength"] = 500 } },
+            ["required"] = new JArray("mode", "reason"),
+            ["description"] = "Par défaut shared : les types dimensionnent les mêmes composants. alternatives uniquement pour des changements réels de forme/options demandés, avec justification ; jamais une copie complète par DN pour contourner des contraintes." };
+
+        internal static bool AllowsGeometryAlternatives(JObject source)
+        {
+            if (source["geometry_policy"] == null) return false;
+            var policy = source["geometry_policy"] as JObject;
+            CodexFamilyDesign.Keys(policy, "mode", "reason");
+            string mode = CodexFamilyDesign.String(policy, "mode", 20);
+            if (policy["reason"]?.Type != JTokenType.String || ((string)policy["reason"]).Length > 500 ||
+                mode != "shared" && mode != "alternatives")
+                throw new InvalidOperationException("geometry_policy exige mode=shared/alternatives et reason texte (500 caractères maximum).");
+            if (mode == "alternatives" && string.IsNullOrWhiteSpace((string)policy["reason"]))
+                throw new InvalidOperationException("Des géométries alternatives exigent la justification d'un changement réel de forme demandé ; une variante par DN n'est pas une justification.");
+            return mode == "alternatives";
+        }
+
+        internal void ValidateSharedGeometry()
+        {
+            if (Types.Count < 2) return;
+            var values = Types.Select(t => Evaluate(t.Overrides)).ToArray();
+            foreach (var display in Displays.Where(d => !string.IsNullOrEmpty(d.VisibleParameter)))
+                if (values.Select(v => v[display.VisibleParameter].Boolean).Distinct().Count() > 1)
+                    throw new InvalidOperationException("Géométrie commune requise : « " + display.Component +
+                        " » change de visibilité selon le type via « " + display.VisibleParameter +
+                        " ». Les DN doivent dimensionner les mêmes composants, pas sélectionner des copies masquées. Utiliser des contraintes natives ; geometry_policy=alternatives est réservé aux variantes de forme/options explicitement demandées, avec reason.");
+        }
         internal static CodexFamilyParameters Parse(JObject source)
         {
             if (source["family_options"] == null || source["family_options"].Type == JTokenType.Null) return null;

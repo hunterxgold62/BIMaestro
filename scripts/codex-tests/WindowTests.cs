@@ -97,6 +97,25 @@ namespace BIMaestro.Codex
                 using (var source = System.IO.File.OpenRead("BIMaestro/Themes/BIMaestroTheme.xaml"))
                     theme = (System.Windows.ResourceDictionary)System.Windows.Markup.XamlReader.Load(source);
                 var window = new CodexWindow(bridge, theme, historyDirectory: System.IO.Path.GetFullPath("tmp/codex-tests/history-" + Guid.NewGuid().ToString("N")));
+                var pendingCreation = new TaskCompletionSource<object>();
+                int queuedCalls = 0;
+                bridge.Handler = (tool, args) => ++queuedCalls == 1 ? pendingCreation.Task : Task.FromResult<object>(new { read = true });
+                var recoveryQueue = new CodexToolRecovery();
+                var queueMethod = typeof(CodexWindow).GetMethod("CallWithRecoveryAsync", PrivateInstance);
+                var firstQueued = (Task<object>)queueMethod.Invoke(window, new object[] { recoveryQueue, "revit_create_family", new JObject(), CancellationToken.None });
+                var readQueued = (Task<object>)queueMethod.Invoke(window, new object[] { recoveryQueue, "revit_family_api", new JObject(), CancellationToken.None });
+                using (var cancelQueued = new CancellationTokenSource())
+                {
+                    var cancelledRead = (Task<object>)queueMethod.Invoke(window, new object[] { recoveryQueue, "revit_family_api", new JObject(), cancelQueued.Token });
+                    cancelQueued.Cancel();
+                    try { Pump(cancelledRead); } catch (OperationCanceledException) { }
+                    if (!cancelledRead.IsCanceled || queuedCalls != 1 || readQueued.IsCompleted) throw new Exception("Queued tools ran during creation or cancellation was ignored");
+                    pendingCreation.SetResult(new { saved = true });
+                    Pump(firstQueued); Pump(readQueued);
+                    if (queuedCalls != 2 || firstQueued.Status != TaskStatus.RanToCompletion || readQueued.Status != TaskStatus.RanToCompletion) throw new Exception("Queued read failed after successful creation");
+                }
+                bridge.Handler = (tool, args) => Task.FromResult<object>(new { });
+                Console.WriteLine("PASS: concurrent Revit calls are serialized and a cancelled queued read never executes");
                 if (!bridge.ShareContext || !bridge.AllowChanges || !bridge.ApplyDirectly || ((CheckBox)Get(window, "context")).IsChecked != true || ((CheckBox)Get(window, "changes")).IsChecked != true || ((CheckBox)Get(window, "direct")).IsChecked != true) throw new Exception("Requested initial permissions are not checked.");
                 var modelType = typeof(CodexWindow).GetNestedType("ModelChoice", BindingFlags.NonPublic);
                 Func<string, bool, object> model = (id, isDefault) => Activator.CreateInstance(modelType, BindingFlags.NonPublic | BindingFlags.Instance, null,

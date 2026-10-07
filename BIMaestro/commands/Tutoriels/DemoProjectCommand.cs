@@ -1,4 +1,4 @@
-﻿using Autodesk.Revit.Attributes;
+using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Plumbing;
 using Autodesk.Revit.DB.Mechanical;
@@ -41,23 +41,44 @@ namespace BIMaestro.Tutorials
 
         internal static string Create(UIApplication uiApp)
         {
+            string path = CopyReference(uiApp.Application.VersionNumber,
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs"));
+            uiApp.OpenAndActivateDocument(path);
+            DemoTrainingInvitation.OnDocumentOpened(uiApp.ActiveUIDocument?.Document);
+            return path;
+        }
+
+        internal static string CopyReference(string version, string folder)
+        {
+            if (int.TryParse(version, out int year) && year < 2024)
+                throw new InvalidOperationException("La maquette d’essai nécessite Revit 2024 ou une version ultérieure.");
+            string reference = Path.Combine(Path.GetDirectoryName(typeof(DemoProjectBuilder).Assembly.Location),
+                "Demo", "Maquette", "BIMaestro_Apprentissage_2024.rvt");
+            if (!File.Exists(reference))
+                throw new FileNotFoundException("La maquette de référence Revit 2024 manque. Réinstallez BIMaestro avec ses ressources de formation.", reference);
+            Directory.CreateDirectory(folder);
+            string path = Path.Combine(folder, "BIMaestro_Apprentissage_" + version + ".rvt");
+            if (File.Exists(path)) path = Path.Combine(folder,
+                "BIMaestro_Apprentissage_" + version + "_" + DateTime.Now.ToString("yyyyMMdd_HHmmss_fff") + ".rvt");
+            File.Copy(reference, path, false);
+            return path;
+        }
+
+        // Maintenance only: regenerate the shared reference in its oldest supported format.
+        internal static string BuildReference(UIApplication uiApp, string path)
+        {
             string version = uiApp.Application.VersionNumber;
+            if (version != "2024") throw new InvalidOperationException("La référence doit être générée dans Revit 2024.");
             string templateFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
                 "Autodesk", "RVT " + version, "Templates");
             string template = new[] { "Default_M_FRA.rte", "Default_M_ENU.rte", "Default_I_ENU.rte" }
                 .Select(name => Path.Combine(templateFolder, name)).FirstOrDefault(File.Exists);
             if (template == null) throw new FileNotFoundException("Aucun gabarit de projet Revit n'a été trouvé pour " + version);
 
-            string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                "RevitLogs");
-            Directory.CreateDirectory(folder);
-            string path = Path.Combine(folder, "BIMaestro_Apprentissage_" + version + ".rvt");
-            if (File.Exists(path)) path = Path.Combine(folder,
-                "BIMaestro_Apprentissage_" + version + "_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".rvt");
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path)));
 
             Document doc = uiApp.Application.NewProjectDocument(template);
             if (doc == null) throw new InvalidOperationException("Revit n'a pas créé le projet de démonstration.");
-            bool saved = false;
             try
             {
                 CheckRequiredFamilies(doc);
@@ -98,6 +119,7 @@ namespace BIMaestro.Tutorials
                     AddBoosterScene(doc, level, system, pipeType);
                     AddOrganizerScene(doc, level);
                     CreateExcelScene(doc, level);
+                    DemoClashExercise.BuildScene(doc);
 
                     ViewFamilyType viewType = new FilteredElementCollector(doc).OfClass(typeof(ViewFamilyType))
                         .Cast<ViewFamilyType>().FirstOrDefault(type => type.ViewFamily == ViewFamily.ThreeDimensional);
@@ -147,17 +169,10 @@ namespace BIMaestro.Tutorials
                 }
 
                 doc.SaveAs(path, new SaveAsOptions { OverwriteExistingFile = false, MaximumBackups = 1 });
-                saved = true;
             }
             finally
             {
                 doc.Close(false);
-            }
-            if (saved)
-            {
-                uiApp.OpenAndActivateDocument(path);
-                // The event also queues this invitation for files opened manually.
-                DemoTrainingInvitation.OnDocumentOpened(uiApp.ActiveUIDocument?.Document);
             }
             return path;
         }
@@ -902,6 +917,7 @@ namespace BIMaestro.Tutorials
             var views = new FilteredElementCollector(doc).OfClass(typeof(View3D)).Cast<View3D>()
                 .Where(view => DemoTourCatalog.Views.Values.Contains(view.Name) ||
                     view.Name == "BIMaestro - 08 Parking Excel")
+                .Where(view => view.ViewTemplateId == ElementId.InvalidElementId)
                 .Where(view => view.DetailLevel != ViewDetailLevel.Fine || view.DisplayStyle != DisplayStyle.FlatColors)
                 .ToList();
             var frontWalls = new FilteredElementCollector(doc).OfClass(typeof(Wall)).Cast<Wall>()

@@ -354,6 +354,7 @@ namespace Analyse
 
         public static void ScheduleDeferredPrime(Document doc)
         {
+            if (ElementHistoryNativeArchive.Owns(doc)) return;
             if (doc == null) return;
             if (!ShouldScheduleDeferredPrime(doc)) return;
 
@@ -380,6 +381,7 @@ namespace Analyse
 
         public static void ProcessDeferredPrime(Document doc)
         {
+            if (ElementHistoryNativeArchive.Owns(doc)) return;
             if (doc == null) return;
 
             var key = GetDocumentKey(doc);
@@ -400,7 +402,9 @@ namespace Analyse
 
             if (DateTime.UtcNow < state.NotBeforeUtc)
                 return;
+            if (!HistoryBackgroundWork.UserIsIdle()) return;
 
+            var primeStartedUtc = DateTime.UtcNow;
             try
             {
                 if (!state.ElementIdsLoaded)
@@ -438,6 +442,11 @@ namespace Analyse
                 {
                     DeferredPrimeByDocumentKey.Remove(key);
                 }
+            }
+            finally
+            {
+                var elapsedMs = (DateTime.UtcNow - primeStartedUtc).TotalMilliseconds;
+                state.NotBeforeUtc = DateTime.UtcNow.AddMilliseconds(Math.Max(300, elapsedMs * 9));
             }
         }
 
@@ -610,7 +619,7 @@ namespace Analyse
 
         public static void CaptureDocumentChanges(Document doc, DocumentChangedEventArgs e)
         {
-            if (doc == null || e == null) return;
+            if (doc == null || e == null || ElementHistoryNativeArchive.Owns(doc)) return;
             var user = GetCurrentHistoryUser(doc);
             var tx = e.GetTransactionNames()?.FirstOrDefault() ?? "Transaction";
             if (IsIgnoredTransaction(tx)) return;
@@ -625,10 +634,19 @@ namespace Analyse
             var relatedTypeParameterDeltaCache = new Dictionary<int, Dictionary<string, object>>();
             var processedChanges = 0;
             var capturedIds = new HashSet<ElementId>();
+            var relationPeers = new HashSet<string>(StringComparer.Ordinal);
+            lock (SnapshotByElementId)
+                foreach (var id in modifiedIds.Concat(deletedIds))
+                    if (SnapshotByElementId.TryGetValue(BuildElementSnapshotKey(doc, id), out var previous))
+                        foreach (var relation in previous.Recipe?.GeometryRelations ?? new List<HistoryGeometryRelation>())
+                            foreach (var uid in new[] { relation.First, relation.Second }.Where(uid => uid != null)) relationPeers.Add(uid);
             // Deleted elements can never be queried again: drain ALL cached snapshots
             // before the time-limited geometry work for added/modified elements.
             foreach (var id in deletedIds)
                 EnqueueDeleted(doc, id, user, tx);
+
+            ElementHistoryNativeArchive.Invalidate(doc, addedIds.Concat(modifiedIds));
+            ElementHistoryRelations.Invalidate(doc, addedIds.Concat(modifiedIds).Concat(deletedIds));
 
             foreach (var id in addedIds)
             {
@@ -656,6 +674,33 @@ namespace Analyse
             // without a pre-deletion snapshot. No triangle capture on this fallback.
             foreach (var id in addedIds.Concat(modifiedIds).Distinct().Where(id => !capturedIds.Contains(id)))
                 PrimeElementSnapshot(doc.GetElement(id));
+
+            // Circuit edits do not always report every connected family as modified.
+            // Refresh their recipes so deleting a device later retains its current circuit.
+            var electricalMembers = addedIds.Concat(modifiedIds).Distinct().Select(doc.GetElement)
+                .OfType<Autodesk.Revit.DB.Electrical.ElectricalSystem>()
+                .SelectMany(s => s.Elements.Cast<Element>().Concat(s.BaseEquipment == null
+                    ? Enumerable.Empty<Element>() : new Element[] { s.BaseEquipment }))
+                .GroupBy(member => member.Id).Select(g => g.First());
+            foreach (var member in electricalMembers.Where(member => !capturedIds.Contains(member.Id)))
+                PrimeElementSnapshot(member);
+
+            // Joins/cuts/attachments may change a peer without reporting it as modified.
+            // Refresh both current and former peers, including a removed relation.
+            foreach (var id in addedIds.Concat(modifiedIds).Distinct())
+            {
+                List<HistoryGeometryRelation> relations;
+                lock (SnapshotByElementId)
+                    relations = SnapshotByElementId.TryGetValue(BuildElementSnapshotKey(doc,id), out var current)
+                        ? current.Recipe?.GeometryRelations : null;
+                foreach (var relation in relations ?? new List<HistoryGeometryRelation>())
+                    foreach (var uid in new[] { relation.First, relation.Second }.Where(uid => uid != null)) relationPeers.Add(uid);
+            }
+            foreach (var uid in relationPeers)
+            {
+                var peer = ElementHistoryReconstruction.FindOriginal(doc, uid);
+                if (peer != null && !capturedIds.Contains(peer.Id)) PrimeElementSnapshot(peer);
+            }
 
             if (DateTime.UtcNow < deadlineUtc)
                 CaptureFamilyDocumentTypeChanges(doc, user, tx);
@@ -1984,14 +2029,14 @@ namespace Analyse
                 Action = "delete",
                 User = user,
                 Tx = tx,
-                Delta = BuildDeleteDelta(snapshot)
+                Delta = BuildDeleteDelta(doc, snapshot)
             });
         }
 
 
 
 
-        private static Dictionary<string, object> BuildDeleteDelta(ElementSnapshot snapshot)
+        private static Dictionary<string, object> BuildDeleteDelta(Document doc, ElementSnapshot snapshot)
         {
             if (snapshot == null) return null;
 
@@ -1999,7 +2044,7 @@ namespace Analyse
             var delta = new Dictionary<string, object>
             {
                 ["deletedUniqueId"] = snapshot.UniqueId,
-                ["recipe"] = snapshot.Recipe,
+                ["recipe"] = snapshot.Recipe ?? ElementHistoryNativeArchive.Find(doc, snapshot.UniqueId),
                 ["captureFailure"] = snapshot.CaptureFailure,
                 ["superComponentUniqueId"] = snapshot.SuperComponentUniqueId,
                 ["familyTypeUniqueId"] = snapshot.FamilyTypeUniqueId,
@@ -2029,7 +2074,7 @@ namespace Analyse
             if (element == null) return true;
             if (element is Autodesk.Revit.DB.Plumbing.PipeInsulation || element is Autodesk.Revit.DB.Mechanical.DuctInsulation) return true;
             if (IsBIMaestroPreviewElement(element)) return true;
-            if (IsAxisLineElement(element)) return true;
+            if (!(element is ModelCurve) && IsAxisLineElement(element)) return true;
             if (element is FamilySymbol familySymbol)
             {
                 if (element.Category != null && ShouldIgnoreCategory(element.Category)) return true;
@@ -2084,7 +2129,7 @@ namespace Analyse
             if (!IsUsefulHistoryText(snapshot.Category)) return true;
             if (IsIgnoredCategoryName(snapshot.Category))
                 return true;
-            if (IsAxisLineSnapshot(snapshot))
+            if (snapshot.Recipe == null && IsAxisLineSnapshot(snapshot))
                 return true;
             return false;
         }

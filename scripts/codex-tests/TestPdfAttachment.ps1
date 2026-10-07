@@ -13,7 +13,7 @@ $compiler = 'C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Cur
 $pdfSource = Join-Path $repoRoot 'BIMaestro/commands/Codex/CodexPdfAttachment.cs'
 $resolverSource = Join-Path $repoRoot 'BIMaestro/commands/Codex/CodexPdfAssemblyResolver.cs'
 $probeSource = Join-Path $PSScriptRoot 'PdfAttachmentProbe.cs'
-$testExe = Join-Path $testBin 'PdfAttachmentProbe.exe'
+$testExe = Join-Path $testBin 'PdfAttachmentProbe.dll'
 $pdfFullPath = [IO.Path]::GetFullPath($PdfPath)
 
 if (!(Test-Path -LiteralPath $pdfFullPath -PathType Leaf)) { throw "PDF introuvable : $pdfFullPath" }
@@ -35,10 +35,16 @@ foreach ($name in $dependencyNames) {
 $references = @('UglyToad.PdfPig.dll', 'UglyToad.PdfPig.DocumentLayoutAnalysis.dll',
     'UglyToad.PdfPig.Rendering.Skia.dll', 'SkiaSharp.dll', 'System.Memory.dll') |
     ForEach-Object { '/reference:' + (Join-Path $testBin $_) }
-& $compiler /nologo /langversion:9 /target:exe /platform:x64 "/out:$testExe" @references $pdfSource $resolverSource $probeSource
+& $compiler /nologo /langversion:9 /target:library /platform:x64 "/out:$testExe" @references $pdfSource $resolverSource (Join-Path $repoRoot 'BIMaestro/commands/Codex/CodexPdfRenderIsolation.cs') $probeSource
 if ($LASTEXITCODE -ne 0) { throw 'Compilation du test PDF échouée.' }
 
 # Use the same raw .NET Framework binding behavior as Revit; the PDF reader
 # supplies narrowly scoped resolution for its NuGet dependencies.
-& $testExe $pdfFullPath
+$hostBin = Join-Path $testBin 'host'
+New-Item -ItemType Directory -Path $hostBin -Force | Out-Null
+$hostExe = Join-Path $hostBin 'PdfAttachmentHost.exe'
+& $compiler /nologo /target:exe /platform:x64 "/out:$hostExe" (Join-Path $PSScriptRoot 'PdfAttachmentHost.cs')
+if ($LASTEXITCODE -ne 0) { throw 'Compilation du hôte PDF échouée.' }
+# Revit.exe is not beside the add-in's native dependencies.
+& $hostExe $testExe $pdfFullPath
 if ($LASTEXITCODE -ne 0) { throw 'Extraction ou rendu du PDF échoué.' }

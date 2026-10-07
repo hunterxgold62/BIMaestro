@@ -4,11 +4,25 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Analyse
 {
     public static class SmartCheckState
     {
+        public static string LastSaveError { get; private set; }
+        public static SmartScanOptions LoadPreferences()
+        {
+            try { var file = Path.Combine(StoreFolder, "clash3d_options.json");
+                return File.Exists(file) ? JsonConvert.DeserializeObject<SmartScanOptions>(File.ReadAllText(file)) : null; }
+            catch { return null; }
+        }
+        public static void SavePreferences(SmartScanOptions options)
+        {
+            try { Directory.CreateDirectory(StoreFolder); AtomicWrite(Path.Combine(StoreFolder, "clash3d_options.json"), JsonConvert.SerializeObject(options)); }
+            catch { /* Analysis is usable even when preferences cannot be persisted. */ }
+        }
         private static readonly object Sync = new object();
         private static readonly Dictionary<string, HashSet<string>> IgnoredByDoc =
             new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
@@ -32,12 +46,16 @@ namespace Analyse
             if (doc == null) return string.Empty;
             var path = doc.PathName;
             if (!string.IsNullOrWhiteSpace(path)) return path.ToLowerInvariant();
-            return $"DOC::{doc.Title}";
+            return $"DOC::{doc.ProjectInformation.UniqueId}";
         }
 
         public static void RestoreIgnored(string docKey, IEnumerable<ModelIssue> issues)
+            => CreateRestorer(docKey)(issues);
+
+        // Snapshot once per scan, rather than copying every saved decision for each published batch.
+        public static Action<IEnumerable<ModelIssue>> CreateRestorer(string docKey)
         {
-            if (string.IsNullOrWhiteSpace(docKey) || issues == null) return;
+            if (string.IsNullOrWhiteSpace(docKey)) return _ => { };
 
             HashSet<string> ignoredSet = null;
             Dictionary<string, IssueStatusRecord> statusSet = null;
@@ -49,30 +67,37 @@ namespace Analyse
                     statusSet = new Dictionary<string, IssueStatusRecord>(records, StringComparer.OrdinalIgnoreCase);
             }
 
-            foreach (var issue in issues)
+            return issues =>
             {
-                var key = BuildKey(issue);
-                var legacyIgnored = ignoredSet != null && ignoredSet.Contains(key);
+                if (issues == null) return;
+                foreach (var issue in issues)
+                {
+                    var key = BuildKey(issue);
+                    var legacyIgnored = ignoredSet != null && ignoredSet.Contains(key);
 
-                if (statusSet != null && statusSet.TryGetValue(key, out var record) && record != null)
-                {
-                    issue.Status = NormalizeStatus(record.Status);
-                    issue.StatusComment = record.Comment;
-                    issue.StatusUser = record.User;
-                    issue.StatusUpdatedUtc = record.UpdatedUtc;
-                    issue.Ignored = ModelIssue.IsResolvedStatus(issue.Status);
+                    if (statusSet != null && statusSet.TryGetValue(key, out var record) && record != null)
+                    {
+                        issue.Status = NormalizeStatus(record.Status);
+                        issue.StatusComment = record.Comment;
+                        issue.StatusUser = record.User;
+                        issue.StatusUpdatedUtc = record.UpdatedUtc;
+                        // A decision is tied to the geometry that was inspected, not just element IDs.
+                        if (ModelIssue.IsResolvedStatus(issue.Status) && !string.Equals(record.Fingerprint, issue.Fingerprint, StringComparison.Ordinal))
+                            issue.Status = ModelIssue.StatusReview;
+                        issue.Ignored = ModelIssue.IsResolvedStatus(issue.Status);
+                    }
+                    else if (legacyIgnored)
+                    {
+                        issue.Status = ModelIssue.StatusFixed;
+                        issue.Ignored = true;
+                    }
+                    else
+                    {
+                        issue.Status = ModelIssue.StatusActive;
+                        issue.Ignored = false;
+                    }
                 }
-                else if (legacyIgnored)
-                {
-                    issue.Status = ModelIssue.StatusFixed;
-                    issue.Ignored = true;
-                }
-                else
-                {
-                    issue.Status = ModelIssue.StatusActive;
-                    issue.Ignored = false;
-                }
-            }
+            };
         }
 
         public static void SetIgnored(string docKey, ModelIssue issue, bool ignored)
@@ -112,7 +137,8 @@ namespace Analyse
                     Status = normalized,
                     Comment = comment,
                     User = issue.StatusUser,
-                    UpdatedUtc = now
+                    UpdatedUtc = now,
+                    Fingerprint = issue.Fingerprint
                 };
 
                 if (!IgnoredByDoc.TryGetValue(docKey, out var ignoredSet))
@@ -136,7 +162,9 @@ namespace Analyse
             var root = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
                 "RevitLogs", "Clash3D", "Miniatures");
-            var safe = MakeSafeFileName(string.IsNullOrWhiteSpace(docKey) ? "document" : docKey);
+            string suffix;
+            using (var hash = SHA256.Create()) suffix = BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(docKey ?? "document"))).Replace("-", "").Substring(0, 16);
+            var safe = MakeSafeFileName(string.IsNullOrWhiteSpace(docKey) ? "document" : docKey) + "_" + suffix;
             return Path.Combine(root, safe);
         }
 
@@ -149,6 +177,7 @@ namespace Analyse
 
         private static string NormalizeStatus(string status)
         {
+            if (string.Equals(status, "OK", StringComparison.OrdinalIgnoreCase)) return ModelIssue.StatusFixed;
             if (string.Equals(status, ModelIssue.StatusToFix, StringComparison.OrdinalIgnoreCase)) return ModelIssue.StatusToFix;
             if (string.Equals(status, ModelIssue.StatusIgnored, StringComparison.OrdinalIgnoreCase)) return ModelIssue.StatusIgnored;
             if (string.Equals(status, ModelIssue.StatusFixed, StringComparison.OrdinalIgnoreCase)) return ModelIssue.StatusFixed;
@@ -231,6 +260,7 @@ namespace Analyse
 
         private static void SaveToDisk()
         {
+            LastSaveError = null;
             try
             {
                 if (!Directory.Exists(StoreFolder))
@@ -240,17 +270,17 @@ namespace Analyse
                     kvp => kvp.Key,
                     kvp => kvp.Value.ToList(),
                     StringComparer.OrdinalIgnoreCase);
-                File.WriteAllText(StorePath, JsonConvert.SerializeObject(ignoredSnapshot, Formatting.Indented));
+                AtomicWrite(StorePath, JsonConvert.SerializeObject(ignoredSnapshot, Formatting.Indented));
 
                 var statusSnapshot = StatusByDoc.ToDictionary(
                     kvp => kvp.Key,
                     kvp => kvp.Value,
                     StringComparer.OrdinalIgnoreCase);
-                File.WriteAllText(StatusStorePath, JsonConvert.SerializeObject(statusSnapshot, Formatting.Indented));
+                AtomicWrite(StatusStorePath, JsonConvert.SerializeObject(statusSnapshot, Formatting.Indented));
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore les erreurs d'écriture pour ne pas interrompre l'UX.
+                LastSaveError = ex.Message;
             }
         }
 
@@ -261,12 +291,25 @@ namespace Analyse
             return safe.Length > 80 ? safe.Substring(0, 80) : safe;
         }
 
+        private static void AtomicWrite(string path, string content)
+        {
+            var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                File.WriteAllText(temporary, content, new UTF8Encoding(false));
+                if (File.Exists(path)) File.Replace(temporary, path, path + ".bak");
+                else File.Move(temporary, path);
+            }
+            finally { if (File.Exists(temporary)) File.Delete(temporary); }
+        }
+
         private class IssueStatusRecord
         {
             public string Status { get; set; }
             public string Comment { get; set; }
             public string User { get; set; }
             public DateTime? UpdatedUtc { get; set; }
+            public string Fingerprint { get; set; }
         }
     }
 }

@@ -513,6 +513,22 @@ namespace Modification
         }
 
         private ProfileConfig FindBuiltInProfile(HostTarget host, ShapeTarget shape, bool isV2)
+            => FindBuiltInProfile(_doc, Config, host, shape, isV2);
+
+        internal static ProfileConfig ResolveClashProfile(Document doc, ReservationAutoV3Config config,
+            ReservationAutoV3PersoConfig personal, HostTarget host, ShapeTarget shape)
+        {
+            string label = config.LastShapeOptionLabel ?? "";
+            bool unhosted = label.IndexOf("sans hôte", StringComparison.OrdinalIgnoreCase) >= 0;
+            if (label.IndexOf("Ma famille", StringComparison.OrdinalIgnoreCase) >= 0)
+                return personal.Get(host, shape, unhosted);
+            if (label.IndexOf("BIMaestro", StringComparison.OrdinalIgnoreCase) >= 0)
+                return FindBuiltInProfile(doc, config, host, shape, unhosted);
+            return host == HostTarget.Mur ? (shape == ShapeTarget.Circulaire ? config.WallCirc : config.WallRect)
+                : (shape == ShapeTarget.Circulaire ? config.FloorCirc : config.FloorRect);
+        }
+
+        private static ProfileConfig FindBuiltInProfile(Document _doc, ReservationAutoV3Config Config, HostTarget host, ShapeTarget shape, bool isV2)
         {
             string[] candidates;
 
@@ -557,8 +573,10 @@ namespace Modification
                     ParamDepth = shape == ShapeTarget.Circulaire
                         ? (host == HostTarget.Mur ? Config.WallCirc.ParamDepth : Config.FloorCirc.ParamDepth)
                         : (host == HostTarget.Mur ? Config.WallRect.ParamDepth : Config.FloorRect.ParamDepth),
-                    VerticalPlacementMode = GetExistingPlacementMode(host, shape),
-                    VerticalPlacementOffsetMm = GetExistingPlacementOffset(host, shape)
+                    VerticalPlacementMode = (host == HostTarget.Mur ? (shape == ShapeTarget.Circulaire ? Config.WallCirc : Config.WallRect)
+                        : (shape == ShapeTarget.Circulaire ? Config.FloorCirc : Config.FloorRect))?.VerticalPlacementMode ?? VerticalPlacementMode.Auto,
+                    VerticalPlacementOffsetMm = (host == HostTarget.Mur ? (shape == ShapeTarget.Circulaire ? Config.WallCirc : Config.WallRect)
+                        : (shape == ShapeTarget.Circulaire ? Config.FloorCirc : Config.FloorRect))?.VerticalPlacementOffsetMm ?? 0
                 };
             }
 

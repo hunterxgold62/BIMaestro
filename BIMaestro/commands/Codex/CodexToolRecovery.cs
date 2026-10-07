@@ -26,7 +26,7 @@ namespace BIMaestro.Codex
 
         private static readonly HashSet<string> ReadTools = new HashSet<string>(StringComparer.Ordinal)
         {
-            "revit_context", "revit_capabilities", "revit_family_contract", "revit_family_program_contract",
+            "revit_context", "revit_capabilities", "revit_family_contract", "revit_family_program_contract", "revit_prepare_family",
             "revit_family_api", "revit_family_template_info", "revit_family_parameters", "revit_inspect_family",
             "revit_inspect_family_element", "revit_selection_geometry", "revit_read_family_design",
             "revit_mep_inspect", "revit_mep_preview_route"
@@ -65,7 +65,7 @@ namespace BIMaestro.Codex
             bool readOnly = ReadTools.Contains(tool ?? "");
             bool mutation = !readOnly && tool != "revit_validate_family" && tool != "revit_validate_parametric_family" &&
                 tool != "revit_test_family_engine" && tool != "revit_open_created_family" &&
-                !(tool == "revit_run_family_program" && args?["validate_only"]?.Type == JTokenType.Boolean && (bool)args["validate_only"]);
+                !((tool == "revit_run_family_program" || tool == "revit_create_family_program") && args?["validate_only"]?.Type == JTokenType.Boolean && (bool)args["validate_only"]);
             string fingerprint = Fingerprint(tool, args);
             for (int attempt = 0; ; attempt++)
             {

@@ -206,6 +206,7 @@ public class BIMaestroApp : IExternalApplication
             Page.SecretGifShortcutManager.PollKeyboardState();
             BIMaestro.UI.RadialGlobalHotkeyService.ProcessPending(_uiApp);
             Analyse.ElementHistoryTracker.ProcessDeferredPrime(_uiApp.ActiveUIDocument?.Document);
+            Analyse.ElementHistoryNativeArchive.ProcessPendingBackground(_uiApp.ActiveUIDocument?.Document);
             RefreshProjectBrowserActiveViewWhenNeeded();
             BIMaestro.ViewHover.ViewHoverPreviewService.ProcessPending(_uiApp);
             BIMaestro.ViewHover.ViewDeckService.ProcessIdling(_uiApp);
@@ -385,6 +386,7 @@ public class BIMaestroApp : IExternalApplication
 
     private void OnDocumentOpenedSafe(object sender, DocumentOpenedEventArgs e)
     {
+        if (Analyse.ElementHistoryNativeArchive.Owns(e.Document)) return;
         try
         {
             _uiApp ??= new UIApplication(e.Document.Application);
@@ -406,6 +408,7 @@ public class BIMaestroApp : IExternalApplication
 
     private void OnDocumentCreatedSafe(object sender, DocumentCreatedEventArgs e)
     {
+        if (Analyse.ElementHistoryNativeArchive.Owns(e.Document)) return;
         try
         {
             _uiApp ??= new UIApplication(e.Document.Application);
@@ -421,6 +424,8 @@ public class BIMaestroApp : IExternalApplication
 
     private void OnDocumentClosingSafe(object sender, DocumentClosingEventArgs e)
     {
+        if (Analyse.ElementHistoryNativeArchive.Owns(e.Document)) return;
+        Analyse.ElementHistoryNativeArchive.Forget(e.Document);
         try
         {
             _uiApp ??= new UIApplication(e.Document.Application);
@@ -448,6 +453,7 @@ public class BIMaestroApp : IExternalApplication
         try
         {
             document = e.GetDocument();
+            if (Analyse.ElementHistoryNativeArchive.Owns(document)) return;
             Couleur.ProjectBrowserColoring.InvalidateViewTypeMap(document);
             BIMaestro.ViewHover.ViewDeckChangeService.Track(document, e);
         }

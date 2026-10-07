@@ -15,6 +15,7 @@ namespace BIMaestro.Tutorials
         private static Document _document;
         private static HashSet<long> _valves;
         private static HashSet<long> _rotated;
+        private static HashSet<long> _copied;
         private static Window _card;
         private static TextBlock _text;
         private static Button _finish;
@@ -29,6 +30,7 @@ namespace BIMaestro.Tutorials
                 .Select(instance => (long)instance.Id.GetIdValue()));
             if (_valves.Count != 6) throw new InvalidOperationException("La scène MEP Booster doit contenir six vannes raccordées.");
             _rotated = new HashSet<long>();
+            _copied = new HashSet<long>();
             MepBooster.MepBoosterService.TutorialActivation = Activation;
             MepBooster.MepBoosterService.TutorialProgress = Report;
             MepBooster.MepBoosterService.TutorialCopy = ReportCopy;
@@ -54,6 +56,7 @@ namespace BIMaestro.Tutorials
                 if (finished) DemoTourCompletion.Show(app.MainWindowHandle, "mep-booster", "Tu as terminé le tutoriel MEP Booster : rotations et copie d’orientation ont été appliquées.");
             };
             card.Closed += (_, __) => { if (ReferenceEquals(_card, card)) { _card = null; _document = null; MepBooster.MepBoosterService.TutorialActivation = null; MepBooster.MepBoosterService.TutorialProgress = null; MepBooster.MepBoosterService.TutorialCopy = null; Couleur.AppearanceOnboarding.ConsumeTourClick("mep-booster"); } };
+            _card.SizeChanged += (_, __) => { if (_card != null) _card.Top = Math.Max(SystemParameters.WorkArea.Top + 16, SystemParameters.WorkArea.Bottom - _card.ActualHeight - 24); };
             UpdateText();
             if (_step > 0) _card.Show();
             if (_step == 0) Couleur.AppearanceOnboarding.StartIntro(app.MainWindowHandle, "mep-booster");
@@ -84,12 +87,14 @@ namespace BIMaestro.Tutorials
         {
             if (_card == null || !Equals(document, _document) || _step != 5 || targets == null) return;
             var copied = targets.Select(id => (long)id.GetIdValue()).Distinct().ToList();
-            bool valid = _rotated.Contains(reference.GetIdValue()) && copied.Count >= 2 &&
-                copied.All(id => _valves.Contains(id) && !_rotated.Contains(id));
+            bool validReference = _rotated.Contains(reference.GetIdValue());
+            if (validReference)
+                foreach (long id in copied.Where(id => _valves.Contains(id) && !_rotated.Contains(id))) _copied.Add(id);
             foreach (long id in copied.Where(id => _valves.Contains(id))) _rotated.Add(id);
+            bool valid = validReference && _copied.Count >= 2;
             if (valid) _step = 6;
             UpdateText();
-            if (!valid) _text.Text += "\nPour valider l’essai, utilise une vanne tournée comme référence et copie sur au moins deux vannes de la scène qui n’ont pas encore été modifiées.";
+            if (!valid) _text.Text += "\nPour valider l’essai, utilise une vanne tournée comme référence et copie sur deux autres vannes, ensemble ou en plusieurs copies. " + _copied.Count + " vanne(s) validée(s) sur 2.";
         }
         private static void UpdateText()
         {

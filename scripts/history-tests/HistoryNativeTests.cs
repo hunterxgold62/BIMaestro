@@ -4,6 +4,7 @@ using Autodesk.Revit.DB.Structure;
 using Autodesk.Revit.DB.Plumbing;
 using Autodesk.Revit.DB.Mechanical;
 using Autodesk.Revit.DB.Electrical;
+using Autodesk.Revit.DB.Architecture;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.UI.Events;
 using Newtonsoft.Json;
@@ -49,6 +50,16 @@ namespace BIMaestro.HistoryTests
             var doc = ui.Application.NewProjectDocument(UnitSystem.Metric);
             try
             {
+                if (File.Exists(Path.Combine(Output,"extended-only.txt")))
+                { VerifyExtendedElements(ui,doc,results); return results; }
+                if (File.Exists(Path.Combine(Output,"relations-only.txt")))
+                { VerifyGeometryRelations(ui,doc,results); return results; }
+                if (File.Exists(Path.Combine(Output,"electrical-only.txt")))
+                { VerifyElectricalSystems(ui,doc,results); return results; }
+                if (File.Exists(Path.Combine(Output,"power-only.txt")))
+                { VerifyElectricalSystem(ui,doc,results,true); return results; }
+                if (File.Exists(Path.Combine(Output,"native-only.txt")))
+                { VerifyNativeArchive(ui,doc,results); VerifyLogicalSystems(doc,results); return results; }
                 var symbol = CreateFamily(ui, doc, "Metric Generic Model.rft");
                 string freeSymbolId = symbol.UniqueId;
                 var hostedSymbol = CreateFamily(ui, doc, "Metric Generic Model wall based.rft");
@@ -112,6 +123,11 @@ namespace BIMaestro.HistoryTests
                 VerifyNetworks(ui, ref doc, results);
                 VerifyNetworkFamily(doc, networkSymbolId, results);
                 VerifyMirroredFamily(doc, freeSymbolId, results);
+                VerifyExtendedElements(ui, doc, results);
+                VerifyNativeArchive(ui,doc,results);
+                VerifyLogicalSystems(doc,results);
+                VerifyElectricalSystems(ui,doc,results);
+                VerifyGeometryRelations(ui,doc,results);
                 var filtered = ElementHistoryRestoration.Restore(doc, new[] {
                     new HistoryRestoreRequest { SourceUniqueId="excluded-a", Label="CML_Calorifuge [1]", Category="Modèles génériques" },
                     new HistoryRestoreRequest { SourceUniqueId="excluded-b", Label="Isolation [2]", Category="Isolants de canalisation" },
@@ -563,6 +579,26 @@ namespace BIMaestro.HistoryTests
             }
             Check(recipe != null,"Recipe absent: " + name);
             var box = element.get_BoundingBox(null);
+            // A line-based family's element box also contains its placement
+            // curve/reference geometry. Compare solid geometry to preview triangles.
+            if (element is FamilyInstance && element.Location is LocationCurve)
+            {
+                var points = new List<XYZ>();
+                void CollectPoints(GeometryElement geometry)
+                {
+                    foreach (var item in geometry)
+                        if (item is GeometryInstance nested) CollectPoints(nested.GetInstanceGeometry());
+                        else if (item is Solid solid)
+                            foreach (Face face in solid.Faces)
+                            {
+                                var mesh = face.Triangulate();
+                                points.AddRange(mesh.Vertices);
+                            }
+                }
+                CollectPoints(element.get_Geometry(new Options { DetailLevel=ViewDetailLevel.Fine }));
+                box = new BoundingBoxXYZ { Min=new XYZ(points.Min(p=>p.X),points.Min(p=>p.Y),points.Min(p=>p.Z)),
+                    Max=new XYZ(points.Max(p=>p.X),points.Max(p=>p.Y),points.Max(p=>p.Z)) };
+            }
             double volume = Volume(element.get_Geometry(new Options { DetailLevel = ViewDetailLevel.Fine }));
             Check(volume > 0,"Test fixture has no original visible volume: " + name);
             var raw = JObject.Parse(JsonConvert.SerializeObject(recipe));
@@ -602,7 +638,7 @@ namespace BIMaestro.HistoryTests
             Check(before.SequenceEqual(Ids(doc)),"Failed reconstruction leaked elements: " + name);
             results.Add(name + " fallback and rollback");
         }
-        private static FamilySymbol CreateFamily(UIApplication ui,Document project,string templateName, bool network = false)
+        private static FamilySymbol CreateFamily(UIApplication ui,Document project,string templateName, bool network = false, bool electrical = false, bool power = false, bool cuttingVoid = false)
         {
             string root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),"Autodesk","RVT " + ui.Application.VersionNumber,"Family Templates","English");
             var familyDoc = ui.Application.NewFamilyDocument(Path.Combine(root,templateName));
@@ -616,7 +652,33 @@ namespace BIMaestro.HistoryTests
                     profile.Append(curves);
                     var sketchPlane = SketchPlane.Create(familyDoc,Plane.CreateByNormalAndOrigin(XYZ.BasisZ,XYZ.Zero));
                     var extrusion = familyDoc.FamilyCreate.NewExtrusion(true,profile,sketchPlane,2);
-                    if(network)
+                    if(cuttingVoid)
+                    {
+                        var voidProfile=new CurveArrArray(); var voidCurves=new CurveArray();
+                        foreach(Curve c in Rectangle(4,-2,6,2,0)) voidCurves.Append(c);
+                        voidProfile.Append(voidCurves);
+                        familyDoc.FamilyCreate.NewExtrusion(false,voidProfile,sketchPlane,10);
+                        familyDoc.OwnerFamily.get_Parameter(BuiltInParameter.FAMILY_ALLOW_CUT_WITH_VOIDS).Set(1);
+                    }
+                    if(electrical)
+                    {
+                        familyDoc.Regenerate();
+                        var solid = extrusion.get_Geometry(new Options { ComputeReferences=true }).OfType<Solid>().First(s=>s.Volume>0);
+                        var face = solid.Faces.Cast<Face>().OfType<PlanarFace>().First(f=>f.FaceNormal.Z>0.99);
+                        var connector=ConnectorElement.CreateElectricalConnector(familyDoc,power ? ElectricalSystemType.PowerBalanced : ElectricalSystemType.Data,face.Reference);
+                        if(power)
+                        {
+                            var voltage=familyDoc.FamilyManager.AddParameter("History voltage",GroupTypeId.Electrical,connector.get_Parameter(BuiltInParameter.RBS_ELEC_VOLTAGE).Definition.GetDataType(),true);
+                            familyDoc.FamilyManager.Set(voltage,UnitUtils.ConvertToInternalUnits(templateName.Contains("Equipment") ? 400 : 230,UnitTypeId.Volts));
+                            familyDoc.FamilyManager.AssociateElementParameterToFamilyParameter(connector.get_Parameter(BuiltInParameter.RBS_ELEC_VOLTAGE),voltage);
+                            var poles=familyDoc.FamilyManager.AddParameter("History poles",GroupTypeId.Electrical,connector.get_Parameter(BuiltInParameter.RBS_ELEC_NUMBER_OF_POLES).Definition.GetDataType(),true);
+                            familyDoc.FamilyManager.Set(poles,templateName.Contains("Equipment") ? 3 : 1);
+                            familyDoc.FamilyManager.AssociateElementParameterToFamilyParameter(connector.get_Parameter(BuiltInParameter.RBS_ELEC_NUMBER_OF_POLES),poles);
+                        }
+                        if(templateName.Contains("Equipment"))
+                            familyDoc.OwnerFamily.get_Parameter(BuiltInParameter.FAMILY_CONTENT_PART_TYPE).Set((int)(power ? PartType.PanelBoard : PartType.OtherPanel));
+                    }
+                    else if(network)
                     {
                         familyDoc.OwnerFamily.FamilyCategory = familyDoc.Settings.Categories.get_Item(BuiltInCategory.OST_PipeAccessory);
                         familyDoc.OwnerFamily.get_Parameter(BuiltInParameter.FAMILY_ALWAYS_VERTICAL)?.Set(0);
@@ -639,13 +701,609 @@ namespace BIMaestro.HistoryTests
                     Check(t.Commit() == TransactionStatus.Committed,"Test family transaction failed");
                 }
                 string fixturePath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location),
-                    network ? "BIMaestro-test-network.rfa" : templateName.Contains("wall based") ? "BIMaestro-test-hosted.rfa" : "BIMaestro-test-free.rfa");
+                    network ? "BIMaestro-test-network.rfa" : "BIMaestro-test-" + Path.GetFileNameWithoutExtension(templateName) + (power ? "-power" : "") + (cuttingVoid ? "-void" : "") + ".rfa");
                 familyDoc.SaveAs(fixturePath,new SaveAsOptions { OverwriteExistingFile = false });
                 var family = familyDoc.LoadFamily(project);
                 return (FamilySymbol)project.GetElement(family.GetFamilySymbolIds().First());
             }
             finally { familyDoc.Close(false); }
         }
+        private void VerifyGeometryRelations(UIApplication ui, Document doc, List<string> results)
+        {
+            var voidSymbol=CreateFamily(ui,doc,"Metric Generic Model.rft",cuttingVoid:true);
+            var columnSymbol=CreateFamily(ui,doc,"Metric Structural Column.rft");
+            var level = new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>().First();
+            var wt = new FilteredElementCollector(doc).OfClass(typeof(WallType)).Cast<WallType>().First(t=>t.Kind==WallKind.Basic);
+            Wall a,b,attached; Floor floor;
+            using(var tx=new Transaction(doc,"Geometry relation fixtures"))
+            {
+                tx.Start();
+                a=Wall.Create(doc,Line.CreateBound(new XYZ(0,600,level.Elevation),new XYZ(20,600,level.Elevation)),wt.Id,level.Id,20,0,false,false);
+                b=Wall.Create(doc,Line.CreateBound(new XYZ(10,590,level.Elevation),new XYZ(10,610,level.Elevation)),wt.Id,level.Id,20,0,false,false);
+                attached=Wall.Create(doc,Line.CreateBound(new XYZ(30,600,level.Elevation),new XYZ(50,600,level.Elevation)),wt.Id,level.Id,20,0,false,false);
+                var ft=new FilteredElementCollector(doc).OfClass(typeof(FloorType)).Cast<FloorType>().First(t=>!t.IsFoundationSlab);
+                floor=Floor.Create(doc,new[]{Rectangle(25,595,55,605,level.Elevation)},ft.Id,level.Id);
+                floor.get_Parameter(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM).Set(10);
+                WallUtils.DisallowWallJoinAtEnd(a,0);
+                doc.Regenerate(); JoinGeometryUtils.JoinGeometry(doc,a,b);
+                if(!JoinGeometryUtils.IsCuttingElementInJoin(doc,a,b)) JoinGeometryUtils.SwitchJoinOrder(doc,a,b);
+                var add=typeof(Wall).GetMethods().FirstOrDefault(m=>m.Name=="AddAttachment" && m.GetParameters().Length==2);
+                if(add!=null) add.Invoke(attached,new[]{(object)floor.Id,Enum.Parse(add.GetParameters()[1].ParameterType,"Top")});
+                Check(tx.Commit()==TransactionStatus.Committed,"Relation fixtures commit");
+            }
+            HistoryRestoreRequest Request(Element e) => new HistoryRestoreRequest { SourceUniqueId=e.UniqueId, Label=e.Name,
+                Category=e.Category?.Name,Recipe=ElementHistoryReconstruction.Capture(e) };
+            ElementHistoryRelations.Invalidate(doc);
+            var ra=Request(a); var rb=Request(b); var rf=Request(floor); var rw=Request(attached);
+            for(int wave=0;wave<20 && rw.Recipe.Native?.Ready==false && rw.Recipe.Native.Failure==null;wave++) ElementHistoryNativeArchive.ProcessPending(doc);
+            Check(ra.Recipe.GeometryRelations.Any(r=>r.Kind=="join" && r.First==a.UniqueId && r.Second==b.UniqueId),"Join cutting order capture");
+            var expectedVolume=Volume(a.get_Geometry(new Options()))+Volume(b.get_Geometry(new Options()));
+            using(var tx=new Transaction(doc,"Delete joined wall")){tx.Start();doc.Delete(a.Id);tx.Commit();}
+            var batch=ElementHistoryRestoration.Restore(doc,new[]{ra});
+            Check(batch.Created==1 && batch.Failed==0 && batch.RelationFailures.Count==0,"Join restoration: "+JsonConvert.SerializeObject(batch));
+            a=(Wall)doc.GetElement(batch.Items.Single().UniqueId);
+            Check(JoinGeometryUtils.AreElementsJoined(doc,a,b) && JoinGeometryUtils.IsCuttingElementInJoin(doc,a,b),"Join direction restored");
+            Check(!WallUtils.IsWallJoinAllowedAtEnd(a,0),"Disabled wall end preserved");
+            Check(Math.Abs(Volume(a.get_Geometry(new Options()))+Volume(b.get_Geometry(new Options()))-expectedVolume)<1e-5,"Joined volume restored");
+            results.Add("joined wall restored against surviving wall; cutting order, volume and disabled end preserved");
+            var repeat=ElementHistoryRestoration.Restore(doc,new[]{ra});
+            Check(repeat.Created==0 && repeat.RelationsRestored==0 && repeat.RelationFailures.Count==0,"Repeated join restoration");
+            results.Add("repeated relation restoration creates no duplicate or unnecessary change");
+            var hasAttach=rf.Recipe.GeometryRelations?.Any(r=>r.Kind=="wall_attach")==true;
+            if(hasAttach)
+            {
+                using(var tx=new Transaction(doc,"Delete attachment target")){tx.Start();doc.Delete(floor.Id);tx.Commit();}
+                batch=ElementHistoryRestoration.Restore(doc,new[]{rf});
+                Check(batch.Created==1 && batch.RelationsRestored>=1 && batch.RelationFailures.Count==0,"Target-only attachment restoration: "+JsonConvert.SerializeObject(batch));
+                floor=(Floor)doc.GetElement(batch.Items.Single().UniqueId);
+                var captured=ElementHistoryRelations.Capture(attached,new List<string>());
+                Check(captured.Any(r=>r.Kind=="wall_attach" && r.Second==floor.UniqueId),"Surviving wall reattached to restored floor");
+                results.Add("floor-only restoration reattaches surviving wall to its original top target");
+                using(var tx=new Transaction(doc,"Delete attached wall")){tx.Start();doc.Delete(attached.Id);tx.Commit();}
+                batch=ElementHistoryRestoration.Restore(doc,new[]{rw});
+                Check(batch.Created==1 && batch.RelationFailures.Count==0,"Owner-only attachment restoration: "+JsonConvert.SerializeObject(batch));
+                attached=(Wall)doc.GetElement(batch.Items.Single().UniqueId);
+                Check(ElementHistoryRelations.Capture(attached,new List<string>()).Any(r=>r.Kind=="wall_attach" && r.Second==floor.UniqueId),"Restored wall attached through restored target identity");
+                results.Add("wall-only restoration resolves attachment target restored in an earlier operation");
+            }
+            using(var tx=new Transaction(doc,"Delete join peer")){tx.Start();doc.Delete(a.Id);doc.Delete(b.Id);tx.Commit();}
+            batch=ElementHistoryRestoration.Restore(doc,new[]{rb});
+            Check(batch.Created==1 && batch.RelationFailures.Any(f=>f.Contains("référence")),"Missing join peer must be reported");
+            results.Add("missing geometric reference explicitly reported without losing restored physical element");
+            Wall target; FamilyInstance cutter;
+            using(var tx=new Transaction(doc,"Void cut fixtures"))
+            {
+                tx.Start();voidSymbol.Activate();doc.Regenerate();
+                target=Wall.Create(doc,Line.CreateBound(new XYZ(0,650,level.Elevation),new XYZ(20,650,level.Elevation)),wt.Id,level.Id,20,0,false,false);
+                cutter=doc.Create.NewFamilyInstance(new XYZ(0,650,level.Elevation),voidSymbol,level,StructuralType.NonStructural);
+                doc.Regenerate();InstanceVoidCutUtils.AddInstanceVoidCut(doc,target,cutter);
+                Check(tx.Commit()==TransactionStatus.Committed,"Void fixture commit");
+            }
+            var rt=Request(target);var rc=Request(cutter);var cutVolume=Volume(target.get_Geometry(new Options()));
+            for(int wave=0;wave<20 && new[]{rt,rc}.Any(r=>r.Recipe.Native?.Ready==false && r.Recipe.Native.Failure==null);wave++) ElementHistoryNativeArchive.ProcessPending(doc);
+            Check(rt.Recipe.GeometryRelations.Any(r=>r.Kind=="void_cut" && r.First==cutter.UniqueId),"Void target capture");
+            using(var tx=new Transaction(doc,"Delete void cutter")){tx.Start();doc.Delete(cutter.Id);tx.Commit();}
+            batch=ElementHistoryRestoration.Restore(doc,new[]{rc});
+            Check(batch.Created==1 && batch.RelationFailures.Count==0,"Void cutter restoration: "+JsonConvert.SerializeObject(batch));
+            cutter=(FamilyInstance)doc.GetElement(batch.Items.Single().UniqueId);
+            Check(InstanceVoidCutUtils.InstanceVoidCutExists(target,cutter) && Math.Abs(Volume(target.get_Geometry(new Options()))-cutVolume)<1e-5,"Void cut and volume restored");
+            results.Add("void cutter restored against surviving wall; cut relation and removed volume preserved");
+            using(var tx=new Transaction(doc,"Delete void cut target")){tx.Start();doc.Delete(target.Id);tx.Commit();}
+            batch=ElementHistoryRestoration.Restore(doc,new[]{rt});
+            Check(batch.Created==1 && batch.RelationFailures.Count==0,"Void target restoration: "+JsonConvert.SerializeObject(batch));
+            target=(Wall)doc.GetElement(batch.Items.Single().UniqueId);
+            Check(InstanceVoidCutUtils.InstanceVoidCutExists(target,cutter),"Void target restored through earlier cutter identity");
+            results.Add("void target restored against cutter restored in an earlier operation");
+            FamilyInstance column; Floor support;
+            using(var tx=new Transaction(doc,"Column attachment fixture"))
+            {
+                tx.Start();columnSymbol.Activate();doc.Regenerate();
+                var top=Level.Create(doc,level.Elevation+15);
+                column=doc.Create.NewFamilyInstance(new XYZ(5,700,level.Elevation),columnSymbol,level,StructuralType.Column);
+                column.get_Parameter(BuiltInParameter.FAMILY_TOP_LEVEL_PARAM).Set(top.Id);
+                var ft=new FilteredElementCollector(doc).OfClass(typeof(FloorType)).Cast<FloorType>().First(t=>!t.IsFoundationSlab);
+                support=Floor.Create(doc,new[]{Rectangle(0,695,20,710,level.Elevation)},ft.Id,level.Id);
+                support.get_Parameter(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM).Set(10);
+                doc.Regenerate();ColumnAttachment.AddColumnAttachment(doc,column,support,1,(ColumnAttachmentCutStyle)0,ColumnAttachmentJustification.Minimum,0.25);
+                Check(tx.Commit()==TransactionStatus.Committed,"Column attach fixture commit");
+            }
+            ElementHistoryRelations.Invalidate(doc);
+            var rs=Request(support);var rp=Request(column);
+            var expectedAttach=ColumnAttachment.GetColumnAttachment(column,1);
+            var attachStyle=expectedAttach.CutStyle;var attachJustification=expectedAttach.Justification;var attachOffset=expectedAttach.AttachOffset;
+            Check(rs.Recipe.GeometryRelations.Any(r=>r.Kind=="column_attach"),"Column target captures reverse attachment");
+            using(var tx=new Transaction(doc,"Detach column for incremental cache"))
+            { tx.Start();ColumnAttachment.RemoveColumnAttachment(column,1);tx.Commit(); }
+            ElementHistoryRelations.Invalidate(doc,new[]{column.Id});
+            Check(!ElementHistoryRelations.Capture(support,new List<string>()).Any(r=>r.Kind=="column_attach" && r.First==column.UniqueId),
+                "Removed column attachment survived incremental cache refresh");
+            using(var tx=new Transaction(doc,"Reattach column for incremental cache"))
+            { tx.Start();ColumnAttachment.AddColumnAttachment(doc,column,support,1,attachStyle,attachJustification,attachOffset);tx.Commit(); }
+            ElementHistoryRelations.Invalidate(doc,new[]{column.Id});
+            Check(ElementHistoryRelations.Capture(support,new List<string>()).Any(r=>r.Kind=="column_attach" && r.First==column.UniqueId),
+                "New column attachment missing from incremental cache refresh");
+            results.Add("incremental attachment cache tracks removal and reattachment without a full model rebuild");
+            for(int wave=0;wave<20 && rp.Recipe.Native?.Ready==false && rp.Recipe.Native.Failure==null;wave++) ElementHistoryNativeArchive.ProcessPending(doc);
+            using(var tx=new Transaction(doc,"Delete column support")){tx.Start();doc.Delete(support.Id);tx.Commit();}
+            batch=ElementHistoryRestoration.Restore(doc,new[]{rs});
+            Check(batch.Created==1 && batch.RelationFailures.Count==0,"Column support restoration: "+JsonConvert.SerializeObject(batch));
+            support=(Floor)doc.GetElement(batch.Items.Single().UniqueId);
+            var actualAttach=ColumnAttachment.GetColumnAttachment(column,1);
+            Check(actualAttach?.TargetId==support.Id && actualAttach.CutStyle==attachStyle && actualAttach.Justification==attachJustification
+                && Math.Abs(actualAttach.AttachOffset-attachOffset)<1e-7,"Column attachment settings preserved");
+            results.Add("floor-only restoration reattaches surviving structural column with cut style, justification and offset");
+            using(var tx=new Transaction(doc,"Delete attached column")){tx.Start();doc.Delete(column.Id);tx.Commit();}
+            batch=ElementHistoryRestoration.Restore(doc,new[]{rp});
+            Check(batch.Created==1 && batch.RelationFailures.Count==0,"Column restoration: "+JsonConvert.SerializeObject(batch));
+            column=(FamilyInstance)doc.GetElement(batch.Items.Single().UniqueId);
+            Check(ColumnAttachment.GetColumnAttachment(column,1)?.TargetId==support.Id,"Restored column attached to earlier restored floor");
+            results.Add("column-only restoration resolves its support restored in an earlier operation");
+            var solidSymbol=CreateSolidCutFamily(ui,doc);
+            FamilyInstance solidTarget,solidCutter;
+            using(var tx=new Transaction(doc,"Solid cut fixture"))
+            {
+                tx.Start();solidSymbol.Activate();doc.Regenerate();
+                solidTarget=AdaptiveComponentInstanceUtils.CreateAdaptiveComponentInstance(doc,solidSymbol);
+                solidCutter=AdaptiveComponentInstanceUtils.CreateAdaptiveComponentInstance(doc,solidSymbol);
+                ElementTransformUtils.MoveElement(doc,solidTarget.Id,new XYZ(0,750,0));
+                ElementTransformUtils.MoveElement(doc,solidCutter.Id,new XYZ(1,751,1));
+                doc.Regenerate();Check(SolidSolidCutUtils.CanElementCutElement(solidCutter,solidTarget,out var reason),"Solid cut fixture validity: "+reason);
+                SolidSolidCutUtils.AddCutBetweenSolids(doc,solidTarget,solidCutter);
+                Check(tx.Commit()==TransactionStatus.Committed,"Solid cut fixture commit");
+            }
+            var st=Request(solidTarget);var sc=Request(solidCutter);var solidVolume=Volume(solidTarget.get_Geometry(new Options()));
+            Check(st.Recipe.GeometryRelations.Any(r=>r.Kind=="solid_cut" && r.First==solidCutter.UniqueId),"Solid cut capture");
+            for(int wave=0;wave<20 && new[]{st,sc}.Any(r=>r.Recipe.Native?.Ready==false && r.Recipe.Native.Failure==null);wave++) ElementHistoryNativeArchive.ProcessPending(doc);
+            using(var tx=new Transaction(doc,"Delete cutting solid")){tx.Start();doc.Delete(solidCutter.Id);tx.Commit();}
+            batch=ElementHistoryRestoration.Restore(doc,new[]{sc});
+            Check(batch.Created==1 && batch.RelationFailures.Count==0,"Cutting solid restore: "+JsonConvert.SerializeObject(batch));
+            solidCutter=(FamilyInstance)doc.GetElement(batch.Items.Single().UniqueId);
+            Check(SolidSolidCutUtils.CutExistsBetweenElements(solidCutter,solidTarget,out var cutterFirst) && cutterFirst
+                && Math.Abs(Volume(solidTarget.get_Geometry(new Options()))-solidVolume)<1e-5,"Solid cut direction and volume preserved");
+            results.Add("solid cutter restored against surviving adaptive solid; cutting direction and volume preserved");
+            using(var tx=new Transaction(doc,"Delete cut solid")){tx.Start();doc.Delete(solidTarget.Id);tx.Commit();}
+            batch=ElementHistoryRestoration.Restore(doc,new[]{st});
+            Check(batch.Created==1 && batch.RelationFailures.Count==0,"Cut solid restore: "+JsonConvert.SerializeObject(batch));
+            solidTarget=(FamilyInstance)doc.GetElement(batch.Items.Single().UniqueId);
+            Check(SolidSolidCutUtils.CutExistsBetweenElements(solidCutter,solidTarget,out cutterFirst) && cutterFirst,"Cut solid restored against earlier restored cutter");
+            results.Add("solid target restored against cutter restored in an earlier operation");
+        }
+
+        private FamilySymbol CreateSolidCutFamily(UIApplication ui,Document project)
+        {
+            var template=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),"Autodesk",
+                "RVT "+ui.Application.VersionNumber,"Family Templates","English","Metric Generic Model Adaptive.rft");
+            var familyDoc=ui.Application.NewFamilyDocument(template);
+            try
+            {
+                using(var tx=new Transaction(familyDoc,"Adaptive solid fixture"))
+                {
+                    tx.Start();familyDoc.FamilyManager.NewType("Cuttable solid");
+                    var plane=SketchPlane.Create(familyDoc,Plane.CreateByNormalAndOrigin(XYZ.BasisZ,XYZ.Zero));
+                    var refs=new ReferenceArray();
+                    foreach(Curve curve in Rectangle(0,0,3,3,0)) refs.Append(familyDoc.FamilyCreate.NewModelCurve(curve,plane).GeometryCurve.Reference);
+                    familyDoc.FamilyCreate.NewExtrusionForm(true,refs,new XYZ(0,0,4));
+                    Check(tx.Commit()==TransactionStatus.Committed,"Adaptive solid fixture commit");
+                }
+                familyDoc.SaveAs(Path.Combine(Output,"BIMaestro-solid-cut.rfa"),new SaveAsOptions());
+                var family=familyDoc.LoadFamily(project);
+                return (FamilySymbol)project.GetElement(family.GetFamilySymbolIds().First());
+            }
+            finally{familyDoc.Close(false);}
+        }
+
+        private void VerifyExtendedElements(UIApplication ui, Document doc, List<string> results)
+        {
+            var roofSymbol = CreateFamily(ui, doc, "Metric Generic Model roof based.rft");
+            var faceSymbol = CreateFamily(ui, doc, "Metric Generic Model face based.rft");
+            var curveSymbol = CreateFamily(ui, doc, "Metric Generic Model line based.rft");
+            var columnSymbol = CreateFamily(ui, doc, "Metric Generic Model two level based.rft");
+            var requests = new List<HistoryRestoreRequest>();
+            void Save(Element element)
+            {
+                string detail = null;
+                var recipe = ElementHistoryReconstruction.Capture(element, s => detail = s);
+                Check(recipe != null, "Extended fixture capture " + element.GetType().Name + ": " + detail);
+                requests.Add(new HistoryRestoreRequest { SourceUniqueId = element.UniqueId, Label = element.GetType().Name, Recipe = recipe });
+            }
+            using (var tx = new Transaction(doc, "Create extended reconstruction fixtures"))
+            {
+                tx.Start();
+                tx.SetFailureHandlingOptions(tx.GetFailureHandlingOptions().SetFailuresPreprocessor(new FixtureFailures()));
+                var level = new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>().OrderBy(l => l.ProjectElevation).First();
+                var top = Level.Create(doc, level.ProjectElevation + 12);
+                var roofType = new FilteredElementCollector(doc).OfClass(typeof(RoofType)).Cast<RoofType>().First();
+                var footprint = new CurveArray();
+                foreach (var curve in Rectangle(300,300,320,320,level.ProjectElevation)) footprint.Append(curve);
+                var mapping = new ModelCurveArray();
+                var roof = doc.Create.NewFootPrintRoof(footprint, level, roofType, out mapping);
+                foreach (ModelCurve model in mapping) roof.set_DefinesSlope(model, false);
+                roof.get_Parameter(BuiltInParameter.ROOF_LEVEL_OFFSET_PARAM).Set(3);
+                doc.Regenerate();
+                Verify(doc, roof, "flat footprint roof with level offset", results);
+                roofSymbol.Activate(); faceSymbol.Activate(); curveSymbol.Activate(); columnSymbol.Activate(); doc.Regenerate();
+                var roofHosted = doc.Create.NewFamilyInstance(new XYZ(304,304,level.ProjectElevation+3), roofSymbol, roof, level, StructuralType.NonStructural);
+                doc.Regenerate();
+                Verify(doc, roofHosted, "roof hosted generic family", results);
+                var topFace = HostObjectUtils.GetTopFaces(roof).First();
+                var face = (Face)roof.GetGeometryObjectFromReference(topFace);
+                var point = face.Project(new XYZ(312,312,level.ProjectElevation+3)).XYZPoint;
+                var faceHosted = doc.Create.NewFamilyInstance(topFace, point, XYZ.BasisX, faceSymbol);
+                var linear = doc.Create.NewFamilyInstance(Line.CreateBound(new XYZ(330,300,level.ProjectElevation),new XYZ(350,300,level.ProjectElevation)),curveSymbol,level,StructuralType.NonStructural);
+                var column = doc.Create.NewFamilyInstance(new XYZ(360,300,level.ProjectElevation),columnSymbol,level,StructuralType.NonStructural);
+                column.get_Parameter(BuiltInParameter.FAMILY_TOP_LEVEL_PARAM)?.Set(top.Id);
+                doc.Regenerate();
+                Verify(doc, faceHosted, "face hosted generic family", results);
+                Verify(doc, linear, "line based generic family", results);
+                Verify(doc, column, "two level generic family", results);
+                Save(roofHosted); Save(faceHosted); Save(linear); Save(column); Save(roof);
+                foreach (var saved in requests.Last().Recipe.SketchCurves)
+                    requests.Insert(0, new HistoryRestoreRequest { SourceUniqueId = saved.SourceUniqueId, Label = "Sketch child", Category = "<Esquisse>", CaptureFailure = "Historical sketch member" });
+                var wallType = new FilteredElementCollector(doc).OfClass(typeof(WallType)).Cast<WallType>().First(t=>t.Kind==WallKind.Basic);
+                var profilePoints = new[] { new XYZ(400,300,level.ProjectElevation), new XYZ(420,300,level.ProjectElevation),
+                    new XYZ(420,300,level.ProjectElevation+9), new XYZ(410,300,level.ProjectElevation+12), new XYZ(400,300,level.ProjectElevation+9) };
+                var wall = Wall.Create(doc, Enumerable.Range(0,profilePoints.Length).Select(i=>(Curve)Line.CreateBound(profilePoints[i],profilePoints[(i+1)%profilePoints.Length])).ToList(),wallType.Id,level.Id,false,XYZ.BasisY);
+                WallUtils.DisallowWallJoinAtEnd(wall,0); WallUtils.DisallowWallJoinAtEnd(wall,1);
+                doc.Regenerate(); Verify(doc,wall,"wall with a non-rectangular sketch profile",results); Save(wall);
+                var floorType = new FilteredElementCollector(doc).OfClass(typeof(FloorType)).Cast<FloorType>().First(t=>!t.IsFoundationSlab);
+                var shaped = Floor.Create(doc,new[] { Rectangle(430,300,450,320,level.ProjectElevation) },floorType.Id,level.Id);
+                doc.Regenerate();
+#if REVIT2024 || REVIT2025_OR_GREATER
+                var editor = shaped.GetSlabShapeEditor();
+#else
+                var editor = shaped.SlabShapeEditor;
+#endif
+                editor.Enable(); doc.Regenerate();
+                var baseZ=editor.SlabShapeVertices.Cast<SlabShapeVertex>().First().Position.Z;
+                var vertex=editor.DrawPoint(new XYZ(440,310,baseZ));
+                Check(vertex!=null,"Shape fixture point"); editor.ModifySubElement(vertex,2); doc.Regenerate();
+                Verify(doc,shaped,"floor modified by an interior shape point",results); Save(shaped);
+                var plane=SketchPlane.Create(doc,Plane.CreateByNormalAndOrigin(XYZ.BasisZ,new XYZ(0,0,level.ProjectElevation)));
+                var modelCurve=doc.Create.NewModelCurve(Arc.Create(new XYZ(470,300,level.ProjectElevation),new XYZ(490,300,level.ProjectElevation),new XYZ(480,305,level.ProjectElevation)),plane);
+                doc.Regenerate(); Save(modelCurve);
+                var ceilingType = new FilteredElementCollector(doc).OfClass(typeof(CeilingType)).FirstElementId();
+                if (ceilingType != ElementId.InvalidElementId)
+                {
+                    var ceiling = Ceiling.Create(doc,new[] { Rectangle(370,300,390,320,level.ProjectElevation), Rectangle(375,305,380,310,level.ProjectElevation) },ceilingType,level.Id);
+                    ceiling.get_Parameter(BuiltInParameter.CEILING_HEIGHTABOVELEVEL_PARAM).Set(9);
+                    doc.Regenerate(); Verify(doc, ceiling, "ceiling with hole and offset", results); Save(ceiling);
+                }
+                Check(tx.Commit()==TransactionStatus.Committed,"Extended fixture commit");
+            }
+            var originals = requests.Where(r=>r.Recipe!=null).Select(r=>doc.GetElement(r.SourceUniqueId).Id).ToList();
+            using(var tx=new Transaction(doc,"Delete extended fixtures"))
+            { tx.Start(); doc.Delete(originals); Check(tx.Commit()==TransactionStatus.Committed,"Extended fixture deletion"); }
+            requests=JsonConvert.DeserializeObject<List<HistoryRestoreRequest>>(JsonConvert.SerializeObject(requests));
+            var batch=ElementHistoryRestoration.Restore(doc,requests);
+            Check(batch.Failed==0 && batch.Created==requests.Count(r=>r.Recipe!=null) && batch.IncludedInParent==4,
+                "Extended restoration with children before parents: "+JsonConvert.SerializeObject(batch));
+            var roofItem=batch.Items.Single(i=>i.Label=="FootPrintRoof");
+            var restoredHost=doc.GetElement(roofItem.UniqueId);
+            foreach(var item in batch.Items.Where(i=>i.Label=="FamilyInstance"))
+            {
+                var restored=(FamilyInstance)doc.GetElement(item.UniqueId);
+                var request=requests.Single(r=>r.SourceUniqueId==item.SourceUniqueId);
+                if(request.Recipe.Host!=null)
+                {
+                    var expectedHost=doc.GetElement(request.Recipe.Host)
+                        ?? doc.GetElement(batch.Items.Single(i=>i.SourceUniqueId==request.Recipe.Host).UniqueId);
+                    Check(restored.Host?.Id==expectedHost.Id,"Family must use its original or restored support");
+                }
+                if(request.Recipe.Placement==FamilyPlacementType.CurveBased.ToString())
+                {
+                    var actual=((LocationCurve)restored.Location).Curve;
+                    var saved=ElementHistoryReconstruction.RestoreCurve(request.Recipe.Loops.Single().Single());
+                    Check(actual.GetEndPoint(0).DistanceTo(saved.GetEndPoint(0))<1e-6
+                        && actual.GetEndPoint(1).DistanceTo(saved.GetEndPoint(1))<1e-6,"Line based family placement curve changed");
+                }
+            }
+            var repeated=ElementHistoryRestoration.Restore(doc,requests);
+            Check(repeated.Created==0 && repeated.Failed==0 && repeated.Existing==requests.Count,"Extended restoration duplicated parent or sketch children");
+            var newerRequests=batch.Items.Select(i=>
+            {
+                var element=doc.GetElement(i.UniqueId);
+                return new HistoryRestoreRequest { SourceUniqueId=element.UniqueId,Label=i.Label,Category=element.Category?.Name,
+                    Recipe=ElementHistoryReconstruction.Capture(element) };
+            }).ToList();
+            using(var tx=new Transaction(doc,"Delete restored extended fixtures"))
+            { tx.Start(); doc.Delete(batch.Items.Select(i=>doc.GetElement(i.UniqueId).Id).ToList()); Check(tx.Commit()==TransactionStatus.Committed,"Repeated extended deletion"); }
+            newerRequests=JsonConvert.DeserializeObject<List<HistoryRestoreRequest>>(JsonConvert.SerializeObject(newerRequests));
+            var newerBatch=ElementHistoryRestoration.Restore(doc,newerRequests);
+            Check(newerBatch.Failed==0,"Restore latest extended history: "+JsonConvert.SerializeObject(newerBatch));
+            var olderBatch=ElementHistoryRestoration.Restore(doc,requests);
+            Check(olderBatch.Created==0 && olderBatch.Failed==0 && olderBatch.Existing==requests.Count,"Older sketch identities lost after a second deletion/restoration");
+            var calo=ElementHistoryRestoration.Restore(doc,new[] {
+                new HistoryRestoreRequest{SourceUniqueId="calo-generic",Category="Modèles génériques",Label="CML_Calorifuge [1]"},
+                new HistoryRestoreRequest{SourceUniqueId="calo-pipe",Category="Pipe Insulations",Label="Pipe insulation"},
+                new HistoryRestoreRequest{SourceUniqueId="calo-duct",Category="Duct Insulations",Label="Duct insulation"} });
+            Check(calo.Items.Count==0 && calo.Failed==0,"Calorifuge must stay deleted");
+            results.Add("roof, roof/face hosted, line and two-level families, ceiling; dependency ordering; sketch ownership and duplicate prevention");
+            results.Add("older sketch origins preserved across repeated deletion/restoration; calorifuge remains excluded");
+        }
+
+        private void VerifyNativeArchive(UIApplication ui, Document doc, List<string> results)
+        {
+            var roots = new List<Element>();
+            Pipe outsidePeer=null;
+            Level level, top;
+            using (var tx = new Transaction(doc,"Native archive fixtures"))
+            {
+                tx.Start();
+                level = new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>().First();
+                top = Level.Create(doc,level.Elevation+10);
+                var wallType = new FilteredElementCollector(doc).OfClass(typeof(WallType)).Cast<WallType>().First(t=>t.Kind==WallKind.Basic);
+                var wall = Wall.Create(doc,Line.CreateBound(new XYZ(0,0,0),new XYZ(20,0,0)),wallType.Id,level.Id,10,0,false,false);
+                var other = Wall.Create(doc,Line.CreateBound(new XYZ(0,10,0),new XYZ(20,10,0)),wallType.Id,level.Id,10,0,false,false);
+                var calo = DirectShape.CreateElement(doc,new ElementId(BuiltInCategory.OST_GenericModel));
+                calo.Name = "CML_Calorifuge";
+                calo.SetShape(new GeometryObject[]{GeometryCreationUtilities.CreateExtrusionGeometry(new[]{Rectangle(3,3,5,5,0)},XYZ.BasisZ,2)});
+                var nested=doc.Create.NewGroup(new[]{wall.Id,other.Id});
+                roots.Add(doc.Create.NewGroup(new[]{nested.Id,calo.Id}));
+                var curtainType = new FilteredElementCollector(doc).OfClass(typeof(WallType)).Cast<WallType>().First(t=>t.Kind==WallKind.Curtain);
+                roots.Add(Wall.Create(doc,Line.CreateBound(new XYZ(40,0,0),new XYZ(60,0,0)),curtainType.Id,level.Id,10,0,false,false));
+                var shape = DirectShape.CreateElement(doc,new ElementId(BuiltInCategory.OST_GenericModel));
+                shape.SetShape(new GeometryObject[]{GeometryCreationUtilities.CreateExtrusionGeometry(new[]{Rectangle(80,0,85,5,0)},XYZ.BasisZ,7)});
+                roots.Add(shape);
+                var railType = new FilteredElementCollector(doc).OfClass(typeof(RailingType)).First();
+                roots.Add(Railing.Create(doc,CurveLoop.Create(new List<Curve>{Line.CreateBound(new XYZ(100,0,0),new XYZ(120,0,0))}),railType.Id,level.Id));
+                var pipeType=new FilteredElementCollector(doc).OfClass(typeof(PipeType)).FirstElementId();
+                var systemType=new FilteredElementCollector(doc).OfClass(typeof(PipingSystemType)).FirstElementId();
+                var p1=Pipe.Create(doc,systemType,pipeType,level.Id,new XYZ(200,0,5),new XYZ(210,0,5));
+                var p2=Pipe.Create(doc,systemType,pipeType,level.Id,new XYZ(210,0,5),new XYZ(220,0,5));
+                outsidePeer=Pipe.Create(doc,systemType,pipeType,level.Id,new XYZ(220,0,5),new XYZ(230,0,5));
+                ElementHistoryNetwork.Ports(p1).OrderBy(p=>p.Origin.X).Last().ConnectTo(ElementHistoryNetwork.Ports(p2).OrderBy(p=>p.Origin.X).First());
+                ElementHistoryNetwork.Ports(p2).OrderBy(p=>p.Origin.X).Last().ConnectTo(ElementHistoryNetwork.Ports(outsidePeer).OrderBy(p=>p.Origin.X).First());
+                roots.Add(doc.Create.NewGroup(new[]{p1.Id,p2.Id}));
+                Check(tx.Commit()==TransactionStatus.Committed,"Native fixture commit");
+            }
+            using (var scope = new StairsEditScope(doc,"Native stair fixture"))
+            {
+                var id = scope.Start(level.Id,top.Id);
+                using(var tx=new Transaction(doc,"Stair run"))
+                { tx.Start(); var stair=(Stairs)doc.GetElement(id); var length=(stair.DesiredRisersNumber-1)*stair.ActualTreadDepth;
+                    StairsRun.CreateStraightRun(doc,id,Line.CreateBound(new XYZ(140,0,level.Elevation),new XYZ(140+length,0,level.Elevation)),StairsRunJustification.Center); tx.Commit(); }
+                scope.Commit(new FixtureFailures());
+                roots.Add(doc.GetElement(id));
+            }
+            using(var tx=new Transaction(doc,"Isolate native fixture geometry"))
+            { tx.Start();ElementTransformUtils.MoveElements(doc,roots.Select(e=>e.Id).Concat(new[]{outsidePeer.Id}).ToList(),new XYZ(1000,1000,0));tx.Commit(); }
+            var requests = roots.Select(e=>new HistoryRestoreRequest{SourceUniqueId=e.UniqueId,Label=e.GetType().Name,
+                Recipe=ElementHistoryReconstruction.Capture(e)}).ToList();
+            // Capture every group/stair/curtain component through the production fallback.
+            var group = roots.OfType<Group>().First();
+            foreach(var id in group.GetMemberIds())
+            {
+                var e=doc.GetElement(id); requests.Add(new HistoryRestoreRequest{SourceUniqueId=e.UniqueId,Label="group member",Recipe=ElementHistoryReconstruction.Capture(e)});
+                if(e.Name.Contains("Calorifuge")) requests.RemoveAt(requests.Count-1);
+            }
+            var stairs=roots.OfType<Stairs>().Single();
+            foreach(var id in stairs.GetStairsRuns())
+            {
+                var e=doc.GetElement(id);requests.Add(new HistoryRestoreRequest{SourceUniqueId=e.UniqueId,Label="stair run",Recipe=ElementHistoryReconstruction.Capture(e)});
+            }
+            var curtain=roots.OfType<Wall>().Single();
+            foreach(var id in curtain.CurtainGrid.GetPanelIds())
+            {
+                var e=doc.GetElement(id); requests.Add(new HistoryRestoreRequest{SourceUniqueId=e.UniqueId,Label="curtain panel",Recipe=ElementHistoryReconstruction.Capture(e)});
+            }
+            var before=Ids(doc);
+            var volumes=requests.ToDictionary(r=>r.SourceUniqueId,r=>Volume(doc.GetElement(r.SourceUniqueId).get_Geometry(new Options())));
+            for(int wave=0;wave<20 && requests.Any(r=>r.Recipe?.Native?.Ready==false && r.Recipe.Native.Failure==null);wave++) ElementHistoryNativeArchive.ProcessPending(doc);
+            Check(before.SequenceEqual(Ids(doc)),"Archiving changed source model");
+            Check(requests.All(r=>r.Recipe?.Native?.Ready==true),"Archive receipt failure: "+JsonConvert.SerializeObject(requests));
+            // After one fallback exists, edits to supported objects must not start
+            // archiving the entire model. This reproduced the continuous idle load.
+            Wall ordinary;
+            using(var tx=new Transaction(doc,"Supported object alongside native archive"))
+            {
+                tx.Start();var type=new FilteredElementCollector(doc).OfClass(typeof(WallType)).Cast<WallType>().First(t=>t.Kind==WallKind.Basic);
+                ordinary=Wall.Create(doc,Line.CreateBound(new XYZ(2000,2000,0),new XYZ(2020,2000,0)),type.Id,level.Id,10,0,false,false);
+                tx.Commit();
+            }
+            var directory=Path.Combine(CollaborativeModelTrackerStore.ActiveDirectory,"native-history");
+            var archiveCount=Directory.GetFiles(directory,"snapshot-*.rvt").Length;
+            Check(ElementHistoryReconstruction.Capture(ordinary)?.Kind=="wall","Supported wall unexpectedly needs a native fallback");
+            ElementHistoryNativeArchive.Invalidate(doc,new[]{ordinary.Id,outsidePeer.Id});
+            ElementHistoryNativeArchive.ProcessPending(doc);
+            Check(Directory.GetFiles(directory,"snapshot-*.rvt").Length==archiveCount
+                && ElementHistoryNativeArchive.Find(doc,ordinary.UniqueId)==null && ElementHistoryNativeArchive.Find(doc,outsidePeer.UniqueId)==null,
+                "Ordinary edits queued unnecessary native archives");
+            results.Add("supported wall and pipe edits do not create native archives after fallback initialization");
+            File.WriteAllText(Path.Combine(Output,"native-recipes.json"),JsonConvert.SerializeObject(requests,Formatting.Indented));
+            requests=JsonConvert.DeserializeObject<List<HistoryRestoreRequest>>(JsonConvert.SerializeObject(requests));
+            using(var tx=new Transaction(doc,"Delete native archive fixtures"))
+            { tx.Start();doc.Delete(roots.Select(e=>e.Id).ToList());Check(tx.Commit()==TransactionStatus.Committed,"Native deletion"); }
+            ElementHistoryNativeArchive.Forget(doc);
+            var batch=ElementHistoryRestoration.Restore(doc,requests);
+            File.WriteAllText(Path.Combine(Output,"native-restoration.json"),JsonConvert.SerializeObject(batch,Formatting.Indented));
+            Check(batch.Failed==0,"Native restore failed: "+JsonConvert.SerializeObject(batch));
+            Check(batch.ConnectionFailures.Count==0,"Grouped MEP reconnection failed: "+string.Join("; ",batch.ConnectionFailures));
+            var peerPort=ElementHistoryNetwork.Ports(outsidePeer).OrderBy(p=>p.Origin.X).First();
+            Check(peerPort.IsConnected,"Grouped pipe lost connection to its existing external neighbor");
+            foreach(var r in requests)
+            {
+                var item=batch.Items.Single(i=>i.SourceUniqueId==r.SourceUniqueId);
+                Check(doc.GetElement(item.UniqueId)!=null,"Restored native component missing");
+                var restoredVolume=Volume(doc.GetElement(item.UniqueId).get_Geometry(new Options()));
+                Check(Math.Abs(restoredVolume-volumes[r.SourceUniqueId])<1e-4,"Native geometry changed: "+r.Label+" "+volumes[r.SourceUniqueId]+" -> "+restoredVolume);
+                results.Add("native archive: "+r.Label+"; identity preserved");
+            }
+            var again=ElementHistoryRestoration.Restore(doc,requests);
+            Check(again.Created==0 && again.Existing==requests.Count && again.Failed==0,"Native restoration duplicated roots/members");
+            Check(!new FilteredElementCollector(doc).WhereElementIsNotElementType().Any(e=>e.Name=="CML_Calorifuge"),"Native group restored calorifuge");
+            var restoredGroup=(Group)doc.GetElement(batch.Items.Single(i=>i.SourceUniqueId==requests[0].SourceUniqueId).UniqueId);
+            Check(restoredGroup.GetMemberIds().Count==1,"Filtered outer group retained calorifuge or lost nested group");
+            var restoredNested=doc.GetElement(restoredGroup.GetMemberIds().Single()) as Group;
+            Check(restoredNested!=null && restoredNested.GetMemberIds().Count==2,"Filtered nested group lost useful walls");
+            results.Add("native archives remain usable after serialization and cache disposal; repeated restore creates no duplicates; source unchanged");
+            results.Add("native group retains its two walls and excludes embedded calorifuge");
+            results.Add("native MEP group preserves its internal connection and reconnects the existing external pipe");
+            var newer=batch.Items.Select(item=>
+            {
+                var element=doc.GetElement(item.UniqueId);
+                return new HistoryRestoreRequest { SourceUniqueId=element.UniqueId,Label=item.Label,Recipe=ElementHistoryReconstruction.Capture(element) };
+            }).ToList();
+            for(int wave=0;wave<20 && newer.Any(r=>r.Recipe?.Native?.Ready==false && r.Recipe.Native.Failure==null);wave++) ElementHistoryNativeArchive.ProcessPending(doc);
+            Check(newer.All(r=>r.Recipe?.Native?.Ready==true),"Native recapture failed");
+            using(var tx=new Transaction(doc,"Delete restored native objects again"))
+            { tx.Start();doc.Delete(batch.Items.Where(i=>i.Created).Select(i=>doc.GetElement(i.UniqueId).Id).ToList());tx.Commit(); }
+            var newerBatch=ElementHistoryRestoration.Restore(doc,newer);
+            Check(newerBatch.Failed==0 && newerBatch.ConnectionFailures.Count==0,"Native second restoration failed: "+JsonConvert.SerializeObject(newerBatch));
+            var olderBatch=ElementHistoryRestoration.Restore(doc,requests);
+            Check(olderBatch.Created==0 && olderBatch.Existing==requests.Count && olderBatch.Failed==0,"Native older identities lost after second deletion");
+            results.Add("nested groups and original native component identities preserved through a second deletion/restoration");
+        }
+
+        private void VerifyLogicalSystems(Document doc,List<string> results)
+        {
+            var members=new List<Element>();
+            using(var tx=new Transaction(doc,"Logical system fixtures"))
+            {
+                tx.Start();
+                var level=new FilteredElementCollector(doc).OfClass(typeof(Level)).FirstElementId();
+                var pipeType=new FilteredElementCollector(doc).OfClass(typeof(PipeType)).FirstElementId();
+                var pipeSystemType=new FilteredElementCollector(doc).OfClass(typeof(PipingSystemType)).FirstElementId();
+                var ductType=new FilteredElementCollector(doc).OfClass(typeof(DuctType)).FirstElementId();
+                var ductSystemType=new FilteredElementCollector(doc).OfClass(typeof(MechanicalSystemType)).FirstElementId();
+                members.Add(Pipe.Create(doc,pipeSystemType,pipeType,level,new XYZ(200,100,10),new XYZ(210,100,10)));
+                members.Add(Duct.Create(doc,ductSystemType,ductType,level,new XYZ(200,120,10),new XYZ(210,120,10)));
+                Check(tx.Commit()==TransactionStatus.Committed,"Logical fixtures commit");
+            }
+            var systems=members.SelectMany(ElementHistoryNetwork.Ports).Select(p=>p.MEPSystem).Where(s=>s!=null).GroupBy(s=>s.UniqueId).Select(g=>g.First()).ToList();
+            Check(systems.Count==2,"Missing pipe/duct logical fixtures");
+            var requests=systems.Cast<Element>().Concat(members).Select(e=>new HistoryRestoreRequest{SourceUniqueId=e.UniqueId,Label=e.GetType().Name,Recipe=ElementHistoryReconstruction.Capture(e)}).ToList();
+            Check(requests.All(r=>r.Recipe!=null),"Missing logical system recipe");
+            using(var tx=new Transaction(doc,"Delete logical networks"))
+            { tx.Start(); doc.Delete(members.Select(e=>e.Id).ToList());tx.Commit(); }
+            var batch=ElementHistoryRestoration.Restore(doc,requests);
+            Check(batch.Failed==0,"Logical system restoration failed: "+JsonConvert.SerializeObject(batch));
+            foreach(var request in requests.Where(r=>r.Recipe.SystemMembers!=null))
+            {
+                var item=batch.Items.Single(i=>i.SourceUniqueId==request.SourceUniqueId);
+                var system=doc.GetElement(item.UniqueId) as MEPSystem;
+                Check(system!=null && system.Name==request.Recipe.SystemName && system.GetTypeId()==doc.GetElement(request.Recipe.Type).Id,"Logical system name/type not preserved");
+                results.Add("logical "+request.Recipe.Kind+": members, type, name and historical identity restored");
+            }
+            var again=ElementHistoryRestoration.Restore(doc,requests);
+            Check(again.Created==0 && again.Existing==requests.Count && again.Failed==0,"Logical systems duplicated on second restore");
+        }
+
+        private void VerifyElectricalSystems(UIApplication ui, Document doc, List<string> results)
+        {
+            VerifyElectricalSystem(ui,doc,results,false);
+            VerifyElectricalSystem(ui,doc,results,true);
+        }
+
+        private void VerifyElectricalSystem(UIApplication ui, Document doc, List<string> results, bool power)
+        {
+            var firstResult=results.Count;
+            var kind=power ? ElectricalSystemType.PowerCircuit : ElectricalSystemType.Data;
+            var fixture = CreateFamily(ui,doc,"Metric Electrical Fixture.rft",electrical:true,power:power);
+            var panelType = CreateFamily(ui,doc,"Metric Electrical Equipment.rft",electrical:true,power:power);
+            List<HistoryRestoreRequest> requests;
+            double expectedVoltage;
+            using(var tx=new Transaction(doc,"Electrical circuit fixtures"))
+            {
+                tx.Start(); fixture.Activate(); panelType.Activate(); doc.Regenerate();
+                var level=new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>().First();
+                var panel=doc.Create.NewFamilyInstance(new XYZ(500,500,0),panelType,level,StructuralType.NonStructural);
+                if(power)
+                {
+                    panel.get_Parameter(BuiltInParameter.RBS_ELEC_MAX_POLE_BREAKERS)?.Set(12);
+                    var settings=ElectricalSetting.GetElectricalSettings(doc);
+                    var voltage=settings.AddVoltageType("History 230",230,220,240);
+                    var lineVoltage=settings.AddVoltageType("History 400",400,380,420);
+                    var distribution=settings.AddDistributionSysType("History three phase",ElectricalPhase.ThreePhase,ElectricalPhaseConfiguration.Wye,4,lineVoltage,voltage);
+                    doc.Regenerate();
+                    File.WriteAllText(Path.Combine(Output,"panel-parameters.json"),JsonConvert.SerializeObject(panel.Parameters.Cast<Parameter>().Select(p=>new{Name=p.Definition.Name,Id=p.Id.GetIdLongValue(),Value=p.AsValueString()})));
+                    ((ElectricalEquipment)panel.MEPModel).DistributionSystem=distribution;
+                }
+                var a=doc.Create.NewFamilyInstance(new XYZ(510,500,0),fixture,level,StructuralType.NonStructural);
+                var b=doc.Create.NewFamilyInstance(new XYZ(520,500,0),fixture,level,StructuralType.NonStructural);
+                doc.Regenerate();
+                var system=ElectricalSystem.Create(doc,new[]{a.Id,b.Id},kind);
+                system.SelectPanel(panel);
+                system.get_Parameter(BuiltInParameter.RBS_ELEC_CIRCUIT_NAME)?.Set("History data circuit");
+                doc.Regenerate();
+                if(power)
+                {
+                    var schedule=PanelScheduleView.CreateInstanceView(doc,panel.Id);
+                    IList<int> rows,cols,targetRows,targetCols;
+                    schedule.GetCellsBySlotNumber(system.StartSlot,out rows,out cols);
+                    schedule.GetCellsBySlotNumber(7,out targetRows,out targetCols);
+                    Check(rows.Count>0 && targetRows.Count>0 && schedule.CanMoveSlotTo(rows[0],cols[0],targetRows[0],targetCols[0]),"Power slot fixture unavailable");
+                    schedule.MoveSlotTo(rows[0],cols[0],targetRows[0],targetCols[0]);
+                    doc.Regenerate();
+                    system.SetCircuitPath(system.GetCircuitPath());
+                }
+                requests=new Element[]{system,a,b,panel}.Select(e=>new HistoryRestoreRequest{SourceUniqueId=e.UniqueId,Label=e.GetType().Name,Recipe=ElementHistoryReconstruction.Capture(e)}).ToList();
+                expectedVoltage=power ? system.Voltage : 0;
+                Check(requests.All(r=>r.Recipe!=null),"Missing electrical fixture recipe");
+                Check(tx.Commit()==TransactionStatus.Committed,"Electrical fixtures commit");
+            }
+            requests=JsonConvert.DeserializeObject<List<HistoryRestoreRequest>>(JsonConvert.SerializeObject(requests));
+            var circuitRequest=requests[0];
+            File.WriteAllText(Path.Combine(Output,power ? "power-requests.json" : "data-requests.json"),JsonConvert.SerializeObject(requests,Formatting.Indented));
+            // First recreate only the logical circuit while its physical components survive.
+            using(var tx=new Transaction(doc,"Delete only the circuit"))
+            { tx.Start(); doc.Delete(doc.GetElement(circuitRequest.SourceUniqueId).Id); tx.Commit(); }
+            var only=ElementHistoryRestoration.Restore(doc,new[]{circuitRequest});
+            Check(only.Created==1 && only.Failed==0,"Circuit-only restore failed: "+JsonConvert.SerializeObject(only));
+            results.Add("electrical circuit restored on surviving equipment and panel");
+            var current=(ElectricalSystem)doc.GetElement(only.Items[0].UniqueId);
+            Check(current.BaseEquipment.UniqueId==circuitRequest.Recipe.Host && current.Elements.Size==2,"Electrical members/panel mismatch");
+            Check(current.LoadName=="History data circuit","Electrical load name mismatch");
+            var memberRequest=requests[1];
+            using(var tx=new Transaction(doc,"Delete one circuit member"))
+            {tx.Start();current.get_Parameter(BuiltInParameter.RBS_ELEC_CIRCUIT_NAME).Set("Surviving edited circuit");doc.Delete(doc.GetElement(memberRequest.SourceUniqueId).Id);tx.Commit();}
+            Check(current.Elements.Size==1,"Expected surviving circuit after deleting one member");
+            var deviceBatch=ElementHistoryRestoration.Restore(doc,new[]{memberRequest});
+            Check(deviceBatch.Failed==0 && current.Elements.Size==2,"Deleted electrical member not reattached: "+JsonConvert.SerializeObject(deviceBatch));
+            Check(current.LoadName=="Surviving edited circuit","Surviving circuit user edits overwritten");
+            results.Add("restoring a device alone also reattaches it to its surviving circuit");
+            using(var tx=new Transaction(doc,"Delete electrical network"))
+            { tx.Start();doc.Delete(requests.Skip(1).Select(r=>doc.GetElement(r.SourceUniqueId)
+                ?? doc.GetElement(deviceBatch.Items.FirstOrDefault(i=>i.SourceUniqueId==r.SourceUniqueId)?.UniqueId)).Select(e=>e.Id).Concat(new[]{current.Id}).ToList());tx.Commit(); }
+            var batch=ElementHistoryRestoration.Restore(doc,requests);
+            Check(batch.Failed==0 && batch.Created==requests.Count,"Electrical network restore failed: "+JsonConvert.SerializeObject(batch));
+            current=(ElectricalSystem)doc.GetElement(batch.Items.Single(i=>i.SourceUniqueId==circuitRequest.SourceUniqueId).UniqueId);
+            Check(current.BaseEquipment.Id==doc.GetElement(batch.Items.Single(i=>i.SourceUniqueId==circuitRequest.Recipe.Host).UniqueId).Id
+                && current.Elements.Size==2 && current.SystemType==kind && current.LoadName=="History data circuit","Restored electrical network mismatch");
+            if(power) Check(current.PolesNumber==1 && Math.Abs(current.Voltage-expectedVoltage)<1e-6
+                && current.StartSlot==circuitRequest.Recipe.ElectricalStartSlot && current.CircuitNumber==circuitRequest.Recipe.ElectricalCircuitNumber,"Power circuit voltage/poles/slot/number mismatch");
+            results.Add("electrical equipment and panel restored before circuit; members, type and load name preserved through JSON");
+            var again=ElementHistoryRestoration.Restore(doc,requests);
+            Check(again.Created==0 && again.Existing==requests.Count && again.Repaired==0,"Electrical circuit duplicated or unnecessarily repaired");
+            results.Add("electrical circuit restoration is idempotent");
+            using(var tx=new Transaction(doc,"Missing equipment electrical fixture"))
+            { tx.Start();doc.Delete(current.Id);tx.Commit(); }
+            var missing=JsonConvert.DeserializeObject<HistoryRestoreRequest>(JsonConvert.SerializeObject(circuitRequest));
+            missing.Recipe.SystemMembers.Add(Guid.NewGuid().ToString()+"-00000001");
+            var missingBatch=ElementHistoryRestoration.Restore(doc,new[]{missing});
+            Check(missingBatch.Failed==1 && new FilteredElementCollector(doc).OfClass(typeof(ElectricalSystem)).GetElementCount()==0,"Incomplete electrical circuit was created");
+            results.Add("missing electrical member rolls back instead of creating an incomplete circuit");
+            var missingPanel=JsonConvert.DeserializeObject<HistoryRestoreRequest>(JsonConvert.SerializeObject(circuitRequest));
+            missingPanel.Recipe.Host=Guid.NewGuid().ToString()+"-00000001";
+            Check(ElementHistoryRestoration.Restore(doc,new[]{missingPanel}).Failed==1,"Missing electrical panel accepted");
+            results.Add("missing electrical panel does not create a disconnected circuit");
+            using(var tx=new Transaction(doc,"Conflicting circuit fixture"))
+            {
+                tx.Start();
+                var level=new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>().First();
+                var third=doc.Create.NewFamilyInstance(new XYZ(530,500,0),fixture,level,StructuralType.NonStructural);
+                doc.Regenerate();
+                var member=doc.GetElement(batch.Items.Single(i=>i.SourceUniqueId==requests[1].SourceUniqueId).UniqueId);
+                ElectricalSystem.Create(doc,new[]{member.Id,third.Id},kind);
+                tx.Commit();
+            }
+            var conflict=ElementHistoryRestoration.Restore(doc,new[]{circuitRequest});
+            Check(conflict.Failed==1 && new FilteredElementCollector(doc).OfClass(typeof(ElectricalSystem)).GetElementCount()==1,"Surviving electrical circuit was overwritten");
+            results.Add("equipment already in a different circuit is preserved and conflict reported");
+            using(var tx=new Transaction(doc,"Clean electrical conflict fixture"))
+            {tx.Start();doc.Delete(new FilteredElementCollector(doc).OfClass(typeof(ElectricalSystem)).ToElementIds());tx.Commit();}
+            for(var i=firstResult;i<results.Count;i++) results[i]=(power ? "power circuit: " : "data circuit: ")+results[i];
+        }
+
         private static CurveLoop Rectangle(double x,double y,double x2,double y2,double z)
         {
             var points=new[]{new XYZ(x,y,z),new XYZ(x2,y,z),new XYZ(x2,y2,z),new XYZ(x,y2,z)};

@@ -35,6 +35,14 @@ namespace BIMaestro.Codex
                         throw new InvalidOperationException("First-page PNG could not be decoded.");
                     Console.WriteLine("Rendered first page: " + bitmap.Width + "x" + bitmap.Height + " px, " + images[0].Png.Length + " bytes");
                 }
+                var repeated = attachment.RenderPages(new[] { 1 });
+                if (repeated.Length != 1 || repeated[0].Png.Length < 100)
+                    throw new InvalidOperationException("Repeated rendering failed after unloading the first PDF domain.");
+                bool invalidRejected = false;
+                try { attachment.RenderPages(new[] { 0 }); }
+                catch (InvalidOperationException) { invalidRejected = true; }
+                if (!invalidRejected) throw new InvalidOperationException("Invalid page accepted across PDF domain boundary.");
+                Console.WriteLine("Repeated rendering and invalid-page rejection passed.");
                 return 0;
             }
             catch (Exception ex)

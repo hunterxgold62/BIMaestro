@@ -3,6 +3,7 @@ using Autodesk.Revit.DB.ExtensibleStorage;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 namespace Analyse
@@ -41,6 +42,9 @@ namespace Analyse
         public int Failed => Items.Count(i => !i.Created && !i.Existing && !i.IncludedInParent);
         public int ConnectionsRestored { get; set; }
         public int ConnectionsExisting { get; set; }
+        public int RelationsRestored { get; set; }
+        public int RelationsExisting { get; set; }
+        public List<string> RelationFailures { get; } = new List<string>();
         public List<string> ConnectionFailures { get; } = new List<string>();
         public List<string> CaptureWarnings { get; } = new List<string>();
         public int Repaired => Items.Count(i => i.Repaired);
@@ -49,8 +53,8 @@ namespace Analyse
 
     internal static class ElementHistoryRestoration
     {
-        // Old histories only retain localized categories and labels. Keep matching
-        // explicit: an unrelated parameter mentioning insulation is not an exclusion.
+        // Insulation remains deliberately deleted, including generic families
+        // named calorifuge and older histories without reconstruction recipes.
         internal static bool IsCalorifuge(string category, string label)
         {
             var name = (category ?? "").Trim();
@@ -84,6 +88,14 @@ namespace Analyse
             return entity.IsValid() ? entity.Get<IList<string>>(schema.GetField("OriginalUniqueIds")).ToList() : null;
         }
 
+        internal static void SetOrigins(Element element, IEnumerable<string> origins)
+        {
+            var schema = OriginSchema();
+            var entity = new Entity(schema);
+            entity.Set<IList<string>>(schema.GetField("OriginalUniqueIds"), origins.Where(s => !string.IsNullOrEmpty(s)).Distinct().ToList());
+            element.SetEntity(entity);
+        }
+
         private static Dictionary<string, string> ReadIndex(Document doc)
         {
             var result = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -102,16 +114,31 @@ namespace Analyse
                 && ElementHistoryReconstruction.FindOriginal(doc, restored) != null ? restored : null;
         }
 
-        internal static HistoryRestoreBatch Restore(Document doc, IEnumerable<HistoryRestoreRequest> requests)
+        internal static HistoryRestoreBatch Restore(Document doc, IEnumerable<HistoryRestoreRequest> requests,
+            Action refreshView = null)
         {
             if (doc == null || doc.IsFamilyDocument || doc.IsReadOnly || doc.IsModifiable)
                 throw new InvalidOperationException("Restoration requires an editable project outside a transaction.");
             var batch = new HistoryRestoreBatch();
+            var display = new RestoreDisplay(refreshView);
             var index = ReadIndex(doc);
             var selected = (requests ?? Enumerable.Empty<HistoryRestoreRequest>()).Where(r => r != null)
                 .GroupBy(r => r.SourceUniqueId ?? r.Label ?? string.Empty).Select(g => g.First())
                 .Where(r => !IsCalorifuge(r.Category, r.Label))
                 .OrderBy(r => r.Recipe?.Kind == "family" ? 1 : 0).ToList();
+            selected = OrderByDependencies(selected);
+            // A deleted device can leave its circuit alive with fewer members. Replay
+            // the circuit captured on the device even when no circuit deletion exists.
+            var explicitIds = new HashSet<string>(selected.Select(r => r.SourceUniqueId));
+            var companionCircuits = selected.SelectMany(r => r.Recipe?.ElectricalCircuits ?? new List<HistoryCircuit>())
+                .Where(c => c.Recipe != null && !explicitIds.Contains(c.SourceUniqueId))
+                .GroupBy(c => c.SourceUniqueId).Select(g => g.First())
+                .Select(c => new HistoryRestoreRequest { SourceUniqueId = c.SourceUniqueId, Label = "Circuit électrique", Recipe = c.Recipe }).ToList();
+            selected.AddRange(companionCircuits);
+            selected = OrderByDependencies(selected);
+            var generatedSketchOrigins = new HashSet<string>(StringComparer.Ordinal);
+            var networksFinalized = false;
+            using (var nativeSources = new ElementHistoryNativeArchive.Sources())
             using (var group = new TransactionGroup(doc, "BIMaestro - Restaurer éléments supprimés"))
             {
                 group.Start();
@@ -123,17 +150,41 @@ namespace Analyse
                         batch.CaptureWarnings.Add(request.Label + " : " + warning);
                     if (string.IsNullOrEmpty(request.SourceUniqueId)) { result.Reason = "identity"; continue; }
                     var existing = Resolve(doc, index, request.SourceUniqueId);
-                    if (existing != null)
+                    if (existing != null && request.Recipe?.Kind != "electrical_system")
                     {
-                        result.Existing = true; result.UniqueId = existing; continue;
+                        result.IncludedInParent = generatedSketchOrigins.Contains(request.SourceUniqueId);
+                        result.Existing = !result.IncludedInParent; result.UniqueId = existing; continue;
                     }
                     var recipe = ElementHistoryReconstruction.ReadRecipe(request.Recipe);
                     if (recipe == null) { result.Reason = "recipe"; result.Detail = request.CaptureFailure
                         ?? "Cet événement ne contient ni recette exploitable ni diagnostic de capture ; la cause d’origine n’a pas été enregistrée."; continue; }
                     // Clone before remapping dependencies. The historical payload is immutable.
                     recipe = JObject.FromObject(recipe).ToObject<HistoryRecipe>();
-                    if (ElementHistoryReconstruction.FindOriginal(doc, recipe.Type) == null) { result.Reason = "type"; continue; }
-                    if (!(ElementHistoryReconstruction.FindOriginal(doc, recipe.Level) is Level)) { result.Reason = "level"; continue; }
+                    recipe.ExistingElectricalSystem = existing;
+                    if (recipe.SystemMembers != null)
+                    {
+                        if (!networksFinalized)
+                        {
+                            display.Flush();
+                            RepairRestoredFittings(doc, selected, index, batch);
+                            Reconnect(doc, selected, index, batch);
+                            networksFinalized = true;
+                        }
+                        recipe.SystemMembers = recipe.SystemMembers.Select(id => Resolve(doc,index,id) ?? id).ToList();
+                    }
+                    Document nativeSource = null;
+                    Element nativeParent = null;
+                    if (recipe.Native != null)
+                    {
+                        try
+                        {
+                            nativeSource = nativeSources.Open(doc, recipe.Native);
+                            nativeParent = ElementHistoryReconstruction.FindOriginal(doc, Resolve(doc, index, recipe.Native.RootSourceUniqueId));
+                        }
+                        catch (Exception ex) { result.Reason = "archive"; result.Detail = ex.Message; continue; }
+                    }
+                    if (recipe.Native == null && recipe.Kind != "electrical_system" && ElementHistoryReconstruction.FindOriginal(doc, recipe.Type) == null) { result.Reason = "type"; continue; }
+                    if (recipe.Native == null && recipe.SystemMembers == null && !(ElementHistoryReconstruction.FindOriginal(doc, recipe.Level) is Level)) { result.Reason = "level"; continue; }
                     if (!string.IsNullOrEmpty(recipe.Host))
                     {
                         recipe.Host = Resolve(doc, index, recipe.Host);
@@ -151,8 +202,17 @@ namespace Analyse
                             .SetFailuresPreprocessor(failures).SetClearAfterRollback(true));
                         try
                         {
-                            var element = ElementHistoryReconstruction.RestoreNative(doc, recipe);
+                            Dictionary<string, string> sketchOrigins;
+                            Element element;
+                            if (nativeSource != null)
+                                element = ElementHistoryNativeArchive.Restore(doc, recipe, nativeSource, nativeParent, out sketchOrigins);
+                            else
+                            {
+                                element = ElementHistoryReconstruction.RestoreNative(doc, recipe);
+                                sketchOrigins = MarkSketchOrigins(doc, element, recipe);
+                            }
                             var origins = (recipe.RestorationOrigins ?? new List<string>())
+                                .Concat(GetOrigins(element) ?? new List<string>())
                                 .Concat(new[] { request.SourceUniqueId }).Distinct().ToList();
                             var schema = OriginSchema();
                             var entity = new Entity(schema);
@@ -170,8 +230,13 @@ namespace Analyse
                                 }
                                 else
                                 {
-                                    result.Created = true; result.UniqueId = uid; result.Detail = failures.Message;
+                                    result.Created = existing == null; result.Existing = existing != null;
+                                    result.Repaired = existing != null && recipe.ElectricalChanged;
+                                    result.UniqueId = uid; result.Detail = failures.Message;
                                     foreach (var origin in origins) index[origin] = uid;
+                                    foreach (var child in sketchOrigins)
+                                        if (doc.GetElement(child.Value) != null)
+                                        { index[child.Key] = child.Value; generatedSketchOrigins.Add(child.Key); }
                                 }
                             }
                             else
@@ -186,7 +251,11 @@ namespace Analyse
                             result.Reason = "creation"; result.Detail = ex.Message;
                         }
                     }
+                    // Only repaint after the element transaction has finished. Keep
+                    // the group open so the entire restoration remains one Undo.
+                    if (result.Created) display.ElementCreated();
                 }
+                display.Flush();
                 // Nested instances are recreated by Revit with their parent. Verify that
                 // the parent and a child of the recorded type actually exist before
                 // removing their historical entries from the failure count.
@@ -211,16 +280,114 @@ namespace Analyse
                     result.Reason = null;
                     result.Detail = "Sous-composant recréé avec sa famille parente.";
                 }
-                RepairRestoredFittings(doc, selected, index, batch);
-                Reconnect(doc, selected, index, batch);
-                if (batch.Created > 0 || batch.ConnectionsRestored > 0 || batch.Repaired > 0)
+                if (!networksFinalized)
+                {
+                    RepairRestoredFittings(doc, selected, index, batch);
+                    Reconnect(doc, selected, index, batch);
+                }
+                ElementHistoryRelations.Restore(doc, selected, index, batch);
+                if (batch.Created > 0 || batch.ConnectionsRestored > 0 || batch.Repaired > 0 || batch.RelationsRestored > 0)
                 {
                     if (group.Assimilate() != TransactionStatus.Committed)
                         throw new InvalidOperationException("Restoration could not be committed.");
                 }
                 else group.RollBack();
             }
+            ElementHistoryRelations.Invalidate(doc);
+            display.Flush(force: batch.ConnectionsRestored > 0 || batch.Repaired > 0 || batch.RelationsRestored > 0);
             return batch;
+        }
+
+        private static List<HistoryRestoreRequest> OrderByDependencies(List<HistoryRestoreRequest> selected)
+        {
+            var byId = selected.Where(r => !string.IsNullOrEmpty(r.SourceUniqueId)).ToDictionary(r => r.SourceUniqueId);
+            var visited = new HashSet<HistoryRestoreRequest>();
+            var ordered = new List<HistoryRestoreRequest>();
+            void Visit(HistoryRestoreRequest request)
+            {
+                if (!visited.Add(request)) return;
+                var references = new[] { request.Recipe?.Host, request.SuperComponentUniqueId, request.Recipe?.Native?.RootSourceUniqueId }
+                    .Concat(request.Recipe?.SystemMembers ?? Enumerable.Empty<string>())
+                    .Concat(request.Recipe?.Parameters?.Select(p => p.Reference) ?? Enumerable.Empty<string>());
+                foreach (var reference in references.Where(r => !string.IsNullOrEmpty(r)))
+                    if (byId.TryGetValue(reference, out var dependency)) Visit(dependency);
+                ordered.Add(request);
+            }
+            // Sketch lines must follow their recorded owning roof/floor/ceiling,
+            // even when the history lists the dependent deletions first.
+            foreach (var request in selected.Where(r => r.Recipe != null && r.Recipe.SystemMembers == null)) Visit(request);
+            foreach (var request in selected.Where(r => r.Recipe?.SystemMembers != null)) Visit(request);
+            foreach (var request in selected) Visit(request);
+            return ordered;
+        }
+
+        private static Dictionary<string, string> MarkSketchOrigins(Document doc, Element element, HistoryRecipe recipe)
+        {
+            var result = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (recipe.SketchCurves == null || recipe.SketchCurves.Count == 0) return result;
+            var candidates = ElementHistoryReconstruction.SketchCurves(doc, element).ToList();
+            bool SamePoint(XYZ a, double[] b) => recipe.Kind == "roof"
+                ? Math.Abs(a.X - b[0]) < 1e-5 && Math.Abs(a.Y - b[1]) < 1e-5
+                : a.DistanceTo(new XYZ(b[0], b[1], b[2])) < 1e-5;
+            foreach (var saved in recipe.SketchCurves.Where(c => !string.IsNullOrEmpty(c.SourceUniqueId)))
+            {
+                var matches = candidates.Where(c =>
+                {
+                    var curve = c.GeometryCurve;
+                    return ((SamePoint(curve.GetEndPoint(0), saved.Start) && SamePoint(curve.GetEndPoint(1), saved.End))
+                        || (SamePoint(curve.GetEndPoint(1), saved.Start) && SamePoint(curve.GetEndPoint(0), saved.End)))
+                        && (saved.Mid == null ? curve is Line : curve is Arc && SamePoint(curve.Evaluate(0.5, true), saved.Mid));
+                }).ToList();
+                if (matches.Count != 1) continue;
+                var child = matches[0];
+                var schema = OriginSchema();
+                var entity = new Entity(schema);
+                var origins = (saved.RestorationOrigins ?? new List<string>()).Concat(new[] { saved.SourceUniqueId }).Distinct().ToList();
+                entity.Set<IList<string>>(schema.GetField("OriginalUniqueIds"), origins);
+                child.SetEntity(entity);
+                foreach (var origin in origins) result[origin] = child.UniqueId;
+                candidates.Remove(child);
+            }
+            return result;
+        }
+
+        // Repaint in quick waves, without sleeps or pumping UI messages while
+        // Revit is modifying the model. Expensive views automatically refresh
+        // less often: target about 5% repaint overhead after the first refresh.
+        private sealed class RestoreDisplay
+        {
+            private Action _refresh;
+            private readonly Stopwatch _sinceRefresh = Stopwatch.StartNew();
+            private double _intervalMilliseconds = 120;
+            private bool _hasRefreshed;
+            private bool _dirty;
+
+            internal RestoreDisplay(Action refresh) { _refresh = refresh; }
+
+            internal void ElementCreated()
+            {
+                if (_refresh == null) return;
+                _dirty = true;
+                if (!_hasRefreshed || _sinceRefresh.Elapsed.TotalMilliseconds >= _intervalMilliseconds)
+                    Flush();
+            }
+
+            internal void Flush(bool force = false)
+            {
+                if (_refresh == null || (!_dirty && !force)) return;
+                var cost = Stopwatch.StartNew();
+                try { _refresh(); }
+                catch
+                {
+                    // Display failures must never cancel a valid restoration.
+                    _refresh = null;
+                    return;
+                }
+                _intervalMilliseconds = Math.Max(_intervalMilliseconds, cost.Elapsed.TotalMilliseconds * 20);
+                _hasRefreshed = true;
+                _dirty = false;
+                _sinceRefresh.Restart();
+            }
         }
 
         private static void RepairRestoredFittings(Document doc, List<HistoryRestoreRequest> selected,
@@ -295,8 +462,11 @@ namespace Analyse
                 if (uid == null) continue;
                 foreach (var link in request.Recipe?.Connections ?? new List<HistoryConnection>())
                 {
+                    var sourceMember = link.SourceMember ?? request.SourceUniqueId;
+                    uid = Resolve(doc,index,sourceMember);
+                    if (uid == null) { batch.ConnectionFailures.Add(request.Label + " : composant source absent."); continue; }
                     // Both ends save the same edge. Include ports to retain multiple links between owners.
-                    string aKey = request.SourceUniqueId + ":" + Newtonsoft.Json.JsonConvert.SerializeObject(link.Port?.Point);
+                    string aKey = sourceMember + ":" + Newtonsoft.Json.JsonConvert.SerializeObject(link.Port?.Point);
                     string bKey = link.Peer + ":" + Newtonsoft.Json.JsonConvert.SerializeObject(link.PeerPort?.Point);
                     string key = string.CompareOrdinal(aKey, bKey) < 0 ? aKey + "|" + bKey : bKey + "|" + aKey;
                     if (!visited.Add(key)) continue;

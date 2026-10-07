@@ -19,16 +19,26 @@ Compression=lzma
 SolidCompression=yes
 
 [Files]
-; Le catalogue et ses PNG sont obligatoires dans la distribution.
-#if !FileExists("bin\Release\Demo\NavigateurFamilles\Images\Mobilier\Bureau\Bureau commun.png") || !FileExists("bin\Release\Demo\Maquette\Familles\CML_Parking.rfa") || !FileExists("bin\Release\Demo\Maquette\Familles\Coude - Générique.rfa")
-  #error Compilez Release avec toutes les ressources de formation avant de creer l'installateur.
+#ifndef Revit2025Bin
+  #define Revit2025Bin "bin\Revit2025\Release"
 #endif
-; Version de test : le module de base compilé avec l'API Revit 2023 est utilisé
-; pour toutes les versions de Revit ciblées.
+#if !FileExists(Revit2025Bin + "\BIMaestro.dll")
+  #error Compilez BIMaestro.Revit2025.csproj en Release avant de creer l'installateur. La DLL .NET Framework ne doit pas etre chargee dans Revit 2025.
+#endif
+; La base de formation accompagne chacun des deux binaires Revit.
+#define TrainingBin "bin\Release"
+#include "..\Installer\TrainingResources.Checks.iss"
+#undef TrainingBin
+#define TrainingBin Revit2025Bin
+#include "..\Installer\TrainingResources.Checks.iss"
+#undef TrainingBin
+; Le binaire .NET Framework reste séparé du binaire .NET 8 de Revit 2025.
 Source: "bin\Release\*.*"; \
   DestDir: "{localappdata}\BIMaestro\Bin"; \
   Flags: ignoreversion recursesubdirs createallsubdirs; \
   Excludes: "*.pdb,BIMaestro - Copie.dll,BIMaestro.Updater.*"
+Source: "{#Revit2025Bin}\*.*"; DestDir: "{localappdata}\BIMaestro\Bin\Revit2025"; \
+  Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.pdb,BIMaestro.Updater.*"
 
 [InstallDelete]
 ; Retirer l'ancien assistant lors d'une mise a jour manuelle.
@@ -83,7 +93,10 @@ begin
 
     for i := Low(Versions) to High(Versions) do
     begin
-      Xml := BuildXml(BinFolder);
+      if Versions[i] = '2025' then
+        Xml := BuildXml(BinFolder + '\Revit2025')
+      else
+        Xml := BuildXml(BinFolder);
       ForceDirectories(AddinsRoot + '\' + Versions[i]);
       ManifestPath := AddinsRoot + '\' + Versions[i] + '\BIMaestro.addin';
       SaveStringToFile(ManifestPath, Xml, False);
