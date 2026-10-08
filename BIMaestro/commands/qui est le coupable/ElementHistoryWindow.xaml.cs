@@ -1911,7 +1911,8 @@ namespace Analyse
                 Recipe = ElementHistoryReconstruction.ReadRecipe(raw),
                 CaptureFailure = captureFailure == null ? null : Convert.ToString(captureFailure), Category = ev.Category,
                 SuperComponentUniqueId = parent == null ? null : Convert.ToString(parent),
-                FamilyTypeUniqueId = familyType == null ? null : Convert.ToString(familyType)
+                FamilyTypeUniqueId = familyType == null ? null : Convert.ToString(familyType),
+                DeletionAudit = ev.DeletionAudit
             };
         }
 
@@ -1986,6 +1987,10 @@ namespace Analyse
                 if (result.RelationsRestored > 0 || result.RelationsExisting > 0 || result.RelationFailures.Count > 0)
                     message += UiLanguage.T($"\n\nRelations géométriques : {result.RelationsRestored} rétablies, {result.RelationsExisting} déjà présentes, {result.RelationFailures.Count} non rétablies.",
                         $"\n\nGeometry relations: {result.RelationsRestored} restored, {result.RelationsExisting} already present, {result.RelationFailures.Count} not restored.");
+                var changedWallJoinOrder = result.RelationAudit.Count(a => a.Kind == "wall_auto_join" && a.JoinOrderMatches == false);
+                if (changedWallJoinOrder > 0)
+                    message += UiLanguage.T($"\nJonctions de murs présentes avec un ordre différent : {changedWallJoinOrder} (détails dans le rapport).",
+                        $"\nWall joins present with a different order: {changedWallJoinOrder} (details in the report).");
                 foreach (var failure in result.RelationFailures.Take(3)) message += "\n" + ShortRestoreDetail(failure);
                 foreach (var failure in failures.Take(4))
                     message += "\n\n" + failure.Label + (string.IsNullOrWhiteSpace(failure.Category) ? "" : " (" + failure.Category + ")") + " : " + RestoreFailureText(failure.Reason)
@@ -2000,15 +2005,35 @@ namespace Analyse
                 // Report I/O must never turn a successful restore into a reported rollback.
                 try
                 {
+                    ElementHistoryTracker.FlushPendingForHistory();
                     var folder = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BIMaestro", "HistoryReports");
                     System.IO.Directory.CreateDirectory(folder);
                     var path = System.IO.Path.Combine(folder, "restauration-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + "-" + Guid.NewGuid().ToString("N").Substring(0, 8) + ".json");
+                    var deletionAuditPaths = result.Items.Select(i => i.DeletionAudit?.BatchReportPath)
+                        .Where(p => !string.IsNullOrWhiteSpace(p)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
                     System.IO.File.WriteAllText(path, Newtonsoft.Json.JsonConvert.SerializeObject(new
                     {
-                        ReportVersion = 1, GeneratedUtc = DateTime.UtcNow, RevitVersion = _doc.Application.VersionNumber,
+                        ReportVersion = 2, GeneratedUtc = DateTime.UtcNow, RevitVersion = _doc.Application.VersionNumber,
+                        AuditSummary = new
+                        {
+                            DeletionAuditPaths = deletionAuditPaths,
+                            ItemsWithoutDeletionAudit = result.Items.Count(i => i.DeletionAudit == null),
+                            FailedByCategoryAndReason = result.Items.Where(i => !i.Created && !i.Existing && !i.IncludedInParent)
+                                .GroupBy(i => new { i.Category, i.Reason, i.RecipeKind })
+                                .Select(g => new { g.Key.Category, g.Key.Reason, g.Key.RecipeKind, Count = g.Count() })
+                                .OrderByDescending(g => g.Count).ToList(),
+                            NativeArchiveNotReadyAtDeletion = result.Items.Count(i => i.DeletionAudit?.NativeArchiveReadyAtDeletion == false),
+                            MissingSnapshotAtDeletion = result.Items.Count(i => i.DeletionAudit?.SnapshotFound == false),
+                            MissingSnapshotStillQueuedInPreload = result.Items.Count(i =>
+                                i.DeletionAudit?.SnapshotFound == false && i.DeletionAudit.PreloadStillQueuedAtDeletion == true)
+                        },
                         Result = result
                     }, Newtonsoft.Json.Formatting.Indented));
                     message += UiLanguage.T("\n\nRapport complet (tous les éléments et connexions) :\n", "\n\nFull report (all elements and connections):\n") + path;
+                    if (deletionAuditPaths.Count > 0)
+                        message += UiLanguage.T("\nAudit de suppression :\n", "\nDeletion audit:\n")
+                            + string.Join("\n", deletionAuditPaths.Take(2))
+                            + (deletionAuditPaths.Count > 2 ? "\n+" + (deletionAuditPaths.Count - 2) : "");
                 }
                 catch (Exception reportError)
                 {

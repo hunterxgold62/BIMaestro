@@ -6,6 +6,7 @@ using Licensing;
 using System;
 using System.IO;
 using System.Reflection;
+using System.Diagnostics;
 using BIMaestro.Localization;
 
 
@@ -205,8 +206,13 @@ public class BIMaestroApp : IExternalApplication
             BIMaestro.MepBooster.MepBoosterService.RestorePersistedState(_uiApp);
             Page.SecretGifShortcutManager.PollKeyboardState();
             BIMaestro.UI.RadialGlobalHotkeyService.ProcessPending(_uiApp);
-            Analyse.ElementHistoryTracker.ProcessDeferredPrime(_uiApp.ActiveUIDocument?.Document);
             Analyse.ElementHistoryNativeArchive.ProcessPendingBackground(_uiApp.ActiveUIDocument?.Document);
+            if (Analyse.ElementHistoryNativeArchive.ShouldRetrySelectedBackgroundSoon(_uiApp.ActiveUIDocument?.Document))
+            {
+                e.SetRaiseWithoutDelay();
+                return;
+            }
+            Analyse.ElementHistoryTracker.ProcessDeferredPrime(_uiApp.ActiveUIDocument?.Document);
             RefreshProjectBrowserActiveViewWhenNeeded();
             BIMaestro.ViewHover.ViewHoverPreviewService.ProcessPending(_uiApp);
             BIMaestro.ViewHover.ViewDeckService.ProcessIdling(_uiApp);
@@ -367,16 +373,25 @@ public class BIMaestroApp : IExternalApplication
     {
         try
         {
+            var timer = Stopwatch.StartNew();
             var doc = args.GetDocument();
             var selectedIds = args.GetSelectedElements();
+            var extractionMs = timer.Elapsed.TotalMilliseconds;
             BIMaestro.ViewHover.ViewDeckChangeService.CaptureSelection(doc, selectedIds);
+            var viewDeckMs = timer.Elapsed.TotalMilliseconds - extractionMs;
             Analyse.ElementHistoryTracker.CaptureSelectedElementDetails(doc, selectedIds);
+            var afterHistoryMs = timer.Elapsed.TotalMilliseconds;
             Analyse.ElementHistoryHoverInfoService.OnSelectionChanged(
                 doc,
                 selectedIds);
+            var afterHoverMs = timer.Elapsed.TotalMilliseconds;
             Couleur.ProjectBrowserColoring.FocusSelectedSheetContent(
                 doc,
                 selectedIds);
+            var totalMs = timer.Elapsed.TotalMilliseconds;
+            Analyse.ElementHistoryTracker.RecordSelectionPipelineTiming(doc, totalMs,
+                extractionMs, viewDeckMs, afterHoverMs - afterHistoryMs,
+                totalMs - afterHoverMs);
         }
         catch (Exception ex)
         {
@@ -425,6 +440,7 @@ public class BIMaestroApp : IExternalApplication
     private void OnDocumentClosingSafe(object sender, DocumentClosingEventArgs e)
     {
         if (Analyse.ElementHistoryNativeArchive.Owns(e.Document)) return;
+        Analyse.ElementHistoryTracker.ForgetAudit(e.Document);
         Analyse.ElementHistoryNativeArchive.Forget(e.Document);
         try
         {

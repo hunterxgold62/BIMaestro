@@ -11,10 +11,11 @@ $networkSource = Join-Path $repo 'BIMaestro/commands/qui est le coupable/Element
 $extendedSource = Join-Path $repo 'BIMaestro/commands/qui est le coupable/ElementHistoryReconstruction.Extended.cs'
 $nativeSource = Join-Path $repo 'BIMaestro/commands/qui est le coupable/ElementHistoryNativeArchive.cs'
 $relationsSource = Join-Path $repo 'BIMaestro/commands/qui est le coupable/ElementHistoryRelations.cs'
+$auditSource = Join-Path $repo 'BIMaestro/commands/qui est le coupable/ElementHistoryAudit.cs'
 if ($RevitVersion -eq '2025') {
     & 'C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe' (Join-Path $PSScriptRoot 'HistoryNative2025.csproj') /restore /t:Build "/p:HistoryOutput=$output/" /p:RestoreIgnoreFailedSources=true /verbosity:minimal
 } else {
-& 'C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/Roslyn/csc.exe' /nologo /langversion:9 /target:library @defines "/out:$assembly" "/reference:$api/RevitAPI.dll" "/reference:$api/RevitAPIUI.dll" "/reference:$json" $networkSource $extendedSource $nativeSource $relationsSource (Join-Path $PSScriptRoot 'NativeArchiveStore.cs') (Join-Path $repo 'BIMaestro/commands/ElementIdExtensions.cs') (Join-Path $repo 'BIMaestro/commands/qui est le coupable/ElementHistoryReconstruction.cs') (Join-Path $repo 'BIMaestro/commands/qui est le coupable/ElementHistoryRestoration.cs') (Join-Path $PSScriptRoot 'HistoryNativeTests.cs')
+& 'C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/Roslyn/csc.exe' /nologo /langversion:9 /target:library @defines "/out:$assembly" "/reference:$api/RevitAPI.dll" "/reference:$api/RevitAPIUI.dll" "/reference:$json" $networkSource $extendedSource $nativeSource $relationsSource $auditSource (Join-Path $PSScriptRoot 'NativeArchiveStore.cs') (Join-Path $repo 'BIMaestro/commands/ElementIdExtensions.cs') (Join-Path $repo 'BIMaestro/commands/qui est le coupable/ElementHistoryReconstruction.cs') (Join-Path $repo 'BIMaestro/commands/qui est le coupable/ElementHistoryRestoration.cs') (Join-Path $PSScriptRoot 'HistoryNativeTests.cs')
 }
 if ($LASTEXITCODE -ne 0) { throw 'Compilation du banc historique échouée.' }
 Copy-Item -LiteralPath $json -Destination $output -Force

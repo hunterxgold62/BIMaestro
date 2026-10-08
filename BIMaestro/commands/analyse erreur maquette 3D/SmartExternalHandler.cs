@@ -18,6 +18,8 @@ namespace Analyse
         public ModelIssue DisplayedIssue { get; private set; }
         public bool ContextVisible { get; private set; }
         public string ReservationMessage { get; private set; }
+        public ElementId CreatedReservationId { get; private set; }
+        internal bool TutorialReservation { get; set; }
         private BoundingBoxXYZ _focusBox;
         public bool ShowAllEnabled { get; set; }
         public IList<ModelIssue> FocusIssues { get; set; } = new List<ModelIssue>();
@@ -164,6 +166,7 @@ namespace Analyse
         private void CreateReservation(UIDocument ui, ModelIssue issue)
         {
             ReservationMessage = null;
+            CreatedReservationId = null;
             if (issue == null || !issue.CanCreateReservation || issue.IsApproximate)
                 throw new InvalidOperationException("La réservation directe nécessite une intersection confirmée d'un objet avec un mur ou sol.");
             var source = ResolveSource(ui.Document, issue);
@@ -172,7 +175,23 @@ namespace Analyse
                 throw new InvalidOperationException("Le lien n'est plus disponible. Rechargez-le et relancez l'analyse.");
             var host = (link?.GetLinkDocument() ?? ui.Document).GetElement(issue.RelatedUniqueId);
             if (source == null || host == null) throw new InvalidOperationException("Les objets ont changé. Relancez l'analyse.");
-            var instance = Modification.ReservationAutoV3Command.CreateForClash(ui.Document, source, host, link);
+            Modification.ReservationAutoV3Config trainingConfig = null;
+            Modification.ReservationAutoV3PersoConfig trainingPersonal = null;
+            if (TutorialReservation)
+            {
+                if (!BIMaestro.Tutorials.DemoClashExercise.IsTraining(ui.Document) || !BIMaestro.Tutorials.DemoClashExercise.IsWall(ui.Document, issue))
+                    throw new InvalidOperationException("La démonstration de réservation est limitée au mur d'essai.");
+                trainingConfig = new Modification.ReservationAutoV3Config { DefaultDynamoAutoEnabled = false };
+                trainingConfig.WallRect.FamilyName = "CML_Réservation rectangulaire murale";
+                trainingPersonal = new Modification.ReservationAutoV3PersoConfig();
+            }
+            var instance = Modification.ReservationAutoV3Command.CreateForClash(ui.Document, source, host, link, trainingConfig, trainingPersonal);
+            CreatedReservationId = instance.Id;
+            if (TutorialReservation)
+            {
+                using (var tx = new Transaction(ui.Document, "BIMaestro - Repérer la réservation d'essai"))
+                { tx.Start(); instance.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.Set(BIMaestro.Tutorials.DemoClashExercise.Prefix + "RESERVATION"); tx.Commit(); }
+            }
             ReservationMessage = "Réservation créée · #" + instance.Id.GetIdLongValue()
                 + (link == null ? ". Relancez l'analyse pour vérifier la traversée." : " dans la maquette active. Le lien reste à coordonner ; relancez l'analyse.");
         }

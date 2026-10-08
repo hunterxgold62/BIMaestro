@@ -1,0 +1,393 @@
+<Project>
+  <PropertyGroup>
+    <AssemblyName>BIMaestro</AssemblyName>
+    <IntermediateOutputPath>obj\Revit2025\Release\</IntermediateOutputPath>
+    <BaseIntermediateOutputPath>obj\Revit2025\</BaseIntermediateOutputPath>
+    <MSBuildProjectExtensionsPath>C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\</MSBuildProjectExtensionsPath>
+    <_TargetAssemblyProjectName>BIMaestro.Revit2025</_TargetAssemblyProjectName>
+    <RootNamespace>BIMaestro</RootNamespace>
+  </PropertyGroup>
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <RootNamespace>BIMaestro</RootNamespace>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>annotations</Nullable>
+    <RevitVersion Condition="'$(RevitVersion)' == ''">2025</RevitVersion>
+    <DefineConstants>$(DefineConstants);REVIT2025_OR_GREATER</DefineConstants>
+    <RevitInstallDir>C:\Program Files\Autodesk\Revit $(RevitVersion)</RevitInstallDir>
+    <DynamoForRevitDir>$(RevitInstallDir)\AddIns\DynamoForRevit</DynamoForRevitDir>
+    <OutputPath>bin\Revit$(RevitVersion)\$(Configuration)\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>
+  </PropertyGroup>
+  <Import Project="BIMaestro.SharedItems.props" />
+  <ItemGroup>
+    <PackageReference Remove="System.IO;System.IO.FileSystem.Primitives;System.Net.Http;System.Runtime;System.Runtime.InteropServices.RuntimeInformation;System.Security.Cryptography.Algorithms;System.Security.Cryptography.Encoding;System.Security.Cryptography.Primitives;System.Security.Cryptography.X509Certificates;System.Text.RegularExpressions" />
+    <PackageReference Update="System.Security.Cryptography.Pkcs" Version="8.0.1" />
+    <COMReference Remove="@(COMReference)" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="8.0.0" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\Accessibility.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\portable.bouncycastle\1.9.0\lib\netstandard2.0\BouncyCastle.Crypto.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\bouncycastle.cryptography\2.4.0\lib\net6.0\BouncyCastle.Cryptography.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\cloudinarydotnet\1.26.2\lib\netstandard2.0\CloudinaryDotNet.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\commonservicelocator\2.0.7\lib\net7.0\CommonServiceLocator.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\cyotek.drawing.bitmapfont\2.0.0\lib\netcoreapp3.1\Cyotek.Drawing.BitmapFont.dll" />
+    <ReferencePath Include="C:\Program Files\Autodesk\Revit 2025\AddIns\DynamoForRevit\DynamoCoreWpf.dll">
+      <EmbedInteropTypes>False</EmbedInteropTypes>
+    </ReferencePath>
+    <ReferencePath Include="C:\Program Files\Autodesk\Revit 2025\AddIns\DynamoForRevit\DynamoManipulation.dll" />
+    <ReferencePath Include="C:\Program Files\Autodesk\Revit 2025\AddIns\DynamoForRevit\Revit\DynamoRevitDS.dll">
+      <EmbedInteropTypes>False</EmbedInteropTypes>
+    </ReferencePath>
+    <ReferencePath Include="C:\Program Files\Autodesk\Revit 2025\AddIns\DynamoForRevit\Revit\DynamoRevitVersionSelector.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\enums.net\5.0.0\lib\net7.0\Enums.NET.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\extendednumerics.bigdecimal\2025.1001.2.129\lib\net8.0\ExtendedNumerics.BigDecimal.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\harfbuzzsharp\8.3.1.5\lib\net6.0\HarfBuzzSharp.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\helixtoolkit\2.27.3\lib\netstandard2.0\HelixToolkit.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\helixtoolkit.wpf\2.27.3\lib\net462\HelixToolkit.Wpf.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\helixtoolkit.wpf.sharpdx\2.27.3\lib\net462\HelixToolkit.Wpf.SharpDX.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\sharpziplib\1.4.2\lib\net6.0\ICSharpCode.SharpZipLib.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\markdown.xaml\1.0.0\lib\net45\Markdown.Xaml.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\mathnet.numerics.signed\5.0.0\lib\net6.0\MathNet.Numerics.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\microsoft.azure.amqp\2.7.0\lib\net8.0\Microsoft.Azure.Amqp.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\microsoft.bcl.asyncinterfaces\9.0.8\lib\netstandard2.1\Microsoft.Bcl.AsyncInterfaces.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\Microsoft.CSharp.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\microsoft.extensions.configuration.abstractions\8.0.0\lib\net8.0\Microsoft.Extensions.Configuration.Abstractions.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\microsoft.extensions.configuration\8.0.0\lib\net8.0\Microsoft.Extensions.Configuration.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\microsoft.extensions.configuration.fileextensions\8.0.0\lib\net8.0\Microsoft.Extensions.Configuration.FileExtensions.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\microsoft.extensions.configuration.json\8.0.0\lib\net8.0\Microsoft.Extensions.Configuration.Json.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\microsoft.extensions.fileproviders.abstractions\8.0.0\lib\net8.0\Microsoft.Extensions.FileProviders.Abstractions.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\microsoft.extensions.fileproviders.physical\8.0.0\lib\net8.0\Microsoft.Extensions.FileProviders.Physical.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\microsoft.extensions.filesystemglobbing\8.0.0\lib\net8.0\Microsoft.Extensions.FileSystemGlobbing.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\microsoft.extensions.logging.abstractions\6.0.0\lib\net6.0\Microsoft.Extensions.Logging.Abstractions.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\microsoft.extensions.primitives\8.0.0\lib\net8.0\Microsoft.Extensions.Primitives.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\microsoft.io.recyclablememorystream\3.0.1\lib\net6.0\Microsoft.IO.RecyclableMemoryStream.dll" />
+    <ReferencePath Include="C:\Windows\assembly\GAC_MSIL\Microsoft.Office.Interop.Excel\15.0.0.0__71e9bce111e9429c\Microsoft.Office.Interop.Excel.dll">
+      <EmbedInteropTypes>true</EmbedInteropTypes>
+    </ReferencePath>
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\Microsoft.VisualBasic.Core.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\Microsoft.VisualBasic.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\Microsoft.VisualBasic.Forms.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\microsoft.web.webview2\1.0.3485.44\lib_manual\netcoreapp3.0\Microsoft.Web.WebView2.Core.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\microsoft.web.webview2\1.0.3485.44\lib_manual\netcoreapp3.0\Microsoft.Web.WebView2.WinForms.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\microsoft.web.webview2\1.0.3485.44\lib_manual\net5.0-windows10.0.17763.0\Microsoft.Web.WebView2.Wpf.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\Microsoft.Win32.Primitives.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\Microsoft.Win32.Registry.AccessControl.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\Microsoft.Win32.Registry.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\Microsoft.Win32.SystemEvents.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\microsoft-windowsapicodepack-core\1.1.5\lib\net7.0-windows7.0\Microsoft.WindowsAPICodePack.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\microsoft-windowsapicodepack-shell\1.1.5\lib\net7.0-windows7.0\Microsoft.WindowsAPICodePack.Shell.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\mscorlib.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\netstandard.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\newtonsoft.json.bson\1.0.2\lib\netstandard2.0\Newtonsoft.Json.Bson.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\newtonsoft.json\13.0.3\lib\net6.0\Newtonsoft.Json.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\nlog\6.0.3\lib\netstandard2.1\NLog.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\npoi\2.7.4\lib\net8.0\NPOI.Core.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\npoi\2.7.4\lib\net8.0\NPOI.OOXML.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\npoi\2.7.4\lib\net8.0\NPOI.OpenXml4Net.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\npoi\2.7.4\lib\net8.0\NPOI.OpenXmlFormats.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\oxyplot.core\2.2.0\lib\net8.0\OxyPlot.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\oxyplot.wpf\2.2.0\lib\net8.0-windows7.0\OxyPlot.Wpf.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\oxyplot.wpf.shared\2.2.0\lib\net8.0-windows7.0\OxyPlot.Wpf.Shared.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\PresentationCore.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\PresentationFramework.Aero.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\PresentationFramework.Aero2.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\PresentationFramework.AeroLite.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\PresentationFramework.Classic.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\PresentationFramework.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\PresentationFramework.Luna.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\PresentationFramework.Royale.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\PresentationUI.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\ReachFramework.dll" />
+    <ReferencePath Include="C:\Program Files\Autodesk\Revit 2025\RevitAPI.dll" />
+    <ReferencePath Include="C:\Program Files\Autodesk\Revit 2025\RevitAPIUI.dll" />
+    <ReferencePath Include="C:\Program Files\Autodesk\Revit 2025\AddIns\DynamoForRevit\Revit\RevitServices.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\sharpdx.d3dcompiler\4.2.0\lib\netstandard1.1\SharpDX.D3DCompiler.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\sharpdx.direct2d1\4.2.0\lib\netstandard1.1\SharpDX.Direct2D1.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\sharpdx.direct3d11\4.2.0\lib\netstandard1.1\SharpDX.Direct3D11.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\sharpdx.direct3d9\4.2.0\lib\netstandard1.3\SharpDX.Direct3D9.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\sharpdx\4.2.0\lib\netstandard1.1\SharpDX.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\sharpdx.dxgi\4.2.0\lib\netstandard1.1\SharpDX.DXGI.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\sharpdx.mathematics\4.2.0\lib\netstandard1.1\SharpDX.Mathematics.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\sixlabors.fonts\1.0.1\lib\netcoreapp3.1\SixLabors.Fonts.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\sixlabors.imagesharp\2.1.10\lib\netcoreapp3.1\SixLabors.ImageSharp.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\skiasharp\3.119.4\ref\net6.0\SkiaSharp.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\skiasharp.harfbuzz\3.119.4\lib\net6.0\SkiaSharp.HarfBuzz.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.AppContext.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Buffers.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\System.CodeDom.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Collections.Concurrent.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Collections.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Collections.Immutable.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Collections.NonGeneric.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Collections.Specialized.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.ComponentModel.Annotations.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.ComponentModel.DataAnnotations.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.ComponentModel.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.ComponentModel.EventBasedAsync.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.ComponentModel.Primitives.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.ComponentModel.TypeConverter.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\System.Configuration.ConfigurationManager.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Configuration.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Console.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Core.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Data.Common.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Data.DataSetExtensions.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Data.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\System.Design.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Diagnostics.Contracts.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Diagnostics.Debug.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Diagnostics.DiagnosticSource.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\System.Diagnostics.EventLog.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Diagnostics.FileVersionInfo.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\System.Diagnostics.PerformanceCounter.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Diagnostics.Process.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Diagnostics.StackTrace.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Diagnostics.TextWriterTraceListener.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Diagnostics.Tools.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Diagnostics.TraceSource.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Diagnostics.Tracing.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\System.DirectoryServices.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\System.Drawing.Common.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\System.Drawing.Design.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\System.Drawing.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Drawing.Primitives.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Dynamic.Runtime.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Formats.Asn1.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Formats.Tar.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Globalization.Calendars.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Globalization.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Globalization.Extensions.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.IO.Compression.Brotli.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.IO.Compression.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.IO.Compression.FileSystem.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.IO.Compression.ZipFile.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.IO.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.IO.FileSystem.AccessControl.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.IO.FileSystem.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.IO.FileSystem.DriveInfo.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.IO.FileSystem.Primitives.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.IO.FileSystem.Watcher.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.IO.IsolatedStorage.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.IO.MemoryMappedFiles.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\System.IO.Packaging.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\system.io.pipelines\9.0.8\lib\net8.0\System.IO.Pipelines.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.IO.Pipes.AccessControl.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.IO.Pipes.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.IO.UnmanagedMemoryStream.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Linq.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Linq.Expressions.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Linq.Parallel.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Linq.Queryable.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Memory.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Net.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Net.Http.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\microsoft.aspnet.webapi.client\6.0.0\lib\netstandard2.0\System.Net.Http.Formatting.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\system.net.http.json\9.0.8\lib\net8.0\System.Net.Http.Json.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Net.HttpListener.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Net.Mail.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Net.NameResolution.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Net.NetworkInformation.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Net.Ping.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Net.Primitives.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Net.Quic.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Net.Requests.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Net.Security.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Net.ServicePoint.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Net.Sockets.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Net.WebClient.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Net.WebHeaderCollection.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Net.WebProxy.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Net.WebSockets.Client.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Net.WebSockets.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Numerics.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Numerics.Vectors.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.ObjectModel.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\System.Printing.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Reflection.DispatchProxy.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Reflection.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Reflection.Emit.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Reflection.Emit.ILGeneration.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Reflection.Emit.Lightweight.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Reflection.Extensions.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Reflection.Metadata.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Reflection.Primitives.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Reflection.TypeExtensions.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\System.Resources.Extensions.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Resources.Reader.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Resources.ResourceManager.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Resources.Writer.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Runtime.CompilerServices.Unsafe.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Runtime.CompilerServices.VisualC.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Runtime.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Runtime.Extensions.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Runtime.Handles.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Runtime.InteropServices.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Runtime.InteropServices.JavaScript.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Runtime.InteropServices.RuntimeInformation.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Runtime.Intrinsics.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Runtime.Loader.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Runtime.Numerics.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Runtime.Serialization.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Runtime.Serialization.Formatters.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Runtime.Serialization.Json.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Runtime.Serialization.Primitives.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Runtime.Serialization.Xml.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Security.AccessControl.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Security.Claims.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Security.Cryptography.Algorithms.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Security.Cryptography.Cng.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Security.Cryptography.Csp.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Security.Cryptography.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Security.Cryptography.Encoding.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Security.Cryptography.OpenSsl.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\System.Security.Cryptography.Pkcs.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Security.Cryptography.Primitives.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\System.Security.Cryptography.ProtectedData.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Security.Cryptography.X509Certificates.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\System.Security.Cryptography.Xml.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Security.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\System.Security.Permissions.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Security.Principal.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Security.Principal.Windows.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Security.SecureString.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.ServiceModel.Web.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.ServiceProcess.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Text.Encoding.CodePages.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Text.Encoding.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Text.Encoding.Extensions.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\system.text.encodings.web\9.0.8\lib\net8.0\System.Text.Encodings.Web.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\system.text.json\9.0.8\lib\net8.0\System.Text.Json.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Text.RegularExpressions.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\System.Threading.AccessControl.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Threading.Channels.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Threading.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Threading.Overlapped.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Threading.Tasks.Dataflow.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Threading.Tasks.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Threading.Tasks.Extensions.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Threading.Tasks.Parallel.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Threading.Thread.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Threading.ThreadPool.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Threading.Timer.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Transactions.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Transactions.Local.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.ValueTuple.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Web.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Web.HttpUtility.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\System.Windows.Controls.Ribbon.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Windows.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\System.Windows.Extensions.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\System.Windows.Forms.Design.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\System.Windows.Forms.Design.Editors.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\System.Windows.Forms.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\System.Windows.Forms.Primitives.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\System.Windows.Input.Manipulations.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\System.Windows.Presentation.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\System.Xaml.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Xml.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Xml.Linq.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Xml.ReaderWriter.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Xml.Serialization.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Xml.XDocument.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Xml.XmlDocument.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Xml.XmlSerializer.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Xml.XPath.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\ref\net8.0\System.Xml.XPath.XDocument.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\pdfpig\0.1.16\lib\net8.0\UglyToad.PdfPig.Core.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\pdfpig\0.1.16\lib\net8.0\UglyToad.PdfPig.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\pdfpig\0.1.16\lib\net8.0\UglyToad.PdfPig.DocumentLayoutAnalysis.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\pdfpig.filters.dct.jpeglibrary\0.1.16.1\lib\net8.0\UglyToad.PdfPig.Filters.Dct.JpegLibrary.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\pdfpig.filters.jbig2.pdfboxjbig2\0.1.16.1\lib\net8.0\UglyToad.PdfPig.Filters.Jbig2.PdfboxJbig2.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\pdfpig.filters.jpx.openjpeg\0.1.16\lib\net8.0\UglyToad.PdfPig.Filters.Jpx.OpenJpeg.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\pdfpig\0.1.16\lib\net8.0\UglyToad.PdfPig.Fonts.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\pdfpig\0.1.16\lib\net8.0\UglyToad.PdfPig.Package.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\pdfpig.rendering.skia\0.1.16.4\lib\net8.0\UglyToad.PdfPig.Rendering.Skia.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\pdfpig\0.1.16\lib\net8.0\UglyToad.PdfPig.Tokenization.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\pdfpig\0.1.16\lib\net8.0\UglyToad.PdfPig.Tokens.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\UIAutomationClient.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\UIAutomationClientSideProviders.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\UIAutomationProvider.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\UIAutomationTypes.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\WindowsBase.dll" />
+    <ReferencePath Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\ref\net8.0\WindowsFormsIntegration.dll" />
+    <ReferencePath Include="C:\Users\lemer\.nuget\packages\zstring\2.6.0\lib\net7.0\ZString.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\Controls\SimpleColorPicker.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\les couleurs\Personnalisation\ColorPreferencesWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\les couleurs\Personnalisation\RevitColorPreferencesWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\animation touche\chargement et salto\StuntSpinner.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\animation touche\oui-non mignion\EyeToggleSwitch.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\animation touche\touche poubelle\AnimatedMenuIcon.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\animation touche\Fantome oui-non\fantome.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\app et excel\Supabase\Bienvenue\WelcomeWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\app et excel\temps revit\TimeSeriesDashboardWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\app et excel\Touche\Modification d'emplacement\RibbonLayoutWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\analyse erreur maquette 3D\SmartCheckWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\AnalysePoids\AnalysePoids.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\AnalysePoids\ProgressWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\bride auto\PickDefaultFlangeWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\Calcul des canalisations\canalisation V2\PipeNetworkOverviewWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\Calcul des canalisations\canalisation V2\PipeSystemSelectionWindowV2.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\changement de texte par IA\CorrectionWindow123.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\changer de couleur de ligne\ColorPicker.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\phase rapide\PhaseQuickEditWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\vue en survol\ViewThumbnailBatchWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\correction automatique\CorrectionResultWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\correction automatique\SelectViewsWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\Dossier famille\FamilyBrowserPlugin.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\Dossier famille\orbit 3D\Family3DPreviewWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\Dossier famille\roue de gta\RadialMenuWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\Dynamo\ConfigureDynamoWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\export dwg\ExportSheetsWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\GPT classique\ProfileSelectionWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\Jeux\flapy bird\FlappyBirdWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\Jeux\snake\SnakeLeaderboardWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\Jeux\snake\SnakeWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\Jeux vidéos\Maquette jouable\RevitGameWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\app et excel\Touche\roue gta des touches\RadialButtonPickerWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\Jeux vidéos\Maquette jouable\GameMepShareWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\menu contextuel\CommandSelectionWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\menu contextuel\MenuContextuel.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\page de mise à jour en direct\UpdatePromptWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\page de mise à jour en direct\SupportPromptWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\Dossier famille\FamilySearchReviewWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\page de mise à jour en direct\SecretGifWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\page de mise à jour en direct\ButtonUpdateNotesWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\page de mise à jour en direct\UpdateWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\première commande\sélection d'élément\FamilySelectionWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\Purge de paramètre de famille\ParameterSelectionWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\purge\CleanupWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\renuméroté élément\ElementRenameWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\GPT classique\GPTbot.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\Réservation auto\résa auto v3\ReservationV3Window.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\Suivi maquette collaboratif\CollaborativeModelTrackerWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\commands\qui est le coupable\ElementHistoryWindow.g.cs" />
+    <Compile Include="C:\Users\lemer\source\repos\hunterxgold62\BIMaestro\BIMaestro\obj\Revit2025\Release\GeneratedInternalTypeHelper.g.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Analyzer Include="C:\Program Files\dotnet\sdk\9.0.300\Sdks\Microsoft.NET.Sdk\targets\..\analyzers\Microsoft.CodeAnalysis.CSharp.NetAnalyzers.dll" />
+    <Analyzer Include="C:\Program Files\dotnet\sdk\9.0.300\Sdks\Microsoft.NET.Sdk\targets\..\analyzers\Microsoft.CodeAnalysis.NetAnalyzers.dll" />
+    <Analyzer Include="C:\Users\lemer\.nuget\packages\microsoft.extensions.logging.abstractions\6.0.0\analyzers\dotnet\roslyn4.0\cs\Microsoft.Extensions.Logging.Generators.dll" />
+    <Analyzer Include="C:\Users\lemer\.nuget\packages\system.text.json\9.0.8\analyzers\dotnet\roslyn4.4\cs\System.Text.Json.SourceGeneration.dll" />
+    <Analyzer Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\analyzers/dotnet/cs/Microsoft.Interop.ComInterfaceGenerator.dll" />
+    <Analyzer Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\analyzers/dotnet/cs/Microsoft.Interop.JavaScript.JSImportGenerator.dll" />
+    <Analyzer Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\analyzers/dotnet/cs/Microsoft.Interop.LibraryImportGenerator.dll" />
+    <Analyzer Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\analyzers/dotnet/cs/Microsoft.Interop.SourceGeneration.dll" />
+    <Analyzer Include="C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.16\analyzers/dotnet/cs/System.Text.RegularExpressions.Generator.dll" />
+    <Analyzer Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\analyzers/dotnet/System.Windows.Forms.Analyzers.dll" />
+    <Analyzer Include="C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.16\analyzers/dotnet/cs/System.Windows.Forms.Analyzers.CSharp.dll" />
+  </ItemGroup>
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+</Project>

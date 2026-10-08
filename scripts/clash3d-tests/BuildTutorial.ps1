@@ -24,6 +24,7 @@ $project += '</ItemGroup><ItemGroup><Compile Include="' + (Join-Path $PSScriptRo
 & $msbuild (Join-Path $output 'TutorialValidation.csproj') /t:Build /m /verbosity:quiet /clp:ErrorsOnly
 if ($LASTEXITCODE -ne 0) { throw 'Compilation du banc de tutoriel échouée.' }
 Get-ChildItem -LiteralPath $pluginOutput -File -Filter '*.dll' | Where-Object { $_.Name -notmatch '^RevitAPI' } | Copy-Item -Destination $output
+Copy-Item -LiteralPath (Join-Path $pluginOutput 'Demo') -Destination $output -Recurse -Force
 $escaped = [Security.SecurityElement]::Escape((Join-Path $output 'BIMaestro.TutorialValidation.dll'))
 $manifest = '<RevitAddIns><AddIn Type="Application"><Name>BIMaestro tutorial validation</Name><Assembly>' + $escaped + '</Assembly><AddInId>3C066066-CA0B-4544-87D1-E7246D8D7D54</AddInId><FullClassName>BIMaestro.Tests.TutorialValidation</FullClassName><VendorId>BMTS</VendorId><VendorDescription>Temporary tutorial validation</VendorDescription></AddIn></RevitAddIns>'
 [IO.File]::WriteAllText((Join-Path $output 'BIMaestro.NativeValidation.addin'), $manifest)

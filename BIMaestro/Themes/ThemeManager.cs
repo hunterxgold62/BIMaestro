@@ -9,7 +9,7 @@ using System.Windows;
 
 internal static class ThemeManager
 {
-    private const string ThemeDictionaryPath = "/BIMaestro;component/Themes/BIMaestroTheme.xaml";
+    private static readonly string ThemeDictionaryPath = "/" + typeof(ThemeManager).Assembly.GetName().Name + ";component/Themes/BIMaestroTheme.xaml";
     private static readonly object SyncRoot = new object();
     private static bool _loaded;
 

@@ -17,6 +17,7 @@ namespace Analyse
         public string Category { get; set; }
         public string SuperComponentUniqueId { get; set; }
         public string FamilyTypeUniqueId { get; set; }
+        public HistoryDeletionElementAudit DeletionAudit { get; set; }
     }
 
     internal sealed class HistoryRestoreItem
@@ -31,6 +32,14 @@ namespace Analyse
         public bool Repaired { get; set; }
         public string SourceUniqueId { get; set; }
         public string Category { get; set; }
+        public string RecipeKind { get; set; }
+        public string NativeRootSourceUniqueId { get; set; }
+        public string HostSourceUniqueId { get; set; }
+        public string SuperComponentSourceUniqueId { get; set; }
+        public List<string> SketchCurveSourceUniqueIds { get; set; }
+        public HistoryDeletionElementAudit DeletionAudit { get; set; }
+        public string ParentSourceUniqueId { get; set; }
+        public string ParentOutcome { get; set; }
     }
 
     internal sealed class HistoryRestoreBatch
@@ -45,6 +54,7 @@ namespace Analyse
         public int RelationsRestored { get; set; }
         public int RelationsExisting { get; set; }
         public List<string> RelationFailures { get; } = new List<string>();
+        public List<HistoryRelationAudit> RelationAudit { get; } = new List<HistoryRelationAudit>();
         public List<string> ConnectionFailures { get; } = new List<string>();
         public List<string> CaptureWarnings { get; } = new List<string>();
         public int Repaired => Items.Count(i => i.Repaired);
@@ -144,7 +154,17 @@ namespace Analyse
                 group.Start();
                 foreach (var request in selected)
                 {
-                    var result = new HistoryRestoreItem { Label = request.Label, SourceUniqueId = request.SourceUniqueId, Category = request.Category };
+                    var result = new HistoryRestoreItem
+                    {
+                        Label = request.Label, SourceUniqueId = request.SourceUniqueId, Category = request.Category,
+                        RecipeKind = request.Recipe?.Kind,
+                        NativeRootSourceUniqueId = request.Recipe?.Native?.RootSourceUniqueId,
+                        HostSourceUniqueId = request.Recipe?.Host,
+                        SuperComponentSourceUniqueId = request.SuperComponentUniqueId,
+                        SketchCurveSourceUniqueIds = request.Recipe?.SketchCurves?.Select(c => c.SourceUniqueId)
+                            .Where(uid => !string.IsNullOrWhiteSpace(uid)).ToList(),
+                        DeletionAudit = request.DeletionAudit
+                    };
                     batch.Items.Add(result);
                     foreach (var warning in request.Recipe?.CaptureWarnings ?? new List<string>())
                         batch.CaptureWarnings.Add(request.Label + " : " + warning);
@@ -294,6 +314,21 @@ namespace Analyse
                 else group.RollBack();
             }
             ElementHistoryRelations.Invalidate(doc);
+            var bySource = batch.Items.Where(i => !string.IsNullOrWhiteSpace(i.SourceUniqueId))
+                .GroupBy(i => i.SourceUniqueId).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+            foreach (var item in batch.Items)
+            {
+                var parentId = item.DeletionAudit?.SketchOwnerSourceUniqueId;
+                if (string.IsNullOrWhiteSpace(parentId)) parentId = item.NativeRootSourceUniqueId;
+                if (string.IsNullOrWhiteSpace(parentId) || parentId == item.SourceUniqueId)
+                    parentId = item.SuperComponentSourceUniqueId ?? item.HostSourceUniqueId;
+                if (string.IsNullOrWhiteSpace(parentId) || parentId == item.SourceUniqueId) continue;
+                item.ParentSourceUniqueId = parentId;
+                if (bySource.TryGetValue(parentId, out var parent))
+                    item.ParentOutcome = parent.Created ? "created" : parent.Existing ? "already_present"
+                        : parent.IncludedInParent ? "included_in_parent" : "failed";
+                else item.ParentOutcome = "not_in_restore_request";
+            }
             display.Flush(force: batch.ConnectionsRestored > 0 || batch.Repaired > 0 || batch.RelationsRestored > 0);
             return batch;
         }

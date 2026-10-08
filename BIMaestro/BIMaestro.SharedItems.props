@@ -408,6 +408,7 @@
       <DependentUpon>ViewThumbnailBatchWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="commands\qui est le coupable\ElementHistoryTracker.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryAudit.cs" />
     <Compile Include="commands\qui est le coupable\ElementHistoryReconstruction.cs" />
     <Compile Include="commands\qui est le coupable\ElementHistoryReconstruction.Extended.cs" />
     <Compile Include="commands\qui est le coupable\ElementHistoryNativeArchive.cs" />

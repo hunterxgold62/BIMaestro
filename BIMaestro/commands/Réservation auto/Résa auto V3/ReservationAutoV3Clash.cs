@@ -96,21 +96,32 @@ namespace Modification
                     if (config.DefaultNormeEnabled) diameter = RoundUpToNext50mm(diameter);
                     TrySet(instance, profile.ParamDiameter, diameter);
                 }
-                var parameters = rect ? (wall ? new[] { profile.ParamLength, profile.ParamHeight, profile.ParamDepth }
-                    : new[] { profile.ParamLength, profile.ParamWidth, profile.ParamDepth }) : new[] { profile.ParamDiameter, profile.ParamDepth };
-                if (parameters.Distinct(StringComparer.OrdinalIgnoreCase).Count() != parameters.Length)
-                    throw new InvalidOperationException("Chaque dimension doit utiliser un paramètre distinct dans Autoréservation. Aucune réservation conservée.");
-                foreach (string name in parameters)
+                var dimensions = rect ? (wall ? new[]
+                    {
+                        new[] { profile.ParamLength, "Longueur", "COM_Longueur", "Largeur", "COM_Largeur", "Length", "Width" },
+                        new[] { profile.ParamHeight, "Hauteur", "COM_Hauteur", "Height" },
+                        new[] { profile.ParamDepth, "Profondeur", "COM_Profondeur", "Depth" }
+                    } : new[]
+                    {
+                        new[] { profile.ParamLength, "Longueur", "COM_Longueur", "Length" },
+                        new[] { profile.ParamWidth, "Largeur", "COM_Largeur", "Width" },
+                        new[] { profile.ParamDepth, "Profondeur", "COM_Profondeur", "Depth" }
+                    }) : new[]
+                    {
+                        new[] { profile.ParamDiameter, "Diamètre", "COM_Diamètre", "Diameter" },
+                        new[] { profile.ParamDepth, "Profondeur", "COM_Profondeur", "Depth" }
+                    };
+                var names = new System.Collections.Generic.List<string>();
+                for (int i = 0; i < dimensions.Length; i++)
                 {
-                    var p = string.IsNullOrWhiteSpace(name) ? null : instance.LookupParameter(name);
-                    bool typeDepth = p == null && name == profile.ParamDepth && !string.IsNullOrWhiteSpace(name);
-                    if (typeDepth) p = symbol.LookupParameter(name);
-                    // A fixed/calculated depth is usable when it spans the host. Never modify the family type.
-                    bool automaticHostDepth = name == profile.ParamDepth && p != null && p.StorageType == StorageType.Double
-                        && p.AsDouble() >= GetHostDepth(host) - 1 / 304.8;
-                    if (p == null || (p.IsReadOnly || typeDepth) && !automaticHostDepth || p.StorageType != StorageType.Double || p.Definition.GetDataType() != SpecTypeId.Length || p.AsDouble() <= 0)
-                        throw new InvalidOperationException("Le paramètre « " + (name ?? "non configuré") + " » est absent, verrouillé ou non dimensionné. Corrigez le mapping dans Autoréservation. Aucune réservation conservée.");
+                    bool depth = i == dimensions.Length - 1;
+                    var name = FindClashDimension(instance, symbol, dimensions[i], depth, GetHostDepth(host));
+                    if (name == null)
+                        throw new InvalidOperationException("Le paramètre « " + (dimensions[i][0] ?? "non configuré") + " » est absent, verrouillé ou non dimensionné. Corrigez le mapping dans Autoréservation. Aucune réservation conservée.");
+                    names.Add(name);
                 }
+                if (names.Distinct(StringComparer.OrdinalIgnoreCase).Count() != names.Count)
+                    throw new InvalidOperationException("Chaque dimension doit utiliser un paramètre distinct dans Autoréservation. Aucune réservation conservée.");
                 if (link == null && unhosted) worker.ForceVoidCutSafe(doc, host, instance);
                 if (schema == null)
                 {
@@ -123,6 +134,29 @@ namespace Modification
                     throw new InvalidOperationException("Revit n'a pas validé la réservation.");
                 return instance;
             }
+        }
+
+        private static string FindClashDimension(FamilyInstance instance, FamilySymbol symbol, string[] candidates,
+            bool depth, double hostDepth)
+        {
+            foreach (var name in candidates.Where(n => !string.IsNullOrWhiteSpace(n)).Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                var p = instance.LookupParameter(name);
+                // ApplySizing uses the first writable instance parameter in this same order.
+                if (p != null && !p.IsReadOnly)
+                    return p.StorageType == StorageType.Double && p.Definition.GetDataType() == SpecTypeId.Length
+                        && p.AsDouble() > 0 ? name : null;
+            }
+            if (!depth) return null;
+            // A fixed or calculated depth can be valid without writing to the family type.
+            foreach (var name in candidates.Where(n => !string.IsNullOrWhiteSpace(n)).Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                var p = instance.LookupParameter(name) ?? symbol.LookupParameter(name);
+                if (p != null && p.StorageType == StorageType.Double && p.Definition.GetDataType() == SpecTypeId.Length
+                    && p.AsDouble() >= hostDepth - 1 / 304.8)
+                    return name;
+            }
+            return null;
         }
     }
 }

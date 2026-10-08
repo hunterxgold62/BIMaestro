@@ -62,7 +62,10 @@ namespace BIMaestro.Tutorials
                 new DemoStep("Observer dans Revit", "Clique sur Voir sélection en 3D. La fenêtre s'effacera après le cadrage pour te laisser observer le croisement : objet contrôlé orange, obstacle bleu. Confirme ensuite l'observation dans la petite carte pour revenir au guide.", "TutorialFocusButton", completionEvent: "clash-focus-observed"),
                 new DemoStep("Corriger le tuyau d'essai", "Clique sur Relever le tuyau d'essai : seul le tuyau transversal de cette scène sera déplacé de 300 mm vers le haut. Ce bouton sert à la formation. Dans ton projet, corrige le réseau avec les outils Revit en tenant compte de la pente et des raccordements.", "TutorialFixButton", completionEvent: "clash-corrected"),
                 new DemoStep("Prouver la disparition du conflit", "Relance Analyser avec les mêmes réglages et attends. Le conflit entre tuyaux doit disparaître ; la traversée du mur doit rester. Une traversée n'indique pas à elle seule qu'une réservation manque ou est incorrecte : examine la paroi et l'ouverture réelle avant de décider.", "AnalyzeButton", completionEvent: "clash-rescan-verified"),
-                new DemoStep("Exporter le résultat vérifié", "Garde Tous dans les statuts et aucune recherche pour afficher la traversée restante. Clique sur Exporter, choisis HTML pour le rapport autonome ou CSV pour le tableau, puis enregistre. Bulbizarre attend l'écriture du fichier ; annuler le dialogue ne valide pas l'étape. Les exports suivent les filtres affichés.", "ExportButton", completionEvent: "clash-export-written")
+                new DemoStep("Observer la traversée du mur", "La traversée restante est présélectionnée. Clique sur Voir sélection en 3D, observe le tuyau et le mur, puis confirme dans la petite carte. Nous allons créer une réservation autour de ce tuyau.", "TutorialFocusButton", completionEvent: "clash-wall-observed"),
+                new DemoStep("Créer la réservation", "Clique sur Créer la réservation. Clash 3D place réellement la famille rectangulaire murale fournie autour du tuyau ; Bulbizarre attend sa création. Cet essai utilise des réglages temporaires. Dans ton projet, le bouton reprend la famille et les réglages d’Auto réservation.", "ReservationButton", completionEvent: "clash-reservation-created"),
+                new DemoStep("Contrôler après la réservation", "Relance Analyser et attends la fin. Contrôle ensuite la position, les dimensions et l’ouverture réelle dans Revit. Une réservation créée ne garantit pas que la famille découpe le mur : si la traversée reste signalée, examine ce résultat avant de la déclarer traitée.", "AnalyzeButton", completionEvent: "clash-reservation-verified"),
+                new DemoStep("Exporter le résultat vérifié", "Garde Tous dans les statuts et aucune recherche. Clique sur Exporter, choisis HTML pour le rapport autonome ou CSV pour le tableau, puis enregistre. Bulbizarre attend l’écriture du fichier ; annuler le dialogue ne valide pas l’étape. Le rapport reprend les résultats de la nouvelle analyse, même si aucune intersection ne reste.", "ExportButton", completionEvent: "clash-export-written")
             },
             ["reservation"] = new[]
             {
@@ -169,6 +172,7 @@ namespace BIMaestro.Tutorials
                     new DemoStep("Choisir les contrôles", "Déplie Personnaliser l'analyse. Choisis les catégories et les contrôles utiles. Collisions avec les liens nécessite des liens chargés et cochés. Les connexions physiques directes entre réseaux sont exclues ; Connecteurs ouverts et Supports de murs sont des contrôles complémentaires.", "LocalCheck", true),
                     new DemoStep("Comprendre le seuil", "Le seuil est en mm³ : il filtre un volume d'intersection, pas une distance de sécurité. Les contacts sans volume sont exclus. Une géométrie maillée ou indécidable peut produire une suspicion à examiner.", "VolumeBox", true),
                     new DemoStep("Examiner les résultats", "Analyser travaille par étapes et peut être annulé. Attends la fin pour un bilan complet. Détail ouvre un aperçu manipulable ; Voir en 3D cadre les objets orange et bleu dans Revit. Une intersection de paroi ne valide pas automatiquement une réservation.", "AnalyzeButton", true),
+                    new DemoStep("Créer une réservation depuis un conflit", "Pour une intersection confirmée entre un objet et un mur ou un sol, ouvre Voir en 3D ou Détail puis clique sur Créer la réservation lorsque le bouton est proposé. Il utilise la famille et les réglages d’Auto réservation. Contrôle les dimensions et l’ouverture réelle, puis relance l’analyse.", "ResultsList", true),
                     new DemoStep("Corriger, puis contrôler", "Corrige les objets avec les outils Revit, puis relance la même analyse. Le statut Traité est une décision manuelle. Une modification rend les anciens résultats périmés ; seule une nouvelle analyse vérifie la géométrie actuelle.", "ResultsList", true),
                     new DemoStep("Exporter", "Exporter produit un rapport HTML autonome ou un CSV à partir des filtres affichés. Vérifie les statuts, le contrôle et la recherche avant d'enregistrer. Revenir à ma vue rétablit la vue et la sélection conservées avant le cadrage.", "ExportButton", true)
                 },
@@ -1503,7 +1507,7 @@ namespace BIMaestro.Tutorials
                 }
                 _completed = false;
                 DemoStep step = _steps[_index];
-                if (_window is Analyse.SmartCheckWindow clash) clash.PrepareTutorialStep(step.Target);
+                if (_window is Analyse.SmartCheckWindow clash) clash.PrepareTutorialStep(step.Target, step.CompletionEvent);
                 if (_window is Famille.FamilyBrowserWindow browser)
                     browser.PrepareTutorialStep(step.Target, step.CompletionEvent);
                 if (_window.FindName("ReservationFamiliesTab") is TabItem familiesTab &&
@@ -1946,7 +1950,7 @@ namespace BIMaestro.Tutorials
             AddCard(stack, "8 · Navigateur de familles",
                 "Explore un catalogue de 35 familles rangées en dossiers et sous-dossiers. Cherche une famille, prévisualise-la en 3D, découvre les photos automatiques et apprends à brancher ta propre bibliothèque.");
             AddCard(stack, "9 · MEP Booster", "Tourne une vanne, observe le résultat et copie son orientation sur d’autres vannes raccordées.");
-            AddCard(stack, "10 · Clash 3D", "Analyse deux intersections connues, examine le croisement en 3D, relève un tuyau d'essai puis vérifie le conflit restant et exporte le rapport.");
+            AddCard(stack, "10 · Clash 3D", "Analyse deux intersections, relève un tuyau d’essai, crée une réservation dans le mur puis relance l’analyse et exporte le rapport.");
             var close = new Button { Content = "Terminer pour l'instant", Padding = new Thickness(12, 7, 12, 7),
                 HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 4, 0, 0) };
             close.Click += (_, __) => Close();

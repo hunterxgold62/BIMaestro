@@ -50,10 +50,14 @@ namespace BIMaestro.HistoryTests
             var doc = ui.Application.NewProjectDocument(UnitSystem.Metric);
             try
             {
+                if (File.Exists(Path.Combine(Output,"auto-wall-only.txt")))
+                { VerifyAutomaticWallJoins(doc,results); return results; }
+                if (File.Exists(Path.Combine(Output,"native-priority-only.txt")))
+                { VerifyNativePriority(doc,results); return results; }
                 if (File.Exists(Path.Combine(Output,"extended-only.txt")))
                 { VerifyExtendedElements(ui,doc,results); return results; }
                 if (File.Exists(Path.Combine(Output,"relations-only.txt")))
-                { VerifyGeometryRelations(ui,doc,results); return results; }
+                { VerifyGeometryRelations(ui,doc,results); VerifyAutomaticWallJoins(doc,results); return results; }
                 if (File.Exists(Path.Combine(Output,"electrical-only.txt")))
                 { VerifyElectricalSystems(ui,doc,results); return results; }
                 if (File.Exists(Path.Combine(Output,"power-only.txt")))
@@ -128,6 +132,7 @@ namespace BIMaestro.HistoryTests
                 VerifyLogicalSystems(doc,results);
                 VerifyElectricalSystems(ui,doc,results);
                 VerifyGeometryRelations(ui,doc,results);
+                VerifyAutomaticWallJoins(doc,results);
                 var filtered = ElementHistoryRestoration.Restore(doc, new[] {
                     new HistoryRestoreRequest { SourceUniqueId="excluded-a", Label="CML_Calorifuge [1]", Category="Modèles génériques" },
                     new HistoryRestoreRequest { SourceUniqueId="excluded-b", Label="Isolation [2]", Category="Isolants de canalisation" },
@@ -708,6 +713,114 @@ namespace BIMaestro.HistoryTests
             }
             finally { familyDoc.Close(false); }
         }
+        private void VerifyAutomaticWallJoins(Document doc, List<string> results)
+        {
+            var level = new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>().First();
+            var type = new FilteredElementCollector(doc).OfClass(typeof(WallType)).Cast<WallType>()
+                .First(t => t.Kind == WallKind.Basic);
+            Wall first, second;
+            using (var tx = new Transaction(doc, "Automatic wall join fixture"))
+            {
+                tx.Start();
+                first = Wall.Create(doc, Line.CreateBound(new XYZ(0,800,level.Elevation),
+                    new XYZ(20,800,level.Elevation)), type.Id, level.Id, 15, 0, false, false);
+                second = Wall.Create(doc, Line.CreateBound(new XYZ(20,800,level.Elevation),
+                    new XYZ(20,820,level.Elevation)), type.Id, level.Id, 15, 0, false, false);
+                doc.Regenerate();
+                Check(tx.Commit() == TransactionStatus.Committed, "Automatic wall fixture commit");
+            }
+            var firstEnd = Enumerable.Range(0, 2).First(end =>
+                ((LocationCurve)first.Location).get_ElementsAtJoin(end).Cast<Element>()
+                    .Any(e => e.Id == second.Id));
+            var firstRequest = new HistoryRestoreRequest { SourceUniqueId = first.UniqueId,
+                Category = first.Category.Name, Label = first.Name,
+                Recipe = ElementHistoryReconstruction.Capture(first) };
+            var secondRequest = new HistoryRestoreRequest { SourceUniqueId = second.UniqueId,
+                Category = second.Category.Name, Label = second.Name,
+                Recipe = ElementHistoryReconstruction.Capture(second) };
+            Check(firstRequest.Recipe.GeometryRelations.Any(r => r.Kind == "wall_auto_join"
+                && r.Second == second.UniqueId && r.End == firstEnd), "Automatic wall peer captured");
+            using (var tx = new Transaction(doc, "Delete automatic wall pair"))
+            {
+                tx.Start(); doc.Delete(first.Id); doc.Delete(second.Id);
+                Check(tx.Commit() == TransactionStatus.Committed, "Automatic wall pair deletion");
+            }
+            var batch = ElementHistoryRestoration.Restore(doc, new[] { firstRequest, secondRequest });
+            Check(batch.Created == 2 && batch.Failed == 0, "Automatic wall pair restoration: "
+                + JsonConvert.SerializeObject(batch));
+            var restoredFirst = (Wall)doc.GetElement(batch.Items.Single(i =>
+                i.SourceUniqueId == firstRequest.SourceUniqueId).UniqueId);
+            var restoredSecond = (Wall)doc.GetElement(batch.Items.Single(i =>
+                i.SourceUniqueId == secondRequest.SourceUniqueId).UniqueId);
+            Check(((LocationCurve)restoredFirst.Location).get_ElementsAtJoin(firstEnd).Cast<Element>()
+                .Any(e => e.Id == restoredSecond.Id), "Automatic wall peer actually rejoined");
+            Check(batch.RelationAudit.Any(r => r.Kind == "wall_auto_join" &&
+                r.FirstSourceUniqueId == firstRequest.SourceUniqueId && r.SecondSourceUniqueId == secondRequest.SourceUniqueId
+                && r.Outcome != "failed"), "Automatic wall join audited: "
+                    + JsonConvert.SerializeObject(batch.RelationAudit));
+            using (var tx = new Transaction(doc, "Break automatic wall join for retry"))
+            {
+                tx.Start(); WallUtils.DisallowWallJoinAtEnd(restoredFirst, firstEnd);
+                Check(tx.Commit() == TransactionStatus.Committed, "Break automatic wall join");
+            }
+            Check(!((LocationCurve)restoredFirst.Location).get_ElementsAtJoin(firstEnd).Cast<Element>()
+                .Any(e => e.Id == restoredSecond.Id), "Automatic wall join was broken for retry");
+            var retry = new HistoryRestoreBatch();
+            retry.Items.Add(new HistoryRestoreItem { SourceUniqueId = firstRequest.SourceUniqueId,
+                UniqueId = restoredFirst.UniqueId, Created = true });
+            retry.Items.Add(new HistoryRestoreItem { SourceUniqueId = secondRequest.SourceUniqueId,
+                UniqueId = restoredSecond.UniqueId, Created = true });
+            ElementHistoryRelations.Restore(doc, new[] { firstRequest, secondRequest },
+                new Dictionary<string, string> {
+                    [firstRequest.SourceUniqueId] = restoredFirst.UniqueId,
+                    [secondRequest.SourceUniqueId] = restoredSecond.UniqueId
+                }, retry);
+            Check(retry.RelationFailures.Count == 0 && ((LocationCurve)restoredFirst.Location)
+                .get_ElementsAtJoin(firstEnd).Cast<Element>().Any(e => e.Id == restoredSecond.Id),
+                "Automatic wall join retry: " + JsonConvert.SerializeObject(retry.RelationAudit));
+            results.Add("automatic wall pair captured, rejoined and verified after both walls are restored");
+            results.Add("missing automatic wall join re-established and verified after an explicit disallow");
+
+            Wall trunk, branch;
+            using (var tx = new Transaction(doc, "Automatic T wall join fixture"))
+            {
+                tx.Start();
+                trunk = Wall.Create(doc, Line.CreateBound(new XYZ(0,850,level.Elevation),
+                    new XYZ(20,850,level.Elevation)), type.Id, level.Id, 15, 0, false, false);
+                branch = Wall.Create(doc, Line.CreateBound(new XYZ(10,850,level.Elevation),
+                    new XYZ(10,870,level.Elevation)), type.Id, level.Id, 15, 0, false, false);
+                doc.Regenerate();
+                Check(tx.Commit() == TransactionStatus.Committed, "Automatic T wall fixture commit");
+            }
+            var branchEnd = Enumerable.Range(0, 2).First(end =>
+                ((LocationCurve)branch.Location).get_ElementsAtJoin(end).Cast<Element>()
+                    .Any(e => e.Id == trunk.Id));
+            var branchRequest = new HistoryRestoreRequest { SourceUniqueId = branch.UniqueId,
+                Category = branch.Category.Name, Label = branch.Name,
+                Recipe = ElementHistoryReconstruction.Capture(branch) };
+            var trunkRequest = new HistoryRestoreRequest { SourceUniqueId = trunk.UniqueId,
+                Category = trunk.Category.Name, Label = trunk.Name,
+                Recipe = ElementHistoryReconstruction.Capture(trunk) };
+            Check(branchRequest.Recipe.GeometryRelations.Any(r => r.Kind == "wall_auto_join"
+                && r.Second == trunk.UniqueId && r.End == branchEnd && !r.SecondEnd.HasValue),
+                "Automatic T join captured without reciprocal end");
+            using (var tx = new Transaction(doc, "Delete automatic T wall pair"))
+            {
+                tx.Start(); doc.Delete(trunk.Id); doc.Delete(branch.Id);
+                Check(tx.Commit() == TransactionStatus.Committed, "Automatic T wall deletion");
+            }
+            var tBatch = ElementHistoryRestoration.Restore(doc, new[] { trunkRequest, branchRequest });
+            Check(tBatch.Created == 2 && tBatch.RelationFailures.Count == 0,
+                "Automatic T wall restoration: " + JsonConvert.SerializeObject(tBatch));
+            var newTrunk = (Wall)doc.GetElement(tBatch.Items.Single(i =>
+                i.SourceUniqueId == trunkRequest.SourceUniqueId).UniqueId);
+            var newBranch = (Wall)doc.GetElement(tBatch.Items.Single(i =>
+                i.SourceUniqueId == branchRequest.SourceUniqueId).UniqueId);
+            Check(((LocationCurve)newBranch.Location).get_ElementsAtJoin(branchEnd).Cast<Element>()
+                .Any(e => e.Id == newTrunk.Id), "Automatic T join peer actually rejoined");
+            results.Add("automatic T wall join captured and verified against the wall body");
+        }
+
         private void VerifyGeometryRelations(UIApplication ui, Document doc, List<string> results)
         {
             var voidSymbol=CreateFamily(ui,doc,"Metric Generic Model.rft",cuttingVoid:true);
@@ -1019,6 +1132,42 @@ namespace BIMaestro.HistoryTests
             Check(calo.Items.Count==0 && calo.Failed==0,"Calorifuge must stay deleted");
             results.Add("roof, roof/face hosted, line and two-level families, ceiling; dependency ordering; sketch ownership and duplicate prevention");
             results.Add("older sketch origins preserved across repeated deletion/restoration; calorifuge remains excluded");
+        }
+
+        private void VerifyNativePriority(Document doc, List<string> results)
+        {
+            var shapes = new List<DirectShape>();
+            using (var tx = new Transaction(doc, "Native priority fixtures"))
+            {
+                tx.Start();
+                for (var i = 0; i < 3; i++)
+                {
+                    var shape = DirectShape.CreateElement(doc, new ElementId(BuiltInCategory.OST_GenericModel));
+                    shape.SetShape(new GeometryObject[] { GeometryCreationUtilities.CreateExtrusionGeometry(
+                        new[] { Rectangle(20 * i, 0, 20 * i + 5, 5, 0) }, XYZ.BasisZ, 5) });
+                    shapes.Add(shape);
+                }
+                Check(tx.Commit() == TransactionStatus.Committed, "Native priority fixture commit");
+            }
+            var receipts = shapes.Select(shape => ElementHistoryReconstruction.Capture(shape)).ToList();
+            Check(receipts.All(r => r?.Native?.Ready == false), "Native requests were not queued");
+            var cooldown = typeof(ElementHistoryNativeArchive).GetField("_nextBackgroundUtc",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Check(cooldown != null, "Native cooldown field missing");
+            cooldown.SetValue(null, DateTime.UtcNow.AddMinutes(1));
+            ElementHistoryNativeArchive.PrioritizeSelectedRoots(doc, DateTime.UtcNow,
+                shapes.Select(s => s.UniqueId));
+            var audit = ElementHistoryNativeArchive.GetBackgroundAudit(doc);
+            Check(audit?.NextEligibleUtc <= DateTime.UtcNow.AddSeconds(3),
+                "Selected roots remained behind the previous archive cooldown");
+            ElementHistoryNativeArchive.ProcessPendingBackground(doc);
+            Check(ElementHistoryNativeArchive.ShouldRetrySelectedBackgroundSoon(doc),
+                "The first Idling callback did not request a retry for selected roots");
+            ElementHistoryNativeArchive.ProcessPending(doc);
+            Check(receipts.All(r => r.Native.Ready),
+                "One priority archive wave left selected roots pending");
+            results.Add("selected native roots preempt old cooldown; one wave saves all selected fixture recipes");
+            ElementHistoryNativeArchive.Forget(doc);
         }
 
         private void VerifyNativeArchive(UIApplication ui, Document doc, List<string> results)

@@ -22,5 +22,6 @@
     <Compile Include="../../BIMaestro/commands/qui est le coupable/ElementHistoryRestoration.cs" />
     <Compile Include="../../BIMaestro/commands/qui est le coupable/ElementHistoryNetwork.cs" />
     <Compile Include="../../BIMaestro/commands/qui est le coupable/ElementHistoryRelations.cs" />
+    <Compile Include="../../BIMaestro/commands/qui est le coupable/ElementHistoryAudit.cs" />
   </ItemGroup>
 </Project>

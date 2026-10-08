@@ -351,6 +351,8 @@ namespace Analyse
         private void CreateReservation(ModelIssue issue)
         {
             if (issue == null || !issue.CanCreateReservation || issue.IsApproximate || Scanning || _busy || _queuedAction.HasValue || _stale) return;
+            _handler.TutorialReservation = _tutorialPrepared;
+            _tutorialActionFailed = false;
             _handler.FocusIssue = issue; RunText.Text = "Création de la réservation avec les réglages d'Autoréservation…";
             Queue(SmartAction.CreateReservation);
         }

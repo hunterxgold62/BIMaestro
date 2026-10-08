@@ -23,6 +23,10 @@ namespace Analyse
         [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
         public double Offset { get; set; }
         public int? JoinType { get; set; }
+        public int? SecondEnd { get; set; }
+        public int? JoinOrder { get; set; }
+        public int? JoinParticipantCount { get; set; }
+        public int? SecondJoinType { get; set; }
     }
 
     internal static class ElementHistoryRelations
@@ -167,10 +171,28 @@ namespace Analyse
             });
             if (element is Wall endWall)
                 Read("Extrémités de mur", () => {
+                    var location = (LocationCurve)endWall.Location;
                     for (var end = 0; end < 2; end++)
+                    {
                         result.Add(new HistoryGeometryRelation { Kind = "wall_end", First = element.UniqueId, End = end,
                             Style = WallUtils.IsWallJoinAllowedAtEnd(endWall, end) ? 1 : 0,
-                            JoinType = (int)((LocationCurve)endWall.Location).get_JoinType(end) });
+                            JoinType = (int)location.get_JoinType(end) });
+                        var participants = location.get_ElementsAtJoin(end).Cast<Element>().ToList();
+                        for (var order = 0; order < participants.Count; order++)
+                        {
+                            if (!(participants[order] is Wall peer) || peer.Id == endWall.Id) continue;
+                            result.Add(new HistoryGeometryRelation
+                            {
+                                Kind = "wall_auto_join", First = endWall.UniqueId,
+                                Second = peer.UniqueId, End = end, JoinType = (int)location.get_JoinType(end),
+                                JoinOrder = order, JoinParticipantCount = participants.Count,
+                                SecondEnd = FindReciprocalWallEnd(peer, endWall.Id)
+                            });
+                            var relation = result[result.Count - 1];
+                            if (relation.SecondEnd.HasValue)
+                                relation.SecondJoinType = (int)((LocationCurve)peer.Location).get_JoinType(relation.SecondEnd.Value);
+                        }
+                    }
                 });
             return result.Where(r => r.First != null && (r.Second != null || r.Kind == "wall_end"))
                 .Where(r => r.Kind != "join" || !result.Any(c => c.Kind == "solid_cut"
@@ -184,6 +206,18 @@ namespace Analyse
 
         internal static string Key(HistoryGeometryRelation r) => r.Kind + ":" + r.First + ":" + r.Second + ":" + r.End;
 
+        private static int? FindReciprocalWallEnd(Wall wall, ElementId peerId)
+        {
+            if (!(wall.Location is LocationCurve location)) return null;
+            for (var end = 0; end < 2; end++)
+                try
+                {
+                    if (location.get_ElementsAtJoin(end).Cast<Element>().Any(e => e.Id == peerId)) return end;
+                }
+                catch { }
+            return null;
+        }
+
         internal static void Restore(Document doc, IEnumerable<HistoryRestoreRequest> requests, Dictionary<string, string> index, HistoryRestoreBatch batch)
         {
             var changed = new HashSet<string>(batch.Items.Where(i => i.Created || i.IncludedInParent).Select(i => i.SourceUniqueId));
@@ -192,20 +226,41 @@ namespace Analyse
             foreach (var pair in index.Where(p => generated.Contains(p.Value))) changed.Add(pair.Key);
             var relations = requests.SelectMany(r => r.Recipe?.GeometryRelations ?? new List<HistoryGeometryRelation>())
                 .Where(r => changed.Contains(r.First) || changed.Contains(r.Second)).GroupBy(Key).Select(g => g.First())
-                .OrderBy(r => r.Kind.EndsWith("attach") ? 0 : r.Kind == "join" ? 1 : r.Kind == "wall_end" ? 3 : 2);
+                .OrderBy(r => r.Kind.EndsWith("attach") ? 0 : r.Kind == "join" ? 1
+                    : r.Kind == "wall_end" ? 3 : r.Kind == "wall_auto_join" ? 4 : 2);
             foreach (var relation in relations)
             {
                 var label = relation.Kind + " [" + relation.First + " → " + relation.Second + "]";
+                var relationAudit = new HistoryRelationAudit
+                {
+                    Kind = relation.Kind,
+                    End = relation.End,
+                    SecondEnd = relation.SecondEnd,
+                    JoinOrder = relation.JoinOrder,
+                    FirstSourceUniqueId = relation.First,
+                    SecondSourceUniqueId = relation.Second
+                };
                 try
                 {
                     var first = Resolve(doc, index, relation.First);
                     var second = Resolve(doc, index, relation.Second);
+                    relationAudit.FirstResolvedUniqueId = first?.UniqueId;
+                    relationAudit.SecondResolvedUniqueId = second?.UniqueId;
                     if (first == null || (second == null && relation.Kind != "wall_end"))
                         throw new InvalidOperationException("Un élément de référence n’est pas présent dans la maquette.");
-                    if (IsCalo(first) || (second != null && IsCalo(second))) continue;
+                    if (IsCalo(first) || (second != null && IsCalo(second)))
+                    {
+                        relationAudit.Outcome = "excluded_insulation";
+                        continue;
+                    }
                     // Most native copies and default wall ends already match. Avoid
                     // thousands of empty transactions on large restoration batches.
-                    if (Matches(doc, relation, first, second)) { batch.RelationsExisting++; continue; }
+                    if (Matches(doc, relation, first, second))
+                    {
+                        batch.RelationsExisting++;
+                        relationAudit.Outcome = "already_present";
+                        continue;
+                    }
                     using (var tx = new Transaction(doc, "BIMaestro - Rétablir relation géométrique"))
                     {
                         tx.Start();
@@ -216,10 +271,39 @@ namespace Analyse
                         if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit a refusé la relation. " + failures.Message);
                         Verify(doc, relation, first, second);
                         if (existing) batch.RelationsExisting++; else batch.RelationsRestored++;
+                        relationAudit.Outcome = existing ? "already_present" : "restored";
                     }
                 }
                 catch (Autodesk.Revit.Exceptions.RegenerationFailedException) { throw; }
-                catch (Exception ex) { batch.RelationFailures.Add(label + " : " + (ex.InnerException?.Message ?? ex.Message)); }
+                catch (Exception ex)
+                {
+                    relationAudit.Outcome = "failed";
+                    relationAudit.Detail = ex.InnerException?.Message ?? ex.Message;
+                    batch.RelationFailures.Add(label + " : " + relationAudit.Detail);
+                }
+                finally
+                {
+                    if (relation.Kind == "wall_auto_join")
+                        try
+                        {
+                            var actualWall = Resolve(doc, index, relation.First) as Wall;
+                            var actualPeer = Resolve(doc, index, relation.Second) as Wall;
+                            if (actualWall != null && actualPeer != null)
+                            {
+                                var participants = ((LocationCurve)actualWall.Location)
+                                    .get_ElementsAtJoin(relation.End).Cast<Element>().ToList();
+                                var position = participants.FindIndex(e => e.Id == actualPeer.Id);
+                                relationAudit.ActualParticipantCount = participants.Count;
+                                relationAudit.ActualJoinOrder = position >= 0 ? (int?)position : null;
+                                if (position >= 0 && relation.JoinOrder.HasValue && relation.JoinParticipantCount == participants.Count)
+                                    relationAudit.JoinOrderMatches = position == relation.JoinOrder.Value;
+                                if (relationAudit.JoinOrderMatches == false)
+                                    relationAudit.Detail = "La jonction est présente, mais l’ordre des murs diffère de l’original.";
+                            }
+                        }
+                        catch { }
+                    batch.RelationAudit.Add(relationAudit);
+                }
             }
         }
 
@@ -249,6 +333,12 @@ namespace Analyse
             }
             if (r.Kind == "wall_end") return WallUtils.IsWallJoinAllowedAtEnd((Wall)first, r.End) == (r.Style == 1)
                 && (r.Style != 1 || !r.JoinType.HasValue || (int)((LocationCurve)first.Location).get_JoinType(r.End) == r.JoinType.Value);
+            if (r.Kind == "wall_auto_join")
+            {
+                if (!(first is Wall wall) || !(second is Wall peer)) return false;
+                return ((LocationCurve)wall.Location).get_ElementsAtJoin(r.End).Cast<Element>()
+                    .Any(e => e.Id == peer.Id);
+            }
             return false;
         }
 
@@ -289,6 +379,26 @@ namespace Analyse
                 { curve.set_JoinType(r.End, (JoinType)r.JoinType.Value); existing = false; }
                 return existing;
             }
+            if (r.Kind == "wall_auto_join")
+            {
+                var wall = (Wall)first;
+                var peer = (Wall)second;
+                if (Matches(doc, r, wall, peer)) return true;
+                // Revit may not recompute an automatic join when both walls were
+                // created with their ends temporarily disabled. Toggle only the
+                // recorded ends after both original walls exist again.
+                WallUtils.DisallowWallJoinAtEnd(wall, r.End);
+                WallUtils.AllowWallJoinAtEnd(wall, r.End);
+                if (r.SecondEnd.HasValue)
+                {
+                    WallUtils.DisallowWallJoinAtEnd(peer, r.SecondEnd.Value);
+                    WallUtils.AllowWallJoinAtEnd(peer, r.SecondEnd.Value);
+                }
+                doc.Regenerate();
+                RestoreWallJoinType(wall, r.End, r.JoinType);
+                if (r.SecondEnd.HasValue) RestoreWallJoinType(peer, r.SecondEnd.Value, r.SecondJoinType);
+                return false;
+            }
             if (r.Kind == "wall_attach")
             {
                 if (WallGet == null || WallAdd == null) throw new InvalidOperationException("Attaches de murs : API Revit 2025.2 ou ultérieure nécessaire.");
@@ -312,6 +422,14 @@ namespace Analyse
                 return false;
             }
             throw new InvalidOperationException("Relation géométrique inconnue.");
+        }
+
+        private static void RestoreWallJoinType(Wall wall, int end, int? joinType)
+        {
+            if (!joinType.HasValue) return;
+            var location = (LocationCurve)wall.Location;
+            if ((int)location.get_JoinType(end) != joinType.Value)
+                location.set_JoinType(end, (JoinType)joinType.Value);
         }
 
         private sealed class Failures : IFailuresPreprocessor

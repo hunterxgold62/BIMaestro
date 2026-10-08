@@ -19,6 +19,7 @@ namespace Analyse
         public int Version { get; set; } = 1;
         public string Kind { get; set; }
         public HistoryNativeArtifact Native { get; set; }
+        public string NativeFallbackReason { get; set; }
         public string SystemName { get; set; }
         public List<string> SystemMembers { get; set; }
         [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
@@ -119,6 +120,10 @@ namespace Analyse
                 ? ElementHistoryNativeArchive.Capture(element) : CaptureCore(element, message => detail = message);
             if (recipe == null && element != null)
                 try { recipe = ElementHistoryNativeArchive.Capture(element); } catch (Exception ex) { detail = ex.Message; }
+            if (recipe?.Kind == "native_archive" && element != null)
+                recipe.NativeFallbackReason = detail ?? (ElementHistoryNativeArchive.RequiresAggregate(element)
+                    ? "Élément groupé ou dépendant : copie native de l'ensemble requise."
+                    : "Aucune recette géométrique directe pour " + element.GetType().Name + ".");
             if (recipe != null && (element is FamilyInstance || element is Group))
             {
                 try
@@ -256,7 +261,16 @@ namespace Analyse
                         || Integer(wall, BuiltInParameter.WALL_CROSS_SECTION) != (int)WallCrossSection.Vertical
                         || Integer(wall, BuiltInParameter.WALL_TOP_IS_ATTACHED) != 0
                         || Integer(wall, BuiltInParameter.WALL_BOTTOM_IS_ATTACHED) != 0
-                        || !(wall.Location is LocationCurve location)) return null;
+                        || !(wall.Location is LocationCurve location))
+                    {
+                        diagnostic?.Invoke("Mur non pris en charge par la recette directe : type=" + wall.WallType.Kind
+                            + ", inclinaison=" + Value(wall, BuiltInParameter.WALL_SINGLE_SLANT_ANGLE_FROM_VERTICAL)
+                            + ", section=" + Integer(wall, BuiltInParameter.WALL_CROSS_SECTION)
+                            + ", attaché en haut=" + (Integer(wall, BuiltInParameter.WALL_TOP_IS_ATTACHED) != 0)
+                            + ", attaché en bas=" + (Integer(wall, BuiltInParameter.WALL_BOTTOM_IS_ATTACHED) != 0)
+                            + ", courbe=" + (wall.Location is LocationCurve) + ".");
+                        return null;
+                    }
                     recipe.Kind = "wall";
                     if (wall.SketchId != ElementId.InvalidElementId)
                     {

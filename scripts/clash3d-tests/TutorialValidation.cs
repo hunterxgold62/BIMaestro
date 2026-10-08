@@ -152,6 +152,12 @@ namespace BIMaestro.Tests
         {
             try
             {
+                using (var tx = new Transaction(_doc, "Load training reservation family"))
+                {
+                    tx.Start();
+                    Check(_doc.LoadFamily(Path.Combine(_folder, "Demo", "Maquette", "Familles", "CML_Réservation rectangulaire murale.rfa")), "Training reservation family was not loaded.");
+                    tx.Commit();
+                }
                 Test("scene has exactly three sources and two confirmed pairs", () =>
                 {
                     var scan = SceneScan(); Check((bool)Static("DemoClashExercise", "Verify", _doc, scan, false), "Initial pairs differ."); scan.Dispose();
@@ -234,6 +240,9 @@ namespace BIMaestro.Tests
             else if (_stage == 3 && _handler.Action == SmartAction.FocusApply) { _stage = 4; Schedule(Focused); }
             else if (_stage == 5 && _handler.Action == SmartAction.TutorialCorrect) { _stage = 6; Schedule(Corrected); }
             else if (_stage == 7 && _handler.Action == SmartAction.ScanBatch && _handler.Session.Complete) { _stage = 8; Schedule(Rescanned); }
+            else if (_stage == 9 && _handler.Action == SmartAction.FocusApply) { _stage = 10; Schedule(WallFocused); }
+            else if (_stage == 11 && _handler.Action == SmartAction.CreateReservation) { _stage = 12; Schedule(ReservationCreated); }
+            else if (_stage == 13 && _handler.Action == SmartAction.ScanBatch && _handler.Session.Complete) { _stage = 14; Schedule(ReservationRescanned); }
         }
         private void FirstScan()
         {
@@ -286,6 +295,47 @@ namespace BIMaestro.Tests
                 Check((bool)Static("DemoClashExercise", "Verify", _doc, _handler.Session, true) && Field<Button>(Guide, "_next").IsEnabled, "Wrong corrected scan.");
                 Check(File.ReadAllText(Path.Combine(_folder, "clash3d_options.json")) == _preferencesSnapshot, "Training overwrote preferences."); });
             Next();
+            _stage = 9; Call(_window, "TutorialFocus_Click", null, new RoutedEventArgs());
+        }
+        private void WallFocused()
+        {
+            Test("wall focus reveals reservation button and waits for observation", () =>
+            {
+                Check((bool)Static("DemoClashExercise", "IsWall", _doc, _handler.DisplayedIssue), "Wrong focused obstacle.");
+                Check(!Field<Button>(Guide, "_next").IsEnabled, "Wall observation passed before confirmation.");
+                Descendants(Field<Window>(_window, "_tutorialObservation")).OfType<Button>().Single().RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Check(Field<Button>(Guide, "_next").IsEnabled, "Observation did not resume.");
+                Check(((Button)_window.FindName("ReservationButton")).IsVisible, "Native reservation button is hidden.");
+            });
+            Next(); Render("tutorial-reservation.png", 1180, 760);
+            Check(!Field<Button>(Guide, "_next").IsEnabled, "Reservation step skipped creation.");
+            _stage = 11;
+            ((Button)_window.FindName("ReservationButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Check(!Field<Button>(Guide, "_next").IsEnabled, "Reservation click validated before creation.");
+        }
+        private void ReservationCreated()
+        {
+            Test("native button creates a real marked reservation and invalidates old results", () =>
+            {
+                var instance = _doc.GetElement(_handler.CreatedReservationId) as FamilyInstance;
+                Check(instance != null && instance.Symbol.Family.Name == "CML_Réservation rectangulaire murale", "Training family was not created.");
+                Check(instance.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() == "BIMaestro_DEMO_CLASH_RESERVATION", "Reservation cannot be reset.");
+                foreach (var names in new[] { new[] { "Longueur", "COM_Longueur", "Largeur", "COM_Largeur" }, new[] { "Hauteur", "COM_Hauteur" }, new[] { "Profondeur", "COM_Profondeur", "Epaisseur", "Épaisseur" } })
+                    Check(names.Any(name => (instance.LookupParameter(name) ?? instance.Symbol.LookupParameter(name))?.AsDouble() > 0), "Missing dimension: " + names[0]);
+                Check(Field<bool>(_window, "_stale") && Field<Button>(Guide, "_next").IsEnabled, "Creation did not advance or mark stale.");
+                Check((bool)_handler.GetType().GetProperty("TutorialReservation", Hidden).GetValue(_handler), "Personal settings were used in training.");
+            });
+            Next(); _stage = 13; Call(_window, "Analyze_Click", null, new RoutedEventArgs());
+        }
+        private void ReservationRescanned()
+        {
+            Test("analysis after reservation checks actual model before export", () =>
+            {
+                Check(_handler.Session.Complete && _handler.Session.Error == null && _handler.Session.SourceCount == 3, "Incomplete reservation rescan.");
+                Check(_handler.Session.Issues.Count <= 1 && _handler.Session.Issues.All(i => (bool)Static("DemoClashExercise", "IsWall", _doc, i)), "Unexpected remaining conflict.");
+                Check(Field<bool>(_window, "_tutorialReservationRescanVerified") && Field<Button>(Guide, "_next").IsEnabled, "Reservation rescan did not validate.");
+            });
+            Next();
             Test("exports validate after actual writes and honor displayed filters", () =>
             {
                 Check(!Field<Button>(Guide, "_next").IsEnabled, "Export step can be skipped.");
@@ -305,6 +355,15 @@ namespace BIMaestro.Tests
                 Call(Guide, "Close");
                 Check(!Field<bool>(_window, "_tutorialPrepared") && ((Button)_window.FindName("TutorialFixButton")).Visibility == System.Windows.Visibility.Collapsed,
                     "Tutorial correction remains accessible.");
+            });
+            Test("restarting training removes its reservation without duplicating the scene", () =>
+            {
+                var reservationId = _handler.CreatedReservationId;
+                Static("DemoClashExercise", "Prepare", _doc);
+                Check(_doc.GetElement(reservationId) == null, "Reservation survived reset.");
+                var scan = SceneScan();
+                Check((bool)Static("DemoClashExercise", "Verify", _doc, scan, false), "Reset did not restore both pairs."); scan.Dispose();
+                Check(!(bool)_handler.GetType().GetProperty("TutorialReservation", Hidden).GetValue(_handler), "Training reservation mode survived guide close.");
             });
             Cleanup();
         }

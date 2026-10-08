@@ -318,13 +318,86 @@ Les changements mettent à jour les propriétaires concernés et les attaches d'
 support supprimé, plutôt que de reparcourir tous les murs/poteaux à chaque transaction.
 Les relations déjà capturées sont réutilisées dans le suivi des éléments voisins.
 
+Les jonctions automatiques entre murs sont enregistrées séparément des jointures
+`JoinGeometryUtils` et des réglages `wall_end`. Chaque extrémité conserve les murs
+qui participaient réellement à sa jonction, leur ordre observé et, si elle existe,
+l'extrémité réciproque. Après recréation des murs, la restauration vérifie la
+présence de chaque voisin avec `LocationCurve.ElementsAtJoin`. Si le voisin manque,
+elle relance uniquement les extrémités concernées et vérifie à nouveau. Le rapport
+contient une entrée `wall_auto_join` par voisin avec l'ID résolu, le résultat et
+l'ordre effectivement observé. L'ordre est audité ; il n'est pas forcé, car l'API
+Revit peut rejeter son changement même quand la jonction physique est correcte.
+
 La préparation initiale et l'archivage au repos attendent au moins 1,5 seconde sans
 entrée clavier/souris. Les petits lots de préparation sont espacés d'au moins 300 ms ;
 les vagues d'archives d'au moins deux secondes. La pause augmente jusqu'à neuf fois
 la durée du dernier lot pour laisser la priorité au travail dans la maquette. Il s'agit d'une
 régulation entre opérations : la création/copie/sauvegarde d'un document Revit
 reste indivisible et doit s'exécuter dans son contexte API principal.
+
+### Audit d'une suppression massive
+
+Chaque transaction de suppression écrit un fichier `suppression-*.json` sous
+`%LOCALAPPDATA%/BIMaestro/HistoryReports`. Il contient **tous** les ID supprimés,
+y compris ceux qui n'avaient aucun instantané et n'apparaîtront donc pas dans
+l'historique restaurable. `PreloadAtDeletion` donne le total initial, les éléments
+visités/capturés/ignorés/échoués, le temps actif et l'estimation restante au débit
+observé. Cette estimation inclut les pauses déjà observées ; elle ne garantit pas
+le temps futur. `PreloadStillQueuedAtDeletion` dit si un ID était encore dans la
+file de préchargement. Une valeur `null` signifie que la file n'avait pas encore été
+établie ou que l'état était indisponible.
+
+Chaque ligne conserve l'origine et l'heure de son instantané, son type de recette,
+l'état exact de son archive native avant suppression, sa racine native, ses liens
+géométriques et, si connue, la courbe d'esquisse propriétaire. Le dernier événement
+de sélection comporte le nombre sélectionné, les cache hits, les captures et les
+temps de chaque service de sélection du plugin. Une archive `Ready=false` à la
+suppression explique directement un échec `archive`, même si la préparation globale
+du modèle était terminée.
+
+Le rapport `restauration-*.json` version 2 référence ces fichiers, détaille les
+échecs par catégorie/motif/recette, relie chaque résultat à son parent connu et
+liste les jointures/attaches avec les identifiants réellement résolus. Un parent
+marqué `created` n'est **pas** une preuve qu'un enfant signalé en échec a été recréé :
+seul `IncludedInParent`, `Existing` ou `Created` confirme ce résultat. Les anciens
+événements sans audit restent lisibles et sont comptés dans `ItemsWithoutDeletionAudit`.
+
+Pour comparer deux essais, conserver ensemble le fichier de suppression, le rapport
+de restauration et la maquette de test. Les rapports sont écrits hors du RVT ; le
+nouveau code doit être chargé au démarrage de Revit avant la suppression testée.
 Le chemin d'archivage explicite utilisé par les tests reste disponible sans attente.
+
+### Priorité de préparation pour un second essai
+
+Au chargement de la maquette, les murs, sols, toits, portes, fenêtres, fondations,
+poteaux/ossatures, équipements mécaniques, gaines et tuyaux passent avant le reste
+du catalogue. Le filtre est appliqué par Revit sur les ID, sans ouvrir chaque élément
+juste pour le classement. La sélection continue de capturer immédiatement ses
+recettes ; ses racines natives (y compris les murs hôtes des portes) sont classées
+dès la sélection à partir des instantanés en cache, sans opération de copie. Elles
+passent ensuite en tête de la prochaine vague d'archivage au repos. L'archivage s'exécute avant le lot de
+préchargement du même événement d'inactivité. Les budgets et délais de repos ne
+changent pas, et aucune catégorie de modèle n'est supprimée de la couverture.
+
+Le journal de suppression expose `PriorityCandidates`, `PriorityVisited`,
+`PriorityCatalogMilliseconds` et `Categories` dans `PreloadAtDeletion`. `Categories`
+décompte les éléments **déjà visités** par catégorie ; ce n'est un inventaire complet
+des candidats qu'après la fin du préchargement. `NativePriorityPendingRootsAtDeletion`
+et `NativePriorityClassificationMilliseconds` mesurent la file native prioritaire.
+Chaque archive indique désormais `NativeArchiveStartedUtc` : une valeur nulle avec
+`NativeArchiveReadyAtDeletion=false` signifie qu'elle attendait encore son tour,
+alors qu'une date permet de distinguer une copie commencée mais non terminée.
+La priorité enregistrée ne contourne pas la condition d'inactivité ni la pause entre
+deux vagues ; un nombre positif de racines prioritaires en attente ne signifie donc
+pas qu'elles étaient déjà prêtes à la suppression.
+`NativeBackgroundAtDeletion` indique le dernier contrôle de la file, le motif
+`cooldown` ou `user_active` s'il a bloqué le travail, la prochaine heure admissible
+et les heures de début/fin de la dernière vague. Un dernier contrôle antérieur à
+la sélection signale qu'aucun passage au repos n'a relancé la file entre-temps.
+L'estimation du temps restant est laissée à `null` tant que la file prioritaire
+n'est pas terminée et qu'au moins 10 % du catalogue (avec un minimum adapté aux
+petits modèles) n'a pas été visité : les premiers murs et familles sont trop coûteux
+pour extrapoler leur cadence à tout le modèle.
 
 Validation intermédiaire : `2025-history-idle-fix-full/result.json`, 76 contrôles
 réussis, dont le scénario empêchant l'archivage inutile des murs et tuyaux.

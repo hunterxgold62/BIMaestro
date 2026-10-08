@@ -12,6 +12,9 @@ namespace Analyse
         private bool _tutorialPrepared, _tutorialCorrected, _tutorialActionFailed, _tutorialRescanVerified;
         private bool _tutorialInitialVerified, _tutorialDetailOpened, _tutorialFocusObserved, _tutorialExportWritten;
         private ElementId _tutorialCrossA, _tutorialCrossB;
+        private bool _tutorialWallObserved, _tutorialReservationCreated, _tutorialReservationRescanVerified;
+        private ElementId _tutorialReservationId;
+        private bool _tutorialInspectWall;
         private Window _tutorialObservation;
 
         internal bool RestartPreparedTutorial(SmartScanSetup setup)
@@ -41,6 +44,8 @@ namespace Analyse
                 throw new InvalidOperationException("Relance le parcours Clash 3D pour préparer les trois tuyaux d'essai.");
             _tutorialPrepared = true; _tutorialCorrected = false;
             _tutorialInitialVerified = _tutorialDetailOpened = _tutorialFocusObserved = _tutorialExportWritten = _tutorialRescanVerified = false;
+            _tutorialWallObserved = _tutorialReservationCreated = _tutorialReservationRescanVerified = _tutorialInspectWall = false;
+            _tutorialReservationId = null;
             var pipes = _setup.Selection.Select(OwnerDocument.GetElement).ToList();
             _tutorialCrossA = pipes.Single(p => p.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() == DemoClashExercise.Prefix + "CROSS_A").Id;
             _tutorialCrossB = pipes.Single(p => p.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() == DemoClashExercise.Prefix + "CROSS_B").Id;
@@ -53,8 +58,9 @@ namespace Analyse
             SettingsExpander.IsExpanded = true;
         }
 
-        internal void PrepareTutorialStep(string target)
+        internal void PrepareTutorialStep(string target, string completionEvent = null)
         {
+            _tutorialInspectWall = completionEvent == "clash-wall-observed";
             SettingsExpander.IsExpanded = target == "ScopeCombo" || target == "LocalCheck" || target == "VolumeBox";
             TutorialFixButton.Visibility = _tutorialPrepared && target == "TutorialFixButton" ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
             TutorialInspectButton.Visibility = _tutorialPrepared && target == "TutorialInspectButton" ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
@@ -62,7 +68,7 @@ namespace Analyse
             TutorialFixButton.IsEnabled = !_tutorialCorrected && !_busy && !_queuedAction.HasValue;
             if (target == "TutorialInspectButton" || target == "TutorialFocusButton")
             {
-                var crossing = _filtered.FirstOrDefault(IsTutorialCrossing);
+                var crossing = _filtered.FirstOrDefault(issue => _tutorialInspectWall ? DemoClashExercise.IsWall(OwnerDocument, issue) : IsTutorialCrossing(issue));
                 if (crossing != null) { ResultsList.SelectedItem = crossing; ResultsList.ScrollIntoView(crossing); }
             }
         }
@@ -78,6 +84,9 @@ namespace Analyse
                 case "clash-corrected": return _tutorialCorrected;
                 case "clash-rescan-verified": return _tutorialRescanVerified && !_stale;
                 case "clash-export-written": return _tutorialExportWritten;
+                case "clash-wall-observed": return _tutorialWallObserved;
+                case "clash-reservation-created": return _tutorialReservationCreated && OwnerDocument.GetElement(_tutorialReservationId) is FamilyInstance;
+                case "clash-reservation-verified": return _tutorialReservationRescanVerified && !_stale;
                 default: return false;
             }
         }
@@ -85,6 +94,7 @@ namespace Analyse
         internal void EndTutorial()
         {
             _tutorialPrepared = false;
+            _handler.TutorialReservation = false;
             _tutorialObservation?.Close(); _tutorialObservation = null;
             TutorialFixButton.Visibility = System.Windows.Visibility.Collapsed;
             TutorialInspectButton.Visibility = TutorialFocusButton.Visibility = System.Windows.Visibility.Collapsed;
@@ -98,6 +108,16 @@ namespace Analyse
         private void TutorialScanCompleted()
         {
             if (!_tutorialPrepared) return;
+            if (_tutorialReservationCreated)
+            {
+                _tutorialReservationRescanVerified = OwnerDocument.GetElement(_tutorialReservationId) is FamilyInstance &&
+                    _session.Complete && !_session.Cancelled && _session.Error == null && _session.SourceCount == 3 &&
+                    _session.Options.Scope == SmartScanScope.Selection && _session.Options.MinimumVolumeMm3 == 10 &&
+                    _session.Options.LocalClashes && _session.Issues.Count <= 1 && _session.Issues.All(issue => DemoClashExercise.IsWall(OwnerDocument, issue));
+                if (_tutorialReservationRescanVerified) DemoTourService.ReportAction(this, "clash-reservation-verified");
+                else RunText.Text += " · Le guide attend une analyse complète des trois tuyaux d'essai après la réservation.";
+                return;
+            }
             bool verified = DemoClashExercise.Verify(OwnerDocument, _session, _tutorialCorrected);
             _tutorialRescanVerified = verified && _tutorialCorrected;
             if (verified && !_tutorialCorrected) _tutorialInitialVerified = true;
@@ -107,8 +127,9 @@ namespace Analyse
                 ". Garde Sélection, Tuyaux, Collisions dans la maquette et le seuil de 10 mm³ ; désactive les autres contrôles, puis relance.";
         }
 
-        private bool DemoClashExerciseExportReady() => _tutorialCorrected && _tutorialRescanVerified && _session != null && _session.Complete &&
-            !_session.Cancelled && _session.Error == null && _all.Count == 1 && _filtered.Count == 1;
+        private bool DemoClashExerciseExportReady() => _tutorialCorrected && _tutorialReservationCreated && _tutorialReservationRescanVerified && _session != null && _session.Complete &&
+            !_session.Cancelled && _session.Error == null && _all.Count <= 1 && _filtered.Count == _all.Count &&
+            string.IsNullOrWhiteSpace(SearchBox.Text);
 
         private void TutorialFix_Click(object sender, RoutedEventArgs args)
         {
@@ -136,6 +157,18 @@ namespace Analyse
                 RunText.Text = "Le tuyau d'essai a été relevé de 300 mm. Relance l'analyse pour vérifier la disparition du conflit entre tuyaux.";
                 DemoTourService.ReportAction(this, "clash-corrected");
             }
+            else if (_handler.Action == SmartAction.CreateReservation && _handler.TutorialReservation &&
+                DemoClashExercise.IsWall(OwnerDocument, _handler.FocusIssue) && _handler.CreatedReservationId != null &&
+                OwnerDocument.GetElement(_handler.CreatedReservationId) is FamilyInstance reservation &&
+                reservation.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() == DemoClashExercise.Prefix + "RESERVATION")
+            {
+                _tutorialReservationId = reservation.Id; _tutorialReservationCreated = true; _tutorialReservationRescanVerified = false;
+                DemoTourService.ReportAction(this, "clash-reservation-created");
+            }
+            else if (_handler.Action == SmartAction.FocusApply && _tutorialInspectWall && DemoClashExercise.IsWall(OwnerDocument, _handler.FocusIssue))
+                _tutorialObservation = DemoTourService.ObserveHistoryResult(this, new System.Windows.Interop.WindowInteropHelper(this).Owner,
+                    "Observer la traversée du mur", "Observe le tuyau orange et le mur bleu. De retour dans Clash 3D, le bouton Créer la réservation utilisera la famille rectangulaire fournie pour cet essai ; tes réglages personnels restent conservés.",
+                    () => { _tutorialWallObserved = true; DemoTourService.ReportAction(this, "clash-wall-observed"); });
             else if (_handler.Action == SmartAction.FocusApply && IsTutorialCrossing(_handler.FocusIssue))
                 _tutorialObservation = DemoTourService.ObserveHistoryResult(this, new System.Windows.Interop.WindowInteropHelper(this).Owner,
                     "Observer le conflit dans Revit", "L'objet contrôlé est orange et l'obstacle bleu. Observe leur croisement : le guide va ensuite relever le tuyau d'essai de 300 mm. Dans ton projet, choisis une correction adaptée au réseau et à ses raccordements.",

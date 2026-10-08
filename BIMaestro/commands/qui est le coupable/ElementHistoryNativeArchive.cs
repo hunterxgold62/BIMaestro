@@ -33,6 +33,9 @@ namespace Analyse
         public string MemberSourceUniqueId { get; set; }
         public bool Ready { get; set; }
         public string Failure { get; set; }
+        public DateTime? RequestedUtc { get; set; }
+        public DateTime? StartedUtc { get; set; }
+        public DateTime? ReadyUtc { get; set; }
     }
 
     // Generic native fallback. A wave is saved once to an immutable, separate RVT:
@@ -49,10 +52,27 @@ namespace Analyse
         {
             internal readonly Dictionary<string, Pending> Pending = new Dictionary<string, Pending>();
             internal readonly Dictionary<string, HistoryRecipe> Ready = new Dictionary<string, HistoryRecipe>();
+            internal readonly HashSet<string> PriorityRoots = new HashSet<string>(StringComparer.Ordinal);
+            internal DateTime PrioritySelectionUtc;
+            internal double PriorityClassificationMilliseconds;
+            internal DateTime? LastBackgroundCheckUtc;
+            internal string LastBlockReason;
+            internal DateTime? LastWaveStartedUtc;
+            internal DateTime? LastWaveCompletedUtc;
+            internal double LastWaveMilliseconds;
         }
         private static readonly Dictionary<Document, State> States = new Dictionary<Document, State>();
         private static bool _processing;
         private static DateTime _nextBackgroundUtc;
+
+        private static void ExpediteSelectedRoots(State state)
+        {
+            if (!state.Pending.Keys.Any(state.PriorityRoots.Contains)) return;
+            // A new selection must not inherit the long pause of an unrelated
+            // archive wave. Work still starts only after the user becomes idle.
+            var next = DateTime.UtcNow.AddSeconds(2);
+            if (_nextBackgroundUtc > next) _nextBackgroundUtc = next;
+        }
         private static State For(Document doc)
         {
             if (!States.TryGetValue(doc, out var state)) States[doc] = state = new State();
@@ -108,7 +128,8 @@ namespace Analyse
             if (state.Ready.TryGetValue(element.UniqueId, out var cached)) return cached;
             if (!state.Pending.TryGetValue(root.UniqueId, out var pending))
                 state.Pending[root.UniqueId] = pending = new Pending { RootId = root.Id, RootUid = root.UniqueId };
-            var receipt = new HistoryNativeArtifact { RootSourceUniqueId = root.UniqueId, MemberSourceUniqueId = element.UniqueId };
+            var receipt = new HistoryNativeArtifact { RootSourceUniqueId = root.UniqueId,
+                MemberSourceUniqueId = element.UniqueId, RequestedUtc = DateTime.UtcNow };
             var queued = pending.Receipts.FirstOrDefault(r => r.MemberSourceUniqueId == element.UniqueId);
             if (queued != null) return Recipe(element, queued);
             pending.Receipts.Add(receipt);
@@ -135,6 +156,17 @@ namespace Analyse
 
         internal static HistoryRecipe Find(Document doc, string uid) => States.TryGetValue(doc, out var state)
             && state.Ready.TryGetValue(uid ?? "", out var recipe) ? recipe : null;
+
+        internal static void GetAuditCounts(Document doc, out int pendingRoots, out int readyRecipes)
+        {
+            pendingRoots = 0;
+            readyRecipes = 0;
+            if (doc != null && States.TryGetValue(doc, out var state))
+            {
+                pendingRoots = state.Pending.Count;
+                readyRecipes = state.Ready.Count;
+            }
+        }
 
         internal static void Invalidate(Document doc, IEnumerable<ElementId> ids)
         {
@@ -181,17 +213,94 @@ namespace Analyse
 
         internal static void ProcessPendingBackground(Document source)
         {
-            if (source == null || DateTime.UtcNow < _nextBackgroundUtc
-                || !States.TryGetValue(source, out var state) || state.Pending.Count == 0) return;
-            if (!HistoryBackgroundWork.UserIsIdle()) return;
+            if (source == null || !States.TryGetValue(source, out var state) || state.Pending.Count == 0) return;
+            var now = DateTime.UtcNow;
+            state.LastBackgroundCheckUtc = now;
+            if (now < _nextBackgroundUtc) { state.LastBlockReason = "cooldown"; return; }
+            if (!HistoryBackgroundWork.UserIsIdle()) { state.LastBlockReason = "user_active"; return; }
+            state.LastBlockReason = null;
+            PrioritizeLastSelection(source, state);
+            state.LastWaveStartedUtc = DateTime.UtcNow;
             var timer = Stopwatch.StartNew();
             try { ProcessPending(source); }
             finally
             {
+                state.LastWaveCompletedUtc = DateTime.UtcNow;
+                state.LastWaveMilliseconds = timer.Elapsed.TotalMilliseconds;
                 // Revit document creation/copy/save requires the main API thread.
                 // Give navigation/editing time between these indivisible operations.
-                _nextBackgroundUtc = DateTime.UtcNow.AddMilliseconds(Math.Max(2000, timer.Elapsed.TotalMilliseconds * 9));
+                _nextBackgroundUtc = DateTime.UtcNow.AddMilliseconds(Math.Max(3000, timer.Elapsed.TotalMilliseconds * 2));
             }
+        }
+
+        internal static bool ShouldRetrySelectedBackgroundSoon(Document source)
+        {
+            if (source == null || !States.TryGetValue(source, out var state)
+                || state.PrioritySelectionUtc == default(DateTime)
+                || !state.Pending.Keys.Any(state.PriorityRoots.Contains)) return false;
+            // Revit may send just one Idling callback after a selection. Keep
+            // callbacks alive briefly until the selected wave becomes eligible.
+            return DateTime.UtcNow < state.PrioritySelectionUtc.AddSeconds(3)
+                && (state.LastBlockReason == "cooldown" || state.LastBlockReason == "user_active");
+        }
+
+        internal static HistoryNativeBackgroundAudit GetBackgroundAudit(Document doc)
+        {
+            if (doc == null || !States.TryGetValue(doc, out var state)) return null;
+            return new HistoryNativeBackgroundAudit
+            {
+                LastCheckUtc = state.LastBackgroundCheckUtc,
+                LastBlockReason = state.LastBlockReason,
+                NextEligibleUtc = _nextBackgroundUtc == default(DateTime) ? (DateTime?)null : _nextBackgroundUtc,
+                LastWaveStartedUtc = state.LastWaveStartedUtc,
+                LastWaveCompletedUtc = state.LastWaveCompletedUtc,
+                LastWaveMilliseconds = state.LastWaveMilliseconds,
+                PrioritySelectionUtc = state.PrioritySelectionUtc == default(DateTime)
+                    ? (DateTime?)null : state.PrioritySelectionUtc
+            };
+        }
+
+        private static void PrioritizeLastSelection(Document source, State state)
+        {
+            if (!ElementHistoryTracker.GetLatestSelectionForNativePriority(source, out var atUtc, out var selectedIds)
+                || atUtc == state.PrioritySelectionUtc) return;
+            var timer = Stopwatch.StartNew();
+            state.PriorityRoots.Clear();
+            foreach (var id in selectedIds)
+            {
+                try
+                {
+                    var element = source.GetElement(new ElementId(id));
+                    if (element != null) state.PriorityRoots.Add(Root(element).UniqueId);
+                }
+                catch (Exception ex) { Trace.WriteLine("History native priority: " + ex.Message); }
+            }
+            state.PrioritySelectionUtc = atUtc;
+            state.PriorityClassificationMilliseconds += timer.Elapsed.TotalMilliseconds;
+            ExpediteSelectedRoots(state);
+        }
+
+        internal static void PrioritizeSelectedRoots(Document source, DateTime atUtc, IEnumerable<string> rootUniqueIds)
+        {
+            if (source == null) return;
+            var timer = Stopwatch.StartNew();
+            var state = For(source);
+            state.PriorityRoots.Clear();
+            foreach (var uid in rootUniqueIds ?? Enumerable.Empty<string>())
+                if (!string.IsNullOrWhiteSpace(uid)) state.PriorityRoots.Add(uid);
+            state.PrioritySelectionUtc = atUtc;
+            state.PriorityClassificationMilliseconds += timer.Elapsed.TotalMilliseconds;
+            ExpediteSelectedRoots(state);
+        }
+
+        internal static void GetPriorityAudit(Document doc, out int pendingPriorityRoots,
+            out double classificationMilliseconds)
+        {
+            pendingPriorityRoots = 0;
+            classificationMilliseconds = 0;
+            if (doc == null || !States.TryGetValue(doc, out var state)) return;
+            pendingPriorityRoots = state.Pending.Keys.Count(state.PriorityRoots.Contains);
+            classificationMilliseconds = state.PriorityClassificationMilliseconds;
         }
 
         private sealed class DestinationTypes : IDuplicateTypeNamesHandler
@@ -222,7 +331,10 @@ namespace Analyse
             _processing = true;
             Document archive = null;
             var completed = new List<Tuple<Pending, Element, Dictionary<string, Element>>>();
-            var wave = state.Pending.Values.Take(12).ToList();
+            var selectedPending = state.Pending.Values.Where(p => state.PriorityRoots.Contains(p.RootUid)).ToList();
+            var wave = (selectedPending.Count > 0 ? selectedPending : state.Pending.Values.ToList())
+                .Take(selectedPending.Count > 0 ? 16 : 8).ToList();
+            var copyBudgetMs = selectedPending.Count > 0 ? 4500 : 1200;
             try
             {
                 archive = source.Application.NewProjectDocument(UnitSystem.Metric);
@@ -238,6 +350,7 @@ namespace Analyse
                 var timer = Stopwatch.StartNew();
                 foreach (var pending in wave)
                 {
+                    foreach (var receipt in pending.Receipts) receipt.StartedUtc = DateTime.UtcNow;
                     var root = source.GetElement(pending.RootId);
                     if (root == null)
                     {
@@ -284,7 +397,10 @@ namespace Analyse
                             state.Pending.Remove(pending.RootUid);
                         }
                     }
-                    if (timer.ElapsedMilliseconds >= 150) break;
+                    // Selected roots share one project creation and SaveAs. The
+                    // larger selected budget avoids leaving most of a deletion
+                    // selection behind the next cooldown.
+                    if (timer.ElapsedMilliseconds >= copyBudgetMs) break;
                 }
                 if (completed.Count == 0) return;
                 var directory = Path.Combine(CollaborativeModelTrackerStore.ActiveDirectory, "native-history");
@@ -297,13 +413,17 @@ namespace Analyse
                     {
                         receipt.File = path; receipt.RootUniqueId = entry.Item2.UniqueId;
                         receipt.Ready = entry.Item3.ContainsKey(receipt.MemberSourceUniqueId);
+                        if (receipt.Ready) receipt.ReadyUtc = DateTime.UtcNow;
                         if (!receipt.Ready) receipt.Failure = "Le composant n’a pas été inclus dans la copie de son parent.";
                     }
                     foreach (var pair in entry.Item3)
                     {
                         var original = source.GetElement(pair.Key);
                         state.Ready[pair.Key] = Recipe(original, new HistoryNativeArtifact { File = path, RootUniqueId = entry.Item2.UniqueId,
-                            RootSourceUniqueId = entry.Item1.RootUid, MemberSourceUniqueId = pair.Key, Ready = true });
+                            RootSourceUniqueId = entry.Item1.RootUid, MemberSourceUniqueId = pair.Key,
+                            Ready = true, RequestedUtc = entry.Item1.Receipts.FirstOrDefault(r => r.MemberSourceUniqueId == pair.Key)?.RequestedUtc,
+                            StartedUtc = entry.Item1.Receipts.FirstOrDefault(r => r.MemberSourceUniqueId == pair.Key)?.StartedUtc,
+                            ReadyUtc = DateTime.UtcNow });
                     }
                     state.Pending.Remove(entry.Item1.RootUid);
                 }

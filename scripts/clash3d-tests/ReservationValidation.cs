@@ -26,7 +26,7 @@ namespace Analyse.Tests
                     using (var t = new Transaction(familyDoc, "Create mapped opening fixture"))
                     {
                         t.Start();
-                        foreach (var name in new[] { "TestLength", "TestHeight", "TestWidth", "TestDepth", "TestDiameter" })
+                        foreach (var name in new[] { "TestLength", "TestHeight", "TestWidth", "TestDepth", "TestDiameter", "COM_Longueur" })
                             familyDoc.FamilyManager.AddParameter(name, GroupTypeId.Geometry, SpecTypeId.Length, true);
                         familyDoc.FamilyManager.NewType("Test opening"); t.Commit();
                     }
@@ -86,6 +86,28 @@ namespace Analyse.Tests
                         try { ReservationAutoV3Command.CreateForClash(doc, pipe, floor, null, config, personal); }
                         catch (InvalidOperationException ex) { refused = ex.Message.Contains("traversée"); }
                         Check(refused && new FilteredElementCollector(doc).OfClass(typeof(FamilyInstance)).GetElementCount() == count+2, "Unrelated source produced an opening.");
+                    });
+                    Test("default length mapping accepts the parameter actually sized by Autoréservation", () =>
+                    {
+                        Pipe fallbackPipe;
+                        using (var t = new Transaction(doc, "Default opening mapping fixture"))
+                        {
+                            t.Start();
+                            var pipeType = new FilteredElementCollector(doc).OfClass(typeof(PipeType)).Cast<PipeType>().First();
+                            var system = new FilteredElementCollector(doc).OfClass(typeof(PipingSystemType)).Cast<PipingSystemType>().First();
+                            fallbackPipe = Pipe.Create(doc, system.Id, pipeType.Id, level.Id, new XYZ(-3,5,2), new XYZ(3,5,2));
+                            fallbackPipe.get_Parameter(BuiltInParameter.RBS_PIPE_DIAMETER_PARAM).Set(100/304.8);
+                            t.Commit();
+                        }
+                        var original = profile.ParamLength; profile.ParamLength = "Longueur";
+                        try
+                        {
+                            config.LastShapeTarget = "Rectangulaire";
+                            config.LastShapeOptionLabel = "";
+                            var opening = ReservationAutoV3Command.CreateForClash(doc, fallbackPipe, wall, null, config, personal);
+                            Check(opening.LookupParameter("COM_Longueur").AsDouble() > 0, "Fallback length was sized but rejected.");
+                        }
+                        finally { profile.ParamLength = original; }
                     });
                     var scan = Scan(new SmartScanSetup { Document = doc }, new SmartScanOptions { Ducts=false, CableTrays=false,Conduits=false,LinkedClashes=false });
                     Test("duct traversal uses rectangular dimensions from Autoréservation", () =>
