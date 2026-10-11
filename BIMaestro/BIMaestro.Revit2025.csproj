@@ -1,6 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <RevitVersion Condition="'$(RevitVersion)' == ''">2025</RevitVersion>
+    <RevitInstallDir Condition="'$(RevitInstallDir)' == ''">C:\Program Files\Autodesk\Revit $(RevitVersion)</RevitInstallDir>
+    <!-- 2025/2026 updates can migrate the host from .NET 8 to .NET 10. -->
+    <RevitRuntimeConfig>$(RevitInstallDir)\RevitAPI.runtimeconfig.json</RevitRuntimeConfig>
+    <RevitRuntimeJson Condition="Exists('$(RevitRuntimeConfig)')">$([System.IO.File]::ReadAllText('$(RevitRuntimeConfig)'))</RevitRuntimeJson>
+    <RevitTargetFramework Condition="'$(RevitTargetFramework)' == ''">net8.0-windows</RevitTargetFramework>
+    <RevitTargetFramework Condition="'$(RevitVersion)' == '2027' Or $([System.String]::Copy('$(RevitRuntimeJson)').Contains('&quot;net10.0&quot;'))">net10.0-windows</RevitTargetFramework>
+    <TargetFramework>$(RevitTargetFramework)</TargetFramework>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
     <EnableDefaultItems>false</EnableDefaultItems>
@@ -10,9 +17,7 @@
     <PlatformTarget>x64</PlatformTarget>
     <LangVersion>9.0</LangVersion>
     <Nullable>annotations</Nullable>
-    <RevitVersion Condition="'$(RevitVersion)' == ''">2025</RevitVersion>
     <DefineConstants>$(DefineConstants);REVIT2025_OR_GREATER</DefineConstants>
-    <RevitInstallDir>C:\Program Files\Autodesk\Revit $(RevitVersion)</RevitInstallDir>
     <DynamoForRevitDir>$(RevitInstallDir)\AddIns\DynamoForRevit</DynamoForRevitDir>
     <OutputPath>bin\Revit$(RevitVersion)\$(Configuration)\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
@@ -31,4 +36,8 @@
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="8.0.0" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
   </ItemGroup>
+  <Target Name="ValidateRevitBuildInputs" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(RevitVersion)' != '2025' And '$(RevitVersion)' != '2026' And '$(RevitVersion)' != '2027'" Text="Utiliser BIMaestro.csproj pour Revit 2023/2024 ; ce projet prend en charge 2025 à 2027." />
+    <Error Condition="!Exists('$(RevitInstallDir)\RevitAPI.dll') Or !Exists('$(RevitInstallDir)\RevitAPIUI.dll')" Text="Les API de Revit $(RevitVersion) sont absentes de $(RevitInstallDir). Installer Revit ou fournir RevitInstallDir ; aucune compilation avec les API d'une autre version." />
+  </Target>
 </Project>

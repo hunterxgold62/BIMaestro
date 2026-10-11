@@ -49,7 +49,7 @@ namespace Modification
                 return Result.Cancelled;
             }
 
-            Dictionary<int, int> phaseOrder = BuildPhaseOrder(phases);
+            Dictionary<long, int> phaseOrder = BuildPhaseOrder(phases);
             int updated = 0;
             int skipped = 0;
             int failed = 0;
@@ -112,7 +112,7 @@ namespace Modification
             ElementId createdPhaseId,
             bool changeDemolishedPhase,
             ElementId demolishedPhaseId,
-            Dictionary<int, int> phaseOrder)
+            Dictionary<long, int> phaseOrder)
         {
             Parameter createdParam = element.get_Parameter(BuiltInParameter.PHASE_CREATED);
             Parameter demolishedParam = element.get_Parameter(BuiltInParameter.PHASE_DEMOLISHED);
@@ -151,12 +151,12 @@ namespace Modification
             return changed;
         }
 
-        private static Dictionary<int, int> BuildPhaseOrder(IList<Phase> phases)
+        private static Dictionary<long, int> BuildPhaseOrder(IList<Phase> phases)
         {
-            var result = new Dictionary<int, int>();
+            var result = new Dictionary<long, int>();
             for (int i = 0; i < phases.Count; i++)
             {
-                result[phases[i].Id.IntegerValue] = i;
+                result[phases[i].Id.GetIdLongValue()] = i;
             }
 
             return result;
@@ -165,7 +165,7 @@ namespace Modification
         private static bool IsPhaseOrderValid(
             ElementId createdPhaseId,
             ElementId demolishedPhaseId,
-            Dictionary<int, int> phaseOrder)
+            Dictionary<long, int> phaseOrder)
         {
             if (AreSameElementId(demolishedPhaseId, ElementId.InvalidElementId))
                 return true;
@@ -175,8 +175,8 @@ namespace Modification
 
             int createdOrder;
             int demolishedOrder;
-            if (!phaseOrder.TryGetValue(createdPhaseId.IntegerValue, out createdOrder) ||
-                !phaseOrder.TryGetValue(demolishedPhaseId.IntegerValue, out demolishedOrder))
+            if (!phaseOrder.TryGetValue(createdPhaseId.GetIdLongValue(), out createdOrder) ||
+                !phaseOrder.TryGetValue(demolishedPhaseId.GetIdLongValue(), out demolishedOrder))
             {
                 return true;
             }
@@ -201,8 +201,8 @@ namespace Modification
 
         private static bool AreSameElementId(ElementId first, ElementId second)
         {
-            int firstValue = first == null ? ElementId.InvalidElementId.IntegerValue : first.IntegerValue;
-            int secondValue = second == null ? ElementId.InvalidElementId.IntegerValue : second.IntegerValue;
+            long firstValue = first.GetIdLongValue();
+            long secondValue = second.GetIdLongValue();
             return firstValue == secondValue;
         }
     }

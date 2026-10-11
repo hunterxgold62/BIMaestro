@@ -11,8 +11,6 @@ namespace BIMaestro.Welcome
     public static class WelcomeManager
     {
         private static readonly TimeSpan DelayAfterFirstUse = TimeSpan.FromMinutes(1);
-        private static readonly TimeSpan SnoozeDuration = TimeSpan.FromDays(1);
-        private static readonly TimeSpan MinAttemptSpacing = TimeSpan.FromHours(6);
 
         private static readonly object _sync = new object();
         private static WelcomeState _state;
@@ -37,8 +35,7 @@ namespace BIMaestro.Welcome
 
                 _state = WelcomeStorage.LoadOrCreate();
                 app.Idling += App_Idling;
-                if (ShouldPromptForCurrentVersion(_state) || ShouldOfferTutorial(_state))
-                    _timer = new Timer(_ => _shouldShow = true, null, DelayAfterFirstUse, Timeout.InfiniteTimeSpan);
+                ArmNextPrompt(DelayAfterFirstUse);
             }
         }
 
@@ -178,7 +175,13 @@ namespace BIMaestro.Welcome
                 if (_lastUiApp != null)
                 {
                     string message = null;
-                    BIMaestro.Tutorials.DemoToursCommand.RunChoice(_lastUiApp, "create", ref message);
+                    var result = BIMaestro.Tutorials.DemoToursCommand.RunChoice(_lastUiApp, "create", ref message);
+                    lock (_sync)
+                    {
+                        WelcomePromptPolicy.TutorialClosed(_state, result == Result.Succeeded, DateTime.UtcNow);
+                        WelcomeStorage.Save(_state);
+                        ArmNextPrompt(TimeSpan.Zero);
+                    }
                 }
                 return;
             }
@@ -193,13 +196,8 @@ namespace BIMaestro.Welcome
                 _state ??= WelcomeStorage.LoadOrCreate();
 
                 showEmail = ShouldPromptForCurrentVersion(_state);
-                showTutorial = ShouldOfferTutorial(_state);
+                showTutorial = !showEmail && ShouldOfferTutorial(_state);
                 if (!showEmail && !showTutorial) { _shouldShow = false; return; }
-                if (_state.LastAttemptUtc.HasValue && DateTime.UtcNow - _state.LastAttemptUtc.Value < MinAttemptSpacing)
-                {
-                    _shouldShow = false;
-                    return;
-                }
 
                 if (Interlocked.Exchange(ref _showing, 1) == 1)
                 {
@@ -207,14 +205,14 @@ namespace BIMaestro.Welcome
                     return;
                 }
 
-                _state.LastAttemptUtc = DateTime.UtcNow;
+                if (showEmail) _state.LastAttemptUtc = DateTime.UtcNow;
                 WelcomeStorage.Save(_state);
             }
 
             bool windowShown = false;
             try
             {
-                var win = new WelcomeWindow(showEmail, showTutorial);
+                var win = new WelcomeWindow(showEmail, showTutorial, _state);
 
                 // Fenêtre possédée par Revit : elle reste devant Revit sans bloquer son utilisation.
                 var hwnd = RevitWindowHandle.GetRevitMainWindowHandle();
@@ -256,57 +254,40 @@ namespace BIMaestro.Welcome
             {
                 _state ??= WelcomeStorage.LoadOrCreate();
 
-                if (win.ResultAction == WelcomeResultAction.OpenDemo)
+                if (win.IsTutorialOffer)
                 {
-                    _state.TutorialOfferCompleted = true;
-                    _state.TutorialSnoozeUntilUtc = null;
-                    _state.SnoozeUntilUtc = DateTime.UtcNow + SnoozeDuration;
-                    openDemo = true;
+                    openDemo = win.ResultAction == WelcomeResultAction.OpenDemo;
+                    if (!openDemo) WelcomePromptPolicy.TutorialClosed(_state, false, DateTime.UtcNow);
                 }
                 else if (win.ResultAction == WelcomeResultAction.OptIn)
                 {
-                    _state.EmailOptIn = true;
                     _state.Email = win.Email;
                     _state.FirstName = win.FirstName;
                     _state.LastName = win.LastName;
                     _state.Company = NormalizeValue(win.Company);
-                    _state.OptInUtc = DateTime.UtcNow;
-                    _state.ProfilePending = true;
-                    _state.WelcomeShown = true;
-                    _state.LastWelcomePromptVersion = CurrentPluginVersion;
                     syncProfile = true;
-                    SnoozeTutorialOffer(_state);
                 }
-                else if (win.ResultAction == WelcomeResultAction.Snooze)
-                {
-                    _state.SnoozeUntilUtc = DateTime.UtcNow + SnoozeDuration;
-                    SnoozeTutorialOffer(_state);
-                }
-                else if (win.ResultAction == WelcomeResultAction.Dismiss)
-                {
-                    _state.HardDismissed = true;
-                    _state.LastWelcomePromptVersion = CurrentPluginVersion;
-                    SnoozeTutorialOffer(_state);
-                }
+                if (!win.IsTutorialOffer) WelcomePromptPolicy.ProfileClosed(_state, win.ResultAction, CurrentPluginVersion, DateTime.UtcNow);
 
                 WelcomeStorage.Save(_state);
                 _shouldShow = false;
-                if (!_state.TutorialOfferCompleted ||
-                    (!_state.HardDismissed && string.IsNullOrWhiteSpace(_state.Email)))
-                {
-                    _timer?.Dispose();
-                    _timer = new Timer(_ => _shouldShow = true, null, SnoozeDuration, Timeout.InfiniteTimeSpan);
-                }
+                if (openDemo) { _timer?.Dispose(); _timer = null; }
+                else ArmNextPrompt(TimeSpan.Zero);
             }
 
             if (syncProfile) TryUpsertProfileNoThrow();
             if (openDemo) _pendingDemoCreate = true;
         }
 
-        private static void SnoozeTutorialOffer(WelcomeState state)
+        private static void ArmNextPrompt(TimeSpan minimumDelay)
         {
-            if (!state.TutorialOfferCompleted)
-                state.TutorialSnoozeUntilUtc = DateTime.UtcNow + SnoozeDuration;
+            _timer?.Dispose(); _timer = null;
+            var now = DateTime.UtcNow;
+            var next = WelcomePromptPolicy.NextAttempt(_state, CurrentPluginVersion, now);
+            if (!next.HasValue) return;
+            var delay = next.Value - now;
+            if (delay < minimumDelay) delay = minimumDelay;
+            _timer = new Timer(_ => _shouldShow = true, null, delay, Timeout.InfiniteTimeSpan);
         }
 
         private static void TryUpsertProfileNoThrow()
@@ -355,20 +336,11 @@ namespace BIMaestro.Welcome
 
         private static bool ShouldPromptForCurrentVersion(WelcomeState state)
         {
-            if (state == null) return true;
-            if (!string.IsNullOrWhiteSpace(state.Email)) return false;
-            if (state.HardDismissed) return false;
-            if (state.SnoozeUntilUtc.HasValue && state.SnoozeUntilUtc.Value > DateTime.UtcNow) return false;
-
-            return !string.Equals(
-                NormalizeValue(state.LastWelcomePromptVersion),
-                CurrentPluginVersion,
-                StringComparison.OrdinalIgnoreCase);
+            return WelcomePromptPolicy.ProfileDue(state, CurrentPluginVersion, DateTime.UtcNow);
         }
 
         private static bool ShouldOfferTutorial(WelcomeState state) =>
-            state != null && !state.TutorialOfferCompleted &&
-            (!state.TutorialSnoozeUntilUtc.HasValue || state.TutorialSnoozeUntilUtc.Value <= DateTime.UtcNow);
+            WelcomePromptPolicy.TutorialDue(state, DateTime.UtcNow);
     }
 
     /// <summary>

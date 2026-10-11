@@ -149,7 +149,7 @@ namespace Couleur
                 _menuId = tourId == "colors" ? "Changement de couleur" :
                     tourId == "organizer" ? "OrganisateurSplit" : null;
                 Title = "BIMaestro — Guide " + _buttonLabel;
-                Width = 330; Height = 230;
+                Width = 330; Height = 270;
                 WindowStartupLocation = WindowStartupLocation.Manual;
                 Left = SystemParameters.WorkArea.Right - Width - 30;
                 Top = SystemParameters.WorkArea.Bottom - Height - 30;

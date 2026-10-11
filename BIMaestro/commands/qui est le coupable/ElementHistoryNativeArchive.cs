@@ -270,7 +270,7 @@ namespace Analyse
             {
                 try
                 {
-                    var element = source.GetElement(new ElementId(id));
+                    var element = source.GetElement(ElementIdExtensions.CreateElementId(id));
                     if (element != null) state.PriorityRoots.Add(Root(element).UniqueId);
                 }
                 catch (Exception ex) { Trace.WriteLine("History native priority: " + ex.Message); }

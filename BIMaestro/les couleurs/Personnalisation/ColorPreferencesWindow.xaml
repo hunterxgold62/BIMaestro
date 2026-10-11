@@ -479,7 +479,7 @@
                                                         <TextBlock Text="Aperçu fixe ici ; animation dans Revit." Style="{StaticResource Hint}" Margin="0,4,0,0" />
                                                     </StackPanel>
                                                     <TextBlock Margin="0,0,0,5" Style="{StaticResource Hint}" FontWeight="SemiBold" Text="Fond principal" />
-                                                    <ui:SimpleColorPicker x:Name="TutorialBackgroundColor" HorizontalAlignment="Stretch" SelectedColor="{Binding BrowserPreferences.BackgroundColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                    <ui:SimpleColorPicker x:Name="TutorialBackgroundColor" HorizontalAlignment="Stretch" TransparentLabel="Par défaut (thème Revit)" SelectedColor="{Binding BrowserPreferences.BackgroundColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                                     <Grid Margin="0,8,0,0">
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="*" />

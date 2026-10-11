@@ -10,11 +10,7 @@ namespace BIMaestro.MepBooster
         internal static long Value(ElementId id)
         {
             if (id == null) return long.MinValue;
-#if REVIT2024
-            return id.Value;
-#else
-            return id.IntegerValue;
-#endif
+            return id.GetIdLongValue();
         }
     }
 

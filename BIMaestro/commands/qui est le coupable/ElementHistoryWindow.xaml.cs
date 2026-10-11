@@ -1555,6 +1555,13 @@ namespace Analyse
                 DetailedMeshModeRadio.IsChecked = detailed;
         }
 
+        internal void ResetTutorialDeletedMeshMode()
+        {
+            if (_pendingRequest?.Type == UiRequestType.CaptureSelectedDetails) _pendingRequest = null;
+            ElementHistoryTracker.CaptureDetailedDeletedMesh = false;
+            if (!_isClosed) ConfigureDeletedMeshMode();
+        }
+
         private void ScopeFilter_Checked(object sender, RoutedEventArgs e)
         {
             var tag = (sender as RadioButton)?.Tag as string;

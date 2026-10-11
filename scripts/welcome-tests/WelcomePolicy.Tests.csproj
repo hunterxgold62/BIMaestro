@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><EnableDefaultItems>false</EnableDefaultItems></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="WelcomePolicy.Tests.cs" />
+    <Compile Include="../../BIMaestro/app et excel/Supabase/Bienvenue/WelcomePromptPolicy.cs" />
+    <Compile Include="../../BIMaestro/app et excel/Supabase/Bienvenue/WelcomeState.cs" />
+    <Compile Include="../../BIMaestro/app et excel/Supabase/Bienvenue/WelcomeResultAction.cs" />
+  </ItemGroup>
+</Project>

@@ -1,6 +1,6 @@
 ; --------------------------------------------------------
 ; BIMaestro.iss — Installateur per-user sans UAC
-; installe BIMaestro.addin en local (2022–2027)
+; installe BIMaestro.addin en local avec les DLL adaptées à chaque version
 ; + Copie d’un uninstalleur renommé "Suppression BIMaestro.exe"
 ;   dans le dossier Addins\2024
 ; + Exclut les fichiers .pdb de l'installation
@@ -19,26 +19,21 @@ Compression=lzma
 SolidCompression=yes
 
 [Files]
-#ifndef Revit2025Bin
-  #define Revit2025Bin "bin\Revit2025\Release"
+#if !FileExists("bin\Release\BIMaestro.dll")
+  #error Compilez BIMaestro.csproj en Release avant de creer l'installateur.
 #endif
-#if !FileExists(Revit2025Bin + "\BIMaestro.dll")
-  #error Compilez BIMaestro.Revit2025.csproj en Release avant de creer l'installateur. La DLL .NET Framework ne doit pas etre chargee dans Revit 2025.
-#endif
-; La base de formation accompagne chacun des deux binaires Revit.
+; La base de formation accompagne la DLL commune.
 #define TrainingBin "bin\Release"
 #include "..\Installer\TrainingResources.Checks.iss"
 #undef TrainingBin
-#define TrainingBin Revit2025Bin
-#include "..\Installer\TrainingResources.Checks.iss"
-#undef TrainingBin
-; Le binaire .NET Framework reste séparé du binaire .NET 8 de Revit 2025.
+; DLL historique pour 2022/2023 ; builds distincts pour 2024 à 2027.
 Source: "bin\Release\*.*"; \
   DestDir: "{localappdata}\BIMaestro\Bin"; \
   Flags: ignoreversion recursesubdirs createallsubdirs; \
   Excludes: "*.pdb,BIMaestro - Copie.dll,BIMaestro.Updater.*"
-Source: "{#Revit2025Bin}\*.*"; DestDir: "{localappdata}\BIMaestro\Bin\Revit2025"; \
-  Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.pdb,BIMaestro.Updater.*"
+#define RevitPayloadRoot "{app}"
+#include "..\Installer\RevitVersioned.Files.iss"
+#undef RevitPayloadRoot
 
 [InstallDelete]
 ; Retirer l'ancien assistant lors d'une mise a jour manuelle.
@@ -67,7 +62,7 @@ begin
 end;
 
 // -----------------------------------------------------------------
-// Après copie, on crée BIMaestro.addin per-user pour Revit 2022–2027
+// Après copie, on crée BIMaestro.addin per-user pour Revit 2022–2027.
 // + on dépose un uninstalleur renommé dans Addins\2024
 // -----------------------------------------------------------------
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -93,10 +88,10 @@ begin
 
     for i := Low(Versions) to High(Versions) do
     begin
-      if Versions[i] = '2025' then
-        Xml := BuildXml(BinFolder + '\Revit2025')
+      if i <= 2 then
+        Xml := BuildXml(BinFolder)
       else
-        Xml := BuildXml(BinFolder);
+        Xml := BuildXml(BinFolder + '\Revit' + Versions[i]);
       ForceDirectories(AddinsRoot + '\' + Versions[i]);
       ManifestPath := AddinsRoot + '\' + Versions[i] + '\BIMaestro.addin';
       SaveStringToFile(ManifestPath, Xml, False);

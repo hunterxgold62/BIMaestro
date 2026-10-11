@@ -14,6 +14,7 @@ namespace Analyse
         private ElementId _tutorialCrossA, _tutorialCrossB;
         private bool _tutorialWallObserved, _tutorialReservationCreated, _tutorialReservationRescanVerified;
         private ElementId _tutorialReservationId;
+        private string _tutorialInitialHtml, _tutorialInitialCsv;
         private bool _tutorialInspectWall;
         private Window _tutorialObservation;
 
@@ -46,6 +47,7 @@ namespace Analyse
             _tutorialInitialVerified = _tutorialDetailOpened = _tutorialFocusObserved = _tutorialExportWritten = _tutorialRescanVerified = false;
             _tutorialWallObserved = _tutorialReservationCreated = _tutorialReservationRescanVerified = _tutorialInspectWall = false;
             _tutorialReservationId = null;
+            _tutorialInitialHtml = _tutorialInitialCsv = null;
             var pipes = _setup.Selection.Select(OwnerDocument.GetElement).ToList();
             _tutorialCrossA = pipes.Single(p => p.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() == DemoClashExercise.Prefix + "CROSS_A").Id;
             _tutorialCrossB = pipes.Single(p => p.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() == DemoClashExercise.Prefix + "CROSS_B").Id;
@@ -95,6 +97,7 @@ namespace Analyse
         {
             _tutorialPrepared = false;
             _handler.TutorialReservation = false;
+            _tutorialInitialHtml = _tutorialInitialCsv = null;
             _tutorialObservation?.Close(); _tutorialObservation = null;
             TutorialFixButton.Visibility = System.Windows.Visibility.Collapsed;
             TutorialInspectButton.Visibility = TutorialFocusButton.Visibility = System.Windows.Visibility.Collapsed;
@@ -120,7 +123,13 @@ namespace Analyse
             }
             bool verified = DemoClashExercise.Verify(OwnerDocument, _session, _tutorialCorrected);
             _tutorialRescanVerified = verified && _tutorialCorrected;
-            if (verified && !_tutorialCorrected) _tutorialInitialVerified = true;
+            if (verified && !_tutorialCorrected)
+            {
+                _tutorialInitialVerified = true;
+                // Freeze the initial report before geometry, statuses or preview files change.
+                _tutorialInitialHtml = SmartClashReport.Html(_setup.Title, _session.Issues, _session, false, "État initial du tutoriel · tous les résultats");
+                _tutorialInitialCsv = SmartClashReport.CsvPhase(_session.Issues, "Avant correction");
+            }
             if (verified)
                 DemoTourService.ReportAction(this, _tutorialCorrected ? "clash-rescan-verified" : "clash-scan-verified");
             else RunText.Text += " · Le guide attend " + (_tutorialCorrected ? "la seule traversée du mur" : "les deux intersections d'essai") +
@@ -129,7 +138,7 @@ namespace Analyse
 
         private bool DemoClashExerciseExportReady() => _tutorialCorrected && _tutorialReservationCreated && _tutorialReservationRescanVerified && _session != null && _session.Complete &&
             !_session.Cancelled && _session.Error == null && _all.Count <= 1 && _filtered.Count == _all.Count &&
-            string.IsNullOrWhiteSpace(SearchBox.Text);
+            string.IsNullOrWhiteSpace(SearchBox.Text) && _tutorialInitialHtml != null && _tutorialInitialCsv != null;
 
         private void TutorialFix_Click(object sender, RoutedEventArgs args)
         {

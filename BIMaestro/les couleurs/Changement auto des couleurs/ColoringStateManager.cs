@@ -1687,7 +1687,7 @@ namespace Couleur
                 break;
             }
 
-            if (!_settings.IsEnabled)
+            if (!_settings.IsEnabled || _settings.BackgroundColor.A == 0)
                 return;
 
             _legacyNativeProjectBrowser =
@@ -2995,7 +2995,9 @@ __BIMAESTRO_ATMOSPHERE_CSS__
                 .Replace("__BIMAESTRO_ATMOSPHERE_CSS__", BrowserAtmosphere.Css(settings))
                 .Replace(
                     "__BIMAESTRO_BROWSER_APPEARANCE_ENABLED__",
-                    settings.IsEnabled ? "true" : "false")
+                    settings.IsEnabled && settings.BackgroundColor.A != 0
+                        ? "true"
+                        : "false")
                 .Replace(
                     "__BIMAESTRO_ACTIVE_PARENT_ENABLED__",
                     settings.IsActiveViewParentHighlightEnabled
@@ -3068,6 +3070,20 @@ __BIMAESTRO_ATMOSPHERE_CSS__
 
         private static string ToCssColor(Color color)
         {
+            if (color.A == 0)
+                return "transparent";
+
+            if (color.A != 255)
+            {
+                return string.Format(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    "rgba({0},{1},{2},{3:0.###})",
+                    color.R,
+                    color.G,
+                    color.B,
+                    color.A / 255.0);
+            }
+
             return $"#{color.R:X2}{color.G:X2}{color.B:X2}";
         }
 

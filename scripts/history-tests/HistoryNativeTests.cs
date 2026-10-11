@@ -38,7 +38,8 @@ namespace BIMaestro.HistoryTests
             try
             {
                 Check(ui.Application.Documents.Size == 0, "Requires an empty test process");
-                var results = File.Exists(Path.Combine(Output,"CML-source.rvt")) ? RunCml(ui) : Run(ui);
+                var results = File.Exists(Path.Combine(Output,"group-copy-source.rvt")) ? RunGroupCopyBenchmark(ui)
+                    : File.Exists(Path.Combine(Output,"CML-source.rvt")) ? RunCml(ui) : Run(ui);
                 File.WriteAllText(Path.Combine(Output, "result.json"), JsonConvert.SerializeObject(new { passed = !results.Any(r => r.StartsWith("FAILED")), tests = results }, Formatting.Indented));
             }
             catch (Exception ex) { File.WriteAllText(Path.Combine(Output, "error.txt"), ex.ToString()); }
@@ -144,6 +145,37 @@ namespace BIMaestro.HistoryTests
                 results.Add("native and named calorifuge excluded from all counts; other errors and capture diagnostics preserved");
             }
             finally { doc.Close(false); }
+            return results;
+        }
+
+        private sealed class BenchmarkDuplicateTypes : IDuplicateTypeNamesHandler
+        { public DuplicateTypeAction OnDuplicateTypeNamesFound(DuplicateTypeNamesHandlerArgs args) => DuplicateTypeAction.UseDestinationTypes; }
+
+        private List<string> RunGroupCopyBenchmark(UIApplication ui)
+        {
+            var results = new List<string>();
+            var source = ui.Application.OpenDocumentFile(Path.Combine(Output, "group-copy-source.rvt"));
+            var destination = ui.Application.NewProjectDocument(UnitSystem.Metric);
+            try
+            {
+                var group = new FilteredElementCollector(source).OfClass(typeof(Group)).Cast<Group>()
+                    .Where(g => !g.ViewSpecific && g.Category?.CategoryType == CategoryType.Model)
+                    .OrderByDescending(g => g.GetMemberIds().Count).First();
+                var members = group.GetMemberIds().Count;
+                var timer = Stopwatch.StartNew();
+                using (var tx = new Transaction(destination, "Benchmark group direct copy"))
+                using (var options = new CopyPasteOptions())
+                {
+                    options.SetDuplicateTypeNamesHandler(new BenchmarkDuplicateTypes());
+                    tx.Start();
+                    var copies = ElementTransformUtils.CopyElements(source, new[] { group.Id }, destination,
+                        Transform.Identity, options);
+                    Check(copies.Any(id => destination.GetElement(id) is Group), "Direct group copy omitted the group");
+                    Check(tx.Commit() == TransactionStatus.Committed, "Direct group copy failed to commit");
+                }
+                results.Add("direct group copy: " + members + " members, " + timer.ElapsedMilliseconds + " ms");
+            }
+            finally { destination.Close(false); source.Close(false); }
             return results;
         }
 

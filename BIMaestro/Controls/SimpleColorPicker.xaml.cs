@@ -34,6 +34,15 @@ namespace BIMaestro.UI
                     FrameworkPropertyMetadataOptions.BindsTwoWayByDefault,
                     OnSelectedColorChanged));
 
+        public static readonly DependencyProperty TransparentLabelProperty =
+            DependencyProperty.Register(
+                nameof(TransparentLabel),
+                typeof(string),
+                typeof(SimpleColorPicker),
+                new PropertyMetadata("Transparent", (sender, _) =>
+                    ((SimpleColorPicker)sender).UpdateVisuals(
+                        ((SimpleColorPicker)sender).SelectedColor)));
+
         public SimpleColorPicker()
         {
             InitializeComponent();
@@ -45,6 +54,12 @@ namespace BIMaestro.UI
         {
             get => (Color?)GetValue(SelectedColorProperty);
             set => SetValue(SelectedColorProperty, value);
+        }
+
+        public string TransparentLabel
+        {
+            get => (string)GetValue(TransparentLabelProperty);
+            set => SetValue(TransparentLabelProperty, value);
         }
 
         public event RoutedPropertyChangedEventHandler<Color?>? SelectedColorChanged;
@@ -92,7 +107,7 @@ namespace BIMaestro.UI
 
         private void ColorPopup_Opened(object sender, EventArgs e)
         {
-            HexTextBox.Text = SelectedColor.HasValue
+            HexTextBox.Text = SelectedColor.HasValue && SelectedColor.Value.A != 0
                 ? ColorToText(SelectedColor.Value)
                 : string.Empty;
             HexTextBox.SelectAll();
@@ -174,7 +189,9 @@ namespace BIMaestro.UI
             }
 
             ColorSwatch.Fill = new SolidColorBrush(color.Value);
-            ColorText.Text = ColorToText(color.Value);
+            ColorText.Text = color.Value.A == 0
+                ? TransparentLabel
+                : ColorToText(color.Value);
         }
 
         private static Color ParseColor(string value)

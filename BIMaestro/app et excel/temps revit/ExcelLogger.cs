@@ -1494,7 +1494,7 @@ public static class TimeLogMetadataExtractor
                 case StorageType.Double:
                     return parameter.AsDouble().ToString("R", CultureInfo.InvariantCulture);
                 case StorageType.ElementId:
-                    return parameter.AsElementId()?.IntegerValue.ToString(CultureInfo.InvariantCulture);
+                    return parameter.AsElementId()?.GetIdLongValue().ToString(CultureInfo.InvariantCulture);
                 default:
                     return null;
             }

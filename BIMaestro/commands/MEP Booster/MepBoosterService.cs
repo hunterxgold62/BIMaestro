@@ -25,6 +25,30 @@ namespace BIMaestro.MepBooster
 
     internal sealed class MepBoosterService : IExternalEventHandler
     {
+        private static readonly object DiagnosticFileLock = new object();
+        internal static string DiagnosticLogPath => Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "BIMaestro", "Logs", "MepBooster.log");
+
+        private static void WriteDiagnostic(string message)
+        {
+            try
+            {
+                lock (DiagnosticFileLock)
+                {
+                    string path = DiagnosticLogPath;
+                    Directory.CreateDirectory(Path.GetDirectoryName(path));
+                    if (File.Exists(path) && new FileInfo(path).Length > 1024 * 1024)
+                        File.WriteAllText(path, "Journal MEP Booster renouvelé." + Environment.NewLine);
+                    File.AppendAllText(path, DateTime.Now.ToString("O") + "  " + message + Environment.NewLine);
+                }
+            }
+            catch (Exception)
+            {
+                // A logging failure must never change the Revit command's behaviour.
+            }
+        }
+
         private static MepBoosterService _instance;
         private static PushButton _button;
         internal static bool IsEnabled => _instance?._enabled == true;
@@ -69,6 +93,7 @@ namespace BIMaestro.MepBooster
         private DateTime _nextInspectionUtc;
         private bool _enabled, _suppressed, _selectionDirty, _previewDirty, _flip, _apply;
         private bool _ready;
+        private bool _idlingObserved, _timerObserved;
         private bool _selectionCheckPending;
         private bool _copyRequested, _copyBusy;
         private int _selectedCount;
@@ -110,6 +135,8 @@ namespace BIMaestro.MepBooster
             service.SetStatus(service._enabled ? "ON — sélectionnez un accessoire dans la vue." : "OFF");
             if (service._enabled)
             {
+                service._idlingObserved = false;
+                service._timerObserved = false;
                 service._timer.Start();
             }
             else
@@ -128,12 +155,18 @@ namespace BIMaestro.MepBooster
             _instance = new MepBoosterService();
             _instance.Initialize(app);
             _instance._enabled = true;
+            _instance._idlingObserved = false;
+            _instance._timerObserved = false;
             _instance._selectionDirty = true;
             _instance._suppressed = false;
             _instance._quietSince = DateTime.UtcNow;
             _instance.SetStatus("ON — sélectionnez un accessoire dans la vue.");
             _instance._timer.Start();
             UpdateButton();
+        }
+        internal static void ProcessIdling(object sender, IdlingEventArgs args)
+        {
+            _instance?.Idling(sender, args);
         }
         private void Initialize(UIApplication app)
         {
@@ -165,7 +198,6 @@ namespace BIMaestro.MepBooster
             _timer = new DispatcherTimer(DispatcherPriority.Normal, _palette.Dispatcher) { Interval = TimeSpan.FromMilliseconds(100) };
             _timer.Tick += Tick;
             var application = BIMaestroApp.UIControlledApp;
-            application.Idling += Idling;
             application.SelectionChanged += SelectionChanged;
             application.ViewActivated += ViewActivated;
             application.ControlledApplication.DocumentChanged += DocumentChanged;
@@ -176,6 +208,7 @@ namespace BIMaestro.MepBooster
         {
             if (_copyBusy) return;
             if (!_enabled) return;
+            SetStatus("SélectionChanged reçu — attente du traitement de la sélection.");
             // A notification is not proof of a different selection. Compare actual
             // selected IDs in the next API callback before hiding a usable palette.
             _selectionCheckPending = true;
@@ -201,7 +234,17 @@ namespace BIMaestro.MepBooster
 
         private void Idling(object sender, IdlingEventArgs args)
         {
-            if (!_enabled || _copyBusy || !(sender is UIApplication app)) return;
+            if (!_enabled || _copyBusy) return;
+            if (!_idlingObserved)
+            {
+                _idlingObserved = true;
+                WriteDiagnostic("Idling reçu ; sender=" + (sender?.GetType().FullName ?? "null"));
+            }
+            if (!(sender is UIApplication app))
+            {
+                SetStatus("Idling sans UIApplication : sélection non traitée.");
+                return;
+            }
             DateTime now = DateTime.UtcNow;
             if (ShouldInspect(_selectionDirty || _selectionCheckPending, _previewDirty || _apply, _palette.IsVisible, now, _nextInspectionUtc))
             {
@@ -231,6 +274,11 @@ namespace BIMaestro.MepBooster
         {
             if (_palette.EditingAngle || _copyBusy || _copyRequested) return;
             if (!_enabled) return;
+            if (!_timerObserved)
+            {
+                _timerObserved = true;
+                WriteDiagnostic("Timer de présentation actif.");
+            }
             uint inputStamp = BoosterNative.InputStamp();
             if (inputStamp != _lastInputStamp)
             {
@@ -242,6 +290,7 @@ namespace BIMaestro.MepBooster
             if (!BoosterNative.IsRevitForeground(_owner)
                 || (BoosterNative.GetForegroundWindow() != _owner && !BoosterNative.IsWindowEnabled(_owner)))
             {
+                SetStatus("Présentation suspendue : fenêtre Revit inactive ou désactivée.");
                 Suspend();
                 return;
             }
@@ -308,7 +357,13 @@ namespace BIMaestro.MepBooster
             // Window enabled/read-only flags may be temporary while Revit invokes an API callback.
             // They must never permanently suppress presentation, nor gate reads of the selection.
             if (doc == null || doc.IsFamilyDocument || doc.IsModifiable || !BoosterNative.IsRevitForeground(_owner))
-            { Suspend(); return; }
+            {
+                SetStatus(doc == null ? "Lecture suspendue : aucun document actif."
+                    : doc.IsFamilyDocument ? "Lecture suspendue : document famille."
+                    : doc.IsModifiable ? "Lecture suspendue : document en modification."
+                    : "Lecture suspendue : Revit n’est pas au premier plan.");
+                Suspend(); return;
+            }
             var ids = uidoc.Selection.GetElementIds().OrderBy(BoosterIds.Value).ToList();
             string selection = string.Join(",", ids.Select(BoosterIds.Value));
             _selectionCheckPending = false;
@@ -451,6 +506,7 @@ namespace BIMaestro.MepBooster
         {
             if (_status == status) return;
             _status = status;
+            WriteDiagnostic(status);
             DiagnosticSink?.Invoke(status);
         }
         private void Rearm()
@@ -479,7 +535,6 @@ namespace BIMaestro.MepBooster
             catch (UnauthorizedAccessException) { }
             service._enabled = false; service._timer.Stop(); service._mouse?.Dispose();
             var application = BIMaestroApp.UIControlledApp;
-            application.Idling -= service.Idling;
             application.SelectionChanged -= service.SelectionChanged;
             application.ViewActivated -= service.ViewActivated;
             application.ControlledApplication.DocumentChanged -= service.DocumentChanged;

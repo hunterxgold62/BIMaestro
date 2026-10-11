@@ -25,11 +25,15 @@ namespace Analyse
             double baseZ = vertices[0].Position.Z;
             bool SameXY(XYZ a, double[] b) => Math.Abs(a.X - b[0]) < 1e-5 && Math.Abs(a.Y - b[1]) < 1e-5;
             // Insert every point into the initially flat top face before changing
-            // elevations; otherwise DrawPoint can reject points off that face.
+            // elevations; otherwise the shape editor can reject points off that face.
             foreach (var saved in recipe.ShapePoints)
             {
                 if (vertices.Any(v => SameXY(v.Position, saved))) continue;
+#if REVIT2025_OR_GREATER
+                var vertex = editor.AddPoint(new XYZ(saved[0], saved[1], baseZ));
+#else
                 var vertex = editor.DrawPoint(new XYZ(saved[0], saved[1], baseZ));
+#endif
                 if (vertex == null) throw new InvalidOperationException("Un point de forme du sol n’a pas pu être recréé.");
                 vertices = editor.SlabShapeVertices.Cast<SlabShapeVertex>().ToList();
             }
@@ -37,7 +41,11 @@ namespace Analyse
             {
                 var a = vertices.Single(v => SameXY(v.Position, crease.Start));
                 var b = vertices.Single(v => SameXY(v.Position, crease.End));
+#if REVIT2025_OR_GREATER
+                editor.AddSplitLine(a, b);
+#else
                 editor.DrawSplitLine(a, b);
+#endif
             }
             foreach (var saved in recipe.ShapePoints)
             {

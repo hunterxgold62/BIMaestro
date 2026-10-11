@@ -164,7 +164,7 @@ namespace Modification
                             if (renumberSheets)
                             {
                                 sortedElements = sheets.OrderBy(sheet => sheet.SheetNumber,
-                                    Comparer<string>.Create(NaturalCompare)).ThenBy(sheet => sheet.Id.IntegerValue)
+                                    Comparer<string>.Create(NaturalCompare)).ThenBy(sheet => sheet.Id.GetIdLongValue())
                                     .Select(sheet => new ElementLocation { Element = sheet, Location = XYZ.Zero }).ToList();
                             }
                             else if (renamerWindow.IsSortByLevelEnabled)
@@ -284,9 +284,9 @@ namespace Modification
                 return Result.Cancelled;
             }
 
-            var viewportIdsOnSheet = new HashSet<int>(
-                activeSheet.GetAllViewports().Select(id => id.IntegerValue));
-            if (selectedViewports.Any(viewport => !viewportIdsOnSheet.Contains(viewport.Id.IntegerValue)))
+            var viewportIdsOnSheet = new HashSet<long>(
+                activeSheet.GetAllViewports().Select(id => id.GetIdLongValue()));
+            if (selectedViewports.Any(viewport => !viewportIdsOnSheet.Contains(viewport.Id.GetIdLongValue())))
             {
                 TaskDialog.Show(
                     UiLanguage.T("Sélection incompatible", "Incompatible Selection"),
@@ -501,10 +501,10 @@ namespace Modification
             IList<Viewport> viewports,
             IList<string> desiredValues)
         {
-            var selectedIds = new HashSet<int>(viewports.Select(viewport => viewport.Id.IntegerValue));
+            var selectedIds = new HashSet<long>(viewports.Select(viewport => viewport.Id.GetIdLongValue()));
             var numbersUsedByOtherViewports = new HashSet<string>(
                 sheet.GetAllViewports()
-                    .Where(id => !selectedIds.Contains(id.IntegerValue))
+                    .Where(id => !selectedIds.Contains(id.GetIdLongValue()))
                     .Select(id => doc.GetElement(id) as Viewport)
                     .Where(viewport => viewport != null)
                     .Select(GetViewportDetailNumber)
@@ -566,12 +566,12 @@ namespace Modification
                     UiLanguage.T("Une même vue est présente plusieurs fois dans la sélection et ne peut pas recevoir plusieurs noms.", "The Same View Appears Multiple Times in the Selection and Cannot Receive Multiple Names."));
             }
 
-            var selectedViewIds = new HashSet<int>(views.Select(view => view.Id.IntegerValue));
+            var selectedViewIds = new HashSet<long>(views.Select(view => view.Id.GetIdLongValue()));
             var namesUsedByOtherViews = new HashSet<string>(
                 new FilteredElementCollector(doc)
                     .OfClass(typeof(View))
                     .Cast<View>()
-                    .Where(view => !selectedViewIds.Contains(view.Id.IntegerValue))
+                    .Where(view => !selectedViewIds.Contains(view.Id.GetIdLongValue()))
                     .Select(view => view.Name),
                 StringComparer.OrdinalIgnoreCase);
 
@@ -625,7 +625,7 @@ namespace Modification
             return viewports
                 .Select(viewport => doc.GetElement(viewport.ViewId) as View)
                 .Where(view => view != null)
-                .GroupBy(view => view.Id.IntegerValue)
+                .GroupBy(view => view.Id.GetIdLongValue())
                 .Select(group => group.First())
                 .ToList();
         }

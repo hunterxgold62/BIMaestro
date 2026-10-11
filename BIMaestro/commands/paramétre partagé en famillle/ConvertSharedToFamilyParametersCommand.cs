@@ -229,7 +229,7 @@ namespace Famille
         {
             string n = parameter?.Definition?.Name;
             if (!string.IsNullOrWhiteSpace(n)) return n;
-            return $"<sans nom / id:{parameter?.Id.IntegerValue}>";
+            return $"<sans nom / id:{parameter?.Id.GetIdLongValue()}>";
         }
 
         private static void EnsureCurrentTypeExists(FamilyManager familyManager, out bool tempTypeCreated)

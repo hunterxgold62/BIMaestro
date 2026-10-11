@@ -1,9 +1,13 @@
-param([string]$SourceDirectory = 'BIMaestro/bin/ClashActions2025', [switch]$Preview)
+param([ValidateSet('2025','2026','2027')][string]$RevitVersion = '2025', [string]$SourceDirectory = '', [switch]$Preview)
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
+if (!$SourceDirectory) { $SourceDirectory = "BIMaestro/bin/Revit$RevitVersion/Release" }
 $source = if ([IO.Path]::IsPathRooted($SourceDirectory)) { [IO.Path]::GetFullPath($SourceDirectory) } else { [IO.Path]::GetFullPath((Join-Path $repo $SourceDirectory)) }
 $dll = Join-Path $source 'BIMaestro.dll'
-if (!(Test-Path -LiteralPath $dll)) { throw 'Compiler la version Revit 2025 avant installation.' }
+if (!(Test-Path -LiteralPath $dll)) { throw "Compiler la version Revit $RevitVersion avant installation." }
+$runtimeConfig = Join-Path "C:\Program Files\Autodesk\Revit $RevitVersion" 'RevitAPI.runtimeconfig.json'
+if (!(Test-Path -LiteralPath $runtimeConfig)) { throw "Revit $RevitVersion ou sa configuration .NET est introuvable." }
+$runtimeMajor = [int](([string]((Get-Content -LiteralPath $runtimeConfig -Raw | ConvertFrom-Json).runtimeOptions.tfm) -split '\.')[0] -replace '^net','')
 # Inspect PE metadata without loading BIMaestro or any Revit assembly into this process.
 Add-Type -AssemblyName System.Reflection.Metadata
 $stream = [IO.File]::OpenRead($dll)
@@ -16,24 +20,25 @@ try {
         $references[$metadata.GetString($reference.Name)] = $reference.Version
     }
 } finally { $pe.Dispose(); $stream.Dispose() }
-if ($references['RevitAPI'].Major -ne 25 -or $references['RevitAPIUI'].Major -ne 25 -or $references['System.Runtime'].Major -ne 8) {
-    throw 'DLL incompatible : Revit 2025 exige les API Revit 25 et .NET 8. Aucun fichier modifié.'
+$apiMajor = [int]$RevitVersion - 2000
+if ($references['RevitAPI'].Major -ne $apiMajor -or $references['RevitAPIUI'].Major -ne $apiMajor -or $references['System.Runtime'].Major -ne $runtimeMajor) {
+    throw "DLL incompatible : Revit $RevitVersion exige les API Revit $apiMajor et .NET $runtimeMajor sur ce poste. Aucun fichier modifié."
 }
 $binRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'BIMaestro/Bin'))
 $hash = (Get-FileHash -LiteralPath $dll -Algorithm SHA256).Hash
-$destination = [IO.Path]::GetFullPath((Join-Path $binRoot ('Revit2025-Clash3D-' + $hash.Substring(0, 12))))
+$destination = [IO.Path]::GetFullPath((Join-Path $binRoot ("Revit$RevitVersion-Clash3D-" + $hash.Substring(0, 12))))
 if (!$destination.StartsWith($binRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Destination hors du dossier BIMaestro.' }
-$manifest = Join-Path $env:APPDATA 'Autodesk/Revit/Addins/2025/BIMaestro.addin'
-if (!(Test-Path -LiteralPath $manifest)) { throw 'Le manifeste BIMaestro pour Revit 2025 est introuvable.' }
+$manifest = Join-Path $env:APPDATA "Autodesk/Revit/Addins/$RevitVersion/BIMaestro.addin"
+if (!(Test-Path -LiteralPath $manifest)) { throw "Le manifeste BIMaestro pour Revit $RevitVersion est introuvable." }
 [xml]$xml = [IO.File]::ReadAllText($manifest)
 $entry = @($xml.RevitAddIns.AddIn | Where-Object { $_.FullClassName -eq 'BIMaestroApp' })
 if ($entry.Count -ne 1) { throw 'Le manifeste ne contient pas une seule entrée BIMaestro attendue.' }
 $oldAssembly = [string]$entry[0].Assembly
 $newAssembly = Join-Path $destination 'BIMaestro.dll'
 $entry[0].Assembly = $newAssembly
-$backup = $manifest + '.before-clash2025-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.bak'
+$backup = $manifest + ".before-clash$RevitVersion-" + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.bak'
 $files = @(Get-ChildItem -LiteralPath $source -File -Recurse | Where-Object Extension -ne '.pdb')
-$plan = [pscustomobject]@{Revit='2025';Source=$source;Destination=$destination;Manifest=$manifest;PreviousAssembly=$oldAssembly;
+$plan = [pscustomobject]@{Revit=$RevitVersion;Runtime="net$runtimeMajor";Source=$source;Destination=$destination;Manifest=$manifest;PreviousAssembly=$oldAssembly;
     Assembly=$newAssembly;Sha256=$hash;Files=$files.Count;Bytes=($files | Measure-Object Length -Sum).Sum;Backup=$backup;Preview=[bool]$Preview}
 if ($Preview) { $plan | ConvertTo-Json; return }
 New-Item -ItemType Directory -Path $destination -Force | Out-Null
@@ -51,4 +56,4 @@ finally { if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $tem
 [xml]$applied = [IO.File]::ReadAllText($manifest)
 if ([string]$applied.RevitAddIns.AddIn.Assembly -ne $newAssembly) { throw 'Le manifeste ne référence pas la version attendue.' }
 $plan | ConvertTo-Json
-Write-Output 'Installation Revit 2025 mise à jour. Redémarrer Revit pour charger la nouvelle DLL.'
+Write-Output "Installation Revit $RevitVersion mise à jour. Redémarrer Revit pour charger la nouvelle DLL."

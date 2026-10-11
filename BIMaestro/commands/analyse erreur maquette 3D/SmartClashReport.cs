@@ -59,6 +59,46 @@ namespace Analyse
             return b.ToString();
         }
         private static string E(string value) => WebUtility.HtmlEncode(value ?? "");
+        public static string TutorialHtml(string initialHtml, string finalHtml, string reservationId)
+        {
+            const string headerEnd = "</header>";
+            int start = initialHtml.IndexOf(headerEnd, StringComparison.Ordinal) + headerEnd.Length;
+            int end = initialHtml.LastIndexOf("</main>", StringComparison.Ordinal);
+            if (start < headerEnd.Length || end < start) throw new InvalidOperationException("Le rapport initial du tutoriel est incomplet.");
+            var comparison = "<section class='card'><h2>Bilan du parcours guidé · Avant / après</h2>" +
+                "<p>Deux intersections ont été confirmées au départ : le croisement entre tuyaux et la traversée du mur. " +
+                "Le tuyau transversal a été relevé de 300 mm, puis la réservation #" + E(reservationId) +
+                " a été créée dans le mur. Une nouvelle analyse a été réalisée après ces modifications.</p>" +
+                "<p class='muted'>Les aperçus de départ sont conservés ci-dessous. Contrôle la position, les dimensions et l’ouverture réelle de la réservation dans Revit.</p></section>" +
+                "<section><h2>Avant correction · État initial conservé</h2>" + initialHtml.Substring(start, end - start) +
+                "</section><section class='card'><h2>Après correction · Dernière analyse</h2>" +
+                "<p>Les résultats ci-dessous décrivent le périmètre analysé après le déplacement du tuyau et la création de la réservation. " +
+                "Aucune intersection restante dans ce périmètre ne constitue une validation générale de la maquette.</p></section>";
+            int insertion = finalHtml.IndexOf(headerEnd, StringComparison.Ordinal);
+            if (insertion < 0) throw new InvalidOperationException("Le rapport final du tutoriel est incomplet.");
+            return finalHtml.Insert(insertion + headerEnd.Length, comparison);
+        }
+
+        internal static string CsvPhase(IEnumerable<ModelIssue> issues, string phase)
+        {
+            string header = Csv(Array.Empty<ModelIssue>());
+            var b = new StringBuilder("Phase;" + header);
+            foreach (var issue in issues)
+                b.Append(CsvCell(phase)).Append(';').Append(Csv(new[] { issue }).Substring(header.Length));
+            return b.ToString();
+        }
+
+        public static string TutorialCsv(string initialCsv, IEnumerable<ModelIssue> finalIssues)
+        {
+            var list = finalIssues.ToList();
+            string final = CsvPhase(list, "Après correction");
+            int headerEnd = final.IndexOf("\r\n", StringComparison.Ordinal) + 2;
+            if (list.Count == 0)
+                final += CsvCell("Après correction : aucune intersection détectée dans le périmètre analysé") +
+                    string.Concat(Enumerable.Repeat(";\"\"", 16)) + "\r\n";
+            return initialCsv + final.Substring(headerEnd);
+        }
+
         public static string Csv(IEnumerable<ModelIssue> issues)
         {
             var b = new StringBuilder("Objet;Obstacle;Niveau;Lien;Contrôle;Certitude;Statut;Type objet;Type obstacle;Id objet;Id obstacle;Id obstacle lié;Volume témoin mm3;Commentaire;Utilisateur;Date UTC\r\n");

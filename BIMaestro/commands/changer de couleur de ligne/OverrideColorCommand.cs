@@ -374,7 +374,7 @@ namespace Modification
         private static string GetReadableElementName(Element element, ElementId fallbackId)
         {
             if (element == null)
-                return $"Id {fallbackId.IntegerValue}";
+                return $"Id {fallbackId.GetIdLongValue()}";
 
             string name = null;
 
@@ -388,9 +388,9 @@ namespace Modification
             }
 
             if (!string.IsNullOrWhiteSpace(name))
-                return $"{name} - Id {element.Id.IntegerValue}";
+                return $"{name} - Id {element.Id.GetIdLongValue()}";
 
-            return $"Id {element.Id.IntegerValue}";
+            return $"Id {element.Id.GetIdLongValue()}";
         }
 
         private class ExistingOverrideInfo

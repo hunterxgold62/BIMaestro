@@ -8,9 +8,12 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
-public class AppUI : IExternalApplication
+public partial class AppUI : IExternalApplication
 {
     private static readonly List<RibbonPanel> ribbonPanels = new List<RibbonPanel>();
     public static UIApplication UiApplication { get; private set; }
@@ -20,6 +23,10 @@ public class AppUI : IExternalApplication
     private static readonly List<string> ribbonButtonOrder = new List<string>();
     private static readonly Dictionary<string, RibbonButtonInfo> ribbonButtonsByCommandClass =
         new Dictionary<string, RibbonButtonInfo>(StringComparer.OrdinalIgnoreCase);
+    private static readonly HashSet<string> badgeToolTipsApplied = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<object, StackPanel> badgeToolTipContents = new Dictionary<object, StackPanel>();
+    private static EventInfo badgeToolTipOpenedEvent;
+    private static EventHandler badgeToolTipOpenedHandler;
     public Result OnStartup(UIControlledApplication application)
     {
         CreateRibbonUI(application);
@@ -208,7 +215,7 @@ public class AppUI : IExternalApplication
                 new RibbonItemDefinition("DemoTours", "Parcours guidés", panel => AddPushButton(panel,
                     "DemoTours", "Parcours\nguidés", assemblyPath,
                     "BIMaestro.Tutorials.DemoToursCommand", "Miniature.png",
-                    "Crée une maquette de formation et essaie les outils BIMaestro pas à pas.")),
+                    "Affiche les parcours guidés : choisis un tutoriel pour essayer les outils BIMaestro pas à pas.")),
 
                 new RibbonItemDefinition("InfoStack", "Infos empilées", panel => AddStackedInfoButtons(
                     panel,
@@ -255,6 +262,8 @@ public class AppUI : IExternalApplication
         ribbonButtonRegistry.Clear();
         ribbonButtonOrder.Clear();
         ribbonButtonsByCommandClass.Clear();
+        badgeToolTipsApplied.Clear();
+        badgeToolTipContents.Clear();
 
         string assemblyPath = Assembly.GetExecutingAssembly().Location;
         var definitions = BuildDefaultRibbonDefinitions(assemblyPath);
@@ -272,6 +281,11 @@ public class AppUI : IExternalApplication
                 item.Builder(panel);
             }
         }
+
+        AddBadgeToolTips();
+        System.Windows.Threading.Dispatcher.CurrentDispatcher.BeginInvoke(
+            System.Windows.Threading.DispatcherPriority.Loaded,
+            new Action(AddBadgeToolTips));
 
     }
 
@@ -611,6 +625,9 @@ public class AppUI : IExternalApplication
         string shortTip = parts.Length > 0 ? parts[0] : "";
         if (string.IsNullOrWhiteSpace(shortTip))
             shortTip = UiLanguage.T($"Exécuter {buttonText}", $"Run {buttonText}");
+        string badgeLabel = GetRibbonBadgeLabel(buttonName);
+        if (badgeLabel != null)
+            shortTip = badgeLabel + " · " + shortTip;
         buttonData.ToolTip = shortTip;
 
         bool hasMultiLine = parts.Length > 1;
@@ -622,12 +639,191 @@ public class AppUI : IExternalApplication
         // - Image => 16x16 (boutons "petits" + stacked)
         // - LargeImage => 32x32 (boutons "gros")
         var small = LoadBitmapFromResource(toolTipImageName, 16);
-        if (small != null) buttonData.Image = small;
+        if (small != null) buttonData.Image = AddRibbonBadge(small, buttonName, 16);
 
         var large = LoadBitmapFromResource(toolTipImageName, 32);
-        if (large != null) buttonData.LargeImage = large;
+        if (large != null) buttonData.LargeImage = AddRibbonBadge(large, buttonName, 32);
 
         return buttonData;
+    }
+
+    private static string GetRibbonBadgeLabel(string buttonName)
+    {
+        if (string.Equals(buttonName, "Qui a fait ça ?", StringComparison.OrdinalIgnoreCase)) return "MAJ";
+        if (string.Equals(buttonName, "ViewTemplateTransfer", StringComparison.OrdinalIgnoreCase)) return "NEW";
+        return null;
+    }
+
+    private static ImageSource AddRibbonBadge(ImageSource icon, string buttonName, int size)
+    {
+        string label = GetRibbonBadgeLabel(buttonName);
+        if (label == null) return icon;
+
+        var badgeColor = label == "MAJ"
+            ? System.Windows.Media.Color.FromRgb(35, 120, 225)
+            : System.Windows.Media.Color.FromRgb(42, 171, 82);
+        double radius = size == 16 ? 3.5 : 5.5;
+        double margin = size == 16 ? 0.5 : 1.0;
+        var center = new System.Windows.Point(size - radius - margin, radius + margin);
+        var visual = new DrawingVisual();
+        using (DrawingContext drawing = visual.RenderOpen())
+        {
+            drawing.DrawImage(icon, new Rect(0, 0, size, size));
+            drawing.DrawEllipse(new SolidColorBrush(badgeColor),
+                new Pen(Brushes.White, size == 16 ? 1.0 : 1.5), center, radius, radius);
+        }
+
+        var result = new RenderTargetBitmap(size, size, 96, 96, PixelFormats.Pbgra32);
+        result.Render(visual);
+        result.Freeze();
+        return result;
+    }
+
+    private static void AddBadgeToolTips()
+    {
+        // Revit n'expose pas la mise en page de l'infobulle dans son API publique.
+        // Le contrôle du ruban accepte cependant une RibbonToolTip WPF personnalisée.
+        try
+        {
+            var adWindows = AppDomain.CurrentDomain.GetAssemblies()
+                .FirstOrDefault(assembly => assembly.GetName().Name == "AdWindows");
+            if (adWindows == null) return;
+
+            if (badgeToolTipOpenedHandler == null)
+            {
+                badgeToolTipOpenedEvent = adWindows.GetType("Autodesk.Windows.ComponentManager")?.GetEvent("ToolTipOpened");
+                if (badgeToolTipOpenedEvent != null)
+                {
+                    badgeToolTipOpenedHandler = OnBadgeToolTipOpened;
+                    badgeToolTipOpenedEvent.AddEventHandler(null, badgeToolTipOpenedHandler);
+                }
+            }
+
+            foreach (string buttonName in new[] { "ViewTemplateTransfer", "Qui a fait ça ?", "PipeLengthByDiameterV2", "AnalysePoidsButton", "Temps par projet", "Clash 3D", "Sélection d'objet", "HighlightElementsByCategories",
+                "ResérvationAuto", "Bride auto", "Choix bride", "Suppression de brides",
+                "OpenSheetFromViewButton", "Export Nomenclature", "ViewThumbnailBatch", "ExportDwgBatch", "GetPaintedMaterialsButton", "ReorientViewButton",
+                "MepBooster", "PipeSystemColors", "RevitGameCommand",
+                "CodexChat", "CommunityFamilies", "GPTBotWindowButton", "TextCorrectionButton", "ScanText", "RealisticViewImage",
+                "FamilyBrowser", "Rosace", "ConvertSharedToFamily", "PurgeFamilyParameters", "Familytraduction", "FamilyViewtraduction", "Export d'unité", "Import d'unité",
+                "ElementHistoryHoverToggle", "Suivi maquette collaboratif",
+                "Couleur de projet", "RestartAppearanceGuide", "Couleur de maquette", "papa Noël", "ViewDeckToggle", "TabCompanionToggle", "WindowCompanionToggle", "BIMaestro_Exemple", "CreateDemoProject", "DemoTours", "NOTE_MAJ", "Snake", "FlappyBird", "CustomizeRibbon", "ContactCommand", "RadialMenuButtonsCommand", "SupportCommand",
+                "dynamo 1", "dynamo 2", "dynamo 3", "dynamo 4", "dynamo 5", "dynamo réglage",
+                "GestionExcelCmd", "Surcharges vues", "ElementRenamerButton", "PhaseQuickEditButton", "Purge du plan" })
+            {
+                try { SetBadgeToolTip(adWindows, buttonName); }
+                catch { /* Garder l'infobulle Revit pour ce bouton. */ }
+            }
+        }
+        catch
+        {
+            // La présentation Revit standard reste disponible si AdWindows change.
+        }
+    }
+
+    private static void SetBadgeToolTip(Assembly adWindows, string buttonName)
+    {
+        if (badgeToolTipsApplied.Contains(buttonName)) return;
+        if (!ribbonButtonRegistry.TryGetValue(buttonName, out var info) || info.PushButton == null)
+            return;
+
+        var ribbonItemField = typeof(Autodesk.Revit.UI.RibbonItem).GetField(
+            "m_RibbonItem", BindingFlags.Instance | BindingFlags.NonPublic);
+        object item = ribbonItemField?.GetValue(info.PushButton);
+        if (item == null) return;
+
+        var toolTip = CreateBadgeToolTip(adWindows, info);
+        var toolTipProperty = item.GetType().GetProperty("ToolTip");
+        if (toolTipProperty == null) return;
+        toolTipProperty.SetValue(item, toolTip, null);
+        badgeToolTipContents[toolTip] = (StackPanel)toolTip.GetType().GetProperty("Content").GetValue(toolTip, null);
+        badgeToolTipsApplied.Add(buttonName);
+    }
+
+    private static void OnBadgeToolTipOpened(object sender, EventArgs args)
+    {
+        try
+        {
+            var popup = sender as System.Windows.Controls.ToolTip;
+            if (popup == null) return;
+            var sourceProperty = popup.GetType().GetProperty("ContentSource");
+            var source = sourceProperty?.GetValue(popup, null);
+            StackPanel content;
+            if (!badgeToolTipContents.TryGetValue(popup.Content ?? new object(), out content)
+                && !badgeToolTipContents.TryGetValue(source ?? new object(), out content)) return;
+            // Revit peut reformater RibbonToolTip lors de l'ouverture. Le contenu
+            // visuel est affecté après ce formatage, avant la seconde résolution.
+            var sourceField = popup.GetType().GetField("ContentSourceProperty", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+            var sourceDp = sourceField?.GetValue(null) as DependencyProperty;
+            if (sourceDp != null) popup.SetCurrentValue(sourceDp, content);
+            else sourceProperty?.SetValue(popup, content, null);
+            popup.Content = content;
+            popup.Closed -= StopToolTipExampleVideo;
+            popup.Closed += StopToolTipExampleVideo;
+        }
+        catch { /* Conserver l'infobulle standard si le contrôle natif change. */ }
+    }
+
+    private static object CreateBadgeToolTip(Assembly adWindows, RibbonButtonInfo info)
+    {
+        var toolTipType = adWindows.GetType("Autodesk.Windows.RibbonToolTip");
+        object toolTip = Activator.CreateInstance(toolTipType);
+        string label = GetRibbonBadgeLabel(info.Id);
+        if (info.Id == "Temps par projet") label = "SUIVI";
+        var badgeBrush = new SolidColorBrush(label == "MAJ"
+            ? System.Windows.Media.Color.FromRgb(35, 120, 225)
+            : label == "SUIVI" ? System.Windows.Media.Color.FromRgb(125, 76, 196)
+            : System.Windows.Media.Color.FromRgb(42, 171, 82));
+
+        var header = new System.Windows.Controls.Grid { Width = 320 };
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var title = new TextBlock
+        {
+            Text = UiLanguage.T(info.Id == "Rosace" ? "Rosace des familles" : info.DisplayName).Replace('\n', ' ').Replace('\r', ' '),
+            FontWeight = FontWeights.SemiBold,
+            FontSize = 14,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        header.Children.Add(title);
+        var badge = new Border
+        {
+            Background = badgeBrush,
+            CornerRadius = new CornerRadius(4),
+            Padding = new Thickness(8, 3, 8, 3),
+            Child = new TextBlock { Text = label, Foreground = Brushes.White, FontWeight = FontWeights.Bold, FontSize = 12 }
+        };
+        System.Windows.Controls.Grid.SetColumn(badge, 1);
+        if (!string.IsNullOrEmpty(label)) header.Children.Add(badge);
+
+        string shortDescription = info.PushButton.ToolTip ?? string.Empty;
+        string prefix = label + " · ";
+        if (shortDescription.StartsWith(prefix, StringComparison.Ordinal))
+            shortDescription = shortDescription.Substring(prefix.Length);
+        shortDescription = GetToolTipExampleDescription(info.Id) ?? shortDescription;
+        var content = new StackPanel();
+        content.Children.Add(header);
+        content.Children.Add(new TextBlock
+        {
+            Text = shortDescription,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 10, 0, 0),
+            MaxWidth = 320
+        });
+        bool hasExample = AddToolTipExample(content, info.Id);
+
+        string expanded = info.PushButton.LongDescription ?? string.Empty;
+        int firstLineEnd = expanded.IndexOfAny(new[] { '\r', '\n' });
+        if (firstLineEnd >= 0)
+            expanded = expanded.Substring(firstLineEnd).TrimStart('\r', '\n');
+
+        toolTipType.GetProperty("Content")?.SetValue(toolTip, content, null);
+        if (!hasExample && !string.IsNullOrWhiteSpace(expanded))
+        {
+            content.Children.Add(new TextBlock { Text = expanded, TextWrapping = TextWrapping.Wrap, MaxWidth = 320, Margin = new Thickness(0, 12, 0, 0) });
+            toolTipType.GetProperty("IsProgressive")?.SetValue(toolTip, false, null);
+        }
+        toolTipType.GetProperty("IsProgressive")?.SetValue(toolTip, false, null);
+        return toolTip;
     }
 
     private static void AddSplitButton(
@@ -678,10 +874,10 @@ public class AppUI : IExternalApplication
         if (buttons.Count > 0)
         {
             var first16 = LoadBitmapFromResource(buttons[0].resourceImageName, 16);
-            if (first16 != null) splitButton.Image = first16;
+            if (first16 != null) splitButton.Image = AddRibbonBadge(first16, buttons[0].buttonName, 16);
 
             var first32 = LoadBitmapFromResource(buttons[0].resourceImageName, 32);
-            if (first32 != null) splitButton.LargeImage = first32;
+            if (first32 != null) splitButton.LargeImage = AddRibbonBadge(first32, buttons[0].buttonName, 32);
         }
 
         PushButton firstButton = null;

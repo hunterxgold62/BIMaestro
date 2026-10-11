@@ -20,6 +20,7 @@
     <Reference Include="RevitAPIUI"><HintPath>$(RevitInstallDir)\RevitAPIUI.dll</HintPath><Private>False</Private></Reference>
     <Compile Include="Program.cs" />
     <Compile Include="HostStubs.cs" />
+    <Compile Include="..\..\BIMaestro\commands\ElementIdExtensions.cs" />
     <EmbeddedResource Include="..\..\BIMaestro\Resources\MEP Booster vanne rotation.png"><LogicalName>BIMaestro.Resources.MEP Booster vanne rotation.png</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="..\..\BIMaestro\Resources\MEP Booster vanne rotation OFF.png"><LogicalName>BIMaestro.Resources.MEP Booster vanne rotation OFF.png</LogicalName></EmbeddedResource>
     <Compile Include="..\..\BIMaestro\commands\MEP Booster\MepBoosterService.cs" />

@@ -443,7 +443,7 @@ namespace BIMaestro.Codex
                     return new { minimum_z_mm=bounds.Min.Z*304.8, maximum_z_mm=bounds.Max.Z*304.8 };
                 }).ToArray();
                 return new { hosting, template=path, walls, floors,
-                    template_parameters=temporary.FamilyManager.Parameters.Cast<FamilyParameter>().Select(p=>new { name=p.Definition.Name, instance=p.IsInstance, built_in=p.Id.IntegerValue<0, reporting=p.IsReporting, read_only=p.IsReadOnly }).ToArray(),
+                    template_parameters=temporary.FamilyManager.Parameters.Cast<FamilyParameter>().Select(p=>new { name=p.Definition.Name, instance=p.IsInstance, built_in=p.Id.GetIdLongValue()<0, reporting=p.IsReporting, read_only=p.IsReadOnly }).ToArray(),
                     note="Coordonnées réelles du gabarit, en mm. Pour un mur parallèle à X : une applique côté +Y commence à maximum_y_mm ; côté -Y elle se termine à minimum_y_mm. Ne pas supposer 150 mm ou un centrage sur Y=0. Ces valeurs seules ne créent pas de liaison aux faces d'un autre mur plus épais : préférer hosting=face pour une applique qui doit suivre sa face hôte." };
             }
             finally { if(temporary!=null&&temporary.IsValidObject)temporary.Close(false); }

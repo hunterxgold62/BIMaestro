@@ -281,14 +281,14 @@
                                  GroupName="DeletedMeshMode"
                                  Tag="simple"
                                  Style="{StaticResource ScopeRadioStyle}"
-                                 ToolTip="Aperçu suppression rapide avec boîte estimative"
+                                 ToolTip="Aperçu rapide avec boîte estimative ; impact généralement imperceptible sur le PC. Mode conseillé par défaut."
                                  Checked="DeletedMeshMode_Checked"/>
                     <RadioButton x:Name="DetailedMeshModeRadio"
                                  Content="Détaillé"
                                  GroupName="DeletedMeshMode"
                                  Tag="detailed"
                                  Style="{StaticResource ScopeRadioStyle}"
-                                 ToolTip="Reconstitue les suppressions futures depuis les familles et types présents (dans leur état actuel). Conserve le maillage pour les formes non prises en charge. Si le type ou l’hôte manque, utilise l’aperçu simplifié."
+                                 ToolTip="Peut ralentir le chargement et demander davantage de ressources au PC. Reconstitue les suppressions futures depuis les familles et types présents (dans leur état actuel). Conserve le maillage pour les formes non prises en charge. Si le type ou l’hôte manque, utilise l’aperçu simplifié."
                                  Checked="DeletedMeshMode_Checked"/>
                 </WrapPanel>
                 <WrapPanel x:Name="ContextScopePanel" Grid.Row="2" Margin="0,8,0,0" Visibility="Collapsed">

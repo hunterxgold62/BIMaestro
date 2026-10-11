@@ -20,8 +20,9 @@ namespace BIMaestro.Welcome
         public string LastName => LastNameBox?.Text?.Trim();
         public string Company => CompanyBox?.Text?.Trim();
         private readonly bool communityProfileRequired;
+        internal bool IsTutorialOffer { get; }
 
-        public WelcomeWindow() : this(false, null, true, true) { }
+        public WelcomeWindow() : this(false, null, true, false) { }
 
         internal WelcomeWindow(bool communityProfileRequired, WelcomeState existing)
             : this(communityProfileRequired, existing, true, false) { }
@@ -29,9 +30,14 @@ namespace BIMaestro.Welcome
         internal WelcomeWindow(bool showEmail, bool showTutorial)
             : this(false, null, showEmail, showTutorial) { }
 
+        internal WelcomeWindow(bool showEmail, bool showTutorial, WelcomeState existing)
+            : this(false, existing, showEmail, showTutorial) { }
+
         private WelcomeWindow(bool communityProfileRequired, WelcomeState existing, bool showEmail, bool showTutorial)
         {
             this.communityProfileRequired = communityProfileRequired;
+            showTutorial = showTutorial && !showEmail;
+            IsTutorialOffer = showTutorial;
             ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
             LogoImage.Source = LoadBitmapFromResource("BIMaestro.png");
@@ -40,19 +46,26 @@ namespace BIMaestro.Welcome
                 System.Windows.Media.BitmapScalingMode.NearestNeighbor);
             TutorialOffer.Visibility = showTutorial ? Visibility.Visible : Visibility.Collapsed;
             EmailContent.Visibility = showEmail ? Visibility.Visible : Visibility.Collapsed;
-            if (showTutorial && showEmail)
-                PrimaryButton.Style = (Style)FindResource("WelcomeSecondaryButton");
             if (!showEmail)
             {
                 WelcomeFooter.Visibility = Visibility.Collapsed;
-                TutorialLaterButton.Visibility = Visibility.Visible;
                 TutorialOffer.Margin = new Thickness(0);
                 WelcomeBody.VerticalScrollBarVisibility = System.Windows.Controls.ScrollBarVisibility.Disabled;
                 SizeToContent = SizeToContent.Height;
                 Height = double.NaN;
                 HeadingSubtitleText.Text = "Prenez vos marques dans une maquette d’essai.";
+                Title = "BIMaestro — Maquette d’essai";
+                HeadingText.Text = "Essayez BIMaestro";
             }
             if (existing != null) { EmailBox.Text = existing.Email ?? ""; FirstNameBox.Text = existing.FirstName ?? ""; LastNameBox.Text = existing.LastName ?? ""; CompanyBox.Text = existing.Company ?? ""; }
+            if (showEmail && !communityProfileRequired && !string.IsNullOrWhiteSpace(existing?.Email))
+            {
+                IntroTitleText.Text = "Complétez vos informations";
+                IntroText.Text = "Vous pouvez ajouter votre entreprise (facultatif). Vos informations déjà enregistrées sont préremplies.";
+                PrimaryButton.Content = "Enregistrer";
+                NoThanksButton.Content = "Conserver";
+                NoThanksButton.ToolTip = "Garder mes informations actuelles sans compléter l’entreprise.";
+            }
             if (communityProfileRequired)
             {
                 Title = "BIMaestro — Profil de la bibliothèque commune";

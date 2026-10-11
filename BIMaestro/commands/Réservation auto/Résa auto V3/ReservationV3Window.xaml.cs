@@ -87,7 +87,7 @@ namespace Modification
             public LoadedTypeItem(FamilySymbol s)
             {
                 Symbol = s;
-                IsGenericModel = s?.Category?.Id?.IntegerValue == (int)BuiltInCategory.OST_GenericModel;
+                IsGenericModel = s?.Category?.Id?.GetIdLongValue() == (int)BuiltInCategory.OST_GenericModel;
                 string category = s?.Category?.Name ?? "Catégorie inconnue";
                 Display = $"{s?.Family?.Name} — {s?.Name}  ·  {category}";
             }

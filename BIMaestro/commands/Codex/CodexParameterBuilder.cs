@@ -64,7 +64,7 @@ namespace BIMaestro.Codex
         }
         internal static void Describe(FamilyManager manager, FamilyParameter parameter, string description)
         {
-            if (parameter.Id.IntegerValue > 0 && !parameter.IsShared) manager.SetDescription(parameter, description);
+            if (parameter.Id.GetIdLongValue() > 0 && !parameter.IsShared) manager.SetDescription(parameter, description);
         }
         internal static string NativeFormula(string formula, IDictionary<string, FamilyParameter> bindings) =>
             FamilyFormula.RewriteParameterNames(formula, bindings.ToDictionary(p => p.Key, p => p.Value.Definition.Name));

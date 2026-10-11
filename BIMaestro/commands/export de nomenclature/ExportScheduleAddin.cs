@@ -265,6 +265,21 @@ namespace Visualisation
 
             int headerRowCount = Math.Min(headerRows.Count, rows.Count);
             bool shouldMergeTitle = ShouldMergeHeaderTitle(headerRows, columnCount);
+            bool[] totalRows = new bool[rows.Count];
+            bool[] grandTotalRows = new bool[rows.Count];
+            int lastBodyRow = rows.Count - 1;
+            while (lastBodyRow >= headerRowCount && rows[lastBodyRow].All(string.IsNullOrWhiteSpace))
+            {
+                lastBodyRow--;
+            }
+            bool hasGrandTotal = HasGrandTotal(schedule);
+            for (int r = headerRowCount; r < rows.Count; r++)
+            {
+                bool isGrandTotal = r == lastBodyRow &&
+                    (hasGrandTotal || LooksLikeGrandTotalRow(rows[r]));
+                grandTotalRows[r] = isGrandTotal;
+                totalRows[r] = isGrandTotal || LooksLikeTotalRow(rows[r]);
+            }
             object[,] values = new object[rows.Count, columnCount];
             string[,] numberFormats = new string[rows.Count, columnCount];
 
@@ -285,7 +300,35 @@ namespace Visualisation
                 }
             }
 
-            return new ScheduleExportContent(values, numberFormats, rows.Count, columnCount, headerRowCount, shouldMergeTitle);
+            return new ScheduleExportContent(values, numberFormats, rows.Count, columnCount,
+                headerRowCount, shouldMergeTitle, totalRows, grandTotalRows);
+        }
+
+        private static bool HasGrandTotal(ViewSchedule schedule)
+        {
+            try
+            {
+                return schedule?.Definition?.ShowGrandTotal == true;
+            }
+            catch { return false; }
+        }
+
+        private static bool LooksLikeTotalRow(string[] row)
+        {
+            string label = row?.FirstOrDefault(cell => !string.IsNullOrWhiteSpace(cell));
+            if (label == null) return false;
+
+            return Regex.IsMatch(label.Trim(),
+                @"^(?:total(?:\s+g[ée]n[ée]ral)?|grand\s+total|sous[- ]total|sub[- ]?total)\b(?:\s*[:：-]|$)",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        }
+
+        private static bool LooksLikeGrandTotalRow(string[] row)
+        {
+            string label = row?.FirstOrDefault(cell => !string.IsNullOrWhiteSpace(cell));
+            return label != null && Regex.IsMatch(label.Trim(),
+                @"^(?:total\s+g[ée]n[ée]ral|grand\s+total)\b",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         }
 
         private static object ToExcelCellValue(string text, out string numberFormat)
@@ -395,6 +438,37 @@ namespace Visualisation
                 rowRange.Interior.Color = System.Drawing.ColorTranslator.ToOle(
                     System.Drawing.Color.FromArgb(242, 242, 242));
                 ComUtils.Release(rowRange);
+            }
+
+            for (int r = content.HeaderRowCount; r < content.RowCount; r++)
+            {
+                if (!content.TotalRows[r]) continue;
+
+                var rowRange = ws.Range[
+                    ws.Cells[firstRow + r, 1], ws.Cells[firstRow + r, content.ColumnCount]];
+                try
+                {
+                    bool isGrandTotal = content.GrandTotalRows[r];
+                    rowRange.Interior.Color = System.Drawing.ColorTranslator.ToOle(
+                        isGrandTotal
+                            ? System.Drawing.Color.FromArgb(218, 232, 246)
+                            : System.Drawing.Color.FromArgb(235, 243, 250));
+                    rowRange.Font.Bold = true;
+                    rowRange.Font.Color = System.Drawing.ColorTranslator.ToOle(
+                        System.Drawing.Color.FromArgb(29, 65, 105));
+                    Excel.Border topBorder = rowRange.Borders[Excel.XlBordersIndex.xlEdgeTop];
+                    try
+                    {
+                        topBorder.LineStyle = Excel.XlLineStyle.xlContinuous;
+                        topBorder.Weight = isGrandTotal
+                            ? Excel.XlBorderWeight.xlMedium
+                            : Excel.XlBorderWeight.xlThin;
+                        topBorder.Color = System.Drawing.ColorTranslator.ToOle(
+                            System.Drawing.Color.FromArgb(75, 116, 158));
+                    }
+                    finally { ComUtils.Release(topBorder); }
+                }
+                finally { ComUtils.Release(rowRange); }
             }
 
             return fullRange;
@@ -679,7 +753,9 @@ namespace Visualisation
                 int rowCount,
                 int columnCount,
                 int headerRowCount,
-                bool shouldMergeTitleRow)
+                bool shouldMergeTitleRow,
+                bool[] totalRows,
+                bool[] grandTotalRows)
             {
                 Values = values;
                 NumberFormats = numberFormats;
@@ -687,6 +763,8 @@ namespace Visualisation
                 ColumnCount = columnCount;
                 HeaderRowCount = headerRowCount;
                 ShouldMergeTitleRow = shouldMergeTitleRow;
+                TotalRows = totalRows;
+                GrandTotalRows = grandTotalRows;
             }
 
             public object[,] Values { get; }
@@ -695,6 +773,8 @@ namespace Visualisation
             public int ColumnCount { get; }
             public int HeaderRowCount { get; }
             public bool ShouldMergeTitleRow { get; }
+            public bool[] TotalRows { get; }
+            public bool[] GrandTotalRows { get; }
         }
     }
 }

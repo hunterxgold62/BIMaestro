@@ -106,7 +106,7 @@
 
                         <Button Grid.Column="1"
                                 Padding="8,3"
-                                Content="Transparent"
+                                Content="{Binding TransparentLabel, ElementName=Root}"
                                 Click="TransparentButton_Click"/>
                     </Grid>
                 </StackPanel>

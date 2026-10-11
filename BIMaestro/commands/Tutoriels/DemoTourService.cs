@@ -65,7 +65,7 @@ namespace BIMaestro.Tutorials
                 new DemoStep("Observer la traversée du mur", "La traversée restante est présélectionnée. Clique sur Voir sélection en 3D, observe le tuyau et le mur, puis confirme dans la petite carte. Nous allons créer une réservation autour de ce tuyau.", "TutorialFocusButton", completionEvent: "clash-wall-observed"),
                 new DemoStep("Créer la réservation", "Clique sur Créer la réservation. Clash 3D place réellement la famille rectangulaire murale fournie autour du tuyau ; Bulbizarre attend sa création. Cet essai utilise des réglages temporaires. Dans ton projet, le bouton reprend la famille et les réglages d’Auto réservation.", "ReservationButton", completionEvent: "clash-reservation-created"),
                 new DemoStep("Contrôler après la réservation", "Relance Analyser et attends la fin. Contrôle ensuite la position, les dimensions et l’ouverture réelle dans Revit. Une réservation créée ne garantit pas que la famille découpe le mur : si la traversée reste signalée, examine ce résultat avant de la déclarer traitée.", "AnalyzeButton", completionEvent: "clash-reservation-verified"),
-                new DemoStep("Exporter le résultat vérifié", "Garde Tous dans les statuts et aucune recherche. Clique sur Exporter, choisis HTML pour le rapport autonome ou CSV pour le tableau, puis enregistre. Bulbizarre attend l’écriture du fichier ; annuler le dialogue ne valide pas l’étape. Le rapport reprend les résultats de la nouvelle analyse, même si aucune intersection ne reste.", "ExportButton", completionEvent: "clash-export-written")
+                new DemoStep("Exporter le bilan avant / après", "Garde Tous dans les statuts et aucune recherche. Clique sur Exporter et choisis HTML pour voir les deux intersections de départ avec leurs aperçus, les actions réalisées et le bilan final. Le CSV distingue aussi Avant et Après correction. Même si aucun conflit ne reste, ton rapport conserve l’exercice. Bulbizarre attend l’enregistrement du fichier.", "ExportButton", completionEvent: "clash-export-written")
             },
             ["reservation"] = new[]
             {
@@ -140,10 +140,10 @@ namespace BIMaestro.Tutorials
                 new DemoStep("Deux suppressions et une modification", "Bulbizarre a supprimé deux objets de la scène, puis passé le troisième de 4 à 2 chaises. Nous allons faire réapparaître les deux objets, puis retrouver les anciennes valeurs du témoin. Dans Action, choisis « Suppressions ».", "ActionFilterCombo"),
                 new DemoStep("Filtrer par utilisateur", "Ce filtre isole les actions d'une personne. Il sert à comprendre qui a modifié la maquette, mais une absence de résultat peut aussi venir de la période chargée. Ne change rien pour retrouver les objets de la démo.", "UserFilterCombo", true),
                 new DemoStep("Recherche et période", "La recherche cible un élément ou une information précise. Les dates « Du » et « Au » limitent les événements chargés ; « Charger période » relit alors l'historique. Garde les filtres actuels pour l'exercice.", "SearchBox", true),
-                new DemoStep("Commencer en mode Simple", "Choisis « Simple ». Ce mode affiche des volumes rouges pour repérer rapidement les objets supprimés. Il est plus léger : garde-le par défaut si ton PC est peu performant.", "SimpleMeshModeRadio"),
+                new DemoStep("Commencer en mode Simple", "Choisis « Simple ». Ce mode affiche des volumes rouges pour repérer les objets supprimés, avec un impact généralement imperceptible sur le PC. Garde-le par défaut.", "SimpleMeshModeRadio"),
                 new DemoStep("Choisir le cluster", "Sélectionne la carte contenant les deux meubles supprimés. Nous allons observer le même cluster dans les deux modes.", "VisualCardsList"),
                 new DemoStep("Observer l’aperçu Simple", "Clique sur « Visualiser cluster ». La fenêtre se mettra de côté pour te laisser observer les volumes rouges dans Revit.", "VisualizeDeletedButton", completionEvent: "history-preview-simple-observed"),
-                new DemoStep("Passer en mode Détaillé", "Choisis maintenant « Détaillé ». Il montre davantage la forme des tables et des chaises lorsque les données nécessaires sont disponibles. Il peut demander plus de temps et de ressources au PC.", "DetailedMeshModeRadio"),
+                new DemoStep("Passer en mode Détaillé", "Choisis maintenant « Détaillé ». Il montre mieux la forme des meubles lorsque les données sont disponibles, mais peut ralentir le chargement et demander davantage de ressources au PC. Le tuto reviendra automatiquement en Simple après la comparaison et à sa fermeture.", "DetailedMeshModeRadio"),
                 new DemoStep("Comparer l’aperçu Détaillé", "Garde le même cluster sélectionné, puis clique à nouveau sur « Visualiser cluster ». L’aperçu détaillé remplacera les volumes simples : compare la forme des meubles dans Revit.", "VisualizeDeletedButton", completionEvent: "history-preview-detailed-observed"),
                 new DemoStep("Retirer l’aperçu rouge", "Tu as observé l’emplacement des objets supprimés. Clique maintenant sur « Nettoyer previews » pour retirer les silhouettes rouges avant de restaurer les objets.", "CleanPreviewsButton", completionEvent: "history-preview-cleaned"),
                 new DemoStep("Sélectionner le mobilier à restaurer", "Reste dans la vue visuelle. Sélectionne la carte du cluster contenant les deux suppressions de mobilier. Si elles apparaissent séparément, restaure une carte puis la seconde.", "VisualCardsList", true),
@@ -394,18 +394,10 @@ namespace BIMaestro.Tutorials
         protected override string ButtonId => "DemoTours";
         protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
-            var choice = new DemoChoiceWindow();
+            var choice = new DemoTrainingChoiceWindow();
             new WindowInteropHelper(choice).Owner = data.Application.MainWindowHandle;
             choice.ShowDialog();
-            string selectedChoice = choice.Choice;
-            if (selectedChoice == "overview")
-            {
-                var overview = new DemoDiscoveryWindow();
-                new WindowInteropHelper(overview).Owner = data.Application.MainWindowHandle;
-                overview.ShowDialog();
-                selectedChoice = overview.SelectedTour;
-            }
-            return RunChoice(data.Application, selectedChoice, ref message);
+            return RunChoice(data.Application, choice.SelectedTour, ref message);
         }
 
         internal static Result RunChoice(UIApplication uiApp, string selectedChoice, ref string message)
@@ -1279,7 +1271,7 @@ namespace BIMaestro.Tutorials
             card.Content = new Border { BorderBrush = DemoTourPalette.Accent, BorderThickness = new Thickness(2), Child = panel };
             panel.Children.Add(new TextBlock { Text = detailed ? "Aperçu Détaillé" : "Aperçu Simple", FontSize = 18, Foreground = DemoTourPalette.Accent });
             panel.Children.Add(new TextBlock { Text = detailed
-                ? "Compare les tables et les chaises rouges aux volumes du mode Simple. Détaillé montre mieux leur forme quand les données sont disponibles, mais peut demander davantage de ressources. Ces objets restent des aperçus."
+                ? "Compare les tables et les chaises rouges aux volumes du mode Simple. Détaillé peut ralentir le chargement et solliciter davantage le PC ; Simple a un impact généralement imperceptible. Après confirmation, le tuto repassera en Simple. Ces objets restent des aperçus."
                 : "Observe les volumes rouges : ils indiquent l’emplacement et l’encombrement des meubles supprimés. Simple est rapide et léger. Nous allons ensuite les comparer au mode Détaillé.",
                 TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 12, 0, 12) });
             var seen = new Button { Content = "J’ai vu l’aperçu · Continuer", Padding = new Thickness(10),
@@ -1290,7 +1282,11 @@ namespace BIMaestro.Tutorials
             card.Closed += (_, __) => {
                 if (!ActiveGuides.ContainsKey(historyWindow)) return;
                 historyWindow.Show(); historyWindow.Activate();
-                if (confirmed) ReportAction(historyWindow, observedAction);
+                if (confirmed)
+                {
+                    if (detailed && historyWindow is Analyse.ElementHistoryWindow history) history.ResetTutorialDeletedMeshMode();
+                    ReportAction(historyWindow, observedAction);
+                }
             };
             historyWindow.Closed += (_, __) => card.Close();
             card.Show();
@@ -1811,7 +1807,9 @@ namespace BIMaestro.Tutorials
 
             internal void Close()
             {
+                if (_closed) return;
                 _closed = true;
+                if (TourId == "history" && _window is Analyse.ElementHistoryWindow history) history.ResetTutorialDeletedMeshMode();
                 _favoriteHighlightTimer?.Stop(); _favoriteHighlightTimer = null;
                 _window.Loaded -= OnLoaded;
                 _detachAction?.Invoke();

@@ -348,6 +348,10 @@ namespace BIMaestro.Tests
                 Call(_window, "WriteExport", Path.Combine(_folder, "tutorial-report.html"), false);
                 Call(_window, "WriteExport", Path.Combine(_folder, "tutorial-report.csv"), true);
                 Check(Field<Button>(Guide, "_next").IsEnabled && File.ReadAllText(Path.Combine(_folder, "tutorial-report.html")).Contains("svg"), "Successful report not validated.");
+                var html = File.ReadAllText(Path.Combine(_folder, "tutorial-report.html"));
+                var csv = File.ReadAllText(Path.Combine(_folder, "tutorial-report.csv"));
+                Check(html.Contains("Avant correction") && html.Contains("Après correction") && html.Contains("300 mm"), "Training comparison is missing.");
+                Check(csv.Contains("Avant correction") && csv.Contains("Après correction"), "CSV lost the initial or final phase.");
                 Render("tutorial-export.png", 1180, 760);
             });
             Test("leaving the tutorial removes its column and correction controls", () =>

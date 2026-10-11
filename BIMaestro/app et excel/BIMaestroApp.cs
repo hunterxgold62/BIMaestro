@@ -204,6 +204,7 @@ public class BIMaestroApp : IExternalApplication
             }
 
             BIMaestro.MepBooster.MepBoosterService.RestorePersistedState(_uiApp);
+            BIMaestro.MepBooster.MepBoosterService.ProcessIdling(sender, e);
             Page.SecretGifShortcutManager.PollKeyboardState();
             BIMaestro.UI.RadialGlobalHotkeyService.ProcessPending(_uiApp);
             Analyse.ElementHistoryNativeArchive.ProcessPendingBackground(_uiApp.ActiveUIDocument?.Document);

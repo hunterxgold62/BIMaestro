@@ -83,12 +83,11 @@
                                        FontSize="13.5" LineHeight="20"
                                        Text="BIMaestro crée une maquette de formation séparée et l’ouvre dans Revit. Essayez les outils pas à pas ; vos projets restent intacts."/>
                             <StackPanel Orientation="Horizontal">
-                                <Button Content="Commencer l’essai" Style="{StaticResource WelcomePrimaryButton}"
+                                <Button Content="Ouvrir la maquette d’essai" Style="{StaticResource WelcomePrimaryButton}"
                                         Click="OpenDemo_Click"/>
-                                <Button x:Name="TutorialLaterButton" Content="Me le rappeler demain"
-                                        Margin="10,0,0,0" Style="{StaticResource WelcomeSecondaryButton}"
-                                        Visibility="Collapsed" Click="Later_Click"/>
                             </StackPanel>
+                            <TextBlock Margin="0,12,0,0" Style="{StaticResource TrustText}"
+                                       Text="Fermez avec la croix pour revoir cette proposition demain."/>
                         </StackPanel>
                     </Border>
                     <StackPanel x:Name="EmailContent">

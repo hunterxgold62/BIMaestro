@@ -3175,7 +3175,7 @@ namespace Modification
         {
             if (elem?.Category == null) return false;
 
-            int categoryId = elem.Category.Id.IntegerValue;
+            long categoryId = elem.Category.Id.GetIdLongValue();
             return categories.Any(category => categoryId == (int)category);
         }
 

@@ -450,6 +450,9 @@ namespace Analyse
             if (_session == null) throw new InvalidOperationException("Lancez une analyse avant d'exporter.");
             var text = csv ? SmartClashReport.Csv(_filtered)
                 : SmartClashReport.Html(_setup.Title, _filtered, _session, _stale, StatusCombo.SelectedItem + " · " + CategoryCombo.SelectedItem + " · " + SearchBox.Text);
+            if (_tutorialPrepared && !_stale && DemoClashExerciseExportReady())
+                text = csv ? SmartClashReport.TutorialCsv(_tutorialInitialCsv, _filtered)
+                    : SmartClashReport.TutorialHtml(_tutorialInitialHtml, text, _tutorialReservationId.GetIdLongValue().ToString());
             File.WriteAllText(path, text, new UTF8Encoding(csv));
             RunText.Text = "Export terminé : " + path;
             if (_tutorialPrepared && !_stale && DemoClashExerciseExportReady())
