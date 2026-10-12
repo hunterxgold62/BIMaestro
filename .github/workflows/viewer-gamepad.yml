@@ -47,7 +47,7 @@ jobs:
             if curl --fail --silent http://localhost:3000/ > /dev/null; then break; fi
             sleep 1
           done
-          if ! VIEWER_TEST_URL=http://localhost:3000 timeout 180s node scripts/test-gamepad-browser.mjs; then
+          if ! VIEWER_TEST_URL=http://localhost:3000 timeout 240s node scripts/test-gamepad-browser.mjs; then
             tail -100 /tmp/viewer-xbox-server.log
             exit 1
           fi

@@ -56,6 +56,7 @@ await page.route('**/components/mep-viewer.tsx*', async route => {
   await route.fulfill({ response, body });
 });
 const scenario = { revision: 1, state: { valves: {}, sources: {}, markups: {} } };
+await page.routeWebSocket('**', socket => socket.close());
 await page.route('**/mep-share', async route => {
   const action = route.request().postDataJSON().action;
   await route.fulfill({ json: action === 'resolve' ? { publication: { id: 'xbox-test', name: 'Maquette de validation', revision: 1 }, role: 'editor', packageUrl: url + '/gamepad.zip', scenario, events: [], realtimeToken: '' } : { scenario } });
@@ -113,8 +114,23 @@ try {
     const before = await state(); await input({ axes: [1, 0, 1, 0] }); assert.ok(distance(before.position, (await state()).position) < 1e-6);
     await input(); await page.getByRole('button', { name: 'Mesurer', exact: true }).evaluate(button => button.focus());
     await tap(0); assert.ok(await page.locator('.gamepad-reticle').isVisible(), 'A measurement must leave menu mode');
+    assert.match(await page.locator('.measure-controls').innerText(), /appuyez sur A/);
+    assert.doesNotMatch(await page.locator('.measure-controls').innerText(), /Cliquez|Échap/);
     await aimAtWall(); await tap(0); assert.ok(await page.locator('.measure-label').count() > 0, 'A places the first measurement point');
     await tap(1);
+  });
+  await check('section picking returns to aiming and LB + triggers move the cut without zooming', async () => {
+    await aimAtWall(); await tap(9);
+    await page.locator('.view-toolbar').getByRole('button', { name: /^Coupe/ }).evaluate(button => button.focus());
+    await tap(0); assert.ok(await page.locator('.gamepad-reticle').isVisible());
+    assert.match(await page.locator('.section-controls [role=status]').innerText(), /appuyez sur A/);
+    await tap(0); const panel = page.locator('.section-controls');
+    assert.match(await panel.innerText(), /LB \+ LT \/ RT/);
+    const offset = await panel.locator('output').innerText(), before = await state();
+    await input({ buttons: { 4: 1, 7: 1 } }); await input();
+    assert.notEqual(await panel.locator('output').innerText(), offset);
+    assert.ok(distance(before.position, (await state()).position) < 1e-6, 'Cut adjustment must not zoom the camera');
+    await panel.getByRole('button', { name: 'Tout réafficher', exact: true }).click(); await input();
   });
   await check('keyboard takeover preserves focus and requires neutral controller before resuming', async () => {
     await input({ axes: [.7, 0, 0, 0] }); await page.keyboard.press('Escape'); await frames();
@@ -123,8 +139,14 @@ try {
     await input(); await input({ axes: [.7, 0, 0, 0] }); assert.equal(await device(), 'gamepad'); await input();
     await page.mouse.move(15, 15); await frames(); assert.equal(await device(), 'keyboard');
   });
-  await check('View changes navigation, walking stops at a wall, Y toggles flight once per press', async () => {
+  await check('View changes navigation, walking, look, crouch, jump and collisions work; Y toggles flight once per press', async () => {
     await tap(8); assert.ok((await page.locator('.statusbar').innerText()).includes('MARCHE'));
+    const standing = await state(); await input({ buttons: { 10: 1 } }); assert.ok((await state()).position[1] < standing.position[1]);
+    await input(); await frames(25);
+    const grounded = await state(); await input({ buttons: { 2: 1 } }); assert.ok((await state()).position[1] > grounded.position[1]);
+    await input(); await frames(50);
+    const facing = await state(); await input({ axes: [0, 0, .6, -.3] }); assert.ok(distance(facing.quaternion, (await state()).quaternion) > .01);
+    await input(); await tap(14);
     await input({ axes: [0, -1, 0, 0] }); await frames(160); await input();
     const position = (await state()).position; assert.ok(position[2] > .5 && position[2] < 4.9, 'Walking must approach but not cross the wall: ' + position);
     await input({ buttons: { 3: 1 } }); await frames(20); assert.ok((await page.locator('.statusbar').innerText()).includes('VOL LIBRE'));
@@ -164,6 +186,8 @@ try {
     const h = await hint.boundingBox(), n = await page.locator('.navigation-switch').boundingBox();
     assert.ok(h.x >= 0 && h.x + h.width <= 640 && h.y + h.height <= 800);
     assert.ok(n.y + n.height <= h.y || h.y + h.height <= n.y, 'Navigation buttons and controller help must not overlap');
+    const lot = await page.locator('.reservation-lot-toolbar').boundingBox();
+    assert.ok(lot.y + lot.height <= h.y || h.y + h.height <= lot.y, 'Lots toolbar must not cover controller help');
     await page.screenshot({ path: 'test-results/xbox-narrow.png' });
   });
   assert.deepEqual(errors, [], 'No browser runtime errors');

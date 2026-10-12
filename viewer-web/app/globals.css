@@ -189,4 +189,8 @@ button { font:inherit; }
 .viewer-shell[data-input-device=gamepad] button:focus { outline: 3px solid #fbbf24; outline-offset: 3px; }
 
 
-@media (max-width: 700px) { .viewer-shell[data-input-device=gamepad] .navigation-switch { top: auto; bottom: 116px; } }
+.viewer-shell[data-input-device=gamepad] .reservation-lot-toolbar { bottom: 116px; max-height: 80px; overflow-y: auto; }
+@media (max-width: 700px) {
+  .viewer-shell[data-input-device=gamepad] .navigation-switch { top: auto; bottom: 212px; }
+  .viewer-shell[data-input-device=gamepad] .gamepad-status { bottom: 256px; }
+}
