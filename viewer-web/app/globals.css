@@ -178,9 +178,9 @@ button { font:inherit; }
 @media (max-height: 650px) { .viewer-mini-map-tools { width: 202px; } }
 
 /* Controller help remains legible on narrow screens and never captures clicks. */
-.gamepad-status { position: absolute; z-index: 4; right: 12px; bottom: 106px; max-width: calc(100% - 24px); padding: 6px 10px; border: 1px solid #587166; border-radius: 6px; color: #e3eee8; background: #102019ed; font-size: 12px; pointer-events: none; }
+.gamepad-status { position: absolute; z-index: 6; right: 12px; bottom: 106px; max-width: calc(100% - 24px); padding: 6px 10px; border: 1px solid #587166; border-radius: 6px; color: #e3eee8; background: #102019ed; font-size: 12px; pointer-events: none; }
 .gamepad-reticle { position: absolute; z-index: 4; left: 50%; top: 50%; width: 15px; height: 15px; transform: translate(-50%, -50%); border: 2px solid white; border-radius: 50%; box-shadow: 0 0 0 1px #142636, 0 1px 5px #0009; pointer-events: none; }
-.viewport .view-hint.gamepad-hint { display: block; z-index: 4; width: max-content; max-width: calc(100% - 24px); max-height: 88px; overflow-y: auto; white-space: normal; text-overflow: clip; font-size: 12px; line-height: 1.9; text-align: center; }
+.viewport .view-hint.gamepad-hint { display: block; z-index: 6; width: max-content; max-width: calc(100% - 24px); max-height: 88px; overflow-y: auto; white-space: normal; text-overflow: clip; font-size: 12px; line-height: 1.9; text-align: center; }
 .gamepad-hint kbd { display: inline-block; min-width: 22px; padding: 0 5px; border: 1px solid #a2b4ab; border-radius: 5px; background: #203b2e; color: white; font: inherit; font-weight: 700; }
 .gamepad-hint .xbox-a { background: #166534; border-color: #86efac; }
 .gamepad-hint .xbox-b { background: #991b1b; border-color: #fca5a5; }
@@ -188,3 +188,5 @@ button { font:inherit; }
 .gamepad-hint .xbox-y { background: #854d0e; border-color: #fde047; }
 .viewer-shell[data-input-device=gamepad] button:focus { outline: 3px solid #fbbf24; outline-offset: 3px; }
 
+
+@media (max-width: 700px) { .viewer-shell[data-input-device=gamepad] .navigation-switch { top: auto; bottom: 116px; } }

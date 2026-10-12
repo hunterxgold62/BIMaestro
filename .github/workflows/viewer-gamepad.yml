@@ -34,3 +34,26 @@ jobs:
       - run: npm test
       - run: npx tsc --noEmit
       - run: npm run build
+      - name: Install Chromium for controller integration checks
+        run: |
+          npm install --no-save --package-lock=false playwright
+          npx playwright install --with-deps chromium
+      - name: Exercise the viewer with a simulated Xbox controller in Chromium
+        run: |
+          npm run dev -- --port 3000 --host 127.0.0.1 > /tmp/viewer-xbox-server.log 2>&1 &
+          viewer_process=$!
+          trap 'kill "$viewer_process" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://localhost:3000/ > /dev/null; then break; fi
+            sleep 1
+          done
+          if ! VIEWER_TEST_URL=http://localhost:3000 timeout 180s node scripts/test-gamepad-browser.mjs; then
+            tail -100 /tmp/viewer-xbox-server.log
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: xbox-browser-screenshots
+          path: viewer-web/test-results/
+          if-no-files-found: ignore
