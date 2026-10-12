@@ -5,7 +5,7 @@ import { mkdir, readFile } from 'node:fs/promises';
 import * as THREE from 'three';
 import { zipSync, unzipSync, strFromU8 } from 'fflate';
 const require = createRequire(import.meta.url);
-const { chromium } = require('playwright');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const url = process.env.VIEWER_TEST_URL || 'http://localhost:3000';
 const json = value => new TextEncoder().encode(JSON.stringify(value));
 const hash = data => createHash('sha256').update(data).digest('hex');
@@ -40,7 +40,7 @@ const archive = zipSync(files);
 // Real Chromium + a deterministic publication. Only controller hardware is mocked.
 // Camera observations are injected into the dev response and never shipped.
 await mkdir('test-results', { recursive: true });
-const browser = await chromium.launch({ headless: true, args: ['--enable-webgl', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHANNEL ? { channel: process.env.PLAYWRIGHT_CHANNEL } : {}), args: ['--enable-webgl', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
 const errors = []; page.on('pageerror', error => errors.push(error.message));
 page.setDefaultTimeout(20000);
@@ -139,26 +139,78 @@ try {
     await input(); await input({ axes: [.7, 0, 0, 0] }); assert.equal(await device(), 'gamepad'); await input();
     await page.mouse.move(15, 15); await frames(); assert.equal(await device(), 'keyboard');
   });
-  await check('View changes navigation, walking, look, crouch, jump and collisions work; Y toggles flight once per press', async () => {
+  await check('Maquette uses B to crouch, A to jump, RT to select and RS click to cancel', async () => {
     await tap(8); assert.ok((await page.locator('.statusbar').innerText()).includes('MARCHE'));
-    const standing = await state(); await input({ buttons: { 10: 1 } }); assert.ok((await state()).position[1] < standing.position[1]);
+    await frames(25);
+    const standing = await state(); await input({ buttons: { 1: 1 } }); assert.ok((await state()).position[1] < standing.position[1]);
     await input(); await frames(25);
-    const grounded = await state(); await input({ buttons: { 2: 1 } }); assert.ok((await state()).position[1] > grounded.position[1]);
+    const grounded = await state(); await input({ buttons: { 0: 1 } }); assert.ok((await state()).position[1] > grounded.position[1]);
+    assert.equal((await state()).selected, null, 'Jumping must not select an object');
     await input(); await frames(50);
+    await aimAtWall(); await tap(7); assert.equal((await state()).selected, 1);
+    await input({ buttons: { 1: 1 } }); assert.equal((await state()).selected, 1, 'Crouching must not clear selection');
+    await input(); await tap(11); assert.equal((await state()).selected, null);
+    assert.match(await page.locator('.gamepad-hint').innerText(), /LS clic.*Courir.*A.*Sauter.*B.*Accroupir.*RT.*Sélectionner/);
+  });
+  await check('LS click starts sprinting without needing to hold the click; releasing forward stops it', async () => {
+    const movement = async (sprint = false) => {
+      await tap(14); await frames(15);
+      return page.evaluate(async sprint => {
+        const t = window.__viewerTest;
+        const set = (buttons = {}) => { window.__pads[0].axes = [0, -1, 0, 0]; window.__pads[0].buttons = Array.from({ length: 17 }, (_, i) => ({ value: buttons[i] || 0, pressed: !!buttons[i] })); };
+        const frames = count => new Promise(resolve => { const tick = () => --count <= 0 ? resolve() : requestAnimationFrame(tick); requestAnimationFrame(tick); });
+        // Start running, then release the stick click while continuing forward.
+        if (sprint) { set({ 10: 1 }); await frames(2); }
+        set(); const before = t.camera.position.clone(), start = performance.now();
+        await frames(5);
+        const speed = t.camera.position.distanceTo(before) / ((performance.now() - start) / 1000);
+        window.__pads[0].axes = [0, 0, 0, 0]; await frames(4);
+        return speed;
+      }, sprint);
+    };
+    const walk = await movement(), sprint = await movement(true), stopped = await movement();
+    assert.ok(sprint > walk * 1.8, `Sprint must accelerate the camera: walk=${walk}, sprint=${sprint}`);
+    assert.ok(stopped < sprint * .7, `Releasing forward must stop sprint: walk=${stopped}, sprint=${sprint}`);
+  });
+  await check('walking, look and collisions work; Y toggles flight, A/B control height and triggers do not', async () => {
     const facing = await state(); await input({ axes: [0, 0, .6, -.3] }); assert.ok(distance(facing.quaternion, (await state()).quaternion) > .01);
     await input(); await tap(14);
     await input({ axes: [0, -1, 0, 0] }); await frames(160); await input();
     const position = (await state()).position; assert.ok(position[2] > .5 && position[2] < 4.9, 'Walking must approach but not cross the wall: ' + position);
     await input({ buttons: { 3: 1 } }); await frames(20); assert.ok((await page.locator('.statusbar').innerText()).includes('VOL LIBRE'));
     await input();
-    const before = await state(); await input({ buttons: { 7: 1 } }); assert.ok((await state()).position[1] > before.position[1]); await input();
-    const raised = await state(); await input({ buttons: { 6: 1 } }); assert.ok((await state()).position[1] < raised.position[1]); await input();
+    const before = await state(); await input({ buttons: { 0: 1 } }); assert.ok((await state()).position[1] > before.position[1]); await input();
+    const raised = await state(); await input({ buttons: { 1: 1 } }); assert.ok((await state()).position[1] < raised.position[1]); await input();
+    const neutral = await state(); await input({ buttons: { 6: 1, 7: 1 } });
+    assert.ok(Math.abs((await state()).position[1] - neutral.position[1]) < 1e-6, 'Triggers must not move vertically'); await input();
+  });
+  await check('maquette tool prompts use RT, which places a measure; RS click cancels it', async () => {
+    await tap(9);
+    await page.getByRole('button', { name: 'Mesurer', exact: true }).evaluate(button => button.focus()); await tap(0);
+    assert.match(await page.locator('.measure-controls').textContent(), /appuyez sur RT/);
+    assert.match(await page.locator('.measure-controls').textContent(), /RS clic pour annuler/);
+    await aimAtWall(); await tap(7); assert.ok(await page.locator('.measure-label').count() > 0);
+    await tap(11); assert.equal(await page.locator('.measure-label').count(), 0);
+    await page.locator('.measure-controls').getByRole('button', { name: 'Fermer', exact: true }).click(); await input();
   });
   await check('holding A on the menu ascent button raises the camera', async () => {
     await tap(9); await page.getByRole('button', { name: 'Monter', exact: true }).evaluate(button => button.focus());
     const before = await state(); await input({ buttons: { 0: 1 } });
     assert.ok((await state()).position[1] > before.position[1], 'Controller menu ascent must behave like the pointer button');
     await input(); await tap(1);
+  });
+  await check('maquette RT places a cut; LB + RT adjusts it without selecting or moving the camera', async () => {
+    await aimAtWall(); await tap(9);
+    await page.locator('.view-toolbar').getByRole('button', { name: /^Coupe/ }).evaluate(button => button.focus()); await tap(0);
+    const panel = page.locator('.section-controls');
+    assert.match(await panel.locator('[role=status]').textContent(), /appuyez sur RT\. RS clic pour annuler/);
+    await tap(7);
+    const offset = await panel.locator('output').innerText(), before = await state();
+    await input({ buttons: { 4: 1, 7: 1 } }); await input();
+    assert.notEqual(await panel.locator('output').innerText(), offset);
+    assert.equal((await state()).selected, before.selected, 'Cut adjustment must not select an object');
+    assert.ok(distance(before.position, (await state()).position) < 1e-6, 'Cut adjustment must not move the camera');
+    await panel.getByRole('button', { name: 'Tout réafficher', exact: true }).click(); await input();
   });
   await check('disconnect during flight stops input and restores keyboard hints', async () => {
     await input({ axes: [.7, 0, 0, 0] }); await input({ connected: false });
@@ -196,6 +248,11 @@ try {
     assert.ok(await page.evaluate(() => { const r = document.querySelector('.three-mount canvas').getBoundingClientRect(); return !!document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.closest('.three-mount'); }));
     await page.screenshot({ path: 'test-results/xbox-narrow-aiming.png' });
     await tap(1); assert.ok(await page.locator('.section-controls').isVisible());
+    await tap(8);
+    const walkingHint = await page.locator('.gamepad-hint').boundingBox(), navigation = await page.locator('.navigation-switch').boundingBox();
+    assert.ok(walkingHint.x >= 0 && walkingHint.x + walkingHint.width <= 640 && walkingHint.y + walkingHint.height <= 800);
+    assert.ok(navigation.y + navigation.height <= walkingHint.y || walkingHint.y + walkingHint.height <= navigation.y, 'Maquette help must not cover navigation');
+    await page.screenshot({ path: 'test-results/xbox-maquette-narrow.png' });
   });
   assert.deepEqual(errors, [], 'No browser runtime errors');
   console.log(checks.length + ' browser integration checks passed.');

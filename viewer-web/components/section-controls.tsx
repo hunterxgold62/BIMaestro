@@ -5,10 +5,11 @@ import { Slider } from '@/components/ui/slider';
 import { maximumSections, type FaceSection } from '@/lib/mep-section';
 
 type Props = {
-  gamepad?: boolean; value: FaceSection[]; selected: string | null; picking: boolean; extent: number;
+  gamepad?: boolean; gamepadMode?: 'orbit' | 'maquette'; value: FaceSection[]; selected: string | null; picking: boolean; extent: number;
   onChange: (value: FaceSection[]) => void; onSelect: (id: string | null) => void; onPick: (picking: boolean) => void;
 };
-export function SectionControls({ gamepad = false, value, selected, picking, extent, onChange, onSelect, onPick }: Props) {
+export function SectionControls({ gamepad = false, gamepadMode = 'orbit', value, selected, picking, extent, onChange, onSelect, onPick }: Props) {
+  const confirm = gamepadMode === 'maquette' ? 'RT' : 'A', cancel = gamepadMode === 'maquette' ? 'RS clic' : 'B';
   const active = value.find(item => item.id === selected);
   const update = (change: Partial<FaceSection>) => onChange(value.map(item => item.id === selected ? { ...item, ...change } : item));
   return <section className="section-controls" aria-label="Coupes de la maquette">
@@ -16,7 +17,7 @@ export function SectionControls({ gamepad = false, value, selected, picking, ext
       <Button size="sm" variant="ghost" disabled={!value.length} onClick={() => { onChange([]); onSelect(null); onPick(false); }}>Tout réafficher</Button></div>
     <Button aria-pressed={picking} disabled={value.length >= maximumSections && !picking}
       onClick={() => onPick(!picking)}>{picking ? 'Annuler la sélection' : gamepad ? '+ Viser une face' : '+ Cliquer une face'}</Button>
-    <p role="status">{picking ? (gamepad ? 'Visez une face et appuyez sur A. B pour annuler. La coupe suit son orientation.' : 'Cliquez une face du bâtiment. La coupe suit son orientation.') : 'Ajoutez plusieurs faces pour isoler la zone à examiner.'}</p>
+    <p role="status">{picking ? (gamepad ? `Visez une face et appuyez sur ${confirm}. ${cancel} pour annuler. La coupe suit son orientation.` : 'Cliquez une face du bâtiment. La coupe suit son orientation.') : 'Ajoutez plusieurs faces pour isoler la zone à examiner.'}</p>
     <p className="section-shortcut"><strong>{gamepad ? 'LB + LT / RT' : 'Ctrl + molette'}</strong><span>Déplacer la coupe sélectionnée avec précision.</span></p>
     {value.length > 0 && <div className="section-list" role="group" aria-label="Choisir une coupe">
       {value.map(item => <Button key={item.id} size="sm" variant={item.id === selected ? 'default' : 'outline'} aria-pressed={item.id === selected}

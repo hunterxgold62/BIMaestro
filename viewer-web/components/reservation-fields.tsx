@@ -18,7 +18,8 @@ function DistanceField({ mark, dimension, onChange }: { mark: Markup; dimension:
   </div>;
 }
 
-export function ReservationFields({ gamepad = false, mark, lots, onChange, picking, onPick, onManageLots }: { gamepad?: boolean; mark: Markup; lots: LotOption[]; onChange: (mark: Markup) => void; picking: boolean; onPick: () => void; onManageLots: () => void }) {
+export function ReservationFields({ gamepad = false, gamepadMode = 'orbit', mark, lots, onChange, picking, onPick, onManageLots }: { gamepad?: boolean; gamepadMode?: 'orbit' | 'maquette'; mark: Markup; lots: LotOption[]; onChange: (mark: Markup) => void; picking: boolean; onPick: () => void; onManageLots: () => void }) {
+  const confirm = gamepadMode === 'maquette' ? 'RT' : 'A', cancel = gamepadMode === 'maquette' ? 'RS clic' : 'B';
   return <>
     <label>Forme<select value={mark.shape || 'rectangle'} onChange={event => onChange({ ...mark, shape: event.target.value as Markup['shape'], diameterCm: mark.diameterCm || mark.widthCm })}><option value="rectangle">Rectangulaire</option><option value="round">Ronde · carottage</option></select></label>
     <label>Lot<select value={mark.lot || 'MEP'} onChange={event => onChange({ ...mark, lot: event.target.value })}>{lots.map(lot => <option key={lot.id} value={lot.id}>{lot.name}</option>)}</select></label>
@@ -27,7 +28,7 @@ export function ReservationFields({ gamepad = false, mark, lots, onChange, picki
     <div className="reservation-dimensions"><strong>Cotations de position</strong><p>Distance perpendiculaire entre l’axe de la réservation, sur sa face de pose, et un sol ou un mur. Une cote appliquée déplace la réservation sur sa face ; les autres cotes sont recalculées.</p>
       {(mark.dimensions || []).map(dimension => <DistanceField key={dimension.id} mark={mark} dimension={dimension} onChange={onChange}/>)}
       <button type="button" disabled={(mark.dimensions?.length || 0) >= 3 && !picking} onClick={onPick}>{picking ? 'Annuler le choix de face' : 'Ajouter une cote · choisir une face'}</button>
-      {picking && <p role="status">{gamepad ? 'Visez la face du sol ou du mur de référence et appuyez sur A. B pour annuler.' : 'Cliquez sur la face du sol ou du mur de référence dans la maquette. Échap pour annuler.'}</p>}
+      {picking && <p role="status">{gamepad ? `Visez la face du sol ou du mur de référence et appuyez sur ${confirm}. ${cancel} pour annuler.` : 'Cliquez sur la face du sol ou du mur de référence dans la maquette. Échap pour annuler.'}</p>}
     </div>
   </>;
 }

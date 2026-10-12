@@ -2,6 +2,7 @@
 // Ignore unknown mappings rather than guessing axes or triggering wrong actions.
 export type Pad = Pick<Gamepad, 'id' | 'index' | 'connected' | 'mapping' | 'axes' | 'buttons'>;
 export const xbox = { a: 0, b: 1, x: 2, y: 3, lb: 4, rb: 5, lt: 6, rt: 7, view: 8, menu: 9, ls: 10, rs: 11, up: 12, down: 13, left: 14, right: 15 } as const;
+export const maquetteXbox = { select: xbox.rt, cancel: xbox.rs, jump: xbox.a, crouch: xbox.b, sprint: xbox.ls, interact: xbox.x } as const;
 export type PadInput = {
   name: string | null;
   moveX: number; moveY: number; lookX: number; lookY: number; vertical: number;
@@ -16,6 +17,21 @@ export function stick(x = 0, y = 0, deadZone = .18): [number, number] {
 }
 const trigger = (value = 0) => Number.isFinite(value) ? Math.max(0, Math.min(1, (value - .08) / .92)) : 0;
 const idle = (name: string | null = null): PadInput => ({ name, moveX: 0, moveY: 0, lookX: 0, lookY: 0, vertical: 0, held: [], tapped: [], active: false });
+
+// Clicking LS starts a run until the player releases forward or crouches.
+// A/B control height in flight; the triggers remain available for targeting.
+export class MepWalkGamepad {
+  private sprinting = false;
+  read(input: PadInput, enabled = true, flying = false) {
+    const crouch = enabled && !flying && !!input.held[maquetteXbox.crouch];
+    if (!enabled || input.moveY >= -.18 || crouch) this.sprinting = false;
+    else if (input.tapped[maquetteXbox.sprint]) this.sprinting = true;
+    return {
+      sprint: this.sprinting, crouch,
+      vertical: enabled && flying ? Number(!!input.held[xbox.a]) - Number(!!input.held[xbox.b]) : 0,
+    };
+  }
+}
 
 export class MepGamepad {
   private key: string | null = null;

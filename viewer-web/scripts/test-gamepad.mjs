@@ -1,10 +1,39 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MepGamepad, stick, xbox, readBrowserPads } from '../lib/mep-gamepad.ts';
+import { MepGamepad, MepWalkGamepad, stick, xbox, readBrowserPads } from '../lib/mep-gamepad.ts';
 
 function pad({ index = 0, id = 'Xbox Wireless Controller', mapping = 'standard', connected = true, axes = [0, 0, 0, 0], buttons = {} } = {}) {
   return { index, id, mapping, connected, axes, buttons: Array.from({ length: 17 }, (_, i) => ({ value: buttons[i] || 0, pressed: (buttons[i] || 0) > .5 })) };
 }
+
+test('clicking the left stick while advancing starts sprinting until forward is released', () => {
+  const reader = new MepGamepad(), walk = new MepWalkGamepad();
+  const read = (options, enabled = true) => walk.read(reader.read([pad(options)]), enabled);
+  read({});
+  assert.equal(read({ axes: [0, -1, 0, 0] }).sprint, false);
+  assert.equal(read({ axes: [0, -1, 0, 0], buttons: { [xbox.ls]: 1 } }).sprint, true);
+  assert.equal(read({ axes: [0, -1, 0, 0] }).sprint, true, 'Releasing the click keeps sprint active');
+  assert.equal(read({ axes: [1, 0, 0, 0] }).sprint, false, 'Strafing alone stops sprint');
+  assert.equal(read({ axes: [0, -1, 0, 0] }).sprint, false, 'Forward alone does not restart sprint');
+  assert.equal(read({ axes: [0, -1, 0, 0], buttons: { [xbox.ls]: 1 } }).sprint, true);
+  const crouching = read({ axes: [0, -1, 0, 0], buttons: { [xbox.b]: 1 } });
+  assert.equal(crouching.crouch, true); assert.equal(crouching.sprint, false);
+  assert.equal(read({ axes: [0, -1, 0, 0], buttons: { [xbox.ls]: 1 } }).sprint, true);
+  assert.equal(read({ axes: [0, -1, 0, 0] }, false).sprint, false, 'Menus and focus changes stop sprint');
+});
+
+test('flight uses A/B for height while triggers remain available to target objects', () => {
+  const reader = new MepGamepad(), walk = new MepWalkGamepad(); reader.read([pad()]);
+  const read = (buttons, flying = true, enabled = true) => walk.read(reader.read([pad({ buttons })]), enabled, flying);
+  assert.equal(read({ [xbox.rt]: 1 }).vertical, 0);
+  assert.equal(read({ [xbox.lt]: 1 }).vertical, 0);
+  assert.equal(read({ [xbox.a]: 1 }).vertical, 1);
+  const descending = read({ [xbox.b]: 1 }); assert.equal(descending.vertical, -1); assert.equal(descending.crouch, false);
+  assert.equal(read({ [xbox.a]: 1, [xbox.b]: 1 }).vertical, 0);
+  assert.equal(read({ [xbox.a]: 1 }, true, false).vertical, 0);
+  assert.equal(read({ [xbox.a]: 1 }, false).vertical, 0);
+  assert.equal(read({ [xbox.b]: 1 }, false).crouch, true);
+});
 test('stick drift is ignored; analog strength and diagonal speed are bounded', () => {
   assert.deepEqual(stick(.1, -.1), [0, 0]);
   assert.deepEqual(stick(NaN, 1), [0, 0]);
