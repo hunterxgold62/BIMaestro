@@ -1629,7 +1629,7 @@ export function MepViewer() {
   };
   const draftIsHost = isReservationHost(viewerPackage?.properties.find(property => property.key === draftMarkup?.elementKey));
   const activeMark = allMarkups.find(item => item.id === activeMarkup);
-  return <><main className="viewer-shell" data-input-device={inputDevice} inert={opening}>
+  return <><main className="viewer-shell" data-input-device={inputDevice} data-gamepad-aiming={inputDevice === 'gamepad' && !gamepadMenu && (pickingMeasure || pickingSection || pickingDimension || !!relocating)} inert={opening}>
     {draftMarkup && <section className="markup-editor" aria-label="Modifier l’annotation">
         <strong>{draftMarkup.kind === 'note' ? 'Annotation' : 'Réservation'}</strong>
         <p>{draftMarkup.elementName}</p>

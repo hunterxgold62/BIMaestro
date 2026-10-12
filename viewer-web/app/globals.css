@@ -194,3 +194,7 @@ button { font:inherit; }
   .viewer-shell[data-input-device=gamepad] .navigation-switch { top: auto; bottom: 212px; }
   .viewer-shell[data-input-device=gamepad] .gamepad-status { bottom: 256px; }
 }
+
+/* Keep the aimed face visible while placing a controller measurement or cut.
+   Menu restores the tool panels; finishing or cancelling restores them too. */
+.viewer-shell[data-gamepad-aiming=true] :is(.measure-controls, .section-controls, .markup-editor) { visibility: hidden; }

@@ -189,6 +189,13 @@ try {
     const lot = await page.locator('.reservation-lot-toolbar').boundingBox();
     assert.ok(lot.y + lot.height <= h.y || h.y + h.height <= lot.y, 'Lots toolbar must not cover controller help');
     await page.screenshot({ path: 'test-results/xbox-narrow.png' });
+    await tap(9);
+    await page.locator('.section-controls').getByRole('button', { name: '+ Viser une face', exact: true }).evaluate(button => button.focus());
+    await tap(0);
+    assert.equal(await page.locator('.section-controls').isVisible(), false, 'The pointing panel must not hide the aimed face');
+    assert.ok(await page.evaluate(() => { const r = document.querySelector('.three-mount canvas').getBoundingClientRect(); return !!document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.closest('.three-mount'); }));
+    await page.screenshot({ path: 'test-results/xbox-narrow-aiming.png' });
+    await tap(1); assert.ok(await page.locator('.section-controls').isVisible());
   });
   assert.deepEqual(errors, [], 'No browser runtime errors');
   console.log(checks.length + ' browser integration checks passed.');
