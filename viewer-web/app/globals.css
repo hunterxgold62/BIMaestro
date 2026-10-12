@@ -198,3 +198,13 @@ button { font:inherit; }
 /* Keep the aimed face visible while placing a controller measurement or cut.
    Menu restores the tool panels; finishing or cancelling restores them too. */
 .viewer-shell[data-gamepad-aiming=true] :is(.measure-controls, .section-controls, .markup-editor) { visibility: hidden; }
+.viewer-shell[data-input-device=gamepad] :is(input,textarea,select,summary,[role=slider],a):focus { outline: 3px solid #fbbf24; outline-offset: 3px; }
+.gamepad-field-editor { position: fixed; z-index: 100; left: 50%; bottom: 18px; transform: translateX(-50%); width: min(620px,calc(100vw - 24px)); max-height: calc(100dvh - 36px); overflow: auto; padding: 18px; border: 2px solid #86efac; border-radius: 14px; background: #102019; color: #f1f8f4; box-shadow: 0 0 0 100vmax #0008; font-size: 14px; }
+.gamepad-field-editor header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.gamepad-field-editor button { padding: 9px; border: 1px solid #748e80; border-radius: 6px; color: white; background: #244a36; min-height: 38px; cursor: pointer; }
+.gamepad-field-editor p { margin: 12px 0; }.gamepad-field-editor [role=alert] { color: #fca5a5; }
+.gamepad-field-value { display: block; margin: 12px 0; padding: 12px; min-height: 48px; border: 2px solid #748e80; border-radius: 6px; background: #091910; white-space: pre-wrap; overflow-wrap: anywhere; }
+.gamepad-keyboard { display: grid; grid-template-columns: repeat(10,minmax(0,1fr)); gap: 6px; }.gamepad-keyboard.numeric { grid-template-columns: repeat(4,minmax(0,1fr)); }
+.gamepad-keyboard-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.gamepad-palette { display: grid; grid-template-columns: repeat(10,minmax(0,1fr)); gap: 6px; margin: 12px 0; }
+@media(max-width:700px) { .gamepad-field-editor { padding: 12px; bottom: 8px; }.gamepad-keyboard { gap: 4px; }.gamepad-field-editor button { padding: 7px 4px; }.viewer-shell[data-input-device=gamepad] .lots-panel { z-index: 55; } }

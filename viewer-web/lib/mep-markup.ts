@@ -57,6 +57,18 @@ export function markupQuaternion(normal: [number, number, number]) {
   return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z));
 }
 
+export function editMarkupOnFace(mark: Markup, xCm: number, yCm: number, mode: 'translate' | 'scale'): Markup {
+  if (!Number.isFinite(xCm) || !Number.isFinite(yCm)) return mark;
+  if (mode === 'translate') {
+    const move = new THREE.Vector3(xCm / 30.48, yCm / 30.48, 0).applyQuaternion(markupQuaternion(mark.normal));
+    return { ...mark, position: new THREE.Vector3(...mark.position).add(move).toArray() };
+  }
+  if (mark.kind !== 'reservation') return mark;
+  const size = (n: number) => Math.round(THREE.MathUtils.clamp(n, 1, 1000) * 10) / 10;
+  return mark.shape === 'round' ? { ...mark, diameterCm: size((mark.diameterCm || mark.widthCm) + xCm + yCm) }
+    : { ...mark, widthCm: size(mark.widthCm + xCm), heightCm: size(mark.heightCm + yCm) };
+}
+
 export function markupObject(mark: Markup, options: { color?: string; showDimensions?: boolean } = {}) {
   const group = new THREE.Group();
   group.position.set(...mark.position);

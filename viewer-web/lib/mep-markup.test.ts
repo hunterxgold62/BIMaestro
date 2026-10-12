@@ -1,9 +1,26 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { markupObject, markupQuaternion, disposeMarkups, dimensionDistance, moveToDimension, reservationGeometry, type Markup } from './mep-markup';
+import { markupObject, markupQuaternion, disposeMarkups, dimensionDistance, moveToDimension, reservationGeometry, editMarkupOnFace, type Markup } from './mep-markup';
 
 const mark: Markup = { id: '12345678-1234-1234-1234-123456789012', kind: 'reservation', elementKey: 'wall-1', elementName: 'Mur', position: [10, 20, 30], normal: [0, 0, 1], text: '', widthCm: 60, heightCm: 40, depthCm: 30, modelRevision: 1 };
 describe('3D markups', () => {
+  it('moves controller edits along wall and floor faces without changing depth or anchors', () => {
+    for (const normal of [[0, 0, 1], [0, 1, 0], [Math.SQRT1_2, 0, Math.SQRT1_2]] as [number, number, number][]) {
+      const original = { ...mark, normal }, moved = editMarkupOnFace(original, 10, -20, 'translate');
+      const change = new THREE.Vector3(...moved.position).sub(new THREE.Vector3(...original.position));
+      expect(change.dot(new THREE.Vector3(...normal))).toBeCloseTo(0);
+      expect(change.length() * 30.48).toBeCloseTo(Math.hypot(10, 20));
+      expect(moved.depthCm).toBe(mark.depthCm); expect(moved.normal).toEqual(normal);
+      expect(original.position).toEqual(mark.position);
+    }
+  });
+  it('bounds controller resizing and preserves circular bores', () => {
+    const resized = editMarkupOnFace(mark, 5, -10, 'scale');
+    expect(resized.widthCm).toBe(65); expect(resized.heightCm).toBe(30); expect(resized.position).toEqual(mark.position);
+    expect(editMarkupOnFace(mark, -10000, 10000, 'scale')).toMatchObject({ widthCm: 1, heightCm: 1000 });
+    expect(editMarkupOnFace({ ...mark, shape: 'round', diameterCm: 40 }, 5, 5, 'scale').diameterCm).toBe(50);
+    expect(editMarkupOnFace({ ...mark, kind: 'note' }, 5, 5, 'scale').widthCm).toBe(60);
+  });
   it('hides reservation dimension lines by default and shows them only when requested', () => {
     const dimension = { id: 'floor', elementKey: 'floor', elementName: 'Sol', point: [0, 0, 0] as [number, number, number], normal: [0, 1, 0] as [number, number, number] };
     const marked = { ...mark, dimensions: [dimension] };

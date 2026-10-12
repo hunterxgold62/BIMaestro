@@ -52,13 +52,17 @@ await page.route('**/components/mep-viewer.tsx*', async route => {
   const response = await route.fetch(); let body = await response.text();
   const marker = 'controlsRef.current = controls;';
   assert.ok(body.includes(marker), 'The test must observe the real viewer module');
-  body = body.replace(marker, marker + ` window.__viewerTest = { camera, controls, get selected() { return selectedIndexRef.current; } };`);
+  body = body.replace(marker, marker + ` window.__viewerTest = { camera, controls, elapsed: 0, get selected() { return selectedIndexRef.current; }, get draft() { return draftRef.current; } };`);
+  assert.ok(body.includes('previousFrameTime = now;'), 'The test must observe simulated frame time');
+  body = body.replace('previousFrameTime = now;', 'previousFrameTime = now; window.__viewerTest.elapsed += delta;');
   await route.fulfill({ response, body });
 });
 const scenario = { revision: 1, state: { valves: {}, sources: {}, markups: {} } };
 await page.routeWebSocket('**', socket => socket.close());
 await page.route('**/mep-share', async route => {
-  const action = route.request().postDataJSON().action;
+  const request = route.request().postDataJSON(), action = request.action;
+  if (action === 'markup') { if (request.remove) delete scenario.state.markups[request.markup.id]; else scenario.state.markups[request.markup.id] = request.markup; scenario.revision++; }
+  if (action === 'reservation-lot') { scenario.state.reservationLots ??= {}; scenario.state.reservationLots[request.id] = request.lot; scenario.revision++; }
   await route.fulfill({ json: action === 'resolve' ? { publication: { id: 'xbox-test', name: 'Maquette de validation', revision: 1 }, role: 'editor', packageUrl: url + '/gamepad.zip', scenario, events: [], realtimeToken: '' } : { scenario } });
 });
 await page.route('**/gamepad.zip', route => route.fulfill({ body: Buffer.from(archive) }));
@@ -68,6 +72,34 @@ const input = async ({ axes = [0, 0, 0, 0], buttons = {}, connected = true } = {
   await frames();
 };
 const tap = async index => { await input(); await input({ buttons: { [index]: 1 } }); await input(); };
+const quickTap = index => page.evaluate(async index => {
+  const frames = n => new Promise(resolve => { const tick = () => --n <= 0 ? resolve() : requestAnimationFrame(tick); requestAnimationFrame(tick); });
+  const buttons = value => { window.__pads[0].axes = [0, 0, 0, 0]; window.__pads[0].buttons = Array.from({ length: 17 }, (_, i) => ({ value: i === index ? value : 0, pressed: i === index && !!value })); };
+  buttons(0); await frames(2); buttons(1); await frames(3); buttons(0); await frames(3);
+}, index);
+const controllerFocus = async locator => {
+  assert.equal(await locator.count(), 1, 'The requested controller target must exist');
+  for (let count = 0; count < 160; count++) {
+    if (await locator.evaluate(element => element === document.activeElement)) return;
+    const keyboard = await page.locator('.gamepad-field-editor').count();
+    const backward = keyboard && await locator.evaluate(target => {
+      const buttons = Array.from(target.closest('.gamepad-field-editor').querySelectorAll('button:not(:disabled)'));
+      const from = buttons.indexOf(document.activeElement), to = buttons.indexOf(target), size = buttons.length;
+      return (from - to + size) % size < (to - from + size) % size;
+    });
+    await quickTap(keyboard ? backward ? 4 : 5 : 13);
+  }
+  throw new Error('Controller navigation could not reach ' + await locator.evaluate(element => element.outerHTML.slice(0, 200)));
+};
+const controllerClick = async locator => { await controllerFocus(locator); await quickTap(0); };
+const controllerText = async (field, value) => {
+  await controllerClick(field);
+  const keyboard = page.locator('.gamepad-field-editor'); await keyboard.waitFor();
+  await controllerClick(keyboard.getByRole('button', { name: 'Tout effacer', exact: true }));
+  for (const key of value) await controllerClick(keyboard.getByRole('button', { name: key, exact: true }));
+  await controllerClick(keyboard.getByRole('button', { name: 'Valider', exact: true }));
+  await keyboard.waitFor({ state: 'hidden' });
+};
 const device = () => page.locator('main').getAttribute('data-input-device');
 const state = () => page.evaluate(() => ({ position: window.__viewerTest.camera.position.toArray(), quaternion: window.__viewerTest.camera.quaternion.toArray(), selected: window.__viewerTest.selected }));
 const distance = (a, b) => Math.hypot(...a.map((v, i) => v - b[i]));
@@ -77,7 +109,8 @@ const aimAtWall = async () => {
   await frames();
 };
 const checks = [];
-async function check(name, run) { await run(); checks.push(name); console.log('PASS', name); }
+let uiPhase = false;
+async function check(name, run) { if (process.env.GAMEPAD_UI_ONLY && !uiPhase) return; await run(); checks.push(name); console.log('PASS', name); }
 try {
   await page.goto(url + '/#/share/' + 'a'.repeat(64));
   await page.bringToFront();
@@ -130,6 +163,10 @@ try {
     await input({ buttons: { 4: 1, 7: 1 } }); await input();
     assert.notEqual(await panel.locator('output').innerText(), offset);
     assert.ok(distance(before.position, (await state()).position) < 1e-6, 'Cut adjustment must not zoom the camera');
+    await tap(9); await controllerFocus(panel.getByRole('slider'));
+    const sliderOffset = await panel.locator('output').innerText(); await quickTap(15);
+    assert.notEqual(await panel.locator('output').innerText(), sliderOffset, 'Controller navigation must adjust the cut slider');
+    await tap(1);
     await panel.getByRole('button', { name: 'Tout réafficher', exact: true }).click(); await input();
   });
   await check('keyboard takeover preserves focus and requires neutral controller before resuming', async () => {
@@ -157,13 +194,14 @@ try {
       await tap(14); await frames(15);
       return page.evaluate(async sprint => {
         const t = window.__viewerTest;
+        t.camera.lookAt(t.camera.position.x + 10, t.camera.position.y, t.camera.position.z);
         const set = (buttons = {}) => { window.__pads[0].axes = [0, -1, 0, 0]; window.__pads[0].buttons = Array.from({ length: 17 }, (_, i) => ({ value: buttons[i] || 0, pressed: !!buttons[i] })); };
         const frames = count => new Promise(resolve => { const tick = () => --count <= 0 ? resolve() : requestAnimationFrame(tick); requestAnimationFrame(tick); });
         // Start running, then release the stick click while continuing forward.
         if (sprint) { set({ 10: 1 }); await frames(2); }
-        set(); const before = t.camera.position.clone(), start = performance.now();
+        set(); const before = t.camera.position.clone(), start = t.elapsed;
         await frames(5);
-        const speed = t.camera.position.distanceTo(before) / ((performance.now() - start) / 1000);
+        const speed = t.camera.position.distanceTo(before) / (t.elapsed - start);
         window.__pads[0].axes = [0, 0, 0, 0]; await frames(4);
         return speed;
       }, sprint);
@@ -253,6 +291,122 @@ try {
     assert.ok(walkingHint.x >= 0 && walkingHint.x + walkingHint.width <= 640 && walkingHint.y + walkingHint.height <= 800);
     assert.ok(navigation.y + navigation.height <= walkingHint.y || walkingHint.y + walkingHint.height <= navigation.y, 'Maquette help must not cover navigation');
     await page.screenshot({ path: 'test-results/xbox-maquette-narrow.png' });
+  });
+  uiPhase = true;
+  await page.setViewportSize({ width: 1440, height: 960 }); await input();
+  if (!((await page.locator('.statusbar').innerText()).includes('NAVIGATION WEB'))) await quickTap(8);
+  await check('controller navigation reaches lists, checkboxes and expandable inspection sections', async () => {
+    await aimAtWall(); await quickTap(0); await quickTap(9);
+    const lot = page.getByRole('combobox', { name: 'Lot actif', exact: true }); await controllerFocus(lot);
+    const previous = await lot.inputValue(), camera = await state(); await quickTap(14);
+    assert.notEqual(await lot.inputValue(), previous, 'Left changes the selected lot');
+    assert.ok(distance(camera.position, (await state()).position) < 1e-6, 'Editing a list must not move the camera');
+    const checkbox = page.getByRole('checkbox', { name: 'Masquer les autres lots' }); await controllerClick(checkbox);
+    assert.equal(await checkbox.isChecked(), true); await quickTap(0); assert.equal(await checkbox.isChecked(), false);
+    const summary = page.locator('.inspection-card summary').first(); await controllerClick(summary);
+    assert.equal(await summary.evaluate(element => element.parentElement.open), false);
+    await quickTap(0); assert.equal(await summary.evaluate(element => element.parentElement.open), true);
+    await quickTap(9); await quickTap(1);
+  });
+  await check('controller-only reservation creation reaches every field and edits numbers, shape and comment', async () => {
+    await aimAtWall(); await quickTap(5);
+    await controllerClick(page.locator('.element-context-menu').getByRole('button', { name: 'Créer une réservation ici', exact: true }));
+    const editor = page.locator('.markup-editor'); await editor.waitFor();
+    const width = editor.getByLabel('Largeur (cm)', { exact: true }); await controllerFocus(width);
+    const before = Number(await width.inputValue()); await quickTap(15); assert.ok(Number(await width.inputValue()) > before);
+    await controllerText(width, '75'); assert.equal(await width.inputValue(), '75');
+    const shape = editor.getByLabel('Forme', { exact: true }); await controllerFocus(shape); await quickTap(15);
+    assert.equal(await shape.inputValue(), 'round');
+    await controllerText(editor.getByLabel('Diamètre (cm)', { exact: true }), '50');
+    await controllerFocus(shape); await quickTap(14); assert.equal(await shape.inputValue(), 'rectangle');
+    await controllerText(editor.getByLabel('Commentaire (facultatif)', { exact: true }), 'test');
+    assert.equal(await editor.locator('textarea').inputValue(), 'test');
+    await quickTap(8);
+    const appearance = page.locator('.appearance-toolbar button').first(), appearanceBefore = await appearance.innerText();
+    await controllerClick(appearance); assert.notEqual(await appearance.innerText(), appearanceBefore, 'View must make other panels reachable during editing');
+    await quickTap(8);
+    await page.screenshot({ path: 'test-results/xbox-reservation-fields.png' });
+  });
+  await check('controller-only lot creation includes text, color, save and return to the reservation', async () => {
+    await controllerClick(page.locator('.markup-editor').getByRole('button', { name: 'Gérer / créer un lot', exact: true }));
+    const lots = page.locator('.lots-panel'); await controllerClick(lots.getByRole('button', { name: '+ Nouveau lot', exact: true }));
+    await controllerText(lots.getByLabel('Nom du lot', { exact: true }), 'essai');
+    await controllerClick(lots.getByLabel('Couleur du lot', { exact: true }));
+    const keyboard = page.locator('.gamepad-field-editor');
+    await controllerClick(keyboard.getByRole('button', { name: '#16a34a', exact: true }));
+    await controllerClick(keyboard.getByRole('button', { name: 'Valider', exact: true }));
+    assert.equal(await lots.getByLabel('Couleur du lot', { exact: true }).inputValue(), '#16a34a');
+    await controllerClick(lots.getByRole('button', { name: 'Créer le lot', exact: true }));
+    await page.waitForFunction(() => window.__viewerTest.draft?.lot && document.querySelector('.lots-panel input')?.value === 'essai');
+    assert.ok(Object.values(scenario.state.reservationLots).some(lot => lot.name === 'essai' && lot.color === '#16a34a'));
+    await quickTap(1); assert.equal(await lots.count(), 0); assert.ok(await page.locator('.markup-editor').isVisible());
+  });
+  await check('controller moves and resizes a reservation on its face while the camera stays still', async () => {
+    await controllerClick(page.locator('.markup-editor').getByRole('button', { name: 'Déplacer', exact: true }));
+    assert.equal(await page.locator('.markup-editor').isVisible(), false, 'The editor must not obscure the manipulated reservation');
+    const camera = await state(), draft = await page.evaluate(() => window.__viewerTest.draft);
+    await input({ axes: [1, 0, 0, 0] }); await input();
+    let moved = await page.evaluate(() => window.__viewerTest.draft);
+    assert.ok(moved.position[0] > draft.position[0]); assert.ok(Math.abs(moved.position[2] - draft.position[2]) < 1e-8);
+    assert.ok(distance(camera.position, (await state()).position) < 1e-6, 'Editing must not walk or pan the camera');
+    const beforeNudge = moved.position; await quickTap(15); moved = await page.evaluate(() => window.__viewerTest.draft);
+    assert.ok(Math.abs((moved.position[0] - beforeNudge[0]) * 30.48 - 1) < 1e-6, 'D-pad nudges by 1 cm');
+    await quickTap(2); const width = moved.widthCm;
+    await input({ axes: [1, -1, 0, 0] }); await input();
+    const resized = await page.evaluate(() => window.__viewerTest.draft);
+    assert.ok(resized.widthCm > width && resized.heightCm > moved.heightCm);
+    assert.deepEqual(resized.position, moved.position);
+    await quickTap(9); assert.ok(await page.locator('.markup-editor').isVisible());
+    assert.equal(Number(await page.locator('.markup-editor').getByLabel('Largeur (cm)', { exact: true }).inputValue()), resized.widthCm);
+  });
+  await check('cancelling a dimension target preserves the draft; picking a floor adds a working distance field', async () => {
+    const pick = page.locator('.markup-editor').getByRole('button', { name: 'Ajouter une cote · choisir une face', exact: true });
+    await controllerClick(pick); await quickTap(1);
+    assert.ok(await page.evaluate(() => !!window.__viewerTest.draft), 'Cancelling a target must keep the reservation');
+    await quickTap(9); await controllerClick(pick);
+    await page.evaluate(() => { const t = window.__viewerTest; t.camera.position.set(0, 8, 5); t.controls.target.set(0, 0, 5); t.camera.lookAt(t.controls.target); t.controls.update(); }); await frames();
+    await quickTap(0); await quickTap(9);
+    const distanceField = page.locator('.reservation-dimension input'); assert.equal(await distanceField.count(), 1);
+    await controllerFocus(distanceField); const before = Number(await distanceField.inputValue()); await quickTap(15); await quickTap(13);
+    assert.ok(Number(await distanceField.inputValue()) > before);
+    await controllerClick(page.locator('.markup-editor').getByRole('button', { name: 'Enregistrer', exact: true }));
+    await page.waitForFunction(() => !window.__viewerTest.draft);
+    const saved = Object.values(scenario.state.markups)[0]; assert.equal(saved.text, 'test'); assert.equal(saved.dimensions.length, 1);
+    assert.ok(saved.widthCm > 75); assert.ok(saved.heightCm > 40);
+  });
+  await check('controller reaches reservation exports and analysis filters without a mouse', async () => {
+    await controllerClick(page.locator('.view-toolbar').getByRole('button', { name: /^Annotation et Résa/ }));
+    const download = page.waitForEvent('download');
+    await controllerClick(page.locator('.markup-list').getByRole('button', { name: 'Exporter vers Revit', exact: true }));
+    assert.ok((await download).suggestedFilename().length > 0);
+    await controllerClick(page.locator('.markup-list').getByRole('button', { name: 'Fermer', exact: true }));
+    await controllerClick(page.locator('.view-toolbar').getByRole('button', { name: 'Analyser les coupes', exact: true }));
+    const panel = page.locator('.mep-impact-panel'); await panel.waitFor();
+    if (await panel.locator('summary').count()) {
+      await controllerClick(panel.locator('summary').first());
+      const filter = panel.getByRole('checkbox', { name: 'Équipements uniquement' }); await controllerClick(filter); assert.equal(await filter.isChecked(), true);
+      await controllerText(panel.getByRole('textbox', { name: 'Filtrer les éléments concernés' }), 'mur');
+    }
+    await quickTap(1); assert.equal(await panel.count(), 0);
+  });
+  await check('saved reservations can be modified and deleted with the controller in Maquette mode', async () => {
+    await quickTap(9); await quickTap(8); await quickTap(9);
+    const listButton = page.locator('.view-toolbar').getByRole('button', { name: /^Annotation et Résa/ });
+    await controllerClick(listButton); await controllerClick(page.locator('.markup-list-item'));
+    await controllerClick(page.locator('.markup-card').getByRole('button', { name: 'Modifier / déplacer', exact: true }));
+    const editor = page.locator('.markup-editor');
+    await controllerClick(editor.getByRole('button', { name: 'Ajouter une cote · choisir une face', exact: true }));
+    await quickTap(11); assert.ok(await page.evaluate(() => !!window.__viewerTest.draft), 'RS cancellation must preserve the draft in Maquette mode');
+    await quickTap(9); await controllerClick(editor.getByRole('button', { name: 'Déplacer', exact: true }));
+    const previous = Object.values(scenario.state.markups)[0].position; await quickTap(14);
+    const next = await page.evaluate(() => window.__viewerTest.draft.position); assert.ok(distance(previous, next) > .01);
+    await quickTap(9); await controllerClick(editor.getByRole('button', { name: 'Enregistrer', exact: true }));
+    await page.waitForFunction(() => !window.__viewerTest.draft);
+    assert.ok(distance(Object.values(scenario.state.markups)[0].position, next) < 1e-8, 'Saving must preserve the edited position within floating-point precision');
+    await controllerClick(listButton); await controllerClick(page.locator('.markup-list-item'));
+    await controllerClick(page.locator('.markup-card').getByRole('button', { name: 'Supprimer', exact: true }));
+    await page.waitForFunction(() => document.querySelector('.view-toolbar')?.textContent.includes('Résa (0)'));
+    assert.equal(Object.keys(scenario.state.markups).length, 0);
   });
   assert.deepEqual(errors, [], 'No browser runtime errors');
   console.log(checks.length + ' browser integration checks passed.');

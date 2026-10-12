@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowLeftRight, Scissors, ChartNoAxesCombined, MessageSquare, Box, ChevronRight, CircleGauge, Contrast, Eye, EyeOff, Footprints, Hand, Layers3, LoaderCircle, LockKeyhole, Pencil, Plane, RotateCcw, SunMedium, Users, Waves } from 'lucide-react';
 import * as THREE from 'three';
 import { MepGamepad, MepWalkGamepad, maquetteXbox, readBrowserPads, xbox } from '@/lib/mep-gamepad';
+import { adjustGamepadControl, focusGamepadControl, gamepadControls, gamepadScope, GamepadMenuRepeat, moveGamepadKey, type GamepadField } from '@/lib/mep-gamepad-ui';
+import { GamepadFieldEditor } from '@/components/gamepad-field-editor';
 import { MepMiniMap } from '@/lib/mep-minimap';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { downloadExchange } from '@/lib/mep-exchange';
@@ -24,7 +26,7 @@ import { ModelStream, tileBounds, disposeModel } from '@/lib/mep-stream';
 import { isReservationHost, hostDepthCm } from '@/lib/mep-host';
 import { ModelPreparation } from '@/lib/mep-prepare';
 import { AsyncWallCutouts } from '@/lib/mep-cutouts-async';
-import { markupObject, disposeMarkups, reservationLot, reservationLabel, dimensionDistance, dimensionFoot, moveToDimension, type ReservationDimension, type Markup } from '@/lib/mep-markup';
+import { markupObject, disposeMarkups, reservationLot, reservationLabel, dimensionDistance, dimensionFoot, moveToDimension, editMarkupOnFace, type ReservationDimension, type Markup } from '@/lib/mep-markup';
 import { ReservationFields } from './reservation-fields';
 import { ReservationLotsPanel } from './reservation-lots';
 import { MeasureControls } from './measure-controls';
@@ -275,6 +277,12 @@ export function MepViewer() {
   const inputDeviceRef = useRef<'keyboard' | 'gamepad'>('keyboard');
   const [connectedPad, setConnectedPad] = useState<string | null>(null);
   const [gamepadMenu, setGamepadMenu] = useState(false);
+  const [gamepadField, setGamepadField] = useState<GamepadField | null>(null);
+  const gamepadFieldRef = useRef<GamepadField | null>(null);
+  const closeGamepadField = useCallback(() => {
+    const target = gamepadFieldRef.current; gamepadFieldRef.current = null; setGamepadField(null);
+    requestAnimationFrame(() => { if (target?.isConnected) target.focus({ preventScroll: true }); });
+  }, []);
   const controlsRef = useRef<OrbitControls | null>(null);
   const flowGroupRef = useRef<THREE.Group | null>(null);
   const valveGroupRef = useRef<THREE.Group | null>(null);
@@ -1064,16 +1072,23 @@ export function MepViewer() {
     };
     const gamepad = new MepGamepad();
     const walkGamepad = new MepWalkGamepad();
+    const menuRepeat = new GamepadMenuRepeat(), editRepeat = new GamepadMenuRepeat();
     let padName: string | null = null, menuMode = false, menuActivationPending = false;
+    let menuWasPicking = false, menuRequestedEdit = false;
+    let managedUiFocus = false;
+    let globalMenuFocus = false;
     const setDevice = (device: 'keyboard' | 'gamepad') => {
       if (inputDeviceRef.current !== device) { inputDeviceRef.current = device; setInputDevice(device); }
     };
     const leavePadMenu = () => {
       menuMode = false; setGamepadMenu(false); gamepad.read(readBrowserPads(), false);
+      managedUiFocus = false;
       const focused = document.activeElement;
       if (focused instanceof HTMLElement && mount.closest('main')?.contains(focused)) focused.blur();
     };
-    const keyboardDevice = () => {
+    const keyboardDevice = (event?: Event) => {
+      if (event instanceof KeyboardEvent && !event.isTrusted) return;
+      managedUiFocus = false;
       setDevice('keyboard'); gamepad.read(readBrowserPads(), false);
       if (menuMode) { menuMode = false; setGamepadMenu(false); }
     };
@@ -1083,12 +1098,7 @@ export function MepViewer() {
     };
     const focusPadButton = (direction: number) => {
       const root = mount.closest('main');
-      const popup = root?.querySelector('.element-context-menu, .markup-card, .markup-editor');
-      const buttons = Array.from((popup || root)?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') || []).filter(button => button.getClientRects().length > 0 && getComputedStyle(button).visibility !== 'hidden');
-      if (!buttons.length) return;
-      const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
-      const next = buttons[index < 0 ? (direction > 0 ? 0 : buttons.length - 1) : (index + direction + buttons.length) % buttons.length];
-      next.focus({ preventScroll: true }); next.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      if (root) { managedUiFocus = true; focusGamepadControl(globalMenuFocus && !gamepadFieldRef.current ? root : gamepadScope(root), direction); }
     };
     const centerPoint = () => { const rect = renderer.domElement.getBoundingClientRect(); return { clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 }; };
     const framePadSelected = () => {
@@ -1097,6 +1107,10 @@ export function MepViewer() {
       viewActionsRef.current?.frameSelected();
     };
     const clearPadSelection = () => {
+      if (pickingDimensionRef.current) { setPickingDimension(false); pickingDimensionRef.current = false; return; }
+      if (measurePickRef.current.picking) { cancelMeasure(); return; }
+      if (pickingSectionRef.current) { setPickingSection(false); pickingSectionRef.current = false; return; }
+      if (relocatingRef.current) { setRelocating(null); return; }
       cancelMeasure(); setPickingDimension(false); pickingDimensionRef.current = false;
       setPickingSection(false); pickingSectionRef.current = false;
       setActiveMarkup(null); setRelocating(null); setDraftMarkup(null); setContextMenu(null);
@@ -1105,6 +1119,7 @@ export function MepViewer() {
     const resetInput = () => { orbitPointer = null; pointerStart = null; looking = false; pressed.clear(); wheelMoveRemaining = 0; gamepad.read(readBrowserPads(), false); };
     const onVisibilityChange = () => { if (document.hidden) resetInput(); };
     const onKeyDown = (event: KeyboardEvent) => {
+      if (!event.isTrusted) return;
       if (!sceneReady) return;
       if (event.code === 'Escape' && measurePickRef.current.picking) { cancelMeasure(); event.preventDefault(); return; }
       if (event.code === 'Escape' && pickingDimensionRef.current) { setPickingDimension(false); pickingDimensionRef.current = false; event.preventDefault(); return; }
@@ -1197,33 +1212,66 @@ export function MepViewer() {
       // selecting a measure, section face, relocation or dimension target.
       if (menuActivationPending) {
         menuActivationPending = false;
-        if (measurePickRef.current.picking || pickingSectionRef.current || pickingDimensionRef.current || relocatingRef.current) leavePadMenu();
+        if ((!menuWasPicking && (measurePickRef.current.picking || pickingSectionRef.current || pickingDimensionRef.current || relocatingRef.current)) || menuRequestedEdit) leavePadMenu();
       }
       const focused = document.activeElement;
-      const editingText = focused instanceof HTMLElement && !!focused.closest('input,textarea,select,[contenteditable]:not([contenteditable=false])');
+      const editingText = !managedUiFocus && !gamepadFieldRef.current && focused instanceof HTMLElement && !!focused.closest('input,textarea,select,[contenteditable]:not([contenteditable=false])');
       let pad = gamepad.read(readBrowserPads(), sceneReady && !document.hidden && document.hasFocus() && !editingText && !draggingEdit && !looking && !orbitPointer);
       if (pad.name !== padName) {
         padName = pad.name; setConnectedPad(padName);
-        if (!padName) { setDevice('keyboard'); if (menuMode) leavePadMenu(); }
+        if (!padName) { setDevice('keyboard'); if (gamepadFieldRef.current) closeGamepadField(); if (menuMode) leavePadMenu(); }
       }
-      if (pad.active) { setDevice('gamepad'); pressed.clear(); wheelMoveRemaining = 0; doubleTapSprint = false; }
+      if (pad.active) {
+        setDevice('gamepad'); pressed.clear(); wheelMoveRemaining = 0; doubleTapSprint = false;
+        if (gamepadFieldRef.current) { menuMode = true; managedUiFocus = true; setGamepadMenu(true); }
+      }
       // Menu and Back remain edge-triggered; holding a button cannot repeat edits.
       if (pad.tapped[xbox.menu]) {
+        if (gamepadFieldRef.current) closeGamepadField();
         menuMode = !menuMode; setGamepadMenu(menuMode);
-        if (menuMode) focusPadButton(1); else leavePadMenu();
+        if (menuMode) { globalMenuFocus = false; focusPadButton(1); } else leavePadMenu();
       }
       const maquettePad = navigationModeRef.current === 'maquette';
       const menuBack = menuMode && pad.tapped[xbox.b];
       const cancelAiming = !menuMode && pad.tapped[maquettePad ? maquetteXbox.cancel : xbox.b];
-      if (menuBack) { setContextMenu(null); leavePadMenu(); }
+      if (menuBack) {
+        const root = mount.closest('main'), scope = root ? gamepadScope(root) : null;
+        if (gamepadFieldRef.current) closeGamepadField();
+        else if (scope?.matches('.lots-panel,.mep-impact-panel,.markup-card')) {
+          const close = gamepadControls(scope).find(element => /^(Fermer|Retour)/.test(element.getAttribute('aria-label') || element.textContent || ''));
+          close?.click();
+        } else { setContextMenu(null); leavePadMenu(); }
+      }
       else if (cancelAiming) clearPadSelection();
       if (menuMode) {
-        if (pad.tapped[xbox.up] || pad.tapped[xbox.left]) focusPadButton(-1);
-        if (pad.tapped[xbox.down] || pad.tapped[xbox.right]) focusPadButton(1);
-        if (pad.tapped[xbox.a] && document.activeElement instanceof HTMLButtonElement && mount.closest('main')?.contains(document.activeElement)) {
-          menuActivationPending = true; document.activeElement.click();
+        if (pad.tapped[xbox.view] && !gamepadFieldRef.current) { globalMenuFocus = !globalMenuFocus; focusPadButton(1); }
+        const root = mount.closest('main'), scope = root ? globalMenuFocus && !gamepadFieldRef.current ? root : gamepadScope(root) : null;
+        if (scope && !gamepadControls(scope).includes(document.activeElement as HTMLElement)) focusPadButton(1);
+        for (const key of menuRepeat.read(pad, now, true)) {
+          if (scope?.matches('.gamepad-field-editor')) moveGamepadKey(scope, Number(key === xbox.right) - Number(key === xbox.left), Number(key === xbox.down) - Number(key === xbox.up));
+          else if (key === xbox.up || key === xbox.down) focusPadButton(key === xbox.up ? -1 : 1);
+          else if (!(document.activeElement instanceof HTMLElement) || !adjustGamepadControl(document.activeElement, key === xbox.left ? -1 : 1, !!pad.held[xbox.lb])) focusPadButton(key === xbox.left ? -1 : 1);
+        }
+        if (scope?.matches('.gamepad-field-editor')) {
+          if (pad.tapped[xbox.lb]) focusPadButton(-1);
+          if (pad.tapped[xbox.rb]) focusPadButton(1);
+          if (pad.tapped[xbox.x]) scope.querySelector<HTMLElement>('[data-editor-action=delete]')?.click();
+          if (pad.tapped[xbox.y]) scope.querySelector<HTMLElement>('[data-editor-action=space]')?.click();
+        }
+        if (pad.tapped[xbox.a] && document.activeElement instanceof HTMLElement && root?.contains(document.activeElement)) {
+          const control = document.activeElement;
+          managedUiFocus = true;
+          if ((control instanceof HTMLInputElement && !['checkbox', 'radio', 'range', 'button', 'submit'].includes(control.type)) || control instanceof HTMLTextAreaElement) {
+            if (!control.readOnly) { gamepadFieldRef.current = control; setGamepadField(control); }
+          } else if (control instanceof HTMLSelectElement) adjustGamepadControl(control, 1);
+          else {
+            menuWasPicking = !!(measurePickRef.current.picking || pickingSectionRef.current || pickingDimensionRef.current || relocatingRef.current);
+            menuRequestedEdit = !!control.dataset.gamepadEdit;
+            menuActivationPending = true; control.click();
+          }
         }
       } else if (pad.active) {
+        menuRepeat.read(pad, now, false);
         if (pad.tapped[maquettePad ? maquetteXbox.select : xbox.a] && !(maquettePad && pad.held[xbox.lb]) && (!draftOpenRef.current || pickingDimensionRef.current)) selectAt(centerPoint());
         if (!draftOpenRef.current) {
         if (pad.tapped[xbox.view]) { changeNavigationMode(navigationModeRef.current === 'orbit' ? 'maquette' : 'orbit'); resetInput(); }
@@ -1232,7 +1280,7 @@ export function MepViewer() {
           if (index !== null && pickedAnchor) {
             const rect = renderer.domElement.getBoundingClientRect();
             setContextMenu({ x: Math.max(8, Math.min(rect.width / 2, rect.width - 236)), y: Math.max(8, Math.min(rect.height / 2, rect.height - 330)), index, ...pickedAnchor });
-            menuMode = true; setGamepadMenu(true);
+            menuMode = true; globalMenuFocus = false; setGamepadMenu(true);
             // Focus after React commits the menu, without creating an uncancelled timer.
           }
         }
@@ -1247,10 +1295,20 @@ export function MepViewer() {
         } else if (pad.tapped[xbox.y] || pad.tapped[xbox.left]) frameModel();
         }
       }
+      const editDraft = !menuMode && !!draftRef.current && !pickingDimensionRef.current && !cancelAiming && !pad.tapped[xbox.menu];
+      const editSteps = editRepeat.read(pad, now, editDraft);
+      if (editDraft && draftRef.current) {
+        if (pad.tapped[xbox.x] && draftRef.current.kind === 'reservation') {
+          editModeRef.current = editModeRef.current === 'translate' ? 'scale' : 'translate'; setEditMode(editModeRef.current);
+        }
+        const precision = pad.held[xbox.lt] ? .1 : 1;
+        const x = pad.moveX * 40 * delta * precision + (Number(editSteps.includes(xbox.right)) - Number(editSteps.includes(xbox.left))) * precision;
+        const y = -pad.moveY * 40 * delta * precision + (Number(editSteps.includes(xbox.up)) - Number(editSteps.includes(xbox.down))) * precision;
+        if (x || y) { const next = editMarkupOnFace(draftRef.current, x, y, editModeRef.current); draftRef.current = next; setDraftMarkup(next); }
+        if (pad.lookX || pad.lookY) orbitSelection(camera, controls.target, new THREE.Vector3(...draftRef.current.position), pad.lookX * 1.5 * delta, pad.lookY * 1.2 * delta);
+      }
       const menuVertical = menuMode && pad.held[xbox.a] && focused instanceof HTMLElement ? Number(focused.dataset.gamepadVertical || 0) : 0;
       if (menuMode || (draftOpenRef.current && !pickingDimensionRef.current) || pad.tapped[xbox.menu] || menuBack || cancelAiming) {
-        const popup = mount.closest('main')?.querySelector('.element-context-menu, .markup-card, .markup-editor');
-        if (menuMode && (!(document.activeElement instanceof HTMLButtonElement) || (popup && !popup.contains(document.activeElement)))) focusPadButton(1);
         pad = { ...pad, moveX: 0, moveY: 0, lookX: 0, lookY: 0, vertical: menuVertical, held: [] };
         pressed.clear(); wheelMoveRemaining = 0;
       }
@@ -1319,7 +1377,7 @@ export function MepViewer() {
       else if (previewMark && !gizmo.object) gizmo.attach(editRoot);
       if (gizmo.mode !== editModeRef.current) gizmo.setMode(editModeRef.current);
       if (navigationModeRef.current === 'orbit') controls.update();
-      else if (!stream || webFlightMode || stream.readyAt(camera.position)) {
+      else if (!draftOpenRef.current && (!stream || webFlightMode || stream.readyAt(camera.position))) {
         let forwardInput = -pad.moveY + Number(pressed.has('KeyW') || pressed.has('KeyZ') || pressed.has('ArrowUp')) - Number(pressed.has('KeyS') || pressed.has('ArrowDown'));
         if (Math.abs(wheelMoveRemaining) > .000001) { const wheelStep = THREE.MathUtils.clamp(wheelMoveRemaining, -walkSpeed * delta, walkSpeed * delta); forwardInput = THREE.MathUtils.clamp(forwardInput + wheelStep / Math.max(.000001, walkSpeed * delta), -1, 1); wheelMoveRemaining -= wheelStep; }
         const rightInput = pad.moveX + Number(pressed.has('KeyD') || pressed.has('ArrowRight')) - Number(pressed.has('KeyA') || pressed.has('KeyQ') || pressed.has('ArrowLeft'));
@@ -1487,6 +1545,7 @@ export function MepViewer() {
       window.removeEventListener('pointermove', pointerDevice, true);
       window.removeEventListener('wheel', keyboardDevice);
       setGamepadMenu(false); setConnectedPad(null); setDevice('keyboard');
+      gamepadFieldRef.current = null; setGamepadField(null);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('blur', resetInput); renderer.domElement.removeEventListener('pointercancel', resetInput);
       controls.dispose(); controlsRef.current = null; viewActionsRef.current = null;
@@ -1636,12 +1695,13 @@ export function MepViewer() {
   };
   const draftIsHost = isReservationHost(viewerPackage?.properties.find(property => property.key === draftMarkup?.elementKey));
   const activeMark = allMarkups.find(item => item.id === activeMarkup);
-  return <><main className="viewer-shell" data-input-device={inputDevice} data-gamepad-aiming={inputDevice === 'gamepad' && !gamepadMenu && (pickingMeasure || pickingSection || pickingDimension || !!relocating)} inert={opening}>
+  return <><main className="viewer-shell" data-input-device={inputDevice} data-gamepad-aiming={inputDevice === 'gamepad' && !gamepadMenu && (pickingMeasure || pickingSection || pickingDimension || !!relocating || !!draftMarkup)} inert={opening}>
+    {gamepadField && <GamepadFieldEditor key={gamepadField.name + gamepadField.type} target={gamepadField} onClose={closeGamepadField}/>}
     {draftMarkup && <section className="markup-editor" aria-label="Modifier l’annotation">
         <strong>{draftMarkup.kind === 'note' ? 'Annotation' : 'Réservation'}</strong>
         <p>{draftMarkup.elementName}</p>
-        <div className="markup-actions"><Button size="sm" variant={editMode === 'translate' ? 'default' : 'outline'} onClick={() => setEditMode('translate')}>Déplacer</Button>{draftMarkup.kind === 'reservation' && <Button size="sm" variant={editMode === 'scale' ? 'default' : 'outline'} onClick={() => setEditMode('scale')}>Redimensionner</Button>}</div>
-        <p>Glissez les poignées sur la face. La découpe sera calculée après « Enregistrer ».</p>
+        <div className="markup-actions"><Button data-gamepad-edit="translate" size="sm" variant={editMode === 'translate' ? 'default' : 'outline'} onClick={() => setEditMode('translate')}>Déplacer</Button>{draftMarkup.kind === 'reservation' && <Button data-gamepad-edit="scale" size="sm" variant={editMode === 'scale' ? 'default' : 'outline'} onClick={() => setEditMode('scale')}>Redimensionner</Button>}</div>
+        <p>{inputDevice === 'gamepad' ? 'Choisissez Déplacer ou Redimensionner, puis utilisez le stick gauche. Le stick droit tourne autour de la réservation ; LT affine le mouvement. Menu revient aux champs.' : 'Glissez les poignées sur la face.'} La découpe sera calculée après « Enregistrer ».</p>
         {draftMarkup && <form onSubmit={event => { event.preventDefault(); void persistMarkup(draftMarkup); }}>
           <label>{draftMarkup.kind === 'note' ? 'Votre annotation' : 'Commentaire (facultatif)'}<textarea required={draftMarkup.kind === 'note'} maxLength={2000} value={draftMarkup.text} onChange={event => setDraftMarkup({ ...draftMarkup, text: event.target.value })}/></label>
           {draftMarkup.kind === 'reservation' && <><ReservationFields gamepad={inputDevice === 'gamepad'} gamepadMode={navigationMode} mark={draftMarkup} lots={lots} onChange={setDraftMarkup} onManageLots={openLots} picking={pickingDimension} onPick={() => { cancelMeasure(); setMeasureOpen(false); setPickingDimension(value => !value); setPickingSection(false); setMarkupError(null); }}/><p>{draftIsHost ? 'La profondeur est ajustée à l’épaisseur détectée du mur ou du sol. Vous pouvez la modifier pour une réservation partielle.' : 'La profondeur part de la face sélectionnée vers l’intérieur. Les murs et les sols peuvent être découpés.'}</p></>}
@@ -1662,7 +1722,9 @@ export function MepViewer() {
     {connectedPad && <div className="gamepad-status" role="status" title={connectedPad}>Manette connectée{inputDevice === 'keyboard' ? ' · Appuyez sur une touche de la manette' : gamepadMenu ? ' · Menu : croix pour naviguer, A pour valider, B pour revenir' : ' · Xbox'}</div>}
     {inputDevice === 'gamepad' && !gamepadMenu && <div className="gamepad-reticle" aria-hidden="true"/>}
     <div className={`view-hint${inputDevice === 'gamepad' ? ' gamepad-hint' : ''}`}>{inputDevice === 'gamepad' ? <>
-      {gamepadMenu ? <><kbd>↑ ↓ ← →</kbd> Parcourir les boutons · <kbd className="xbox-a">A</kbd> Valider · <kbd className="xbox-b">B</kbd> Retour</> : <>
+      {gamepadMenu ? <><kbd>↑ ↓</kbd> Parcourir les champs · <kbd>← →</kbd> Régler · <kbd>LB</kbd> ×10 · <kbd className="xbox-a">A</kbd> Ouvrir / valider · <kbd>View ⧉</kbd> Tous les panneaux · <kbd className="xbox-b">B</kbd> Retour</> : draftMarkup && !pickingDimension ? <>
+        <kbd>LS</kbd> {editMode === 'translate' ? 'Déplacer sur la face' : 'Largeur / hauteur'} · <kbd>↑ ↓ ← →</kbd> Ajuster de 1 cm · <kbd>LT</kbd> Précision (1 mm) · <kbd>RS</kbd> Tourner la vue · {draftMarkup.kind === 'reservation' && <><kbd>X</kbd> Déplacer / redimensionner · </>}<kbd>Menu ☰</kbd> Champs et enregistrement
+      </> : <>
         {navigationMode === 'maquette' ? <>
           <kbd>LS</kbd> Marcher · <kbd>RS</kbd> Regarder · <kbd>LS clic</kbd> Courir en avançant · <kbd className="xbox-a">A</kbd> {flightMode ? 'Monter (maintenir)' : 'Sauter'} · <kbd className="xbox-b">B</kbd> {flightMode ? 'Descendre (maintenir)' : 'Accroupir (maintenir)'} · <kbd>RT</kbd> {pickingMeasure || pickingSection || pickingDimension || relocating ? 'Placer le point visé' : 'Sélectionner'} · <kbd>LT</kbd> Viser avec précision · <kbd className="xbox-x">X</kbd> Porte · <kbd className="xbox-y">Y</kbd> {flightMode ? 'Marcher' : 'Voler'} · <kbd>RS clic</kbd> Annuler · <kbd>↑</kbd> Carte · <kbd>←</kbd> Réapparaître ·
         </> : <>
