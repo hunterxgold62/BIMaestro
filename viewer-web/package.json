@@ -9,6 +9,7 @@
     "dev": "vinext dev",
     "build": "vinext build",
     "start": "wrangler dev --config dist/server/wrangler.json",
+    "test:gamepad": "node --experimental-strip-types scripts/test-gamepad.mjs",
     "test": "vitest run --config vitest.config.ts",
     "lint": "oxlint app components/mep-viewer.tsx lib",
     "format": "oxfmt"
@@ -66,3 +67,4 @@
   },
   "type": "module"
 }
+

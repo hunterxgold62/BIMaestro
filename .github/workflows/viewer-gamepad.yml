@@ -1,0 +1,36 @@
+name: Viewer Xbox checks
+on:
+  push:
+    branches: [ajout-manette-xbox]
+  pull_request:
+    paths: ['viewer-web/**', '.github/workflows/viewer-gamepad.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: viewer-web
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /viewer-web/
+            /.sites/bimaestro-viewer-mep/.openai/hosting.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: viewer-web/package-lock.json
+      - name: Restore the existing non-secret hosting manifest
+        run: |
+          mkdir -p .openai
+          cp ../.sites/bimaestro-viewer-mep/.openai/hosting.json .openai/hosting.json
+      - run: npm ci
+      - run: npm run test:gamepad
+      - run: npm test
+      - run: npx tsc --noEmit
+      - run: npm run build

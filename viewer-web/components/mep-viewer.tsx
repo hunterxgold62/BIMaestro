@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowLeftRight, Scissors, ChartNoAxesCombined, MessageSquare, Box, ChevronRight, CircleGauge, Contrast, Eye, EyeOff, Footprints, Hand, Layers3, LoaderCircle, LockKeyhole, Pencil, Plane, RotateCcw, SunMedium, Users, Waves } from 'lucide-react';
 import * as THREE from 'three';
+import { MepGamepad, readBrowserPads, xbox } from '@/lib/mep-gamepad';
 import { MepMiniMap } from '@/lib/mep-minimap';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { downloadExchange } from '@/lib/mep-exchange';
@@ -270,6 +271,10 @@ export function MepViewer() {
   const [miniMapVisible, setMiniMapVisible] = useState(false);
   const miniMapVisibleRef = useRef(false);
   useEffect(() => { miniMapVisibleRef.current = miniMapVisible; }, [miniMapVisible]);
+  const [inputDevice, setInputDevice] = useState<'keyboard' | 'gamepad'>('keyboard');
+  const inputDeviceRef = useRef<'keyboard' | 'gamepad'>('keyboard');
+  const [connectedPad, setConnectedPad] = useState<string | null>(null);
+  const [gamepadMenu, setGamepadMenu] = useState(false);
   const controlsRef = useRef<OrbitControls | null>(null);
   const flowGroupRef = useRef<THREE.Group | null>(null);
   const valveGroupRef = useRef<THREE.Group | null>(null);
@@ -491,6 +496,8 @@ export function MepViewer() {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     let sectionWasEnabled = false, shadowsBeforeSection = renderer.shadowMap.enabled;
     mount.appendChild(renderer.domElement);
+    renderer.domElement.tabIndex = 0;
+    renderer.domElement.setAttribute('aria-label', 'Maquette 3D interactive');
     const controls = new OrbitControls(camera, renderer.domElement);
     controlsRef.current = controls; controls.enabled = navigationModeRef.current === 'orbit';
     controls.target.set(0, 1.5, 0); controls.enableDamping = true; controls.dampingFactor = .14; controls.rotateSpeed = 1.15; controls.panSpeed = .4; controls.enableZoom = false; controls.screenSpacePanning = true;
@@ -998,6 +1005,7 @@ export function MepViewer() {
       return null;
     };
     const onPointerDown = (event: PointerEvent) => {
+      renderer.domElement.focus({ preventScroll: true });
       if (!sceneReady || gizmo.axis || draggingEdit) return;
       pointerStart = { x: event.clientX, y: event.clientY, dragged: false, time: performance.now() };
       suppressContextMenu = false;
@@ -1048,7 +1056,53 @@ export function MepViewer() {
       const rect = renderer.domElement.getBoundingClientRect();
       setContextMenu({ x: Math.min(event.clientX - rect.left, Math.max(8, rect.width - 236)), y: Math.min(event.clientY - rect.top, Math.max(8, rect.height - 330)), index, ...pickedAnchor });
     };
-    const resetInput = () => { orbitPointer = null; pointerStart = null; looking = false; pressed.clear(); wheelMoveRemaining = 0; };
+    const interactDoor = () => {
+      let nearest: DoorAnimation | null = null; let nearestDistance = 8;
+      doors.forEach(door => { const distance = door.center.distanceTo(camera.position); if (distance < nearestDistance) { nearest = door; nearestDistance = distance; } });
+      if (nearest) (nearest as DoorAnimation).open = !(nearest as DoorAnimation).open;
+      else setError(viewerPackage?.viewer ? 'Aucune porte assez proche.' : 'Republiez cette maquette avec la nouvelle version du plugin pour rendre les portes interactives.');
+    };
+    const gamepad = new MepGamepad();
+    let padName: string | null = null, menuMode = false;
+    const setDevice = (device: 'keyboard' | 'gamepad') => {
+      if (inputDeviceRef.current !== device) { inputDeviceRef.current = device; setInputDevice(device); }
+    };
+    const leavePadMenu = () => {
+      menuMode = false; setGamepadMenu(false); gamepad.read(readBrowserPads(), false);
+      const focused = document.activeElement;
+      if (focused instanceof HTMLElement && mount.closest('main')?.contains(focused)) focused.blur();
+    };
+    const keyboardDevice = () => {
+      setDevice('keyboard'); gamepad.read(readBrowserPads(), false);
+      if (menuMode) { menuMode = false; setGamepadMenu(false); }
+    };
+    const pointerDevice = (event: PointerEvent) => {
+      if (event.type === 'pointermove' && !event.movementX && !event.movementY) return;
+      keyboardDevice();
+    };
+    const focusPadButton = (direction: number) => {
+      const root = mount.closest('main');
+      const popup = root?.querySelector('.element-context-menu, .markup-card, .markup-editor');
+      const buttons = Array.from((popup || root)?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') || []).filter(button => button.getClientRects().length > 0 && getComputedStyle(button).visibility !== 'hidden');
+      if (!buttons.length) return;
+      const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+      const next = buttons[index < 0 ? (direction > 0 ? 0 : buttons.length - 1) : (index + direction + buttons.length) % buttons.length];
+      next.focus({ preventScroll: true }); next.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    };
+    const centerPoint = () => { const rect = renderer.domElement.getBoundingClientRect(); return { clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 }; };
+    const framePadSelected = () => {
+      if (selection.bounds.isEmpty()) return;
+      if (navigationModeRef.current === 'maquette') setFlight(true);
+      viewActionsRef.current?.frameSelected();
+    };
+    const clearPadSelection = () => {
+      cancelMeasure(); setPickingDimension(false); pickingDimensionRef.current = false;
+      setPickingSection(false); pickingSectionRef.current = false;
+      setActiveMarkup(null); setRelocating(null); setDraftMarkup(null); setContextMenu(null);
+      selectedIndexRef.current = null; setSelectedIndex(null);
+    };
+    const resetInput = () => { orbitPointer = null; pointerStart = null; looking = false; pressed.clear(); wheelMoveRemaining = 0; gamepad.read(readBrowserPads(), false); };
+    const onVisibilityChange = () => { if (document.hidden) resetInput(); };
     const onKeyDown = (event: KeyboardEvent) => {
       if (!sceneReady) return;
       if (event.code === 'Escape' && measurePickRef.current.picking) { cancelMeasure(); event.preventDefault(); return; }
@@ -1071,13 +1125,7 @@ export function MepViewer() {
       if (!event.repeat && ['KeyW', 'KeyZ', 'ArrowUp'].includes(event.code)) {
         const now = performance.now() / 1000; doubleTapSprint = now - lastForwardTap <= .34; lastForwardTap = doubleTapSprint ? -Infinity : now;
       }
-      if (!event.repeat && event.code === 'KeyE') {
-        let nearest: DoorAnimation | null = null; let nearestDistance = 8;
-        doors.forEach((door) => { const distance = door.center.distanceTo(camera.position); if (distance < nearestDistance) { nearest = door; nearestDistance = distance; } });
-        if (nearest) (nearest as DoorAnimation).open = !(nearest as DoorAnimation).open;
-        else setError(viewerPackage?.viewer ? 'Aucune porte assez proche.' : 'Republiez cette maquette avec la nouvelle version du plugin pour rendre les portes interactives.');
-        event.preventDefault();
-      }
+      if (!event.repeat && event.code === 'KeyE') { interactDoor(); event.preventDefault(); }
       pressed.add(event.code);
       if (['KeyW', 'KeyZ', 'KeyA', 'KeyQ', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) event.preventDefault();
     };
@@ -1114,6 +1162,11 @@ export function MepViewer() {
     const labelLayer = markupLabelsRef.current;
     labelLayer?.addEventListener('wheel', onWheel, { passive: false, capture: true });
     window.addEventListener('keydown', onKeyDown, { passive: false }); window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('keydown', keyboardDevice, true);
+    window.addEventListener('pointerdown', pointerDevice, true);
+    window.addEventListener('pointermove', pointerDevice, true);
+    window.addEventListener('wheel', keyboardDevice, { passive: true });
+    document.addEventListener('visibilitychange', onVisibilityChange);
     window.addEventListener('blur', resetInput); renderer.domElement.addEventListener('pointercancel', resetInput);
     const resize = () => {
       const width = mount.clientWidth, height = mount.clientHeight;
@@ -1139,6 +1192,71 @@ export function MepViewer() {
         qualityFrames = 0; qualityStart = now;
       }
       stream?.update(now);
+      const focused = document.activeElement;
+      const editingText = focused instanceof HTMLElement && !!focused.closest('input,textarea,select,[contenteditable]:not([contenteditable=false])');
+      let pad = gamepad.read(readBrowserPads(), sceneReady && !document.hidden && document.hasFocus() && !editingText && !draggingEdit && !looking && !orbitPointer);
+      if (pad.name !== padName) {
+        padName = pad.name; setConnectedPad(padName);
+        if (!padName) { setDevice('keyboard'); if (menuMode) leavePadMenu(); }
+      }
+      if (pad.active) { setDevice('gamepad'); pressed.clear(); wheelMoveRemaining = 0; doubleTapSprint = false; }
+      // Menu and Back remain edge-triggered; holding a button cannot repeat edits.
+      if (pad.tapped[xbox.menu]) {
+        menuMode = !menuMode; setGamepadMenu(menuMode);
+        if (menuMode) focusPadButton(1); else leavePadMenu();
+      }
+      if (pad.tapped[xbox.b]) { if (menuMode) { setContextMenu(null); leavePadMenu(); } else clearPadSelection(); }
+      if (menuMode) {
+        if (pad.tapped[xbox.up] || pad.tapped[xbox.left]) focusPadButton(-1);
+        if (pad.tapped[xbox.down] || pad.tapped[xbox.right]) focusPadButton(1);
+        if (pad.tapped[xbox.a] && document.activeElement instanceof HTMLButtonElement && mount.closest('main')?.contains(document.activeElement)) document.activeElement.click();
+      } else if (pad.active) {
+        if (pad.tapped[xbox.a] && (!draftOpenRef.current || pickingDimensionRef.current)) selectAt(centerPoint());
+        if (!draftOpenRef.current) {
+        if (pad.tapped[xbox.view]) { changeNavigationMode(navigationModeRef.current === 'orbit' ? 'maquette' : 'orbit'); resetInput(); }
+        if (pad.tapped[xbox.rb] && !measurePickRef.current.picking && !pickingSectionRef.current && !draftOpenRef.current) {
+          const point = centerPoint(); const index = selectAt(point, true);
+          if (index !== null && pickedAnchor) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            setContextMenu({ x: Math.max(8, Math.min(rect.width / 2, rect.width - 236)), y: Math.max(8, Math.min(rect.height / 2, rect.height - 330)), index, ...pickedAnchor });
+            menuMode = true; setGamepadMenu(true);
+            // Focus after React commits the menu, without creating an uncancelled timer.
+          }
+        }
+        if (pad.tapped[xbox.right] || (pad.tapped[xbox.x] && navigationModeRef.current === 'orbit')) framePadSelected();
+        if (pad.tapped[xbox.down]) setFlowsVisible(value => !value);
+        if (navigationModeRef.current === 'maquette') {
+          if (pad.tapped[xbox.y]) setFlight(!webFlightMode);
+          if (pad.tapped[xbox.x] && !webFlightMode && grounded) { verticalVelocity = 11.2; grounded = false; }
+          if (pad.tapped[xbox.rs]) interactDoor();
+          if (pad.tapped[xbox.up]) setMiniMapVisible(value => !value);
+          if (pad.tapped[xbox.left]) enterSpectator();
+        } else if (pad.tapped[xbox.y] || pad.tapped[xbox.left]) frameModel();
+        }
+      }
+      if (menuMode || (draftOpenRef.current && !pickingDimensionRef.current) || pad.tapped[xbox.menu] || pad.tapped[xbox.b]) {
+        const popup = mount.closest('main')?.querySelector('.element-context-menu, .markup-card, .markup-editor');
+        if (menuMode && (!(document.activeElement instanceof HTMLButtonElement) || (popup && !popup.contains(document.activeElement)))) focusPadButton(1);
+        pad = { ...pad, moveX: 0, moveY: 0, lookX: 0, lookY: 0, vertical: 0, held: [] };
+        pressed.clear(); wheelMoveRemaining = 0;
+      }
+      const padCrouch = !!pad.held[xbox.ls];
+      if (navigationModeRef.current === 'maquette' && (pad.lookX || pad.lookY)) {
+        const euler = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
+        euler.y -= pad.lookX * 2.2 * delta;
+        euler.x = THREE.MathUtils.clamp(euler.x - pad.lookY * 1.7 * delta, -1.48, 1.48);
+        camera.quaternion.setFromEuler(euler);
+      }
+      if (navigationModeRef.current === 'orbit' && (pad.moveX || pad.moveY || pad.lookX || pad.lookY || pad.vertical)) {
+        const precision = pad.held[xbox.lb] ? .3 : 1;
+        if (pad.lookX || pad.lookY) orbitSelection(camera, controls.target, selectedPivot || controls.target, pad.lookX * 1.8 * delta * precision, pad.lookY * 1.5 * delta * precision);
+        const distance = Math.max(.5, camera.position.distanceTo(controls.target));
+        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+        const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+        const move = right.multiplyScalar(pad.moveX).addScaledVector(up, -pad.moveY).multiplyScalar(distance * .65 * delta * precision);
+        move.addScaledVector(camera.getWorldDirection(new THREE.Vector3()), pad.vertical * distance * delta * precision);
+        camera.position.add(move); controls.target.add(move);
+      }
       controls.enabled = sceneReady && !draggingEdit && !pickingSectionRef.current && navigationModeRef.current === 'orbit';
       if (!sceneReady) { pressed.clear(); wheelMoveRemaining = 0; return; }
       activeSection = sectionPlanes(sectionRef.current);
@@ -1178,19 +1296,19 @@ export function MepViewer() {
       if (gizmo.mode !== editModeRef.current) gizmo.setMode(editModeRef.current);
       if (navigationModeRef.current === 'orbit') controls.update();
       else if (!stream || webFlightMode || stream.readyAt(camera.position)) {
-        let forwardInput = Number(pressed.has('KeyW') || pressed.has('KeyZ') || pressed.has('ArrowUp')) - Number(pressed.has('KeyS') || pressed.has('ArrowDown'));
+        let forwardInput = -pad.moveY + Number(pressed.has('KeyW') || pressed.has('KeyZ') || pressed.has('ArrowUp')) - Number(pressed.has('KeyS') || pressed.has('ArrowDown'));
         if (Math.abs(wheelMoveRemaining) > .000001) { const wheelStep = THREE.MathUtils.clamp(wheelMoveRemaining, -walkSpeed * delta, walkSpeed * delta); forwardInput = THREE.MathUtils.clamp(forwardInput + wheelStep / Math.max(.000001, walkSpeed * delta), -1, 1); wheelMoveRemaining -= wheelStep; }
-        const rightInput = Number(pressed.has('KeyD') || pressed.has('ArrowRight')) - Number(pressed.has('KeyA') || pressed.has('KeyQ') || pressed.has('ArrowLeft'));
+        const rightInput = pad.moveX + Number(pressed.has('KeyD') || pressed.has('ArrowRight')) - Number(pressed.has('KeyA') || pressed.has('KeyQ') || pressed.has('ArrowLeft'));
         const shift = pressed.has('ShiftLeft') || pressed.has('ShiftRight');
-        const verticalInput = webFlightMode ? Number(pressed.has('Space')) - Number(shift) : 0;
+        const verticalInput = webFlightMode ? THREE.MathUtils.clamp(pad.vertical + Number(pressed.has('Space')) - Number(shift), -1, 1) : 0;
         if (forwardInput || rightInput || verticalInput) {
           // Comme dans le repère du plugin, avancer/reculer ne modifie jamais
           // l'altimétrie, même lorsque la caméra regarde vers le haut ou le bas.
-          // La hauteur en vol reste exclusivement pilotée par Espace et Maj.
+          // La hauteur en vol reste exclusivement pilotée par Espace / Maj ou les gâchettes.
           const forward = new THREE.Vector3(); camera.getWorldDirection(forward); forward.y = 0; if (forward.lengthSq() < .001) forward.set(0, 0, -1); else forward.normalize();
           const right = new THREE.Vector3().crossVectors(forward, camera.up).normalize(); const movement = forward.multiplyScalar(forwardInput).add(right.multiplyScalar(rightInput)); if (movement.lengthSq() > 1) movement.normalize();
-          const crouching = !webFlightMode && (pressed.has('ControlLeft') || pressed.has('ControlRight'));
-          const sprint = (!webFlightMode && shift) || doubleTapSprint; const speed = crouching ? crouchSpeed : webFlightMode ? (sprint ? flySprintSpeed : flySpeed) : (sprint ? sprintSpeed : walkSpeed);
+          const crouching = !webFlightMode && (padCrouch || pressed.has('ControlLeft') || pressed.has('ControlRight'));
+          const sprint = !!pad.held[xbox.lb] || (!webFlightMode && shift) || doubleTapSprint; const speed = crouching ? crouchSpeed : webFlightMode ? (sprint ? flySprintSpeed : flySpeed) : (sprint ? sprintSpeed : walkSpeed);
           movement.y += verticalInput;
           if (movement.lengthSq() > 1) movement.normalize(); const step = movement.multiplyScalar(speed * delta);
           if (webFlightMode) camera.position.add(step);
@@ -1227,7 +1345,7 @@ export function MepViewer() {
         }
         if (webFlightMode) playerFootY = camera.position.y - currentEyeHeight;
         else {
-          const crouching = pressed.has('ControlLeft') || pressed.has('ControlRight'); const targetEyeHeight = crouching ? 2.72 : 5.28; currentEyeHeight = THREE.MathUtils.damp(currentEyeHeight, targetEyeHeight, 10, delta);
+          const crouching = padCrouch || pressed.has('ControlLeft') || pressed.has('ControlRight'); const targetEyeHeight = crouching ? 2.72 : 5.28; currentEyeHeight = THREE.MathUtils.damp(currentEyeHeight, targetEyeHeight, 10, delta);
           if (!grounded) { verticalVelocity -= 28 * delta; playerFootY += verticalVelocity * delta; }
           collisionRaycaster.set(new THREE.Vector3(camera.position.x, playerFootY + .86, camera.position.z), new THREE.Vector3(0, -1, 0));
           collisionRaycaster.near = 0; collisionRaycaster.far = 3.26;
@@ -1340,6 +1458,12 @@ export function MepViewer() {
       renderer.domElement.removeEventListener('pointerdown', onPointerDown, true); renderer.domElement.removeEventListener('pointermove', onPointerMove, true); renderer.domElement.removeEventListener('pointerup', onPointerUp); renderer.domElement.removeEventListener('contextmenu', onContextMenu); renderer.domElement.removeEventListener('wheel', onWheel, true);
       labelLayer?.removeEventListener('wheel', onWheel, true);
       window.removeEventListener('keydown', onKeyDown); window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('keydown', keyboardDevice, true);
+      window.removeEventListener('pointerdown', pointerDevice, true);
+      window.removeEventListener('pointermove', pointerDevice, true);
+      window.removeEventListener('wheel', keyboardDevice);
+      setGamepadMenu(false); setConnectedPad(null); setDevice('keyboard');
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('blur', resetInput); renderer.domElement.removeEventListener('pointercancel', resetInput);
       controls.dispose(); controlsRef.current = null; viewActionsRef.current = null;
       if (flowGroupRef.current === flowGroup) flowGroupRef.current = null;
@@ -1360,7 +1484,7 @@ export function MepViewer() {
         if (renderable.material) (Array.isArray(renderable.material) ? renderable.material : [renderable.material]).forEach((material) => material.dispose());
       });
     };
-  }, [viewerPackage, propertiesByIndex, propertiesByKey, applyFlowFocus, resolved]);
+  }, [viewerPackage, propertiesByIndex, propertiesByKey, applyFlowFocus, resolved, changeNavigationMode]);
 
   useEffect(() => {
     viewActionsRef.current?.updateMepState(graph, hiddenSystems);
@@ -1488,7 +1612,7 @@ export function MepViewer() {
   };
   const draftIsHost = isReservationHost(viewerPackage?.properties.find(property => property.key === draftMarkup?.elementKey));
   const activeMark = allMarkups.find(item => item.id === activeMarkup);
-  return <><main className="viewer-shell" inert={opening}>
+  return <><main className="viewer-shell" data-input-device={inputDevice} inert={opening}>
     {draftMarkup && <section className="markup-editor" aria-label="Modifier l’annotation">
         <strong>{draftMarkup.kind === 'note' ? 'Annotation' : 'Réservation'}</strong>
         <p>{draftMarkup.elementName}</p>
@@ -1504,14 +1628,20 @@ export function MepViewer() {
     {impactOpen && <MepImpactPanel graph={graph} reportText={reportText} calculating={calculating} error={calculationError} isEditor={isEditor} token={shareToken} scenario={scenario} publicationRevision={resolved?.publication.revision} selectedKey={selectedProperty?.key} onScenario={next => setScenario(current => !current || next.revision >= current.revision ? next : current)} onClose={() => setImpactOpen(false)} onReference={setReference} onSelect={key => { const property = propertiesByKey.get(key); if (property) { setSelectedIndex(property.index); requestAnimationFrame(() => viewActionsRef.current?.frameSelected()); } }}/>}
     <header className="topbar"><div className="brand-mark"><Waves size={19}/><span>BIMaestro</span><b>Maquette 3D</b></div><div className="model-title"><span>{resolved?.publication.name || 'Démonstration · Local technique'}</span><Badge variant="outline">Révision {resolved?.publication.revision || 'démo'}</Badge></div><div className={`access-badge ${isEditor ? 'editor' : 'reader'}`}>{isEditor ? <Pencil size={15}/> : <LockKeyhole size={15}/>}<span><small>MODE DU LIEN</small>{isEditor ? 'ÉDITION COLLABORATIVE' : 'CONSULTATION · LECTURE SEULE'}</span></div></header>
     <section className="viewport">{sectionOpen && <SectionControls value={section} onChange={setSection} selected={selectedSection} onSelect={setSelectedSection} picking={pickingSection} onPick={value => { cancelMeasure(); setPickingDimension(false); setPickingSection(value); }} extent={sectionExtent}/>}<div ref={mountRef} className="three-mount"/><div className="view-toolbar"><Button size="sm" variant="secondary" onClick={() => viewActionsRef.current?.isometric()}><Box/> Isométrique</Button><Button size="sm" variant="secondary" aria-expanded={sectionOpen} onClick={() => { setLotsOpen(false); setMarkupListOpen(false); setMeasureOpen(false); cancelMeasure(); setPickingDimension(false); setSectionOpen(value => !value); if (!sectionOpen && section.length === 0) setPickingSection(true); else setPickingSection(false); }}><Scissors/> Coupe{section.length ? ' · ' + section.length : ''}</Button><Button size="sm" variant="secondary" disabled={!!draftMarkup} aria-expanded={measureOpen} onClick={() => { setMeasureOpen(value => !value); setSectionOpen(false); setPickingSection(false); setLotsOpen(false); setMarkupListOpen(false); if (!measureOpen) startMeasure(); else cancelMeasure(); }}><ArrowLeftRight/> Mesurer</Button><Button size="sm" variant="secondary" onClick={() => setImpactOpen(v => !v)}><ChartNoAxesCombined/> Analyser les coupes</Button><Button size="sm" variant="secondary" onClick={() => { setMarkupListOpen(v => !v); setLotsOpen(false); setSectionOpen(false); setPickingSection(false); setMeasureOpen(false); cancelMeasure(); }}><MessageSquare/> Annotation et Résa ({allMarkups.length}){reviewCount > 0 ? ` · ⚠ ${reviewCount} à vérifier` : ''}</Button></div><div className="reservation-lot-toolbar"><label>Lot actif <select aria-label="Lot actif" value={currentLot} onChange={event => { setCurrentLot(event.target.value); setActiveMarkup(null); }}>{lots.map(lot => <option key={lot.id} value={lot.id}>{lot.name}</option>)}</select></label><span className="lot-swatch" style={{ background: lotDetails(currentLot, lotSettings).color }}/><label><input type="checkbox" checked={onlyCurrentLot} onChange={event => { setOnlyCurrentLot(event.target.checked); setActiveMarkup(null); }}/> Masquer les autres lots</label><button aria-expanded={lotsOpen} onClick={() => lotsOpen ? setLotsOpen(false) : openLots()}>Lots</button></div><div className={`viewer-left-column${navigationMode === 'maquette' ? ' with-mini-map' : ''}`}>{navigationMode === 'maquette' && <div className="viewer-mini-map-tools">
-      {!miniMapVisible && <button className="viewer-map-show" aria-controls="viewer-mini-map" onClick={() => setMiniMapVisible(true)} title="Afficher la mini-carte (M)">Mini-carte <kbd>M</kbd></button>}
-      <div id="viewer-mini-map" className="viewer-mini-map" hidden={!miniMapVisible}><header><strong>Plan local</strong><button onClick={() => setMiniMapVisible(false)} aria-label="Fermer la mini-carte" title="Fermer la mini-carte (M)">×</button></header><canvas ref={miniMapRef} width={280} height={280} aria-label="Plan local de 30 mètres, position et direction de la caméra"/></div>
-      </div>}<div className="appearance-toolbar" aria-label="Réglages de rendu"><button className={realisticLighting ? 'active' : ''} onClick={() => setRealisticLighting((value) => !value)} title="Basculer entre le mode ombré du plugin et les couleurs uniformes"><SunMedium/><span>{realisticLighting ? 'Ombré' : 'Uniforme'}</span></button><button className={highContrast ? 'active' : ''} onClick={() => setHighContrast((value) => !value)} title="Renforcer les contours et le contraste"><Contrast/><span>Contraste</span></button><button className={modelOpacity < 1 ? 'active' : ''} onClick={cycleOpacity} title="Faire varier la transparence de la maquette"><Layers3/><span>{Math.round(modelOpacity * 100)} %</span></button></div></div><div className="navigation-switch" aria-label="Mode de navigation"><button className={navigationMode === 'orbit' ? 'active' : ''} onClick={() => changeNavigationMode('orbit')}><Hand size={15}/><span>Navigation web</span></button><button className={navigationMode === 'maquette' ? 'active' : ''} onClick={() => changeNavigationMode('maquette')}><Footprints size={15}/><span>Maquette 3D</span></button></div>{navigationMode === 'maquette' && <div className="flight-controls" aria-label="Commandes de déplacement vertical"><button className={flightMode ? 'active' : ''} onClick={() => viewActionsRef.current?.toggleFlight()} title={flightMode ? 'Revenir au mode marche' : 'Activer le vol libre'}><Plane/><span>{flightMode ? 'Quitter le vol' : 'Vol libre'}</span></button>{flightMode && <><button aria-label="Monter" title="Monter" onPointerDown={() => holdInput('Space', true)} onPointerUp={() => holdInput('Space', false)} onPointerCancel={() => holdInput('Space', false)} onPointerLeave={() => holdInput('Space', false)}><ArrowUp/><span>Monter</span></button><button aria-label="Descendre" title="Descendre" onPointerDown={() => holdInput('ShiftLeft', true)} onPointerUp={() => holdInput('ShiftLeft', false)} onPointerCancel={() => holdInput('ShiftLeft', false)} onPointerLeave={() => holdInput('ShiftLeft', false)}><ArrowDown/><span>Descendre</span></button></>}<button onClick={() => viewActionsRef.current?.enterSpectator()} title="Revenir au point de départ"><RotateCcw/><span>Réapparaître</span></button></div>}{contextMenu && contextProperty && <div className="element-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} role="menu"><header><span>{contextProperty.name}</span><small>#{contextProperty.elementId}</small></header><button disabled={section.length >= maximumSections} onClick={sectionFromContext}>Faire une coupe</button>{isEditor && <><button onClick={() => beginMarkup('note')}>Annoter ici</button><button onClick={() => beginMarkup('reservation')}>Créer une réservation ici</button>{contextMepElement && <>{contextValve && <button disabled={saving} onClick={() => void runScenarioEdit(contextMepElement, 'valve', !contextValve.isClosed)}>{contextValve.isClosed ? 'Ouvrir la vanne' : 'Fermer la vanne'}</button>}<button disabled={saving} className={contextSourceKind === 'inlet' ? 'active' : ''} onClick={() => void runScenarioEdit(contextMepElement, 'source', 'inlet')}>{contextSourceKind === 'inlet' ? '✓ Départ du réseau' : 'Définir comme départ'}</button><button disabled={saving} className={contextSourceKind === 'outlet' ? 'active' : ''} onClick={() => void runScenarioEdit(contextMepElement, 'source', 'outlet')}>{contextSourceKind === 'outlet' ? '✓ Retour du réseau' : 'Définir comme retour'}</button>{contextSourceKind && <button disabled={saving} className="danger" onClick={() => void runScenarioEdit(contextMepElement, 'source', 'none')}>Retirer {contextSourceKind === 'inlet' ? 'le départ' : 'le retour'}</button>}</>}</>}<button onClick={() => setContextMenu(null)}>Fermer</button></div>}<div ref={markupLabelsRef} className="markup-labels">{visibleMarkups.map(mark => <button key={mark.id} data-markup={mark.id} className={`markup-label ${mark.kind}`} style={{ borderColor: lotDetails(reservationLot(mark), lotSettings).color, color: lotDetails(reservationLot(mark), lotSettings).color, background: "white" }} onClick={() => { setActiveMarkup(mark.id); setMarkupError(null); }} title={mark.text || 'Réservation'}>{mark.kind === 'note' ? 'A.' : 'R.'} <span>{mark.kind === 'note' ? mark.text : `${lotDetails(reservationLot(mark), lotSettings).name} · ${reservationLabel(mark)}`}</span></button>)}{dimensionMarks.flatMap(mark => (mark.dimensions || []).map(dimension => <span key={mark.id + dimension.id} data-markup={mark.id} data-dimension={dimension.id} className="markup-label dimension-label">{dimensionDistance(mark, dimension).toFixed(1)} cm</span>))}</div>{activeMark && <div className="markup-card"><strong>{activeMark.kind === 'note' ? 'Annotation' : 'Réservation'}</strong><small>{activeMark.elementName}</small>{activeMark.needsReview && <p aria-live="polite">{activeMark.reviewCandidate ? 'Position proposée sur le support retrouvé. Vérifiez la position et les cotations, puis confirmez. Les autres réservations sont temporairement masquées.' : 'Ancienne position affichée. Le support n’a pas été retrouvé avec certitude : choisissez une nouvelle face. Les autres réservations sont temporairement masquées.'}</p>}<p>{activeMark.text}</p>{activeMark.kind === 'reservation' && <p>{lotDetails(reservationLot(activeMark), lotSettings).name} · {reservationLabel(activeMark)} · Profondeur {activeMark.depthCm} cm</p>}{activeMark.dimensions?.map(dimension => <p key={dimension.id}>{dimension.elementName} · Axe : {dimensionDistance(activeMark, dimension).toFixed(1)} cm</p>)}{markupError && <p role="alert">{markupError}</p>}{isEditor && <>{activeMark.needsReview && activeMark.reviewCandidate && <Button size="sm" disabled={saving} onClick={() => void persistMarkup(activeMark)}>Confirmer cette position et les cotations</Button>}{activeMark.kind === 'note' && !activeMark.needsReview && <Button size="sm" variant="outline" disabled={exporting || !!(viewerPackage?.manifest.tiles && loadedZones < viewerPackage.manifest.tiles.length)} onClick={() => void exportBcf([activeMark])}>Exporter BCF</Button>}<Button size="sm" onClick={() => { setEditMode("translate"); if (activeMark.needsReview) setRelocating(activeMark); else setDraftMarkup({ ...activeMark }); setActiveMarkup(null); }}>Modifier / déplacer</Button>{activeMark.kind === 'note' && <Button size="sm" onClick={() => { setRelocating(activeMark); setActiveMarkup(null); }}>Replacer sur une face</Button>}<Button size="sm" variant="outline" disabled={saving} onClick={() => void persistMarkup(activeMark, true)}>Supprimer</Button></>}<Button size="sm" variant="ghost" onClick={() => setActiveMarkup(null)}>Fermer</Button></div>}{relocating && <div className="relocation-hint">Cliquez sur la nouvelle face pour replacer « {relocating.text || relocating.elementName} ». Échap pour annuler.</div>}
+      {!miniMapVisible && <button className="viewer-map-show" aria-controls="viewer-mini-map" onClick={() => setMiniMapVisible(true)} title={inputDevice === 'gamepad' ? 'Afficher la mini-carte (croix ↑)' : 'Afficher la mini-carte (M)'}>Mini-carte <kbd>{inputDevice === 'gamepad' ? '↑' : 'M'}</kbd></button>}
+      <div id="viewer-mini-map" className="viewer-mini-map" hidden={!miniMapVisible}><header><strong>Plan local</strong><button onClick={() => setMiniMapVisible(false)} aria-label="Fermer la mini-carte" title={inputDevice === 'gamepad' ? 'Fermer la mini-carte (croix ↑)' : 'Fermer la mini-carte (M)'}>×</button></header><canvas ref={miniMapRef} width={280} height={280} aria-label="Plan local de 30 mètres, position et direction de la caméra"/></div>
+      </div>}<div className="appearance-toolbar" aria-label="Réglages de rendu"><button className={realisticLighting ? 'active' : ''} onClick={() => setRealisticLighting((value) => !value)} title="Basculer entre le mode ombré du plugin et les couleurs uniformes"><SunMedium/><span>{realisticLighting ? 'Ombré' : 'Uniforme'}</span></button><button className={highContrast ? 'active' : ''} onClick={() => setHighContrast((value) => !value)} title="Renforcer les contours et le contraste"><Contrast/><span>Contraste</span></button><button className={modelOpacity < 1 ? 'active' : ''} onClick={cycleOpacity} title="Faire varier la transparence de la maquette"><Layers3/><span>{Math.round(modelOpacity * 100)} %</span></button></div></div><div className="navigation-switch" aria-label="Mode de navigation"><button className={navigationMode === 'orbit' ? 'active' : ''} onClick={() => changeNavigationMode('orbit')}><Hand size={15}/><span>Navigation web</span></button><button className={navigationMode === 'maquette' ? 'active' : ''} onClick={() => changeNavigationMode('maquette')}><Footprints size={15}/><span>Maquette 3D</span></button></div>{navigationMode === 'maquette' && <div className="flight-controls" aria-label="Commandes de déplacement vertical"><button className={flightMode ? 'active' : ''} onClick={() => viewActionsRef.current?.toggleFlight()} title={flightMode ? 'Revenir au mode marche' : 'Activer le vol libre'}><Plane/><span>{flightMode ? 'Quitter le vol' : 'Vol libre'}</span></button>{flightMode && <><button aria-label="Monter" title="Monter" onPointerDown={() => holdInput('Space', true)} onPointerUp={() => holdInput('Space', false)} onPointerCancel={() => holdInput('Space', false)} onPointerLeave={() => holdInput('Space', false)}><ArrowUp/><span>Monter</span></button><button aria-label="Descendre" title="Descendre" onPointerDown={() => holdInput('ShiftLeft', true)} onPointerUp={() => holdInput('ShiftLeft', false)} onPointerCancel={() => holdInput('ShiftLeft', false)} onPointerLeave={() => holdInput('ShiftLeft', false)}><ArrowDown/><span>Descendre</span></button></>}<button onClick={() => viewActionsRef.current?.enterSpectator()} title="Revenir au point de départ"><RotateCcw/><span>Réapparaître</span></button></div>}{contextMenu && contextProperty && <div className="element-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} role="menu"><header><span>{contextProperty.name}</span><small>#{contextProperty.elementId}</small></header><button disabled={section.length >= maximumSections} onClick={sectionFromContext}>Faire une coupe</button>{isEditor && <><button onClick={() => beginMarkup('note')}>Annoter ici</button><button onClick={() => beginMarkup('reservation')}>Créer une réservation ici</button>{contextMepElement && <>{contextValve && <button disabled={saving} onClick={() => void runScenarioEdit(contextMepElement, 'valve', !contextValve.isClosed)}>{contextValve.isClosed ? 'Ouvrir la vanne' : 'Fermer la vanne'}</button>}<button disabled={saving} className={contextSourceKind === 'inlet' ? 'active' : ''} onClick={() => void runScenarioEdit(contextMepElement, 'source', 'inlet')}>{contextSourceKind === 'inlet' ? '✓ Départ du réseau' : 'Définir comme départ'}</button><button disabled={saving} className={contextSourceKind === 'outlet' ? 'active' : ''} onClick={() => void runScenarioEdit(contextMepElement, 'source', 'outlet')}>{contextSourceKind === 'outlet' ? '✓ Retour du réseau' : 'Définir comme retour'}</button>{contextSourceKind && <button disabled={saving} className="danger" onClick={() => void runScenarioEdit(contextMepElement, 'source', 'none')}>Retirer {contextSourceKind === 'inlet' ? 'le départ' : 'le retour'}</button>}</>}</>}<button onClick={() => setContextMenu(null)}>Fermer</button></div>}<div ref={markupLabelsRef} className="markup-labels">{visibleMarkups.map(mark => <button key={mark.id} data-markup={mark.id} className={`markup-label ${mark.kind}`} style={{ borderColor: lotDetails(reservationLot(mark), lotSettings).color, color: lotDetails(reservationLot(mark), lotSettings).color, background: "white" }} onClick={() => { setActiveMarkup(mark.id); setMarkupError(null); }} title={mark.text || 'Réservation'}>{mark.kind === 'note' ? 'A.' : 'R.'} <span>{mark.kind === 'note' ? mark.text : `${lotDetails(reservationLot(mark), lotSettings).name} · ${reservationLabel(mark)}`}</span></button>)}{dimensionMarks.flatMap(mark => (mark.dimensions || []).map(dimension => <span key={mark.id + dimension.id} data-markup={mark.id} data-dimension={dimension.id} className="markup-label dimension-label">{dimensionDistance(mark, dimension).toFixed(1)} cm</span>))}</div>{activeMark && <div className="markup-card"><strong>{activeMark.kind === 'note' ? 'Annotation' : 'Réservation'}</strong><small>{activeMark.elementName}</small>{activeMark.needsReview && <p aria-live="polite">{activeMark.reviewCandidate ? 'Position proposée sur le support retrouvé. Vérifiez la position et les cotations, puis confirmez. Les autres réservations sont temporairement masquées.' : 'Ancienne position affichée. Le support n’a pas été retrouvé avec certitude : choisissez une nouvelle face. Les autres réservations sont temporairement masquées.'}</p>}<p>{activeMark.text}</p>{activeMark.kind === 'reservation' && <p>{lotDetails(reservationLot(activeMark), lotSettings).name} · {reservationLabel(activeMark)} · Profondeur {activeMark.depthCm} cm</p>}{activeMark.dimensions?.map(dimension => <p key={dimension.id}>{dimension.elementName} · Axe : {dimensionDistance(activeMark, dimension).toFixed(1)} cm</p>)}{markupError && <p role="alert">{markupError}</p>}{isEditor && <>{activeMark.needsReview && activeMark.reviewCandidate && <Button size="sm" disabled={saving} onClick={() => void persistMarkup(activeMark)}>Confirmer cette position et les cotations</Button>}{activeMark.kind === 'note' && !activeMark.needsReview && <Button size="sm" variant="outline" disabled={exporting || !!(viewerPackage?.manifest.tiles && loadedZones < viewerPackage.manifest.tiles.length)} onClick={() => void exportBcf([activeMark])}>Exporter BCF</Button>}<Button size="sm" onClick={() => { setEditMode("translate"); if (activeMark.needsReview) setRelocating(activeMark); else setDraftMarkup({ ...activeMark }); setActiveMarkup(null); }}>Modifier / déplacer</Button>{activeMark.kind === 'note' && <Button size="sm" onClick={() => { setRelocating(activeMark); setActiveMarkup(null); }}>Replacer sur une face</Button>}<Button size="sm" variant="outline" disabled={saving} onClick={() => void persistMarkup(activeMark, true)}>Supprimer</Button></>}<Button size="sm" variant="ghost" onClick={() => setActiveMarkup(null)}>Fermer</Button></div>}{relocating && <div className="relocation-hint">{inputDevice === 'gamepad' ? 'Visez la nouvelle face et appuyez sur A' : 'Cliquez sur la nouvelle face'} pour replacer « {relocating.text || relocating.elementName} ». {inputDevice === 'gamepad' ? 'B' : 'Échap'} pour annuler.</div>}
     {markupListOpen && <aside className="markup-list" aria-label="Annotations et réservations"><strong>Annotations et réservations</strong><h2 className="export-heading">Exporter les réservations</h2>{viewerPackage && !viewerPackage.manifest.sharedCoordinates && <p role="status">Pour exporter un IFC en coordonnées partagées, republiez cette maquette depuis Revit avec le plugin corrigé.</p>}<label className="export-lot">Lots à exporter<select value={exportLot} onChange={event => setExportLot(event.target.value)}><option value="">Tous les lots</option>{lots.map(lot => <option key={lot.id} value={lot.id}>{lot.name}</option>)}</select></label><div className="markup-actions"><Button size="sm" variant="outline" disabled={exporting || !allMarkups.some(m => m.kind === 'reservation' && !m.needsReview && (!exportLot || reservationLot(m) === exportLot))} onClick={() => exportReservations(true)}>{exporting ? 'Export en cours…' : 'Exporter IFC'}</Button><Button size="sm" variant="outline" disabled={exporting || !allMarkups.some(m => m.kind === 'reservation' && !m.needsReview && (!exportLot || reservationLot(m) === exportLot))} onClick={() => exportReservations(false)}>Exporter vers Revit</Button></div><p>IFC : coordonnées partagées du site actif Revit. Export vers Revit : repère interne. Les points à vérifier sont exclus. Le choix des lots à exporter est indépendant des lots masqués.</p><h2 className="export-heading">Exporter les annotations</h2><div className="markup-actions"><Button size="sm" variant="outline" disabled={exporting || !allMarkups.some(m => m.kind === 'note' && !m.needsReview)} onClick={() => exportReservations(true, true)}>{exporting ? 'Export en cours…' : 'Exporter annotations IFC'}</Button><Button size="sm" variant="outline" disabled={exporting || !allMarkups.some(m => m.kind === 'note' && !m.needsReview) || !!(viewerPackage?.manifest.tiles && loadedZones < viewerPackage.manifest.tiles.length)} onClick={() => void exportBcf()}>{exporting ? 'Export en cours…' : 'Exporter annotations BCF'}</Button></div><p>Les annotations confirmées sont exportées en coordonnées partagées, avec leur texte et leur élément associé. Cet export est indépendant du filtre par lot des réservations.</p><Button size="sm" variant="ghost" onClick={() => setMarkupListOpen(false)}>Fermer</Button>{!allMarkups.length && <p>Aucune annotation enregistrée.</p>}{listedMarkups.map(mark => <button className="markup-list-item" style={{ color: lotDetails(reservationLot(mark), lotSettings).color, borderLeftColor: lotDetails(reservationLot(mark), lotSettings).color }} key={mark.id} onClick={() => { setActiveMarkup(mark.id); setMarkupListOpen(false); if (mark.needsReview) viewActionsRef.current?.frameMarkup(mark); }}><b>{(mark.kind === 'note' ? 'A.' : 'R.') + ' ' + lotDetails(reservationLot(mark), lotSettings).name} · {mark.elementName}</b><span>{mark.needsReview ? `⚠ À vérifier · ${mark.text || reservationLabel(mark)}` : mark.text || reservationLabel(mark)}</span></button>)}</aside>}
     {lotsOpen && <ReservationLotsPanel lots={lots} editable={isEditor} onSave={persistLot} onClose={() => setLotsOpen(false)} onSaved={(id, created) => { if (!created) return; setCurrentLot(id); setDraftMarkup(current => current?.kind === 'reservation' ? { ...current, lot: id } : current); }}/>}
     {measureOpen && <MeasureControls mode={measureMode} onMode={mode => { setMeasureMode(mode); measureModeRef.current = mode; startMeasure(); }} measures={measures} picking={pickingMeasure} hasStart={!!measureStart} onStart={startMeasure} onCancel={cancelMeasure} onRemove={id => setMeasures(current => current.filter(item => item.id !== id))} onClear={() => { setMeasures([]); cancelMeasure(); }} onClose={() => { setMeasureOpen(false); cancelMeasure(); }}/> }
     <div ref={measureLabelsRef} className="markup-labels measure-labels">{measureOpen && measures.map((measure, index) => { const values = measureDistances(measure.start, measure.end); return <span key={measure.id} data-measure={measure.id} data-dimension="horizontal" className="measure-label"><b>Mesure {index + 1}</b><span>Directe {values.direct.toFixed(3)} m</span><span>Horiz. {values.horizontal.toFixed(3)} m · Vert. {values.vertical.toFixed(3)} m</span></span>; })}{measureOpen && measureStart && <span className="measure-label">Point A</span>}</div>
-    <div className="view-hint">{navigationMode === 'orbit' ? `Clic : sélectionner · ${isEditor ? 'Clic droit : annoter / réservation · ' : ''}Double-clic / F : cadrer · Molette : zoom vers la souris · Glisser : regarder · Sélection : pivoter autour · Échap : libérer` : `Maintenir clic gauche : regarder · Clic droit : ${isEditor ? 'annoter / réservation' : 'inspecter'} · ZQSD / WASD : avancer · Espace : ${flightMode ? 'monter' : 'sauter'} · Maj : ${flightMode ? 'descendre' : 'courir'} · E : porte · F : ${flightMode ? 'revenir au sol' : 'voler'}`}</div>{loading && <div className="viewer-message"><LoaderCircle className="spin"/>Ouverture du partage…</div>}{error && <button className="viewer-message error" onClick={() => setError(null)}>{error}<small>Cliquer pour fermer</small></button>}</section>
+    {connectedPad && <div className="gamepad-status" role="status" title={connectedPad}>Manette connectée{inputDevice === 'keyboard' ? ' · Appuyez sur une touche de la manette' : gamepadMenu ? ' · Menu : croix pour naviguer, A pour valider, B pour revenir' : ' · Xbox'}</div>}
+    {inputDevice === 'gamepad' && !gamepadMenu && <div className="gamepad-reticle" aria-hidden="true"/>}
+    <div className={`view-hint${inputDevice === 'gamepad' ? ' gamepad-hint' : ''}`}>{inputDevice === 'gamepad' ? <>
+      {gamepadMenu ? <><kbd>↑ ↓ ← →</kbd> Parcourir les boutons · <kbd className="xbox-a">A</kbd> Valider · <kbd className="xbox-b">B</kbd> Retour</> : <>
+        <kbd>LS</kbd> {navigationMode === 'orbit' ? 'Déplacer la vue' : 'Marcher'} · <kbd>RS</kbd> {navigationMode === 'orbit' ? 'Pivoter' : 'Regarder'} · <kbd>LT / RT</kbd> {navigationMode === 'orbit' ? 'Zoom − / +' : flightMode ? 'Descendre / monter' : 'En vol : descendre / monter'} · <kbd className="xbox-a">A</kbd> {measureStart || pickingSection || pickingDimension || relocating ? 'Placer le point visé' : 'Sélectionner'} · <kbd className="xbox-b">B</kbd> Annuler · <kbd className="xbox-x">X</kbd> {navigationMode === 'orbit' ? 'Cadrer' : 'Sauter'} · <kbd className="xbox-y">Y</kbd> {navigationMode === 'orbit' ? 'Isométrique' : flightMode ? 'Marcher' : 'Voler'} · <kbd>LB</kbd> {navigationMode === 'orbit' ? 'Précision' : 'Courir'} · <kbd>RB</kbd> Actions · {navigationMode === 'maquette' && <><kbd>LS clic</kbd> Accroupir · <kbd>RS clic</kbd> Porte · <kbd>↑</kbd> Carte · </>}<kbd>↓</kbd> Flux · <kbd>←</kbd> {navigationMode === 'maquette' ? 'Réapparaître' : 'Isométrique'} · <kbd>→</kbd> Cadrer · <kbd>View ⧉</kbd> Changer de mode · <kbd>Menu ☰</kbd> Interface
+      </>}
+    </> : navigationMode === 'orbit' ? `Clic : sélectionner · ${isEditor ? 'Clic droit : annoter / réservation · ' : ''}Double-clic / F : cadrer · Molette : zoom vers la souris · Glisser : regarder · Sélection : pivoter autour · Échap : libérer` : `Maintenir clic gauche : regarder · Clic droit : ${isEditor ? 'annoter / réservation' : 'inspecter'} · ZQSD / WASD : avancer · Espace : ${flightMode ? 'monter' : 'sauter'} · Maj : ${flightMode ? 'descendre' : 'courir'} · E : porte · F : ${flightMode ? 'revenir au sol' : 'voler'}`}</div>{loading && <div className="viewer-message"><LoaderCircle className="spin"/>Ouverture du partage…</div>}{error && <button className="viewer-message error" onClick={() => setError(null)}>{error}<small>Cliquer pour fermer</small></button>}</section>
     <aside className={`mep-panel ${selectedProperty ? 'inspection-panel' : ''}`}>
       {selectedProperty ? <>
         <div className="inspection-heading"><div><span>ÉLÉMENTS INSPECTÉS</span><small>1 élément</small></div><button onClick={() => setSelectedIndex(null)}>Retour</button></div>
@@ -1537,7 +1667,7 @@ export function MepViewer() {
         <p className="mep-command-status">{flowsVisible ? flowRenderStats.paths > 0 ? `${flowRenderStats.paths} parcours affiché(s) · ${flowRenderStats.arrows} flèche(s) animée(s).` : 'Aucun parcours exploitable dans cette publication.' : 'Les flux sont désactivés.'}</p>
         <button className="advanced-toggle" onClick={() => setAdvancedPanelOpen((value) => !value)}>Réglages et analyses <span>{advancedPanelOpen ? '−' : '+'}</span></button>
         {advancedPanelOpen && <section className="advanced-content"><div className="section-title"><span>SYSTÈMES AFFICHÉS</span><Eye size={14}/></div><div className="network-list">{systems.map((system, index) => <button key={system.key} onClick={() => toggleSystem(system.key)} className={hiddenSystems.has(system.key) ? 'network-hidden' : ''}><i style={{ background: colorOf(system, index) }}/><span>{system.name}<small>{system.elementCount || 0} éléments</small></span>{hiddenSystems.has(system.key) ? <EyeOff size={16}/> : <Eye size={16}/>}</button>)}</div><div className="panel-separator"/><span className="legend-title">LÉGENDE</span><p className="plugin-legend">Flux lumineux : connexion établie · Gris : isolé · Ambre : indéterminé<br/>Vannes : anneau vert ouverte · croix rouge fermée · ambre incertaine · blanc sélectionnée</p></section>}
-        <p className="selection-instruction">Pointe un objet puis effectue un clic gauche pour ouvrir sa fiche complète.</p>
+        <p className="selection-instruction">{inputDevice === 'gamepad' ? 'Vise un objet au centre de l’écran puis appuie sur A pour ouvrir sa fiche.' : 'Pointe un objet puis effectue un clic gauche pour ouvrir sa fiche complète.'}</p>
       </>}
     </aside>
     <footer className="statusbar"><output>{calculating ? "Recalcul des flux…" : calculationError || "Flux indicatifs · aucun débit ni pression calculés"}</output>{cutting && <output>Découpe en cours… vous pouvez continuer à naviguer</output>}<div><Waves size={14}/><span>Fluides</span><b className={flowsVisible ? '' : 'off'}>{flowsVisible ? 'ACTIFS' : 'ARRÊTÉS'}</b></div><div>{flightMode && navigationMode === 'maquette' ? <Plane size={14}/> : <Footprints size={14}/>}<span>MODE</span><b>{navigationMode === 'orbit' ? 'NAVIGATION WEB' : flightMode ? 'VOL LIBRE' : 'MARCHE'}</b></div><div><Users size={14}/><span>{viewerPackage?.manifest.tiles ? loadedZones + ' / ' + viewerPackage.manifest.tiles.length + ' zones chargées' : resolved ? 'Scénario synchronisé' : 'Aperçu local'}</span><i/></div></footer>
@@ -1550,3 +1680,4 @@ export function MepViewer() {
     </div>
   </div>}</>;
 }
+
