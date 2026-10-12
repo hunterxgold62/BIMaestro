@@ -114,8 +114,8 @@ try {
     const before = await state(); await input({ axes: [1, 0, 1, 0] }); assert.ok(distance(before.position, (await state()).position) < 1e-6);
     await input(); await page.getByRole('button', { name: 'Mesurer', exact: true }).evaluate(button => button.focus());
     await tap(0); assert.ok(await page.locator('.gamepad-reticle').isVisible(), 'A measurement must leave menu mode');
-    assert.match(await page.locator('.measure-controls').innerText(), /appuyez sur A/);
-    assert.doesNotMatch(await page.locator('.measure-controls').innerText(), /Cliquez|Échap/);
+    assert.match(await page.locator('.measure-controls').textContent(), /appuyez sur A/);
+    assert.doesNotMatch(await page.locator('.measure-controls').textContent(), /Cliquez|Échap/);
     await aimAtWall(); await tap(0); assert.ok(await page.locator('.measure-label').count() > 0, 'A places the first measurement point');
     await tap(1);
   });
@@ -123,7 +123,7 @@ try {
     await aimAtWall(); await tap(9);
     await page.locator('.view-toolbar').getByRole('button', { name: /^Coupe/ }).evaluate(button => button.focus());
     await tap(0); assert.ok(await page.locator('.gamepad-reticle').isVisible());
-    assert.match(await page.locator('.section-controls [role=status]').innerText(), /appuyez sur A/);
+    assert.match(await page.locator('.section-controls [role=status]').textContent(), /appuyez sur A/);
     await tap(0); const panel = page.locator('.section-controls');
     assert.match(await panel.innerText(), /LB \+ LT \/ RT/);
     const offset = await panel.locator('output').innerText(), before = await state();
