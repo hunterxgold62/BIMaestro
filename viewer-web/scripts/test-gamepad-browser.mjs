@@ -187,7 +187,7 @@ try {
     await aimAtWall(); await tap(7); assert.equal((await state()).selected, 1);
     await input({ buttons: { 1: 1 } }); assert.equal((await state()).selected, 1, 'Crouching must not clear selection');
     await input(); await tap(11); assert.equal((await state()).selected, null);
-    assert.match(await page.locator('.gamepad-hint').innerText(), /LS clic.*Courir.*A.*Sauter.*B.*Accroupir.*RT.*Sélectionner/);
+    assert.match(await page.locator('.gamepad-hint').textContent(), /LS clic.*Courir.*A.*Sauter.*B.*Accroupir.*RT.*Sélectionner/);
   });
   await check('LS click starts sprinting without needing to hold the click; releasing forward stops it', async () => {
     const movement = async (sprint = false) => {
