@@ -181,8 +181,10 @@ export class MepVrVisit {
     const right = sources.find(s => s.handedness === 'right' && s.gamepad?.mapping === 'xr-standard');
     const visible = this.session.visibilityState === 'visible' && !document.hidden;
     const pad = this.pad.read(readBrowserPads(), visible);
-    const [mx, my] = left ? xrStick(left) : [pad.moveX, pad.moveY];
-    const [turn] = right ? xrStick(right) : [pad.lookX];
+    const [nativeX, nativeY] = left ? xrStick(left) : [0, 0];
+    const [nativeTurn] = right ? xrStick(right) : [0];
+    const nativeActive = !!(nativeX || nativeY || nativeTurn || sources.some(s => s.gamepad?.buttons.some(b => b.pressed)));
+    const [mx, my, turn] = nativeActive ? [nativeX, nativeY, nativeTurn] : [pad.moveX, pad.moveY, pad.lookX];
     let reset = false, exit = false;
     for (const source of sources) {
       const buttons = source.gamepad?.buttons.map(b => b.pressed) || [], before = this.previous.get(source);

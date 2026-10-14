@@ -107,6 +107,12 @@ try {
         assert.ok(Math.abs(turned - yaw + Math.PI / 6) < 1e-6);
         await page.waitForTimeout(150); assert.equal(await page.evaluate(() => window.__test.camera.parent.rotation.y), turned);
         await page.evaluate(() => window.__session.inputSources[1].gamepad.axes = [0, 0, 0, 0]);
+        const xboxBefore = await page.evaluate(() => window.__test.camera.getWorldPosition(window.__test.camera.position.clone()).toArray());
+        await page.evaluate(() => window.__pads = [{ id: 'Xbox', index: 0, connected: true, mapping: 'standard', axes: [0, -1, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) }]);
+        await page.waitForTimeout(200);
+        const xboxAfter = await page.evaluate(() => window.__test.camera.getWorldPosition(window.__test.camera.position.clone()).toArray());
+        assert.ok(Math.hypot(xboxAfter[0] - xboxBefore[0], xboxAfter[2] - xboxBefore[2]) > .1, 'Xbox walking must work while idle XR controllers remain connected');
+        await page.evaluate(() => window.__pads = []);
         await page.getByRole('button', { name: 'Quitter la VR', exact: true }).click();
         await entry.waitFor(); await page.waitForFunction(() => !window.__test.renderer.xr.isPresenting);
         const after = await page.evaluate(() => ({ position: window.__test.camera.position.toArray(), quaternion: window.__test.camera.quaternion.toArray(), near: window.__test.camera.near, fov: window.__test.camera.fov, parent: !!window.__test.camera.parent }));
