@@ -81,6 +81,7 @@ namespace BIMaestro.Codex
         private readonly Button connect = Button("Connexion ChatGPT");
         private readonly Button disconnect = Button("Déconnexion");
         private readonly Button send = Button("Envoyer");
+        private readonly Button dictate = Button("Micro");
         private readonly Button stop = Button("Arrêter");
         private readonly Button reset = Button("Nouvelle discussion");
         private readonly CheckBox separateMode = new CheckBox { Content = "Nouvelle famille dans un Revit séparé", IsChecked = true, Margin = new Thickness(0, 6, 0, 6) };
@@ -312,7 +313,7 @@ namespace BIMaestro.Codex
                   </ControlTemplate.Triggers>
                 </ControlTemplate>")));
             context.Style = changes.Style = direct.Style = internet.Style = permissionStyle;
-            foreach (var button in new[] { connect, disconnect, send, stop, reset, historyButton, browse, claudeInstall, attach, pasteImage, showArtifact, openArtifact, community, shareArtifact, openDiagnostics })
+            foreach (var button in new[] { connect, disconnect, send, dictate, stop, reset, historyButton, browse, claudeInstall, attach, pasteImage, showArtifact, openArtifact, community, shareArtifact, openDiagnostics })
                 button.SetResourceReference(StyleProperty, "SecondaryButton");
             send.SetResourceReference(StyleProperty, "PrimaryButton");
             browse.MinWidth = 110;
@@ -434,7 +435,14 @@ namespace BIMaestro.Codex
             attach.Content = "Joindre"; attach.ToolTip = mepMode ? "Joindre un P&ID PDF ou une image" : "Joindre une image ou une fiche technique PDF"; attach.MinWidth = 88;
             pasteImage.Content = "Coller"; pasteImage.ToolTip = "Coller une image du presse-papiers"; pasteImage.MinWidth = 88;
             send.MinWidth = 120; stop.MinWidth = 72; reset.MinWidth = 90;
-            var buttons = new WrapPanel(); buttons.Children.Add(attach); buttons.Children.Add(pasteImage); buttons.Children.Add(send); buttons.Children.Add(stop); bottom.Children.Add(buttons);
+            dictate.MinWidth = 88;
+            var microphoneLabel = new StackPanel { Orientation = Orientation.Horizontal };
+            microphoneLabel.Children.Add(new TextBlock { Text = "\uE720", FontFamily = new FontFamily("Segoe MDL2 Assets"), FontSize = 16, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 7, 0) });
+            microphoneLabel.Children.Add(new TextBlock { Text = "Micro", VerticalAlignment = VerticalAlignment.Center });
+            dictate.Content = microphoneLabel;
+            System.Windows.Automation.AutomationProperties.SetName(dictate, "Micro : dicter votre demande");
+            dictate.ToolTip = "Dicter avec le micro via Windows (Win+H). Micro et Internet nécessaires. Arrêtez la dictée, relisez puis cliquez sur Envoyer.";
+            var buttons = new WrapPanel(); buttons.Children.Add(attach); buttons.Children.Add(pasteImage); buttons.Children.Add(dictate); buttons.Children.Add(send); buttons.Children.Add(stop); bottom.Children.Add(buttons);
             var conversation = new DockPanel();
             var discussionHeader = new DockPanel { Margin = new Thickness(0, 0, 0, 6) };
             var discussionActions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right };
@@ -528,6 +536,7 @@ namespace BIMaestro.Codex
             connect.Click += async (_, __) => await ConnectAsync();
             disconnect.Click += async (_, __) => await LogoutAsync();
             send.Click += async (_, __) => await SendAsync();
+            dictate.Click += (_, __) => StartDictation();
             stop.Click += async (_, __) => await StopAsync();
             reset.Click += (_, __) => { if (!ReleaseHistory()) return; threadId = null; turnId = null; claudeClient?.NewDiscussion(); lastArtifact = null; lastLibraryCheck = null; input.Clear(); SelectPreferredModel(); direct.IsChecked = false; attachments.Clear(); pdfAttachments.Clear(); RefreshAttachments(); transcript.Clear(); Append("BIMaestro", "Nouvelle discussion. Les modifications déjà faites dans Revit et les fichiers créés sont conservés."); UpdateControls(); };
             input.PreviewKeyDown += async (_, e) =>
@@ -823,6 +832,7 @@ namespace BIMaestro.Codex
                 changes.IsChecked == true ? "Autorisations Revit : confirmation" :
                 context.IsChecked == true ? "Autorisations Revit : lecture seule" : "Autorisations Revit : désactivées";
             send.IsEnabled = !busy && !connecting && !checkingLibrary && !separateRevitStarting && ready && models.SelectedItem != null;
+            dictate.IsEnabled = !busy && !connecting && !checkingLibrary && !separateRevitStarting;
             send.Content = !bridge.DedicatedSession && separateMode.IsChecked == true ? "Envoyer dans le Revit séparé" : "Envoyer";
             separateMode.IsEnabled = !busy && !connecting && !checkingLibrary && !separateRevitStarting;
             stop.IsEnabled = busy;

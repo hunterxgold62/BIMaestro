@@ -1342,6 +1342,8 @@ namespace IA
                 if (save.ShowDialog(this) == true)
                 {
                     File.WriteAllBytes(save.FileName, _resultBytes);
+                    Licensing.OperationTelemetry.Track("RealisticViewImageCommand", "Image réaliste IA", "save_image", false,
+                        new Dictionary<string, int> { ["files_exported"] = 1 });
 
                     MessageBox.Show(
                         this,

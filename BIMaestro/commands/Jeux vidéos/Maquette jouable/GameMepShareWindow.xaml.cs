@@ -231,19 +231,27 @@ namespace BIMaestro.VideoGames
 
         private async void RevokeButton_Click(object sender, RoutedEventArgs e)
         {
+            string scope = (DeletionScopeComboBox.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Tag as string;
+            if (string.IsNullOrWhiteSpace(scope)) return;
+            string confirmation = scope == "data"
+                ? "Supprimer définitivement les résas, annotations et lots du partage web ? La maquette 3D et les liens sont conservés. Le fichier Revit reste intact."
+                : scope == "model"
+                    ? "Supprimer la maquette 3D publiée et désactiver les deux liens ? Les résas et annotations sont conservées pendant 5 mois et seront retrouvées lors d'un nouvel export."
+                    : "Supprimer définitivement la maquette publiée ET ses résas, annotations et lots, puis désactiver les deux liens ? Le fichier Revit reste intact.";
             if (MessageBox.Show(this,
-                    "Supprimer la maquette publiée et révoquer immédiatement les deux liens ?",
-                    "Révoquer le partage", MessageBoxButton.YesNo,
+                    confirmation,
+                    "Supprimer les données du partage", MessageBoxButton.YesNo,
                     MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
             SetBusy(true);
             try
             {
-                await GameMepPublishClient.RevokeAsync(
-                    _scene.MepGraph, _state, CancellationToken.None);
-                _state = new GameMepShareState();
+                await GameMepPublishClient.DeleteAsync(
+                    _scene.MepGraph, _state, scope, CancellationToken.None);
                 ShowState();
                 PublishProgressBar.Value = 0;
-                StatusText.Text = "Maquette publiée supprimée et liens révoqués. Vous pouvez créer un nouveau partage.";
+                StatusText.Text = scope == "data" ? "Résas et annotations supprimées. La maquette publiée est conservée."
+                    : scope == "model" ? "Maquette 3D supprimée. Résas et annotations conservées ; publiez une nouvelle révision pour les retrouver."
+                    : "Maquette publiée, résas et annotations supprimées.";
             }
             catch (Exception exception) { StatusText.Text = exception.Message; }
             finally { ShowState(); SetBusy(false); }
@@ -254,7 +262,7 @@ namespace BIMaestro.VideoGames
             bool available = !string.IsNullOrWhiteSpace(_state.PublicationId) &&
                 !string.IsNullOrWhiteSpace(_state.ViewerUrl) &&
                 !string.IsNullOrWhiteSpace(_state.EditorUrl);
-            LinksPanel.Visibility = available ? Visibility.Visible : Visibility.Collapsed;
+            LinksPanel.Visibility = !string.IsNullOrWhiteSpace(_state.PublicationId) ? Visibility.Visible : Visibility.Collapsed;
             ViewerUrlTextBox.Text = _state.ViewerUrl;
             EditorUrlTextBox.Text = _state.EditorUrl;
             PublishButton.Content = available ? "Publier une nouvelle révision" : "Partager sur le web";

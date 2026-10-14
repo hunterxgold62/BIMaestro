@@ -71,12 +71,16 @@ namespace Visualisation
                 {
                     string xlsxPath = Path.Combine(excelDir, fileBaseName + ".xlsx");
                     ExportScheduleToExcel(schedule, xlsxPath);
+                    RecordOperationResult(ButtonId, "export_excel", false,
+                        new Dictionary<string, int> { ["files_exported"] = 1 });
                     AskAndOpen(xlsxPath, "Excel");
                 }
                 else if (res == TaskDialogResult.CommandLink2)
                 {
                     string pdfPath = Path.Combine(pdfDir, fileBaseName + ".pdf");
                     ExportScheduleToPdfViaExcel(schedule, pdfPath);
+                    RecordOperationResult(ButtonId, "export_pdf", false,
+                        new Dictionary<string, int> { ["files_exported"] = 1 });
                     AskAndOpen(pdfPath, "PDF");
                 }
                 else

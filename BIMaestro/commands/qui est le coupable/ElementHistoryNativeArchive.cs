@@ -17,11 +17,40 @@ namespace Analyse
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool GetLastInputInfo(ref LastInput input);
-
-        internal static bool UserIsIdle()
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
+        [DllImport("user32.dll")]
+        private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+        private static readonly uint ProcessId = (uint)Process.GetCurrentProcess().Id;
+        private static bool _wasForeground;
+        private static uint _foregroundSince;
+        internal static bool Paused;
+        internal static bool SelectionRequested;
+        internal static bool CanStartSelection(bool foreground, bool requested, bool paused)
+            => foreground && requested && !paused;
+        internal static bool SelectionCanRun()
         {
+            var window = GetForegroundWindow();
+            GetWindowThreadProcessId(window, out var foregroundProcess);
+            return CanStartSelection(window != IntPtr.Zero && foregroundProcess == ProcessId, SelectionRequested, Paused);
+        }
+
+        internal static bool CanRun(uint now, uint lastInput, bool foreground, uint minimumIdleMilliseconds)
+        {
+            if (!foreground) { _wasForeground = false; return false; }
+            if (!_wasForeground) { _wasForeground = true; _foregroundSince = now; }
+            return unchecked(now - _foregroundSince) >= minimumIdleMilliseconds
+                && unchecked(now - lastInput) >= minimumIdleMilliseconds;
+        }
+
+        internal static bool UserIsIdle(uint minimumIdleMilliseconds = 2000)
+        {
+            if (Paused) return false;
             var input = new LastInput { Size = (uint)Marshal.SizeOf(typeof(LastInput)) };
-            return GetLastInputInfo(ref input) && unchecked((uint)Environment.TickCount - input.Tick) >= 1500;
+            var window = GetForegroundWindow();
+            GetWindowThreadProcessId(window, out var foregroundProcess);
+            return GetLastInputInfo(ref input) && CanRun((uint)Environment.TickCount, input.Tick,
+                window != IntPtr.Zero && foregroundProcess == ProcessId, minimumIdleMilliseconds);
         }
     }
 
@@ -46,6 +75,8 @@ namespace Analyse
         {
             internal ElementId RootId;
             internal string RootUid;
+            internal string CostKey;
+            internal string ElementClass;
             internal readonly List<HistoryNativeArtifact> Receipts = new List<HistoryNativeArtifact>();
         }
         private sealed class State
@@ -60,10 +91,68 @@ namespace Analyse
             internal DateTime? LastWaveStartedUtc;
             internal DateTime? LastWaveCompletedUtc;
             internal double LastWaveMilliseconds;
+            internal DateTime NextBackgroundUtc;
+            internal int PriorityViewId = -1;
+            internal HashSet<string> VisibleRoots = new HashSet<string>();
+            internal Document Archive;
+            internal HashSet<ElementId> TemplateTypeIds;
+            internal bool RetireArchive;
+            internal int ArchiveWaves;
+            internal int ArchiveRoots;
+            internal DateTime ArchiveUsedUtc;
         }
         private static readonly Dictionary<Document, State> States = new Dictionary<Document, State>();
         private static bool _processing;
-        private static DateTime _nextBackgroundUtc;
+        private static State _archiveOwner;
+        private static readonly HashSet<Document> OwnedArchives = new HashSet<Document>();
+        private static readonly List<Document> RetiredArchives = new List<Document>();
+        private static Autodesk.Revit.ApplicationServices.Application _watchedApplication;
+
+        private static void SourceChanged(object sender, Autodesk.Revit.DB.Events.DocumentChangedEventArgs args)
+        {
+            if (States.TryGetValue(args.GetDocument(), out var state)) state.RetireArchive = true;
+        }
+        private static void SourceClosing(object sender, Autodesk.Revit.DB.Events.DocumentClosingEventArgs args)
+        {
+            if (!OwnedArchives.Contains(args.Document)) Forget(args.Document);
+        }
+        private static void Retire(State state)
+        {
+            if (state.Archive != null) RetiredArchives.Add(state.Archive);
+            state.Archive = null;
+            state.TemplateTypeIds = null;
+            state.ArchiveWaves = state.ArchiveRoots = 0;
+            state.RetireArchive = false;
+            if (_archiveOwner == state) _archiveOwner = null;
+        }
+        private static void CloseRetired(Document diagnosticSource = null)
+        {
+            var timer = Stopwatch.StartNew();
+            foreach (var archive in RetiredArchives.ToList())
+            {
+                try
+                {
+                    if (archive.IsValidObject) archive.Close(false);
+                    RetiredArchives.Remove(archive);
+                    OwnedArchives.Remove(archive);
+                }
+                catch (Exception ex) { Trace.WriteLine("History archive close: " + ex.Message); }
+            }
+            if (diagnosticSource != null)
+                HistoryPerformanceLog.Record(diagnosticSource,"native_close",timer.Elapsed.TotalMilliseconds,0,0,false);
+        }
+        internal static void Shutdown()
+        {
+            foreach (var state in States.Values) Retire(state);
+            CloseRetired();
+            States.Clear();
+            if (_watchedApplication != null)
+            {
+                _watchedApplication.DocumentChanged -= SourceChanged;
+                _watchedApplication.DocumentClosing -= SourceClosing;
+                _watchedApplication = null;
+            }
+        }
 
         private static void ExpediteSelectedRoots(State state)
         {
@@ -71,15 +160,21 @@ namespace Analyse
             // A new selection must not inherit the long pause of an unrelated
             // archive wave. Work still starts only after the user becomes idle.
             var next = DateTime.UtcNow.AddSeconds(2);
-            if (_nextBackgroundUtc > next) _nextBackgroundUtc = next;
+            if (state.NextBackgroundUtc > next) state.NextBackgroundUtc = next;
         }
         private static State For(Document doc)
         {
+            if (_watchedApplication == null)
+            {
+                _watchedApplication = doc.Application;
+                _watchedApplication.DocumentChanged += SourceChanged;
+                _watchedApplication.DocumentClosing += SourceClosing;
+            }
             if (!States.TryGetValue(doc, out var state)) States[doc] = state = new State();
             return state;
         }
 
-        internal static bool Owns(Document doc) => doc != null && ((_processing && !States.ContainsKey(doc))
+        internal static bool Owns(Document doc) => doc != null && (OwnedArchives.Contains(doc) || (_processing && !States.ContainsKey(doc))
             || (!string.IsNullOrEmpty(doc.PathName) && string.Equals(Path.GetDirectoryName(doc.PathName),
                 Path.Combine(CollaborativeModelTrackerStore.ActiveDirectory, "native-history"), StringComparison.OrdinalIgnoreCase)));
 
@@ -98,6 +193,10 @@ namespace Analyse
                 else if (element is FamilyInstance instance && instance.SuperComponent != null) parent = instance.SuperComponent;
                 else if (element is FamilyInstance panel && panel.Host is Wall wall && wall.WallType.Kind == WallKind.Curtain) parent = wall;
                 else if (element is FamilyInstance hosted && hosted.Host is HostObject hostObject) parent = hostObject;
+#if REVIT2024 || REVIT2025_OR_GREATER
+                else if (element is Toposolid topo && topo.HostTopoId != ElementId.InvalidElementId)
+                    parent = element.Document.GetElement(topo.HostTopoId);
+#endif
                 if (parent == null) return element;
                 element = parent;
             }
@@ -116,7 +215,28 @@ namespace Analyse
                     element.Name + " " + (element is FamilyInstance instance ? instance.Symbol?.Family?.Name : ""));
         }
 
-        internal static HistoryRecipe Capture(Element element)
+        internal static bool IsHeavyTerrain(Element element)
+        {
+            if (element == null) return false;
+            bool Terrain(Element e) => e != null && (e.GetType().Name == "Toposolid" || e.GetType().Name == "TopographySurface");
+            if (Terrain(element)) return true;
+            if (element.GroupId == ElementId.InvalidElementId && !(element is Group)) return false;
+            var root = Root(element);
+            var pending = new Queue<Element>();
+            var seen = new HashSet<ElementId>();
+            pending.Enqueue(root);
+            while (pending.Count > 0)
+            {
+                var candidate = pending.Dequeue();
+                if (candidate == null || !seen.Add(candidate.Id)) continue;
+                if (Terrain(candidate)) return true;
+                if (candidate is Group group)
+                    foreach (var id in group.GetMemberIds()) pending.Enqueue(element.Document.GetElement(id));
+            }
+            return false;
+        }
+
+        internal static HistoryRecipe Capture(Element element, bool allowHeavyTerrain = true)
         {
             if (_processing || element == null || element.Document.IsFamilyDocument || element is ElementType
                 || element.ViewSpecific || element.Category == null
@@ -126,8 +246,10 @@ namespace Analyse
             if (!(root is Group) && root.Category?.CategoryType != CategoryType.Model) return Find(element.Document, element.UniqueId);
             var state = For(element.Document);
             if (state.Ready.TryGetValue(element.UniqueId, out var cached)) return cached;
+            if (!allowHeavyTerrain && IsHeavyTerrain(root)) return null;
             if (!state.Pending.TryGetValue(root.UniqueId, out var pending))
-                state.Pending[root.UniqueId] = pending = new Pending { RootId = root.Id, RootUid = root.UniqueId };
+                state.Pending[root.UniqueId] = pending = new Pending { RootId = root.Id, RootUid = root.UniqueId,
+                    CostKey = HistoryCaptureCosts.Key(root), ElementClass = root.GetType().Name };
             var receipt = new HistoryNativeArtifact { RootSourceUniqueId = root.UniqueId,
                 MemberSourceUniqueId = element.UniqueId, RequestedUtc = DateTime.UtcNow };
             var queued = pending.Receipts.FirstOrDefault(r => r.MemberSourceUniqueId == element.UniqueId);
@@ -209,39 +331,68 @@ namespace Analyse
             }
         }
 
-        internal static void Forget(Document doc) => States.Remove(doc);
-
-        internal static void ProcessPendingBackground(Document source)
+        internal static void Forget(Document doc)
         {
+            if (States.TryGetValue(doc,out var state)) Retire(state);
+            States.Remove(doc);
+        }
+
+        internal static void ProcessPendingBackground(Document source, bool selectionOnly = false)
+        {
+            if (HistoryBackgroundWork.UserIsIdle())
+            {
+                foreach (var idleState in States.Values.Where(s=>s.Archive!=null && s.Pending.Count==0
+                    && DateTime.UtcNow>s.ArchiveUsedUtc.AddSeconds(30)).ToList()) Retire(idleState);
+                CloseRetired();
+            }
             if (source == null || !States.TryGetValue(source, out var state) || state.Pending.Count == 0) return;
             var now = DateTime.UtcNow;
             state.LastBackgroundCheckUtc = now;
-            if (now < _nextBackgroundUtc) { state.LastBlockReason = "cooldown"; return; }
-            if (!HistoryBackgroundWork.UserIsIdle()) { state.LastBlockReason = "user_active"; return; }
+            if (!selectionOnly && now < state.NextBackgroundUtc) { state.LastBlockReason = "cooldown"; return; }
+            bool CanContinue() => selectionOnly ? HistoryBackgroundWork.SelectionCanRun() : HistoryBackgroundWork.UserIsIdle();
+            if (!CanContinue()) { state.LastBlockReason = "user_active_or_paused"; return; }
             state.LastBlockReason = null;
             PrioritizeLastSelection(source, state);
+            var view = source.ActiveView;
+            if (!selectionOnly && view != null && view.Id.GetIdValue() != state.PriorityViewId
+                && FilteredElementCollector.IsViewValidForElementIteration(source, view.Id))
+            {
+                var viewTimer = Stopwatch.StartNew();
+                try
+                {
+                    var visibleIds = new HashSet<int>(new FilteredElementCollector(source, view.Id)
+                        .WhereElementIsNotElementType().ToElementIds().Select(id => id.GetIdValue()));
+                    state.VisibleRoots = new HashSet<string>(state.Pending.Values
+                        .Where(p => visibleIds.Contains(p.RootId.GetIdValue())).Select(p => p.RootUid));
+                    state.PriorityViewId = view.Id.GetIdValue();
+                    HistoryPerformanceLog.Record(source, "native_view_priority", viewTimer.Elapsed.TotalMilliseconds,
+                        visibleIds.Count, state.Pending.Count, false);
+                }
+                catch (Exception ex) { Trace.WriteLine("History native view priority: " + ex.Message); }
+            }
+            if (!CanContinue()) { state.LastBlockReason = "user_active_or_paused"; return; }
             state.LastWaveStartedUtc = DateTime.UtcNow;
             var timer = Stopwatch.StartNew();
-            try { ProcessPending(source); }
+            var pendingBefore = state.Pending.Count;
+            try { ProcessPending(source, background: true, priorityOnly: selectionOnly); }
             finally
             {
                 state.LastWaveCompletedUtc = DateTime.UtcNow;
                 state.LastWaveMilliseconds = timer.Elapsed.TotalMilliseconds;
                 // Revit document creation/copy/save requires the main API thread.
                 // Give navigation/editing time between these indivisible operations.
-                _nextBackgroundUtc = DateTime.UtcNow.AddMilliseconds(Math.Max(3000, timer.Elapsed.TotalMilliseconds * 2));
+                // A costly indivisible call must not be followed immediately by another one.
+                var recoveryMs = Math.Min(5000, Math.Max(500, state.LastWaveMilliseconds));
+                state.NextBackgroundUtc = DateTime.UtcNow.AddMilliseconds(recoveryMs);
+                HistoryPerformanceLog.Record(source, "native_archive", timer.Elapsed.TotalMilliseconds,
+                    pendingBefore - state.Pending.Count, state.Pending.Count, state.Pending.Count == 0);
             }
         }
 
         internal static bool ShouldRetrySelectedBackgroundSoon(Document source)
         {
-            if (source == null || !States.TryGetValue(source, out var state)
-                || state.PrioritySelectionUtc == default(DateTime)
-                || !state.Pending.Keys.Any(state.PriorityRoots.Contains)) return false;
-            // Revit may send just one Idling callback after a selection. Keep
-            // callbacks alive briefly until the selected wave becomes eligible.
-            return DateTime.UtcNow < state.PrioritySelectionUtc.AddSeconds(3)
-                && (state.LastBlockReason == "cooldown" || state.LastBlockReason == "user_active");
+            return source != null && States.TryGetValue(source, out var state)
+                && state.Pending.Count > 0 && HistoryBackgroundWork.UserIsIdle();
         }
 
         internal static HistoryNativeBackgroundAudit GetBackgroundAudit(Document doc)
@@ -251,7 +402,7 @@ namespace Analyse
             {
                 LastCheckUtc = state.LastBackgroundCheckUtc,
                 LastBlockReason = state.LastBlockReason,
-                NextEligibleUtc = _nextBackgroundUtc == default(DateTime) ? (DateTime?)null : _nextBackgroundUtc,
+                NextEligibleUtc = state.NextBackgroundUtc == default(DateTime) ? (DateTime?)null : state.NextBackgroundUtc,
                 LastWaveStartedUtc = state.LastWaveStartedUtc,
                 LastWaveCompletedUtc = state.LastWaveCompletedUtc,
                 LastWaveMilliseconds = state.LastWaveMilliseconds,
@@ -324,7 +475,43 @@ namespace Analyse
             }
         }
 
-        internal static void ProcessPending(Document source)
+        private static HashSet<string> IncomingTypeNames(Document source, IEnumerable<Pending> wave)
+        {
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var seen = new HashSet<ElementId>();
+            var pendingTypes = new Queue<ElementType>();
+            void AddType(ElementId id)
+            {
+                if (id == null || id == ElementId.InvalidElementId || !seen.Add(id)) return;
+                if (source.GetElement(id) is ElementType type) pendingTypes.Enqueue(type);
+            }
+            void AddParameterTypes(Element element)
+            {
+                foreach (Parameter parameter in element.Parameters)
+                    if (parameter.HasValue && parameter.StorageType == StorageType.ElementId)
+                        AddType(parameter.AsElementId());
+            }
+            foreach (var item in wave)
+            {
+                var root = source.GetElement(item.RootId);
+                if (root == null) continue;
+                foreach (var member in Aggregate(source, root))
+                {
+                    AddType(member.GetTypeId());
+                    AddParameterTypes(member);
+                }
+            }
+            while (pendingTypes.Count > 0)
+            {
+                var type = pendingTypes.Dequeue();
+                names.Add(type.Name);
+                AddParameterTypes(type);
+            }
+            return names;
+        }
+
+        internal static void ProcessPending(Document source, bool background = false, int maxRoots = 16,
+            bool targetTypeRenames = true, bool reuseArchive = true, bool priorityOnly = false)
         {
             if (_processing || source == null || source.IsFamilyDocument || source.IsModifiable
                 || !States.TryGetValue(source, out var state) || state.Pending.Count == 0) return;
@@ -332,24 +519,66 @@ namespace Analyse
             Document archive = null;
             var completed = new List<Tuple<Pending, Element, Dictionary<string, Element>>>();
             var selectedPending = state.Pending.Values.Where(p => state.PriorityRoots.Contains(p.RootUid)).ToList();
-            var wave = (selectedPending.Count > 0 ? selectedPending : state.Pending.Values.ToList())
-                .Take(selectedPending.Count > 0 ? 16 : 8).ToList();
-            var copyBudgetMs = selectedPending.Count > 0 ? 4500 : 1200;
+            if (priorityOnly && selectedPending.Count == 0) { _processing = false; return; }
+            var wave = (selectedPending.Count > 0 ? selectedPending : state.Pending.Values
+                .OrderByDescending(p => state.VisibleRoots.Contains(p.RootUid)).ToList())
+                .OrderBy(p => HistoryCaptureCosts.Estimate(p.CostKey, "native_root", p.ElementClass))
+                .ThenByDescending(p => state.VisibleRoots.Contains(p.RootUid))
+                .Take(Math.Max(1, Math.Min(16, maxRoots))).ToList();
+            // Yield sooner during automatic work; a single Revit copy is indivisible.
+            var copyBudgetMs = background ? 50 : 250;
             try
             {
-                archive = source.Application.NewProjectDocument(UnitSystem.Metric);
+                var stageTimer = Stopwatch.StartNew();
+                HashSet<string> incomingNames = null;
+                if (targetTypeRenames)
+                {
+                    try { incomingNames = IncomingTypeNames(source, wave); }
+                    catch (Exception ex) { Trace.WriteLine("History native type preflight: " + ex.Message); }
+                }
+                HistoryPerformanceLog.Record(source, "native_type_preflight", stageTimer.Elapsed.TotalMilliseconds,
+                    incomingNames?.Count ?? 0, state.Pending.Count, false);
+                stageTimer.Restart();
+                if (_archiveOwner != null && _archiveOwner != state) Retire(_archiveOwner);
+                if (!reuseArchive || state.RetireArchive || state.ArchiveWaves>=8 || state.ArchiveRoots>=32) Retire(state);
+                CloseRetired(source);
+                bool created = state.Archive == null;
+                if (created)
+                {
+                    archive = state.Archive = source.Application.NewProjectDocument(UnitSystem.Metric);
+                    OwnedArchives.Add(archive);
+                    state.TemplateTypeIds = new HashSet<ElementId>(new FilteredElementCollector(archive).WhereElementIsElementType().ToElementIds());
+                    _archiveOwner = state;
+                    HistoryPerformanceLog.Record(source, "native_create", stageTimer.Elapsed.TotalMilliseconds,
+                        0, state.Pending.Count, false);
+                }
+                else
+                {
+                    archive = state.Archive;
+                    HistoryPerformanceLog.Record(source, "native_reuse", stageTimer.Elapsed.TotalMilliseconds,
+                        0, state.Pending.Count, false);
+                }
+                stageTimer.Restart();
                 // A blank project's stock type names must not substitute their
                 // definitions for types that were modified in the source model.
                 using (var tx = new Transaction(archive, "BIMaestro - Initialiser archive native"))
                 {
                     tx.Start();
-                    foreach (var type in new FilteredElementCollector(archive).WhereElementIsElementType())
-                        try { type.Name = "History-" + Guid.NewGuid().ToString("N") + "-" + type.Name; } catch { }
-                    tx.Commit();
+                    var initializationFailures = new Failures();
+                    tx.SetFailureHandlingOptions(tx.GetFailureHandlingOptions().SetFailuresPreprocessor(initializationFailures).SetClearAfterRollback(true));
+                    foreach (var type in state.TemplateTypeIds.Select(archive.GetElement).OfType<ElementType>())
+                        if (incomingNames == null || incomingNames.Contains(type.Name))
+                            try { type.Name = "History-" + Guid.NewGuid().ToString("N") + "-" + type.Name; } catch { }
+                    if (tx.Commit() != TransactionStatus.Committed)
+                        throw new InvalidOperationException("Revit a refusé l’initialisation de l’archive : " + initializationFailures.Message);
                 }
+                HistoryPerformanceLog.Record(source, "native_initialize", stageTimer.Elapsed.TotalMilliseconds,
+                    0, state.Pending.Count, false);
                 var timer = Stopwatch.StartNew();
                 foreach (var pending in wave)
                 {
+                    if (background && !(priorityOnly ? HistoryBackgroundWork.SelectionCanRun() : HistoryBackgroundWork.UserIsIdle())) break;
+                    var rootTimer = Stopwatch.StartNew();
                     foreach (var receipt in pending.Receipts) receipt.StartedUtc = DateTime.UtcNow;
                     var root = source.GetElement(pending.RootId);
                     if (root == null)
@@ -397,16 +626,20 @@ namespace Analyse
                             state.Pending.Remove(pending.RootUid);
                         }
                     }
-                    // Selected roots share one project creation and SaveAs. The
-                    // larger selected budget avoids leaving most of a deletion
-                    // selection behind the next cooldown.
+                    HistoryPerformanceLog.RecordElement(root, "native_root", rootTimer.Elapsed.TotalMilliseconds,
+                        completed.Any(entry => entry.Item1 == pending));
+                    // A wave shares one project creation and SaveAs. Check the
+                    // budget between copies; Revit cannot interrupt a single copy.
                     if (timer.ElapsedMilliseconds >= copyBudgetMs) break;
                 }
                 if (completed.Count == 0) return;
                 var directory = Path.Combine(CollaborativeModelTrackerStore.ActiveDirectory, "native-history");
                 Directory.CreateDirectory(directory);
                 var path = Path.Combine(directory, "snapshot-" + Guid.NewGuid().ToString("N") + ".rvt");
+                stageTimer.Restart();
                 archive.SaveAs(path, new SaveAsOptions { OverwriteExistingFile = false, MaximumBackups = 1 });
+                HistoryPerformanceLog.Record(source, "native_save", stageTimer.Elapsed.TotalMilliseconds,
+                    completed.Count, state.Pending.Count, false);
                 foreach (var entry in completed)
                 {
                     foreach (var receipt in entry.Item1.Receipts)
@@ -427,16 +660,32 @@ namespace Analyse
                     }
                     state.Pending.Remove(entry.Item1.RootUid);
                 }
+                state.ArchiveWaves++;
+                state.ArchiveRoots += completed.Count;
+                state.ArchiveUsedUtc = DateTime.UtcNow;
+                // A terrain/large mesh must not be serialized again for each later small object.
+                // Keep its immutable file, but start the next wave with an empty document.
+                if (new FileInfo(path).Length > 8 * 1024 * 1024)
+                {
+                    state.RetireArchive = true;
+                    HistoryPerformanceLog.Record(source, "native_pool_size_limit", 0,
+                        completed.Count, state.Pending.Count, false);
+                }
             }
             catch (Exception ex)
             {
+                state.RetireArchive = true;
                 foreach (var pending in wave)
                 {
                     foreach (var receipt in pending.Receipts) receipt.Failure = "Archivage natif non enregistré : " + ex.Message;
                     state.Pending.Remove(pending.RootUid);
                 }
             }
-            finally { try { if (archive != null) archive.Close(false); } finally { _processing = false; } }
+            finally
+            {
+                if (!reuseArchive) { Retire(state); CloseRetired(source); }
+                _processing = false;
+            }
         }
 
         private static Element CopyRoot(Document source,Element root,Document destination,CopyPasteOptions options)
@@ -454,11 +703,13 @@ namespace Analyse
                     var groupCopies=ElementTransformUtils.CopyElements(source,regular.Select(e=>e.Id).ToList(),destination,Transform.Identity,options)
                         .Select(destination.GetElement).Where(e=>e!=null && !(e is ElementType)).ToList();
                     destination.Regenerate();
+                    var copyDescriptors = groupCopies.Select(e => new ShapeDescriptor(e)).ToList();
                     foreach(var original in regular)
                     {
-                        var memberMatches=groupCopies.Where(e=>Same(original,e)).ToList();
+                        var descriptor = new ShapeDescriptor(original);
+                        var memberMatches=copyDescriptors.Where(candidate=>descriptor.Matches(candidate)).ToList();
                         if(memberMatches.Count!=1) throw new InvalidOperationException("L’identité d’un membre du groupe est ambiguë.");
-                        members.Add(memberMatches[0].Id);groupCopies.Remove(memberMatches[0]);
+                        members.Add(memberMatches[0].Element.Id);copyDescriptors.Remove(memberMatches[0]);
                     }
                 }
                 foreach(var member in originals.Where(e=>e is Group || e is DirectShape))
@@ -526,6 +777,44 @@ namespace Analyse
                     queue.Enqueue(doc.GetElement(railing.TopRail));
                     foreach(var id in railing.GetHandRails()) queue.Enqueue(doc.GetElement(id));
                 }
+#if REVIT2024 || REVIT2025_OR_GREATER
+                if (element is Toposolid topo)
+                    foreach (var id in topo.GetSubDivisionIds()) queue.Enqueue(doc.GetElement(id));
+#endif
+            }
+        }
+
+        // Read each native bounding box once; comparing aggregate members must not make O(n²) API calls.
+        private sealed class ShapeDescriptor
+        {
+            internal Element Element;
+            internal Tuple<Type,long?> Kind;
+            internal string Name;
+            internal double[] Bounds;
+            internal ShapeDescriptor(Element element)
+            {
+                Element = element;
+                Kind = Tuple.Create(element.GetType(), element.Category?.Id.GetIdLongValue());
+                var box = element.get_BoundingBox(null);
+                if (box == null) Name = element.Name;
+                else
+                {
+                    var min = box.Min; var max = box.Max;
+                    Bounds = new[] { min.X,min.Y,min.Z,max.X,max.Y,max.Z };
+                }
+            }
+            internal bool Matches(ShapeDescriptor other)
+            {
+                if (!Kind.Equals(other.Kind)) return false;
+                if (Bounds == null || other.Bounds == null) return Bounds == null && other.Bounds == null && Name == other.Name;
+                for (int offset=0;offset<6;offset+=3)
+                {
+                    double distance=0;
+                    for (int axis=0;axis<3;axis++)
+                    { var delta=Bounds[offset+axis]-other.Bounds[offset+axis]; distance+=delta*delta; }
+                    if (Math.Sqrt(distance)>=1e-4) return false;
+                }
+                return true;
             }
         }
         private static bool Same(Element a, Element b)
@@ -538,15 +827,18 @@ namespace Analyse
         private static Dictionary<string, Element> MatchAggregate(Document source, Element root, Document archive, Element nativeRoot)
         {
             var result = new Dictionary<string, Element> { [root.UniqueId] = nativeRoot };
-            var candidates = Aggregate(archive, nativeRoot).Where(e => e.Id != nativeRoot.Id).ToList();
+            var candidates = Aggregate(archive, nativeRoot).Where(e => e.Id != nativeRoot.Id)
+                .Select(e => new ShapeDescriptor(e)).GroupBy(descriptor => descriptor.Kind)
+                .ToDictionary(group => group.Key, group => group.ToList());
             foreach (var element in Aggregate(source, root).Where(e => e.Id != root.Id))
             {
                 if (IsCalo(element)) continue;
-                var matches = candidates.Where(e => Same(element, e)).ToList();
-                if (matches.Count == 0) matches = candidates.Where(e => e.GetType() == element.GetType()
-                    && e.Category?.Id.GetIdLongValue() == element.Category?.Id.GetIdLongValue()).ToList();
+                var original = new ShapeDescriptor(element);
+                if (!candidates.TryGetValue(original.Kind, out var compatible)) continue;
+                var matches = compatible.Where(candidate => original.Matches(candidate)).ToList();
+                if (matches.Count == 0) matches = compatible.ToList();
                 if (matches.Count != 1) continue;
-                result[element.UniqueId] = matches[0]; candidates.Remove(matches[0]);
+                result[element.UniqueId] = matches[0].Element; compatible.Remove(matches[0]);
             }
             return result;
         }
@@ -595,6 +887,7 @@ namespace Analyse
         internal sealed class Sources : IDisposable
         {
             private readonly Dictionary<string, Document> _documents = new Dictionary<string, Document>(StringComparer.OrdinalIgnoreCase);
+            private readonly HashSet<Document> _borrowed = new HashSet<Document>();
             internal Document Open(Document destination, HistoryNativeArtifact artifact)
             {
                 if (artifact?.Ready != true) throw new InvalidOperationException(artifact?.Failure ?? "L’archive native n’était pas prête avant la suppression.");
@@ -606,10 +899,23 @@ namespace Analyse
                 // letters and another workstation do not break saved receipts.
                 var path = Path.GetFullPath(Path.Combine(CollaborativeModelTrackerStore.ActiveDirectory,"native-history",filename));
                 if (!_documents.TryGetValue(path, out var source))
-                    _documents[path] = source = destination.Application.OpenDocumentFile(path);
+                {
+                    CloseRetired();
+                    var owner = States.Values.FirstOrDefault(state=>state.Archive != null && state.Archive.IsValidObject
+                        && string.Equals(state.Archive.PathName,path,StringComparison.OrdinalIgnoreCase));
+                    if (owner != null && owner.Archive.IsModified)
+                    { Retire(owner); CloseRetired(); owner = null; }
+                    source = owner?.Archive ?? destination.Application.OpenDocumentFile(path);
+                    if (owner != null) _borrowed.Add(source);
+                    _documents[path] = source;
+                }
                 return source;
             }
-            public void Dispose() { foreach (var doc in _documents.Values) doc.Close(false); _documents.Clear(); }
+            public void Dispose()
+            {
+                foreach (var doc in _documents.Values.Where(doc=>!_borrowed.Contains(doc))) doc.Close(false);
+                _documents.Clear(); _borrowed.Clear();
+            }
         }
 
         internal static Element Restore(Document destination, HistoryRecipe recipe, Document source, Element existingRoot,

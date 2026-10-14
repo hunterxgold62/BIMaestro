@@ -468,6 +468,8 @@ namespace ScheduleIO
 
 
                 using (var fs = new FileStream(path, FileMode.Create, FileAccess.Write)) wb.Write(fs);
+                RecordOperationResult(ButtonId, "export_excel", BIMaestro.Tutorials.DemoExcelExercise.NeedsExport(doc),
+                    new Dictionary<string, int> { ["files_exported"] = 1 });
 
                 var dlg = new TaskDialog(UiLanguage.T("Export Excel", "Excel Export"));
                 dlg.MainInstruction = UiLanguage.T("Export terminé", "Export Completed");

@@ -62,9 +62,6 @@ Name: "french"; MessagesFile: "compiler:Languages\French.isl"
 Source: "bin\Release\*.*"; DestDir: "{app}\Contents"; \
   Flags: ignoreversion recursesubdirs createallsubdirs; \
   Excludes: "*.pdb,BIMaestro - Copie.dll,BIMaestro.Updater.*"
-#define RevitPayloadRoot "{app}\Contents"
-#include "..\Installer\RevitVersioned.Files.iss"
-#undef RevitPayloadRoot
 
 ; Ressources publiques du paquet Autodesk.
 Source: "Resources\OLD\BIMaestro.png"; DestDir: "{app}\Contents"; \
@@ -106,9 +103,6 @@ begin
 end;
 
 function BuildPackageContentsXml(): String;
-var
-  Year: Integer;
-  Version, ModulePath: String;
 begin
   Result :=
     '<?xml version="1.0" encoding="utf-8"?>' + #13#10 +
@@ -129,30 +123,19 @@ begin
     '    Url="https://www.bimaestro.fr/"' + #13#10 +
     '    Email="bimaestro.plugin@gmail.com"' + #13#10 +
     '    Phone="" />' + #13#10 +
-    '  <Components Description="BIMaestro pour Revit 2022 à 2023">' + #13#10 +
-    '    <RuntimeRequirements OS="Win64" Platform="Revit" SeriesMin="R2022" SeriesMax="R2023" />' + #13#10 +
+    '  <Components Description="BIMaestro pour Revit 2022 à 2027">' + #13#10 +
+    '    <RuntimeRequirements OS="Win64" Platform="Revit" SeriesMin="R2022" SeriesMax="R2027" />' + #13#10 +
     '    <ComponentEntry AppName="BIMaestro"' + #13#10 +
     '      Version="{#AppVersion}"' + #13#10 +
     '      ModuleName="./Contents/BIMaestro.addin"' + #13#10 +
     '      AppDescription="Suite d''outils BIMaestro pour Revit" />' + #13#10 +
-    '  </Components>' + #13#10;
-  for Year := 2024 to 2027 do
-  begin
-    Version := IntToStr(Year);
-    ModulePath := './Contents/Revit' + Version + '/BIMaestro.addin';
-    Result := Result +
-      '  <Components Description="BIMaestro pour Revit ' + Version + '">' + #13#10 +
-      '    <RuntimeRequirements OS="Win64" Platform="Revit" SeriesMin="R' + Version + '" SeriesMax="R' + Version + '" />' + #13#10 +
-      '    <ComponentEntry AppName="BIMaestro" Version="{#AppVersion}" ModuleName="' + ModulePath + '" AppDescription="Suite d''outils BIMaestro pour Revit" />' + #13#10 +
-      '  </Components>' + #13#10;
-  end;
-  Result := Result + '</ApplicationPackage>';
+    '  </Components>' + #13#10 +
+    '</ApplicationPackage>';
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   PackagePath, AddinPath, DllPath: String;
-  Year: Integer;
 begin
   if CurStep <> ssPostInstall then
     exit;
@@ -175,12 +158,6 @@ begin
 
   if not SaveStringToFile(AddinPath, BuildBundleAddinXml(), False) then
     RaiseException('Impossible de créer BIMaestro.addin.');
-  for Year := 2024 to 2027 do
-  begin
-    AddinPath := ExpandConstant('{app}\Contents\Revit') + IntToStr(Year) + '\BIMaestro.addin';
-    if not SaveStringToFile(AddinPath, BuildBundleAddinXml(), False) then
-      RaiseException('Impossible de créer BIMaestro.addin pour Revit ' + IntToStr(Year));
-  end;
 end;
 
 [UninstallDelete]

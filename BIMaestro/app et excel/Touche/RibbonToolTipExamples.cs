@@ -176,6 +176,39 @@ public partial class AppUI
         return true;
     }
 
+    private static StackPanel CreateReservationToolTipCard()
+    {
+        var card = new StackPanel { Width = 320 };
+        card.Children.Add(new Border {
+            Background = new SolidColorBrush(Color.FromRgb(237, 243, 249)),
+            CornerRadius = new CornerRadius(8), ClipToBounds = true,
+            Child = new Image { Source = ExampleImage("ReservationCardHero.png"), Width = 320, Height = 126, Stretch = Stretch.Uniform }
+        });
+        var title = ExampleText("Réservation auto", true);
+        title.FontSize = 16; title.Margin = new Thickness(10, 10, 10, 0);
+        card.Children.Add(title);
+        var summary = ExampleText("Une ouverture centrée sur le réseau, au passage de la paroi.");
+        summary.Margin = new Thickness(10, 5, 10, 0); summary.MaxWidth = 300;
+        card.Children.Add(summary);
+        var steps = new Grid { Margin = new Thickness(8, 12, 8, 8) };
+        for (int i = 0; i < 3; i++) steps.ColumnDefinitions.Add(new ColumnDefinition());
+        string[] labels = { "Réseau", "Paroi", "Réservation" };
+        for (int i = 0; i < 3; i++)
+        {
+            var step = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center };
+            step.Children.Add(new Image { Source = ExampleImage("ReservationCardStep" + i + ".png"), Width = 44, Height = 44 });
+            var label = ExampleText(labels[i], true); label.FontSize = 11;
+            label.HorizontalAlignment = HorizontalAlignment.Center;
+            step.Children.Add(label);
+            Grid.SetColumn(step, i); steps.Children.Add(step);
+        }
+        card.Children.Add(steps);
+        var footer = ExampleText("APERÇU ILLUSTRATIF", true);
+        footer.FontSize = 9; footer.Foreground = new SolidColorBrush(Color.FromRgb(110, 127, 145));
+        footer.Margin = new Thickness(10, 0, 10, 4); card.Children.Add(footer);
+        return card;
+    }
+
     private static Border ExampleCard(string heading, string text, string color)
     {
         var body = new StackPanel();

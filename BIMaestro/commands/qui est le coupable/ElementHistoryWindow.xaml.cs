@@ -592,6 +592,12 @@ namespace Analyse
             row.VisualSubtitle = BuildVisualSubtitle(row, events);
             row.StoryText = BuildStoryText(row, events);
             row.EvidenceText = BuildEvidenceText(row);
+            var deletionBatch = events.Select(ev => ev.DeletionAudit)
+                .FirstOrDefault(audit => audit?.BatchDeletedElementCount > 0);
+            if (deletionBatch != null)
+                row.EvidenceText = UiLanguage.T(
+                    $"Lot : {deletionBatch.BatchDeletedElementCount} suppressions détectées, {deletionBatch.BatchWithSnapshotCount} éléments capturés avant suppression.",
+                    $"Batch: {deletionBatch.BatchDeletedElementCount} deletions detected, {deletionBatch.BatchWithSnapshotCount} elements captured before deletion.");
             row.VisualCueText = GetVisualCueText(row.Action);
             row.PreviewItems = BuildPreviewItems(events);
         }
@@ -1220,6 +1226,8 @@ namespace Analyse
 
         private static string GetClusterKey(ElementHistoryEvent e)
         {
+            if (e.Action == "delete" && !string.IsNullOrWhiteSpace(e.DeletionAudit?.BatchId))
+                return "delete|" + e.ModelKey + "|" + e.DeletionAudit.BatchId;
             var ticks = e.Ts.ToUniversalTime().Ticks / TimeSpan.FromSeconds(5).Ticks;
             if (string.Equals(e.Action, "create", StringComparison.OrdinalIgnoreCase))
             {

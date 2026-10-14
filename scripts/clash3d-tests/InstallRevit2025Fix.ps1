@@ -5,6 +5,11 @@ if (!$SourceDirectory) { $SourceDirectory = "BIMaestro/bin/Revit$RevitVersion/Re
 $source = if ([IO.Path]::IsPathRooted($SourceDirectory)) { [IO.Path]::GetFullPath($SourceDirectory) } else { [IO.Path]::GetFullPath((Join-Path $repo $SourceDirectory)) }
 $dll = Join-Path $source 'BIMaestro.dll'
 if (!(Test-Path -LiteralPath $dll)) { throw "Compiler la version Revit $RevitVersion avant installation." }
+foreach ($dependency in @('OxyPlot.dll', 'OxyPlot.Wpf.Shared.dll', 'OxyPlot.Wpf.dll')) {
+    if (!(Test-Path -LiteralPath (Join-Path $source $dependency))) {
+        throw "Dépendance du tableau de bord absente : $dependency. Recompiler avec CopyLocalLockFileAssemblies=true avant installation."
+    }
+}
 $runtimeConfig = Join-Path "C:\Program Files\Autodesk\Revit $RevitVersion" 'RevitAPI.runtimeconfig.json'
 if (!(Test-Path -LiteralPath $runtimeConfig)) { throw "Revit $RevitVersion ou sa configuration .NET est introuvable." }
 $runtimeMajor = [int](([string]((Get-Content -LiteralPath $runtimeConfig -Raw | ConvertFrom-Json).runtimeOptions.tfm) -split '\.')[0] -replace '^net','')

@@ -52,6 +52,8 @@ namespace Famille
             }
 
             File.WriteAllText(filePath, JsonConvert.SerializeObject(list, Formatting.Indented));
+            RecordOperationResult(ButtonId, "export_units", false,
+                new Dictionary<string, int> { ["files_exported"] = 1, ["units_exported"] = list.Count });
 
             var disciplineCount = UnitUtils.GetAllDisciplines().Count();
             TaskDialog.Show(UiLanguage.T("Export unités", "Export Units"), UiLanguage.T($"✅ {list.Count} unité(s) exportée(s) (toutes disciplines, {disciplineCount} discipline(s)) vers :\n{filePath}", $"✅ {list.Count} unit(s) exported (all disciplines, {disciplineCount} discipline(s)) to:\n{filePath}"));

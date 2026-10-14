@@ -50,6 +50,7 @@ namespace Famille
                 bool singleMode = targetPaths.Count == 1;
                 int ok = 0;
                 int fail = 0;
+                int reloadedCount = 0;
                 string firstError = null;
 
                 foreach (var path in targetPaths)
@@ -65,8 +66,10 @@ namespace Famille
                         using (var tx = new Transaction(doc, "Recharger famille (écraser valeurs de type)"))
                         {
                             tx.Start();
-                            doc.LoadFamily(path, new FamilyLoadOptionOverwrite(), out reloaded);
-                            tx.Commit();
+                            bool loaded = doc.LoadFamily(path, new FamilyLoadOptionOverwrite(), out reloaded);
+                            if (tx.Commit() != TransactionStatus.Committed)
+                                throw new InvalidOperationException("Family reload transaction was not committed.");
+                            if (loaded) reloadedCount++;
                         }
 
                         LastWriteTimes[path] = currentWriteUtc;
@@ -127,6 +130,9 @@ namespace Famille
                     }
                 }
 
+                Licensing.OperationTelemetry.Track("FamilyBrowserCommand", "Navigateur de familles", "reload_families", false,
+                    new Dictionary<string, int> { ["families_reloaded"] = reloadedCount,
+                        ["families_unchanged"] = Math.Max(0, ok - reloadedCount), ["items_failed"] = fail });
                 if (!singleMode)
                 {
                     string message = UiLanguage.T($"Familles rechargées : {ok}\nÉchecs : {fail}", $"Families reloaded: {ok}\nFailures: {fail}");

@@ -1,11 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { PanelLeft, PanelRight } from 'lucide-react';
 import { ArrowDown, ArrowUp, ArrowLeftRight, Scissors, ChartNoAxesCombined, MessageSquare, Box, ChevronRight, CircleGauge, Contrast, Eye, EyeOff, Footprints, Hand, Layers3, LoaderCircle, LockKeyhole, Pencil, Plane, RotateCcw, SunMedium, Users, Waves } from 'lucide-react';
 import * as THREE from 'three';
 import { MepGamepad, MepWalkGamepad, maquetteXbox, readBrowserPads, xbox } from '@/lib/mep-gamepad';
 import { adjustGamepadControl, focusGamepadControl, gamepadControls, gamepadScope, GamepadMenuRepeat, moveGamepadKey, type GamepadField } from '@/lib/mep-gamepad-ui';
 import { GamepadFieldEditor } from '@/components/gamepad-field-editor';
+import { locateRoom, type RoomLocation } from '@/lib/mep-room';
 import { MepMiniMap } from '@/lib/mep-minimap';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { downloadExchange } from '@/lib/mep-exchange';
@@ -36,6 +38,12 @@ import { saveMarkup, readScenario, saveReservationLot } from '@/lib/mep-api';
 import { Badge } from '@/components/ui/badge';
 import type { MepGraph, MepSourceOverride, MepSystemColor, ResolvedShare, Scenario, ViewerPackage, WebProperty } from '@/lib/mep-contract';
 import { canAnimate, connectionLabel } from '@/lib/mep-engine';
+import { createFlowMaterial, attachFlowDistances, createFlowChevronGeometry } from '@/lib/mep-flow-material';
+import { createWaterVolume } from '@/lib/mep-water-volume';
+import { waterPathRadii } from '@/lib/mep-water-size';
+import { flowPhases, flowPathKey, flowArrowDistance, flowTrace } from '@/lib/mep-flow-continuity';
+import { explainFlowEnd, type FlowEnd } from '@/lib/mep-flow-end';
+import { equipmentStopKind } from '@/lib/mep-equipment-stop';
 import { useMepCalculation } from '@/hooks/use-mep-calculation';
 import { MepImpactPanel } from '@/components/mep-impact-panel';
 import { fetchR2PilotAsset, resolveShare, shareTokenFromLocation, subscribeToScenario, updateSource, updateValve, useR2Storage } from '@/lib/mep-api';
@@ -59,8 +67,12 @@ type AnimatedFlowArrow = {
   points: THREE.Vector3[];
   cumulative: number[];
   length: number;
-  phase: number;
+  slot: number;
+  flowStart: number;
+  spacing: number;
+  enabled: boolean;
   forward: boolean;
+  waterRadius: number | null;
 };
 type FlowVisual = {
   objects: THREE.Object3D[];
@@ -71,8 +83,14 @@ type FlowVisual = {
   systemKey: string;
   center: THREE.Vector3;
   stateOpacity: number;
+  targetActive: number;
+  current: ReturnType<typeof createFlowMaterial>;
+  water?: ReturnType<typeof createWaterVolume>;
+  points: THREE.Vector3[];
+  color: string;
+  radii: { start: number; end: number } | null;
 };
-type ValveVisual = { marker: THREE.Mesh; elementKey: string };
+type ValveVisual = { marker: THREE.Mesh; handle: THREE.Mesh; targetAngle: number; available: boolean; elementKey: string; systemKey: string };
 type ModelMaterialState = {
   material: THREE.Material;
   opacity: number;
@@ -80,6 +98,11 @@ type ModelMaterialState = {
   depthWrite: boolean;
 };
 type ViewActions = {
+  traceSelectedFlow: () => void;
+  followSelectedFlow: (elementKey?: string, reverse?: boolean, branchKey?: string) => void;
+  chooseFollowBranch: (key: string) => void;
+  stopFollowing: () => void;
+  toggleLocalCut: () => void;
   isometric: () => void;
   frameSelected: () => void;
   frameMarkup: (mark: Markup) => void;
@@ -181,7 +204,7 @@ function reliabilityLabel(value: number | string | undefined) {
   return 'Sens à confirmer';
 }
 
-function sampleFlowPath(animation: AnimatedFlowArrow, progress: number) {
+function sampleFlowPath(animation: Pick<AnimatedFlowArrow, 'points' | 'cumulative' | 'length'>, progress: number) {
   const distance = progress * animation.length;
   let segment = 1;
   while (segment < animation.cumulative.length - 1 && animation.cumulative[segment] < distance) segment++;
@@ -270,6 +293,7 @@ export function MepViewer() {
   useEffect(() => { draftOpenRef.current = !!draftMarkup; }, [draftMarkup]);
   const mountRef = useRef<HTMLDivElement>(null);
   const miniMapRef = useRef<HTMLCanvasElement>(null);
+  const [roomLocation, setRoomLocation] = useState<RoomLocation | null>(null);
   const [miniMapVisible, setMiniMapVisible] = useState(false);
   const miniMapVisibleRef = useRef(false);
   useEffect(() => { miniMapVisibleRef.current = miniMapVisible; }, [miniMapVisible]);
@@ -289,6 +313,7 @@ export function MepViewer() {
   const modelMaterialStatesRef = useRef<ModelMaterialState[]>([]);
   const flowFocusAppliedRef = useRef<boolean | null>(null);
   const flowsVisibleRef = useRef(false);
+  const waterViewRef = useRef(false);
   const valveMarkersVisibleRef = useRef(false);
   const viewActionsRef = useRef<ViewActions | null>(null);
   const [section, setSection] = useState<FaceSection[]>([]);
@@ -309,6 +334,25 @@ export function MepViewer() {
   const navigationModeRef = useRef<NavigationMode>('orbit');
   const [navigationMode, setNavigationMode] = useState<NavigationMode>('orbit');
   const [flowsVisible, setFlowsVisible] = useState(false);
+  const [panelCollapsed, setPanelCollapsed] = useState(false);
+  const [followingFlow, setFollowingFlow] = useState(false);
+  const [followEnd, setFollowEnd] = useState<FlowEnd | null>(null);
+  const [followPaused, setFollowPaused] = useState(false);
+  const followPausedRef = useRef(false);
+  const [equipmentStops, setEquipmentStops] = useState(true);
+  const equipmentStopsRef = useRef(true);
+  equipmentStopsRef.current = equipmentStops;
+  const [equipmentPause, setEquipmentPause] = useState<string | null>(null);
+  const [followSpeed, setFollowSpeed] = useState(1);
+  const followSpeedRef = useRef(1);
+  const [followStep, setFollowStep] = useState<{ network: string; element: string; color: string; history: string[]; reverse: boolean } | null>(null);
+  const [clearFollowView, setClearFollowView] = useState(true);
+  const [followBranches, setFollowBranches] = useState<Array<{ key: string; name: string }>>([]);
+  const clearFollowViewRef = useRef(true);
+  clearFollowViewRef.current = clearFollowView;
+  const followingSystemKeyRef = useRef<string | null>(null);
+  const [localCut, setLocalCut] = useState(false);
+  const [waterView, setWaterView] = useState(false);
   const [valveMarkersVisible, setValveMarkersVisible] = useState(false);
   const [flowRenderStats, setFlowRenderStats] = useState({ paths: 0, arrows: 0, fallbackPaths: 0 });
   const [flightMode, setFlightMode] = useState(false);
@@ -322,6 +366,7 @@ export function MepViewer() {
   const [impactOpen, setImpactOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const selectedIndexRef = useRef<number | null>(null);
+  const flowPulseRequestRef = useRef(0);
   useEffect(() => { selectedIndexRef.current = selectedIndex; }, [selectedIndex]);
   const [inspectionHistory, setInspectionHistory] = useState<number[]>([]);
   const [advancedPanelOpen, setAdvancedPanelOpen] = useState(false);
@@ -337,6 +382,7 @@ export function MepViewer() {
   const graphStateRef = useRef<MepGraph | null>(null);
   const hiddenSystemsRef = useRef<Set<string>>(new Set());
   const selectedSystemKeyRef = useRef<string | null>(null);
+  const hoveredSystemKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     graphStateRef.current = graph;
@@ -437,6 +483,7 @@ export function MepViewer() {
   }, []);
 
   useEffect(() => { modelOpacityRef.current = modelOpacity; viewActionsRef.current?.applyAppearance(); }, [modelOpacity]);
+  useEffect(() => { waterViewRef.current = waterView; viewActionsRef.current?.applyFlowPresentation(); }, [waterView]);
   useEffect(() => { realisticLightingRef.current = realisticLighting; viewActionsRef.current?.applyAppearance(); }, [realisticLighting]);
   useEffect(() => { highContrastRef.current = highContrast; viewActionsRef.current?.applyAppearance(); }, [highContrast]);
 
@@ -537,25 +584,61 @@ export function MepViewer() {
     const animatedFlowArrows: AnimatedFlowArrow[] = [];
     const flowVisuals: FlowVisual[] = [];
     const valveVisuals: ValveVisual[] = [];
+    let traceRoutes = new Map<string, { start: number; length: number; forward: boolean }>();
+    let pulseEnd = 0, lastPulseRequest = -1;
+    let pulseTravel = 0, lastPulseTick = performance.now(), lastFollowStep = '';
+    let followHistory: string[] = [], lastHistoryNetwork = '';
+    const visitedEquipment = new Set<string>();
+    let equipmentSlowUntil = 0, equipmentSlowEnd = 0;
+    let followRoute: FlowVisual[] = [], followOffset = new THREE.Vector3();
+    let traceSeed: string | null = null, traceReverse = false, lastFollowInput = 0, lastClearView = 0;
+    let previousLocalSections: FaceSection[] | null = null;
+    const stopFollowing = () => { followRoute = []; followingSystemKeyRef.current = null; followPausedRef.current = false; setFollowPaused(false); setFollowingFlow(false); setFollowStep(null); setFollowEnd(null); };
+    const traceSelection = (elementKey?: string, reverse = false) => {
+      const property = propertiesByIndex.get(selectedIndexRef.current ?? -1);
+      traceSeed = elementKey || property?.key || null; traceReverse = reverse;
+      traceRoutes = traceSeed && graphStateRef.current ? flowTrace(graphStateRef.current, traceSeed, reverse) : new Map();
+      pulseTravel = 0; lastPulseTick = performance.now();
+      pulseEnd = 0;
+      for (const route of traceRoutes.values()) pulseEnd = Math.max(pulseEnd, route.start + route.length + 3);
+      if (traceRoutes.size) setFlowsVisible(true);
+    };
     const edgeMaterials: THREE.LineBasicMaterial[] = [];
+    let waterVolumeCount = 0;
     const applyFlowPresentation = () => {
-      const focusedSystem = selectedSystemKeyRef.current;
+      const focusedSystem = followingSystemKeyRef.current || selectedSystemKeyRef.current || hoveredSystemKeyRef.current;
+      const waterMode = waterViewRef.current;
+      let waterBuildBudget = 24;
       for (const visual of flowVisuals) {
         const focused = !focusedSystem || visual.systemKey === focusedSystem;
         const distance = camera.position.distanceTo(visual.center);
         const distanceFade = THREE.MathUtils.clamp(1.05 - distance / Math.max(modelSphere.radius * 2.35, 30), .42, 1);
-        const emphasis = focusedSystem ? (focused ? 1 : .2) : .5;
+        const emphasis = focusedSystem ? (focused ? 1 : .4) : .85;
         visual.material.opacity = visual.stateOpacity * emphasis * distanceFade;
-        visual.material.linewidth = focusedSystem && focused ? 4 : focusedSystem ? 1.5 : 2.6;
-        visual.haloMaterial.opacity = (focusedSystem && focused ? .34 : focusedSystem ? .05 : .14) * distanceFade;
-        visual.haloMaterial.linewidth = focusedSystem && focused ? 6 : focusedSystem ? 2.5 : 4.2;
+        visual.material.linewidth = focusedSystem && focused ? 4.8 : focusedSystem ? 1.8 : 3.4;
+        visual.haloMaterial.color.set('#102820');
+        visual.haloMaterial.opacity = (focusedSystem && focused ? .48 : focusedSystem ? .12 : .32) * distanceFade;
+        visual.haloMaterial.linewidth = visual.material.linewidth + 2.4;
+        if (waterMode && visual.objects[0].visible && visual.radii && !visual.water && waterBuildBudget > 0 && waterVolumeCount < 1600 && visual.points.some(point => point.distanceToSquared(visual.points[0]) > .0004)) {
+          visual.water = createWaterVolume(visual.points, visual.color, visual.radii.start, visual.radii.end);
+          flowGroup.add(visual.water.mesh); waterBuildBudget--; waterVolumeCount++;
+        }
+        if (visual.water) {
+          visual.water.mesh.visible = waterMode && visual.objects[0].visible && visual.current.active.value > .01;
+          visual.water.uniforms.opacity.value = emphasis * distanceFade * visual.current.active.value;
+          visual.water.uniforms.active.value = visual.current.active.value;
+          visual.water.uniforms.direction.value = visual.current.direction.value;
+          visual.water.uniforms.origin.value = visual.current.origin.value;
+          visual.water.uniforms.spacing.value = visual.current.spacing.value;
+        }
         visual.material.needsUpdate = true;
         visual.haloMaterial.needsUpdate = true;
       }
       for (const animation of animatedFlowArrows) {
         const focused = !focusedSystem || animation.systemKey === focusedSystem;
         const material = animation.mesh.material as THREE.MeshBasicMaterial;
-        material.opacity = focusedSystem ? (focused ? .9 : .08) : .42;
+        material.opacity = focusedSystem ? (focused ? 1 : .4) : .95;
+        for (const child of animation.mesh.children) (child as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>).material.opacity = material.opacity * .85;
         material.transparent = true;
         material.needsUpdate = true;
       }
@@ -563,6 +646,9 @@ export function MepViewer() {
     const collisionGeometries = new Set<THREE.BufferGeometry>();
     let modelSphere = new THREE.Sphere(new THREE.Vector3(0, 2, 0), 8);
     const walkSpeed = 7.2, sprintSpeed = 18, crouchSpeed = 4.2, flySpeed = 15, flySprintSpeed = 26.24672;
+    let lastRoomCheck = -Infinity, roomCandidateSince = 0, roomCandidateKey = '', shownRoomKey = '';
+    let currentRoom: RoomLocation | null = null;
+    setRoomLocation(null);
     let playerFootY = 0, currentEyeHeight = 5.28, verticalVelocity = 0, wheelMoveRemaining = 0;
     const lastSafeFoot = new THREE.Vector3();
     let unsupportedSince: number | null = null;
@@ -621,6 +707,8 @@ export function MepViewer() {
     };
     const updateMepState = (nextGraph: MepGraph | null, nextHiddenSystems: Set<string>) => {
       if (!nextGraph) return;
+      const phases = flowPhases(nextGraph);
+      const closedValves = new Set(nextGraph.valves.filter(valve => valve.isEnabledAsValve && valve.isClosed).map(valve => valve.elementKey));
       const elements = new Map(nextGraph.elements.map((element) => [element.key, element]));
       for (const visual of flowVisuals) {
         const path = elements.get(visual.elementKey)?.paths?.[visual.pathOrdinal];
@@ -628,24 +716,99 @@ export function MepViewer() {
         const supplied = state === 2 || state === 'supplied';
         const isolated = state === 1 || state === 'isolated';
         visual.stateOpacity = supplied && path?.hasCirculation ? .94 : isolated ? .58 : .72;
+        visual.targetActive = canAnimate(path) && !closedValves.has(visual.elementKey) ? 1 : 0;
+        visual.current.direction.value = path?.flowForward === false ? -1 : 1;
+        const phase = phases.get(flowPathKey(visual.elementKey, visual.pathOrdinal));
+        if (phase) { visual.current.origin.value = phase.origin; visual.current.spacing.value = phase.spacing; }
         const visible = !nextHiddenSystems.has(visual.systemKey) && (!stream || stream.complete(propertiesByKey.get(visual.elementKey)?.index ?? -1));
         visual.objects.forEach((object) => { object.visible = visible; });
       }
       applyFlowPresentation();
       for (const animation of animatedFlowArrows) {
         const path = elements.get(animation.elementKey)?.paths?.[animation.pathOrdinal];
-        animation.mesh.visible = !nextHiddenSystems.has(animation.systemKey) && (!stream || stream.complete(propertiesByKey.get(animation.elementKey)?.index ?? -1)) &&
-          canAnimate(path);
+        animation.enabled = !nextHiddenSystems.has(animation.systemKey) && (!stream || stream.complete(propertiesByKey.get(animation.elementKey)?.index ?? -1)) &&
+          canAnimate(path) && !closedValves.has(animation.elementKey);
+        animation.mesh.visible = animation.enabled;
         animation.forward = path?.flowForward !== false;
+        const phase = phases.get(flowPathKey(animation.elementKey, animation.pathOrdinal));
+        animation.flowStart = phase?.start ?? 0; animation.spacing = phase?.spacing ?? 6;
       }
       const valves = new Map(nextGraph.valves.map((valve) => [valve.elementKey, valve]));
       for (const visual of valveVisuals) {
         const valve = valves.get(visual.elementKey);
         const material = visual.marker.material as THREE.MeshBasicMaterial;
-        if (valve) material.color.set(valve.isClosed ? '#ef544a' : '#20d08b');
+        if (valve) {
+          material.color.set(valve.isClosed ? '#ef544a' : '#20d08b');
+          (visual.handle.material as THREE.MeshBasicMaterial).color.copy(material.color);
+          visual.targetAngle = valve.isClosed ? Math.PI / 2 : 0;
+        }
+        visual.available = !nextHiddenSystems.has(visual.systemKey) && (!stream || stream.complete(propertiesByKey.get(visual.elementKey)?.index ?? -1));
+      }
+      // Re-reading visibility/scenario must not cancel a pulse at the next joint.
+      // Rebuild its admissible route from the current calculation, preserving time.
+      if (traceRoutes.size && traceSeed) {
+        traceRoutes = flowTrace(nextGraph, traceSeed, traceReverse);
+        pulseEnd = 0;
+        for (const route of traceRoutes.values()) pulseEnd = Math.max(pulseEnd, route.start + route.length + 3);
       }
     };
     viewActionsRef.current = {
+      traceSelectedFlow: () => { flowPulseRequestRef.current++; },
+      stopFollowing,
+      chooseFollowBranch: key => viewActionsRef.current?.followSelectedFlow(traceSeed || undefined, traceReverse, key),
+      followSelectedFlow: (elementKey, reverse = false, branchKey) => {
+        visitedEquipment.clear(); equipmentSlowUntil = 0; equipmentSlowEnd = 0; setEquipmentPause(null);
+        setFollowEnd(null);
+        traceSelection(elementKey, reverse);
+        followPausedRef.current = false; setFollowPaused(false);
+        lastFollowStep = ''; followHistory = []; lastHistoryNetwork = ''; setFollowStep(null);
+        followRoute = flowVisuals.filter(visual => traceRoutes.has(flowPathKey(visual.elementKey, visual.pathOrdinal)))
+          .sort((a, b) => traceRoutes.get(flowPathKey(a.elementKey, a.pathOrdinal))!.start - traceRoutes.get(flowPathKey(b.elementKey, b.pathOrdinal))!.start || a.elementKey.localeCompare(b.elementKey));
+        if (!followRoute.length) return;
+        // Follow one continuous branch at junctions instead of jumping between parallel routes.
+        const chain = [followRoute[0]];
+        let branches: Array<{ key: string; name: string }> = [];
+        while (chain.length < followRoute.length) {
+          const tail = chain[chain.length - 1], tailRoute = traceRoutes.get(flowPathKey(tail.elementKey, tail.pathOrdinal))!;
+          const end = tail.points[tailRoute.forward ? tail.points.length - 1 : 0];
+          const candidates = followRoute.filter(candidate => {
+            if (chain.includes(candidate)) return false;
+            const route = traceRoutes.get(flowPathKey(candidate.elementKey, candidate.pathOrdinal))!;
+            return Math.abs(route.start - tailRoute.start - tailRoute.length) < .05 && candidate.points[route.forward ? 0 : candidate.points.length - 1].distanceTo(end) < .05;
+          });
+          if (candidates.length > 1 && !branches.length) branches = candidates.map(candidate => ({ key: flowPathKey(candidate.elementKey, candidate.pathOrdinal), name: `${graphStateRef.current?.systems.find(system => system.key === candidate.systemKey)?.name || candidate.systemKey} · ${propertiesByKey.get(candidate.elementKey)?.name || candidate.elementKey} #${propertiesByKey.get(candidate.elementKey)?.elementId || candidate.elementKey} · branche ${candidate.pathOrdinal + 1}` }));
+          const next = candidates.find(candidate => flowPathKey(candidate.elementKey, candidate.pathOrdinal) === branchKey) || candidates[0];
+          if (!next) break;
+          chain.push(next);
+        }
+        followRoute = chain;
+        setFollowBranches(branches);
+        const first = followRoute[0], route = traceRoutes.get(flowPathKey(first.elementKey, first.pathOrdinal))!;
+        const start = first.points[route.forward ? 0 : first.points.length - 1];
+        controls.target.copy(start);
+        followOffset.copy(camera.position).sub(start);
+        if (followOffset.length() > 18) followOffset.setLength(18);
+        if (followOffset.length() < 4) followOffset.set(4, 3, 4);
+        camera.position.copy(start).add(followOffset); controls.update();
+        changeNavigationMode('orbit'); setPanelCollapsed(true); setFollowingFlow(true);
+      },
+      toggleLocalCut: () => {
+        if (previousLocalSections) { setSection(previousLocalSections); previousLocalSections = null; setLocalCut(false); return; }
+        const system = selectedSystemKeyRef.current;
+        if (!system) return;
+        const bounds = new THREE.Box3();
+        flowVisuals.filter(visual => visual.systemKey === system).forEach(visual => visual.points.forEach(point => bounds.expandByPoint(point)));
+        if (bounds.isEmpty()) return;
+        bounds.expandByScalar(3);
+        previousLocalSections = sectionRef.current;
+        const cuts: FaceSection[] = [];
+        for (const axis of ['x', 'y', 'z'] as const) for (const sign of [1, -1]) {
+          const normal = new THREE.Vector3(); normal[axis] = sign;
+          const anchor = bounds.getCenter(new THREE.Vector3()); anchor[axis] = sign === 1 ? bounds.min[axis] : bounds.max[axis];
+          cuts.push({ id: crypto.randomUUID(), name: 'Coupe locale du réseau', enabled: true, normal: normal.toArray(), anchor: anchor.toArray(), offset: 0, inverted: false });
+        }
+        setSection(cuts); setLocalCut(true);
+      },
       captureMarkup: async (mark) => {
         if (disposed) throw new Error('La vue 3D n’est plus disponible.');
         const width = 960, height = 720;
@@ -891,25 +1054,32 @@ export function MepViewer() {
           const opacity = supplied && path.hasCirculation ? .98 : isolated ? .68 : .82;
           const positions = points.flatMap((point) => [point.x, point.y, point.z]);
           const haloGeometry = new LineGeometry(); haloGeometry.setPositions(positions);
-          const haloMaterial = new LineMaterial({ color: '#07100e', linewidth: 4.2, transparent: true, opacity: .14, depthTest: true, depthWrite: false });
+          const haloMaterial = new LineMaterial({ color, linewidth: 7, transparent: true, opacity: .12, depthTest: true, depthWrite: false, toneMapped: false });
           haloMaterial.resolution.set(Math.max(mount.clientWidth, 1), Math.max(mount.clientHeight, 1)); flowLineMaterials.push(haloMaterial);
           const halo = new Line2(haloGeometry, haloMaterial); halo.computeLineDistances(); halo.renderOrder = 3000; halo.frustumCulled = false; halo.raycast = () => {}; flowGroup.add(halo);
           const geometry = new LineGeometry(); geometry.setPositions(positions);
-          const material = new LineMaterial({ color, linewidth: 2.6, transparent: true, opacity: opacity * .5, depthTest: true, depthWrite: false });
+          attachFlowDistances(geometry, points);
+          const current = createFlowMaterial(color);
+          current.active.value = canAnimate(path) ? 1 : 0;
+          current.direction.value = path.flowForward === false ? -1 : 1;
+          const material = current.material;
           material.resolution.set(Math.max(mount.clientWidth, 1), Math.max(mount.clientHeight, 1)); flowLineMaterials.push(material);
           const line = new Line2(geometry, material); line.computeLineDistances(); line.renderOrder = 3001; line.frustumCulled = false; line.raycast = () => {}; flowGroup.add(line); renderedPathCount++;
           const center = points.reduce((sum, point) => sum.add(point), new THREE.Vector3()).multiplyScalar(1 / points.length);
-          flowVisuals.push({ objects: [halo, line], material, haloMaterial, elementKey: element.key, pathOrdinal, systemKey: element.systemKey, center, stateOpacity: opacity });
+          const radii = waterPathRadii(path as { startConnector: number; endConnector: number }, connectorsByIndex, propertiesByKey.get(element.key));
+          flowVisuals.push({ objects: [halo, line], material, haloMaterial, elementKey: element.key, pathOrdinal, systemKey: element.systemKey, center, stateOpacity: opacity, targetActive: current.active.value, current, points, color, radii });
           const cumulative = [0];
           for (let index = 1; index < points.length; index++) cumulative.push(cumulative[index - 1] + points[index].distanceTo(points[index - 1]));
           const length = cumulative[cumulative.length - 1];
           if (length > .02 && animatedFlowArrows.length < 1200) {
-            const count = Math.max(1, Math.min(6, Math.ceil(length / 18)));
+            const count = Math.max(1, Math.min(256, Math.ceil(length / 4.5)));
             for (let index = 0; index < count && animatedFlowArrows.length < 1200; index++) {
-              const arrow = new THREE.Mesh(new THREE.ConeGeometry(.12, .48, 8), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .42, depthTest: true, depthWrite: false, toneMapped: false }));
+              const arrow = new THREE.Mesh(createFlowChevronGeometry(), new THREE.MeshBasicMaterial({ color: new THREE.Color(color).lerp(new THREE.Color('#f1ffff'), .65), side: THREE.DoubleSide, transparent: true, opacity: .95, depthTest: true, depthWrite: false, toneMapped: false }));
+              const outline = new THREE.Mesh(arrow.geometry, new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(.3), side: THREE.DoubleSide, transparent: true, opacity: .8, depthTest: true, depthWrite: false, toneMapped: false }));
+              outline.scale.setScalar(1.32); outline.renderOrder = 3001.5; arrow.add(outline);
               arrow.visible = canAnimate(path);
               arrow.renderOrder = 3002; arrow.frustumCulled = false; flowGroup.add(arrow);
-              animatedFlowArrows.push({ mesh: arrow, elementKey: element.key, pathOrdinal, systemKey: element.systemKey, points, cumulative, length, phase: index / count, forward: path.flowForward !== false });
+              animatedFlowArrows.push({ mesh: arrow, elementKey: element.key, pathOrdinal, systemKey: element.systemKey, points, cumulative, length, slot: index, flowStart: 0, spacing: 6, enabled: canAnimate(path), forward: path.flowForward !== false, waterRadius: radii ? Math.min(radii.start, radii.end) : null });
             }
           }
         }
@@ -918,9 +1088,22 @@ export function MepViewer() {
         if (!disposed) setFlowRenderStats({ paths: renderedPathCount, arrows: animatedFlowArrows.length, fallbackPaths: fallbackPathCount });
       }, 0);
       if (initialGraph) for (const valve of initialGraph.valves.filter((item) => item.isEnabledAsValve)) {
-        const element = initialGraph.elements.find((item) => item.key === valve.elementKey); const point = toWebPoint(element?.paths?.[0]?.points?.[0]); if (!point) continue;
-        const marker = new THREE.Mesh(new THREE.TorusGeometry(.34, .09, 8, 24), new THREE.MeshBasicMaterial({ color: valve.isClosed ? '#ef544a' : '#20d08b', depthTest: false }));
-        marker.position.copy(point); marker.renderOrder = 22; valveGroup.add(marker); valveVisuals.push({ marker, elementKey: valve.elementKey });
+        const element = initialGraph.elements.find((item) => item.key === valve.elementKey);
+        const points = (element?.paths?.[0]?.points || []).map(toWebPoint).filter((point): point is THREE.Vector3 => point !== null);
+        if (points.length < 2) continue;
+        const start = points[0], end = points[points.length - 1];
+        const axis = end.clone().sub(start).normalize();
+        if (axis.lengthSq() < .5) continue;
+        // Symbolic quarter-turn handle: never rotate the exported valve body.
+        const assembly = new THREE.Group(); assembly.position.copy(start).lerp(end, .5);
+        assembly.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), axis);
+        const marker = new THREE.Mesh(new THREE.TorusGeometry(.34, .045, 8, 32), new THREE.MeshBasicMaterial({ color: valve.isClosed ? '#ef544a' : '#20d08b', depthTest: false, toneMapped: false }));
+        const handle = new THREE.Mesh(new THREE.CapsuleGeometry(.065, .55, 4, 8), new THREE.MeshBasicMaterial({ color: valve.isClosed ? '#ef544a' : '#20d08b', depthTest: false, toneMapped: false }));
+        handle.geometry.rotateZ(-Math.PI / 2); handle.position.z = .12;
+        handle.rotation.z = valve.isClosed ? Math.PI / 2 : 0;
+        marker.renderOrder = 22; handle.renderOrder = 23;
+        assembly.add(marker, handle); valveGroup.add(assembly);
+        valveVisuals.push({ marker, handle, targetAngle: handle.rotation.z, available: true, elementKey: valve.elementKey, systemKey: element!.systemKey });
       }
       updateMepState(initialGraph, initialHiddenSystems);
       applyFlowPresentation();
@@ -931,6 +1114,35 @@ export function MepViewer() {
     let pointerStart: { x: number; y: number; dragged: boolean; time: number } | null = null; let looking = false; let suppressContextMenu = false;
     let previousFrameTime = performance.now();
     let pickedAnchor: Pick<ContextMenuState, 'position' | 'normal' | 'depthCm'> | null = null;
+    let lastHoverPick = 0;
+    const clearFlowHover = () => {
+      if (!hoveredSystemKeyRef.current) return;
+      hoveredSystemKeyRef.current = null; applyFlowPresentation();
+    };
+    const hoverFlowAt = (event: PointerEvent) => {
+      if (!flowsVisibleRef.current || pointerStart || draggingEdit || gizmo.axis || draftRef.current || measurePickRef.current.picking) { clearFlowHover(); return; }
+      const now = performance.now();
+      if (now - lastHoverPick < 70) return;
+      lastHoverPick = now;
+      const rect = renderer.domElement.getBoundingClientRect();
+      const planes = sectionPlanes(sectionRef.current);
+      raycaster.firstHitOnly = planes.length === 0;
+      pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
+      raycaster.setFromCamera(pointer, camera);
+      let system: string | null = null;
+      for (const hit of raycaster.intersectObjects(pickables.filter(isObjectVisible), false)) {
+        if (hit.faceIndex == null || !sectionContains(planes, hit.point)) continue;
+        const geometry = (hit.object as THREE.Mesh).geometry;
+        const attribute = geometry.getAttribute('_ELEMENT') || geometry.getAttribute('_element');
+        if (!attribute) continue;
+        const vertex = geometry.index ? geometry.index.getX(hit.faceIndex * 3) : hit.faceIndex * 3;
+        const raw = propertiesByIndex.get(Math.round(attribute.getX(vertex)));
+        const property = raw?.selectionTargetKey ? propertiesByKey.get(raw.selectionTargetKey) : raw;
+        system = graphStateRef.current?.elements.find(element => element.key === property?.key)?.systemKey || null;
+        break;
+      }
+      if (system !== hoveredSystemKeyRef.current) { hoveredSystemKeyRef.current = system; applyFlowPresentation(); }
+    };
     const selectAt = (event: { clientX: number; clientY: number }, contextOnly = false) => {
       pickedAnchor = null;
       const selectable = pickables.filter(isObjectVisible);
@@ -1003,6 +1215,7 @@ export function MepViewer() {
         }
         setActiveMarkup(null);
         selectedIndexRef.current = property.index;
+        flowPulseRequestRef.current++;
         setSelectedIndex(property.index);
         setInspectionHistory((current) => [property.index, ...current.filter((item) => item !== property.index)].slice(0, 8));
         return property.index;
@@ -1013,13 +1226,14 @@ export function MepViewer() {
       return null;
     };
     const onPointerDown = (event: PointerEvent) => {
+      if (followRoute.length) lastFollowInput = performance.now();
       renderer.domElement.focus({ preventScroll: true });
       if (!sceneReady || gizmo.axis || draggingEdit) return;
       pointerStart = { x: event.clientX, y: event.clientY, dragged: false, time: performance.now() };
       suppressContextMenu = false;
       if (pickingSectionRef.current) return;
       const measurePivot = measurePickRef.current.picking && measurePickRef.current.start ? new THREE.Vector3(...measurePickRef.current.start) : null;
-      const pivot = measurePickRef.current.picking ? measurePivot : selectedIndexRef.current !== null ? selectedPivot : null;
+      const pivot = followRoute.length ? controls.target.clone() : measurePickRef.current.picking ? measurePivot : selectedIndexRef.current !== null ? selectedPivot : null;
       if (!pickingDimensionRef.current && event.button === 0 && (navigationModeRef.current === 'orbit' || measurePivot) && pivot && !event.shiftKey && !event.ctrlKey && !event.metaKey) {
         if (navigationModeRef.current === 'maquette') controls.target.copy(camera.position).addScaledVector(camera.getWorldDirection(new THREE.Vector3()), Math.max(1, camera.position.distanceTo(pivot)));
         orbitPointer = { id: event.pointerId, x: event.clientX, y: event.clientY, pivot: pivot.clone() };
@@ -1031,6 +1245,7 @@ export function MepViewer() {
     };
     const onPointerMove = (event: PointerEvent) => {
       if (!sceneReady) return;
+      hoverFlowAt(event);
       if (pointerStart && Math.hypot(event.clientX - pointerStart.x, event.clientY - pointerStart.y) >= 5) pointerStart.dragged = true;
       if (pointerStart && !pointerStart.dragged) { event.stopImmediatePropagation(); return; }
       if (orbitPointer && event.pointerId === orbitPointer.id) {
@@ -1051,7 +1266,7 @@ export function MepViewer() {
       looking = false; orbitPointer = null; pointerStart = null;
       if (renderer.domElement.hasPointerCapture(event.pointerId)) renderer.domElement.releasePointerCapture(event.pointerId);
       if (event.button === 2 && dragged) suppressContextMenu = true;
-      if (simpleClick && event.button === 0) selectAt(event);
+      if (simpleClick && event.button === 0 && !followRoute.length) selectAt(event);
     };
 
     const onContextMenu = (event: MouseEvent) => {
@@ -1120,6 +1335,7 @@ export function MepViewer() {
     const onVisibilityChange = () => { if (document.hidden) resetInput(); };
     const onKeyDown = (event: KeyboardEvent) => {
       if (!event.isTrusted) return;
+      if (['Escape', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyZ', 'KeyQ', 'KeyF'].includes(event.code)) stopFollowing();
       if (!sceneReady) return;
       if (event.code === 'Escape' && measurePickRef.current.picking) { cancelMeasure(); event.preventDefault(); return; }
       if (event.code === 'Escape' && pickingDimensionRef.current) { setPickingDimension(false); pickingDimensionRef.current = false; event.preventDefault(); return; }
@@ -1148,6 +1364,12 @@ export function MepViewer() {
     const onKeyUp = (event: KeyboardEvent) => { pressed.delete(event.code); if (['KeyW', 'KeyZ', 'ArrowUp'].includes(event.code)) doubleTapSprint = false; };
     const onWheel = (event: WheelEvent) => {
       if (!sceneReady) { event.preventDefault(); return; }
+      if (followRoute.length && !event.ctrlKey) {
+        event.preventDefault(); event.stopImmediatePropagation(); lastFollowInput = performance.now();
+        const offset = camera.position.clone().sub(controls.target);
+        offset.setLength(THREE.MathUtils.clamp(offset.length() * Math.exp(Math.sign(event.deltaY) * .12), 2, 80));
+        camera.position.copy(controls.target).add(offset); controls.update(); return;
+      }
       if (event.ctrlKey && selectedSectionRef.current) {
         event.preventDefault(); event.stopImmediatePropagation();
         setSection(current => current.map(cut => cut.id === selectedSectionRef.current
@@ -1173,6 +1395,7 @@ export function MepViewer() {
       event.preventDefault(); wheelMoveRemaining = THREE.MathUtils.clamp(wheelMoveRemaining - Math.sign(event.deltaY) * 3.2, -12, 12);
     };
     const onDoubleClick = (event: MouseEvent) => { if (draftRef.current || !sceneReady || measureStateRef.current.open) return; const id = selectAt(event); if (id !== null) { selection.set(pickables.filter((m): m is THREE.Mesh => m instanceof THREE.Mesh), new Set([id])); viewActionsRef.current?.frameSelected(); } };
+    renderer.domElement.addEventListener('pointerleave', clearFlowHover);
     renderer.domElement.addEventListener('dblclick', onDoubleClick);
     renderer.domElement.addEventListener('pointerdown', onPointerDown, true); renderer.domElement.addEventListener('pointermove', onPointerMove, true); renderer.domElement.addEventListener('pointerup', onPointerUp); renderer.domElement.addEventListener('contextmenu', onContextMenu); renderer.domElement.addEventListener('wheel', onWheel, { passive: false, capture: true });
     const labelLayer = markupLabelsRef.current;
@@ -1190,13 +1413,14 @@ export function MepViewer() {
       flowLineMaterials.forEach((material) => material.resolution.set(Math.max(width, 1), Math.max(height, 1)));
     };
     const observer = new ResizeObserver(resize); observer.observe(mount); resize();
-    let frame = 0, lastFlowUpdate = 0;
+    let frame = 0, presentationFrame = 0, lastFlowUpdate = 0;
     let lastLabelVisibility = -Infinity;
     let qualityFrames = 0, qualityStart = performance.now();
     const animate = () => {
       frame = requestAnimationFrame(animate);
       if (draftOpenRef.current) { pressed.clear(); wheelMoveRemaining = 0; }
       const now = performance.now(); const delta = Math.min((now - previousFrameTime) / 1000, .05); previousFrameTime = now;
+      const pulseElapsed = Math.max(0, (now - lastPulseTick) / 1000); lastPulseTick = now;
       if (!document.hidden && ++qualityFrames >= 120) {
         const frameMs = (now - qualityStart) / qualityFrames;
         const ratio = renderer.getPixelRatio();
@@ -1354,15 +1578,19 @@ export function MepViewer() {
       controls.enableRotate = true;
       controls.enableDamping = !measurePickRef.current.picking;
       if (lastSelection !== selectedIndexRef.current) {
+        stopFollowing();
         lastSelection = selectedIndexRef.current;
         const property = lastSelection === null ? null : propertiesByIndex.get(lastSelection);
         const ids = new Set<number>(lastSelection === null ? [] : [lastSelection]);
         if (property) for (const p of propertiesByIndex.values()) if (p.selectionTargetKey === property.key) ids.add(p.index);
         selection.set(pickables.filter((m): m is THREE.Mesh => m instanceof THREE.Mesh), ids);
         selectedPivot = lastSelection === null || selection.bounds.isEmpty() ? null : selection.bounds.getCenter(new THREE.Vector3());
+        traceSelection();
+        lastPulseRequest = flowPulseRequestRef.current;
 
       }
       selection.sync();
+      if (lastPulseRequest !== flowPulseRequestRef.current) { lastPulseRequest = flowPulseRequestRef.current; traceSelection(); }
       const draftColor = draftRef.current ? lotDetails(reservationLot(draftRef.current), lotSettingsRef.current).color : '';
       if (!draggingEdit && (previewMark !== draftRef.current || previewColor !== draftColor)) {
         previewColor = draftColor;
@@ -1448,22 +1676,139 @@ export function MepViewer() {
           camera.position.y = playerFootY + currentEyeHeight;
         }
       }
-      if (flowGroup.visible && now - lastFlowUpdate >= 1000 / 30) {
+      if (!flowGroup.visible && followRoute.length) stopFollowing();
+      if (flowGroup.visible) {
+        const previousPulseTravel = pulseTravel;
+        const equipmentSlow = equipmentStopsRef.current && (now < equipmentSlowUntil || pulseTravel < equipmentSlowEnd);
+        if (!equipmentSlow && equipmentSlowUntil > 0) { equipmentSlowUntil = 0; equipmentSlowEnd = 0; setEquipmentPause(null); }
+        pulseTravel += pulseElapsed * 8 * (followRoute.length ? followPausedRef.current ? 0 : followSpeedRef.current * (equipmentSlow ? .3 : 1) : 1);
+        if (followRoute.length && !followPausedRef.current) {
+          if (equipmentStopsRef.current) for (const candidate of followRoute) {
+            const route = traceRoutes.get(flowPathKey(candidate.elementKey, candidate.pathOrdinal));
+            if (!route || visitedEquipment.has(candidate.elementKey) || candidate.targetActive <= 0 || route.start > pulseTravel || route.start + route.length < previousPulseTravel) continue;
+            const element = graphStateRef.current?.elements.find(element => element.key === candidate.elementKey);
+            const kind = equipmentStopKind(element);
+            if (route && kind && !visitedEquipment.has(candidate.elementKey) && candidate.targetActive > 0 && route.start <= pulseTravel && route.start + route.length >= previousPulseTravel) {
+              visitedEquipment.add(candidate.elementKey);
+              pulseTravel = Math.max(previousPulseTravel, route.start);
+              equipmentSlowUntil = now + 3000; equipmentSlowEnd = route.start + route.length;
+              setEquipmentPause(`${kind} · ${element!.name} #${element!.elementId}`); break;
+            }
+          }
+        }
+        const pulseDistance = pulseTravel;
+        if (followRoute.length) {
+          const visual = followRoute.find(visual => {
+            const route = traceRoutes.get(flowPathKey(visual.elementKey, visual.pathOrdinal));
+            return route && pulseDistance >= route.start && pulseDistance <= route.start + route.length;
+          });
+          const route = visual && traceRoutes.get(flowPathKey(visual.elementKey, visual.pathOrdinal));
+          if (visual && route && visual.targetActive > 0) {
+            const progress = THREE.MathUtils.clamp((pulseDistance - route.start) / Math.max(route.length, .001), 0, 1);
+            const cumulative = [0];
+            for (let i = 1; i < visual.points.length; i++) cumulative.push(cumulative[i - 1] + visual.points[i].distanceTo(visual.points[i - 1]));
+            const sample = sampleFlowPath({ points: visual.points, cumulative, length: route.length }, route.forward ? progress : 1 - progress);
+            const movement = sample.position.clone().sub(controls.target).multiplyScalar(1 - Math.exp(-6 * delta));
+            if (!followPausedRef.current) { controls.target.add(movement); camera.position.add(movement); }
+            if (orbitPointer) orbitPointer.pivot.copy(controls.target);
+            if (followingSystemKeyRef.current !== visual.systemKey) { followingSystemKeyRef.current = visual.systemKey; applyFlowPresentation(); }
+            const stepKey = flowPathKey(visual.elementKey, visual.pathOrdinal);
+            if (stepKey !== lastFollowStep) {
+              lastFollowStep = stepKey;
+              const element = graphStateRef.current?.elements.find(element => element.key === visual.elementKey);
+              const network = graphStateRef.current?.systems.find(system => system.key === visual.systemKey)?.name || element?.systemName || visual.systemKey;
+              const name = propertiesByKey.get(visual.elementKey)?.name || element?.name || visual.elementKey;
+              if (visual.systemKey !== lastHistoryNetwork) { followHistory.push(network); lastHistoryNetwork = visual.systemKey; }
+              if (/pompe|pump/i.test(`${name} ${element?.category || ''}`) && followHistory[followHistory.length - 1] !== name) followHistory.push(name);
+              followHistory = followHistory.slice(-5);
+              setFollowStep({ network, element: `${name} #${element?.elementId || visual.elementKey}`, color: visual.color, history: [...followHistory], reverse: traceReverse });
+            }
+            if (!followPausedRef.current && clearFollowViewRef.current && now - lastFollowInput > 3000 && now - lastClearView > 650 && !orbitPointer) {
+              lastClearView = now;
+              const offset = camera.position.clone().sub(controls.target);
+              const obstacles = pickables.filter(isObjectVisible);
+              const score = (candidate: THREE.Vector3) => {
+                const origin = controls.target.clone().add(candidate), aim = controls.target.clone().sub(origin);
+                collisionRaycaster.set(origin, aim.clone().normalize()); collisionRaycaster.far = Math.max(0, aim.length() - .7);
+                return collisionRaycaster.intersectObjects(obstacles, false).filter(hit => sectionContains(activeSection, hit.point)).length;
+              };
+              const initial = score(offset);
+              if (initial > 0) {
+                let best = offset, bestScore = initial;
+                for (const angle of [-Math.PI / 4, Math.PI / 4, -Math.PI / 2, Math.PI / 2]) {
+                  const candidate = offset.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle), value = score(candidate);
+                  if (value < bestScore) { best = candidate; bestScore = value; }
+                }
+                followOffset.copy(best);
+              } else followOffset.copy(offset);
+            }
+            if (!followPausedRef.current && clearFollowViewRef.current && now - lastFollowInput > 3000 && !orbitPointer) camera.position.lerp(controls.target.clone().add(followOffset), 1 - Math.exp(-1.5 * delta));
+          } else {
+            const terminal = visual || followRoute[followRoute.length - 1];
+            const result = graphStateRef.current && terminal ? explainFlowEnd(graphStateRef.current, terminal.elementKey, terminal.pathOrdinal, traceReverse) : null;
+            stopFollowing();
+            if (result) setFollowEnd(result);
+          }
+        }
+        for (const visual of flowVisuals) {
+          visual.current.active.value = THREE.MathUtils.damp(visual.current.active.value, visual.targetActive, 8, delta);
+          if (Math.abs(visual.current.active.value - visual.targetActive) < .01) visual.current.active.value = visual.targetActive;
+          if (visual.targetActive > 0) visual.current.time.value = now / 1000;
+          const route = traceRoutes.get(flowPathKey(visual.elementKey, visual.pathOrdinal));
+          visual.current.pulseDirection.value = route?.forward === false ? -1 : 1;
+          visual.current.pulseStart.value = route ? route.start + (route.forward ? 0 : route.length) : 0;
+          visual.current.pulseDistance.value = pulseDistance;
+          visual.current.pulseEnabled.value = route && pulseDistance >= 0 && pulseDistance <= pulseEnd && visual.targetActive > 0 ? 1 : 0;
+          if (visual.water?.mesh.visible) {
+            visual.water.uniforms.time.value = visual.current.time.value;
+            visual.water.uniforms.active.value = visual.current.active.value;
+            visual.water.uniforms.pulseStart.value = visual.current.pulseStart.value;
+            visual.water.uniforms.pulseDirection.value = visual.current.pulseDirection.value;
+            visual.water.uniforms.pulseDistance.value = pulseDistance;
+            visual.water.uniforms.pulseEnabled.value = visual.current.pulseEnabled.value;
+            if (visual.current.active.value <= .01) visual.water.mesh.visible = false;
+          }
+        }
+      }
+      let animatedValveVisible = false;
+      for (const visual of valveVisuals) {
+        const moving = Math.abs(visual.handle.rotation.z - visual.targetAngle) > .02;
+        visual.handle.rotation.z = THREE.MathUtils.damp(visual.handle.rotation.z, visual.targetAngle, 9, delta);
+        const selected = selectedIndexRef.current === propertiesByKey.get(visual.elementKey)?.index;
+        visual.marker.parent!.visible = visual.available && (valveMarkersVisibleRef.current || moving || (selected && waterViewRef.current));
+        animatedValveVisible ||= visual.marker.parent!.visible;
+      }
+      valveGroup.visible = valveMarkersVisibleRef.current || animatedValveVisible;
+      if (flowGroup.visible && now - lastFlowUpdate >= 1000 / 60) {
         lastFlowUpdate = now;
         const seconds = now / 1000;
         for (const animation of animatedFlowArrows) {
-          if (!animation.mesh.visible) continue;
-          const rawProgress = animation.phase + seconds * 2.4 / animation.length * (animation.forward ? 1 : -1);
-          const progress = rawProgress - Math.floor(rawProgress);
+          const mid = animation.points[Math.floor(animation.points.length / 2)];
+          const pixelsPerFoot = Math.max(mount.clientHeight, 1) / Math.max(.01, camera.position.distanceTo(mid) * 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+          const stride = pixelsPerFoot < 4 ? 8 : pixelsPerFoot < 9 ? 4 : pixelsPerFoot < 18 ? 2 : 1;
+          const distance = animation.enabled ? flowArrowDistance(animation.flowStart, animation.length, animation.spacing * stride, animation.slot, seconds) : null;
+          animation.mesh.visible = distance !== null;
+          if (distance === null) continue;
+          const progress = animation.forward ? distance / animation.length : 1 - distance / animation.length;
           const sample = sampleFlowPath(animation, progress);
           animation.mesh.position.copy(sample.position);
           const direction = animation.forward ? sample.direction : sample.direction.multiplyScalar(-1);
-          animation.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
-          const scale = THREE.MathUtils.clamp(camera.position.distanceTo(sample.position) * .009, .65, 3.2);
+          // Face the camera around the pipe axis: a flat chevron must never
+          // disappear edge-on when orbiting around a vertical or horizontal pipe.
+          const view = camera.position.clone().sub(sample.position).normalize();
+          const right = new THREE.Vector3().crossVectors(direction, view);
+          if (right.lengthSq() < .0001) right.set(1, 0, 0).applyQuaternion(camera.quaternion).addScaledVector(direction, -new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion).dot(direction));
+          right.normalize();
+          const normal = new THREE.Vector3().crossVectors(right, direction).normalize();
+          animation.mesh.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, direction, normal));
+          // About 22 screen pixels at any zoom, capped on short fittings.
+          const pixelsToWorld = camera.position.distanceTo(sample.position) * 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) / Math.max(mount.clientHeight, 1);
+          const diameterLimit = waterViewRef.current && animation.waterRadius ? animation.waterRadius * 2 / (.48 * 1.32) * .85 : Infinity;
+          const scale = Math.min(diameterLimit, animation.length * .65, THREE.MathUtils.clamp(pixelsToWorld * 22 / .655, .18, 5));
           animation.mesh.scale.setScalar(scale);
         }
       }
-      if (flowGroup.visible && frame % 8 === 0) applyFlowPresentation();
+      if (flowGroup.visible && ++presentationFrame % 8 === 0) applyFlowPresentation();
       doors.forEach((door) => {
         const target = door.open ? Math.PI * .51 : 0; door.angle = THREE.MathUtils.damp(door.angle, target, 8, delta); door.meshes.forEach((mesh) => { mesh.rotation.y = door.angle; });
       });
@@ -1515,13 +1860,23 @@ export function MepViewer() {
         element.style.top = Math.max(element.offsetHeight + 4, (1 - projected.y) * mount.clientHeight / 2) + 'px';
       }
       renderer.autoClear = false; renderer.clear(); renderer.render(scene, camera);
+      if (sceneReady && now - lastRoomCheck >= 200) {
+        lastRoomCheck = now;
+        const walking = navigationModeRef.current === 'maquette' && !webFlightMode;
+        const candidate = locateRoom(viewerPackage?.viewer?.rooms || [], camera.position.x, walking ? playerFootY : camera.position.y, camera.position.z);
+        const key = candidate ? candidate.room.key + ':' + candidate.approximate : '';
+        if (key !== roomCandidateKey) { roomCandidateKey = key; roomCandidateSince = now; }
+        if (key !== shownRoomKey && now - roomCandidateSince >= 400) {
+          shownRoomKey = key; currentRoom = candidate; setRoomLocation(candidate);
+        }
+      }
       if (sceneReady && navigationModeRef.current === 'maquette' && miniMapVisibleRef.current && miniMapRef.current) {
         miniMap.draw(miniMapRef.current, camera, pickables, now,
-          camera.position.y);
+          currentRoom ? currentRoom.room.baseElevation + 4 : camera.position.y, currentRoom?.room);
       }
       if (flowGroup.visible || valveGroup.visible) {
         renderer.clearDepth();
-        if (buildingVisibility) renderer.render(buildingVisibility.scene, camera);
+        if (buildingVisibility && !waterViewRef.current && modelOpacityRef.current > .3) renderer.render(buildingVisibility.scene, camera);
         renderer.render(overlayScene, camera);
       }
       if (!openingReleased) { openingReleased = true; setOpening(false); }
@@ -1536,6 +1891,8 @@ export function MepViewer() {
       gizmo.dispose(); disposeMarkups(editRoot); selection.dispose(); renderer.domElement.removeEventListener('dblclick', onDoubleClick);
 
       disposed = true; cancelAnimationFrame(frame); observer.disconnect();
+      hoveredSystemKeyRef.current = null;
+      renderer.domElement.removeEventListener('pointerleave', clearFlowHover);
       if (statsTimer !== null) window.clearTimeout(statsTimer);
       renderer.domElement.removeEventListener('pointerdown', onPointerDown, true); renderer.domElement.removeEventListener('pointermove', onPointerMove, true); renderer.domElement.removeEventListener('pointerup', onPointerUp); renderer.domElement.removeEventListener('contextmenu', onContextMenu); renderer.domElement.removeEventListener('wheel', onWheel, true);
       labelLayer?.removeEventListener('wheel', onWheel, true);
@@ -1695,7 +2052,7 @@ export function MepViewer() {
   };
   const draftIsHost = isReservationHost(viewerPackage?.properties.find(property => property.key === draftMarkup?.elementKey));
   const activeMark = allMarkups.find(item => item.id === activeMarkup);
-  return <><main className="viewer-shell" data-input-device={inputDevice} data-gamepad-aiming={inputDevice === 'gamepad' && !gamepadMenu && (pickingMeasure || pickingSection || pickingDimension || !!relocating || !!draftMarkup)} inert={opening}>
+  return <><main className="viewer-shell compact-ui" data-panel-collapsed={panelCollapsed} data-input-device={inputDevice} data-gamepad-aiming={inputDevice === 'gamepad' && !gamepadMenu && (pickingMeasure || pickingSection || pickingDimension || !!relocating || !!draftMarkup)} inert={opening}>
     {gamepadField && <GamepadFieldEditor key={gamepadField.name + gamepadField.type} target={gamepadField} onClose={closeGamepadField}/>}
     {draftMarkup && <section className="markup-editor" aria-label="Modifier l’annotation">
         <strong>{draftMarkup.kind === 'note' ? 'Annotation' : 'Réservation'}</strong>
@@ -1711,17 +2068,12 @@ export function MepViewer() {
       </section>}
     {impactOpen && <MepImpactPanel graph={graph} reportText={reportText} calculating={calculating} error={calculationError} isEditor={isEditor} token={shareToken} scenario={scenario} publicationRevision={resolved?.publication.revision} selectedKey={selectedProperty?.key} onScenario={next => setScenario(current => !current || next.revision >= current.revision ? next : current)} onClose={() => setImpactOpen(false)} onReference={setReference} onSelect={key => { const property = propertiesByKey.get(key); if (property) { setSelectedIndex(property.index); requestAnimationFrame(() => viewActionsRef.current?.frameSelected()); } }}/>}
     <header className="topbar"><div className="brand-mark"><Waves size={19}/><span>BIMaestro</span><b>Maquette 3D</b></div><div className="model-title"><span>{resolved?.publication.name || 'Démonstration · Local technique'}</span><Badge variant="outline">Révision {resolved?.publication.revision || 'démo'}</Badge></div><div className={`access-badge ${isEditor ? 'editor' : 'reader'}`}>{isEditor ? <Pencil size={15}/> : <LockKeyhole size={15}/>}<span><small>MODE DU LIEN</small>{isEditor ? 'ÉDITION COLLABORATIVE' : 'CONSULTATION · LECTURE SEULE'}</span></div></header>
-    <section className="viewport">{sectionOpen && <SectionControls gamepad={inputDevice === 'gamepad'} gamepadMode={navigationMode} value={section} onChange={setSection} selected={selectedSection} onSelect={setSelectedSection} picking={pickingSection} onPick={value => { cancelMeasure(); setPickingDimension(false); setPickingSection(value); }} extent={sectionExtent}/>}<div ref={mountRef} className="three-mount"/><div className="view-toolbar"><Button size="sm" variant="secondary" onClick={() => viewActionsRef.current?.isometric()}><Box/> Isométrique</Button><Button size="sm" variant="secondary" aria-expanded={sectionOpen} onClick={() => { setLotsOpen(false); setMarkupListOpen(false); setMeasureOpen(false); cancelMeasure(); setPickingDimension(false); setSectionOpen(value => !value); if (!sectionOpen && section.length === 0) setPickingSection(true); else setPickingSection(false); }}><Scissors/> Coupe{section.length ? ' · ' + section.length : ''}</Button><Button size="sm" variant="secondary" disabled={!!draftMarkup} aria-expanded={measureOpen} onClick={() => { setMeasureOpen(value => !value); setSectionOpen(false); setPickingSection(false); setLotsOpen(false); setMarkupListOpen(false); if (!measureOpen) startMeasure(); else cancelMeasure(); }}><ArrowLeftRight/> Mesurer</Button><Button size="sm" variant="secondary" onClick={() => setImpactOpen(v => !v)}><ChartNoAxesCombined/> Analyser les coupes</Button><Button size="sm" variant="secondary" onClick={() => { setMarkupListOpen(v => !v); setLotsOpen(false); setSectionOpen(false); setPickingSection(false); setMeasureOpen(false); cancelMeasure(); }}><MessageSquare/> Annotation et Résa ({allMarkups.length}){reviewCount > 0 ? ` · ⚠ ${reviewCount} à vérifier` : ''}</Button></div><div className="reservation-lot-toolbar"><label>Lot actif <select aria-label="Lot actif" value={currentLot} onChange={event => { setCurrentLot(event.target.value); setActiveMarkup(null); }}>{lots.map(lot => <option key={lot.id} value={lot.id}>{lot.name}</option>)}</select></label><span className="lot-swatch" style={{ background: lotDetails(currentLot, lotSettings).color }}/><label><input type="checkbox" checked={onlyCurrentLot} onChange={event => { setOnlyCurrentLot(event.target.checked); setActiveMarkup(null); }}/> Masquer les autres lots</label><button aria-expanded={lotsOpen} onClick={() => lotsOpen ? setLotsOpen(false) : openLots()}>Lots</button></div><div className={`viewer-left-column${navigationMode === 'maquette' ? ' with-mini-map' : ''}`}>{navigationMode === 'maquette' && <div className="viewer-mini-map-tools">
+    <section className="viewport">{sectionOpen && <SectionControls gamepad={inputDevice === 'gamepad'} gamepadMode={navigationMode} value={section} onChange={setSection} selected={selectedSection} onSelect={setSelectedSection} picking={pickingSection} onPick={value => { cancelMeasure(); setPickingDimension(false); setPickingSection(value); }} extent={sectionExtent}/>}<div ref={mountRef} className="three-mount"/><div className="view-toolbar" aria-label="Outils de la maquette"><Button size="sm" variant="secondary" onClick={() => viewActionsRef.current?.isometric()}><Box/> Isométrique</Button><Button size="sm" variant="secondary" aria-expanded={sectionOpen} onClick={() => { setLotsOpen(false); setMarkupListOpen(false); setMeasureOpen(false); cancelMeasure(); setPickingDimension(false); setSectionOpen(value => !value); if (!sectionOpen && section.length === 0) setPickingSection(true); else setPickingSection(false); }}><Scissors/> Coupe{section.length ? ' · ' + section.length : ''}</Button><Button size="sm" variant="secondary" disabled={!!draftMarkup} aria-expanded={measureOpen} onClick={() => { setMeasureOpen(value => !value); setSectionOpen(false); setPickingSection(false); setLotsOpen(false); setMarkupListOpen(false); if (!measureOpen) startMeasure(); else cancelMeasure(); }}><ArrowLeftRight/> Mesurer</Button><Button size="sm" variant="secondary" onClick={() => setImpactOpen(v => !v)}><ChartNoAxesCombined/> Analyser les coupes</Button><Button size="sm" variant="secondary" onClick={() => { setMarkupListOpen(v => !v); setLotsOpen(false); setSectionOpen(false); setPickingSection(false); setMeasureOpen(false); cancelMeasure(); }}><MessageSquare/> Annotation et Résa ({allMarkups.length}){reviewCount > 0 ? ` · ⚠ ${reviewCount} à vérifier` : ''}</Button></div><div className={`viewer-left-column${navigationMode === 'maquette' ? ' with-mini-map' : ''}`}>{navigationMode === 'maquette' && <div className="viewer-mini-map-tools">
       {!miniMapVisible && <button className="viewer-map-show" aria-controls="viewer-mini-map" onClick={() => setMiniMapVisible(true)} title={inputDevice === 'gamepad' ? 'Afficher la mini-carte (croix ↑)' : 'Afficher la mini-carte (M)'}>Mini-carte <kbd>{inputDevice === 'gamepad' ? '↑' : 'M'}</kbd></button>}
-      <div id="viewer-mini-map" className="viewer-mini-map" hidden={!miniMapVisible}><header><strong>Plan local</strong><button onClick={() => setMiniMapVisible(false)} aria-label="Fermer la mini-carte" title={inputDevice === 'gamepad' ? 'Fermer la mini-carte (croix ↑)' : 'Fermer la mini-carte (M)'}>×</button></header><canvas ref={miniMapRef} width={280} height={280} aria-label="Plan local de 30 mètres, position et direction de la caméra"/></div>
-      </div>}<div className="appearance-toolbar" aria-label="Réglages de rendu"><button className={realisticLighting ? 'active' : ''} onClick={() => setRealisticLighting((value) => !value)} title="Basculer entre le mode ombré du plugin et les couleurs uniformes"><SunMedium/><span>{realisticLighting ? 'Ombré' : 'Uniforme'}</span></button><button className={highContrast ? 'active' : ''} onClick={() => setHighContrast((value) => !value)} title="Renforcer les contours et le contraste"><Contrast/><span>Contraste</span></button><button className={modelOpacity < 1 ? 'active' : ''} onClick={cycleOpacity} title="Faire varier la transparence de la maquette"><Layers3/><span>{Math.round(modelOpacity * 100)} %</span></button></div></div><div className="navigation-switch" aria-label="Mode de navigation"><button className={navigationMode === 'orbit' ? 'active' : ''} onClick={() => changeNavigationMode('orbit')}><Hand size={15}/><span>Navigation web</span></button><button className={navigationMode === 'maquette' ? 'active' : ''} onClick={() => changeNavigationMode('maquette')}><Footprints size={15}/><span>Maquette 3D</span></button></div>{navigationMode === 'maquette' && <div className="flight-controls" aria-label="Commandes de déplacement vertical"><button className={flightMode ? 'active' : ''} onClick={() => viewActionsRef.current?.toggleFlight()} title={flightMode ? 'Revenir au mode marche' : 'Activer le vol libre'}><Plane/><span>{flightMode ? 'Quitter le vol' : 'Vol libre'}</span></button>{flightMode && <><button data-gamepad-vertical="1" aria-label="Monter" title="Monter" onPointerDown={() => holdInput('Space', true)} onPointerUp={() => holdInput('Space', false)} onPointerCancel={() => holdInput('Space', false)} onPointerLeave={() => holdInput('Space', false)}><ArrowUp/><span>Monter</span></button><button data-gamepad-vertical="-1" aria-label="Descendre" title="Descendre" onPointerDown={() => holdInput('ShiftLeft', true)} onPointerUp={() => holdInput('ShiftLeft', false)} onPointerCancel={() => holdInput('ShiftLeft', false)} onPointerLeave={() => holdInput('ShiftLeft', false)}><ArrowDown/><span>Descendre</span></button></>}<button onClick={() => viewActionsRef.current?.enterSpectator()} title="Revenir au point de départ"><RotateCcw/><span>Réapparaître</span></button></div>}{contextMenu && contextProperty && <div className="element-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} role="menu"><header><span>{contextProperty.name}</span><small>#{contextProperty.elementId}</small></header><button disabled={section.length >= maximumSections} onClick={sectionFromContext}>Faire une coupe</button>{isEditor && <><button onClick={() => beginMarkup('note')}>Annoter ici</button><button onClick={() => beginMarkup('reservation')}>Créer une réservation ici</button>{contextMepElement && <>{contextValve && <button disabled={saving} onClick={() => void runScenarioEdit(contextMepElement, 'valve', !contextValve.isClosed)}>{contextValve.isClosed ? 'Ouvrir la vanne' : 'Fermer la vanne'}</button>}<button disabled={saving} className={contextSourceKind === 'inlet' ? 'active' : ''} onClick={() => void runScenarioEdit(contextMepElement, 'source', 'inlet')}>{contextSourceKind === 'inlet' ? '✓ Départ du réseau' : 'Définir comme départ'}</button><button disabled={saving} className={contextSourceKind === 'outlet' ? 'active' : ''} onClick={() => void runScenarioEdit(contextMepElement, 'source', 'outlet')}>{contextSourceKind === 'outlet' ? '✓ Retour du réseau' : 'Définir comme retour'}</button>{contextSourceKind && <button disabled={saving} className="danger" onClick={() => void runScenarioEdit(contextMepElement, 'source', 'none')}>Retirer {contextSourceKind === 'inlet' ? 'le départ' : 'le retour'}</button>}</>}</>}<button onClick={() => setContextMenu(null)}>Fermer</button></div>}<div ref={markupLabelsRef} className="markup-labels">{visibleMarkups.map(mark => <button key={mark.id} data-markup={mark.id} className={`markup-label ${mark.kind}`} style={{ borderColor: lotDetails(reservationLot(mark), lotSettings).color, color: lotDetails(reservationLot(mark), lotSettings).color, background: "white" }} onClick={() => { setActiveMarkup(mark.id); setMarkupError(null); }} title={mark.text || 'Réservation'}>{mark.kind === 'note' ? 'A.' : 'R.'} <span>{mark.kind === 'note' ? mark.text : `${lotDetails(reservationLot(mark), lotSettings).name} · ${reservationLabel(mark)}`}</span></button>)}{dimensionMarks.flatMap(mark => (mark.dimensions || []).map(dimension => <span key={mark.id + dimension.id} data-markup={mark.id} data-dimension={dimension.id} className="markup-label dimension-label">{dimensionDistance(mark, dimension).toFixed(1)} cm</span>))}</div>{activeMark && <div className="markup-card"><strong>{activeMark.kind === 'note' ? 'Annotation' : 'Réservation'}</strong><small>{activeMark.elementName}</small>{activeMark.needsReview && <p aria-live="polite">{activeMark.reviewCandidate ? 'Position proposée sur le support retrouvé. Vérifiez la position et les cotations, puis confirmez. Les autres réservations sont temporairement masquées.' : 'Ancienne position affichée. Le support n’a pas été retrouvé avec certitude : choisissez une nouvelle face. Les autres réservations sont temporairement masquées.'}</p>}<p>{activeMark.text}</p>{activeMark.kind === 'reservation' && <p>{lotDetails(reservationLot(activeMark), lotSettings).name} · {reservationLabel(activeMark)} · Profondeur {activeMark.depthCm} cm</p>}{activeMark.dimensions?.map(dimension => <p key={dimension.id}>{dimension.elementName} · Axe : {dimensionDistance(activeMark, dimension).toFixed(1)} cm</p>)}{markupError && <p role="alert">{markupError}</p>}{isEditor && <>{activeMark.needsReview && activeMark.reviewCandidate && <Button size="sm" disabled={saving} onClick={() => void persistMarkup(activeMark)}>Confirmer cette position et les cotations</Button>}{activeMark.kind === 'note' && !activeMark.needsReview && <Button size="sm" variant="outline" disabled={exporting || !!(viewerPackage?.manifest.tiles && loadedZones < viewerPackage.manifest.tiles.length)} onClick={() => void exportBcf([activeMark])}>Exporter BCF</Button>}<Button size="sm" onClick={() => { setEditMode("translate"); if (activeMark.needsReview) setRelocating(activeMark); else setDraftMarkup({ ...activeMark }); setActiveMarkup(null); }}>Modifier / déplacer</Button>{activeMark.kind === 'note' && <Button size="sm" onClick={() => { setRelocating(activeMark); setActiveMarkup(null); }}>Replacer sur une face</Button>}<Button size="sm" variant="outline" disabled={saving} onClick={() => void persistMarkup(activeMark, true)}>Supprimer</Button></>}<Button size="sm" variant="ghost" onClick={() => setActiveMarkup(null)}>Fermer</Button></div>}{relocating && <div className="relocation-hint">{inputDevice === 'gamepad' ? `Visez la nouvelle face et appuyez sur ${navigationMode === 'maquette' ? 'RT' : 'A'}` : 'Cliquez sur la nouvelle face'} pour replacer « {relocating.text || relocating.elementName} ». {inputDevice === 'gamepad' ? navigationMode === 'maquette' ? 'RS clic' : 'B' : 'Échap'} pour annuler.</div>}
+      <div id="viewer-mini-map" className="viewer-mini-map" hidden={!miniMapVisible}><header><strong title={roomLocation ? `${roomLocation.room.levelName} · ${roomLocation.room.number}` : undefined}>{roomLocation?.room.name || 'Plan local'}</strong><button onClick={() => setMiniMapVisible(false)} aria-label="Fermer la mini-carte" title={inputDevice === 'gamepad' ? 'Fermer la mini-carte (croix ↑)' : 'Fermer la mini-carte (M)'}>×</button></header><canvas ref={miniMapRef} width={280} height={280} aria-label="Plan local de 30 mètres, position et direction de la caméra"/></div>
+      </div>}<div className="appearance-toolbar" aria-label="Réglages de rendu"><button className={realisticLighting ? 'active' : ''} onClick={() => setRealisticLighting((value) => !value)} title="Basculer entre le mode ombré du plugin et les couleurs uniformes"><SunMedium/><span>{realisticLighting ? 'Ombré' : 'Uniforme'}</span></button><button className={highContrast ? 'active' : ''} onClick={() => setHighContrast((value) => !value)} title="Renforcer les contours et le contraste"><Contrast/><span>Contraste</span></button><button className={modelOpacity < 1 ? 'active' : ''} onClick={cycleOpacity} title="Faire varier la transparence de la maquette"><Layers3/><span>{Math.round(modelOpacity * 100)} %</span></button></div></div><div className="navigation-switch" aria-label="Mode de navigation"><button aria-label="Navigation web" title="Navigation web" className={navigationMode === 'orbit' ? 'active' : ''} onClick={() => changeNavigationMode('orbit')}><Hand size={15}/><span>Navigation web</span></button><button aria-label="Maquette 3D" title="Maquette 3D" className={navigationMode === 'maquette' ? 'active' : ''} onClick={() => changeNavigationMode('maquette')}><Footprints size={15}/><span>Maquette 3D</span></button></div>{navigationMode === 'maquette' && <div className="flight-controls" aria-label="Commandes de déplacement vertical"><button className={flightMode ? 'active' : ''} onClick={() => viewActionsRef.current?.toggleFlight()} title={flightMode ? 'Revenir au mode marche' : 'Activer le vol libre'}><Plane/><span>{flightMode ? 'Quitter le vol' : 'Vol libre'}</span></button>{flightMode && <><button data-gamepad-vertical="1" aria-label="Monter" title="Monter" onPointerDown={() => holdInput('Space', true)} onPointerUp={() => holdInput('Space', false)} onPointerCancel={() => holdInput('Space', false)} onPointerLeave={() => holdInput('Space', false)}><ArrowUp/><span>Monter</span></button><button data-gamepad-vertical="-1" aria-label="Descendre" title="Descendre" onPointerDown={() => holdInput('ShiftLeft', true)} onPointerUp={() => holdInput('ShiftLeft', false)} onPointerCancel={() => holdInput('ShiftLeft', false)} onPointerLeave={() => holdInput('ShiftLeft', false)}><ArrowDown/><span>Descendre</span></button></>}<button onClick={() => viewActionsRef.current?.enterSpectator()} title="Revenir au point de départ"><RotateCcw/><span>Réapparaître</span></button></div>}{contextMenu && contextProperty && <div className="element-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} role="menu"><header><span>{contextProperty.name}</span><small>#{contextProperty.elementId}</small></header><button disabled={section.length >= maximumSections} onClick={sectionFromContext}>Faire une coupe</button>{isEditor && <><button onClick={() => beginMarkup('note')}>Annoter ici</button><button onClick={() => beginMarkup('reservation')}>Créer une réservation ici</button>{contextMepElement && <>{contextValve && <button disabled={saving} onClick={() => void runScenarioEdit(contextMepElement, 'valve', !contextValve.isClosed)}>{contextValve.isClosed ? 'Ouvrir la vanne' : 'Fermer la vanne'}</button>}<button disabled={saving} className={contextSourceKind === 'inlet' ? 'active' : ''} onClick={() => void runScenarioEdit(contextMepElement, 'source', 'inlet')}>{contextSourceKind === 'inlet' ? '✓ Départ du réseau' : 'Définir comme départ'}</button><button disabled={saving} className={contextSourceKind === 'outlet' ? 'active' : ''} onClick={() => void runScenarioEdit(contextMepElement, 'source', 'outlet')}>{contextSourceKind === 'outlet' ? '✓ Retour du réseau' : 'Définir comme retour'}</button>{contextSourceKind && <button disabled={saving} className="danger" onClick={() => void runScenarioEdit(contextMepElement, 'source', 'none')}>Retirer {contextSourceKind === 'inlet' ? 'le départ' : 'le retour'}</button>}</>}</>}<button onClick={() => setContextMenu(null)}>Fermer</button></div>}<div ref={markupLabelsRef} className="markup-labels">{visibleMarkups.map(mark => <button key={mark.id} data-markup={mark.id} className={`markup-label ${mark.kind}`} style={{ borderColor: lotDetails(reservationLot(mark), lotSettings).color, color: lotDetails(reservationLot(mark), lotSettings).color, background: "white" }} onClick={() => { setActiveMarkup(mark.id); setMarkupError(null); }} title={mark.text || 'Réservation'}>{mark.kind === 'note' ? 'A.' : 'R.'} <span>{mark.kind === 'note' ? mark.text : `${lotDetails(reservationLot(mark), lotSettings).name} · ${reservationLabel(mark)}`}</span></button>)}{dimensionMarks.flatMap(mark => (mark.dimensions || []).map(dimension => <span key={mark.id + dimension.id} data-markup={mark.id} data-dimension={dimension.id} className="markup-label dimension-label">{dimensionDistance(mark, dimension).toFixed(1)} cm</span>))}</div>{activeMark && <div className="markup-card"><strong>{activeMark.kind === 'note' ? 'Annotation' : 'Réservation'}</strong><small>{activeMark.elementName}</small>{activeMark.needsReview && <p aria-live="polite">{activeMark.reviewCandidate ? 'Position proposée sur le support retrouvé. Vérifiez la position et les cotations, puis confirmez. Les autres réservations sont temporairement masquées.' : 'Ancienne position affichée. Le support n’a pas été retrouvé avec certitude : choisissez une nouvelle face. Les autres réservations sont temporairement masquées.'}</p>}<p>{activeMark.text}</p>{activeMark.kind === 'reservation' && <p>{lotDetails(reservationLot(activeMark), lotSettings).name} · {reservationLabel(activeMark)} · Profondeur {activeMark.depthCm} cm</p>}{activeMark.dimensions?.map(dimension => <p key={dimension.id}>{dimension.elementName} · Axe : {dimensionDistance(activeMark, dimension).toFixed(1)} cm</p>)}{markupError && <p role="alert">{markupError}</p>}{isEditor && <>{activeMark.needsReview && activeMark.reviewCandidate && <Button size="sm" disabled={saving} onClick={() => void persistMarkup(activeMark)}>Confirmer cette position et les cotations</Button>}{activeMark.kind === 'note' && !activeMark.needsReview && <Button size="sm" variant="outline" disabled={exporting || !!(viewerPackage?.manifest.tiles && loadedZones < viewerPackage.manifest.tiles.length)} onClick={() => void exportBcf([activeMark])}>Exporter BCF</Button>}<Button size="sm" onClick={() => { setEditMode("translate"); if (activeMark.needsReview) setRelocating(activeMark); else setDraftMarkup({ ...activeMark }); setActiveMarkup(null); }}>Modifier / déplacer</Button>{activeMark.kind === 'note' && <Button size="sm" onClick={() => { setRelocating(activeMark); setActiveMarkup(null); }}>Replacer sur une face</Button>}<Button size="sm" variant="outline" disabled={saving} onClick={() => void persistMarkup(activeMark, true)}>Supprimer</Button></>}<Button size="sm" variant="ghost" onClick={() => setActiveMarkup(null)}>Fermer</Button></div>}{relocating && <div className="relocation-hint">{inputDevice === 'gamepad' ? `Visez la nouvelle face et appuyez sur ${navigationMode === 'maquette' ? 'RT' : 'A'}` : 'Cliquez sur la nouvelle face'} pour replacer « {relocating.text || relocating.elementName} ». {inputDevice === 'gamepad' ? navigationMode === 'maquette' ? 'RS clic' : 'B' : 'Échap'} pour annuler.</div>}
     {markupListOpen && <aside className="markup-list" aria-label="Annotations et réservations"><strong>Annotations et réservations</strong><h2 className="export-heading">Exporter les réservations</h2>{viewerPackage && !viewerPackage.manifest.sharedCoordinates && <p role="status">Pour exporter un IFC en coordonnées partagées, republiez cette maquette depuis Revit avec le plugin corrigé.</p>}<label className="export-lot">Lots à exporter<select value={exportLot} onChange={event => setExportLot(event.target.value)}><option value="">Tous les lots</option>{lots.map(lot => <option key={lot.id} value={lot.id}>{lot.name}</option>)}</select></label><div className="markup-actions"><Button size="sm" variant="outline" disabled={exporting || !allMarkups.some(m => m.kind === 'reservation' && !m.needsReview && (!exportLot || reservationLot(m) === exportLot))} onClick={() => exportReservations(true)}>{exporting ? 'Export en cours…' : 'Exporter IFC'}</Button><Button size="sm" variant="outline" disabled={exporting || !allMarkups.some(m => m.kind === 'reservation' && !m.needsReview && (!exportLot || reservationLot(m) === exportLot))} onClick={() => exportReservations(false)}>Exporter vers Revit</Button></div><p>IFC : coordonnées partagées du site actif Revit. Export vers Revit : repère interne. Les points à vérifier sont exclus. Le choix des lots à exporter est indépendant des lots masqués.</p><h2 className="export-heading">Exporter les annotations</h2><div className="markup-actions"><Button size="sm" variant="outline" disabled={exporting || !allMarkups.some(m => m.kind === 'note' && !m.needsReview)} onClick={() => exportReservations(true, true)}>{exporting ? 'Export en cours…' : 'Exporter annotations IFC'}</Button><Button size="sm" variant="outline" disabled={exporting || !allMarkups.some(m => m.kind === 'note' && !m.needsReview) || !!(viewerPackage?.manifest.tiles && loadedZones < viewerPackage.manifest.tiles.length)} onClick={() => void exportBcf()}>{exporting ? 'Export en cours…' : 'Exporter annotations BCF'}</Button></div><p>Les annotations confirmées sont exportées en coordonnées partagées, avec leur texte et leur élément associé. Cet export est indépendant du filtre par lot des réservations.</p><Button size="sm" variant="ghost" onClick={() => setMarkupListOpen(false)}>Fermer</Button>{!allMarkups.length && <p>Aucune annotation enregistrée.</p>}{listedMarkups.map(mark => <button className="markup-list-item" style={{ color: lotDetails(reservationLot(mark), lotSettings).color, borderLeftColor: lotDetails(reservationLot(mark), lotSettings).color }} key={mark.id} onClick={() => { setActiveMarkup(mark.id); setMarkupListOpen(false); if (mark.needsReview) viewActionsRef.current?.frameMarkup(mark); }}><b>{(mark.kind === 'note' ? 'A.' : 'R.') + ' ' + lotDetails(reservationLot(mark), lotSettings).name} · {mark.elementName}</b><span>{mark.needsReview ? `⚠ À vérifier · ${mark.text || reservationLabel(mark)}` : mark.text || reservationLabel(mark)}</span></button>)}</aside>}
-    {lotsOpen && <ReservationLotsPanel lots={lots} editable={isEditor} onSave={persistLot} onClose={() => setLotsOpen(false)} onSaved={(id, created) => { if (!created) return; setCurrentLot(id); setDraftMarkup(current => current?.kind === 'reservation' ? { ...current, lot: id } : current); }}/>}
-    {measureOpen && <MeasureControls gamepad={inputDevice === 'gamepad'} gamepadMode={navigationMode} mode={measureMode} onMode={mode => { setMeasureMode(mode); measureModeRef.current = mode; startMeasure(); }} measures={measures} picking={pickingMeasure} hasStart={!!measureStart} onStart={startMeasure} onCancel={cancelMeasure} onRemove={id => setMeasures(current => current.filter(item => item.id !== id))} onClear={() => { setMeasures([]); cancelMeasure(); }} onClose={() => { setMeasureOpen(false); cancelMeasure(); }}/> }
-    <div ref={measureLabelsRef} className="markup-labels measure-labels">{measureOpen && measures.map((measure, index) => { const values = measureDistances(measure.start, measure.end); return <span key={measure.id} data-measure={measure.id} data-dimension="horizontal" className="measure-label"><b>Mesure {index + 1}</b><span>Directe {values.direct.toFixed(3)} m</span><span>Horiz. {values.horizontal.toFixed(3)} m · Vert. {values.vertical.toFixed(3)} m</span></span>; })}{measureOpen && measureStart && <span className="measure-label">Point A</span>}</div>
-    {connectedPad && <div className="gamepad-status" role="status" title={connectedPad}>Manette connectée{inputDevice === 'keyboard' ? ' · Appuyez sur une touche de la manette' : gamepadMenu ? ' · Menu : croix pour naviguer, A pour valider, B pour revenir' : ' · Xbox'}</div>}
-    {inputDevice === 'gamepad' && !gamepadMenu && <div className="gamepad-reticle" aria-hidden="true"/>}
-    <div className={`view-hint${inputDevice === 'gamepad' ? ' gamepad-hint' : ''}`}>{inputDevice === 'gamepad' ? <>
+    <div className="viewer-context-bar" aria-label="Contexte de la maquette">{roomLocation && <span className="room-location" title={roomLocation.approximate ? 'Repérage par emprise et niveau, au-dessus de la hauteur déclarée Revit' : 'Pièce ou espace MEP exporté depuis Revit'}>{roomLocation.room.name}<small>{roomLocation.room.levelName}{roomLocation.approximate ? ' · ≈' : ''}</small></span>}<details className="context-lot"><summary aria-label="Choisir le lot actif"><i className="lot-swatch" style={{ background: lotDetails(currentLot, lotSettings).color }}/><span>{lots.find(lot => lot.id === currentLot)?.name || currentLot}</span><ChevronRight size={13}/></summary><div className="reservation-lot-toolbar"><label>Lot actif <select aria-label="Lot actif" value={currentLot} onChange={event => { setCurrentLot(event.target.value); setActiveMarkup(null); }}>{lots.map(lot => <option key={lot.id} value={lot.id}>{lot.name}</option>)}</select></label><span className="lot-swatch" style={{ background: lotDetails(currentLot, lotSettings).color }}/><label><input type="checkbox" checked={onlyCurrentLot} onChange={event => { setOnlyCurrentLot(event.target.checked); setActiveMarkup(null); }}/> Masquer les autres lots</label><button aria-expanded={lotsOpen} onClick={() => lotsOpen ? setLotsOpen(false) : openLots()}>Lots</button></div></details><details className="navigation-help"><summary aria-label="Aide de navigation">?</summary><div className={`view-hint${inputDevice === 'gamepad' ? ' gamepad-hint' : ''}`}>{inputDevice === 'gamepad' ? <>
       {gamepadMenu ? <><kbd>↑ ↓</kbd> Parcourir les champs · <kbd>← →</kbd> Régler · <kbd>LB</kbd> ×10 · <kbd className="xbox-a">A</kbd> Ouvrir / valider · <kbd>View ⧉</kbd> Tous les panneaux · <kbd className="xbox-b">B</kbd> Retour</> : draftMarkup && !pickingDimension ? <>
         <kbd>LS</kbd> {editMode === 'translate' ? 'Déplacer sur la face' : 'Largeur / hauteur'} · <kbd>↑ ↓ ← →</kbd> Ajuster de 1 cm · <kbd>LT</kbd> Précision (1 mm) · <kbd>RS</kbd> Tourner la vue · {draftMarkup.kind === 'reservation' && <><kbd>X</kbd> Déplacer / redimensionner · </>}<kbd>Menu ☰</kbd> Champs et enregistrement
       </> : <>
@@ -1731,8 +2083,24 @@ export function MepViewer() {
           <kbd>LS</kbd> Déplacer la vue · <kbd>RS</kbd> Pivoter · <kbd>LT / RT</kbd> Zoom − / + · <kbd className="xbox-a">A</kbd> {pickingMeasure || pickingSection || pickingDimension || relocating ? 'Placer le point visé' : 'Sélectionner'} · <kbd className="xbox-b">B</kbd> Annuler · <kbd className="xbox-x">X</kbd> Cadrer · <kbd className="xbox-y">Y</kbd> Isométrique · <kbd>LB</kbd> Précision · <kbd>←</kbd> Isométrique ·
         </>} <kbd>RB</kbd> Actions · {selectedSection && <><kbd>LB + LT / RT</kbd> Déplacer la coupe · </>}<kbd>↓</kbd> Flux · <kbd>→</kbd> Cadrer · <kbd>View ⧉</kbd> Changer de mode · <kbd>Menu ☰</kbd> Interface
       </>}
-    </> : navigationMode === 'orbit' ? `Clic : sélectionner · ${isEditor ? 'Clic droit : annoter / réservation · ' : ''}Double-clic / F : cadrer · Molette : zoom vers la souris · Glisser : regarder · Sélection : pivoter autour · Échap : libérer` : `Maintenir clic gauche : regarder · Clic droit : ${isEditor ? 'annoter / réservation' : 'inspecter'} · ZQSD / WASD : avancer · Espace : ${flightMode ? 'monter' : 'sauter'} · Maj : ${flightMode ? 'descendre' : 'courir'} · E : porte · F : ${flightMode ? 'revenir au sol' : 'voler'}`}</div>{loading && <div className="viewer-message"><LoaderCircle className="spin"/>Ouverture du partage…</div>}{error && <button className="viewer-message error" onClick={() => setError(null)}>{error}<small>Cliquer pour fermer</small></button>}</section>
-    <aside className={`mep-panel ${selectedProperty ? 'inspection-panel' : ''}`}>
+    </> : navigationMode === 'orbit' ? `Clic : sélectionner · ${isEditor ? 'Clic droit : annoter / réservation · ' : ''}Double-clic / F : cadrer · Molette : zoom vers la souris · Glisser : regarder · Sélection : pivoter autour · Échap : libérer` : `Maintenir clic gauche : regarder · Clic droit : ${isEditor ? 'annoter / réservation' : 'inspecter'} · ZQSD / WASD : avancer · Espace : ${flightMode ? 'monter' : 'sauter'} · Maj : ${flightMode ? 'descendre' : 'courir'} · E : porte · F : ${flightMode ? 'revenir au sol' : 'voler'}`}</div></details>    {followingFlow && <div className="follow-banner" aria-label="Étape du parcours" style={{ borderLeftColor: followStep?.color || '#7cc8a3' }}>
+      <header className="follow-card-heading"><div className="follow-step"><small>{followStep?.reverse ? 'REMONTÉE DU PARCOURS' : 'SUIVI DU FLUX'}{followPaused ? ' · EN PAUSE' : ''}</small><strong>{followStep?.network || 'Départ du parcours'}</strong></div><button className="follow-stop" onClick={() => viewActionsRef.current?.stopFollowing()}>Arrêter le suivi</button></header>
+      {equipmentPause && <small className="equipment-pause-note" role="status">Ralentissement : {equipmentPause}</small>}
+      <label className="equipment-stop-toggle"><input type="checkbox" checked={equipmentStops} onChange={event => setEquipmentStops(event.target.checked)}/> Ralentir aux équipements</label>
+      <div className="follow-playback"><button onClick={() => { followPausedRef.current = !followPausedRef.current; setFollowPaused(followPausedRef.current); setEquipmentPause(null); }}>{followPaused ? 'Reprendre le suivi' : 'Mettre en pause'}</button><label>Vitesse<select aria-label="Vitesse du suivi" value={followSpeed} onChange={event => { const speed = Number(event.target.value); followSpeedRef.current = speed; setFollowSpeed(speed); }}><option value={.25}>0,25×</option><option value={.5}>0,5×</option><option value={1}>1×</option><option value={2}>2×</option></select></label></div>
+      <details className="follow-options"><summary>Détails et options du parcours</summary><div className="follow-step"><span>{followStep?.element || 'Préparation du suivi…'}</span>{followStep && followStep.history.length > 1 && <p title={followStep.history.join(' → ')}>{followStep.history.join(' → ')}</p>}</div><label><input type="checkbox" checked={clearFollowView} onChange={event => setClearFollowView(event.target.checked)}/> Vue dégagée</label>{followBranches.length > 1 && <label>Relancer par une branche<select defaultValue="" onChange={event => { if (event.target.value) viewActionsRef.current?.chooseFollowBranch(event.target.value); }}><option value="">Branche automatique</option>{followBranches.map(branch => <option key={branch.key} value={branch.key}>{branch.name}</option>)}</select></label>}<small>Glisser : tourner · Molette : zoom · Échap : arrêter</small></details>
+    </div>}
+</div>
+    {followEnd && <div className="flow-end-result" role="status"><strong>{followEnd.title}</strong><p>{followEnd.description}</p><small>{graph?.elements.find(element => element.key === followEnd.elementKey)?.name || followEnd.elementKey}</small><div><button disabled={!propertiesByKey.has(followEnd.elementKey)} onClick={() => { const property = propertiesByKey.get(followEnd.elementKey); if (property) { setSelectedIndex(property.index); setPanelCollapsed(false); } }}>Voir l’élément</button><button onClick={() => setFollowEnd(null)}>Fermer</button></div></div>}
+    {lotsOpen && <ReservationLotsPanel lots={lots} editable={isEditor} onSave={persistLot} onClose={() => setLotsOpen(false)} onSaved={(id, created) => { if (!created) return; setCurrentLot(id); setDraftMarkup(current => current?.kind === 'reservation' ? { ...current, lot: id } : current); }}/>}
+    {measureOpen && <MeasureControls gamepad={inputDevice === 'gamepad'} gamepadMode={navigationMode} mode={measureMode} onMode={mode => { setMeasureMode(mode); measureModeRef.current = mode; startMeasure(); }} measures={measures} picking={pickingMeasure} hasStart={!!measureStart} onStart={startMeasure} onCancel={cancelMeasure} onRemove={id => setMeasures(current => current.filter(item => item.id !== id))} onClear={() => { setMeasures([]); cancelMeasure(); }} onClose={() => { setMeasureOpen(false); cancelMeasure(); }}/> }
+    <div ref={measureLabelsRef} className="markup-labels measure-labels">{measureOpen && measures.map((measure, index) => { const values = measureDistances(measure.start, measure.end); return <span key={measure.id} data-measure={measure.id} data-dimension="horizontal" className="measure-label"><b>Mesure {index + 1}</b><span>Directe {values.direct.toFixed(3)} m</span><span>Horiz. {values.horizontal.toFixed(3)} m · Vert. {values.vertical.toFixed(3)} m</span></span>; })}{measureOpen && measureStart && <span className="measure-label">Point A</span>}</div>
+    {connectedPad && <div className="gamepad-status" role="status" title={connectedPad}>Manette connectée{inputDevice === 'keyboard' ? ' · Appuyez sur une touche de la manette' : gamepadMenu ? ' · Menu : croix pour naviguer, A pour valider, B pour revenir' : ' · Xbox'}</div>}
+    {inputDevice === 'gamepad' && !gamepadMenu && <div className="gamepad-reticle" aria-hidden="true"/>}
+    {loading && <div className="viewer-message"><LoaderCircle className="spin"/>Ouverture du partage…</div>}{error && <button className="viewer-message error" onClick={() => setError(null)}>{error}<small>Cliquer pour fermer</small></button>}</section>
+    <aside className={`mep-panel ${panelCollapsed ? 'panel-collapsed' : ''} ${selectedProperty ? 'inspection-panel' : ''}`}>
+      <button className="panel-minimize" title={panelCollapsed ? 'Développer le panneau MEP' : 'Réduire le panneau MEP'} aria-label={panelCollapsed ? 'Développer le panneau MEP' : 'Réduire le panneau MEP'} aria-expanded={!panelCollapsed} onClick={() => setPanelCollapsed(value => !value)}>{panelCollapsed ? <PanelLeft size={19} aria-hidden="true"/> : <PanelRight size={19} aria-hidden="true"/>}</button>
+      {panelCollapsed && <span className="panel-rail-label">MEP</span>}
       {selectedProperty ? <>
         <div className="inspection-heading"><div><span>ÉLÉMENTS INSPECTÉS</span><small>1 élément</small></div><button onClick={() => setSelectedIndex(null)}>Retour</button></div>
         <div className="panel-separator"/>
@@ -1745,7 +2113,7 @@ export function MepViewer() {
             <p>État : {calculating ? 'Recalcul en cours' : connectionLabel(selectedMepElement)}{selectedPath ? <><br/>Sens : {canAnimate(selectedPath) ? selectedPath.flowForward ? 'début → fin (supposé)' : 'fin → début (supposé)' : 'non établi — flèches arrêtées'}</> : null}</p>
             {(directionExplanation || selectedPath?.directionReason) && <details className="network-understanding"><summary>Comprendre et suivre le réseau <ChevronRight/></summary><div className="direction-card"><b>Pourquoi ce sens ?</b><strong>{reliabilityLabel(directionExplanation?.reliability)}</strong><p>{selectedPath?.directionReason || directionExplanation?.rule || 'Sens déterminé à partir des connecteurs et des sources du réseau.'}</p>{directionExplanation?.primarySourceName && <p>Source principale : {directionExplanation.primarySourceName}</p>}{directionExplanation?.upstreamElementNames?.length ? <p>Amont : {directionExplanation.upstreamElementNames.slice(0, 7).join(' → ')}</p> : null}</div></details>}
             {selectedValve && <div className={`state-card ${isClosed ? 'closed' : ''}`}><span>Vanne {isClosed ? 'fermée' : 'ouverte'} · confiance {confidenceLabel(selectedValve.confidence)}</span><strong>{isClosed ? 'Fermée' : 'Ouverte'}</strong><p>Amont : {flowStateLabel(selectedValve.upstreamState)} · Aval : {flowStateLabel(selectedValve.downstreamState)}{selectedValve.detectionReason ? <><br/>Détection : {selectedValve.detectionReason}</> : null}</p><button disabled={saving || (!!viewerPackage && !isEditor)} onClick={viewerPackage ? toggleValve : () => setDemoValveClosed((value) => !value)}>{saving ? 'Synchronisation…' : !isEditor && viewerPackage ? 'Verrouillée en lecture seule' : isClosed ? 'Ouvrir la vanne' : 'Fermer la vanne'}</button></div>}
-            <div className="quick-actions"><span>ACTIONS RAPIDES</span><button onClick={() => { setFlowsVisible(true); isolateSelectedSystem(); }}>{systemIsIsolated ? 'Afficher tous les systèmes' : 'Isoler ce système'}</button><button onClick={() => setFlowsVisible((value) => !value)}>{flowsVisible ? 'Masquer le flux' : 'Afficher le flux du réseau'}</button></div>
+            <div className="quick-actions"><span>ACTIONS RAPIDES</span><button disabled={!selectedPath || !canAnimate(selectedPath)} onClick={() => viewActionsRef.current?.traceSelectedFlow()}>Suivre le flux</button><button disabled={!followingFlow && (!selectedPath || !canAnimate(selectedPath))} onClick={() => followingFlow ? viewActionsRef.current?.stopFollowing() : viewActionsRef.current?.followSelectedFlow()}>{followingFlow ? 'Arrêter la caméra' : 'Accompagner la vague'}</button><button onClick={() => viewActionsRef.current?.toggleLocalCut()}>{localCut ? 'Restaurer les coupes' : 'Coupe locale du réseau'}</button><button onClick={() => { setFlowsVisible(true); isolateSelectedSystem(); }}>{systemIsIsolated ? 'Afficher tous les systèmes' : 'Isoler ce système'}</button><button onClick={() => setFlowsVisible((value) => !value)}>{flowsVisible ? 'Masquer le flux' : 'Afficher le flux du réseau'}</button></div>
           </section>}
           {Object.keys(details.properties || {}).length > 0 && <details className="property-expander"><summary>Paramètres Revit <ChevronRight/></summary><dl>{Object.entries(details.properties).map(([name, value]) => <div key={name}><dt>{name}</dt><dd>{value}</dd></div>)}</dl></details>}
         </article>
@@ -1753,7 +2121,17 @@ export function MepViewer() {
       </> : <>
         <div className="plugin-panel-heading"><div><span>FLUIDES MEP</span><small>{graph ? `${graph.elements.length} éléments · ${systems.length} systèmes` : 'Analyse des canalisations'}</small></div><CircleGauge size={17}/></div>
         <div className="mep-tabs"><button className={flowsVisible ? 'active' : ''} onClick={() => setFlowsVisible((value) => !value)}>Flux · {flowsVisible ? 'ON' : 'OFF'}</button><button className={valveMarkersVisible ? 'active' : ''} onClick={() => setValveMarkersVisible((value) => !value)}>Vannes · {valveMarkersVisible ? 'ON' : 'OFF'}</button></div>
+        <button className={`mep-water-view ${waterView ? 'active' : ''}`} aria-pressed={waterView} onClick={() => {
+          setWaterView(!waterView); setModelOpacity(1);
+          if (!waterView) setFlowsVisible(true);
+        }} title="Afficher un volume d’eau translucide avec des vagues animées et les flèches de sens">{waterView ? 'Revenir au flux classique' : 'Voir dans les tuyaux'}</button>
         <div className="source-stats"><div><span>ARRIVÉES</span><b>{arrivalCount} active{arrivalCount > 1 ? 's' : ''}</b></div><div><span>RETOURS</span><b>{returnCount} actif{returnCount > 1 ? 's' : ''}</b></div></div>
+        <details className="source-journeys"><summary>Parcourir depuis une arrivée ou un retour</summary>{activeSources.map((source, index) => {
+          const reverse = source.boundaryKind === 1 || String(source.boundaryKind).toLowerCase() === 'outlet';
+          const element = graph?.elements.find(element => element.key === source.elementKey);
+          const systemName = graph?.systems.find(system => system.key === (source.systemKey || element?.systemKey))?.name || element?.systemName;
+          return <button key={`${source.elementKey}-${index}`} disabled={!graph || flowTrace(graph, source.elementKey, reverse).size === 0} onClick={() => viewActionsRef.current?.followSelectedFlow(source.elementKey, reverse)}>{reverse ? 'Remonter depuis' : 'Partir de'} {systemName ? `${systemName} · ` : ''}{source.name || element?.name || source.elementKey} #{element?.elementId || source.elementKey}</button>;
+        })}<small>Depuis un retour, le parcours remonte à rebours ; les flèches gardent le sens de circulation.</small></details>
         <p className="mep-command-status">{flowsVisible ? flowRenderStats.paths > 0 ? `${flowRenderStats.paths} parcours affiché(s) · ${flowRenderStats.arrows} flèche(s) animée(s).` : 'Aucun parcours exploitable dans cette publication.' : 'Les flux sont désactivés.'}</p>
         <button className="advanced-toggle" onClick={() => setAdvancedPanelOpen((value) => !value)}>Réglages et analyses <span>{advancedPanelOpen ? '−' : '+'}</span></button>
         {advancedPanelOpen && <section className="advanced-content"><div className="section-title"><span>SYSTÈMES AFFICHÉS</span><Eye size={14}/></div><div className="network-list">{systems.map((system, index) => <button key={system.key} onClick={() => toggleSystem(system.key)} className={hiddenSystems.has(system.key) ? 'network-hidden' : ''}><i style={{ background: colorOf(system, index) }}/><span>{system.name}<small>{system.elementCount || 0} éléments</small></span>{hiddenSystems.has(system.key) ? <EyeOff size={16}/> : <Eye size={16}/>}</button>)}</div><div className="panel-separator"/><span className="legend-title">LÉGENDE</span><p className="plugin-legend">Flux lumineux : connexion établie · Gris : isolé · Ambre : indéterminé<br/>Vannes : anneau vert ouverte · croix rouge fermée · ambre incertaine · blanc sélectionnée</p></section>}

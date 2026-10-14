@@ -18,6 +18,7 @@ namespace Famille
             var uidoc = uiapp.ActiveUIDocument;
             var doc = uidoc.Document;
             Family fam = null;
+            bool loaded = false;
 
             // Nom de la famille sans extension
             var famName = Path.GetFileNameWithoutExtension(FamilyPath);
@@ -35,8 +36,8 @@ namespace Famille
                 using (var tx = new Transaction(doc, "Charger Famille"))
                 {
                     tx.Start();
-                    doc.LoadFamily(FamilyPath, new FamilyLoadOptionKeep(), out fam);
-                    tx.Commit();
+                    loaded = doc.LoadFamily(FamilyPath, new FamilyLoadOptionKeep(), out fam);
+                    if (tx.Commit() != TransactionStatus.Committed) return;
                 }
 
                 // Si jamais LoadFamily n'a pas trouvé de nouvelle famille,  
@@ -54,6 +55,11 @@ namespace Famille
             // 3) Si on n'a toujours pas la famille, on arrête
             if (fam == null)
                 return;
+            Licensing.OperationTelemetry.Track("FamilyBrowserCommand", "Navigateur de familles", "load_family",
+                FamilyBrowserCommand.MainWindowRef is System.Windows.Window tutorialWindow &&
+                    BIMaestro.Tutorials.DemoTourService.IsActive(tutorialWindow),
+                new Dictionary<string, int> { ["families_loaded"] = loaded ? 1 : 0,
+                    ["families_reused"] = loaded ? 0 : 1 });
 
             // 4) Récupérer et activer le premier symbole
             var symId = fam.GetFamilySymbolIds().FirstOrDefault();

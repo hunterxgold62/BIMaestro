@@ -20,7 +20,7 @@ namespace Famille
             if (uidoc == null) return;
             var doc = uidoc.Document;
 
-            int ok = 0, fail = 0;
+            int ok = 0, fail = 0, unchanged = 0;
 
             foreach (var p in FamilyPaths)
             {
@@ -32,8 +32,9 @@ namespace Famille
                     {
                         tx.Start();
                         Family fam;
-                        doc.LoadFamily(p, new FamilyLoadOptionOverwrite(), out fam);
-                        tx.Commit();
+                        bool loaded = doc.LoadFamily(p, new FamilyLoadOptionOverwrite(), out fam);
+                        if (tx.Commit() != TransactionStatus.Committed) { fail++; continue; }
+                        if (!loaded) { unchanged++; continue; }
                     }
                     FamilyUsageManager.RegisterUse(p);
                     ok++;
@@ -41,9 +42,12 @@ namespace Famille
                 catch { fail++; }
             }
 
+            Licensing.OperationTelemetry.Track("FamilyBrowserCommand", "Navigateur de familles", "load_collection", false,
+                new Dictionary<string, int> { ["families_loaded"] = ok,
+                    ["families_unchanged"] = unchanged, ["items_failed"] = fail });
             TaskDialog.Show("Collections", UiLanguage.T(
-                $"Familles chargées : {ok}\nÉchecs : {fail}",
-                $"Families loaded: {ok}\nFailures: {fail}"));
+                $"Familles chargées : {ok}\nFamilles inchangées : {unchanged}\nÉchecs : {fail}",
+                $"Families loaded: {ok}\nUnchanged families: {unchanged}\nFailures: {fail}"));
         }
 
         public string GetName() => "LoadCollectionHandler";

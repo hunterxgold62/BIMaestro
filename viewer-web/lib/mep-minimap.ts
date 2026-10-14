@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { isObjectVisible } from './mep-visibility';
+import type { ViewerRoom } from './mep-contract';
 
 const range = 30 / .3048;
 type Segment = [number, number, number, number];
@@ -9,7 +10,7 @@ export class MepMiniMap {
   private segments: Segment[] = [];
   private lastPlan = -Infinity;
   private lastDraw = -Infinity;
-  draw(canvas: HTMLCanvasElement, camera: THREE.Camera, objects: THREE.Object3D[], now: number, altitude: number) {
+  draw(canvas: HTMLCanvasElement, camera: THREE.Camera, objects: THREE.Object3D[], now: number, altitude: number, room?: ViewerRoom) {
     if (now - this.lastDraw < 200) return;
     this.lastDraw = now;
     const ctx = canvas.getContext('2d');
@@ -69,6 +70,15 @@ export class MepMiniMap {
     ctx.clearRect(0, 0, size, size);
     ctx.fillStyle = '#101e18'; ctx.fillRect(0, 0, size, size);
     ctx.save(); ctx.beginPath(); ctx.rect(12, 12, size - 24, size - 24); ctx.clip();
+    if (room) {
+      ctx.beginPath();
+      for (const loop of room.loops) {
+        loop.forEach((p, i) => i ? ctx.lineTo(x(p[0]), y(p[2])) : ctx.moveTo(x(p[0]), y(p[2])));
+        ctx.closePath();
+      }
+      ctx.fillStyle = '#43b58a22'; ctx.fill('evenodd');
+      ctx.strokeStyle = '#69c8a0'; ctx.lineWidth = 1.5; ctx.stroke();
+    }
     ctx.strokeStyle = '#789e90'; ctx.lineWidth = 1;
     ctx.beginPath();
     for (const line of this.segments) { ctx.moveTo(x(line[0]), y(line[1])); ctx.lineTo(x(line[2]), y(line[3])); }

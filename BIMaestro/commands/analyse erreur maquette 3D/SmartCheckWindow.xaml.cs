@@ -34,6 +34,7 @@ namespace Analyse
         private int _publishedCount, _activeCount, _confirmedCount, _approximateCount;
         private bool Scanning => _session != null && !_session.Complete;
         private SmartScanSession _session;
+        private SmartScanSession _reportedScanSession;
         private string _previousSignature;
         private string _currentSignature;
         private HashSet<string> _previousKeys;
@@ -245,6 +246,13 @@ namespace Analyse
             }
             if (!_session.Cancelled && _session.Error == null) _previousSignature = _currentSignature;
             var partial = _session.Cancelled || _session.Error != null;
+            if (!partial && !ReferenceEquals(_reportedScanSession, _session))
+            {
+                _reportedScanSession = _session;
+                Licensing.OperationTelemetry.Track("SmartClashCommand", "Clash 3D", "analysis", _tutorialPrepared,
+                    new Dictionary<string, int> { ["analyses_completed"] = 1,
+                        ["objects_analyzed"] = _session.SourceCount, ["issues_found"] = _session.Issues.Count });
+            }
             RunText.Text = (partial ? "Analyse interrompue · résultats partiels" : _session.Stage) + " · " + _session.SourceCount + " objet(s) · " + _session.Seconds.ToString("F1") + " s"
                 + (_session.Diagnostics.Count > 0 ? " · " + _session.Diagnostics.Count + " point(s) à consulter dans le bilan" : "");
             if (_session.Error != null) RunText.Text += " · " + _session.Error;
@@ -454,6 +462,8 @@ namespace Analyse
                 text = csv ? SmartClashReport.TutorialCsv(_tutorialInitialCsv, _filtered)
                     : SmartClashReport.TutorialHtml(_tutorialInitialHtml, text, _tutorialReservationId.GetIdLongValue().ToString());
             File.WriteAllText(path, text, new UTF8Encoding(csv));
+            Licensing.OperationTelemetry.Track("SmartClashCommand", "Clash 3D", csv ? "export_csv" : "export_html",
+                _tutorialPrepared, new Dictionary<string, int> { ["files_exported"] = 1 });
             RunText.Text = "Export terminé : " + path;
             if (_tutorialPrepared && !_stale && DemoClashExerciseExportReady())
             { _tutorialExportWritten = true; BIMaestro.Tutorials.DemoTourService.ReportAction(this, "clash-export-written"); }

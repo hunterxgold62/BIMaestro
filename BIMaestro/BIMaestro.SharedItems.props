@@ -69,6 +69,7 @@
     <Compile Include="commands\Codex\CodexMepDiagnostics.cs" />
     <Compile Include="commands\Codex\CodexRevitBridge.cs" />
     <Compile Include="commands\Codex\CodexWindow.cs" />
+    <Compile Include="commands\Codex\CodexWindow.Dictation.cs" />
     <Compile Include="commands\Codex\CodexCommunityLibrary.cs" />
     <Compile Include="commands\Codex\CodexCommunityWindow.cs" />
     <Compile Include="commands\Codex\CodexCommunityCommand.cs" />

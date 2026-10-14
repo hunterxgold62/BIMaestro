@@ -15,13 +15,12 @@ namespace BIMaestro.VideoGames
     /// </summary>
     internal sealed class GameMepFlowRenderer
     {
-        private const double ParticleUpdateInterval = 1.0 / 30.0;
+        private const double ParticleUpdateInterval = 1.0 / 60.0;
         private const double MaximumRenderDistance = 420.0;
-        private const double ParticleSpacing = 18.0;
+        private const double ParticleSpacing = 6.0;
         private const double FlowSpeed = 2.4;
-        private const double ArrowLength = 0.90;
-        private const double ArrowHeadLength = 0.30;
-        private const double ArrowHeadWidth = 0.22;
+        private const double ArrowLength = 1.60;
+        private const int ParticleVertexCount = 10;
         private const int MinimumParticleBudget = 350;
         private const int MaximumParticleBudget = 4000;
         private const int MaximumLineSegmentCount = 150000;
@@ -1115,9 +1114,9 @@ namespace BIMaestro.VideoGames
                 return;
             }
 
-            var positions = new Vector3Collection(_particles.Count * 6);
-            var indices = new IntCollection(_particles.Count * 6);
-            var colors = new Color4Collection(_particles.Count * 6);
+            var positions = new Vector3Collection(_particles.Count * ParticleVertexCount);
+            var indices = new IntCollection(_particles.Count * ParticleVertexCount);
+            var colors = new Color4Collection(_particles.Count * ParticleVertexCount);
             for (int index = 0; index < _particles.Count; index++)
             {
                 Particle particle = _particles[index];
@@ -1125,17 +1124,19 @@ namespace BIMaestro.VideoGames
                     ? particle.FixedPosition
                     : particle.Path.Sample(particle.Phase);
                 int first = positions.Count;
-                for (int vertex = 0; vertex < 6; vertex++)
+                for (int vertex = 0; vertex < ParticleVertexCount; vertex++)
                 {
                     positions.Add(ToVector(initial));
-                    colors.Add(particle.Color);
+                    // A soft coloured tail leads into a pale, luminous crest.
+                    float glow = vertex >= 6 ? 1.0f : (vertex / 2) / 2.0f;
+                    colors.Add(new SharpDX.Color4(
+                        particle.Color.Red + (1.0f - particle.Color.Red) * glow * 0.65f,
+                        particle.Color.Green + (1.0f - particle.Color.Green) * glow * 0.65f,
+                        particle.Color.Blue + (1.0f - particle.Color.Blue) * glow * 0.65f,
+                        particle.Color.Alpha * (0.25f + glow * 0.75f)));
                 }
-                indices.Add(first);
-                indices.Add(first + 1);
-                indices.Add(first + 2);
-                indices.Add(first + 3);
-                indices.Add(first + 4);
-                indices.Add(first + 5);
+                for (int vertex = 0; vertex < ParticleVertexCount; vertex++)
+                    indices.Add(first + vertex);
             }
 
             _arrowGeometry = new LineGeometry3D
@@ -1198,28 +1199,31 @@ namespace BIMaestro.VideoGames
                 return;
             direction.Normalize();
 
-            // La tête reste dans un plan lisible depuis la caméra, y
-            // compris sur les tronçons verticaux ou vus presque de face.
-            Vector3D view = cameraPosition - tip;
-            Vector3D side = Vector3D.CrossProduct(direction, view);
+            // Sample the trail along the path so it follows elbows instead
+            // of cutting diagonally across them. Reuse the existing GPU pool.
+            int first = particleIndex * ParticleVertexCount;
+            for (int segment = 0; segment < 3; segment++)
+            {
+                double from = tailProgress + (tipProgress - tailProgress) * segment / 3.0;
+                double to = tailProgress + (tipProgress - tailProgress) * (segment + 1) / 3.0;
+                _arrowGeometry.Positions[first + segment * 2] = ToVector(path.Sample(from));
+                _arrowGeometry.Positions[first + segment * 2 + 1] = ToVector(path.Sample(to));
+            }
+            // A broad, camera-facing head makes direction explicit even in
+            // a still frame. Keep the fading trail behind it.
+            Vector3D side = Vector3D.CrossProduct(direction, cameraPosition - tip);
             if (side.LengthSquared < 1e-8)
                 side = Vector3D.CrossProduct(direction, new Vector3D(0, 0, 1));
             if (side.LengthSquared < 1e-8)
                 side = Vector3D.CrossProduct(direction, new Vector3D(0, 1, 0));
             side.Normalize();
-
-            double headLength = Math.Min(ArrowHeadLength, visibleLength * 0.48);
-            double headWidth = Math.Min(ArrowHeadWidth, headLength * 0.90);
-            Point3D headBase = tip - direction * headLength;
-            Point3D headA = headBase + side * headWidth;
-            Point3D headB = headBase - side * headWidth;
-            int first = particleIndex * 6;
-            _arrowGeometry.Positions[first] = ToVector(tail);
-            _arrowGeometry.Positions[first + 1] = ToVector(tip);
-            _arrowGeometry.Positions[first + 2] = ToVector(tip);
-            _arrowGeometry.Positions[first + 3] = ToVector(headA);
-            _arrowGeometry.Positions[first + 4] = ToVector(tip);
-            _arrowGeometry.Positions[first + 5] = ToVector(headB);
+            double size = Math.Min(visibleLength * 0.55,
+                Math.Max(0.22, Math.Min(0.85, (cameraPosition - tip).Length * 0.012)));
+            Point3D headBase = tip - direction * size;
+            _arrowGeometry.Positions[first + 6] = ToVector(headBase + side * size * 0.65);
+            _arrowGeometry.Positions[first + 7] = ToVector(tip);
+            _arrowGeometry.Positions[first + 8] = ToVector(tip);
+            _arrowGeometry.Positions[first + 9] = ToVector(headBase - side * size * 0.65);
         }
 
         private void WriteFixedMarker(int particleIndex, Point3D position)
@@ -1227,7 +1231,9 @@ namespace BIMaestro.VideoGames
             if (!IsFinite(position))
                 return;
             const double radius = 0.24;
-            int first = particleIndex * 6;
+            int first = particleIndex * ParticleVertexCount;
+            for (int vertex = 6; vertex < ParticleVertexCount; vertex++)
+                _arrowGeometry.Positions[first + vertex] = ToVector(position);
             _arrowGeometry.Positions[first] = ToVector(
                 position + new Vector3D(-radius, 0, 0));
             _arrowGeometry.Positions[first + 1] = ToVector(

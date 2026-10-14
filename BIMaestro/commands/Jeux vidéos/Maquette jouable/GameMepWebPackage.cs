@@ -338,6 +338,13 @@ namespace BIMaestro.VideoGames
                     spawn = ToWebPoint(scene.SpawnFootPosition),
                     eyeHeight = 5.28,
                     initialYaw = scene.InitialYawRadians,
+                    rooms = scene.Rooms.Select(room => new {
+                        key = room.Key, name = room.Name, number = room.Number,
+                        levelName = room.LevelName, kind = room.Kind,
+                        baseElevation = room.BaseElevation, declaredTop = room.DeclaredTop,
+                        navigationTop = room.NavigationTop,
+                        loops = room.Loops.Select(loop => loop.Select(ToWebPoint))
+                    }),
                     doors = scene.Doors.Select(door => new
                     {
                         key = door.Key,

@@ -113,18 +113,61 @@ namespace Analyse
 
     internal static partial class ElementHistoryReconstruction
     {
-        internal static HistoryRecipe Capture(Element element, Action<string> diagnostic = null)
+        internal static HistoryRecipe Capture(Element element, Action<string> diagnostic = null, bool includeDetails = true,
+            bool allowHeavyTerrain = true)
         {
+            if (!allowHeavyTerrain && ElementHistoryNativeArchive.IsHeavyTerrain(element))
+            {
+                var ready = ElementHistoryNativeArchive.Find(element.Document, element.UniqueId);
+                if (ready?.Native?.Ready == true) return ready;
+                diagnostic?.Invoke("Terrain exclu de l’archivage automatique pour éviter une longue pause Revit.");
+                return null;
+            }
             string detail = null;
             var recipe = element != null && ElementHistoryNativeArchive.RequiresAggregate(element)
-                ? ElementHistoryNativeArchive.Capture(element) : CaptureCore(element, message => detail = message);
-            if (recipe == null && element != null)
-                try { recipe = ElementHistoryNativeArchive.Capture(element); } catch (Exception ex) { detail = ex.Message; }
+                ? (includeDetails ? ElementHistoryNativeArchive.Capture(element, allowHeavyTerrain) : null)
+                : CaptureCore(element, message => detail = message, includeDetails);
+            if (recipe == null && element != null && includeDetails)
+                try { recipe = ElementHistoryNativeArchive.Capture(element, allowHeavyTerrain); } catch (Exception ex) { detail = ex.Message; }
             if (recipe?.Kind == "native_archive" && element != null)
                 recipe.NativeFallbackReason = detail ?? (ElementHistoryNativeArchive.RequiresAggregate(element)
                     ? "Élément groupé ou dépendant : copie native de l'ensemble requise."
                     : "Aucune recette géométrique directe pour " + element.GetType().Name + ".");
-            if (recipe != null && (element is FamilyInstance || element is Group))
+            if (recipe == null)
+                diagnostic?.Invoke(detail ?? ("Capture non prise en charge : " + (element?.GetType().Name ?? "Élément absent")));
+            return includeDetails && recipe != null ? Enrich(element, recipe, diagnostic, coreHasDetails: true,
+                allowHeavyTerrain: allowHeavyTerrain) : recipe;
+        }
+
+        // Enrich the already captured placement/parameters, never recapture them just for joins.
+        internal static HistoryRecipe Enrich(Element element, HistoryRecipe recipe, Action<string> diagnostic = null,
+            bool coreHasDetails = false, bool allowHeavyTerrain = true)
+        {
+            if (recipe == null || recipe.Kind == "native_archive")
+            {
+                if (!coreHasDetails) return Capture(element, diagnostic, allowHeavyTerrain: allowHeavyTerrain);
+            }
+            if (recipe == null || element == null) return recipe;
+            if (!coreHasDetails)
+            {
+                var warnings = recipe.CaptureWarnings ?? new List<string>();
+                if (element is FamilyInstance family)
+                {
+                    recipe.Connections = ElementHistoryNetwork.CaptureConnections(family, warnings);
+                    if (recipe.Ports == null) recipe.Ports = ElementHistoryNetwork.CaptureFamilyPorts(family);
+                }
+                else if (element is MEPCurve)
+                    recipe.Connections = ElementHistoryNetwork.CaptureConnections(element, warnings);
+                if (element is HostObject || element is FamilyInstance)
+                {
+                    recipe.RequiresMeshPreview = JoinGeometryUtils.GetJoinedElements(element.Document, element).Count > 0
+                        || (InstanceVoidCutUtils.CanBeCutWithVoid(element)
+                            && InstanceVoidCutUtils.GetCuttingVoidInstances(element).Count > 0)
+                        || (element is HostObject host && host.FindInserts(true,true,true,true).Count > 0);
+                }
+                if (warnings.Count > 0) recipe.CaptureWarnings = warnings;
+            }
+            if (element is FamilyInstance || element is Group)
             {
                 try
                 {
@@ -144,19 +187,6 @@ namespace Analyse
                     recipe.CaptureWarnings.Add("Circuits électriques non enregistrés : " + ex.Message);
                 }
             }
-            if (recipe == null)
-            {
-                var instance = element as FamilyInstance;
-                string context = element?.GetType().Name ?? "Élément absent";
-                try
-                {
-                    if (instance != null)
-                        context += "; placement=" + instance.Symbol.Family.FamilyPlacementType
-                            + "; miroir=" + instance.Mirrored + "; sous-composant=" + (instance.SuperComponent != null);
-                }
-                catch { /* Diagnostics must not break snapshot capture. */ }
-                diagnostic?.Invoke(detail ?? ("Capture non prise en charge : " + context + "."));
-            }
             if (recipe != null)
             {
                 var warnings = recipe.CaptureWarnings ?? new List<string>();
@@ -170,7 +200,7 @@ namespace Analyse
             return recipe;
         }
 
-        private static HistoryRecipe CaptureCore(Element element, Action<string> diagnostic)
+        private static HistoryRecipe CaptureCore(Element element, Action<string> diagnostic, bool includeDetails = true)
         {
             try
             {
@@ -193,7 +223,7 @@ namespace Analyse
                     return new HistoryRecipe { Kind = "duct_system", Type = doc.GetElement(ductSystem.GetTypeId())?.UniqueId,
                         RestorationOrigins = ElementHistoryRestoration.GetOrigins(element), RequiresMeshPreview = true,
                         SystemName = ductSystem.Name, SystemMembers = ductSystem.DuctNetwork.Cast<Element>().Select(e => e.UniqueId).ToList() };
-                if (element is MEPCurve) return ElementHistoryNetwork.Capture(element);
+                if (element is MEPCurve) return ElementHistoryNetwork.Capture(element, includeDetails);
                 if (doc.IsFamilyDocument) return null;
                 if (element is ModelCurve model && element.Category?.Id.GetIdLongValue() != (int)BuiltInCategory.OST_SketchLines)
                 {
@@ -208,7 +238,7 @@ namespace Analyse
                         RestorationOrigins = ElementHistoryRestoration.GetOrigins(model) };
                 }
                 if (element is FootPrintRoof || element is Ceiling)
-                    return CaptureSketchHost(element, diagnostic);
+                    return CaptureSketchHost(element, diagnostic, includeDetails);
                 if (element is FamilyInstance extendedFamily && extendedFamily.Symbol.Family.FamilyPlacementType != FamilyPlacementType.OneLevelBased
                     && extendedFamily.Symbol.Family.FamilyPlacementType != FamilyPlacementType.OneLevelBasedHosted)
                     return CaptureExtendedFamily(extendedFamily, diagnostic);
@@ -218,14 +248,14 @@ namespace Analyse
                 if (type == null || level == null) { diagnostic?.Invoke("Type ou niveau de référence introuvable à la capture."); return null; }
                 // Keep a mesh for cuts/joins, but retain the native placement recipe
                 // so the host itself can still be restored with its deleted instances.
-                bool hasCuts = JoinGeometryUtils.GetJoinedElements(doc, element).Count != 0
+                bool hasCuts = includeDetails && (JoinGeometryUtils.GetJoinedElements(doc, element).Count != 0
                     || (InstanceVoidCutUtils.CanBeCutWithVoid(element)
-                        && InstanceVoidCutUtils.GetCuttingVoidInstances(element).Count != 0);
+                        && InstanceVoidCutUtils.GetCuttingVoidInstances(element).Count != 0));
                 var recipe = new HistoryRecipe
                 {
                     Type = type.UniqueId, Level = level.UniqueId,
                     LevelElevation = level.ProjectElevation,
-                    RequiresMeshPreview = hasCuts,
+                    RequiresMeshPreview = !includeDetails || hasCuts,
                     RestorationOrigins = ElementHistoryRestoration.GetOrigins(element)
                 };
                 if (element is FamilyInstance instance)
@@ -251,7 +281,11 @@ namespace Analyse
                     recipe.BasisZ = Pack(instance.GetTransform().BasisZ);
                     recipe.Mirrored = instance.Mirrored;
                     recipe.CaptureWarnings = new List<string>();
-                    recipe.Connections = ElementHistoryNetwork.CaptureConnections(instance, recipe.CaptureWarnings);
+                    if (includeDetails)
+                    {
+                        recipe.Connections = ElementHistoryNetwork.CaptureConnections(instance, recipe.CaptureWarnings);
+                    }
+                    // Local port sizes belong to reconstruction, neighbor connections do not.
                     recipe.Ports = ElementHistoryNetwork.CaptureFamilyPorts(instance);
                 }
                 else if (element is Wall wall)
@@ -294,7 +328,7 @@ namespace Analyse
                     recipe.LocationLine = Integer(wall, BuiltInParameter.WALL_KEY_REF_PARAM);
                     recipe.Flipped = wall.Flipped;
                     recipe.WallStructural = Integer(wall, BuiltInParameter.WALL_STRUCTURAL_SIGNIFICANT) != 0;
-                    recipe.RequiresMeshPreview |= wall.FindInserts(true, true, true, true).Count != 0;
+                    recipe.RequiresMeshPreview |= includeDetails && wall.FindInserts(true, true, true, true).Count != 0;
                 }
                 else if (element is Floor floor)
                 {
@@ -305,7 +339,7 @@ namespace Analyse
                     recipe.Kind = "floor";
                     recipe.Offset = Value(floor, BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM);
                     recipe.FloorStructural = Integer(floor, BuiltInParameter.FLOOR_PARAM_IS_STRUCTURAL) != 0;
-                    recipe.RequiresMeshPreview |= floor.FindInserts(true, true, true, true).Count != 0;
+                    recipe.RequiresMeshPreview |= includeDetails && floor.FindInserts(true, true, true, true).Count != 0;
                     recipe.Loops = new List<List<HistoryCurve>>();
                     int count = 0;
                     foreach (CurveArray loop in sketch.Profile)

@@ -79,9 +79,8 @@ namespace Modification
                         "Dans la vue 3D, clique d'abord sur la canalisation qui traverse le mur, puis sur ce mur. " +
                         "BIMaestro placera ta réservation à leur croisement. Appuie sur Échap pour arrêter la sélection.", "Je choisis les éléments");
 
-                var reservationsBefore = guided
-                    ? new HashSet<string>(FindInstances(doc, reservationSymbol.Id).Select(instance => instance.UniqueId))
-                    : null;
+                var reservationsBefore = new HashSet<string>(FindInstances(doc, reservationSymbol.Id)
+                    .Select(instance => instance.UniqueId));
                 int createdForTutorial = 0;
                 using (var t = new Transaction(doc, "Réservations Auto V3"))
                 {
@@ -105,8 +104,14 @@ namespace Modification
                             createdForTutorial++;
                         }
                     }
-                    t.Commit();
+                    if (t.Commit() != TransactionStatus.Committed)
+                        return Result.Failed;
                 }
+
+                int committedReservations = FindInstances(doc, reservationSymbol.Id)
+                    .Count(instance => !reservationsBefore.Contains(instance.UniqueId));
+                RecordOperationResult(ButtonId, win.AutomatiqueEnabled ? "automatic" : "manual", guided,
+                    new Dictionary<string, int> { ["reservations_created"] = committedReservations });
 
                 if (guided)
                 {

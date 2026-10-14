@@ -9,6 +9,8 @@
     <RevitTargetFramework Condition="'$(RevitVersion)' == '2027' Or $([System.String]::Copy('$(RevitRuntimeJson)').Contains('&quot;net10.0&quot;'))">net10.0-windows</RevitTargetFramework>
     <TargetFramework>$(RevitTargetFramework)</TargetFramework>
     <UseWPF>true</UseWPF>
+    <!-- Revit loads this library directly; its NuGet runtime dependencies must ship beside it. -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <UseWindowsForms>true</UseWindowsForms>
     <EnableDefaultItems>false</EnableDefaultItems>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>

@@ -22,6 +22,7 @@ namespace BIMaestro.UI
                     return;
 
                 var doc = uidoc.Document;
+                bool loaded = false;
                 var famName = Path.GetFileNameWithoutExtension(FamilyPath);
 
                 var fam = new FilteredElementCollector(doc)
@@ -34,8 +35,8 @@ namespace BIMaestro.UI
                     using (var tx = new Transaction(doc, "Charger famille"))
                     {
                         tx.Start();
-                        doc.LoadFamily(FamilyPath, new Famille.FamilyLoadOptionKeep(), out fam);
-                        tx.Commit();
+                        loaded = doc.LoadFamily(FamilyPath, new Famille.FamilyLoadOptionKeep(), out fam);
+                        if (tx.Commit() != TransactionStatus.Committed) return;
                     }
                     if (fam == null)
                     {
@@ -48,6 +49,10 @@ namespace BIMaestro.UI
                 }
 
                 var symId = fam.GetFamilySymbolIds().FirstOrDefault();
+                Licensing.OperationTelemetry.Track("RadialMenuCommand", "Rosace", "load_family",
+                    SuppressUsageTracking || BIMaestro.Tutorials.DemoTourService.IsTutorialFamilyForRosace(FamilyPath),
+                    new Dictionary<string, int> { ["families_loaded"] = loaded ? 1 : 0,
+                        ["families_reused"] = loaded ? 0 : 1 });
                 if (symId == ElementId.InvalidElementId) return;
 
                 var symbol = doc.GetElement(symId) as FamilySymbol;

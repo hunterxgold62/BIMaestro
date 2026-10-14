@@ -30,6 +30,7 @@ namespace Couleur
                 return;
             }
             _appearanceGuideStep = 0;
+            BIMaestro.Tutorials.TutorialAnalytics.Ensure("colors");
             _appearanceTouchedIcons.Clear();
             ConnectAppearanceGuideActions();
             AppearanceGuideCard.Visibility = Visibility.Visible;
@@ -46,7 +47,11 @@ namespace Couleur
             StartAppearanceTutorial();
         }
 
-        private void RestartAppearanceTutorial_Click(object sender, RoutedEventArgs args) => StartAppearanceTutorial();
+        private void RestartAppearanceTutorial_Click(object sender, RoutedEventArgs args)
+        {
+            BIMaestro.Tutorials.TutorialAnalytics.End("colors", "interrupted");
+            StartAppearanceTutorial();
+        }
         private void AppearanceGuidePrevious_Click(object sender, RoutedEventArgs args)
         {
             if (_appearanceGuideStep > 0) { _appearanceGuideStep--; ShowAppearanceGuideStep(); }
@@ -60,7 +65,11 @@ namespace Couleur
             ShowAppearanceGuideStep();
         }
 
-        private void AppearanceGuideQuit_Click(object sender, RoutedEventArgs args) => StopAppearanceTutorial();
+        private void AppearanceGuideQuit_Click(object sender, RoutedEventArgs args)
+        {
+            BIMaestro.Tutorials.TutorialAnalytics.End("colors", "quit");
+            StopAppearanceTutorial();
+        }
         private void GoToBrowserIconsButton_Click(object sender, RoutedEventArgs args) =>
             BrowserTabs.SelectedItem = BrowserIconsTab;
         private void AppearanceTutorialClosed(object sender, EventArgs args) => RemoveAppearanceGuideHighlight();
@@ -257,6 +266,7 @@ namespace Couleur
                     break;
             }
             AppearanceGuideTitle.Text = title;
+            BIMaestro.Tutorials.TutorialAnalytics.Step("colors", _appearanceGuideStep, title);
             AppearanceGuideText.Text = description;
             AppearanceGuideCard.VerticalAlignment = _appearanceGuideStep == 11 || _appearanceGuideStep == 13
                 ? VerticalAlignment.Top : VerticalAlignment.Bottom;

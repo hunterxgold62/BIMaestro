@@ -18,6 +18,56 @@ using Panel = System.Windows.Controls.Panel;
 
 namespace BIMaestro.Tutorials
 {
+    // One attempt survives window/ribbon hand-offs; explicit exits end it.
+    internal static class TutorialAnalytics
+    {
+        private sealed class Attempt
+        {
+            internal string Id = Guid.NewGuid().ToString("D");
+            internal int Step;
+            internal string Title;
+            internal bool Ended;
+        }
+        private static readonly Dictionary<string, Attempt> Attempts = new Dictionary<string, Attempt>();
+        internal static readonly string[] Catalog = { "reservation", "history", "colors", "pipe-calculation", "organizer", "view-template", "excel", "family-browser", "mep-booster", "clash-3d" };
+
+        internal static void Ensure(string id)
+        {
+            if (!Catalog.Contains(id)) return;
+            if (Attempts.TryGetValue(id, out Attempt existing) && !existing.Ended) return;
+            var attempt = new Attempt();
+            Attempts[id] = attempt;
+            Emit(id, attempt, "started");
+        }
+        internal static void Step(string id, int index, string title)
+        {
+            Ensure(id);
+            if (!Attempts.TryGetValue(id, out Attempt attempt)) return;
+            attempt.Step = index + 1;
+            attempt.Title = title;
+            Emit(id, attempt, "step_viewed");
+        }
+        internal static void End(string id, string outcome)
+        {
+            if (!Attempts.TryGetValue(id, out Attempt attempt) || attempt.Ended) return;
+            Emit(id, attempt, outcome);
+            attempt.Ended = true;
+        }
+        internal static void Complete(string id) => End(id, "completed");
+        internal static void Shutdown()
+        {
+            foreach (string id in Attempts.Keys.ToArray()) End(id, "interrupted");
+        }
+        private static void Emit(string id, Attempt attempt, string action)
+        {
+            Telemetry.TrackButton("Tutorial.Event", true, new {
+                schema_version = 1, catalog_version = "1", tutorial_id = id,
+                attempt_id = attempt.Id, event_id = Guid.NewGuid().ToString("D"),
+                action, step_index = attempt.Step, step_title = attempt.Title
+            });
+        }
+    }
+
     internal static class DemoTourPalette
     {
         internal static readonly Brush Accent = new SolidColorBrush(System.Windows.Media.Color.FromRgb(15, 81, 50));
@@ -1230,6 +1280,7 @@ namespace BIMaestro.Tutorials
             {
                 if (previous.TourId == id && previous.IsPreparedExercise)
                     preparedExercise = true;
+                TutorialAnalytics.End(previous.TourId, "interrupted");
                 previous.Close();
             }
             if (id == "family-browser" && window is Famille.FamilyBrowserWindow browser &&
@@ -1456,6 +1507,7 @@ namespace BIMaestro.Tutorials
                     if (!_completed) return;
                     if (_index + 1 == _steps.Length)
                     {
+                        TutorialAnalytics.Complete(TourId);
                         Close();
                         DemoTourCompletion.Show(new WindowInteropHelper(_window).Owner, TourId,
                             "Tu as terminé ce tutoriel.", () => _window.Close());
@@ -1463,7 +1515,7 @@ namespace BIMaestro.Tutorials
                     }
                     _index++; ShowStep();
                 });
-                AddButton(buttons, "Quitter", Close);
+                AddButton(buttons, "Quitter", () => { TutorialAnalytics.End(TourId, "quit"); Close(); });
                 _root.Children.Add(_card);
                 if (window.IsLoaded)
                     window.Dispatcher.BeginInvoke(new Action(ShowStep), DispatcherPriority.Loaded);
@@ -1495,6 +1547,7 @@ namespace BIMaestro.Tutorials
                 _detachAction = null;
                 RemoveHighlight();
                 if (_index < 0 || _index >= _steps.Length) return;
+                TutorialAnalytics.Step(TourId, _index, _steps[_index].Title);
                 if (TourId == "family-browser" && _steps[_index].Target == "RevitFamilySplit" &&
                     _window is Famille.FamilyBrowserWindow familyBrowser)
                 {
@@ -1845,6 +1898,7 @@ namespace BIMaestro.Tutorials
         private static readonly string[] Labels = { "Auto réservation", "Qui a fait ça ?", "Couleurs et vues", "Calcul des canalisations", "Organisateur", "Gabarit de vue", "Gestion Excel", "Navigateur de familles", "MEP Booster", "Clash 3D" };
         internal static void Show(IntPtr owner, string completed, string summary, Action beforeNext = null)
         {
+            TutorialAnalytics.Complete(completed);
             int index = Array.IndexOf(Order, completed);
             int next = index < 0 || index + 1 == Order.Length ? 0 : index + 1;
             bool continueTour = DemoTourMessage.Show(owner, "Tutoriel terminé",

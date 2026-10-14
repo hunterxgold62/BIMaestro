@@ -35,6 +35,7 @@ namespace BIMaestro.VideoGames
         private Color _currentColor = Color.FromRgb(190, 195, 202);
         private double _currentOpacity = 1.0;
         private int _nextWebElementIndex;
+        private readonly HashSet<string> _roomPlacements = new HashSet<string>();
 
         public RevitGameExportContext(Document document)
         {
@@ -78,6 +79,9 @@ namespace BIMaestro.VideoGames
             _nextWebElementIndex = 0;
             _transforms.Push(Transform.Identity);
             _documents.Push(_rootDocument);
+            _scene.Rooms.Clear();
+            _roomPlacements.Clear();
+            CaptureRooms(_rootDocument, Transform.Identity);
             return true;
         }
 
@@ -200,10 +204,69 @@ namespace BIMaestro.VideoGames
                 _documents.Push(_documents.Count > 0 ? _documents.Peek() : _rootDocument);
             }
 
+            CaptureRooms(_documents.Peek(), _transforms.Peek());
             // Le polymesh d'un lien est exprimé dans son repère propre. La
             // transformation du LinkNode restitue son placement origine à origine,
             // par coordonnées partagées, ainsi que rotation et dénivelé.
             return RenderNodeAction.Proceed;
+        }
+
+        private void CaptureRooms(Document document, Transform placement)
+        {
+            // Spatial elements are usually hidden in 3D: collect independently of polymesh callbacks.
+            if (Math.Abs(placement.BasisZ.Z - 1) > 1e-5) return;
+            string instance = document.GetHashCode() + ":" + string.Join(",", new[] {
+                placement.Origin.X, placement.Origin.Y, placement.Origin.Z,
+                placement.BasisX.X, placement.BasisX.Y, placement.BasisY.X, placement.BasisY.Y
+            }.Select(v => v.ToString("R", System.Globalization.CultureInfo.InvariantCulture)));
+            if (!_roomPlacements.Add(instance)) return;
+            var collected = new List<GameRoomData>();
+            using (var options = new SpatialElementBoundaryOptions())
+            foreach (SpatialElement element in new FilteredElementCollector(document).OfClass(typeof(SpatialElement)))
+            {
+                try
+                {
+                    var room = element as Autodesk.Revit.DB.Architecture.Room;
+                    var space = element as Autodesk.Revit.DB.Mechanical.Space;
+                    if (room == null && space == null) continue;
+                    if ((room != null ? room.Area : space!.Area) <= 0) continue;
+                    var level = document.GetElement(element.LevelId) as Level;
+                    if (level == null) continue;
+                    double lower = element.get_Parameter(BuiltInParameter.ROOM_LOWER_OFFSET)?.AsDouble() ?? 0;
+                    double basis = level.Elevation + lower + placement.Origin.Z;
+                    double height = room != null ? room.UnboundedHeight : space!.UnboundedHeight;
+                    var data = new GameRoomData {
+                        Key = instance + ":" + element.UniqueId, Name = element.Name,
+                        Number = room != null ? room.Number : space!.Number,
+                        Kind = room != null ? "room" : "space", LevelName = level.Name,
+                        BaseElevation = basis, DeclaredTop = basis + height
+                    };
+                    var boundaries = element.GetBoundarySegments(options);
+                    if (boundaries == null) continue;
+                    foreach (var boundary in boundaries)
+                    {
+                        var points = new List<Point3D>();
+                        foreach (var segment in boundary)
+                        foreach (XYZ point in segment.GetCurve().Tessellate())
+                        {
+                            XYZ transformed = placement.OfPoint(point);
+                            var p = new Point3D(transformed.X, transformed.Y, transformed.Z);
+                            if (points.Count == 0 || (points[points.Count - 1] - p).Length > 1e-6) points.Add(p);
+                        }
+                        if (points.Count >= 3) data.Loops.Add(points);
+                    }
+                    if (data.Loops.Count > 0) collected.Add(data);
+                }
+                catch (Autodesk.Revit.Exceptions.InvalidOperationException) { }
+            }
+            foreach (var data in collected)
+            {
+                // Navigation envelope only; never alter the room's declared Revit height.
+                double next = collected.Where(r => r.BaseElevation > data.BaseElevation + 1)
+                    .Select(r => r.BaseElevation).DefaultIfEmpty(double.PositiveInfinity).Min();
+                data.NavigationTop = Math.Min(next, Math.Max(data.DeclaredTop, data.BaseElevation + 13.12));
+                _scene.Rooms.Add(data);
+            }
         }
 
         public void OnLinkEnd(LinkNode node)

@@ -1,6 +1,6 @@
 ; --------------------------------------------------------
 ; BIMaestro.iss — Installateur per-user sans UAC
-; installe BIMaestro.addin en local avec les DLL adaptées à chaque version
+; installe BIMaestro.addin en local (2022–2027) avec une DLL commune
 ; + Copie d’un uninstalleur renommé "Suppression BIMaestro.exe"
 ;   dans le dossier Addins\2024
 ; + Exclut les fichiers .pdb de l'installation
@@ -26,14 +26,11 @@ SolidCompression=yes
 #define TrainingBin "bin\Release"
 #include "..\Installer\TrainingResources.Checks.iss"
 #undef TrainingBin
-; DLL historique pour 2022/2023 ; builds distincts pour 2024 à 2027.
+; Tous les manifestes Revit utilisent la DLL commune compilée en Release.
 Source: "bin\Release\*.*"; \
   DestDir: "{localappdata}\BIMaestro\Bin"; \
   Flags: ignoreversion recursesubdirs createallsubdirs; \
   Excludes: "*.pdb,BIMaestro - Copie.dll,BIMaestro.Updater.*"
-#define RevitPayloadRoot "{app}"
-#include "..\Installer\RevitVersioned.Files.iss"
-#undef RevitPayloadRoot
 
 [InstallDelete]
 ; Retirer l'ancien assistant lors d'une mise a jour manuelle.
@@ -88,10 +85,7 @@ begin
 
     for i := Low(Versions) to High(Versions) do
     begin
-      if i <= 2 then
-        Xml := BuildXml(BinFolder)
-      else
-        Xml := BuildXml(BinFolder + '\Revit' + Versions[i]);
+      Xml := BuildXml(BinFolder);
       ForceDirectories(AddinsRoot + '\' + Versions[i]);
       ManifestPath := AddinsRoot + '\' + Versions[i] + '\BIMaestro.addin';
       SaveStringToFile(ManifestPath, Xml, False);

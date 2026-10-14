@@ -377,7 +377,7 @@ namespace Analyse
             }
             return links;
         }
-        internal static HistoryRecipe Capture(Element element)
+        internal static HistoryRecipe Capture(Element element, bool includeDetails = true)
         {
             var curve = element as MEPCurve;
             string kind = element is Pipe ? "pipe" : element is Duct ? "duct" : element is Conduit ? "conduit" : element is CableTray ? "tray"
@@ -401,7 +401,8 @@ namespace Analyse
             return new HistoryRecipe
             {
                 Kind = "network", Type = type.UniqueId, Level = level.UniqueId, LevelElevation = level.ProjectElevation,
-                RestorationOrigins = ElementHistoryRestoration.GetOrigins(element), Connections = CaptureConnections(element, warnings), CaptureWarnings = warnings,
+                RestorationOrigins = ElementHistoryRestoration.GetOrigins(element),
+                Connections = includeDetails ? CaptureConnections(element, warnings) : null, CaptureWarnings = warnings,
                 // Placement/system built-ins are controlled by the geometry recipe; do
                 // not replay stale offsets over the absolute start/end points.
                 Parameters = ElementHistoryReconstruction.CaptureParameters(element)

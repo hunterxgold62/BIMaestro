@@ -17,6 +17,7 @@ namespace Visualisation
     public partial class ExportWindow : Window
     {
         private readonly Document _doc;
+        internal IDictionary<string, int> OperationCounts { get; private set; }
         private readonly List<ViewSheetSet> _sheetSets;
         private const string HelpUrl = "https://www.bimaestro.fr/visualisation?outil=dwg-export";
 
@@ -114,6 +115,7 @@ namespace Visualisation
             var pdfRule = TryGetActivePdfNamingRule(_doc);
 
             var sw = Stopwatch.StartNew();
+            int exported = 0;
             foreach (var vs in sheets)
             {
                 string nameFromPdf = pdfRule != null
@@ -135,15 +137,18 @@ namespace Visualisation
                         SanitizeFileName(vs.SheetNumber),
                         "dwg");
 
-                    TryExport(vs, exportDir, fallback, options);
+                    success = TryExport(vs, exportDir, fallback, options);
                 }
+                if (success) exported++;
             }
             sw.Stop();
+            OperationCounts = new Dictionary<string, int> { ["files_exported"] = exported,
+                ["sheets_exported"] = exported, ["items_failed"] = sheets.Count - exported };
 
             MessageBox.Show(
                 UiLanguage.T(
-                    $"Export de {sheets.Count} feuilles réalisé en {sw.Elapsed:mm\\:ss}.",
-                    $"Exported {sheets.Count} sheets in {sw.Elapsed:mm\\:ss}."),
+                    $"Export de {exported}/{sheets.Count} feuilles réalisé en {sw.Elapsed:mm\\:ss}.",
+                    $"Exported {exported}/{sheets.Count} sheets in {sw.Elapsed:mm\\:ss}."),
                 UiLanguage.T("Terminé", "Complete"), MessageBoxButton.OK, MessageBoxImage.Information);
 
             Close();
@@ -153,7 +158,7 @@ namespace Visualisation
         {
             try
             {
-                _doc.Export(dir, nameNoExt, new List<ElementId> { vs.Id }, options);
+                if (!_doc.Export(dir, nameNoExt, new List<ElementId> { vs.Id }, options)) return false;
                 string pcp = Path.Combine(dir, nameNoExt + ".pcp");
                 if (File.Exists(pcp)) File.Delete(pcp);
                 return true;

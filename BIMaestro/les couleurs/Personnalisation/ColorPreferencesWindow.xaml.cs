@@ -1333,7 +1333,7 @@ namespace Couleur
 
         private void SaveButton_Click(object sender, RoutedEventArgs e)
         {
-            bool guided = _appearanceGuideStep >= 0;
+            bool guided = _appearanceGuideStep == AppearanceGuideStepCount - 1;
             SaveSettingsAndContinue(() =>
             {
                 Close();

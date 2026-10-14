@@ -19,7 +19,7 @@ using System.Reflection;
 namespace BIMaestro.HistoryTests
 {
     // Run with the existing isolated launcher; never operate on an open user model.
-    public sealed class HistoryNativeTests : IExternalApplication
+    public sealed partial class HistoryNativeTests : IExternalApplication
     {
         private UIControlledApplication application;
         private string Output => Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
@@ -38,7 +38,9 @@ namespace BIMaestro.HistoryTests
             try
             {
                 Check(ui.Application.Documents.Size == 0, "Requires an empty test process");
-                var results = File.Exists(Path.Combine(Output,"group-copy-source.rvt")) ? RunGroupCopyBenchmark(ui)
+                var results = File.Exists(Path.Combine(Output,"tracker-regression-only.txt")) ? RunTrackerRegression(ui)
+                    : File.Exists(Path.Combine(Output,"real-model-source.rvt")) ? RunRealModelBenchmark(ui)
+                    : File.Exists(Path.Combine(Output,"group-copy-source.rvt")) ? RunGroupCopyBenchmark(ui)
                     : File.Exists(Path.Combine(Output,"CML-source.rvt")) ? RunCml(ui) : Run(ui);
                 File.WriteAllText(Path.Combine(Output, "result.json"), JsonConvert.SerializeObject(new { passed = !results.Any(r => r.StartsWith("FAILED")), tests = results }, Formatting.Indented));
             }
@@ -51,6 +53,14 @@ namespace BIMaestro.HistoryTests
             var doc = ui.Application.NewProjectDocument(UnitSystem.Metric);
             try
             {
+                if (File.Exists(Path.Combine(Output,"native-cost-only.txt")))
+                { VerifyNativeCostOrdering(doc,results); return results; }
+                if (File.Exists(Path.Combine(Output,"basic-only.txt")))
+                { VerifyBasicCapture(ui,doc,results); return results; }
+                if (File.Exists(Path.Combine(Output,"capture-benchmark-only.txt")))
+                { VerifyCaptureOptimizations(ui,doc,results); return results; }
+                if (File.Exists(Path.Combine(Output,"native-batching-only.txt")))
+                { VerifyNativeBatching(ui,doc,results); return results; }
                 if (File.Exists(Path.Combine(Output,"auto-wall-only.txt")))
                 { VerifyAutomaticWallJoins(doc,results); return results; }
                 if (File.Exists(Path.Combine(Output,"native-priority-only.txt")))
@@ -144,12 +154,227 @@ namespace BIMaestro.HistoryTests
                     && filtered.Items[0].Detail=="Placement non pris en charge","Insulation must be excluded without hiding pipe/fitting failures");
                 results.Add("native and named calorifuge excluded from all counts; other errors and capture diagnostics preserved");
             }
-            finally { doc.Close(false); }
+            finally { ElementHistoryNativeArchive.Shutdown(); doc.Close(false); }
             return results;
         }
 
         private sealed class BenchmarkDuplicateTypes : IDuplicateTypeNamesHandler
         { public DuplicateTypeAction OnDuplicateTypeNamesFound(DuplicateTypeNamesHandlerArgs args) => DuplicateTypeAction.UseDestinationTypes; }
+
+        private void VerifyBasicCapture(UIApplication ui, Document doc, List<string> results)
+        {
+            var symbol = CreateFamily(ui, doc, "Metric Generic Model.rft");
+            var requests = new List<HistoryRestoreRequest>();
+            var positions = new Dictionary<string, XYZ>();
+            using (var tx = new Transaction(doc, "Basic capture fixtures"))
+            {
+                tx.Start();
+                var level = Level.Create(doc, 0);
+                var type = new FilteredElementCollector(doc).OfClass(typeof(WallType)).Cast<WallType>().First(t => t.Kind == WallKind.Basic);
+                var wall = Wall.Create(doc, Line.CreateBound(new XYZ(0,0,0),new XYZ(20,0,0)), type.Id, level.Id, 10, 0, false, false);
+                symbol.Activate(); doc.Regenerate();
+                var family = doc.Create.NewFamilyInstance(new XYZ(50,50,0),symbol,level,StructuralType.NonStructural);
+                doc.Regenerate();
+                foreach (var element in new Element[] { wall, family })
+                {
+                    var recipe = ElementHistoryReconstruction.Capture(element, includeDetails:false);
+                    Check(recipe != null && recipe.Kind != "native_archive", "Baseline must immediately contain a restoration recipe");
+                    Check(recipe.GeometryRelations == null && recipe.Connections == null && recipe.ElectricalCircuits == null,
+                        "Baseline must defer joins, connections and circuits");
+                    requests.Add(new HistoryRestoreRequest { SourceUniqueId=element.UniqueId, Label=element.Name, Recipe=recipe });
+                    if (element.Location is LocationPoint point) positions[element.UniqueId]=point.Point;
+                }
+                var second = Wall.Create(doc, Line.CreateBound(new XYZ(0,30,0),new XYZ(20,30,0)),type.Id,level.Id,10,0,false,false);
+                var third = Wall.Create(doc, Line.CreateBound(new XYZ(0,40,0),new XYZ(20,40,0)),type.Id,level.Id,10,0,false,false);
+                var group = doc.Create.NewGroup(new[] { second.Id, third.Id });
+                string detail = null;
+                Check(ElementHistoryReconstruction.Capture(group, reason=>detail=reason, includeDetails:false)==null,
+                    "Complex group must not start native archive from baseline");
+                ElementHistoryNativeArchive.GetAuditCounts(doc,out var pending,out var ready);
+                Check(pending==0 && ready==0 && !string.IsNullOrWhiteSpace(detail), "Baseline silently queued a native archive");
+                Check(tx.Commit()==TransactionStatus.Committed,"Basic fixture commit");
+            }
+            results.Add("simple baseline immediately contains recipes; optional relations and native copies remain deferred");
+            using (var tx = new Transaction(doc,"Delete baseline fixtures"))
+            { tx.Start(); foreach(var request in requests) doc.Delete(doc.GetElement(request.SourceUniqueId).Id); tx.Commit(); }
+            requests=JsonConvert.DeserializeObject<List<HistoryRestoreRequest>>(JsonConvert.SerializeObject(requests));
+            var batch=ElementHistoryRestoration.Restore(doc,requests);
+            Check(batch.Created==2 && batch.Failed==0,"Baseline wall/family restoration: "+JsonConvert.SerializeObject(batch));
+            foreach(var item in batch.Items)
+                if(positions.TryGetValue(item.SourceUniqueId,out var point))
+                    Check(((LocationPoint)doc.GetElement(item.UniqueId).Location).Point.DistanceTo(point)<1e-6,"Baseline family placement changed");
+            results.Add("wall and family restored after real deletion and JSON roundtrip without optional enrichment");
+        }
+
+        private void VerifyCaptureOptimizations(UIApplication ui, Document doc, List<string> results)
+        {
+            var symbol = CreateFamily(ui,doc,"Metric Generic Model.rft");
+            var elements = new List<Element>();
+            WallType wallType;
+            using(var tx=new Transaction(doc,"Capture benchmark fixtures"))
+            {
+                tx.Start();
+                var level=Level.Create(doc,0);
+                wallType=new FilteredElementCollector(doc).OfClass(typeof(WallType)).Cast<WallType>().First(t=>t.Kind==WallKind.Basic);
+                symbol.Activate(); doc.Regenerate();
+                for(int i=0;i<100;i++)
+                {
+                    elements.Add(Wall.Create(doc,Line.CreateBound(new XYZ(i*30,0,0),new XYZ(i*30+20,0,0)),wallType.Id,level.Id,10,0,false,false));
+                    elements.Add(doc.Create.NewFamilyInstance(new XYZ(i*30,30,0),symbol,level,StructuralType.NonStructural));
+                }
+                tx.Commit();
+            }
+            // Warm the relation index/JIT before timing either path.
+            ElementHistoryReconstruction.Capture(elements[0]);
+            ElementHistoryReconstruction.Capture(elements[1]);
+            var baseline=elements.Select(e=>ElementHistoryReconstruction.Capture(e,includeDetails:false)).ToList();
+            Check(baseline.All(r=>r!=null),"Benchmark fixture baseline recipe missing");
+            var watch=Stopwatch.StartNew();
+            var recaptured=elements.Select(e=>ElementHistoryReconstruction.Capture(e)).ToList();
+            var recaptureMs=watch.Elapsed.TotalMilliseconds;
+            watch.Restart();
+            for(int i=0;i<elements.Count;i++)
+            {
+                var parameters=baseline[i].Parameters;
+                var before=baseline[i];
+                baseline[i]=ElementHistoryReconstruction.Enrich(elements[i],baseline[i]);
+                Check(ReferenceEquals(before,baseline[i]) && ReferenceEquals(parameters,baseline[i].Parameters),
+                    "Enrichment recaptured geometry/parameters instead of retaining baseline");
+            }
+            var enrichMs=watch.Elapsed.TotalMilliseconds;
+            for(int i=0;i<elements.Count;i++)
+                Check(JToken.DeepEquals(JObject.FromObject(recaptured[i]),JObject.FromObject(baseline[i])),
+                    "Enrichment output differs from full capture: "+elements[i].Id);
+            results.Add("200 full/enriched recipes equivalent; enrichment retains baseline objects and parameter payloads");
+
+            // Load the built production tracker into a separate reflection context: do not register another application.
+            var productionPath=File.ReadAllText(Path.Combine(Output,"production-dll.txt")).Trim();
+            var production=Assembly.Load(File.ReadAllBytes(productionPath));
+            var tracker=production.GetType("Analyse.ElementHistoryTracker",true);
+            var build=tracker.GetMethod("BuildSnapshot",BindingFlags.NonPublic|BindingFlags.Static);
+            var invalidate=tracker.GetMethod("InvalidateCaptureCaches",BindingFlags.NonPublic|BindingFlags.Static);
+            var getCache=tracker.GetMethod("GetTypeParameterCache",BindingFlags.NonPublic|BindingFlags.Static);
+            Check(build!=null && invalidate!=null && getCache!=null,"Production capture hooks missing");
+            object Snapshot(Element element,Dictionary<int,Dictionary<string,string>> cache)
+                => build.Invoke(null,new object[]{element,false,0,false,cache});
+            Snapshot(elements[0],new Dictionary<int,Dictionary<string,string>>());
+            var batchReads=0;
+            watch.Restart();
+            for(int offset=0;offset<elements.Count;offset+=25)
+            {
+                var cache=new Dictionary<int,Dictionary<string,string>>();
+                foreach(var element in elements.Skip(offset).Take(25)) Snapshot(element,cache);
+                batchReads+=cache.Count;
+            }
+            var batchCacheMs=watch.Elapsed.TotalMilliseconds;
+            invalidate.Invoke(null,new object[]{doc});
+            var sessionCache=(Dictionary<int,Dictionary<string,string>>)getCache.Invoke(null,new object[]{doc});
+            watch.Restart();
+            foreach(var element in elements) Snapshot(element,sessionCache);
+            var sessionCacheMs=watch.Elapsed.TotalMilliseconds;
+            Check(sessionCache.Count==2 && batchReads==16,"Type cache did not eliminate repeated reads across batches");
+            using(var tx=new Transaction(doc,"Type cache invalidation fixture"))
+            { tx.Start();wallType.get_Parameter(BuiltInParameter.ALL_MODEL_TYPE_COMMENTS).Set("history-cache-invalidation-probe");tx.Commit(); }
+            invalidate.Invoke(null,new object[]{doc});
+            var updated=(Dictionary<int,Dictionary<string,string>>)getCache.Invoke(null,new object[]{doc});
+            Check(updated.Count==0,"Type cache retained values after invalidation");
+            Snapshot(elements[0],updated);
+            Check(updated.Values.Any(values=>values.Values.Contains("history-cache-invalidation-probe")),"Type change was lost through the cache");
+            results.Add("type parameters read 2 times instead of 16 across 8 batches; invalidation preserves a changed type value");
+            File.WriteAllText(Path.Combine(Output,"capture-benchmark.json"),JsonConvert.SerializeObject(new {
+                Elements=elements.Count, Types=2, BatchTypeReads=batchReads, SessionTypeReads=sessionCache.Count,
+                BatchCacheMilliseconds=batchCacheMs, SessionCacheMilliseconds=sessionCacheMs,
+                FullRecaptureMilliseconds=recaptureMs, EnrichmentMilliseconds=enrichMs,
+                RevitVersion=ui.Application.VersionNumber
+            },Formatting.Indented));
+        }
+
+        private void VerifyNativeBatching(UIApplication ui, Document doc, List<string> results)
+        {
+            var groups=new List<Group>();
+            using(var tx=new Transaction(doc,"Native batching fixtures"))
+            {
+                tx.Start();
+                var level=Level.Create(doc,0);
+                var type=new FilteredElementCollector(doc).OfClass(typeof(WallType)).Cast<WallType>().First(t=>t.Kind==WallKind.Basic);
+                var compound=type.GetCompoundStructure();
+                Check(compound!=null && compound.GetLayers().Count>0,"Native batching wall fixture has no layers");
+                var layers=compound.GetLayers(); layers[0].Width+=0.1; compound.SetLayers(layers);type.SetCompoundStructure(compound);
+                for(int i=0;i<32;i++)
+                {
+                    var first=Wall.Create(doc,Line.CreateBound(new XYZ(i*30,0,0),new XYZ(i*30+20,0,0)),type.Id,level.Id,10,0,false,false);
+                    var second=Wall.Create(doc,Line.CreateBound(new XYZ(i*30,20,0),new XYZ(i*30+20,20,0)),type.Id,level.Id,10,0,false,false);
+                    groups.Add(doc.Create.NewGroup(new[]{first.Id,second.Id}));
+                }
+                tx.Commit();
+            }
+            List<HistoryRecipe> Archive(IEnumerable<Group> fixtures,int limit,out double elapsed,out int waves,out int files)
+            {
+                var recipes=fixtures.Select(group=>ElementHistoryReconstruction.Capture(group)).ToList();
+                Check(recipes.All(recipe=>recipe?.Kind=="native_archive"),"Native benchmark recipe missing");
+                var timer=Stopwatch.StartNew(); waves=0;
+                while(recipes.Any(recipe=>!recipe.Native.Ready && recipe.Native.Failure==null) && waves<32)
+                { ElementHistoryNativeArchive.ProcessPending(doc,maxRoots:limit,targetTypeRenames:limit!=2,reuseArchive:limit!=2); waves++; }
+                elapsed=timer.Elapsed.TotalMilliseconds;
+                Check(recipes.All(recipe=>recipe.Native.Ready),"Native benchmark did not archive all groups: "+JsonConvert.SerializeObject(recipes.Select(recipe=>recipe.Native)));
+                files=recipes.Select(recipe=>recipe.Native.File).Distinct().Count();
+                return recipes;
+            }
+            var control=Archive(groups.Take(16),2,out var controlMs,out var controlWaves,out var controlFiles);
+            var optimized=Archive(groups.Skip(16),16,out var optimizedMs,out var optimizedWaves,out var optimizedFiles);
+            Check(controlFiles>=8 && optimizedFiles<=controlFiles,"Native batching increased the archive count");
+            results.Add("32 groups archived; 2-root control versus 16-root ceiling with identical 250 ms copy budget");
+            var group=groups.Last();
+            var request=new HistoryRestoreRequest{SourceUniqueId=group.UniqueId,Label="Batched group",Recipe=optimized.Last()};
+            using(var tx=new Transaction(doc,"Delete batched group")){tx.Start();doc.Delete(group.Id);tx.Commit();}
+            request=JsonConvert.DeserializeObject<HistoryRestoreRequest>(JsonConvert.SerializeObject(request));
+            var batch=ElementHistoryRestoration.Restore(doc,new[]{request});
+            Check(batch.Failed==0 && batch.Created==1,"Batched native restore: "+JsonConvert.SerializeObject(batch));
+            Check(doc.GetElement(batch.Items.Single(i=>i.Created).UniqueId) is Group restored && restored.GetMemberIds().Count==2,
+                "Batched native archive lost group members");
+            var restoredGroup=(Group)doc.GetElement(batch.Items.Single(i=>i.Created).UniqueId);
+            var sourceWidth=((Wall)doc.GetElement(groups[0].GetMemberIds().First())).Width;
+            Check(restoredGroup.GetMemberIds().Select(doc.GetElement).OfType<Wall>().All(w=>Math.Abs(w.Width-sourceWidth)<1e-8),
+                "Targeted type isolation substituted the blank template wall definition");
+            results.Add("a group restored from a shared native archive after deletion and JSON roundtrip, both members retained");
+            HistoryRecipe versioned;
+            double changedWidth;
+            using(var tx=new Transaction(doc,"Archive pool type-change fixture"))
+            {
+                tx.Start();
+                tx.SetFailureHandlingOptions(tx.GetFailureHandlingOptions().SetFailuresPreprocessor(new FixtureFailures()).SetClearAfterRollback(true));
+                var type=((Wall)doc.GetElement(groups[0].GetMemberIds().First())).WallType;
+                var compound=type.GetCompoundStructure(); var layers=compound.GetLayers();
+                layers[0].Width+=0.1;compound.SetLayers(layers);type.SetCompoundStructure(compound);
+                var level=new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>().First();
+                var first=Wall.Create(doc,Line.CreateBound(new XYZ(1200,0,0),new XYZ(1220,0,0)),type.Id,level.Id,10,0,false,false);
+                var second=Wall.Create(doc,Line.CreateBound(new XYZ(1200,20,0),new XYZ(1220,20,0)),type.Id,level.Id,10,0,false,false);
+                var newer=doc.Create.NewGroup(new[]{first.Id,second.Id});
+                changedWidth=type.Width;
+                Check(tx.Commit()==TransactionStatus.Committed,"Archive pool type-change fixture commit");
+                versioned=ElementHistoryReconstruction.Capture(newer);
+            }
+            for(int attempt=0;attempt<8 && !versioned.Native.Ready;attempt++) ElementHistoryNativeArchive.ProcessPending(doc);
+            Check(versioned.Native.Ready,"Pool did not renew after a source model change");
+            using(var sources=new ElementHistoryNativeArchive.Sources())
+            {
+                var oldArchive=sources.Open(doc,optimized[0].Native);
+                var oldRoot=(Group)oldArchive.GetElement(optimized[0].Native.RootUniqueId);
+                Check(oldRoot.GetMemberIds().Select(oldArchive.GetElement).OfType<Wall>().All(w=>Math.Abs(w.Width-sourceWidth)<1e-8),
+                    "Pool changed a historical type definition in a saved snapshot");
+                var newArchive=sources.Open(doc,versioned.Native);
+                var newRoot=(Group)newArchive.GetElement(versioned.Native.RootUniqueId);
+                Check(newRoot.GetMemberIds().Select(newArchive.GetElement).OfType<Wall>().All(w=>Math.Abs(w.Width-changedWidth)<1e-8),
+                    "Pool reused the old type definition after a source change");
+            }
+            results.Add("source change renews the pooled archive; older/newer immutable snapshots retain different historical wall widths");
+            File.WriteAllText(Path.Combine(Output,"native-batching-benchmark.json"),JsonConvert.SerializeObject(new {
+                GroupsPerArm=16,ControlMilliseconds=controlMs,OptimizedMilliseconds=optimizedMs,
+                ControlWaves=controlWaves,OptimizedWaves=optimizedWaves,ControlFiles=controlFiles,OptimizedFiles=optimizedFiles,
+                RevitVersion=ui.Application.VersionNumber
+            },Formatting.Indented));
+            HistoryPerformanceLog.Flush();
+        }
 
         private List<string> RunGroupCopyBenchmark(UIApplication ui)
         {

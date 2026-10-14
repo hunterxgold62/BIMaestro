@@ -107,22 +107,31 @@ namespace Licensing
         public static void Shutdown()
         {
             try { _timer?.Dispose(); } catch { }
+            lock (_lock)
+            {
+                if (_buffer.Count > 0)
+                {
+                    PersistQueueToDisk(new List<UsageEvent>(_buffer));
+                    _buffer.Clear();
+                }
+            }
             WriteLog("[Shutdown]");
         }
 
         private static async Task SafeFlushAsync()
         {
-            if (_flushing) return;
             List<UsageEvent> toSend;
 
             lock (_lock)
             {
-                if (_buffer.Count == 0) return;
-                toSend = new List<UsageEvent>(_buffer);
-                _buffer.Clear();
+                if (_flushing || _buffer.Count == 0) return;
+                _flushing = true;
+                // collect-usage accepts at most 200 events per request.
+                int count = Math.Min(200, _buffer.Count);
+                toSend = _buffer.GetRange(0, count);
+                _buffer.RemoveRange(0, count);
             }
 
-            _flushing = true;
             try
             {
                 var payload = new { license_key = _fallbackLicenseKey, events = toSend };
@@ -148,6 +157,7 @@ namespace Licensing
                         if (code == 404 || code == 405)
                         {
                             WriteLog($"[Flush] HTTP {code} (bad path), try fallback…");
+                            if (attempt == _paths.Length - 1) PersistQueueToDisk(toSend);
                             continue;
                         }
 
@@ -177,7 +187,7 @@ namespace Licensing
                 WriteLog("[Flush/Outer] EX: " + ex.Message);
                 PersistQueueToDisk(toSend);
             }
-            finally { _flushing = false; }
+            finally { lock (_lock) { _flushing = false; } }
         }
 
         private static void PersistQueueToDisk(List<UsageEvent> events)

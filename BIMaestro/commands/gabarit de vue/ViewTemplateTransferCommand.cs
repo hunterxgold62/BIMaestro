@@ -1,6 +1,7 @@
 ﻿using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using System.Collections.Generic;
 using BIMaestro.Localization;
 using Licensing;
 using Microsoft.Win32;
@@ -131,7 +132,7 @@ namespace BIMaestro.ViewTemplates
             return result;
         }
 
-        private static Result Export(ExternalCommandData data, Document document, View activeView)
+        private Result Export(ExternalCommandData data, Document document, View activeView)
         {
             if (!CanUseView(activeView)) return ShowUnsupportedView();
 
@@ -179,6 +180,8 @@ namespace BIMaestro.ViewTemplates
                 saveDialog.FileName,
                 JsonConvert.SerializeObject(package, Formatting.Indented),
                 new UTF8Encoding(false));
+            RecordOperationResult(ButtonId, "export_view_template", false,
+                new Dictionary<string, int> { ["files_exported"] = 1 });
 
             TaskDialog.Show(
                 UiLanguage.T("Export terminé", "Export Complete"),

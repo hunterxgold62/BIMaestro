@@ -1,5 +1,63 @@
 # Vérification des badges d’infobulle
 
+### Réservation auto — fiche outil du 12 octobre 2026
+
+La mise en page native personnalisée de ce bouton devient une fiche statique :
+grande illustration en tête, titre, description courte puis trois pictogrammes
+Réseau / Paroi / Réservation. Les autres boutons conservent leur présentation.
+`GenerateReservationCard.py` génère l'image de tête et les trois pictogrammes.
+Rendu du véritable constructeur WPF inspecté : 320 × 288,8 DIP, sans découpe.
+Builds finaux 2023, 2024, 2025 et 2026 réussis et ressources copiées ; contrôle
+des contrats/API et des médias réussi pour les quatre versions. Installation
+dans de nouveaux dossiers par version avec sauvegarde des manifestes et
+vérification des empreintes. Redémarrer Revit pour charger la nouvelle DLL.
+Le rendu a été vérifié hors Revit ; aucun nouveau test de survol natif pour
+cette présentation. La commande de réservation n'est pas modifiée.
+
+### Scanner Clash 3D et personnage de chantier — 12 octobre 2026
+
+`GenerateClashScanner.py` remplace le fondu de paroi par une bande de scanner
+révélant progressivement deux réseaux cachés, avec repère d'intersection rouge.
+`GenerateVisualEffects.py` ne régénère plus ClashCut pour préserver cet aperçu.
+Bride auto conserve sa vue éclatée et ajoute un petit ouvrier avec casque,
+gilet et clé, suivant la bride puis serrant une fixation au réassemblage.
+Les deux animations sont illustratives. Décodage intégral : chacune contient
+120 images, dure six secondes et mesure 640 × 360 ; posters et fin de montage
+inspectés. Médias installés en 2023 à 2026 avec contrôle des empreintes.
+Aucun changement des commandes métier et aucun nouveau test natif Revit
+pour ces retouches des médias.
+
+### Bride auto — vue éclatée du 12 octobre 2026
+
+Le raccord vanne/brides/joints s'écarte sur son axe puis se réassemble, avec
+transition douce et pause dans les deux états. Les joints sont illustratifs ;
+aucun changement de la commande métier. L'aperçu Suppression de brides reste
+distinct. Génération ciblée : `GenerateModificationExamples.py ModFlanges`.
+MP4 entièrement décodé : 120 images, six secondes, 640 × 360. États éclaté
+et assemblé inspectés visuellement, médias copiés dans les sorties de build
+et les dossiers actifs 2023 à 2026 avec contrôle des empreintes. Pas de
+nouveau test natif Revit pour cette retouche des médias.
+
+### Surcharges de vues — retouche du 12 octobre 2026
+
+Même gaine coudée et même support en arrière-plan dans trois vues : normal
+opaque, demi-teinte atténuée mais opaque, transparence réelle par composition
+alpha révélant le support. Chaque mode est mis en évidence pendant deux secondes.
+`GenerateModificationExamples.py ModOverrides` régénère uniquement cet aperçu.
+Animation entièrement décodée : 120 images, six secondes, 640 × 360 ; poster
+inspecté visuellement. Médias installés en 2023 à 2026 avec contrôle des
+empreintes ; commande métier inchangée, sans nouveau test natif de cette retouche.
+
+### Réservation auto — retouche du 12 octobre 2026
+
+Nouvel avant/après avec paroi en perspective, réseau occulté dans l'épaisseur,
+ouverture centrée sur son axe et détail de face montrant le jeu périphérique.
+`GenerateModificationExamples.py ModReservation` régénère uniquement cet aperçu.
+MP4 entièrement décodé : 120 images, six secondes, 640 × 360 ; poster inspecté.
+Les deux médias sont copiés dans les sorties de build et les dossiers actifs
+de Revit 2023 à 2026, avec vérification des empreintes. Aucun changement de la
+commande métier ; pas de nouveau test natif Revit pour cette retouche graphique.
+
 ## Compatibilité Revit 2023 à 2027 — audit du 11 octobre 2026
 
 Les builds Release ont été compilés séparément contre les API 2023, 2024,

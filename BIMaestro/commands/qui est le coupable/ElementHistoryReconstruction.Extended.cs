@@ -58,7 +58,7 @@ namespace Analyse
                     throw new InvalidOperationException("La forme recréée du sol ne correspond pas à la forme enregistrée.");
         }
 
-        private static HistoryRecipe CaptureSketchHost(Element element, Action<string> diagnostic)
+        private static HistoryRecipe CaptureSketchHost(Element element, Action<string> diagnostic, bool includeDetails = true)
         {
             var doc = element.Document;
             var level = FindLevel(element);
@@ -67,7 +67,7 @@ namespace Analyse
             {
                 Type = doc.GetElement(element.GetTypeId()).UniqueId, Level = level.UniqueId,
                 LevelElevation = level.ProjectElevation, RestorationOrigins = ElementHistoryRestoration.GetOrigins(element),
-                RequiresMeshPreview = JoinGeometryUtils.GetJoinedElements(doc, element).Count > 0
+                RequiresMeshPreview = !includeDetails || JoinGeometryUtils.GetJoinedElements(doc, element).Count > 0
                     || (element is HostObject host && host.FindInserts(true, true, true, true).Count > 0),
                 Loops = new List<List<HistoryCurve>>()
             };

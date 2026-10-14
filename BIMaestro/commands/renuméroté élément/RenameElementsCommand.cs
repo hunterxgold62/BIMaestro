@@ -86,6 +86,7 @@ namespace Modification
             if (renamerWindow.ShowDialog() == true)
             {
                 string selectedParameter = renamerWindow.SelectedParameter;
+                var valuesBefore = SnapshotTextValues(doc, selectedIds, selectedParameter);
 
                 using (Transaction tx = new Transaction(doc, "Mettre à jour ou réinitialiser les éléments"))
                 {
@@ -235,17 +236,21 @@ namespace Modification
                             }
                         }
 
-                        tx.Commit();
+                        if (tx.Commit() != TransactionStatus.Committed)
+                            return Result.Failed;
 
                     }
                     catch (Exception ex)
                     {
-                        tx.RollBack();
+                        if (tx.GetStatus() == TransactionStatus.Started) tx.RollBack();
                         TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T("Une erreur est survenue : ", "An Error Occurred: ") + ex.Message);
                         return Result.Failed;
                     }
                 }
 
+                var valuesAfter = SnapshotTextValues(doc, selectedIds, selectedParameter);
+                RecordOrganizerResult(valuesBefore, valuesAfter, selectedIds.Count,
+                    renamerWindow.IsReset, "elements", guidedExercise);
                 if (guidedExercise)
                     BIMaestro.Tutorials.DemoOrganizerExercise.Verify(data.Application, selectedIds,
                         renamerWindow.IsSortByLevelEnabled, selectedParameter);
@@ -330,6 +335,7 @@ namespace Modification
                 return Result.Failed;
             }
 
+            var viewportValuesBefore = SnapshotViewportValues(doc, sortedViewports, renamerWindow.SelectedParameter);
             using (var transaction = new Transaction(doc, "Organiser les fenêtres de vue"))
             {
                 try
@@ -353,7 +359,8 @@ namespace Modification
                         SetViewNames(doc, sortedViewports, desiredValues);
                     }
 
-                    transaction.Commit();
+                    if (transaction.Commit() != TransactionStatus.Committed)
+                        return Result.Failed;
                 }
                 catch (Exception ex)
                 {
@@ -370,7 +377,60 @@ namespace Modification
                 }
             }
 
+            RecordOrganizerResult(viewportValuesBefore,
+                SnapshotViewportValues(doc, sortedViewports, renamerWindow.SelectedParameter),
+                viewportValuesBefore.Count, false, "viewports", false);
             return Result.Succeeded;
+        }
+
+        // Values stay in memory; telemetry only receives aggregate counts.
+        private static Dictionary<long, string> SnapshotTextValues(Document doc,
+            IEnumerable<ElementId> ids, string parameterName)
+        {
+            var values = new Dictionary<long, string>();
+            foreach (ElementId id in ids)
+            {
+                Parameter parameter = doc.GetElement(id)?.LookupParameter(parameterName);
+                if (parameter != null && !parameter.IsReadOnly && parameter.StorageType == StorageType.String)
+                    values[id.GetIdLongValue()] = parameter.AsString() ?? string.Empty;
+            }
+            return values;
+        }
+
+        private Dictionary<long, string> SnapshotViewportValues(Document doc,
+            IEnumerable<Viewport> viewports, string target)
+        {
+            var values = new Dictionary<long, string>();
+            foreach (Viewport viewport in viewports)
+            {
+                if (target == ViewportDetailNumberTarget)
+                    values[viewport.Id.GetIdLongValue()] = GetViewportDetailNumber(viewport);
+                else
+                {
+                    View view = doc.GetElement(viewport.ViewId) as View;
+                    if (view == null) continue;
+                    values[view.Id.GetIdLongValue()] = target == ViewTitleTarget
+                        ? view.get_Parameter(BuiltInParameter.VIEW_DESCRIPTION)?.AsString() ?? string.Empty
+                        : view.Name;
+                }
+            }
+            return values;
+        }
+
+        private void RecordOrganizerResult(Dictionary<long, string> before,
+            Dictionary<long, string> after, int selectedCount, bool reset, string mode, bool isTutorial)
+        {
+            int changed = before.Count(pair => after.TryGetValue(pair.Key, out string value)
+                && !string.Equals(pair.Value, value, StringComparison.Ordinal));
+            int unchanged = before.Count(pair => after.TryGetValue(pair.Key, out string value)
+                && string.Equals(pair.Value, value, StringComparison.Ordinal));
+            RecordOperationResult(ButtonId, mode, isTutorial, new Dictionary<string, int>
+            {
+                ["elements_renamed"] = reset ? 0 : changed,
+                ["elements_reset"] = reset ? changed : 0,
+                ["elements_unchanged"] = unchanged,
+                ["elements_skipped"] = Math.Max(0, selectedCount - changed - unchanged)
+            });
         }
 
         private List<Viewport> SortViewportsByReadingOrder(

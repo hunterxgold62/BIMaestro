@@ -1,8 +1,115 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.IO;
+using System.Text;
+using System.Linq;
+using Autodesk.Revit.DB;
+using Newtonsoft.Json;
 
 namespace Analyse
 {
+    // Plain session measurements; sorting never re-reads geometry or walks the model.
+    internal static class HistoryCaptureCosts
+    {
+        private static readonly Dictionary<string, double> Costs = new Dictionary<string, double>();
+        internal static string Key(Element element)
+            => element.Document.GetHashCode() + "|" + element.GetType().Name + "|" + element.GetTypeId().GetIdLongValue();
+        internal static double Initial(string elementClass)
+        {
+            switch (elementClass)
+            {
+                case "Toposolid": case "TopographySurface": return 5000;
+                case "ImportInstance": return 3000;
+                case "DirectShape": return 1500;
+                case "Stairs": return 1000;
+                case "Railing": return 500;
+                case "Group": return 200;
+                default: return 10;
+            }
+        }
+        internal static double Estimate(string key, string phase, string elementClass)
+            => key != null && Costs.TryGetValue(phase + "|" + key, out var ms) ? ms
+                : phase == "element_capture_basic" ? 5 : Initial(elementClass);
+        internal static bool KnownSlowBasic(Element element)
+            => Estimate(Key(element), "element_capture_basic", element.GetType().Name) > 100;
+        internal static void Observe(string key, string phase, double ms)
+        {
+            if (key == null) return;
+            var index = phase + "|" + key;
+            if (Costs.Count >= 10000 && !Costs.ContainsKey(index)) return;
+            Costs[index] = Costs.TryGetValue(index, out var previous) ? previous * 0.75 + ms * 0.25 : ms;
+        }
+    }
+
+    // Capture plain values on the Revit thread; serialize and write on the existing logger worker.
+    internal static class HistoryPerformanceLog
+    {
+        private static readonly string Session = Guid.NewGuid().ToString("N");
+        private static readonly ConcurrentQueue<Tuple<string, object>> Pending = new ConcurrentQueue<Tuple<string, object>>();
+        private static readonly object WriteSync = new object();
+
+        internal static void Record(Document doc, string phase, double elapsedMs, int elements,
+            int remaining, bool complete, Element element = null, bool? success = null)
+        {
+            if (doc == null || Pending.Count >= 10000) return;
+            var path = Path.Combine(CollaborativeModelTrackerStore.ActiveDirectory, "history-performance",
+                "performance-" + DateTime.UtcNow.ToString("yyyy-MM-dd") + "-" + Session + ".jsonl");
+            Pending.Enqueue(Tuple.Create(path, (object)new
+            {
+                SchemaVersion = 2, Session, AtUtc = DateTime.UtcNow,
+                ModelKey = ElementHistoryTracker.GetDocumentKeyForHistory(doc),
+                RuntimeDocumentId = doc.GetHashCode(), ModelName = doc.Title,
+                ViewId = doc.ActiveView?.Id.GetIdValue(), Phase = phase,
+                ElapsedMilliseconds = elapsedMs, Elements = elements, Remaining = remaining, Complete = complete,
+                ElementId = element?.Id.GetIdLongValue(), ElementUniqueId = element?.UniqueId,
+                ElementClass = element?.GetType().Name, Category = element?.Category?.Name,
+                ElementName = element?.Name,
+                ElementFamily = element is FamilyInstance family ? family.Symbol?.FamilyName
+                    : element is FamilySymbol symbol ? symbol.FamilyName : null,
+                ElementTypeId = element?.GetTypeId().GetIdLongValue(),
+                ElementType = element == null ? null : element.Document.GetElement(element.GetTypeId())?.Name,
+                Success = success
+            }));
+        }
+
+        internal static void RecordElement(Element element, string phase, double elapsedMs, bool success)
+        {
+            if (element == null) return;
+            try
+            {
+                HistoryCaptureCosts.Observe(HistoryCaptureCosts.Key(element), phase, elapsedMs);
+                Record(element.Document, phase, elapsedMs, 1, 0, false, element, success);
+            }
+            catch (Exception ex) { Trace.WriteLine("History element performance: " + ex.Message); }
+        }
+
+        internal static void Flush()
+        {
+            lock (WriteSync)
+            {
+                var batch = new List<Tuple<string, object>>();
+                while (batch.Count < 500 && Pending.TryDequeue(out var record)) batch.Add(record);
+                foreach (var group in batch.GroupBy(record => record.Item1))
+                {
+                    try
+                    {
+                        Directory.CreateDirectory(Path.GetDirectoryName(group.Key));
+                        var text = new StringBuilder();
+                        foreach (var item in group) text.AppendLine(JsonConvert.SerializeObject(item.Item2));
+                        File.AppendAllText(group.Key, text.ToString(), Encoding.UTF8);
+                    }
+                    catch (Exception ex)
+                    {
+                        Trace.WriteLine("History performance write: " + ex.Message);
+                        foreach (var item in group) Pending.Enqueue(item);
+                    }
+                }
+            }
+        }
+    }
+
     internal sealed class HistoryPreloadCategoryAudit
     {
         public string Category { get; set; }
@@ -21,6 +128,7 @@ namespace Analyse
         public int TotalCandidates { get; set; }
         public int Visited { get; set; }
         public int Captured { get; set; }
+        public int BasicRecipesCaptured { get; set; }
         public int Skipped { get; set; }
         public int Failed { get; set; }
         public int Batches { get; set; }
@@ -49,6 +157,7 @@ namespace Analyse
             {
                 ScheduledUtc = ScheduledUtc, StartedUtc = StartedUtc, CompletedUtc = CompletedUtc,
                 TotalCandidates = TotalCandidates, Visited = Visited, Captured = Captured,
+                BasicRecipesCaptured = BasicRecipesCaptured,
                 Skipped = Skipped, Failed = Failed, Batches = Batches,
                 ActiveMilliseconds = ActiveMilliseconds,
                 PriorityCatalogMilliseconds = PriorityCatalogMilliseconds,
@@ -95,6 +204,8 @@ namespace Analyse
     internal sealed class HistoryDeletionElementAudit
     {
         public string BatchId { get; set; }
+        public int BatchDeletedElementCount { get; set; }
+        public int BatchWithSnapshotCount { get; set; }
         public string BatchReportPath { get; set; }
         public int ElementId { get; set; }
         public string OriginalUniqueId { get; set; }
@@ -137,6 +248,8 @@ namespace Analyse
         public int NativeReady { get; set; }
         public int NativeNotReady { get; set; }
         public int NativePendingRootsAtDeletion { get; set; }
+        public int RestorationCapturesPendingAtDeletion { get; set; }
+        public int SelectionCapturesPendingAtDeletion { get; set; }
         public int NativeReadyRecipesAtDeletion { get; set; }
         public int NativePriorityPendingRootsAtDeletion { get; set; }
         public double NativePriorityClassificationMilliseconds { get; set; }

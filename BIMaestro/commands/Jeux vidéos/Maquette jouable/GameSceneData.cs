@@ -362,6 +362,19 @@ namespace BIMaestro.VideoGames
         }
     }
 
+    internal sealed class GameRoomData
+    {
+        public string Key = string.Empty, Name = string.Empty, Number = string.Empty, LevelName = string.Empty, Kind = "room";
+        public double BaseElevation, DeclaredTop, NavigationTop;
+        public List<List<Point3D>> Loops = new List<List<Point3D>>();
+        public void Translate(Vector3D offset)
+        {
+            BaseElevation += offset.Z; DeclaredTop += offset.Z; NavigationTop += offset.Z;
+            foreach (var loop in Loops)
+                for (int i = 0; i < loop.Count; i++) loop[i] += offset;
+        }
+    }
+
     internal sealed class GameSceneData
     {
         public string SourceDocumentId { get; set; } = string.Empty;
@@ -372,6 +385,7 @@ namespace BIMaestro.VideoGames
         public string SourceSharedSiteName { get; set; } = string.Empty;
         public IList<GameMeshData> Meshes { get; } = new List<GameMeshData>();
         public IList<GameDoorData> Doors { get; } = new List<GameDoorData>();
+        public IList<GameRoomData> Rooms { get; } = new List<GameRoomData>();
         public IList<GameElementData> Elements { get; } = new List<GameElementData>();
         public IList<GameTriangle> Triangles { get; } = new List<GameTriangle>();
         public GameMepGraphData MepGraph { get; set; } = new GameMepGraphData();
@@ -442,6 +456,8 @@ namespace BIMaestro.VideoGames
 
             foreach (GameDoorData door in Doors)
                 door.Translate(offset);
+            foreach (GameRoomData room in Rooms)
+                room.Translate(offset);
 
             foreach (GameElementData element in Elements)
                 element.Translate(offset);

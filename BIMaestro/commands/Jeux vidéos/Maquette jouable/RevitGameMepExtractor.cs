@@ -9,6 +9,7 @@ using System.Windows.Media;
 using System.Windows.Media.Media3D;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Mechanical;
+using Autodesk.Revit.DB.ExtensibleStorage;
 using MediaColor = System.Windows.Media.Color;
 
 namespace BIMaestro.VideoGames
@@ -997,6 +998,25 @@ namespace BIMaestro.VideoGames
             Document document,
             GameMepGraphData graph)
         {
+            // Freeze the legacy key in the RVT to keep existing shares through
+            // Save As, renames and moves, without orphaning previous exports.
+            var identitySchemaId = new Guid("df896c7c-e84a-469b-b8ca-438ed6e49c3a");
+            Schema identitySchema = Schema.Lookup(identitySchemaId);
+            var projectInfo = document.ProjectInformation;
+            if (identitySchema != null && projectInfo != null)
+            {
+                Entity saved = projectInfo.GetEntity(identitySchema);
+                if (saved.IsValid())
+                {
+                    string savedKey = saved.Get<string>(identitySchema.GetField("ModelKey"));
+                    if (!string.IsNullOrWhiteSpace(savedKey))
+                    {
+                        graph.ScenarioModelKey = savedKey;
+                        graph.ScenarioCanPersist = true;
+                        return;
+                    }
+                }
+            }
             string stableIdentity = string.Empty;
             try
             {
@@ -1060,7 +1080,39 @@ namespace BIMaestro.VideoGames
 
             if (!string.IsNullOrWhiteSpace(stableIdentity))
             {
-                graph.ScenarioModelKey = NormalizeScenarioIdentity(stableIdentity);
+                string key = NormalizeScenarioIdentity(stableIdentity);
+                if (projectInfo == null || document.IsReadOnly)
+                    throw new InvalidOperationException("Ouvrez la maquette en écriture pour enregistrer son identité de partage, puis sauvegardez le RVT.");
+                if (identitySchema == null)
+                {
+                    var builder = new SchemaBuilder(identitySchemaId);
+                    builder.SetSchemaName("BIMaestroMepProjectIdentity");
+                    builder.SetReadAccessLevel(AccessLevel.Public);
+                    builder.SetWriteAccessLevel(AccessLevel.Public);
+                    builder.AddSimpleField("ModelKey", typeof(string));
+                    identitySchema = builder.Finish();
+                }
+                var entity = new Entity(identitySchema);
+                entity.Set(identitySchema.GetField("ModelKey"), key);
+                if (document.IsModifiable)
+                {
+                    using (var tx = new SubTransaction(document))
+                    {
+                        tx.Start(); projectInfo.SetEntity(entity);
+                        if (tx.Commit() != TransactionStatus.Committed)
+                            throw new InvalidOperationException("Identité du partage non enregistrée.");
+                    }
+                }
+                else
+                {
+                    using (var tx = new Transaction(document, "Conserver l'identité du partage MEP"))
+                    {
+                        tx.Start(); projectInfo.SetEntity(entity);
+                        if (tx.Commit() != TransactionStatus.Committed)
+                            throw new InvalidOperationException("Identité du partage non enregistrée.");
+                    }
+                }
+                graph.ScenarioModelKey = key;
                 graph.ScenarioCanPersist = true;
                 return;
             }

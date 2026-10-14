@@ -60,6 +60,8 @@ namespace Analyse
             public DateTime CapturedUtc { get; set; }
             public string CaptureSource { get; set; }
             public List<string> SketchDependentUniqueIds { get; set; }
+            [JsonIgnore] public string CaptureCostKey { get; set; }
+            [JsonIgnore] public string CaptureClass { get; set; }
         }
 
         private sealed class GhostMeshSnapshot
@@ -212,7 +214,10 @@ namespace Analyse
             public DateTime NotBeforeUtc { get; set; }
             public Queue<ElementId> PendingElementIds { get; set; } = new Queue<ElementId>();
             public HashSet<int> PriorityElementIds { get; set; } = new HashSet<int>();
+            public HashSet<int> CostDeferredIds { get; } = new HashSet<int>();
             public bool ElementIdsLoaded { get; set; }
+            public int PriorityViewId { get; set; } = -1;
+            public DateTime NextViewCheckUtc { get; set; }
         }
 
         private sealed class HistoryModelScope
@@ -240,6 +245,34 @@ namespace Analyse
         private static readonly HashSet<string> FamilyParameterPrimedDocumentKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private static readonly Dictionary<string, DeferredPrimeState> DeferredPrimeByDocumentKey =
             new Dictionary<string, DeferredPrimeState>(StringComparer.OrdinalIgnoreCase);
+        private sealed class RestorationCaptureState
+        {
+            internal readonly Dictionary<int, ElementSnapshot> Pending = new Dictionary<int, ElementSnapshot>();
+            internal readonly HashSet<int> LightPending = new HashSet<int>();
+            internal readonly HashSet<int> CostDeferredIds = new HashSet<int>();
+            internal DateTime NotBeforeUtc;
+        }
+        private static readonly Dictionary<string, RestorationCaptureState> RestorationCaptureByDocumentKey =
+            new Dictionary<string, RestorationCaptureState>(StringComparer.OrdinalIgnoreCase);
+        // Plain parameter values only; cache survives idle batches, invalidated on every model change.
+        private static readonly Dictionary<Document, Dictionary<int, Dictionary<string, string>>> TypeParameterCaches =
+            new Dictionary<Document, Dictionary<int, Dictionary<string, string>>>();
+        private static readonly Dictionary<Document, Dictionary<Tuple<int,string,int,string>, string>> ParameterDisplayCaches =
+            new Dictionary<Document, Dictionary<Tuple<int,string,int,string>, string>>();
+
+        private static Dictionary<int, Dictionary<string, string>> GetTypeParameterCache(Document doc)
+        {
+            if (!TypeParameterCaches.TryGetValue(doc, out var cache))
+                TypeParameterCaches[doc] = cache = new Dictionary<int, Dictionary<string, string>>();
+            return cache;
+        }
+
+        internal static void InvalidateCaptureCaches(Document doc)
+        {
+            if (doc == null) return;
+            TypeParameterCaches.Remove(doc);
+            ParameterDisplayCaches.Remove(doc);
+        }
         private static readonly Dictionary<string, HistoryPreloadAudit> PreloadAuditByDocumentKey =
             new Dictionary<string, HistoryPreloadAudit>(StringComparer.OrdinalIgnoreCase);
         private static readonly Dictionary<string, HistorySelectionAudit> SelectionAuditByDocumentKey =
@@ -260,14 +293,14 @@ namespace Analyse
         private const int MaxGhostPreviewVertices = 3600;
         private const int MaxGhostCandidateFaces = 12000;
         private const int GhostCoordinateDecimals = 5;
-        private const int DeferredPrimeBatchSize = 25;
-        private const int DeferredPrimeTimeBudgetMs = 35;
+        private const int DeferredPrimeBatchSize = 100;
+        private const int DeferredPrimeTimeBudgetMs = 500;
         private const int MaxSelectionSnapshotCount = 25;
         private const int SelectionSnapshotTimeBudgetMs = 80;
         private const int MaxChangedElementSnapshotsPerTransaction = 250;
         private const int DocumentChangedTimeBudgetMs = 300;
         private const int SelectionDetailedGeometryTimeoutMs = 500;
-        private static readonly TimeSpan DeferredPrimeDelay = TimeSpan.FromSeconds(8);
+        private static readonly TimeSpan DeferredPrimeDelay = TimeSpan.FromSeconds(2);
         private static readonly TimeSpan HistoryMaintenanceInitialDelay = TimeSpan.FromMinutes(10);
         private static readonly TimeSpan HistoryMaintenanceInterval = TimeSpan.FromHours(1);
         private const bool IncludeAnnotationCategoriesForFuture = false;
@@ -371,6 +404,7 @@ namespace Analyse
 
         internal static void ForgetAudit(Document doc)
         {
+            InvalidateCaptureCaches(doc);
             var key = GetDocumentKey(doc);
             if (string.IsNullOrWhiteSpace(key)) return;
             lock (SnapshotByElementId)
@@ -378,6 +412,7 @@ namespace Analyse
                 PreloadAuditByDocumentKey.Remove(key);
                 SelectionAuditByDocumentKey.Remove(key);
                 LastSelectionIdsByDocumentKey.Remove(key);
+                RestorationCaptureByDocumentKey.Remove(key);
                 foreach (var ownerKey in SketchOwnerByCurveUniqueId.Keys
                     .Where(value => value.StartsWith(key + "|", StringComparison.Ordinal)).ToList())
                     SketchOwnerByCurveUniqueId.Remove(ownerKey);
@@ -438,6 +473,7 @@ namespace Analyse
             if (!HistoryBackgroundWork.UserIsIdle()) return;
 
             var primeStartedUtc = DateTime.UtcNow;
+            int batchVisited = 0;
             HistoryPreloadAudit audit;
             lock (SnapshotByElementId)
                 PreloadAuditByDocumentKey.TryGetValue(key, out audit);
@@ -446,23 +482,39 @@ namespace Analyse
                 if (audit != null && !audit.StartedUtc.HasValue) audit.StartedUtc = primeStartedUtc;
                 if (!state.ElementIdsLoaded)
                     LoadDeferredPrimeElementIds(doc, state, audit);
+                PrioritizeActiveView(doc, state);
 
                 if (audit != null && audit.TotalCandidates == 0)
                     audit.TotalCandidates = state.PendingElementIds.Count;
 
                 int processed = 0;
+                var typeParameterCache = GetTypeParameterCache(doc);
                 var deadlineUtc = DateTime.UtcNow.AddMilliseconds(DeferredPrimeTimeBudgetMs);
                 while (processed < DeferredPrimeBatchSize
                        && state.PendingElementIds.Count > 0
-                       && DateTime.UtcNow < deadlineUtc)
+                       && DateTime.UtcNow < deadlineUtc
+                       && HistoryBackgroundWork.UserIsIdle())
                 {
                     var id = state.PendingElementIds.Dequeue();
                     var element = doc.GetElement(id);
-                    var outcome = PrimeElementSnapshot(element, "preload");
+                    if (element != null && !HasSnapshot(BuildElementSnapshotKey(doc,id))
+                        && HistoryCaptureCosts.KnownSlowBasic(element) && state.CostDeferredIds.Add(id.GetIdValue()))
+                    {
+                        state.PendingElementIds.Enqueue(id);
+                        processed++;
+                        continue;
+                    }
+                    var outcome = PrimeElementSnapshot(element, "preload", typeParameterCache);
+                    batchVisited++;
                     if (audit != null)
                     {
                         audit.Visited++;
-                        if (outcome > 0) audit.Captured++;
+                        if (outcome > 0)
+                        {
+                            audit.Captured++;
+                            if (SnapshotByElementId.TryGetValue(BuildElementSnapshotKey(doc, id), out var baseline)
+                                && baseline.Recipe != null) audit.BasicRecipesCaptured++;
+                        }
                         else if (outcome < 0) audit.Failed++;
                         else audit.Skipped++;
                         if (state.PriorityElementIds.Contains(id.GetIdValue())) audit.PriorityVisited++;
@@ -488,6 +540,7 @@ namespace Analyse
 
                 if (DateTime.UtcNow >= deadlineUtc)
                     return;
+                if (!HistoryBackgroundWork.UserIsIdle()) return;
 
                 PrimeFamilyDocumentTypes(doc);
                 if (audit != null) { audit.Complete = true; audit.CompletedUtc = DateTime.UtcNow; }
@@ -510,14 +563,167 @@ namespace Analyse
             {
                 var elapsedMs = (DateTime.UtcNow - primeStartedUtc).TotalMilliseconds;
                 if (audit != null) audit.ActiveMilliseconds += elapsedMs;
-                // Finish the model-element priority queue promptly, then return
-                // to the gentler cadence for the rest of the document.
-                var priorityRemaining = state.PendingElementIds.Count > 0
-                    && state.PriorityElementIds.Contains(state.PendingElementIds.Peek().GetIdValue());
-                state.NotBeforeUtc = DateTime.UtcNow.AddMilliseconds(priorityRemaining
-                    ? Math.Max(100, elapsedMs * 2)
-                    : Math.Max(300, elapsedMs * 9));
+                HistoryPerformanceLog.Record(doc, "preload", elapsedMs, batchVisited,
+                    state.PendingElementIds.Count, audit?.Complete == true);
+                state.NotBeforeUtc = DateTime.UtcNow.AddMilliseconds(25);
             }
+        }
+
+        internal static bool ShouldContinueDeferredPrime(Document doc)
+        {
+            if (doc == null || ElementHistoryNativeArchive.Owns(doc) || !HistoryBackgroundWork.UserIsIdle()) return false;
+            var key = GetDocumentKey(doc);
+            lock (SnapshotByElementId) return DeferredPrimeByDocumentKey.ContainsKey(key)
+                || (RestorationCaptureByDocumentKey.TryGetValue(key, out var restoration)
+                    && (restoration.Pending.Count > 0 || restoration.LightPending.Count > 0));
+        }
+
+        internal static bool HasPendingBasicInventory(Document doc)
+        {
+            if (doc == null) return false;
+            var key = GetDocumentKey(doc);
+            return DeferredPrimeByDocumentKey.ContainsKey(key)
+                || (RestorationCaptureByDocumentKey.TryGetValue(key, out var state) && state.LightPending.Count > 0);
+        }
+
+        private static void QueueRestorationCapture(Document doc, ElementId id, ElementSnapshot snapshot, Element element = null)
+        {
+            // Metadata is tracked for history, but cannot benefit from geometric/native enrichment.
+            element = element ?? doc.GetElement(id);
+            if (element == null || element is ElementType || element is Material || element is GraphicsStyle
+                || element is View || element is ProjectInfo || element is Autodesk.Revit.DB.Plumbing.PipeSegment) return;
+            if (snapshot.CaptureFailure?.StartsWith("Terrain exclu", StringComparison.Ordinal) == true) return;
+            var key = GetDocumentKey(doc);
+            if (!RestorationCaptureByDocumentKey.TryGetValue(key, out var state))
+                RestorationCaptureByDocumentKey[key] = state = new RestorationCaptureState();
+            state.Pending[id.GetIdValue()] = snapshot;
+        }
+
+        internal static void ProcessDeferredRestorationCapture(Document doc, bool selectionOnly = false)
+        {
+            if (doc == null || ElementHistoryNativeArchive.Owns(doc)
+                || !(selectionOnly ? HistoryBackgroundWork.SelectionCanRun() : HistoryBackgroundWork.UserIsIdle())) return;
+            var key = GetDocumentKey(doc);
+            if (!RestorationCaptureByDocumentKey.TryGetValue(key, out var state)
+                || (state.Pending.Count == 0 && state.LightPending.Count == 0) || DateTime.UtcNow < state.NotBeforeUtc) return;
+            var timer = Stopwatch.StartNew();
+            int processed = 0;
+            LastSelectionIdsByDocumentKey.TryGetValue(key, out var selected);
+            try
+            {
+                var typeCache = GetTypeParameterCache(doc);
+                int lightProcessed = 0;
+                foreach (var idValue in state.LightPending.OrderByDescending(id => selected?.Contains(id) == true)
+                    .ThenBy(id => state.CostDeferredIds.Contains(id))
+                    .Where(id => !selectionOnly || selected?.Contains(id) == true).Take(25).ToList())
+                {
+                    if (!(selectionOnly ? HistoryBackgroundWork.SelectionCanRun() : HistoryBackgroundWork.UserIsIdle()) || timer.ElapsedMilliseconds >= 25) break;
+                    state.LightPending.Remove(idValue);
+                    var id = ElementIdExtensions.CreateElementId(idValue);
+                    if (HasSnapshot(BuildElementSnapshotKey(doc, id))) continue;
+                    var element = doc.GetElement(id);
+                    if (element == null || ShouldIgnoreElement(element)) continue;
+                    if (HistoryCaptureCosts.KnownSlowBasic(element) && state.CostDeferredIds.Add(idValue))
+                    {
+                        state.LightPending.Add(idValue);
+                        continue;
+                    }
+                    try
+                    {
+                        var snapshot = BuildSnapshot(element, false, includeRestoration: false, typeParameterCache: typeCache);
+                        snapshot.CaptureSource = "selection_deferred";
+                        StoreSnapshot(doc, id, snapshot);
+                        QueueRestorationCapture(doc, id, snapshot, element);
+                        lightProcessed++;
+                    }
+                    catch (Exception ex) { Trace.WriteLine("History deferred selection: " + ex.Message); }
+                }
+                if (lightProcessed > 0)
+                    HistoryPerformanceLog.Record(doc, "selection_capture", timer.Elapsed.TotalMilliseconds,
+                        lightProcessed, state.LightPending.Count, state.LightPending.Count == 0);
+                // Finish baseline restoration coverage before joins, circuits, and native fallback.
+                if (selectionOnly && state.LightPending.Any(id => selected?.Contains(id) == true)) return;
+                if (!selectionOnly && HasPendingBasicInventory(doc)) return;
+                // Selection first; remaining order was established by the visible-first inventory.
+                var selectedPending = selected == null ? Enumerable.Empty<int>() : selected.Where(state.Pending.ContainsKey);
+                var candidates = selectedPending.Concat(selectionOnly ? Enumerable.Empty<int>()
+                    : state.Pending.Keys.Where(id => selected?.Contains(id) != true))
+                    .OrderByDescending(id => selected?.Contains(id) == true)
+                    .ThenBy(id => HistoryCaptureCosts.Estimate(state.Pending[id].CaptureCostKey,
+                        "element_enrichment", state.Pending[id].CaptureClass))
+                    .Take(10).ToList();
+                foreach (var idValue in candidates)
+                {
+                    if (!(selectionOnly ? HistoryBackgroundWork.SelectionCanRun() : HistoryBackgroundWork.UserIsIdle()) || timer.ElapsedMilliseconds >= 25) break;
+                    var expected = state.Pending[idValue];
+                    state.Pending.Remove(idValue);
+                    var id = ElementIdExtensions.CreateElementId(idValue);
+                    var element = doc.GetElement(id);
+                    if (element == null || !SnapshotByElementId.TryGetValue(BuildElementSnapshotKey(doc, id), out var current)
+                        || !ReferenceEquals(current, expected)) continue;
+                    var elementTimer = Stopwatch.StartNew();
+                    try
+                    {
+                        string failure = null;
+                        current.Recipe = ElementHistoryReconstruction.Enrich(element, current.Recipe, reason => failure = reason,
+                            allowHeavyTerrain: false);
+                        current.CaptureFailure = failure;
+                        current.SketchDependentUniqueIds = CaptureSketchDependentUniqueIds(element);
+                        if (CaptureDetailedDeletedMesh && selected?.Contains(idValue) == true && !current.DetailCaptureAttempted)
+                        {
+                            if (!ShouldKeepDetailedSnapshotSimple(element))
+                            {
+                                var deadline = DateTime.UtcNow.AddMilliseconds(25);
+                                if (current.Recipe == null || current.Recipe.RequiresMeshPreview)
+                                {
+                                    current.GhostMesh = CaptureGhostMesh(element, deadline);
+                                    if (!IsDeadlineExpired(deadline)) current.ObbCorners = GetOrientedCorners(element, deadline);
+                                }
+                            }
+                            current.DetailCaptureAttempted = true;
+                        }
+                        StoreSnapshot(doc, id, current);
+                    }
+                    catch (Exception ex) { current.CaptureFailure = ex.Message; }
+                    finally { HistoryPerformanceLog.RecordElement(element, "element_enrichment",
+                        elementTimer.Elapsed.TotalMilliseconds, current.CaptureFailure == null); }
+                    processed++;
+                }
+            }
+            finally
+            {
+                if (selectionOnly && selected != null && SelectionAuditByDocumentKey.TryGetValue(key, out var selectionAudit))
+                {
+                    var roots = selected.Select(id => SnapshotByElementId.TryGetValue(key + "|element|" + id, out var snapshot)
+                        ? snapshot.Recipe?.Native?.RootSourceUniqueId : null).Where(uid => uid != null);
+                    ElementHistoryNativeArchive.PrioritizeSelectedRoots(doc, selectionAudit.AtUtc, roots);
+                }
+                state.NotBeforeUtc = DateTime.UtcNow.AddMilliseconds(25);
+                HistoryPerformanceLog.Record(doc, "restoration_capture", timer.Elapsed.TotalMilliseconds,
+                    processed, state.Pending.Count, state.Pending.Count == 0 && state.LightPending.Count == 0);
+            }
+        }
+
+        private static void PrioritizeActiveView(Document doc, DeferredPrimeState state)
+        {
+            var view = doc.ActiveView;
+            if (view == null || view.IsTemplate || DateTime.UtcNow < state.NextViewCheckUtc
+                || view.Id.GetIdValue() == state.PriorityViewId) return;
+            state.NextViewCheckUtc = DateTime.UtcNow.AddSeconds(2);
+            if (!FilteredElementCollector.IsViewValidForElementIteration(doc, view.Id)) return;
+            var timer = Stopwatch.StartNew();
+            try
+            {
+                var visible = new HashSet<int>(new FilteredElementCollector(doc, view.Id)
+                    .WhereElementIsNotElementType().ToElementIds().Select(id => id.GetIdValue()));
+                var remaining = state.PendingElementIds.ToList();
+                state.PendingElementIds = new Queue<ElementId>(remaining.Where(id => visible.Contains(id.GetIdValue()))
+                    .Concat(remaining.Where(id => !visible.Contains(id.GetIdValue()))));
+                state.PriorityViewId = view.Id.GetIdValue();
+                HistoryPerformanceLog.Record(doc, "view_priority", timer.Elapsed.TotalMilliseconds,
+                    visible.Count, state.PendingElementIds.Count, false);
+            }
+            catch (Exception ex) { Trace.WriteLine("History view priority: " + ex.Message); }
         }
 
         private static void LoadDeferredPrimeElementIds(Document doc, DeferredPrimeState state, HistoryPreloadAudit audit)
@@ -553,7 +759,10 @@ namespace Analyse
                 if (audit != null) audit.PriorityCatalogError = ex.ToString();
             }
 
-            foreach (var id in new FilteredElementCollector(doc).WhereElementIsNotElementType().ToElementIds())
+            var modelCategories = doc.Settings.Categories.Cast<Category>()
+                .Where(category => category.CategoryType == CategoryType.Model).Select(category => category.Id).ToList();
+            foreach (var id in new FilteredElementCollector(doc).WhereElementIsNotElementType()
+                .WherePasses(new ElementMulticategoryFilter(modelCategories)).ToElementIds())
                 if (!state.PriorityElementIds.Contains(id.GetIdValue()))
                     state.PendingElementIds.Enqueue(id);
 
@@ -635,7 +844,8 @@ namespace Analyse
             }
         }
 
-        private static int PrimeElementSnapshot(Element el, string source = "document_change_or_manual")
+        private static int PrimeElementSnapshot(Element el, string source = "document_change_or_manual",
+            Dictionary<int, Dictionary<string, string>> typeParameterCache = null)
         {
             try
             {
@@ -646,9 +856,12 @@ namespace Analyse
                 // selected, rather than consuming the initial scan's budget.
                 if (source == "preload" && el.Category?.CategoryType != CategoryType.Model
                     && !(el is Sketch)) return 0;
-                var snapshot = BuildSnapshot(el, includeOrientedCorners: false);
+                if (source == "preload" && HasSnapshot(BuildElementSnapshotKey(el.Document, el.Id))) return 0;
+                var snapshot = BuildSnapshot(el, includeOrientedCorners: false,
+                    includeRestoration: source != "preload", typeParameterCache: typeParameterCache);
                 snapshot.CaptureSource = source;
                 StoreSnapshot(el.Document, el.Id, snapshot);
+                if (source == "preload") QueueRestorationCapture(el.Document, el.Id, snapshot, el);
                 return 1;
             }
             catch
@@ -671,11 +884,12 @@ namespace Analyse
             string documentKey = null;
             try
             {
-                var deadlineUtc = DateTime.UtcNow.AddMilliseconds(SelectionSnapshotTimeBudgetMs);
-                var processed = 0;
+                var deadlineUtc = HistoryBackgroundWork.Paused ? DateTime.MinValue
+                    : DateTime.UtcNow.AddMilliseconds(SelectionSnapshotTimeBudgetMs);
                 documentKey = GetDocumentKey(doc);
                 if (string.IsNullOrWhiteSpace(documentKey)) return;
                 var selectionKeyPrefix = documentKey + "|element|";
+                var typeParameterCache = GetTypeParameterCache(doc);
 
                 foreach (var id in selectedIds)
                 {
@@ -683,13 +897,21 @@ namespace Analyse
                     var idValue = id.GetIdValue();
                     selectedIdValues.Add(idValue);
                     var snapshotKey = selectionKeyPrefix + idValue.ToString(CultureInfo.InvariantCulture);
-
-                    // The background prime and DocumentChanged already keep the
-                    // simple restoration recipe current. Rebuilding it on every
-                    // selection makes large selections block Revit's UI thread.
-                    if (!CaptureDetailedDeletedMesh && HasSnapshot(snapshotKey))
+                    if (SnapshotByElementId.TryGetValue(snapshotKey, out var savedSnapshot))
                     {
                         selectionAudit.CacheHits++;
+                        if (savedSnapshot.Recipe == null || (CaptureDetailedDeletedMesh && !savedSnapshot.DetailCaptureAttempted))
+                            QueueRestorationCapture(doc, id, savedSnapshot);
+                        continue;
+                    }
+                    if (DateTime.UtcNow >= deadlineUtc)
+                    {
+                        if (!HasSnapshot(snapshotKey))
+                        {
+                            if (!RestorationCaptureByDocumentKey.TryGetValue(documentKey, out var pending))
+                                RestorationCaptureByDocumentKey[documentKey] = pending = new RestorationCaptureState();
+                            pending.LightPending.Add(idValue);
+                        }
                         continue;
                     }
 
@@ -697,6 +919,14 @@ namespace Analyse
                     if (element == null) continue;
                     var keepSimpleOnly = ShouldKeepSelectionSnapshotSimple(element);
                     if (ShouldIgnoreElement(element) && !keepSimpleOnly) continue;
+                    if (HistoryCaptureCosts.KnownSlowBasic(element))
+                    {
+                        if (!RestorationCaptureByDocumentKey.TryGetValue(documentKey, out var slowPending))
+                            RestorationCaptureByDocumentKey[documentKey] = slowPending = new RestorationCaptureState();
+                        slowPending.LightPending.Add(idValue);
+                        slowPending.CostDeferredIds.Add(idValue);
+                        continue;
+                    }
 
                     if (CaptureDetailedDeletedMesh && !keepSimpleOnly && HasDetailCaptureAttempted(snapshotKey))
                     {
@@ -704,30 +934,13 @@ namespace Analyse
                         continue;
                     }
 
-                    var quickSnapshot = BuildSnapshot(element, includeOrientedCorners: false);
+                    var quickSnapshot = BuildSnapshot(element, includeOrientedCorners: false,
+                        includeRestoration: false, typeParameterCache: typeParameterCache);
                     quickSnapshot.CaptureSource = "selection";
                     StoreSnapshot(doc, id, quickSnapshot);
+                    QueueRestorationCapture(doc, id, quickSnapshot, element);
                     selectionAudit.SimpleCaptured++;
-                    processed++;
-
-                    if (!CaptureDetailedDeletedMesh || keepSimpleOnly)
-                    {
-                        quickSnapshot.DetailCaptureAttempted = keepSimpleOnly;
-                        StoreSnapshot(doc, id, quickSnapshot);
-                        continue;
-                    }
-
-                    if (HasDetailCaptureAttempted(snapshotKey)) continue;
-                    // Limit meshes, not the recipes for the rest of a multi-selection.
-                    if (processed > MaxSelectionSnapshotCount || DateTime.UtcNow >= deadlineUtc) continue;
-
-                    var snapshot = BuildSnapshot(
-                        element,
-                        includeOrientedCorners: true,
-                        detailedGeometryTimeoutMs: SelectionDetailedGeometryTimeoutMs);
-                    snapshot.CaptureSource = "selection_detailed";
-                    StoreSnapshot(doc, id, snapshot);
-                    selectionAudit.DetailedCaptured++;
+                    quickSnapshot.DetailCaptureAttempted = keepSimpleOnly;
                 }
             }
             catch (Exception ex)
@@ -779,6 +992,38 @@ namespace Analyse
             }
         }
 
+        internal sealed class SelectionPreparationStatus
+        {
+            internal DateTime AtUtc;
+            internal int Total, Pending, RecipesAvailable, MissingRecipePending, AdditionalDetailsPending, ExcludedHeavy;
+        }
+
+        internal static SelectionPreparationStatus GetSelectionPreparationStatus(Document doc)
+        {
+            if (doc == null) return null;
+            var key = GetDocumentKey(doc);
+            if (!LastSelectionIdsByDocumentKey.TryGetValue(key, out var selected)
+                || !SelectionAuditByDocumentKey.TryGetValue(key, out var audit)) return null;
+            RestorationCaptureByDocumentKey.TryGetValue(key, out var state);
+            var status = new SelectionPreparationStatus { AtUtc = audit.AtUtc, Total = selected.Count };
+            foreach (var id in selected)
+            {
+                SnapshotByElementId.TryGetValue(key + "|element|" + id, out var snapshot);
+                var native = snapshot?.Recipe?.Native;
+                var ready = snapshot?.Recipe != null && (native == null || native.Ready);
+                if (ready) status.RecipesAvailable++;
+                if (snapshot?.CaptureFailure?.StartsWith("Terrain exclu", StringComparison.Ordinal) == true) status.ExcludedHeavy++;
+                if (state?.LightPending.Contains(id) == true || state?.Pending.ContainsKey(id) == true
+                    || (native != null && !native.Ready && native.Failure == null))
+                {
+                    status.Pending++;
+                    if (ready) status.AdditionalDetailsPending++;
+                    else status.MissingRecipePending++;
+                }
+            }
+            return status;
+        }
+
         internal static bool GetLatestSelectionForNativePriority(Document doc, out DateTime atUtc,
             out HashSet<int> selectedIds)
         {
@@ -827,6 +1072,7 @@ namespace Analyse
         public static void CaptureDocumentChanges(Document doc, DocumentChangedEventArgs e)
         {
             if (doc == null || e == null || ElementHistoryNativeArchive.Owns(doc)) return;
+            InvalidateCaptureCaches(doc);
             var user = GetCurrentHistoryUser(doc);
             var tx = e.GetTransactionNames()?.FirstOrDefault() ?? "Transaction";
             if (IsIgnoredTransaction(tx)) return;
@@ -949,6 +1195,11 @@ namespace Analyse
             };
             ElementHistoryNativeArchive.GetAuditCounts(doc, out var pendingRoots, out var readyRecipes);
             audit.NativePendingRootsAtDeletion = pendingRoots;
+            if (RestorationCaptureByDocumentKey.TryGetValue(modelKey, out var preparation))
+            {
+                audit.RestorationCapturesPendingAtDeletion = preparation.Pending.Count;
+                audit.SelectionCapturesPendingAtDeletion = preparation.LightPending.Count;
+            }
             audit.NativeReadyRecipesAtDeletion = readyRecipes;
             ElementHistoryNativeArchive.GetPriorityAudit(doc, out var priorityRoots, out var priorityMs);
             audit.NativePriorityPendingRootsAtDeletion = priorityRoots;
@@ -1011,6 +1262,11 @@ namespace Analyse
                         if (native.Ready) audit.NativeReady++; else audit.NativeNotReady++;
                     }
                 }
+            }
+            foreach (var item in audit.Elements)
+            {
+                item.BatchDeletedElementCount = audit.DeletedElementCount;
+                item.BatchWithSnapshotCount = audit.WithSnapshot;
             }
             return audit;
         }
@@ -1624,8 +1880,13 @@ namespace Analyse
             return modelKey + "|element|" + id.GetIdValue().ToString(CultureInfo.InvariantCulture);
         }
 
-        private static ElementSnapshot BuildSnapshot(Element el, bool includeOrientedCorners, int detailedGeometryTimeoutMs = 0)
+        private static ElementSnapshot BuildSnapshot(Element el, bool includeOrientedCorners, int detailedGeometryTimeoutMs = 0,
+            bool includeRestoration = true, Dictionary<int, Dictionary<string, string>> typeParameterCache = null)
         {
+            var captureTimer = Stopwatch.StartNew();
+            bool captured = false;
+            try
+            {
             string family = null;
             string typeName = null;
             var typeId = ElementId.InvalidElementId;
@@ -1652,28 +1913,33 @@ namespace Analyse
             }
 
             var parameters = CaptureWritableParameters(el);
-            AddTypeParametersToSnapshot(el, parameters);
+            AddTypeParametersToSnapshot(el, parameters, typeParameterCache);
 
             string captureFailure = null;
-            var recipe = ElementHistoryReconstruction.Capture(el, reason => captureFailure = reason);
+            var recipe = ElementHistoryReconstruction.Capture(el, reason => captureFailure = reason,
+                includeDetails: includeRestoration, allowHeavyTerrain: false);
+            BoundingBoxXYZ bounds = null;
+            try { bounds = el.get_BoundingBox(null); } catch { }
             var snapshot = new ElementSnapshot
             {
+                CaptureCostKey = HistoryCaptureCosts.Key(el), CaptureClass = el.GetType().Name,
                 CapturedUtc = DateTime.UtcNow,
                 CaptureSource = "document_change_or_manual",
-                SketchDependentUniqueIds = CaptureSketchDependentUniqueIds(el),
+                SketchDependentUniqueIds = includeRestoration ? CaptureSketchDependentUniqueIds(el) : null,
                 UniqueId = el.UniqueId,
                 Category = categoryName,
                 Family = CleanHistoryText(family),
                 TypeName = CleanHistoryText(typeName),
                 TypeId = typeId == null || typeId == ElementId.InvalidElementId ? -1 : typeId.GetIdValue(),
                 Name = el.Name ?? string.Empty,
-                Location = GetLocation(el),
-                BBoxMin = GetBBoxMin(el),
-                BBoxMax = GetBBoxMax(el),
+                Location = GetLocation(el, bounds),
+                BBoxMin = bounds?.Min,
+                BBoxMax = bounds?.Max,
                 DetailCaptureAttempted = includeOrientedCorners,
                 // Restoration data is independent of the visual preview mode.
                 Recipe = recipe,
-                CaptureFailure = captureFailure,
+                CaptureFailure = captureFailure ?? (!includeRestoration && recipe == null
+                    ? "Restauration complexe en attente de préparation différée." : null),
                 SuperComponentUniqueId = (el as FamilyInstance)?.SuperComponent?.UniqueId,
                 FamilyTypeUniqueId = (el as FamilyInstance)?.Symbol?.UniqueId,
                 Parameters = parameters
@@ -1693,7 +1959,14 @@ namespace Analyse
                     snapshot.ObbCorners = GetOrientedCorners(el, deadlineUtc);
             }
 
+            captured = true;
             return snapshot;
+            }
+            finally
+            {
+                HistoryPerformanceLog.RecordElement(el, includeRestoration ? "element_capture_full" : "element_capture_basic",
+                    captureTimer.Elapsed.TotalMilliseconds, captured);
+            }
         }
 
         private static List<string> CaptureSketchDependentUniqueIds(Element element)
@@ -1817,15 +2090,24 @@ namespace Analyse
             };
         }
 
-        private static Dictionary<string, string> CaptureWritableParameters(Element el)
+        private static Dictionary<string, string> CaptureWritableParameters(Element el, bool legacyEnumeration = false,
+            bool useDisplayCache = true)
         {
             var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             if (el == null) return result;
             var captureReadOnlyParameters = el is FamilySymbol;
+            Dictionary<Tuple<int,string,int,string>, string> displayCache = null;
+            int typeKey = -1;
+            if (useDisplayCache)
+            {
+                if (!ParameterDisplayCaches.TryGetValue(el.Document, out displayCache))
+                    ParameterDisplayCaches[el.Document] = displayCache = new Dictionary<Tuple<int,string,int,string>, string>();
+                typeKey = (el is ElementType ? el.Id : el.GetTypeId()).GetIdValue();
+            }
 
             try
             {
-                foreach (var parameter in GetElementParametersForHistory(el))
+                foreach (var parameter in GetElementParametersForHistory(el, legacyEnumeration))
                 {
                     try
                     {
@@ -1834,7 +2116,28 @@ namespace Analyse
                         var name = CleanHistoryText(parameter.Definition?.Name);
                         if (!IsUsefulHistoryText(name) || IsIgnoredParameterName(name)) continue;
 
-                        var value = parameter.HasValue ? ReadParameterValue(parameter) : string.Empty;
+                        string value = string.Empty;
+                        if (parameter.HasValue)
+                        {
+                            // Raw values identify repeated display strings; units are never reformatted off-thread.
+                            string raw = null;
+                            if (displayCache != null)
+                            {
+                                switch (parameter.StorageType)
+                                {
+                                    // Numeric formatting may be overridden per instance: read it directly.
+                                    case StorageType.ElementId: raw = parameter.AsElementId()?.GetIdLongValue().ToString(CultureInfo.InvariantCulture); break;
+                                }
+                            }
+                            var displayKey = raw == null ? null : Tuple.Create(typeKey,
+                                parameter.Id.GetIdLongValue().ToString(CultureInfo.InvariantCulture) + "|" + name,
+                                (int)parameter.StorageType, raw);
+                            if (displayKey == null || !displayCache.TryGetValue(displayKey, out value))
+                            {
+                                value = ReadParameterValue(parameter);
+                                if (displayKey != null && displayCache.Count < 10000) displayCache[displayKey] = value;
+                            }
+                        }
                         if (value == null) value = string.Empty;
                         if (!result.ContainsKey(name))
                             result[name] = value;
@@ -1851,7 +2154,8 @@ namespace Analyse
             return result;
         }
 
-        private static void AddTypeParametersToSnapshot(Element el, Dictionary<string, string> parameters)
+        private static void AddTypeParametersToSnapshot(Element el, Dictionary<string, string> parameters,
+            Dictionary<int, Dictionary<string, string>> cache = null)
         {
             if (el == null || parameters == null || el is FamilySymbol) return;
 
@@ -1859,11 +2163,17 @@ namespace Analyse
             {
                 var typeId = el.GetTypeId();
                 if (typeId == null || typeId == ElementId.InvalidElementId) return;
+                cache = cache ?? GetTypeParameterCache(el.Document);
 
-                var type = el.Document?.GetElement(typeId);
-                if (type == null || type.Id == el.Id || ShouldIgnoreElement(type)) return;
-
-                foreach (var pair in CaptureWritableParameters(type))
+                Dictionary<string, string> typeParameters;
+                if (!cache.TryGetValue(typeId.GetIdValue(), out typeParameters))
+                {
+                    var type = el.Document?.GetElement(typeId);
+                    if (type == null || type.Id == el.Id || ShouldIgnoreElement(type)) return;
+                    typeParameters = CaptureWritableParameters(type);
+                    cache[typeId.GetIdValue()] = typeParameters;
+                }
+                foreach (var pair in typeParameters)
                 {
                     if (string.IsNullOrWhiteSpace(pair.Key)) continue;
                     if (!parameters.ContainsKey(pair.Key))
@@ -1875,7 +2185,7 @@ namespace Analyse
             }
         }
 
-        private static List<Parameter> GetElementParametersForHistory(Element el)
+        private static List<Parameter> GetElementParametersForHistory(Element el, bool includeMapAlways = false)
         {
             var result = new List<Parameter>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -1894,15 +2204,18 @@ namespace Analyse
             {
             }
 
+            bool allParametersRead = false;
             try
             {
                 foreach (Parameter parameter in el.Parameters)
                     AddParameterForHistory(result, seen, parameter);
+                allParametersRead = true;
             }
             catch
             {
             }
 
+            if (allParametersRead && !includeMapAlways) return result;
             try
             {
                 var map = el.ParametersMap;
@@ -2356,7 +2669,7 @@ namespace Analyse
                 if (!string.IsNullOrWhiteSpace(key)) SnapshotByElementId.Remove(key);
             }
 
-            if (ShouldIgnoreSnapshot(snapshot)) return;
+            if (snapshot != null && ShouldIgnoreSnapshot(snapshot)) return;
 
             EnqueueHistoryEvent(new ElementHistoryEvent
             {
@@ -2366,7 +2679,7 @@ namespace Analyse
                 ModelKey = GetDocumentKey(doc),
                 ElementId = id.GetIdValue(),
                 UniqueId = "deleted:" + id.GetIdValue(),
-                Category = snapshot.Category,
+                Category = snapshot?.Category ?? "Non capturé",
                 Family = snapshot?.Family ?? string.Empty,
                 TypeName = snapshot?.TypeName ?? string.Empty,
                 ThumbnailPath = ResolveThumbnailPath(doc, snapshot?.TypeId ?? -1, snapshot?.Family, snapshot?.TypeName),
@@ -2374,7 +2687,11 @@ namespace Analyse
                 User = user,
                 Tx = tx,
                 DeletionAudit = deletionAudit,
-                Delta = BuildDeleteDelta(doc, snapshot)
+                Delta = snapshot == null ? new Dictionary<string, object>
+                {
+                    ["captureFailure"] = "Élément supprimé avant sa capture : restauration indisponible.",
+                    ["snapshotMissing"] = true
+                } : BuildDeleteDelta(doc, snapshot)
             });
         }
 
@@ -3300,14 +3617,14 @@ namespace Analyse
             try { return el?.get_BoundingBox(null)?.Max; } catch { return null; }
         }
 
-        private static XYZ GetLocation(Element el)
+        private static XYZ GetLocation(Element el, BoundingBoxXYZ bounds)
         {
             if (el?.Location is LocationPoint lp) return lp.Point;
             if (el?.Location is LocationCurve lc) return lc.Curve?.Evaluate(0.5, true);
 
             try
             {
-                var bb = el?.get_BoundingBox(null);
+                var bb = bounds;
                 if (bb != null)
                 {
                     return new XYZ(
@@ -3390,6 +3707,7 @@ namespace Analyse
 
         private static void FlushAudit()
         {
+            HistoryPerformanceLog.Flush();
             while (AuditQueue.TryDequeue(out var audit))
             {
                 try

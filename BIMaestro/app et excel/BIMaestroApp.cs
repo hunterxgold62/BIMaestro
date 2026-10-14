@@ -29,6 +29,134 @@ public class BIMaestroApp : IExternalApplication
     private bool _hasShownTimeTrackingError = false;
     private string _lastRibbonTabTitle;
     private DateTime _nextRibbonInspectionUtc = DateTime.MinValue;
+    private DateTime _nextHistoryCaptureUtc = DateTime.MinValue;
+    private System.Windows.Threading.DispatcherTimer _historyWakeTimer;
+    private ExternalEvent _historyWakeEvent;
+    private System.Windows.Window _selectionPreparationWindow;
+    private System.Windows.Controls.TextBlock _selectionPreparationText;
+    private System.Windows.Controls.Button _selectionPreparationStop;
+    private DateTime _selectionPreparationDismissedUtc;
+    private DateTime _selectionPreparationDisplayedUtc;
+    private DateTime? _selectionPreparationCompletedUtc;
+
+    private void UpdateSelectionPreparation(UIApplication app)
+    {
+        var status = Analyse.ElementHistoryTracker.GetSelectionPreparationStatus(app?.ActiveUIDocument?.Document);
+        if (status == null || status.Total == 0)
+        {
+            _selectionPreparationWindow?.Close();
+            return;
+        }
+        if (_selectionPreparationWindow == null && (status.Pending > 0 || status.ExcludedHeavy > 0 || Analyse.HistoryBackgroundWork.Paused)
+            && status.AtUtc != _selectionPreparationDismissedUtc)
+        {
+            _selectionPreparationText = new System.Windows.Controls.TextBlock
+            {
+                Margin = new System.Windows.Thickness(16), TextWrapping = System.Windows.TextWrapping.Wrap
+            };
+            var panel = new System.Windows.Controls.StackPanel();
+            panel.Children.Add(_selectionPreparationText);
+            _selectionPreparationStop = new System.Windows.Controls.Button
+            {
+                Content = "Stop", Margin = new System.Windows.Thickness(16,0,16,12),
+                Padding = new System.Windows.Thickness(12,4,12,4)
+            };
+            _selectionPreparationStop.Click += (sender,args) =>
+            {
+                Analyse.HistoryBackgroundWork.Paused = !Analyse.HistoryBackgroundWork.Paused;
+                Analyse.HistoryBackgroundWork.SelectionRequested = !Analyse.HistoryBackgroundWork.Paused;
+                _nextHistoryCaptureUtc = DateTime.MinValue;
+                _selectionPreparationStop.Content = Analyse.HistoryBackgroundWork.Paused ? "Reprendre" : "Stop";
+                _selectionPreparationText.Text = _selectionPreparationText.Text.Split('\n')[0]
+                    + (Analyse.HistoryBackgroundWork.Paused
+                        ? "\nPréparation arrêtée. Les données déjà capturées sont conservées."
+                        : "\nReprise de la préparation prioritaire…");
+                if (!Analyse.HistoryBackgroundWork.Paused) _historyWakeEvent?.Raise();
+            };
+            panel.Children.Add(_selectionPreparationStop);
+            var window = new System.Windows.Window
+            {
+                Title = "BIMaestro — Préparation de la sélection", Width = 370,
+                SizeToContent = System.Windows.SizeToContent.Height,
+                ResizeMode = System.Windows.ResizeMode.NoResize, ShowInTaskbar = false,
+                WindowStartupLocation = System.Windows.WindowStartupLocation.CenterOwner,
+                ShowActivated = false, Content = panel
+            };
+            new System.Windows.Interop.WindowInteropHelper(window).Owner = app.MainWindowHandle;
+            window.Closed += (sender, args) =>
+            {
+                _selectionPreparationDismissedUtc = _selectionPreparationDisplayedUtc;
+                _selectionPreparationWindow = null;
+                _selectionPreparationCompletedUtc = null;
+            };
+            _selectionPreparationWindow = window;
+            window.Show();
+        }
+        if (_selectionPreparationWindow == null) return;
+        _selectionPreparationDisplayedUtc = status.AtUtc;
+        _selectionPreparationStop.Content = Analyse.HistoryBackgroundWork.Paused ? "Reprendre" : "Stop";
+        _selectionPreparationText.Text = $"{status.RecipesAvailable} / {status.Total} recettes de restauration disponibles.\n"
+            + (Analyse.HistoryBackgroundWork.Paused
+                ? "Préparation arrêtée. Les données déjà capturées sont conservées."
+                : status.Pending > 0
+                ? $"{status.MissingRecipePending} éléments sans recette en préparation.\n{status.AdditionalDetailsPending} éléments déjà préparés : compléments en cours."
+                : $"Préparation terminée. {status.Total - status.RecipesAvailable} éléments sans recette disponible.")
+            + (status.ExcludedHeavy > 0 ? $"\n{status.ExcludedHeavy} éléments contenant un terrain exclus : restauration non préparée." : "");
+        if (status.Pending == 0 && !Analyse.HistoryBackgroundWork.Paused)
+        {
+            _selectionPreparationCompletedUtc ??= DateTime.UtcNow;
+            if (DateTime.UtcNow > _selectionPreparationCompletedUtc.Value.AddSeconds(4)) _selectionPreparationWindow.Close();
+        }
+        else _selectionPreparationCompletedUtc = null;
+    }
+
+    private sealed class HistoryWakeHandler : IExternalEventHandler
+    {
+        private readonly BIMaestroApp _owner;
+        internal HistoryWakeHandler(BIMaestroApp owner) { _owner = owner; }
+        public void Execute(UIApplication app)
+        {
+            try { _owner.ProcessHistoryBackground(app); }
+            catch (Exception ex) { AppendLog("History wake: " + ex); }
+        }
+        public string GetName() => "BIMaestro - Suivi historique léger";
+    }
+
+    private void ProcessHistoryBackground(UIApplication app)
+    {
+        var doc = app?.ActiveUIDocument?.Document;
+        if (doc == null)
+        {
+            Analyse.HistoryBackgroundWork.SelectionRequested = false;
+            _selectionPreparationWindow?.Close();
+            return;
+        }
+        // Also covers already-open documents and a new key after Save As.
+        Analyse.ElementHistoryTracker.ScheduleDeferredPrime(doc);
+        UpdateSelectionPreparation(app);
+        var selection = Analyse.ElementHistoryTracker.GetSelectionPreparationStatus(doc);
+        var immediateSelection = Analyse.HistoryBackgroundWork.SelectionRequested && selection?.Pending > 0;
+        if (DateTime.UtcNow < _nextHistoryCaptureUtc
+            || !(immediateSelection ? Analyse.HistoryBackgroundWork.SelectionCanRun() : Analyse.HistoryBackgroundWork.UserIsIdle())) return;
+        var timer = Stopwatch.StartNew();
+        var passBudgetMs = immediateSelection ? 25 : 200;
+        if (immediateSelection)
+            Analyse.ElementHistoryTracker.ProcessDeferredRestorationCapture(doc, selectionOnly: true);
+        else
+        {
+            Analyse.ElementHistoryTracker.ProcessDeferredPrime(doc);
+            if (timer.ElapsedMilliseconds < passBudgetMs)
+                Analyse.ElementHistoryTracker.ProcessDeferredRestorationCapture(doc);
+        }
+        Analyse.ElementHistoryNativeArchive.GetPriorityAudit(doc, out var priorityRoots, out _);
+        if (timer.ElapsedMilliseconds < passBudgetMs && (priorityRoots > 0 || !Analyse.ElementHistoryTracker.HasPendingBasicInventory(doc)))
+            Analyse.ElementHistoryNativeArchive.ProcessPendingBackground(doc, selectionOnly: immediateSelection);
+        UpdateSelectionPreparation(app);
+        if (Analyse.ElementHistoryTracker.GetSelectionPreparationStatus(doc)?.Pending == 0)
+            Analyse.HistoryBackgroundWork.SelectionRequested = false;
+        _nextHistoryCaptureUtc = DateTime.UtcNow.AddMilliseconds(
+            immediateSelection && Analyse.HistoryBackgroundWork.SelectionRequested ? 100 : 2000);
+    }
     private DateTime _lastRibbonApplyUtc = DateTime.MinValue;
     private int _pendingProjectBrowserViewRefreshes;
     private int _pendingProjectBrowserAppearanceRefreshes;
@@ -116,6 +244,7 @@ public class BIMaestroApp : IExternalApplication
                     install_id = InstallId,
                     revit_version = revitVersion
                 });
+                Telemetry.TrackButton("Tutorial.Catalog", true, new { catalog_version = "1" });
                
             }
             catch (Exception telEx)
@@ -132,6 +261,17 @@ public class BIMaestroApp : IExternalApplication
             application.ViewActivated += OnViewActivatedSafe;
             application.SelectionChanged += OnSelectionChangedSafe;
             application.Idling += OnIdlingSafe;
+            _historyWakeEvent = ExternalEvent.Create(new HistoryWakeHandler(this));
+            _historyWakeTimer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(250)
+            };
+            _historyWakeTimer.Tick += (sender, args) =>
+            {
+                // No model access from a timer: Revit grants the API context through Execute.
+                if (Analyse.HistoryBackgroundWork.SelectionCanRun() || Analyse.HistoryBackgroundWork.UserIsIdle()) _historyWakeEvent?.Raise();
+            };
+            _historyWakeTimer.Start();
 
             // --- Ruban ---
             AppUI.CreateRibbonUI(application);
@@ -162,6 +302,10 @@ public class BIMaestroApp : IExternalApplication
 
     public Result OnShutdown(UIControlledApplication application)
     {
+        _historyWakeTimer?.Stop();
+        _selectionPreparationWindow?.Close();
+        _historyWakeEvent?.Dispose();
+        _historyWakeEvent = null;
         try
         {
             BIMaestro.Codex.CodexCommand.Shutdown();
@@ -170,6 +314,7 @@ public class BIMaestroApp : IExternalApplication
             BIMaestro.MepBooster.MepBoosterService.Shutdown();
             BIMaestro.ViewHover.ViewDeckService.Shutdown();
             Couleur.AppearanceOnboarding.Shutdown();
+            BIMaestro.Tutorials.TutorialAnalytics.Shutdown();
             try { Telemetry.FlushAsync().GetAwaiter().GetResult(); }
             catch { }
             finally { Telemetry.Shutdown(); }
@@ -177,6 +322,7 @@ public class BIMaestroApp : IExternalApplication
             Page.SecretGifShortcutManager.Shutdown();
             BIMaestro.UI.RadialGlobalHotkeyService.Shutdown();
             Analyse.ElementHistoryTracker.Stop();
+            Analyse.ElementHistoryNativeArchive.Shutdown();
             ExcelLogger.Shutdown();
             WpfApp?.Shutdown();
         }
@@ -207,13 +353,7 @@ public class BIMaestroApp : IExternalApplication
             BIMaestro.MepBooster.MepBoosterService.ProcessIdling(sender, e);
             Page.SecretGifShortcutManager.PollKeyboardState();
             BIMaestro.UI.RadialGlobalHotkeyService.ProcessPending(_uiApp);
-            Analyse.ElementHistoryNativeArchive.ProcessPendingBackground(_uiApp.ActiveUIDocument?.Document);
-            if (Analyse.ElementHistoryNativeArchive.ShouldRetrySelectedBackgroundSoon(_uiApp.ActiveUIDocument?.Document))
-            {
-                e.SetRaiseWithoutDelay();
-                return;
-            }
-            Analyse.ElementHistoryTracker.ProcessDeferredPrime(_uiApp.ActiveUIDocument?.Document);
+            ProcessHistoryBackground(_uiApp);
             RefreshProjectBrowserActiveViewWhenNeeded();
             BIMaestro.ViewHover.ViewHoverPreviewService.ProcessPending(_uiApp);
             BIMaestro.ViewHover.ViewDeckService.ProcessIdling(_uiApp);
@@ -377,10 +517,17 @@ public class BIMaestroApp : IExternalApplication
             var timer = Stopwatch.StartNew();
             var doc = args.GetDocument();
             var selectedIds = args.GetSelectedElements();
+            if (selectedIds.Count == 0) _selectionPreparationWindow?.Close();
             var extractionMs = timer.Elapsed.TotalMilliseconds;
             BIMaestro.ViewHover.ViewDeckChangeService.CaptureSelection(doc, selectedIds);
             var viewDeckMs = timer.Elapsed.TotalMilliseconds - extractionMs;
             Analyse.ElementHistoryTracker.CaptureSelectedElementDetails(doc, selectedIds);
+            Analyse.HistoryBackgroundWork.SelectionRequested = selectedIds.Count > 0;
+            if (selectedIds.Count > 0)
+            {
+                _nextHistoryCaptureUtc = DateTime.MinValue;
+                _historyWakeEvent?.Raise();
+            }
             var afterHistoryMs = timer.Elapsed.TotalMilliseconds;
             Analyse.ElementHistoryHoverInfoService.OnSelectionChanged(
                 doc,

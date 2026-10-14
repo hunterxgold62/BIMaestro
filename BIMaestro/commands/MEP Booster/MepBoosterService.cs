@@ -386,7 +386,8 @@ namespace BIMaestro.MepBooster
                 try
                 {
                     if (doc.IsReadOnly) throw new InvalidOperationException("Le document est en lecture seule.");
-                    BoosterOrientation.Run(uidoc, ids, _preview);
+                    Licensing.OperationTelemetry.Observe(app, "MepBooster", "MEP Booster", "copy_orientation", false,
+                        () => BoosterOrientation.Run(uidoc, ids, _preview));
                 }
                 catch (Autodesk.Revit.Exceptions.OperationCanceledException) { }
                 catch (Exception ex) { TaskDialog.Show("MEP Booster — copie annulée", ex.Message); }
@@ -416,7 +417,8 @@ namespace BIMaestro.MepBooster
                 bool flip = _flip;
                 // Capture local references: DocumentChanged closes the palette during Commit.
                 var parts = _parts;
-                try { BoosterOperations.Apply(doc, parts, angle, flip);
+                try { Licensing.OperationTelemetry.Observe(app, "MepBooster", "MEP Booster", "apply_orientation", false,
+                    () => BoosterOperations.Apply(doc, parts, angle, flip));
                     TutorialProgress?.Invoke(doc, parts.Select(part => part.Id), "applied", angle); }
                 catch (Exception ex)
                 {

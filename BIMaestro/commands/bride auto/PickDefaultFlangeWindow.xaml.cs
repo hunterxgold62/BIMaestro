@@ -114,9 +114,10 @@ namespace Modification
 
     /// <summary>Bouton “Choisir la bride” : ouvre la fenêtre, enregistre le choix pour la session.</summary>
     [Transaction(TransactionMode.ReadOnly)]
-    public class PickDefaultFlange : IExternalCommand
+    public class PickDefaultFlange : Licensing.BaseTrackedCommand
     {
-        public Result Execute(ExternalCommandData data, ref string message, ElementSet elements)
+        protected override string ButtonId => "PickDefaultFlange";
+        protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
             var doc = data.Application.ActiveUIDocument.Document;
 

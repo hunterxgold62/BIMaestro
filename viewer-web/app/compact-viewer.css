@@ -1,0 +1,43 @@
+.compact-ui .viewport .view-toolbar { top:12px;left:12px;display:flex;flex-direction:column;align-items:flex-start;gap:5px;z-index:6;width:40px;max-width:none;flex-wrap:nowrap; }
+.compact-ui .viewport .view-toolbar button { width:38px;min-width:38px;height:38px;padding:9px;justify-content:flex-start;gap:8px;white-space:nowrap;overflow:hidden;font-size:0;border-radius:7px;transition:background .15s; }
+.compact-ui .viewport .view-toolbar button svg { width:18px;height:18px;flex:none; }
+.compact-ui .viewport .view-toolbar button:hover,.compact-ui .viewport .view-toolbar button:focus-visible { width:max-content;max-width:min(330px,calc(100vw - 80px));font-size:12px; }
+.compact-ui .viewport .view-toolbar button[aria-expanded=true] { background:#186f55;border-color:#43b58a; }
+.compact-ui .viewport .viewer-left-column { top:236px;left:12px;max-width:calc(100% - 24px);max-height:calc(100% - 310px);overflow:visible;z-index:6; }
+.compact-ui .viewport .appearance-toolbar { width:40px;min-width:40px;padding:2px;gap:2px;order:0; }
+.compact-ui .viewport .appearance-toolbar button { min-width:34px;width:34px;height:34px;padding:8px;gap:8px; }
+.compact-ui .viewport .appearance-toolbar span { display:inline-block;max-width:0;opacity:0;overflow:hidden;white-space:nowrap;transition:opacity .15s; }
+.compact-ui .viewport .appearance-toolbar:hover,.compact-ui .viewport .appearance-toolbar:focus-within { width:max-content; }
+.compact-ui .viewport .appearance-toolbar:hover button,.compact-ui .viewport .appearance-toolbar:focus-within button { width:100%; }
+.compact-ui .viewport .appearance-toolbar:hover span,.compact-ui .viewport .appearance-toolbar:focus-within span { max-width:160px;opacity:1; }
+.compact-ui .viewport .viewer-mini-map-tools { order:1; }
+.compact-ui .viewport .navigation-switch { top:12px;bottom:auto;padding:2px;z-index:3; }
+.compact-ui .viewport .navigation-switch button { padding:9px;min-width:34px; }
+.compact-ui .viewport .navigation-switch span { display:inline-block;max-width:0;opacity:0;overflow:hidden;white-space:nowrap; }
+.compact-ui .viewport .navigation-switch button:hover span,.compact-ui .viewport .navigation-switch button:focus-visible span { max-width:140px;opacity:1; }
+.compact-ui .viewer-context-bar { position:absolute;left:66px;bottom:12px;z-index:7;max-width:calc(100% - 126px);display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px;border:1px solid #476151;border-radius:9px;background:#10211ef2;color:#e4eee9;box-shadow:0 5px 18px #0003; }
+.compact-ui .context-lot summary,.compact-ui .navigation-help summary { display:flex;align-items:center;gap:7px;list-style:none;padding:8px;border-radius:6px;cursor:pointer;font-size:12px; }
+.compact-ui .context-lot summary::-webkit-details-marker,.compact-ui .navigation-help summary::-webkit-details-marker { display:none; }
+.compact-ui .context-lot[open] summary { background:#264036; }.compact-ui .context-lot[open] summary svg { transform:rotate(-90deg); }
+.compact-ui .context-lot .reservation-lot-toolbar { left:0;bottom:calc(100% + 8px);max-width:min(450px,calc(100vw - 90px));min-width:260px;font-size:12px;background:#10211ef5;color:#e4eee9;border:1px solid #476151; }
+.compact-ui .context-lot .reservation-lot-toolbar select,.compact-ui .context-lot .reservation-lot-toolbar button { background:#1b2d25;color:#e4eee9;border-color:#476151;font-size:12px; }
+.compact-ui .navigation-help .view-hint { display:block;position:absolute;bottom:calc(100% + 8px);left:0;transform:none;max-width:min(520px,calc(100vw - 90px));width:max-content;white-space:normal;line-height:1.7; }
+.compact-ui .viewer-context-bar .follow-banner { position:static;width:auto;max-width:none;max-height:none;overflow:visible;padding:0 0 0 10px;background:transparent;border:0;border-left:1px solid #476151;box-shadow:none;display:flex;gap:12px;align-items:center;flex-wrap:wrap; }
+.compact-ui .follow-card-heading { gap:10px; }.compact-ui .follow-step small { font-size:8px; }.compact-ui .follow-step strong { font-size:12px; }
+.compact-ui .follow-playback { margin:0;gap:8px; }.compact-ui .follow-playback label { font-size:0; }.compact-ui .follow-playback button,.compact-ui .follow-playback select { font-size:11px;padding:7px; }
+.compact-ui .follow-stop { font-size:10px; }
+.compact-ui .follow-options { border:0;padding:0;margin:0;font-size:10px; }
+.compact-ui .follow-options[open] { position:absolute;bottom:calc(100% + 8px);right:0;width:min(330px,calc(100vw - 90px));padding:12px;border:1px solid #476151;border-radius:8px;background:#10211ef8;max-height:min(350px,60vh);overflow:auto; }
+.compact-ui .follow-options .follow-step span { white-space:normal; }
+.compact-ui .equipment-stop-toggle { display:flex;align-items:center;gap:5px;font-size:10px;color:#b4c4bc; }.compact-ui .equipment-pause-note { flex-basis:100%;color:#efcf91;font-size:11px; }
+.compact-ui .flow-end-result { position:absolute;left:66px;bottom:76px;z-index:7;width:min(330px,calc(100% - 126px));padding:12px;border:1px solid #476151;border-radius:8px;background:#10211ef5;color:#e4eee9;font-size:12px; }.flow-end-result p { margin:7px 0;line-height:1.5; }.flow-end-result small { color:#9fc6b5; }.flow-end-result>div { display:flex;gap:8px;margin-top:10px; }.flow-end-result button { padding:6px 8px;border:1px solid #476151;border-radius:5px;background:#1b2d25;color:#e4eee9;cursor:pointer; }.flow-end-result button:disabled { opacity:.4;cursor:default; }
+.compact-ui .viewport .measure-controls,.compact-ui .viewport .section-controls,.compact-ui .viewport .lots-panel,.compact-ui .viewport .markup-list { top:12px;left:66px;max-width:calc(100% - 126px);max-height:calc(100% - 100px); }
+@media(max-width:700px) { .compact-ui .viewer-context-bar { left:60px;max-width:calc(100% - 116px);gap:4px;padding:4px; }.compact-ui .viewer-context-bar .follow-banner { gap:6px;padding-left:6px; }.compact-ui .follow-options summary { font-size:10px; }.compact-ui .follow-step small { max-width:110px; }.compact-ui .viewport .viewer-mini-map-tools { max-width:200px; } }
+
+/* Plan local beside the left tool dock, independent of rendering controls. */
+.compact-ui .viewport .viewer-mini-map-tools { position:absolute;top:-224px;left:54px;max-width:min(280px,calc(100vw - 140px)); }
+.compact-ui .viewport .viewer-mini-map { width:100%; }
+.compact-ui .viewer-mini-map header strong { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.compact-ui .room-location { display:flex;flex-direction:column;padding:0 8px;font-size:12px;border-right:1px solid #476151;max-width:180px;overflow:hidden;text-overflow:ellipsis; }
+.compact-ui .room-location small { font-size:10px;color:#9cbaad; }
+@media(max-width:700px) { .compact-ui .viewport .viewer-mini-map-tools { max-width:180px; }.compact-ui .room-location { max-width:110px; } }

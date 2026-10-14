@@ -16,6 +16,8 @@ namespace Visualisation
             var commandData = data;
             var wnd = new ExportWindow(commandData);
             wnd.ShowDialog();  // Fenêtre modale pour rester dans le contexte Revit
+            if (wnd.OperationCounts != null)
+                RecordOperationResult(ButtonId, "export_dwg", false, wnd.OperationCounts);
             return Result.Succeeded;
         }
 

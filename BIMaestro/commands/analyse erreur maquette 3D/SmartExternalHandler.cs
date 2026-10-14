@@ -74,7 +74,9 @@ namespace Analyse
                 {
                     case SmartAction.ScanBatch: Session?.Advance(); break;
                     case SmartAction.RefreshSetup: SetupRefreshed?.Invoke(SmartScanSetup.Capture(ui)); break;
-                    case SmartAction.TutorialCorrect: BIMaestro.Tutorials.DemoClashExercise.Correct(OwnerDocument); break;
+                    case SmartAction.TutorialCorrect:
+                        Licensing.OperationTelemetry.Observe(app, "SmartClashCommand", "Clash 3D", "tutorial_correction", true,
+                            () => BIMaestro.Tutorials.DemoClashExercise.Correct(OwnerDocument)); break;
                     case SmartAction.RestoreView: Restore(ui); break;
                     case SmartAction.ToggleContext: ToggleContext(ui); break;
                     case SmartAction.CreateReservation: CreateReservation(ui, FocusIssue); break;
@@ -187,6 +189,8 @@ namespace Analyse
             }
             var instance = Modification.ReservationAutoV3Command.CreateForClash(ui.Document, source, host, link, trainingConfig, trainingPersonal);
             CreatedReservationId = instance.Id;
+            Licensing.OperationTelemetry.Track("SmartClashCommand", "Clash 3D", "create_reservation", TutorialReservation,
+                new Dictionary<string, int> { ["reservations_created"] = 1 });
             if (TutorialReservation)
             {
                 using (var tx = new Transaction(ui.Document, "BIMaestro - Repérer la réservation d'essai"))

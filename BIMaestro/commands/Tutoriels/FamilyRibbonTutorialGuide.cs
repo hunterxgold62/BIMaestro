@@ -127,7 +127,7 @@ namespace BIMaestro.Tutorials
             stack.Children.Add(buttons);
             _previous = AddButton(buttons, "Précédent", Previous);
             _next = AddButton(buttons, "Suivant", Next);
-            AddButton(buttons, "Quitter", Close);
+            AddButton(buttons, "Quitter", () => { TutorialAnalytics.End("family-browser", "quit"); Close(); });
             _cardWindow.Closed += (_, __) => Close();
 
             _outlineWindow = new Window
@@ -221,6 +221,7 @@ namespace BIMaestro.Tutorials
             if (!_completed) return;
             if (_index == _steps.Length - 1)
             {
+                TutorialAnalytics.Complete("family-browser");
                 Close();
                 DemoTourCompletion.Show(_revitHandle, "family-browser", "Tu as terminé le tutoriel Navigateur de familles, y compris le placement depuis la rosace.");
                 return;
@@ -252,6 +253,7 @@ namespace BIMaestro.Tutorials
             if (_index == KeyboardShortcutStep)
                 _keyboardDialogSeen = false;
             DemoStep step = _steps[_index];
+            TutorialAnalytics.Step("family-browser", _index, step.Title);
             _title.Text = $"{_index + 1}/{_steps.Length} · {step.Title}";
             _text.Text = step.Text;
             _previous.IsEnabled = _index > FirstStep;

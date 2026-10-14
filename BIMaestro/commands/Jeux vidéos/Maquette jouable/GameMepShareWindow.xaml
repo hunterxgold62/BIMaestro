@@ -39,7 +39,7 @@
             <Border Background="#FF132229" BorderBrush="#FF263A42" BorderThickness="1" Padding="12" Margin="0,0,7,0">
                 <StackPanel>
                     <TextBlock Text="EXPIRATION" Foreground="#FF718991" FontSize="10"/>
-                    <TextBlock Text="30 jours · révocable" Margin="0,4,0,14"/>
+                    <TextBlock Text="Maquette et liens : 30 jours&#10;Résas et annotations : 5 mois" TextWrapping="Wrap" Margin="0,4,0,14"/>
                     <TextBlock Text="ALLÈGEMENT WEB" Foreground="#FF52D9D3" FontSize="11"/>
                     <TextBlock x:Name="OptimizationText" Text="Analyse des éléments et calcul du gain en arrière-plan…" TextWrapping="Wrap" Margin="0,8,0,12"/>
                     <Button x:Name="LightenButton" Content="Alléger les détails" IsEnabled="False" Click="LightenButton_Click" Margin="0,0,0,10"/>
@@ -74,7 +74,12 @@
                     <DockPanel><Button DockPanel.Dock="Right" Content="Copier" Click="CopyEditorButton_Click"/><TextBox x:Name="EditorUrlTextBox" IsReadOnly="True"/></DockPanel>
                     <WrapPanel Margin="0,16,0,0">
                         <Button Content="Prolonger de 30 jours" Click="ExtendButton_Click"/>
-                        <Button Content="Révoquer" Foreground="#FFFF928A" Click="RevokeButton_Click"/>
+                        <ComboBox x:Name="DeletionScopeComboBox" SelectedIndex="1" MinWidth="170" Margin="0,0,8,0">
+                            <ComboBoxItem Content="Résas et annotations" Tag="data"/>
+                            <ComboBoxItem Content="Maquette 3D uniquement" Tag="model"/>
+                            <ComboBoxItem Content="Les deux" Tag="both"/>
+                        </ComboBox>
+                        <Button Content="Supprimer…" Foreground="#FFFF928A" Click="RevokeButton_Click"/>
                     </WrapPanel>
                 </StackPanel>
             </Border>

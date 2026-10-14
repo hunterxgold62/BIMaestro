@@ -66,7 +66,8 @@ export type MepDiagnostic = { key: string; title: string; explanation: string; e
 export type MepGraph = { connectors: MepConnector[]; connections: MepConnection[]; elements: MepElement[]; valves: MepValve[]; sources: MepSource[]; systems: MepSystem[]; directionConstraints?: unknown[]; engineVersion?: string; allowImplicitTerminals?: boolean; analysisReference?: MepAnalysisReference; impactReport?: MepImpactReport; diagnostics?: MepDiagnostic[] };
 export type MepReplay = { schemaVersion: number; documentLabel: string; graph: MepGraph };
 export type ViewerDoor = { key: string; center: number[]; hinge: number[]; secondHinge: number[] };
-export type ViewerConfig = { spawn: number[]; eyeHeight: number; initialYaw: number; doors: ViewerDoor[] };
+export type ViewerRoom = { key: string; name: string; number: string; levelName: string; kind: 'room' | 'space'; baseElevation: number; declaredTop: number; navigationTop: number; loops: number[][][] };
+export type ViewerConfig = { rooms?: ViewerRoom[]; spawn: number[]; eyeHeight: number; initialYaw: number; doors: ViewerDoor[] };
 
 export type ViewerPackage = {
   manifest: z.infer<typeof manifestSchema>;

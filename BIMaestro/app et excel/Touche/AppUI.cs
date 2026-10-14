@@ -809,7 +809,13 @@ public partial class AppUI : IExternalApplication
             Margin = new Thickness(0, 10, 0, 0),
             MaxWidth = 320
         });
-        bool hasExample = AddToolTipExample(content, info.Id);
+        bool hasExample;
+        if (info.Id == "ResérvationAuto")
+        {
+            content = CreateReservationToolTipCard();
+            hasExample = true;
+        }
+        else hasExample = AddToolTipExample(content, info.Id);
 
         string expanded = info.PushButton.LongDescription ?? string.Empty;
         int firstLineEnd = expanded.IndexOfAny(new[] { '\r', '\n' });

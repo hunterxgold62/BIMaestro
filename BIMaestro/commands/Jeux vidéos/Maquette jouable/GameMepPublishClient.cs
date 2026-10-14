@@ -18,6 +18,7 @@ namespace BIMaestro.VideoGames
         public string EditorToken { get; set; } = string.Empty;
         public DateTime ExpiresAtUtc { get; set; }
         public int Revision { get; set; }
+        public int PendingRevision { get; set; }
         public string ViewerUrl => string.IsNullOrWhiteSpace(ViewerToken)
             ? string.Empty
             : "https://viewer.bimaestro.fr/#/share/" + ViewerToken;
@@ -47,6 +48,29 @@ namespace BIMaestro.VideoGames
             GameSceneData scene,
             string name,
             IProgress<GameMepPublishProgress> progress,
+            CancellationToken cancellationToken)
+        {
+            if (!scene.MepGraph.ScenarioCanPersist)
+                throw new InvalidOperationException(string.IsNullOrWhiteSpace(scene.MepGraph.ScenarioPersistenceError)
+                    ? "Enregistrez le fichier Revit avant de publier un partage durable."
+                    : scene.MepGraph.ScenarioPersistenceError);
+            try { return await PublishCoreAsync(scene, name, progress, cancellationToken); }
+            catch
+            {
+                var interrupted = Load(scene.MepGraph);
+                if (interrupted.PendingRevision > 0 && !string.IsNullOrWhiteSpace(interrupted.PublicationId))
+                {
+                    try { await PostAsync(new { action = "manage", command = "abort-upload",
+                        publicationId = interrupted.PublicationId, revision = interrupted.PendingRevision }, CancellationToken.None); }
+                    catch { /* The server lease expires if cancellation cannot reach it. */ }
+                    interrupted.PendingRevision = 0; Save(scene.MepGraph, interrupted);
+                }
+                throw;
+            }
+        }
+
+        private static async Task<GameMepShareState> PublishCoreAsync(
+            GameSceneData scene, string name, IProgress<GameMepPublishProgress> progress,
             CancellationToken cancellationToken)
         {
             progress?.Report(new GameMepPublishProgress
@@ -98,6 +122,7 @@ namespace BIMaestro.VideoGames
 
             // Keep the returned tokens even if a later asset transfer is interrupted.
             state.PublicationId = publicationId;
+            state.PendingRevision = revision;
             if (!string.IsNullOrWhiteSpace(viewerToken)) state.ViewerToken = viewerToken;
             if (!string.IsNullOrWhiteSpace(editorToken)) state.EditorToken = editorToken;
             Save(scene.MepGraph, state);
@@ -135,6 +160,7 @@ namespace BIMaestro.VideoGames
             }, cancellationToken);
             state.PublicationId = publicationId;
             state.Revision = revision;
+            state.PendingRevision = 0;
             if (!string.IsNullOrWhiteSpace(viewerToken)) state.ViewerToken = viewerToken;
             if (!string.IsNullOrWhiteSpace(editorToken)) state.EditorToken = editorToken;
             DateTime expires;
@@ -205,15 +231,17 @@ namespace BIMaestro.VideoGames
             Save(graph, state);
         }
 
-        public static async Task RevokeAsync(
+        public static async Task DeleteAsync(
             GameMepGraphData graph,
             GameMepShareState state,
+            string scope,
             CancellationToken cancellationToken)
         {
             try { await PostAsync(new
             {
                 action = "manage",
-                command = "revoke",
+                command = "delete",
+                scope,
                 publicationId = state.PublicationId
             }, cancellationToken); }
             catch (PublicationRequestException exception) when (
@@ -221,7 +249,8 @@ namespace BIMaestro.VideoGames
             {
                 // Already deleted remotely: clearing the local share is still required.
             }
-            state.PublicationId = string.Empty;
+            if (scope == "data") return;
+            if (scope == "both") state.PublicationId = string.Empty;
             state.ViewerToken = string.Empty;
             state.EditorToken = string.Empty;
             state.Revision = 0;

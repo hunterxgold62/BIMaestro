@@ -80,6 +80,7 @@ namespace Couleur
 
         internal static void StartIntro(IntPtr owner, string tourId = "colors")
         {
+            BIMaestro.Tutorials.TutorialAnalytics.Ensure(tourId);
             _intro?.Close();
             _introTourId = tourId;
             _intro = new IntroWindow(owner, tourId);
@@ -170,7 +171,7 @@ namespace Couleur
                 layout.Children.Add(_hint);
                 var quit = new Button { Content = "Quitter le guide", HorizontalAlignment = HorizontalAlignment.Right,
                     Padding = new Thickness(10, 5, 10, 5), Margin = new Thickness(0, 8, 0, 0) };
-                quit.Click += (_, __) => Close();
+                quit.Click += (_, __) => { BIMaestro.Tutorials.TutorialAnalytics.End(_tourId, "quit"); Close(); };
                 layout.Children.Add(quit);
                 _timer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher)
                 { Interval = TimeSpan.FromMilliseconds(700) };
