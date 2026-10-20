@@ -63,6 +63,7 @@ namespace BIMaestro.PropertiesAppearance
             IntPtr result = DefSubclassProc(h, message, w, l);
             if (message == 0x82) { Dispose(); return result; }
             if (!paint || _disposed || _cells.Count == 0 || Error != null) return result;
+            long measured = PropertiesAppearanceMetrics.Begin();
             try
             {
                 if (!_grid.IsCurrent()) return result;
@@ -82,8 +83,9 @@ namespace BIMaestro.PropertiesAppearance
                     foreach (var cell in _cells)
                     {
                         if (!cell.Header && !_grid.CanStyle(cell.Row)) continue;
-                        for (uint col = 1; col <= (cell.Header ? 1 : 2); col++)
+                        for (uint col = 1; col <= 3; col++)
                         {
+                            if (cell.Header && col == 2) continue;
                             if (editing && col == 2) continue;
                             Transform(_grid.Bounds(cell.Row, col), dirty, _grid.TextColor(cell.Row, col), cell);
                         }
@@ -96,6 +98,7 @@ namespace BIMaestro.PropertiesAppearance
                 finally { ReleaseDC(h, dc); }
             }
             catch (Exception ex) { Error = "Habillage suspendu : " + ex.Message; RemoveWindowSubclass(h, _callback, new UIntPtr(HookId)); RedrawWindow(h, IntPtr.Zero, IntPtr.Zero, 0x105); }
+            finally { PropertiesAppearanceMetrics.End("Paint", measured); }
             return result;
         }
         private void Transform(NativePropertiesGrid.Rect cell, NativePropertiesGrid.Rect dirty, uint nativeText, CellPlan plan)

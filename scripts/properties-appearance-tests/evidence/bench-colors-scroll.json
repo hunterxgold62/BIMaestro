@@ -1,0 +1,36 @@
+{
+  "Label": "colors-scroll",
+  "WallMs": 67958.5364,
+  "CpuMs": 67984.375,
+  "CpuOneCorePercent": 100.03802112489286,
+  "MemoryDeltaMB": 10.22265625,
+  "Metrics": {
+    "CellReads": 26383,
+    "Timings": {
+      "Layout": {
+        "Count": 115,
+        "MeanMs": 1.08,
+        "P95Ms": 1.555,
+        "MaxMs": 8.332
+      },
+      "Refresh": {
+        "Count": 115,
+        "MeanMs": 571.159,
+        "P95Ms": 620.356,
+        "MaxMs": 700.43
+      },
+      "DispatcherLag": {
+        "Count": 116,
+        "MeanMs": 565.838,
+        "P95Ms": 1201.896,
+        "MaxMs": 1718.618
+      },
+      "Paint": {
+        "Count": 2,
+        "MeanMs": 2.744,
+        "P95Ms": 4.165,
+        "MaxMs": 4.165
+      }
+    }
+  }
+}

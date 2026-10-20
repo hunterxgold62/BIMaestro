@@ -31,7 +31,7 @@ namespace BIMaestro.PropertiesAppearance
                 if (_event == null) _event = ExternalEvent.Create(_handler);
                 PropertiesAppearanceService.ReloadSaved();
                 ThemeManager.EnsureThemeLoaded();
-                _window = new PropertiesAppearanceWindow(AppearanceContext.Capture(app));
+                _window = new PropertiesAppearanceWindow(AppearanceContext.ForEditor(app));
                 new WindowInteropHelper(_window) { Owner = app.MainWindowHandle };
                 _window.Closed += (_, __) => { _window = null; if (_shuttingDown) return; try { Request(app => { PropertiesAppearanceService.CancelPreview(); PropertiesAppearanceService.ProcessIdling(app); }); } catch { PropertiesAppearanceService.CancelPreview(); } };
                 _window.Show();

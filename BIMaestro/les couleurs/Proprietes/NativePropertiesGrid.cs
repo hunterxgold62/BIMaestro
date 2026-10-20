@@ -18,12 +18,14 @@ namespace BIMaestro.PropertiesAppearance
         private static IntPtr _og, _mfc;
         private static bool _checked;
         private static string _failure;
+        private static readonly HashSet<IntPtr> VerifiedTypeImages = new HashSet<IntPtr>();
         private static FromHandle _from;
         private static Count _rows, _columns;
         private static Cell _value, _style;
         private static StyleFlag _readOnly, _enabled;
         private static StyleColor _text;
         private static CellRect _rect;
+        private static MoveRowsDelegate _move;
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate IntPtr FromHandle(IntPtr h);
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate uint Count(IntPtr p);
@@ -32,6 +34,18 @@ namespace BIMaestro.PropertiesAppearance
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate uint StyleColor(IntPtr p);
         // MSVC x64 member return: this in RCX, CRect return storage in RDX.
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate IntPtr CellRect(IntPtr p, ref Rect rect, uint row, uint col);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate int MoveRowsDelegate(IntPtr p, uint from, uint to, uint destination, uint flags, int command);
+        [DllImport("user32.dll")] private static extern IntPtr GetFocus();
+        [DllImport("user32.dll")] private static extern bool IsChild(IntPtr parent, IntPtr child);
+        [DllImport("user32.dll")] private static extern bool RedrawWindow(IntPtr window, IntPtr rect, IntPtr region, uint flags);
+        internal bool IsEditing => IsChild(Window, GetFocus());
+        internal bool MoveRows(uint from, uint to, uint destination)
+        {
+            if (!IsCurrent() || IsEditing || from < 1 || to > RowCount || to < from || destination < 1 || destination > RowCount) return false;
+            if (_move == null) _move = Function<MoveRowsDelegate>("?MoveRows@CGXGridCore@@UEAAHKKKIW4GXCmdType@@@Z");
+            return _move(Core, from, to, destination, 0, 0) != 0;
+        }
+        internal void Redraw() => RedrawWindow(Window, IntPtr.Zero, IntPtr.Zero, 0x105);
         internal delegate bool EnumProc(IntPtr h, IntPtr p);
         [StructLayout(LayoutKind.Sequential)] internal struct Rect { internal int Left, Top, Right, Bottom; }
         [StructLayout(LayoutKind.Sequential)] private struct Mbi { public IntPtr Base, AllocationBase; public uint AllocationProtect; public ushort PartitionId; public UIntPtr Size; public uint State, Protect, Type; }
@@ -109,7 +123,14 @@ namespace BIMaestro.PropertiesAppearance
         }
 
         internal bool IsCurrent() => _from(Window) == _object && Ptr(Core) == _coreVtable;
-        internal string Value(uint row, uint col) => Wide(Ptr(_value(Core, row, col)));
+        internal bool RefreshIfCurrent()
+        {
+            if (!IsWindowVisible(Window) || !IsCurrent()) return false;
+            RowCount = _rows(Core); uint columns = _columns(Core);
+            return RowCount <= 2000 && columns >= 3 && columns <= 10;
+        }
+
+        internal string Value(uint row, uint col) { if (PropertiesAppearanceMetrics.Enabled) PropertiesAppearanceMetrics.CellReads++; return Wide(Ptr(_value(Core, row, col))); }
         internal Rect Bounds(uint row, uint col)
         {
             var rect = new Rect(); _rect(Core, ref rect, row, col);
@@ -134,7 +155,11 @@ namespace BIMaestro.PropertiesAppearance
             var vtable = Ptr(obj); var col = Ptr(IntPtr.Subtract(vtable, 8));
             if (Int(col) != 1) throw new NotSupportedException("RTTI natif non reconnu.");
             var image = IntPtr.Subtract(col, Int(col, 20));
-            if (!Process.GetCurrentProcess().Modules.Cast<ProcessModule>().Any(m => m.BaseAddress == image)) throw new NotSupportedException("Module RTTI inconnu.");
+            if (!VerifiedTypeImages.Contains(image))
+            {
+                if (!Process.GetCurrentProcess().Modules.Cast<ProcessModule>().Any(m => m.BaseAddress == image)) throw new NotSupportedException("Module RTTI inconnu.");
+                VerifiedTypeImages.Add(image);
+            }
             int offset = Int(col, 4); if (offset < 0 || offset > 8192) throw new NotSupportedException("Objet natif non reconnu.");
             var complete = IntPtr.Subtract(obj, offset); var hierarchy = IntPtr.Add(image, Int(col, 16));
             int count = Int(hierarchy, 8); if (count < 1 || count > 200) throw new NotSupportedException("Hiérarchie native non reconnue.");

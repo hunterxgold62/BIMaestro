@@ -27,12 +27,21 @@ namespace BIMaestro.PropertiesAppearance
         public AppearanceRule Copy() => new AppearanceRule { Kind = Kind, TargetKey = TargetKey, Label = Label, Light = Light.Copy(), Dark = Dark.Copy() };
     }
 
+    public sealed class AppearanceLayout
+    {
+        public List<string> Groups { get; set; } = new List<string>();
+        public Dictionary<string, List<string>> Parameters { get; set; } = new Dictionary<string, List<string>>();
+        [JsonIgnore] public bool IsEmpty => Groups.Count == 0 && !Parameters.Any(p => p.Value.Count > 0);
+        public AppearanceLayout Copy() => new AppearanceLayout { Groups = Groups.ToList(), Parameters = Parameters.ToDictionary(p => p.Key, p => p.Value.ToList()) };
+    }
+
     public sealed class AppearanceProfile
     {
         public string Key { get; set; } = "all";
         public string Name { get; set; } = "Toutes les propriétés";
         public List<AppearanceRule> Rules { get; set; } = new List<AppearanceRule>();
-        public AppearanceProfile Copy() => new AppearanceProfile { Key = Key, Name = Name, Rules = Rules.Select(r => r.Copy()).ToList() };
+        public AppearanceLayout Layout { get; set; } = new AppearanceLayout();
+        public AppearanceProfile Copy() => new AppearanceProfile { Key = Key, Name = Name, Rules = Rules.Select(r => r.Copy()).ToList(), Layout = Layout.Copy() };
         public override string ToString() => Name;
     }
 
@@ -108,6 +117,9 @@ namespace BIMaestro.PropertiesAppearance
             foreach (var p in value.Profiles)
             {
                 p.Rules = p.Rules ?? new List<AppearanceRule>();
+                p.Layout = p.Layout ?? new AppearanceLayout(); p.Layout.Groups = p.Layout.Groups ?? new List<string>();
+                p.Layout.Parameters = p.Layout.Parameters ?? new Dictionary<string, List<string>>();
+                foreach (var key in p.Layout.Parameters.Keys.ToArray()) p.Layout.Parameters[key] = p.Layout.Parameters[key] ?? new List<string>();
                 foreach (var r in p.Rules) { r.Light = r.Light ?? new PaletteColors(); r.Dark = r.Dark ?? new PaletteColors(); }
             }
             return value;
@@ -116,7 +128,9 @@ namespace BIMaestro.PropertiesAppearance
         // Merge a single profile under a cross-process lock: another Revit's profiles survive.
         internal static AppearancePreferences Save(AppearanceProfile profile, bool enabled) => SaveMany(new[] { profile }, enabled);
 
-        internal static AppearancePreferences SaveMany(IEnumerable<AppearanceProfile> profiles, bool enabled)
+        internal static AppearancePreferences SaveMany(IEnumerable<AppearanceProfile> profiles, bool enabled) => Persist(profiles, enabled, false);
+        internal static AppearancePreferences ResetAll() => Persist(new AppearanceProfile[0], false, true);
+        private static AppearancePreferences Persist(IEnumerable<AppearanceProfile> profiles, bool enabled, bool resetAll)
         {
             using (var mutex = new Mutex(false, "Local\\BIMaestro.PropertiesAppearance." + Environment.UserName))
             {
@@ -125,11 +139,11 @@ namespace BIMaestro.PropertiesAppearance
                 {
                     try { held = mutex.WaitOne(TimeSpan.FromSeconds(3)); } catch (AbandonedMutexException) { held = true; }
                     if (!held) throw new IOException("Les préférences sont utilisées dans une autre fenêtre Revit. Réessayez.");
-                    var latest = Load(); latest.Enabled = enabled;
+                    var latest = Load(); latest.Enabled = enabled; if (resetAll) latest.Profiles.Clear();
                     foreach (var profile in profiles)
                     {
                         latest.Profiles.RemoveAll(p => p.Key == profile.Key);
-                        if (profile.Rules.Any(r => !r.Light.IsEmpty || !r.Dark.IsEmpty)) latest.Profiles.Add(profile.Copy());
+                        if (!profile.Layout.IsEmpty || profile.Rules.Any(r => !r.Light.IsEmpty || !r.Dark.IsEmpty)) latest.Profiles.Add(profile.Copy());
                     }
                     Directory.CreateDirectory(Path.GetDirectoryName(FilePath));
                     string temp = FilePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
