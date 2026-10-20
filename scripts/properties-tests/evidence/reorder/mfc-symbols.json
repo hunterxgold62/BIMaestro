@@ -1,0 +1,22 @@
+[
+  [
+    "CMFCToolBar::FromHandlePermanent",
+    "0x15a030"
+  ],
+  [
+    "CMenu::FromHandlePermanent",
+    "0x2b3890"
+  ],
+  [
+    "CImageList::FromHandlePermanent",
+    "0x2a1d20"
+  ],
+  [
+    "CWnd::FromHandlePermanent",
+    "0x2957c0"
+  ],
+  [
+    "AfxGetModuleState",
+    "0x1382e0"
+  ]
+]

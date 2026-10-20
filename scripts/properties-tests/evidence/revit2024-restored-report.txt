@@ -1,0 +1,31 @@
+20/10/2026 09:42:20 Command=restore
+         System.Windows.Controls.TextBlock Name=mAnchorableTitle Text=Propriétés
+UIFramework.TypeSelectorToolBarControl Name= Text=
+ System.Windows.Controls.StackPanel Name=PART_StackPanel Text=
+  System.Windows.Controls.ContentPresenter Name= Text=
+   UIFramework.RvtRibbonItemControl Name=mRibbonItemControl Text=
+    System.Windows.Controls.ContentPresenter Name=mContent Text=
+     System.Windows.Controls.DockPanel Name= Text=
+      UIFramework.ComboBoxControl Name=mComboBox Text=
+       System.Windows.Controls.Border Name= Text=
+        System.Windows.Controls.Grid Name=MainGrid Text=
+         UIFramework.IMEPopup Name=PART_Popup Text=
+         System.Windows.Controls.Primitives.ToggleButton Name=mToggleButton Text=
+          System.Windows.Controls.Grid Name= Text=
+           System.Windows.Controls.Border Name=mBorder Text=
+            System.Windows.Controls.ContentPresenter Name=mButtonContent Text=
+             System.Windows.Controls.Grid Name= Text=
+              System.Windows.Controls.Border Name=mPreviewBorder Text=
+               System.Windows.Controls.Image Name=mImage Text=
+              System.Windows.Controls.StackPanel Name=StackPanel_FamilyTypeText_Full Text=
+               System.Windows.Controls.TextBlock Name=TextBlock_Family Text=Mur de base
+               System.Windows.Controls.TextBlock Name=TextBlock_Type Text=Mur 1
+              System.Windows.Shapes.Path Name=Arrow Text=
+              System.Windows.Controls.TextBlock Name=TextBlock_FamilyTypeText_Short Text=Mur de base : Mur 1
+           System.Windows.Controls.Border Name=InnerPressedShadowBorder Text=
+                 System.Windows.Controls.TextBlock Name=mAnchorablerHeader Text=Propriétés
+MANAGER ManagePropertiesPalette, UIFrameworkServices, Version=24.3.30.0, Culture=neutral, PublicKeyToken=null
+Field Int64 <alignment member>
+Native border hooks=0
+Saved property count=0
+Parameter fingerprint SHA256=D71D2ACA0B3FB2AD30B5EA30108940A1EC54E96537707A9572F7EDEAA8C00D1E Entries=89

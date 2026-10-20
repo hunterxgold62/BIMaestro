@@ -1,0 +1,29 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Reflection;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using Autodesk.Revit.UI;
+using Autodesk.Revit.UI.Events;
+using Autodesk.Revit.DB;
+namespace BIMaestro.PropertiesTests {
+ public class PropertiesProbe:IExternalApplication {
+  string dir; DateTime last=DateTime.MinValue; bool first=true;
+  public Result OnStartup(UIControlledApplication a){dir=Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);File.WriteAllText(Path.Combine(dir,"started.txt"),DateTime.Now.ToString("O"));a.Idling+=Idle;return Result.Succeeded;}
+  public Result OnShutdown(UIControlledApplication a){a.Idling-=Idle;return Result.Succeeded;}
+  void Idle(object sender,IdlingEventArgs e){if((DateTime.UtcNow-last).TotalSeconds<1)return;last=DateTime.UtcNow;var app=sender as UIApplication;if(app==null)return;string c=Path.Combine(dir,"control.txt");string command=first?"inspect":null;first=false;if(File.Exists(c)){command=File.ReadAllText(c).Trim();File.Delete(c);}if(string.IsNullOrEmpty(command))return;try{if(command.StartsWith("run ")){var ass=Assembly.LoadFrom(command.Substring(4).Trim());ass.GetType("BIMaestro.PropertiesTests.Experiment",true).GetMethod("Run",BindingFlags.Public|BindingFlags.Static).Invoke(null,new object[]{app,dir});}else if(command=="show-properties"){var pane=app.GetDockablePane(DockablePanes.BuiltInDockablePanes.PropertiesPalette);if(!pane.IsShown()){var id=RevitCommandId.LookupPostableCommandId(PostableCommand.TogglePropertiesPalette);if(app.CanPostCommand(id))app.PostCommand(id);}}else if(command=="fixture")Fixture(app);else if(command.StartsWith("open "))app.OpenAndActivateDocument(command.Substring(5).Trim());else if(command=="select-wall"){var wall=new FilteredElementCollector(app.ActiveUIDocument.Document).OfClass(typeof(Wall)).FirstElement();if(wall!=null)app.ActiveUIDocument.Selection.SetElementIds(new[]{wall.Id});}Dump(app);}catch(Exception ex){File.WriteAllText(Path.Combine(dir,"error.txt"),ex.ToString());}}
+  void Fixture(UIApplication a){string path=Path.Combine(dir,"PropertiesFixture.rvt");if(!File.Exists(path)){var d=a.Application.NewProjectDocument(UnitSystem.Metric);try{var level=new FilteredElementCollector(d).OfClass(typeof(Level)).Cast<Level>().FirstOrDefault();var wt=new FilteredElementCollector(d).OfClass(typeof(WallType)).Cast<WallType>().FirstOrDefault();if(level!=null&&wt!=null)using(var t=new Transaction(d,"Disposable palette test")){t.Start();Wall.Create(d,Line.CreateBound(XYZ.Zero,new XYZ(20,0,0)),wt.Id,level.Id,10,0,false,false);t.Commit();}d.SaveAs(path,new SaveAsOptions{OverwriteExistingFile=true});}finally{d.Close(false);}}a.OpenAndActivateDocument(path);}
+  void Dump(UIApplication a){var b=new StringBuilder();b.AppendLine("Revit "+a.Application.VersionNumber+" "+DateTime.Now);if(a.ActiveUIDocument!=null){b.AppendLine("ActiveView="+a.ActiveUIDocument.ActiveView.Id);foreach(var w in new FilteredElementCollector(a.ActiveUIDocument.Document).OfClass(typeof(Wall)).Take(3))b.AppendLine("Wall="+w.Id);}var roots=new HashSet<DependencyObject>();if(System.Windows.Application.Current!=null)foreach(System.Windows.Window w in System.Windows.Application.Current.Windows)roots.Add(w);foreach(PresentationSource p in PresentationSource.CurrentSources)if(p.RootVisual!=null)roots.Add(p.RootVisual);int total=0;foreach(var r in roots){b.AppendLine("ROOT "+r.GetType().FullName);Walk(r,b,0,ref total,false);}b.AppendLine("LOADED TYPES");foreach(var ass in AppDomain.CurrentDomain.GetAssemblies()){Type[] ts;try{ts=ass.GetTypes();}catch(ReflectionTypeLoadException ex){ts=ex.Types;}catch{continue;}foreach(var t in ts.Where(t=>t!=null&&Relevant(t.FullName))){b.AppendLine(t.Assembly.GetName().Name+" :: "+t.FullName);if(t.Name=="ManagePropertiesPalette"||t.FullName.Contains("PropertyPalette")||t.FullName.Contains("MPPType")){foreach(var m in t.GetMembers(BindingFlags.Public|BindingFlags.NonPublic|BindingFlags.Static|BindingFlags.Instance|BindingFlags.DeclaredOnly))b.AppendLine("  MEMBER "+m.MemberType+" "+m);}}}b.AppendLine("WIN32 CHILD WINDOWS");EnumChildWindows(a.MainWindowHandle,(h,l)=>{var cls=new StringBuilder(256);var txt=new StringBuilder(512);GetClassName(h,cls,256);GetWindowText(h,txt,512);b.AppendLine(h+" | "+cls+" | "+txt);return true;},IntPtr.Zero);File.WriteAllText(Path.Combine(dir,"inspection.txt"),b.ToString());}
+  static bool Relevant(string s){s=(s??"").ToLowerInvariant();return s.Contains("property")||s.Contains("properties")||s.Contains("propriét");}
+  static void Walk(DependencyObject o,StringBuilder b,int depth,ref int total,bool inScope){if(o==null||depth>45||total++>35000)return;string type=o.GetType().FullName;var f=o as FrameworkElement;string name=f==null?"":f.Name;string text=o is TextBlock?((TextBlock)o).Text:o is ContentControl?Convert.ToString(((ContentControl)o).Content):"";if(text.Length>140)text=text.Substring(0,140);bool scope=inScope||Relevant(type)||Relevant(name)||Relevant(text);if(scope||depth<3){b.Append(' ',Math.Min(depth,30));b.Append(type+" Name="+name+" Text="+text.Replace('\n',' '));if(o is System.Windows.Controls.Control){var c=(System.Windows.Controls.Control)o;b.Append(" FG="+c.Foreground+" BG="+c.Background);}if(f!=null)b.Append(" Size="+f.ActualWidth+"x"+f.ActualHeight);b.AppendLine();}int n=0;try{n=VisualTreeHelper.GetChildrenCount(o);}catch{}for(int i=0;i<n;i++)Walk(VisualTreeHelper.GetChild(o,i),b,depth+1,ref total,scope);}
+  delegate bool EnumProc(IntPtr hwnd,IntPtr l);
+  [DllImport("user32.dll")]static extern bool EnumChildWindows(IntPtr h,EnumProc p,IntPtr l);
+  [DllImport("user32.dll",CharSet=CharSet.Unicode)]static extern int GetClassName(IntPtr h,StringBuilder b,int n);
+  [DllImport("user32.dll",CharSet=CharSet.Unicode)]static extern int GetWindowText(IntPtr h,StringBuilder b,int n);
+ }
+}

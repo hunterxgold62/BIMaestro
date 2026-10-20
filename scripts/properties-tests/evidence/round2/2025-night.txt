@@ -1,0 +1,9 @@
+Revit 2025 Command=night
+Restored local styles, hooks and original native theme.
+Native dark theme requested; original=Light
+Mode=night WPF saved=26 Native hooks=2
+Paints=9 Tinted bands=2 Max overlay ms=3.712 Last ms=1.873 Mean ms=1.816
+Tint detection: visible grayscale bands only; experimental paint overlay, not semantic parameter styles.
+Grid=12650900 571x146
+Grid=4526412 537x575
+Fingerprint=965F318E2728E54CF63E35F0674B6B39093384AF6788B7338EF4A011DFC92FD5

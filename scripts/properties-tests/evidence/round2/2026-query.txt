@@ -1,0 +1,5 @@
+Command=query longueur
+Parameter fingerprint SHA256=31B1259452DFDB85CA324C8440E0A10E88B3C29D52D7727B3E00C05625C860B0 Entries=96
+Extension=True Parent=System.Windows.Controls.Grid rows=36 dark=True results=Élément : Mur 1
+1 résultat(s) · lecture seule
+Longueur : 6096

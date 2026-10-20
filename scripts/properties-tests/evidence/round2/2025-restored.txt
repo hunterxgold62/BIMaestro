@@ -1,0 +1,9 @@
+Revit 2025 Command=restore
+Restored local styles, hooks and original native theme.
+Mode=inspect WPF saved=0 Native hooks=0
+Paints=121 Tinted bands=52 Max overlay ms=20.810 Last ms=4.180 Mean ms=3.642
+Tint detection: visible grayscale bands only; experimental paint overlay, not semantic parameter styles.
+Recolored grayscale foreground pixels=166646; this is raster styling, not native cell font or parameter content.
+Grid=12650900 571x406
+Grid=4526412 537x575
+Fingerprint=965F318E2728E54CF63E35F0674B6B39093384AF6788B7338EF4A011DFC92FD5

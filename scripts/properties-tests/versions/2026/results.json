@@ -1,0 +1,31 @@
+{
+  "version": 2026,
+  "date": "2026-10-20",
+  "runtime": true,
+  "fixture": "2026-round2/PropertiesFixture.rvt",
+  "dll": "experiment2026-r5.dll",
+  "nativeTypeSelectorPreserved": true,
+  "extension": "readonly WPF popup wrapped around original HwndSource RootVisual",
+  "nativeGridFilter": false,
+  "nativeGridNavigation": false,
+  "nativeGridReorder": false,
+  "viewParameterCount": 60,
+  "wallParameterCount": 36,
+  "viewScaleQuery": {
+    "count": 1,
+    "value": "100"
+  },
+  "wallLengthQuery": {
+    "count": 1,
+    "value": "6096"
+  },
+  "lightVariantApplied": true,
+  "darkVariantApplied": true,
+  "automaticThemeDetection": true,
+  "automaticSelectionRefresh": true,
+  "restoreR3Validated": true,
+  "fingerprintBeforeAfter": "31B1259452DFDB85CA324C8440E0A10E88B3C29D52D7727B3E00C05625C860B0",
+  "fingerprintEntries": 96,
+  "visualVerifiedByWorker": true,
+  "finalState": "Original RootVisual restored, external event disposed, Revit closed after visual verification"
+}

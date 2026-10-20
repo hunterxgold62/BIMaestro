@@ -1,0 +1,121 @@
+Native reorder lab Revit=2025 command=move time=2026-10-20T12:18:59.5692978+02:00
+Document=C:\Users\lemer\.codex\worktrees\properties-palette\BIMaestro\tmp\properties-tests\2025-reorder\PropertiesFixture.rvt
+Fingerprint before=40DA2F888AD9A43E1D317B5B98A7EAE0C4C2D3B45ADDA5A524FD78E67CC5FA02
+MFC=C:\WINDOWS\SYSTEM32\mfc140u.dll SHA256=FC9B1F94752D7080436824B480E83BA1EC930E3F7BAA881F4E842B882E715CFC
+GRID HWND=6756378
+Permanent CWnd=2130691814096
+RTTI object=.?AVElemGrid@@ image=DesktopMFC.dll offset=0
+BASE .?AVElemGrid@@ mdisp=0 pdisp=-1 vdisp=0
+BASE .?AVAGrid@@ mdisp=0 pdisp=-1 vdisp=0
+BASE .?AVCGXGridWnd@@ mdisp=0 pdisp=-1 vdisp=0
+BASE .?AVCWnd@@ mdisp=0 pdisp=-1 vdisp=0
+BASE .?AVCCmdTarget@@ mdisp=0 pdisp=-1 vdisp=0
+BASE .?AVCObject@@ mdisp=0 pdisp=-1 vdisp=0
+BASE .?AVCGXGridCore@@ mdisp=232 pdisp=-1 vdisp=0
+Verified core=2130691814328
+Dimensions=47x3
+ROW 0 |  | Paramètre | Valeur | =
+ROW 1 | 1 |  |  |
+ROW 2 |  | Graphismes |  | ^
+ROW 3 |  |   Echelle de la vue | 100 |
+ROW 4 | 4 |   Valeur de l'échelle    1: | 100 |
+ROW 5 | 5 |   Afficher le modèle | 0 |
+ROW 6 | 6 |   Niveau de détail | 1 |
+ROW 7 | 7 |   Visibilité des éléments | 1 |
+ROW 8 | 8 |   Remplacements visibilité / graphisme |  |
+ROW 9 | 9 |   Options d'affichage des graphismes |  |
+ROW 10 | 10 |   Orientation | 0 |
+ROW 11 | 11 |   Affichage des jonctions de mur | 0 |
+ROW 12 | 12 |   Discipline | 4095 |
+ROW 13 | 13 |   Afficher les lignes cachées | 1 |
+ROW 14 | 14 |   Emplacement du choix des couleurs | 1 |
+ROW 15 | 15 |   Choix des couleurs |  |
+ROW 16 | 16 |   Choix des couleurs du système |  |
+ROW 17 | 17 |   Style d'affichage de l'analyse par défaut | Aucun(e) |
+ROW 18 | 18 |   Trajectoire du soleil | 0 |
+ROW 19 | 19 |  |  |
+ROW 20 |  | Niveau en fond de plan |  | ^
+ROW 21 |  |   Plage: niveau de base | -1 |
+ROW 22 | 22 |   Plage: niveau supérieur | -1 |
+ROW 23 | 23 |   Lecture du fond de plan | 0 |
+ROW 24 | 24 |  |  |
+ROW 25 |  | Etendues |  | ^
+ROW 26 |  |   Cadrer la vue | 0 |
+ROW 27 | 27 |   Zone cadrée visible | 0 |
+ROW 28 | 28 |   Cadrage de l'annotation | 0 |
+ROW 29 | 29 |   Plage de la vue |  |
+ROW 30 | 30 |   Niveau associé | Niveau 1 |
+ROW 31 | 31 |   Zone de définition | -1 |
+ROW 32 | 32 |   Décalage symbolique de la colonne | 304.8 |
+ROW 33 | 33 |   Délimitation de la profondeur | 0 |
+ROW 34 | 34 |  |  |
+ROW 35 |  | Données d'identification |  | ^
+ROW 36 |  |   Gabarit de vue | <Aucun> |
+ROW 37 | 37 |   Nom de la vue | Niveau 1 |
+ROW 38 | 38 |   Dépendance | Indépendant |
+ROW 39 | 39 |   Titre sur la feuille |  |
+ROW 40 | 40 |   Référencement du jeu de feuilles | -1 |
+ROW 41 | 41 |   Référencement de la feuille |  |
+ROW 42 | 42 |   Référencement du détail |  |
+ROW 43 | 43 |  |  |
+ROW 44 |  | Phase de construction |  | ^
+ROW 45 |  |   Filtre des phases | 2306 |
+ROW 46 | 46 |   Phase | 4 |
+ROW 47 |  |  |  |
+Identified block=25..34 destination=20
+Calling native MoveRows; flags=0 explicit redraw; commandType=0; complete group block
+MoveRows returned=1
+AFTER 0 |  | Paramètre | Valeur | =
+AFTER 1 | 1 |  |  |
+AFTER 2 |  | Graphismes |  | ^
+AFTER 3 |  |   Echelle de la vue | 100 |
+AFTER 4 | 4 |   Valeur de l'échelle    1: | 100 |
+AFTER 5 | 5 |   Afficher le modèle | 0 |
+AFTER 6 | 6 |   Niveau de détail | 1 |
+AFTER 7 | 7 |   Visibilité des éléments | 1 |
+AFTER 8 | 8 |   Remplacements visibilité / graphisme |  |
+AFTER 9 | 9 |   Options d'affichage des graphismes |  |
+AFTER 10 | 10 |   Orientation | 0 |
+AFTER 11 | 11 |   Affichage des jonctions de mur | 0 |
+AFTER 12 | 12 |   Discipline | 4095 |
+AFTER 13 | 13 |   Afficher les lignes cachées | 1 |
+AFTER 14 | 14 |   Emplacement du choix des couleurs | 1 |
+AFTER 15 | 15 |   Choix des couleurs |  |
+AFTER 16 | 16 |   Choix des couleurs du système |  |
+AFTER 17 | 17 |   Style d'affichage de l'analyse par défaut | Aucun(e) |
+AFTER 18 | 18 |   Trajectoire du soleil | 0 |
+AFTER 19 | 19 |  |  |
+AFTER 20 |  | Etendues |  | ^
+AFTER 21 |  |   Cadrer la vue | 0 |
+AFTER 22 | 22 |   Zone cadrée visible | 0 |
+AFTER 23 | 23 |   Cadrage de l'annotation | 0 |
+AFTER 24 | 24 |   Plage de la vue |  |
+AFTER 25 | 25 |   Niveau associé | Niveau 1 |
+AFTER 26 | 26 |   Zone de définition | -1 |
+AFTER 27 | 27 |   Décalage symbolique de la colonne | 304.8 |
+AFTER 28 | 28 |   Délimitation de la profondeur | 0 |
+AFTER 29 | 29 |  |  |
+AFTER 30 |  | Niveau en fond de plan |  | ^
+AFTER 31 |  |   Plage: niveau de base | -1 |
+AFTER 32 | 32 |   Plage: niveau supérieur | -1 |
+AFTER 33 | 33 |   Lecture du fond de plan | 0 |
+AFTER 34 | 34 |  |  |
+AFTER 35 |  | Données d'identification |  | ^
+AFTER 36 |  |   Gabarit de vue | <Aucun> |
+AFTER 37 | 37 |   Nom de la vue | Niveau 1 |
+AFTER 38 | 38 |   Dépendance | Indépendant |
+AFTER 39 | 39 |   Titre sur la feuille |  |
+AFTER 40 | 40 |   Référencement du jeu de feuilles | -1 |
+AFTER 41 | 41 |   Référencement de la feuille |  |
+AFTER 42 | 42 |   Référencement du détail |  |
+AFTER 43 | 43 |  |  |
+AFTER 44 |  | Phase de construction |  | ^
+AFTER 45 |  |   Filtre des phases | 2306 |
+AFTER 46 | 46 |   Phase | 4 |
+AFTER 47 |  |  |  |
+Expected complete block permutation=False
+Rows unchanged=False
+GRID HWND=5510344
+Permanent CWnd=0
+Fingerprint after=40DA2F888AD9A43E1D317B5B98A7EAE0C4C2D3B45ADDA5A524FD78E67CC5FA02
+Native command complete; document modified=False
