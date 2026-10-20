@@ -4,6 +4,8 @@ Branche `codex/properties-palette`. Bilan du 20 octobre 2026. Quatre instances r
 
 [Ouvrir le comparatif des captures](Gallery.html).
 
+**Nouveau : [réordonnancement natif démontré en Revit 2025](ReorderGallery.html)**. Le bloc Étendues a été déplacé avant Niveau en fond de plan. Le pont C++ a depuis été identifié avec les symboles Microsoft et les métadonnées RTTI. Les limites des séries précédentes sur cet accès sont donc dépassées ; stabilité des reconstructions et édition restent à qualifier. Voir [preuves](REORDER-RESULTS.md).
+
 **Suite : [essais du corps de la grille](TextGallery.html)** — zoom natif réellement démontré en 2025, texte coloré, plan technique, bandes, projecteur et épaississement graphique. Cette troisième série corrige la limite précédente sur le zoom des caractères et des lignes ; voir [protocole et réserves](TEXT-EXPERIMENTS.md).
 
 ## Résultats réellement obtenus

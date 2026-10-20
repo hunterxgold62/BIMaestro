@@ -41,3 +41,5 @@ Aucune preuve officielle de migration du moteur de la palette entre 2023 et 2026
 - [ExternalDefinitionCreationOptions.HideWhenNoValue](https://help.autodesk.com/cloudhelp/2026/ENU/Revit-API-MainReference/files/html/2a3a90d6-cf4b-ae88-b587-612dc96c0bc2.htm)
 - [Dockable Dialog Panes : restrictions de Hide](https://help.autodesk.com/cloudhelp/2026/ENU/Revit-API/files/Revit_API_Developers_Guide/Advanced_Topics/Revit_API_Revit_API_Developers_Guide_Advanced_Topics_Dockable_Dialog_Panes_html.html)
 - [PostableCommand : TogglePropertiesPalette](https://help.autodesk.com/cloudhelp/2026/ENU/Revit-API-MainReference/files/html/f6ccdc1b-6ac3-9c49-d0bb-8a7d1877eab0.htm)
+## Actualisation : réordonnancement natif
+Le 20 octobre 2026, un accès vérifié à la véritable instance C++ a permis le déplacement natif du bloc Étendues avant Niveau en fond de plan en Revit 2025. Cette preuve dépasse la limite des premières séries, sans constituer une API publique ni une qualification de tous les éditeurs. [Résultats et garde-fous](REORDER-RESULTS.md).
