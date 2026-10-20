@@ -119,7 +119,7 @@ namespace BIMaestro.PropertiesAppearance
                 var grid = NativePropertiesGrid.Find(app);
                 if (grid == null) { _renderer?.Dispose(); _renderer = null; Status = "Affichez la palette Propriétés pour voir vos couleurs."; return; }
                 string signature = context.Signature + "/" + IsDark;
-                
+
                 var cells = new List<PropertiesPaletteRenderer.CellPlan>();
                 string group = null;
                 for (uint row = 1; row <= grid.RowCount; row++)
