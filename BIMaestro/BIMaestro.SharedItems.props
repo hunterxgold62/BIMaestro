@@ -1,5 +1,9 @@
 <Project>
   <ItemGroup>
+    <Compile Include="les couleurs\Home\*.cs" />
+    <EmbeddedResource Include="les couleurs\Home\Resources\*.js">
+      <LogicalName>BIMaestro.Home.%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
     <Content Include="..\Demo\BIMaestro_Apprentissage_2024.rvt" Condition="Exists('..\Demo\BIMaestro_Apprentissage_2024.rvt')">
       <Link>Demo\Maquette\BIMaestro_Apprentissage_2024.rvt</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

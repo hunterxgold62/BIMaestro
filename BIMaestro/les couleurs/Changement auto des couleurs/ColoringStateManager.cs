@@ -1102,10 +1102,7 @@ namespace Couleur
                     "const badgeStyle=document.getElementById(" +
                     "'bimaestro-project-browser-badges');" +
                     "if(badgeStyle)badgeStyle.remove();" +
-                    "t.originals.forEach((css,el)=>{" +
-                    "if(!el)return;" +
-                    "if(css===null)el.removeAttribute('style');" +
-                    "else el.setAttribute('style',css);});" +
+                    "if(t.restoreAppearance)t.restoreAppearance();" +
                     "delete window.__bimaestroProjectBrowserTheme;}");
                 ExecuteBrowserScript(
                     _chromiumBrowser,
@@ -1764,7 +1761,28 @@ namespace Couleur
             string script = @"
 (()=>{
   const key='__bimaestroProjectBrowserTheme';
-  const version=28;
+  const version=29;
+  // Revit owns geometry and updates inline heights while documents switch.
+  // Restore only appearance properties, never an old complete style attribute.
+  const restoreAppearance=target=>{
+    if(!target.originals)return;
+    target.originals.forEach((saved,el)=>{
+      if(!el)return;
+      if(typeof saved==='string'||saved===null){
+        const legacy=document.createElement('div');
+        if(saved!==null)legacy.setAttribute('style',saved);
+        saved={};
+        ['color','background-color'].forEach(property=>{
+          saved[property]={value:legacy.style.getPropertyValue(property),
+            priority:legacy.style.getPropertyPriority(property)};
+        });
+      }
+      Object.entries(saved).forEach(([property,original])=>{
+        if(original.value)el.style.setProperty(property,original.value,original.priority);
+        else el.style.removeProperty(property);
+      });
+    });
+  };
   const theme={
     appearanceEnabled:__BIMAESTRO_BROWSER_APPEARANCE_ENABLED__,
     activeParentEnabled:__BIMAESTRO_ACTIVE_PARENT_ENABLED__,
@@ -1825,12 +1843,7 @@ namespace Couleur
         el.removeAttribute('data-bimaestro-focus-target');
         el.removeAttribute('data-bimaestro-bubble-surface');
       });
-    if(previous.originals)
-      previous.originals.forEach((css,el)=>{
-        if(!el)return;
-        if(css===null)el.removeAttribute('style');
-        else el.setAttribute('style',css);
-      });
+    restoreAppearance(previous);
     const previousStyle=document.getElementById(
       'bimaestro-project-browser-badges');
     if(previousStyle)previousStyle.remove();
@@ -1839,11 +1852,12 @@ namespace Couleur
   if(!window[key]){
     const originals=new Map();
     const state={disposed:false};
-    const remember=el=>{
-      if(!originals.has(el))
-        originals.set(
-          el,
-          el.hasAttribute('style')?el.getAttribute('style'):null);
+    const remember=(el,property)=>{
+      if(!originals.has(el))originals.set(el,{});
+      const saved=originals.get(el);
+      if(!Object.prototype.hasOwnProperty.call(saved,property))
+        saved[property]={value:el.style.getPropertyValue(property),
+          priority:el.style.getPropertyPriority(property)};
     };
     let badgeStyle=document.getElementById(
       'bimaestro-project-browser-badges');
@@ -2123,7 +2137,8 @@ __BIMAESTRO_ATMOSPHERE_CSS__
       if(theme.appearanceEnabled){
         [document.documentElement,document.body].forEach(el=>{
           if(!el)return;
-          remember(el);
+          remember(el,'background-color');
+          remember(el,'color');
           el.setAttribute(
             'data-bimaestro-bubble-surface',
             theme.mode);
@@ -2138,7 +2153,7 @@ __BIMAESTRO_ATMOSPHERE_CSS__
           const r=el.getBoundingClientRect();
           if(r.width>=window.innerWidth*.60&&
              r.height>=window.innerHeight*.25){
-            remember(el);
+            remember(el,'background-color');
             el.setAttribute(
               'data-bimaestro-bubble-surface',
               theme.mode);
@@ -2149,7 +2164,7 @@ __BIMAESTRO_ATMOSPHERE_CSS__
           }
           const value=(el.textContent||'').trim();
           if(value&&el.children.length===0){
-            remember(el);
+            remember(el,'color');
             el.style.setProperty(
               'color',
               theme.text,
@@ -2978,6 +2993,7 @@ __BIMAESTRO_ATMOSPHERE_CSS__
     window[key]={
       version,
       originals,
+      restoreAppearance:()=>restoreAppearance({originals}),
       observer,
       paint,
       focusView,

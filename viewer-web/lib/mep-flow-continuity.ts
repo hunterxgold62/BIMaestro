@@ -137,6 +137,64 @@ export function flowTrace(graph: MepGraph, elementKey: string, reverse = false) 
 }
 
 /** One moving lattice shared by connected elements, including short fittings. */
+export function flowFollowChain(graph: MepGraph, elementKey: string, reverse = false, branchKey?: string) {
+  const trace = flowTrace(graph, elementKey, reverse);
+  const edges = flowEdges(graph).map(edge => reverse ? { ...edge, from: edge.to, to: edge.from, forward: !edge.forward } : edge);
+  const routes = new Map<string, { start: number; length: number; forward: boolean }>();
+  let edge = edges.find(e => e.key.startsWith(`${elementKey}\0`) && trace.has(e.key)) || edges.find(e => trace.get(e.key)?.start === 0);
+  let distance = 0;
+  let branches: string[] = [];
+  while (edge && !routes.has(edge.key)) {
+    routes.set(edge.key, { start: distance, length: edge.length, forward: edge.forward });
+    distance += edge.length;
+    const candidates = edges.filter(next => next.from === edge!.to && !routes.has(next.key));
+    if (candidates.length > 1 && !branches.length) branches = candidates.map(next => next.key);
+    edge = candidates.find(next => next.key === branchKey) || candidates[0];
+  }
+  return { routes, branches };
+}
+
+/** Distinct wave arrivals survive reconvergence; a wave never repeats an edge. */
+export function flowPulseArrivals(graph: MepGraph, elementKey: string, reverse = false) {
+  const first = flowTrace(graph, elementKey, reverse);
+  const edges = flowEdges(graph).map(edge => reverse ? { ...edge, from: edge.to, to: edge.from, forward: !edge.forward } : edge);
+  const outgoing = new Map<number, Edge[]>();
+  for (const edge of edges) outgoing.set(edge.from, [...(outgoing.get(edge.from) || []), edge]);
+  type Arrival = { edge: Edge; distance: number; previous?: Arrival };
+  const heap: Arrival[] = [];
+  const push = (arrival: Arrival) => {
+    heap.push(arrival); let i = heap.length - 1;
+    while (i > 0) { const p = (i - 1) >> 1; if (heap[p].distance <= heap[i].distance) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; }
+  };
+  const pop = () => {
+    const head = heap[0], last = heap.pop()!;
+    if (heap.length) {
+      heap[0] = last; let i = 0;
+      while (true) { const l = i * 2 + 1, r = l + 1; let n = i;
+        if (l < heap.length && heap[l].distance < heap[n].distance) n = l;
+        if (r < heap.length && heap[r].distance < heap[n].distance) n = r;
+        if (n === i) break; [heap[n], heap[i]] = [heap[i], heap[n]]; i = n;
+      }
+    }
+    return head;
+  };
+  const arrivals = new Map<string, number[]>();
+  for (const edge of edges) if (first.get(edge.key)?.start === 0) push({ edge, distance: 0 });
+  while (heap.length) {
+    const arrival = pop(), starts = arrivals.get(arrival.edge.key) || [];
+    // Bound GPU slots and traversal for dense cyclic models. Equal fronts merge.
+    if (starts.length >= 8 || starts.some(start => Math.abs(start - arrival.distance) < .05)) continue;
+    starts.push(arrival.distance); arrivals.set(arrival.edge.key, starts);
+    for (const next of outgoing.get(arrival.edge.to) || []) {
+      let repeated = false;
+      for (let ancestor: Arrival | undefined = arrival; ancestor; ancestor = ancestor.previous) if (ancestor.edge.key === next.key) { repeated = true; break; }
+      if (!repeated) push({ edge: next, distance: arrival.distance + arrival.edge.length, previous: arrival });
+    }
+  }
+  return arrivals;
+}
+
+/** One moving lattice shared by connected elements, including short fittings. */
 export function flowArrowDistance(start: number, length: number, spacing: number, slot: number, seconds: number) {
   const first = ((seconds * 2.4 - start) % spacing + spacing) % spacing;
   const distance = first + slot * spacing;

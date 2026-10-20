@@ -67,9 +67,13 @@ namespace Couleur
         {
             var result = new List<BrowserIconAsset>();
             var names = new[] { "Éclairage", "Électricité", "Ventilation", "Plomberie",
-                "Architecture", "Structure", "Coordination", "Chauffage", "Sécurité incendie", "Réseaux informatiques" };
+                "Architecture", "Structure", "Coordination", "Chauffage", "Sécurité incendie", "Réseaux informatiques",
+                "Existant", "Démolition", "Nouveau projet", "Études", "Validation", "Publication", "Archives",
+                "Niveaux", "Zones", "Jardin", "Chambres", "Accueil", "Restaurant", "Toiture", "Détails", "Présentation" };
             var ids = new[] { "lighting", "power", "ventilation", "plumbing",
-                "architecture", "structure", "coordination", "heating", "fire", "data" };
+                "architecture", "structure", "coordination", "heating", "fire", "data",
+                "existing", "demolition", "new-project", "study", "validation", "publication", "archive",
+                "levels", "zone", "garden", "room", "reception", "restaurant", "roof", "details", "presentation" };
             for (int i = 0; i < ids.Length; i++)
                 using (var stream = typeof(ProjectBrowserIcons).Assembly.GetManifestResourceStream(
                     "BIMaestro.Resources.BrowserIcons." + ids[i] + ".png"))

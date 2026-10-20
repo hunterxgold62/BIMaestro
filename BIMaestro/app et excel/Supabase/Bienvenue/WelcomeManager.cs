@@ -10,13 +10,12 @@ namespace BIMaestro.Welcome
 {
     public static class WelcomeManager
     {
-        private static readonly TimeSpan DelayAfterFirstUse = TimeSpan.FromMinutes(1);
-
         private static readonly object _sync = new object();
         private static WelcomeState _state;
         private static bool _initialized;
 
         private static Timer _timer;
+        private static ExternalEvent _promptEvent;
         private static volatile bool _shouldShow;
         private static bool _pendingDemoCreate;
         private static int _showing;
@@ -34,8 +33,23 @@ namespace BIMaestro.Welcome
                 _initialized = true;
 
                 _state = WelcomeStorage.LoadOrCreate();
+                _promptEvent = ExternalEvent.Create(new PromptEventHandler());
                 app.Idling += App_Idling;
-                ArmNextPrompt(DelayAfterFirstUse);
+                ArmNextPrompt(TimeSpan.Zero);
+            }
+        }
+
+        public static void Shutdown(UIControlledApplication app)
+        {
+            app.Idling -= App_Idling;
+            lock (_sync)
+            {
+                _timer?.Dispose();
+                _timer = null;
+                _promptEvent?.Dispose();
+                _promptEvent = null;
+                _shouldShow = false;
+                _initialized = false;
             }
         }
 
@@ -61,14 +75,8 @@ namespace BIMaestro.Welcome
                 {
                     _state.FirstCommandUtc = DateTime.UtcNow;
                     WelcomeStorage.Save(_state);
-                    ArmTimer();
                 }
-                else
-                {
-                    var due = _state.FirstCommandUtc.Value + DelayAfterFirstUse;
-                    if (DateTime.UtcNow >= due) _shouldShow = true;
-                    else ArmTimer();
-                }
+                ArmNextPrompt(TimeSpan.Zero);
             }
         }
 
@@ -155,15 +163,16 @@ namespace BIMaestro.Welcome
                 return (_state.FirstName.Trim() + " " + _state.LastName.Trim()).Trim();
             }
         }
-        private static void ArmTimer()
+        private static void RequestPrompt()
         {
-            _timer?.Dispose();
+            _shouldShow = true;
+            _promptEvent?.Raise();
+        }
 
-            var now = DateTime.UtcNow;
-            var dueUtc = (_state.FirstCommandUtc ?? now) + DelayAfterFirstUse;
-            var ms = Math.Max(0, (int)Math.Min(int.MaxValue, (dueUtc - now).TotalMilliseconds));
-
-            _timer = new Timer(_ => _shouldShow = true, null, ms, Timeout.Infinite);
+        private sealed class PromptEventHandler : IExternalEventHandler
+        {
+            public void Execute(UIApplication app) => App_Idling(app, null);
+            public string GetName() => "BIMaestro - Invitation de bienvenue";
         }
 
         private static void App_Idling(object sender, Autodesk.Revit.UI.Events.IdlingEventArgs e)
@@ -186,7 +195,7 @@ namespace BIMaestro.Welcome
                 return;
             }
             if (!_shouldShow) return;
-            if (Application.Current?.Windows.Cast<Window>().Any(window => window.IsVisible) == true)
+            if (HasVisibleBIMaestroWindow())
                 return;
 
             bool showEmail;
@@ -245,6 +254,10 @@ namespace BIMaestro.Welcome
             }
         }
 
+        internal static bool HasVisibleBIMaestroWindow() =>
+            Application.Current?.Windows.Cast<Window>().Any(window =>
+                window.IsVisible && window.GetType().Assembly == typeof(WelcomeManager).Assembly) == true;
+
         private static void HandleWelcomeClosed(WelcomeWindow win)
         {
             bool openDemo = false;
@@ -276,7 +289,11 @@ namespace BIMaestro.Welcome
             }
 
             if (syncProfile) TryUpsertProfileNoThrow();
-            if (openDemo) _pendingDemoCreate = true;
+            if (openDemo)
+            {
+                _pendingDemoCreate = true;
+                _promptEvent?.Raise();
+            }
         }
 
         private static void ArmNextPrompt(TimeSpan minimumDelay)
@@ -287,7 +304,8 @@ namespace BIMaestro.Welcome
             if (!next.HasValue) return;
             var delay = next.Value - now;
             if (delay < minimumDelay) delay = minimumDelay;
-            _timer = new Timer(_ => _shouldShow = true, null, delay, Timeout.InfiniteTimeSpan);
+            if (delay <= TimeSpan.Zero) { RequestPrompt(); return; }
+            _timer = new Timer(_ => RequestPrompt(), null, delay, Timeout.InfiniteTimeSpan);
         }
 
         private static void TryUpsertProfileNoThrow()

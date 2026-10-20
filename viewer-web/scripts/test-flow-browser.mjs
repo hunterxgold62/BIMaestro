@@ -40,7 +40,7 @@ graph.elements.push({ key: 'wall', elementId: 1, name: 'Vanne test', category: '
 graph.connectors = [0, 1].map(index => ({ index, elementKey: 'wall', systemKey: 'water', crossSectionArea: Math.PI * (500 / 304.8 / 2) ** 2, position: index ? [5, 1, 6] : [-5, 1, 3] }));
 graph.elements.push({ ...structuredClone(graph.elements[0]), key: 'floor', elementId: 2, name: 'Tuyau raccordé', connectorIndices: [4, 5], paths: [{ ...structuredClone(graph.elements[0].paths[0]), elementKey: 'floor', startConnector: 4, endConnector: 5, points: [[6, 1, 6], [9, 1, 6]] }] });
 const centre = [5.5, 1, 6];
-const teePorts = [[2, [5, 1, 6]], [3, [6, 1, 6]], [6, [5.5, 2, 6]]];
+const teePorts = [[2, [5, 1, 6]], [3, [6, 1, 6]], [6, [5.5, 3, 6]]];
 graph.elements.push({ ...structuredClone(graph.elements[0]), key: 'tee', elementId: 3, name: 'Té Revit', isPipeFitting: true, connectorIndices: [2, 3, 6], paths: teePorts.map(([index, position], ordinal) => ({ ...structuredClone(graph.elements[0].paths[0]), elementKey: 'tee', startConnector: index, endConnector: -1, points: [position, centre], flowForward: ordinal === 0 })) });
 graph.connectors.push(...teePorts.map(([index, position]) => ({ index, elementKey: 'tee', systemKey: 'water', crossSectionArea: Math.PI * (500 / 304.8 / 2) ** 2, position })));
 graph.connectors.push(...[4, 5].map(index => ({ index, elementKey: 'floor', systemKey: 'water', crossSectionArea: Math.PI * (500 / 304.8 / 2) ** 2, position: index === 4 ? [6, 1, 6] : [9, 1, 6] })));
@@ -181,8 +181,9 @@ try {
   await page.evaluate(() => window.__flowTest.trace(1));
   await page.waitForTimeout(100);
   await page.evaluate(graph => window.__flowTest.update(graph, new Set()), graph);
-  const beforeFollow = await page.evaluate(() => { const t = window.__flowTest; t.flowVisuals[1].systemKey = 'other'; t.focus('water', null); t.follow(); return t.camera.position.toArray(); });
+  const beforeFollow = await page.evaluate(() => { const t = window.__flowTest; t.flowVisuals[1].systemKey = 'other'; t.focus('water', null); t.follow('wall'); return t.camera.position.toArray(); });
   await page.waitForTimeout(250);
+  assert.equal(await page.evaluate(() => window.__flowTest.flowVisuals.filter(v => v.elementKey === 'tee' && v.current.pulseEnabled.value === 1).length), 3, 'Explicit arrival follow keeps the light on both tee branches while camera chooses one');
   assert.ok(await page.evaluate(before => window.__flowTest.camera.position.distanceTo({x:before[0],y:before[1],z:before[2]}) > .01, beforeFollow), 'Camera accompanies the travelling wave');
   await page.locator('.follow-banner').waitFor();
   assert.equal(await page.locator('.viewer-context-bar .follow-banner').count(), 1, 'Follow and lot controls share the bottom context bar');
@@ -261,5 +262,22 @@ try {
   assert.ok(await page.locator('.flow-end-result').isVisible(), 'Natural ending explains why the camera stopped');
   await page.locator('.flow-end-result').getByRole('button',{name:'Fermer',exact:true}).click();
   assert.equal(await page.locator('.flow-end-result').count(),0);
+  await page.getByRole('button', { name: 'Développer le panneau MEP', exact: true }).click();
+  await page.getByRole('button', { name: 'Voir dans les tuyaux', exact: true }).click();
+  await page.evaluate(graph => {
+    graph.connections.push({connectorA:6,connectorB:4,isInternal:false,isValveGateCandidate:false,elementKey:''});
+    window.__flowTest.update(graph,new Set());
+    window.__flowTest.follow('wall',false,'tee\0'+'2');
+  },graph);
+  await page.waitForFunction(() => window.__flowTest.flowVisuals[1].current.extraPulseCount.value === 1);
+  const arrivals = await page.evaluate(() => {
+    const v=window.__flowTest.flowVisuals[1];
+    return { first:v.current.pulseStart.value, second:v.current.extraPulseStarts.value[0], waterSecond:v.water.uniforms.extraPulseStarts.value[0], waterCount:v.water.uniforms.extraPulseCount.value };
+  });
+  assert.equal(arrivals.first,14,'Short branch front arrives first');
+  assert.equal(arrivals.second,15.5,'Long branch front survives on the common downstream pipe');
+  assert.equal(arrivals.waterSecond,15.5);
+  assert.equal(arrivals.waterCount,1);
+  assert.deepEqual(errors,[],'Both line and water multi-front shaders compile');
   console.log('PASS: volumetric water shader, forward/reverse chevrons and waves, stopped water, valve isolation and classic-mode restoration');
 } finally { await browser.close(); }

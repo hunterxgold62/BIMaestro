@@ -401,7 +401,7 @@ namespace BIMaestro.Tutorials
                 tx.Commit();
             }
             Analyse.ElementHistoryTracker.FlushPendingForHistory();
-            Analyse.ElementHistoryTracker.PrimeDocument(doc);
+            Analyse.ElementHistoryTracker.ScheduleDeferredPrime(doc);
             Analyse.ElementHistoryTracker.PrimeExerciseElements(doc, toRemove.Concat(new[] { witness.Id }));
             if (chairCount.AsInteger() != 4)
                 throw new InvalidOperationException("Le mobilier témoin doit avoir 4 chaises avant de préparer son historique.");
@@ -1179,7 +1179,7 @@ namespace BIMaestro.Tutorials
             if (!string.Equals(activePath, _pendingPath, StringComparison.OrdinalIgnoreCase))
                 return false;
             if (DateTime.UtcNow < _readyAfterUtc || GetForegroundWindow() != uiApp.MainWindowHandle ||
-                Application.Current?.Windows.Cast<Window>().Any(window => window.IsVisible) == true)
+                BIMaestro.Welcome.WelcomeManager.HasVisibleBIMaestroWindow())
                 return true;
 
             _pendingPath = null;

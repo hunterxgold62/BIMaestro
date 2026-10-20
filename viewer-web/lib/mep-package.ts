@@ -1,5 +1,6 @@
 import { unzip, strFromU8 } from 'fflate';
 import { manifestSchema, type MepReplay, type ViewerConfig, type ViewerPackage, type WebProperty } from './mep-contract';
+import { normalizeRoomElevation } from './mep-room';
 
 export async function digest(data: Uint8Array): Promise<string> {
   const copy = Uint8Array.from(data);
@@ -30,12 +31,14 @@ export async function openViewerPackage(url: string, fetchAsset?: () => Promise<
     const expected = manifest.files['viewer.json'];
     if (!expected || expected.bytes !== viewerFile.byteLength || await digest(viewerFile) !== expected.sha256) throw new Error('Contrôle d’intégrité échoué pour viewer.json');
   }
+  const viewer = viewerFile ? JSON.parse(strFromU8(viewerFile)) as ViewerConfig : null;
+  if (viewer?.rooms) viewer.rooms = viewer.rooms.map(normalizeRoomElevation);
   return {
     manifest,
     modelUrl, overviewUrl,
     replay: JSON.parse(strFromU8(archive['mep.json'])) as MepReplay,
     properties: JSON.parse(strFromU8(archive['properties.json'])) as WebProperty[],
-    viewer: viewerFile ? JSON.parse(strFromU8(viewerFile)) as ViewerConfig : null,
+    viewer,
     dispose: () => { URL.revokeObjectURL(modelUrl); if (overviewUrl) URL.revokeObjectURL(overviewUrl); },
   };
 }

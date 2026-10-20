@@ -1479,17 +1479,30 @@ namespace BIMaestro.VideoGames
                         out string terminalJunctionKey) ||
                     string.IsNullOrWhiteSpace(terminalJunctionKey) ||
                     !manifoldArms.TryGetValue(sidePort,
-                        out HashSet<int> sideArm))
+                        out HashSet<int> sideArm) ||
+                    !junctionSimpleArms.TryGetValue(junctionKey, out var manifoldSimpleArms) ||
+                    !manifoldSimpleArms.TryGetValue(sidePort, out bool simpleManifoldArm) || !simpleManifoldArm)
                 {
                     continue;
                 }
+
+                // A shortest distance from all inlets can turn halfway along
+                // a tee-to-tee arm (two fronts meet). Choose the arm direction
+                // once at its boundaries, then propagate along its own topology.
+                var armDistances = BuildArmDistances(sidePort, sideArm);
+                var terminal = _graph.FindElement(terminalJunctionKey);
+                var terminalPorts = terminal?.ConnectorIndices.Where(sideArm.Contains).ToArray();
+                if (terminalPorts == null || terminalPorts.Length != 1 ||
+                    highDistance[sidePort] < 0 || highDistance[terminalPorts[0]] < 0 ||
+                    highDistance[sidePort] == highDistance[terminalPorts[0]]) continue;
+                bool awayFromJunction = highDistance[sidePort] < highDistance[terminalPorts[0]];
 
                 foreach (GameMepPathData branchPath in sideArm
                     .Where(index => index >= 0 && index < connectorCount)
                     .Select(index => _graph.FindElement(
                         _graph.Connectors[index].ElementKey))
-                    .Where(item => item?.IsPipeCurve == true &&
-                        !item.IsPipeJunction)
+                    .Where(item => item != null && !item.IsPipeJunction &&
+                        (item.IsPipeCurve || IsPassiveTwoPortComponent(item)))
                     .Cast<GameMepElementData>()
                     .SelectMany(item => item.Paths)
                     .Where(item => item.EndConnector >= 0)
@@ -1499,13 +1512,14 @@ namespace BIMaestro.VideoGames
                     int end = branchPath.EndConnector;
                     if (start < 0 || start >= highDistance.Length ||
                         end < 0 || end >= highDistance.Length ||
-                        highDistance[start] < 0 || highDistance[end] < 0 ||
-                        highDistance[start] == highDistance[end])
+                        !armDistances.TryGetValue(start, out int startDistance) ||
+                        !armDistances.TryGetValue(end, out int endDistance) ||
+                        startDistance == endDistance)
                     {
                         continue;
                     }
 
-                    bool forward = highDistance[start] < highDistance[end];
+                    bool forward = (startDistance < endDistance) == awayFromJunction;
                     if (suppliedManifoldBranchDirections.TryGetValue(
                             branchPath, out bool existing) && existing != forward)
                     {

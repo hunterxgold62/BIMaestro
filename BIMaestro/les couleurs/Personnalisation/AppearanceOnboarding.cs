@@ -53,7 +53,7 @@ namespace Couleur
             if (DateTime.UtcNow - _projectReadyUtc.Value < TimeSpan.FromSeconds(8)) return;
             if (GetForegroundWindow() != app.MainWindowHandle) return;
             // Let BIMaestro's existing welcome dialog finish before asking.
-            if (Application.Current?.Windows.Cast<Window>().Any(window => window.IsVisible) == true) return;
+            if (BIMaestro.Welcome.WelcomeManager.HasVisibleBIMaestroWindow()) return;
             _askedThisSession = true;
             try
             {

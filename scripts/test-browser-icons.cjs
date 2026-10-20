@@ -78,7 +78,12 @@ const script = value => source.replace('__ICON_CONFIGURATION__', JSON.stringify(
     assert.deepEqual(errors, []);
     const catalog = [['lighting','Éclairage'],['power','Électricité'],['ventilation','Ventilation'],['plumbing','Plomberie'],
       ['architecture','Architecture'],['structure','Structure'],['coordination','Coordination'],
-      ['heating','Chauffage'],['fire','Sécurité incendie'],['data','Réseaux informatiques']];
+      ['heating','Chauffage'],['fire','Sécurité incendie'],['data','Réseaux informatiques'],
+      ['existing','Existant'],['demolition','Démolition'],['new-project','Nouveau projet'],
+      ['study','Études'],['validation','Validation'],['publication','Publication'],['archive','Archives'],
+      ['levels','Niveaux'],['zone','Zones'],['garden','Jardin'],['room','Chambres'],
+      ['reception','Accueil'],['restaurant','Restaurant'],['roof','Toiture'],['details','Détails'],['presentation','Présentation']];
+    await page.setViewportSize({ width: 700, height: 900 });
     await page.setContent(`<style>body{margin:0;font:16px Segoe UI;display:flex}.panel{padding:24px;width:300px;background:#172434;color:#edf2fa}.light{background:#f5f6f8;color:#182333}.row{display:flex;align-items:center;gap:6px;height:32px}img{width:18px;height:18px;object-fit:contain}</style>${['panel','panel light'].map(cls => `<div class="${cls}">${catalog.map(([id,name]) => `<div class="row"><img src="${icon(id)}">${name}</div>`).join('')}</div>`).join('')}`);
     await page.waitForFunction(() => Array.from(document.images).every(i => i.complete && i.naturalWidth));
     await page.screenshot({ path: path.join(root, 'tmp/browser-icons/catalog-preview.png') });

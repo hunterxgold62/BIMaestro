@@ -1,7 +1,7 @@
 const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'..');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/lemer/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
-const publicDir=path.join(root,'.sites/bimaestro-viewer-mep-audit/public');
+const publicDir=path.resolve(root,process.env.MEP_ENGINE_PUBLIC_DIR || '.sites/bimaestro-viewer-mep-audit/public');
 const cases=JSON.parse(fs.readFileSync(path.resolve(root,process.env.MEP_PARITY_FILE || 'tmp/mep-parity.json'),'utf8'));
 if (process.argv.includes('--permutations')) {
  for (const item of [...cases]) {

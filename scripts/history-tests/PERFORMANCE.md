@@ -136,11 +136,15 @@ Les appels explicites de validation gardent la possibilité de capturer les terr
 L'inventaire inactif examine au maximum 100 candidats par lot, avec un budget de
 500 ms contrôlé entre éléments (150 ms avant l'ajustement du 14 octobre demandé
 par l'utilisateur ; initialement 25 candidats / 25 ms). Le passage global
-ne démarre d'autres étapes que si moins de 200 ms se sont écoulées, puis laisse au moins 2 secondes
+ne démarre d'autres étapes que si moins de 200 ms se sont écoulées, puis laisse au moins 1 seconde
 de pause. Une API individuelle ne peut toujours pas être interrompue.
 La préparation explicite de sélection conserve ses petits passages immédiats.
-Son affichage sépare maintenant les recettes manquantes en préparation des éléments
-déjà préparés dont les compléments sont encore en cours, et signale les terrains exclus.
+Depuis le 16 octobre, le délai d'inactivité et le délai initial sont d'une seconde.
+La fenêtre de préparation de sélection et ses avertissements de recettes manquantes
+sont supprimés. La sélection reste prioritaire, avec capture de base immédiate
+limitée et poursuite par petits lots. Les données déjà capturées sont conservées.
+La suppression n'attend pas la préparation ; une recette non encore capturée ne
+permet pas de garantir la restauration. Les diagnostics restent dans les journaux.
 
 Le journal utilisateur `performance-2026-10-13-10b8ab1feda54875ba97354950c0856a.jsonl`
 montre un archivage de terrain de 17,011 s, dont 14,365 s de copie native.

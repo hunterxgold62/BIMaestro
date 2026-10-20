@@ -43,7 +43,7 @@ import { canAnimate, connectionLabel } from '@/lib/mep-engine';
 import { createFlowMaterial, attachFlowDistances, createFlowChevronGeometry } from '@/lib/mep-flow-material';
 import { createWaterVolume } from '@/lib/mep-water-volume';
 import { waterPathRadii } from '@/lib/mep-water-size';
-import { flowPhases, flowPathKey, flowArrowDistance, flowTrace } from '@/lib/mep-flow-continuity';
+import { flowPhases, flowPathKey, flowArrowDistance, flowTrace, flowFollowChain, flowPulseArrivals } from '@/lib/mep-flow-continuity';
 import { explainFlowEnd, type FlowEnd } from '@/lib/mep-flow-end';
 import { equipmentStopKind } from '@/lib/mep-equipment-stop';
 import { useMepCalculation } from '@/hooks/use-mep-calculation';
@@ -589,7 +589,15 @@ export function MepViewer() {
     const flowVisuals: FlowVisual[] = [];
     const valveVisuals: ValveVisual[] = [];
     let traceRoutes = new Map<string, { start: number; length: number; forward: boolean }>();
+    let cameraRoutes = new Map<string, { start: number; length: number; forward: boolean }>();
+    let pulseArrivals = new Map<string, number[]>();
+    let followBranchKey: string | undefined;
     let pulseEnd = 0, lastPulseRequest = -1;
+    const refreshPulseEnd = () => {
+      pulseEnd = 0;
+      for (const [key, route] of traceRoutes) for (const start of pulseArrivals.get(key) || [route.start]) pulseEnd = Math.max(pulseEnd, start + route.length + 3);
+      for (const route of cameraRoutes.values()) pulseEnd = Math.max(pulseEnd, route.start + route.length + 3);
+    };
     let pulseTravel = 0, lastPulseTick = performance.now(), lastFollowStep = '';
     let followHistory: string[] = [], lastHistoryNetwork = '';
     const visitedEquipment = new Set<string>();
@@ -602,9 +610,10 @@ export function MepViewer() {
       const property = propertiesByIndex.get(selectedIndexRef.current ?? -1);
       traceSeed = elementKey || property?.key || null; traceReverse = reverse;
       traceRoutes = traceSeed && graphStateRef.current ? flowTrace(graphStateRef.current, traceSeed, reverse) : new Map();
+      pulseArrivals = traceSeed && graphStateRef.current ? flowPulseArrivals(graphStateRef.current, traceSeed, reverse) : new Map();
+      cameraRoutes.clear();
       pulseTravel = 0; lastPulseTick = performance.now();
-      pulseEnd = 0;
-      for (const route of traceRoutes.values()) pulseEnd = Math.max(pulseEnd, route.start + route.length + 3);
+      refreshPulseEnd();
       if (traceRoutes.size) setFlowsVisible(true);
     };
     const edgeMaterials: THREE.LineBasicMaterial[] = [];
@@ -752,8 +761,12 @@ export function MepViewer() {
       // Rebuild its admissible route from the current calculation, preserving time.
       if (traceRoutes.size && traceSeed) {
         traceRoutes = flowTrace(nextGraph, traceSeed, traceReverse);
-        pulseEnd = 0;
-        for (const route of traceRoutes.values()) pulseEnd = Math.max(pulseEnd, route.start + route.length + 3);
+        pulseArrivals = flowPulseArrivals(nextGraph, traceSeed, traceReverse);
+        if (followRoute.length) {
+          cameraRoutes = flowFollowChain(nextGraph, traceSeed, traceReverse, followBranchKey).routes;
+          followRoute = [...cameraRoutes.keys()].map(key => flowVisuals.find(visual => flowPathKey(visual.elementKey, visual.pathOrdinal) === key)).filter((visual): visual is FlowVisual => !!visual);
+        }
+        refreshPulseEnd();
       }
     };
     viewActionsRef.current = {
@@ -766,28 +779,20 @@ export function MepViewer() {
         traceSelection(elementKey, reverse);
         followPausedRef.current = false; setFollowPaused(false);
         lastFollowStep = ''; followHistory = []; lastHistoryNetwork = ''; setFollowStep(null);
-        followRoute = flowVisuals.filter(visual => traceRoutes.has(flowPathKey(visual.elementKey, visual.pathOrdinal)))
-          .sort((a, b) => traceRoutes.get(flowPathKey(a.elementKey, a.pathOrdinal))!.start - traceRoutes.get(flowPathKey(b.elementKey, b.pathOrdinal))!.start || a.elementKey.localeCompare(b.elementKey));
+        if (!traceSeed || !graphStateRef.current) return;
+        const chain = flowFollowChain(graphStateRef.current, traceSeed, reverse, branchKey);
+        followBranchKey = branchKey;
+        cameraRoutes = chain.routes;
+        refreshPulseEnd();
+        followRoute = [...chain.routes.keys()].map(key => flowVisuals.find(visual => flowPathKey(visual.elementKey, visual.pathOrdinal) === key)).filter((visual): visual is FlowVisual => !!visual);
         if (!followRoute.length) return;
-        // Follow one continuous branch at junctions instead of jumping between parallel routes.
-        const chain = [followRoute[0]];
-        let branches: Array<{ key: string; name: string }> = [];
-        while (chain.length < followRoute.length) {
-          const tail = chain[chain.length - 1], tailRoute = traceRoutes.get(flowPathKey(tail.elementKey, tail.pathOrdinal))!;
-          const end = tail.points[tailRoute.forward ? tail.points.length - 1 : 0];
-          const candidates = followRoute.filter(candidate => {
-            if (chain.includes(candidate)) return false;
-            const route = traceRoutes.get(flowPathKey(candidate.elementKey, candidate.pathOrdinal))!;
-            return Math.abs(route.start - tailRoute.start - tailRoute.length) < .05 && candidate.points[route.forward ? 0 : candidate.points.length - 1].distanceTo(end) < .05;
-          });
-          if (candidates.length > 1 && !branches.length) branches = candidates.map(candidate => ({ key: flowPathKey(candidate.elementKey, candidate.pathOrdinal), name: `${graphStateRef.current?.systems.find(system => system.key === candidate.systemKey)?.name || candidate.systemKey} · ${propertiesByKey.get(candidate.elementKey)?.name || candidate.elementKey} #${propertiesByKey.get(candidate.elementKey)?.elementId || candidate.elementKey} · branche ${candidate.pathOrdinal + 1}` }));
-          const next = candidates.find(candidate => flowPathKey(candidate.elementKey, candidate.pathOrdinal) === branchKey) || candidates[0];
-          if (!next) break;
-          chain.push(next);
-        }
-        followRoute = chain;
+        const branches = chain.branches.map(key => {
+          const candidate = flowVisuals.find(visual => flowPathKey(visual.elementKey, visual.pathOrdinal) === key);
+          const element = graphStateRef.current?.elements.find(element => key.startsWith(element.key + '\0'));
+          return { key, name: candidate ? `${graphStateRef.current?.systems.find(system => system.key === candidate.systemKey)?.name || candidate.systemKey} · ${element?.name || candidate.elementKey} #${element?.elementId || candidate.elementKey} · branche ${candidate.pathOrdinal + 1}` : element?.name || key };
+        });
         setFollowBranches(branches);
-        const first = followRoute[0], route = traceRoutes.get(flowPathKey(first.elementKey, first.pathOrdinal))!;
+        const first = followRoute[0], route = cameraRoutes.get(flowPathKey(first.elementKey, first.pathOrdinal))!;
         const start = first.points[route.forward ? 0 : first.points.length - 1];
         controls.target.copy(start);
         followOffset.copy(camera.position).sub(start);
@@ -1738,7 +1743,7 @@ export function MepViewer() {
         pulseTravel += pulseElapsed * 8 * (followRoute.length ? followPausedRef.current ? 0 : followSpeedRef.current * (equipmentSlow ? .3 : 1) : 1);
         if (followRoute.length && !followPausedRef.current) {
           if (equipmentStopsRef.current) for (const candidate of followRoute) {
-            const route = traceRoutes.get(flowPathKey(candidate.elementKey, candidate.pathOrdinal));
+            const route = cameraRoutes.get(flowPathKey(candidate.elementKey, candidate.pathOrdinal));
             if (!route || visitedEquipment.has(candidate.elementKey) || candidate.targetActive <= 0 || route.start > pulseTravel || route.start + route.length < previousPulseTravel) continue;
             const element = graphStateRef.current?.elements.find(element => element.key === candidate.elementKey);
             const kind = equipmentStopKind(element);
@@ -1753,10 +1758,10 @@ export function MepViewer() {
         const pulseDistance = pulseTravel;
         if (followRoute.length) {
           const visual = followRoute.find(visual => {
-            const route = traceRoutes.get(flowPathKey(visual.elementKey, visual.pathOrdinal));
+            const route = cameraRoutes.get(flowPathKey(visual.elementKey, visual.pathOrdinal));
             return route && pulseDistance >= route.start && pulseDistance <= route.start + route.length;
           });
-          const route = visual && traceRoutes.get(flowPathKey(visual.elementKey, visual.pathOrdinal));
+          const route = visual && cameraRoutes.get(flowPathKey(visual.elementKey, visual.pathOrdinal));
           if (visual && route && visual.targetActive > 0) {
             const progress = THREE.MathUtils.clamp((pulseDistance - route.start) / Math.max(route.length, .001), 0, 1);
             const cumulative = [0];
@@ -1813,6 +1818,21 @@ export function MepViewer() {
           visual.current.pulseStart.value = route ? route.start + (route.forward ? 0 : route.length) : 0;
           visual.current.pulseDistance.value = pulseDistance;
           visual.current.pulseEnabled.value = route && pulseDistance >= 0 && pulseDistance <= pulseEnd && visual.targetActive > 0 ? 1 : 0;
+          const pathKey = flowPathKey(visual.elementKey, visual.pathOrdinal);
+          const cameraRoute = cameraRoutes.get(pathKey);
+          const arrivals = pulseArrivals.get(pathKey) || [];
+          const offset = route?.forward === false ? route.length : 0;
+          const extras = visual.current.extraPulseStarts.value;
+          let extraCount = 0;
+          for (const start of arrivals) {
+            if (route && Math.abs(start - route.start) >= .05 && extraCount < 7) extras[extraCount++] = start + offset;
+          }
+          // Always preserve the camera's own front, even beyond the bounded arrival slots.
+          if (route && cameraRoute && Math.abs(cameraRoute.start - route.start) >= .05 && !arrivals.some(start => Math.abs(start - cameraRoute.start) < .05)) {
+            extras[Math.min(extraCount, 6)] = cameraRoute.start + offset;
+            extraCount = Math.min(extraCount + 1, 7);
+          }
+          visual.current.extraPulseCount.value = extraCount;
           if (visual.water?.mesh.visible) {
             visual.water.uniforms.time.value = visual.current.time.value;
             visual.water.uniforms.active.value = visual.current.active.value;
@@ -1820,6 +1840,8 @@ export function MepViewer() {
             visual.water.uniforms.pulseDirection.value = visual.current.pulseDirection.value;
             visual.water.uniforms.pulseDistance.value = pulseDistance;
             visual.water.uniforms.pulseEnabled.value = visual.current.pulseEnabled.value;
+            visual.water.uniforms.extraPulseStarts.value.set(extras);
+            visual.water.uniforms.extraPulseCount.value = extraCount;
             if (visual.current.active.value <= .01) visual.water.mesh.visible = false;
           }
         }

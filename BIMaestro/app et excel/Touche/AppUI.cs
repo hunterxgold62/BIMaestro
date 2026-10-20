@@ -197,6 +197,10 @@ public partial class AppUI : IExternalApplication
 
            new RibbonPanelDefinition("Couleur et information", new List<RibbonItemDefinition>
             {
+                new RibbonItemDefinition("HomeAppearanceTest", "Accueil · Test", panel => AddPushButton(panel,
+                    "HomeAppearanceTest", "Accueil\nTest", assemblyPath,
+                    "BIMaestro.Home.HomeAppearanceCommand", "Miniature.png",
+                    "Choisit l’un des quatre affichages de l’accueil et active le catalogue du journal Excel. Suit le thème clair ou sombre de Revit. Aucun changement avant activation.")),
                 new RibbonItemDefinition("Changement de couleur", "Couleurs et onglets", panel => AddColorAndDeckButtons(panel, assemblyPath, new List<(string, string, string, string, string)>
                 {
                     ("Couleur de projet", "Couleurs", "Couleur.ToggleCombinedColoringCommand", "Couleur oui non.png","Clic : ouvre la personnalisation des couleurs. Double-clic : active ou désactive les panneaux colorés."),
@@ -618,6 +622,8 @@ public partial class AppUI : IExternalApplication
         buttonText = UiLanguage.T(buttonText);
         toolTip = UiLanguage.T(toolTip);
         PushButtonData buttonData = new PushButtonData(buttonName, buttonText, assemblyPath, className);
+        if (buttonName == "HomeAppearanceTest")
+            buttonData.AvailabilityClassName = "BIMaestro.Home.HomeAppearanceAvailability";
 
         // ToolTip / LongDescription (comme tu faisais)
         string tt = toolTip ?? "";

@@ -8,6 +8,24 @@ namespace Analyse
 {
     internal static partial class ElementHistoryReconstruction
     {
+        private static readonly System.Reflection.MethodInfo ShapeAddPoint =
+            typeof(SlabShapeEditor).GetMethod("AddPoint", new[] { typeof(XYZ) })
+            ?? typeof(SlabShapeEditor).GetMethod("DrawPoint", new[] { typeof(XYZ) });
+        private static readonly System.Reflection.MethodInfo ShapeAddSplitLine =
+            typeof(SlabShapeEditor).GetMethod("AddSplitLine", new[] { typeof(SlabShapeVertex), typeof(SlabShapeVertex) })
+            ?? typeof(SlabShapeEditor).GetMethod("DrawSplitLine", new[] { typeof(SlabShapeVertex), typeof(SlabShapeVertex) });
+
+        private static object InvokeShapeMethod(System.Reflection.MethodInfo method, SlabShapeEditor editor, object[] arguments)
+        {
+            if (method == null) throw new NotSupportedException("Cette version de Revit ne permet pas de recréer les points ou lignes de forme du sol.");
+            try { return method.Invoke(editor, arguments); }
+            catch (System.Reflection.TargetInvocationException ex) when (ex.InnerException != null)
+            {
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+                throw;
+            }
+        }
+
         private static void CaptureSlabShape(SlabShapeEditor editor, HistoryRecipe recipe)
         {
             recipe.ShapePoints = editor.SlabShapeVertices.Cast<SlabShapeVertex>().Select(v => Pack(v.Position)).ToList();
@@ -29,11 +47,8 @@ namespace Analyse
             foreach (var saved in recipe.ShapePoints)
             {
                 if (vertices.Any(v => SameXY(v.Position, saved))) continue;
-#if REVIT2025_OR_GREATER
-                var vertex = editor.AddPoint(new XYZ(saved[0], saved[1], baseZ));
-#else
-                var vertex = editor.DrawPoint(new XYZ(saved[0], saved[1], baseZ));
-#endif
+                var vertex = (SlabShapeVertex)InvokeShapeMethod(ShapeAddPoint, editor,
+                    new object[] { new XYZ(saved[0], saved[1], baseZ) });
                 if (vertex == null) throw new InvalidOperationException("Un point de forme du sol n’a pas pu être recréé.");
                 vertices = editor.SlabShapeVertices.Cast<SlabShapeVertex>().ToList();
             }
@@ -41,11 +56,7 @@ namespace Analyse
             {
                 var a = vertices.Single(v => SameXY(v.Position, crease.Start));
                 var b = vertices.Single(v => SameXY(v.Position, crease.End));
-#if REVIT2025_OR_GREATER
-                editor.AddSplitLine(a, b);
-#else
-                editor.DrawSplitLine(a, b);
-#endif
+                InvokeShapeMethod(ShapeAddSplitLine, editor, new object[] { a, b });
             }
             foreach (var saved in recipe.ShapePoints)
             {
@@ -73,11 +84,7 @@ namespace Analyse
             };
             if (element is FootPrintRoof roof)
             {
-#if REVIT2024 || REVIT2025_OR_GREATER
-                if (roof.GetSlabShapeEditor()?.IsEnabled == true)
-#else
-                if (roof.SlabShapeEditor?.IsEnabled == true)
-#endif
+                if (GetShapeEditor(roof)?.IsEnabled == true)
                 { diagnostic?.Invoke("Toiture modifiée par points : données de forme non prises en charge."); return null; }
                 recipe.Kind = "roof";
                 recipe.Offset = Value(roof, BuiltInParameter.ROOF_LEVEL_OFFSET_PARAM);

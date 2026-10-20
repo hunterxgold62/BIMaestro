@@ -358,10 +358,8 @@ namespace Modification
             if (ogs.Halftone)
                 return true;
 
-#if REVIT_2025_OR_GREATER
             if (ogs.Transparency >= 0)
                 return true;
-#endif
 
             return false;
         }

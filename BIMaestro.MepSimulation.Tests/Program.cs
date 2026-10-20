@@ -107,6 +107,21 @@ namespace BIMaestro.VideoGames
         {
             try
             {
+                if (args.Length == 2 && args[0] == "--verify-flow-follow")
+                {
+                    var graph = GameMepReplayStore.Load(args[1]).Graph;
+                    var engine = new GameMepSimulationEngine(graph); engine.Recalculate();
+                    foreach (long id in new long[] { 824096, 824098, 862290 })
+                    {
+                        var path = graph.FindElement(id).Paths.Single();
+                        Console.WriteLine(id + ": " + path.FlowForward + " " + path.DirectionReason);
+                    }
+                    Assert(graph.FindElement(824096).Paths.Single().FlowForward == graph.FindElement(824098).Paths.Single().FlowForward &&
+                        graph.FindElement(824098).Paths.Single().FlowForward == graph.FindElement(862290).Paths.Single().FlowForward,
+                        "The real model serial arm must cross elbow 824098 without opposite directions.");
+                    File.WriteAllText("tmp/flow-investigation/recalculated.json", Newtonsoft.Json.JsonConvert.SerializeObject(graph, GameMepCalculation.JsonSettings));
+                    Console.WriteLine("Real flow-follow regression passed."); return 0;
+                }
                 if (args.Length == 2 && args[0] == "--export-parity") GameMepParity.OutputPath = args[1];
                 if (args.Length == 3 && args[0] == "--verify-antibes-inlet")
                 {

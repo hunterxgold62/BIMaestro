@@ -43,7 +43,7 @@ namespace Analyse
                 && unchecked(now - lastInput) >= minimumIdleMilliseconds;
         }
 
-        internal static bool UserIsIdle(uint minimumIdleMilliseconds = 2000)
+        internal static bool UserIsIdle(uint minimumIdleMilliseconds = 1000)
         {
             if (Paused) return false;
             var input = new LastInput { Size = (uint)Marshal.SizeOf(typeof(LastInput)) };
@@ -339,6 +339,9 @@ namespace Analyse
 
         internal static void ProcessPendingBackground(Document source, bool selectionOnly = false)
         {
+            if (!ElementHistoryTracker.CaptureDetailedDeletedMesh) return;
+            // Native API copies can be indivisible: selection prioritizes them, but does not bypass idle.
+            if (selectionOnly && !HistoryBackgroundWork.UserIsIdle()) return;
             if (HistoryBackgroundWork.UserIsIdle())
             {
                 foreach (var idleState in States.Values.Where(s=>s.Archive!=null && s.Pending.Count==0
@@ -349,7 +352,8 @@ namespace Analyse
             var now = DateTime.UtcNow;
             state.LastBackgroundCheckUtc = now;
             if (!selectionOnly && now < state.NextBackgroundUtc) { state.LastBlockReason = "cooldown"; return; }
-            bool CanContinue() => selectionOnly ? HistoryBackgroundWork.SelectionCanRun() : HistoryBackgroundWork.UserIsIdle();
+            bool CanContinue() => HistoryBackgroundWork.UserIsIdle()
+                && (!selectionOnly || HistoryBackgroundWork.SelectionCanRun());
             if (!CanContinue()) { state.LastBlockReason = "user_active_or_paused"; return; }
             state.LastBlockReason = null;
             PrioritizeLastSelection(source, state);
@@ -522,8 +526,8 @@ namespace Analyse
             if (priorityOnly && selectedPending.Count == 0) { _processing = false; return; }
             var wave = (selectedPending.Count > 0 ? selectedPending : state.Pending.Values
                 .OrderByDescending(p => state.VisibleRoots.Contains(p.RootUid)).ToList())
-                .OrderBy(p => HistoryCaptureCosts.Estimate(p.CostKey, "native_root", p.ElementClass))
-                .ThenByDescending(p => state.VisibleRoots.Contains(p.RootUid))
+                .OrderByDescending(p => state.VisibleRoots.Contains(p.RootUid))
+                .ThenBy(p => HistoryCaptureCosts.Estimate(p.CostKey, "native_root", p.ElementClass))
                 .Take(Math.Max(1, Math.Min(16, maxRoots))).ToList();
             // Yield sooner during automatic work; a single Revit copy is indivisible.
             var copyBudgetMs = background ? 50 : 250;
@@ -577,7 +581,8 @@ namespace Analyse
                 var timer = Stopwatch.StartNew();
                 foreach (var pending in wave)
                 {
-                    if (background && !(priorityOnly ? HistoryBackgroundWork.SelectionCanRun() : HistoryBackgroundWork.UserIsIdle())) break;
+                    if (background && (!HistoryBackgroundWork.UserIsIdle()
+                        || (priorityOnly && !HistoryBackgroundWork.SelectionCanRun()))) break;
                     var rootTimer = Stopwatch.StartNew();
                     foreach (var receipt in pending.Receipts) receipt.StartedUtc = DateTime.UtcNow;
                     var root = source.GetElement(pending.RootId);

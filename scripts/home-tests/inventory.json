@@ -1,0 +1,256 @@
+{
+  "collectedDate": "2026-10-16",
+  "scope": "Installed-file inventory plus live Home experiment; matrix evidence preserved separately. Not a released feature.",
+  "sdk": [
+    "9.0.300"
+  ],
+  "desktopReferencePacks": [
+    "8.0.16",
+    "9.0.5"
+  ],
+  "desktopRuntimes": [
+    "8.0.16",
+    "8.0.21",
+    "9.0.5",
+    "10.0.10"
+  ],
+  "revit": [
+    {
+      "year": 2023,
+      "root": "C:/Program Files/Autodesk/Revit 2023",
+      "revitFileVersion": "23.0.11.19",
+      "homeAssemblyVersion": "23.0.11.19",
+      "manifestClass": "ModelBrowser.ModelBrowserApplication",
+      "manifestSeparateContext": false,
+      "localLegacyAssets": [
+        {
+          "path": "C:\\Program Files\\Autodesk\\Revit 2023\\AddIns\\ModelBrowser\\resource\\index.html",
+          "bytes": 550,
+          "sha256": "0B3ABADD6A87A4B58CBB11C8547E497B3E07C2FACB500C0581A0C990925ABB90"
+        },
+        {
+          "path": "C:\\Program Files\\Autodesk\\Revit 2023\\AddIns\\ModelBrowser\\resource\\static\\css\\index.main.css",
+          "bytes": 285655,
+          "sha256": "56F0D8ECFFA171D0A3A227864BA2320A1F7ED4F24BFDA61640BFA57C4131B75C"
+        },
+        {
+          "path": "C:\\Program Files\\Autodesk\\Revit 2023\\AddIns\\ModelBrowser\\resource\\static\\js\\index.bundle.js",
+          "bytes": 2914873,
+          "sha256": "683EB476C8EE37F9358784AFC89D9CAA05D5065359E7820E98D3EEF9D78AB7E2"
+        }
+      ],
+      "runtimeConfig": null,
+      "liveStatus": "verified-experimental",
+      "architectureEvidence": [
+        "CefSharp",
+        "CefSharp.Wpf.HwndHost",
+        "chromiumWebBrowser"
+      ],
+      "liveEvidence": {
+        "matrixPath": "tmp/home-tests/matrix-results.json",
+        "matrixPassed": true,
+        "cases": 5,
+        "homeKind": "legacy",
+        "url": "file:///C:/Program%20Files/Autodesk/Revit%202023/Addins/ModelBrowser/resource/index.html#/",
+        "browser": "CEF",
+        "nativeOpenThenCancel": "verified by root agent",
+        "screenshot": "tmp/home-tests/screenshots/2023-compact.png",
+        "productionReady": false
+      }
+    },
+    {
+      "year": 2024,
+      "root": "C:/Program Files/Autodesk/Revit 2024",
+      "revitFileVersion": "24.3.30.11",
+      "homeAssemblyVersion": "24.3.30.11",
+      "manifestClass": "ModelBrowser.ModelBrowserApplication",
+      "manifestSeparateContext": false,
+      "localLegacyAssets": [
+        {
+          "path": "C:\\Program Files\\Autodesk\\Revit 2024\\AddIns\\ModelBrowser\\resource\\index.html",
+          "bytes": 564,
+          "sha256": "92B39DEDA9168BDEC71B97A9C903E8A66EC1297EF5D2377AD864853EB453B671"
+        },
+        {
+          "path": "C:\\Program Files\\Autodesk\\Revit 2024\\AddIns\\ModelBrowser\\resource\\static\\css\\index.main.css",
+          "bytes": 342265,
+          "sha256": "50634CD3514EEBA7CA16F09C62C255CABB4B4A786F9D913BBBA450DB0258F0DE"
+        },
+        {
+          "path": "C:\\Program Files\\Autodesk\\Revit 2024\\AddIns\\ModelBrowser\\resource\\static\\js\\index.bundle.js",
+          "bytes": 4262472,
+          "sha256": "A9CC5D127F720AAD89E706FAA42CE030D110163A958D81FF3B15682F9E8CE655"
+        }
+      ],
+      "runtimeConfig": null,
+      "liveStatus": "verified-experimental",
+      "architectureEvidence": [
+        "IBrowserControlAdapter",
+        "cefBrowser",
+        "webview2Browser",
+        "webBrowserControl",
+        "ToggleHomePage"
+      ],
+      "liveEvidence": {
+        "matrixPath": "tmp/home-tests/matrix-results.json",
+        "matrixPassed": true,
+        "cases": 5,
+        "homeKind": "legacy",
+        "url": "file:///C:/Program%20Files/Autodesk/Revit%202024/Addins/ModelBrowser/resource/index.html#/",
+        "browser": "CEF",
+        "nativeOpenThenCancel": "verified by root agent",
+        "screenshot": "tmp/home-tests/screenshots/2024-blueprint.png",
+        "productionReady": false
+      }
+    },
+    {
+      "year": 2025,
+      "root": "C:/Program Files/Autodesk/Revit 2025",
+      "revitFileVersion": "25.5.0.57",
+      "homeAssemblyVersion": "25.5.0.57",
+      "manifestClass": "ModelBrowser.ModelBrowserApplication",
+      "manifestSeparateContext": false,
+      "localLegacyAssets": [
+        {
+          "path": "C:\\Program Files\\Autodesk\\Revit 2025\\AddIns\\ModelBrowser\\resource\\index.html",
+          "bytes": 564,
+          "sha256": "92B39DEDA9168BDEC71B97A9C903E8A66EC1297EF5D2377AD864853EB453B671"
+        },
+        {
+          "path": "C:\\Program Files\\Autodesk\\Revit 2025\\AddIns\\ModelBrowser\\resource\\static\\css\\index.main.css",
+          "bytes": 333204,
+          "sha256": "1CE6A4A8C3E3BC09EF81CD58877E7B87DCAE1F22B4F434A59042308A026C6E28"
+        },
+        {
+          "path": "C:\\Program Files\\Autodesk\\Revit 2025\\AddIns\\ModelBrowser\\resource\\static\\js\\index.bundle.js",
+          "bytes": 4622844,
+          "sha256": "149C05E95E2B4DBCC771F0B5F66A3B990F20EA8936A499D19BFC41BD391FA41E"
+        }
+      ],
+      "runtimeConfig": {
+        "runtimeOptions": {
+          "tfm": "net10.0",
+          "frameworks": [
+            {
+              "name": "Microsoft.NETCore.App",
+              "version": "10.0.0"
+            },
+            {
+              "name": "Microsoft.WindowsDesktop.App",
+              "version": "10.0.0"
+            }
+          ],
+          "configProperties": {
+            "System.Reflection.Metadata.MetadataUpdater.IsSupported": false,
+            "System.Runtime.Serialization.EnableUnsafeBinaryFormatterSerialization": true,
+            "CSWINRT_USE_WINDOWS_UI_XAML_PROJECTIONS": false
+          }
+        }
+      },
+      "liveStatus": "verified-experimental",
+      "architectureEvidence": [
+        "IBrowserControlAdapter",
+        "cefBrowser",
+        "webview2Browser",
+        "webBrowserControl",
+        "ToggleHomePage"
+      ],
+      "liveEvidence": {
+        "matrixPath": "tmp/home-tests/matrix-results.json",
+        "matrixPassed": true,
+        "cases": 5,
+        "homeKind": "uda",
+        "url": "file:///C:/program%20files/autodesk/revit%202025/Addins/ModelBrowser/resource/udabrowser.html#/Recent",
+        "browser": "CEF",
+        "nativeOpenThenCancel": "verified by root agent",
+        "screenshot": "tmp/home-tests/screenshots/2025-dark.png",
+        "productionReady": false
+      }
+    },
+    {
+      "year": 2026,
+      "root": "C:/Program Files/Autodesk/Revit 2026",
+      "revitFileVersion": "26.5.0.55",
+      "homeAssemblyVersion": "26.5.0.55",
+      "manifestClass": "ModelBrowser.ModelBrowserApplication",
+      "manifestSeparateContext": true,
+      "localLegacyAssets": [
+        {
+          "path": "C:\\Program Files\\Autodesk\\Revit 2026\\AddIns\\ModelBrowser\\resource\\index.html",
+          "bytes": 564,
+          "sha256": "92B39DEDA9168BDEC71B97A9C903E8A66EC1297EF5D2377AD864853EB453B671"
+        },
+        {
+          "path": "C:\\Program Files\\Autodesk\\Revit 2026\\AddIns\\ModelBrowser\\resource\\static\\css\\index.main.css",
+          "bytes": 333204,
+          "sha256": "1CE6A4A8C3E3BC09EF81CD58877E7B87DCAE1F22B4F434A59042308A026C6E28"
+        },
+        {
+          "path": "C:\\Program Files\\Autodesk\\Revit 2026\\AddIns\\ModelBrowser\\resource\\static\\js\\index.bundle.js",
+          "bytes": 4627532,
+          "sha256": "D409A78E70E02A9A7BC07E0CE2B447616BEF406B8BDF1C29EE9E04DE1AD1B8A6"
+        }
+      ],
+      "runtimeConfig": {
+        "runtimeOptions": {
+          "tfm": "net10.0",
+          "frameworks": [
+            {
+              "name": "Microsoft.NETCore.App",
+              "version": "10.0.0"
+            },
+            {
+              "name": "Microsoft.WindowsDesktop.App",
+              "version": "10.0.0"
+            },
+            {
+              "name": "Microsoft.AspNetCore.App",
+              "version": "10.0.0"
+            }
+          ],
+          "configProperties": {
+            "System.Reflection.Metadata.MetadataUpdater.IsSupported": false,
+            "System.Runtime.Serialization.EnableUnsafeBinaryFormatterSerialization": true,
+            "CSWINRT_USE_WINDOWS_UI_XAML_PROJECTIONS": false
+          }
+        }
+      },
+      "liveStatus": "verified-experimental",
+      "architectureEvidence": [
+        "BrowserImplementation",
+        "webBrowserControl",
+        "ResetBrowserBackgroundColor",
+        "ContextName=ModelBrowser"
+      ],
+      "liveEvidence": {
+        "matrixPath": "tmp/home-tests/matrix-results.json",
+        "matrixPassed": true,
+        "cases": 5,
+        "homeKind": "uda",
+        "url": "file:///C:/Program%20Files/Autodesk/Revit%202026/Addins/ModelBrowser/resource/udabrowser.html",
+        "browser": "WebView2",
+        "nativeOpenThenCancel": "verified by root agent",
+        "screenshot": "tmp/home-tests/screenshots/2026-large.png",
+        "productionReady": false
+      }
+    }
+  ],
+  "liveMatrix": {
+    "passed": true,
+    "cases": 20,
+    "failures": 0,
+    "startedUtc": "2026-10-16T21:24:30.6138407Z",
+    "updatedUtc": "2026-10-16T21:24:44.9036279Z",
+    "finalCleanup": "Verified: all four Home presets restored; enhancements restored; exact temporary probe registrations removed. Existing test processes may retain probe until closed; no next-startup registration.",
+    "limitations": [
+      "Only active Home mode tested per version",
+      "Search-route rerender may require theme reapplication",
+      "No restart persistence or production integration acceptance"
+    ],
+    "restorationEvidence": [
+      "tmp/home-tests/matrix-results.json",
+      "tmp/home-tests/enhancements-restored.json",
+      "tmp/home-tests/screenshots/2025-restored.png"
+    ]
+  }
+}

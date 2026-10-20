@@ -334,17 +334,10 @@ namespace BIMaestro.Codex
 
         private static ElementId ParseElementId(JToken token, string name)
         {
-#if REVIT2024
             if (token?.Type != JTokenType.String ||
                 !long.TryParse((string)token, NumberStyles.Integer, CultureInfo.InvariantCulture, out long value) || value <= 0)
                 throw new InvalidOperationException("Identifiant Revit invalide : " + name + ".");
-            return new ElementId(value);
-#else
-            if (token?.Type != JTokenType.String ||
-                !int.TryParse((string)token, NumberStyles.Integer, CultureInfo.InvariantCulture, out int value) || value <= 0)
-                throw new InvalidOperationException("Identifiant Revit invalide : " + name + ".");
-            return new ElementId(value);
-#endif
+            return ElementIdExtensions.CreateElementId(value);
         }
 
         private static XYZ ReadWaypoint(JToken token)

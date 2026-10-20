@@ -1,0 +1,10 @@
+{
+  "engineVersion": "mep-topology-2.0.1",
+  "hashes": {
+    "GameMepData.cs": "137b822222cc3be62e2d93c636d05e5d722057d7bc9a1eb9f392ca5a1b243ec6",
+    "GameMepImpact.cs": "a11b433e9d656dc07c7c10fbb51918e6d78e539567ef86c2794135cb5c574a53",
+    "GameMepCalculation.cs": "bd6f856577012dd7b0e1e7d4bcaf562690643a4657ae4b53a48f3fc418895f70",
+    "GameMepDirectionExplanation.cs": "a857d77012597d65ce13fc582ea5df1cb0c20803e2b12163cba1f3bbfeb3793d",
+    "GameMepDiagnostics.cs": "8da92ddf0aa788a05e82a3ba3882ad9f2bc98b77a836b27a359d6816a8d5d203"
+  }
+}

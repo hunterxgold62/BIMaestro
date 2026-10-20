@@ -15,6 +15,12 @@ dans la DLL et décodés à 64 px pour un affichage de 18 px. Les imports PNG/JP
 en PNG et conservés dans `iconesArborescence.json`, à côté de `couleursRuban.json` : ils restent
 disponibles si leur fichier d'origine est déplacé. Aucun appel IA n'est fait depuis Revit.
 
+La bibliothèque contient désormais 26 icônes. Les 16 ajouts (phases, validation, publication,
+archives, niveaux, zones, jardin, chambres, accueil, restaurant, toiture, détails et présentation)
+possèdent des sources SVG et des PNG transparents de 64 px générés par
+`scripts/browser-demo/GenerateWorkflowIcons.ps1`. Ils sont incorporés dans toutes les builds
+du plugin et proposés dans le même sélecteur que les dix icônes d'origine.
+
 ## Prompts utilisés
 
 Ajouts : les six images suivantes sont également produites avec imagegen intégré, puis copiées dans ce dossier. Les associations déjà enregistrées restent inchangées.

@@ -1,4 +1,4 @@
-﻿using Autodesk.Revit.DB;
+using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Events;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -62,6 +62,7 @@ namespace Analyse
             public List<string> SketchDependentUniqueIds { get; set; }
             [JsonIgnore] public string CaptureCostKey { get; set; }
             [JsonIgnore] public string CaptureClass { get; set; }
+            [JsonIgnore] public bool RequiresDetailedCapture { get; set; }
         }
 
         private sealed class GhostMeshSnapshot
@@ -250,6 +251,8 @@ namespace Analyse
             internal readonly Dictionary<int, ElementSnapshot> Pending = new Dictionary<int, ElementSnapshot>();
             internal readonly HashSet<int> LightPending = new HashSet<int>();
             internal readonly HashSet<int> CostDeferredIds = new HashSet<int>();
+            internal HashSet<int> VisibleIds = new HashSet<int>();
+            internal int VisibleViewId = -1;
             internal DateTime NotBeforeUtc;
         }
         private static readonly Dictionary<string, RestorationCaptureState> RestorationCaptureByDocumentKey =
@@ -300,7 +303,7 @@ namespace Analyse
         private const int MaxChangedElementSnapshotsPerTransaction = 250;
         private const int DocumentChangedTimeBudgetMs = 300;
         private const int SelectionDetailedGeometryTimeoutMs = 500;
-        private static readonly TimeSpan DeferredPrimeDelay = TimeSpan.FromSeconds(2);
+        private static readonly TimeSpan DeferredPrimeDelay = TimeSpan.FromSeconds(1);
         private static readonly TimeSpan HistoryMaintenanceInitialDelay = TimeSpan.FromMinutes(10);
         private static readonly TimeSpan HistoryMaintenanceInterval = TimeSpan.FromHours(1);
         private const bool IncludeAnnotationCategoriesForFuture = false;
@@ -592,7 +595,6 @@ namespace Analyse
             element = element ?? doc.GetElement(id);
             if (element == null || element is ElementType || element is Material || element is GraphicsStyle
                 || element is View || element is ProjectInfo || element is Autodesk.Revit.DB.Plumbing.PipeSegment) return;
-            if (snapshot.CaptureFailure?.StartsWith("Terrain exclu", StringComparison.Ordinal) == true) return;
             var key = GetDocumentKey(doc);
             if (!RestorationCaptureByDocumentKey.TryGetValue(key, out var state))
                 RestorationCaptureByDocumentKey[key] = state = new RestorationCaptureState();
@@ -643,12 +645,24 @@ namespace Analyse
                         lightProcessed, state.LightPending.Count, state.LightPending.Count == 0);
                 // Finish baseline restoration coverage before joins, circuits, and native fallback.
                 if (selectionOnly && state.LightPending.Any(id => selected?.Contains(id) == true)) return;
+                if (!CaptureDetailedDeletedMesh) return;
                 if (!selectionOnly && HasPendingBasicInventory(doc)) return;
                 // Selection first; remaining order was established by the visible-first inventory.
+                var activeView = doc.ActiveView;
+                if (!selectionOnly && activeView != null && state.VisibleViewId != activeView.Id.GetIdValue()
+                    && FilteredElementCollector.IsViewValidForElementIteration(doc, activeView.Id))
+                {
+                    state.VisibleIds = new HashSet<int>(new FilteredElementCollector(doc, activeView.Id)
+                        .WhereElementIsNotElementType().ToElementIds().Select(id => id.GetIdValue()));
+                    state.VisibleViewId = activeView.Id.GetIdValue();
+                }
                 var selectedPending = selected == null ? Enumerable.Empty<int>() : selected.Where(state.Pending.ContainsKey);
                 var candidates = selectedPending.Concat(selectionOnly ? Enumerable.Empty<int>()
                     : state.Pending.Keys.Where(id => selected?.Contains(id) != true))
+                    .Where(id => !selectionOnly || !state.Pending[id].RequiresDetailedCapture)
                     .OrderByDescending(id => selected?.Contains(id) == true)
+                    .ThenByDescending(id => state.VisibleIds.Contains(id))
+                    .ThenBy(id => state.Pending[id].RequiresDetailedCapture)
                     .ThenBy(id => HistoryCaptureCosts.Estimate(state.Pending[id].CaptureCostKey,
                         "element_enrichment", state.Pending[id].CaptureClass))
                     .Take(10).ToList();
@@ -666,7 +680,16 @@ namespace Analyse
                     {
                         string failure = null;
                         current.Recipe = ElementHistoryReconstruction.Enrich(element, current.Recipe, reason => failure = reason,
-                            allowHeavyTerrain: false);
+                            allowHeavyTerrain: true);
+                        if (current.RequiresDetailedCapture)
+                        {
+                            current.Parameters = CaptureWritableParameters(element);
+                            AddTypeParametersToSnapshot(element, current.Parameters, typeCache);
+                            var bounds = element.get_BoundingBox(null);
+                            current.Location = GetLocation(element, bounds);
+                            current.BBoxMin = bounds?.Min;
+                            current.BBoxMax = bounds?.Max;
+                        }
                         current.CaptureFailure = failure;
                         current.SketchDependentUniqueIds = CaptureSketchDependentUniqueIds(element);
                         if (CaptureDetailedDeletedMesh && selected?.Contains(idValue) == true && !current.DetailCaptureAttempted)
@@ -692,7 +715,7 @@ namespace Analyse
             }
             finally
             {
-                if (selectionOnly && selected != null && SelectionAuditByDocumentKey.TryGetValue(key, out var selectionAudit))
+                if (selected != null && SelectionAuditByDocumentKey.TryGetValue(key, out var selectionAudit))
                 {
                     var roots = selected.Select(id => SnapshotByElementId.TryGetValue(key + "|element|" + id, out var snapshot)
                         ? snapshot.Recipe?.Native?.RootSourceUniqueId : null).Where(uid => uid != null);
@@ -773,39 +796,10 @@ namespace Analyse
             state.ElementIdsLoaded = true;
         }
 
+        // Compatibility entry point: scheduling never scans the document or marks it complete.
         public static void PrimeDocument(Document doc)
         {
-            if (doc == null) return;
-
-            var key = GetDocumentKey(doc);
-            lock (SnapshotByElementId)
-            {
-                if (PrimedDocumentKeys.Contains(key)) return;
-                PrimedDocumentKeys.Add(key);
-            }
-
-            try
-            {
-                foreach (var el in new FilteredElementCollector(doc).WhereElementIsNotElementType())
-                {
-                    PrimeElementSnapshot(el);
-                }
-
-                foreach (var symbol in new FilteredElementCollector(doc).OfClass(typeof(FamilySymbol)))
-                {
-                    PrimeElementSnapshot(symbol);
-                }
-
-                PrimeFamilyDocumentTypes(doc);
-            }
-            catch
-            {
-            }
-
-            lock (SnapshotByElementId)
-            {
-                FamilyParameterPrimedDocumentKeys.Add(key);
-            }
+            ScheduleDeferredPrime(doc);
         }
 
         internal static void PrimeExerciseElements(Document doc, IEnumerable<ElementId> ids)
@@ -817,31 +811,7 @@ namespace Analyse
 
         public static void PrimeFamilyParameterSnapshots(Document doc)
         {
-            if (doc == null) return;
-
-            var key = GetDocumentKey(doc);
-            if (string.IsNullOrWhiteSpace(key)) return;
-
-            lock (SnapshotByElementId)
-            {
-                if (FamilyParameterPrimedDocumentKeys.Contains(key)) return;
-                FamilyParameterPrimedDocumentKeys.Add(key);
-            }
-
-            try
-            {
-                if (doc.IsFamilyDocument)
-                {
-                    PrimeFamilyDocumentTypes(doc);
-                    return;
-                }
-
-                foreach (var symbol in new FilteredElementCollector(doc).OfClass(typeof(FamilySymbol)))
-                    PrimeElementSnapshot(symbol);
-            }
-            catch
-            {
-            }
+            ScheduleDeferredPrime(doc);
         }
 
         private static int PrimeElementSnapshot(Element el, string source = "document_change_or_manual",
@@ -1013,8 +983,9 @@ namespace Analyse
                 var ready = snapshot?.Recipe != null && (native == null || native.Ready);
                 if (ready) status.RecipesAvailable++;
                 if (snapshot?.CaptureFailure?.StartsWith("Terrain exclu", StringComparison.Ordinal) == true) status.ExcludedHeavy++;
-                if (state?.LightPending.Contains(id) == true || state?.Pending.ContainsKey(id) == true
-                    || (native != null && !native.Ready && native.Failure == null))
+                if (state?.LightPending.Contains(id) == true || (CaptureDetailedDeletedMesh
+                    && ((state?.Pending.ContainsKey(id) == true && snapshot?.RequiresDetailedCapture != true)
+                    || (native != null && !native.Ready && native.Failure == null))))
                 {
                     status.Pending++;
                     if (ready) status.AdditionalDetailsPending++;
@@ -1641,12 +1612,14 @@ namespace Analyse
             if (!isCreate && (suppressSecondaryModification || action == "modify_skip" || IsLowValueParameterChange(action, delta)))
             {
                 StoreSnapshot(doc, id, current);
+                QueueRestorationCapture(doc, id, current, el);
                 return true;
             }
 
             if (!isCreate && IsNoisy3DViewChange(action, current, delta))
             {
                 StoreSnapshot(doc, id, current);
+                QueueRestorationCapture(doc, id, current, el);
                 return true;
             }
 
@@ -1669,6 +1642,7 @@ namespace Analyse
             });
 
             StoreSnapshot(doc, id, current);
+            QueueRestorationCapture(doc, id, current, el);
             return true;
         }
 
@@ -1912,20 +1886,23 @@ namespace Analyse
                 catch { }
             }
 
+            var deferHeavy = ElementHistoryReconstruction.RequiresDetailedCapture(el);
             var parameters = CaptureWritableParameters(el);
             AddTypeParametersToSnapshot(el, parameters, typeParameterCache);
 
             string captureFailure = null;
-            var recipe = ElementHistoryReconstruction.Capture(el, reason => captureFailure = reason,
-                includeDetails: includeRestoration, allowHeavyTerrain: false);
+            var recipe = deferHeavy ? null : ElementHistoryReconstruction.Capture(el, reason => captureFailure = reason,
+                includeDetails: includeRestoration, allowHeavyTerrain: CaptureDetailedDeletedMesh, automaticCapture: true);
+            if (deferHeavy) captureFailure = "Préparation réservée au mode détaillé en inactivité.";
             BoundingBoxXYZ bounds = null;
-            try { bounds = el.get_BoundingBox(null); } catch { }
+            if (!deferHeavy) try { bounds = el.get_BoundingBox(null); } catch { }
             var snapshot = new ElementSnapshot
             {
                 CaptureCostKey = HistoryCaptureCosts.Key(el), CaptureClass = el.GetType().Name,
+                RequiresDetailedCapture = deferHeavy,
                 CapturedUtc = DateTime.UtcNow,
                 CaptureSource = "document_change_or_manual",
-                SketchDependentUniqueIds = includeRestoration ? CaptureSketchDependentUniqueIds(el) : null,
+                SketchDependentUniqueIds = includeRestoration && !deferHeavy ? CaptureSketchDependentUniqueIds(el) : null,
                 UniqueId = el.UniqueId,
                 Category = categoryName,
                 Family = CleanHistoryText(family),
@@ -1935,8 +1912,8 @@ namespace Analyse
                 Location = GetLocation(el, bounds),
                 BBoxMin = bounds?.Min,
                 BBoxMax = bounds?.Max,
-                DetailCaptureAttempted = includeOrientedCorners,
-                // Restoration data is independent of the visual preview mode.
+                DetailCaptureAttempted = includeOrientedCorners && !deferHeavy,
+                // Light mode keeps direct recipes; detailed mode adds deferred native/relationship capture.
                 Recipe = recipe,
                 CaptureFailure = captureFailure ?? (!includeRestoration && recipe == null
                     ? "Restauration complexe en attente de préparation différée." : null),
@@ -1945,7 +1922,7 @@ namespace Analyse
                 Parameters = parameters
             };
 
-            if (includeOrientedCorners && !ShouldKeepDetailedSnapshotSimple(el))
+            if (includeOrientedCorners && !deferHeavy && !ShouldKeepDetailedSnapshotSimple(el))
             {
                 var deadlineUtc = detailedGeometryTimeoutMs > 0
                     ? DateTime.UtcNow.AddMilliseconds(detailedGeometryTimeoutMs)

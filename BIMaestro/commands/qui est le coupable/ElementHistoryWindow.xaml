@@ -272,23 +272,23 @@
                     <TextBlock x:Name="ResultText" VerticalAlignment="Center" Foreground="{DynamicResource Text.Secondary}" Text="0 / 0 évènements affichés"/>
                 </WrapPanel>
                 <WrapPanel x:Name="DeletedMeshModePanel" Grid.Row="1" Margin="0,8,0,0">
-                    <TextBlock Text="Aperçu suppression"
+                    <TextBlock Text="Préparation des suppressions"
                                Style="{StaticResource FilterLabel}"
                                VerticalAlignment="Center"
                                Margin="0,0,8,6"/>
                     <RadioButton x:Name="SimpleMeshModeRadio"
-                                 Content="Simple"
+                                 Content="Léger"
                                  GroupName="DeletedMeshMode"
                                  Tag="simple"
                                  Style="{StaticResource ScopeRadioStyle}"
-                                 ToolTip="Aperçu rapide avec boîte estimative ; impact généralement imperceptible sur le PC. Mode conseillé par défaut."
+                                 ToolTip="Recettes simples : murs, sols, portes, fenêtres et tronçons de réseau pris en charge. Priorité à la sélection et à la vue active. Les copies natives, équipements CVC, groupes, escaliers, garde-corps et terrains attendent le mode détaillé."
                                  Checked="DeletedMeshMode_Checked"/>
                     <RadioButton x:Name="DetailedMeshModeRadio"
                                  Content="Détaillé"
                                  GroupName="DeletedMeshMode"
                                  Tag="detailed"
                                  Style="{StaticResource ScopeRadioStyle}"
-                                 ToolTip="Peut ralentir le chargement et demander davantage de ressources au PC. Reconstitue les suppressions futures depuis les familles et types présents (dans leur état actuel). Conserve le maillage pour les formes non prises en charge. Si le type ou l’hôte manque, utilise l’aperçu simplifié."
+                                 ToolTip="Ajoute les relations et les objets complexes : équipements CVC, groupes, escaliers, garde-corps, terrains et copies natives. Préparation progressive en inactivité, sélection puis vue active prioritaires. Certaines opérations Revit peuvent provoquer une pause. Les captures déjà réalisées sont conservées."
                                  Checked="DeletedMeshMode_Checked"/>
                 </WrapPanel>
                 <WrapPanel x:Name="ContextScopePanel" Grid.Row="2" Margin="0,8,0,0" Visibility="Collapsed">

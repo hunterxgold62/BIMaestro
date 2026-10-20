@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MepGraph, MepElement } from './mep-contract';
-import { flowPhases, flowPathKey, flowArrowDistance, flowTrace } from './mep-flow-continuity';
+import { flowPhases, flowPathKey, flowArrowDistance, flowTrace, flowFollowChain, flowPulseArrivals } from './mep-flow-continuity';
 import { decodeMepPoint } from './mep-point';
 
 const edge = (key: string, a: number, b: number, length: number, forward = true): MepElement => ({ key, elementId: a, name: key, category: 'Tuyaux', typeName: '', systemKey: 'water', systemName: 'Eau', connectorIndices: [a, b], flowState: 2, paths: [{ elementKey: key, systemKey: 'water', startConnector: a, endConnector: b, points: [[0, 0, 0], [length, 0, 0]], flowState: 2, hasCirculation: true, flowForward: forward, directionState: 1 }] });
@@ -47,6 +47,22 @@ describe('Connected flow presentation', () => {
 });
 
 describe('Selected flow pulse', () => {
+  it('follows a connected longer branch after a shorter parallel path rejoins it', () => {
+    const g = graph([edge('seed',0,1,2),edge('a-long',1,2,10),edge('b-short',1,2,1),edge('next',2,3,3)]);
+    expect(flowTrace(g,'seed').get(flowPathKey('next',0))?.start).toBe(3);
+    expect(flowPulseArrivals(g,'seed').get(flowPathKey('next',0))).toEqual([3,12]);
+    expect(flowPulseArrivals(g,'next',true).get(flowPathKey('seed',0))).toEqual([4,13]);
+    const follow = flowFollowChain(g,'seed');
+    expect(follow.routes.get(flowPathKey('next',0))?.start).toBe(12);
+    expect(follow.branches).toHaveLength(2);
+    expect(flowFollowChain(g,'seed',false,flowPathKey('b-short',0)).routes.get(flowPathKey('next',0))?.start).toBe(3);
+  });
+  it('stops a camera loop without crossing a closed valve', () => {
+    const g = graph([edge('seed',0,1,2),edge('loop',1,0,2),edge('gate',1,2,2)]);
+    g.valves = [{elementKey:'gate',isClosed:true,isEnabledAsValve:true}] as MepGraph['valves'];
+    expect(flowFollowChain(g,'seed').routes.size).toBe(2);
+    expect(flowPulseArrivals(g,'seed').get(flowPathKey('seed',0))).toEqual([0]);
+  });
   it('starts from a boundary connector even when the source has no rendered path', () => {
     const g = graph([edge('pipe', 0, 1, 2)]);
     g.sources = [{ elementKey: 'boundary', isActive: true, entryConnectorIndex: 1, exitConnectorIndex: 0 }];

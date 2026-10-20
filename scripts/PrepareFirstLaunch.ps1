@@ -1,4 +1,4 @@
-param([switch]$WelcomeOnly)
+param([switch]$WelcomeOnly, [switch]$FreshUser)
 $ErrorActionPreference = 'Stop'
 if (@(Get-Process Revit -ErrorAction SilentlyContinue).Count -gt 0) {
     throw 'Fermer Revit avant de réinitialiser les marqueurs : une instance ouverte pourrait les réécrire.'
@@ -36,6 +36,7 @@ try {
         if ($profileReset) {
             # Keep identity and already supplied profile data when replaying onboarding.
             $state = Get-Content -LiteralPath $saved -Raw | ConvertFrom-Json -AsHashtable
+            if ($FreshUser) { $state = @{ SchemaVersion = 1; InstallId = $state.InstallId } }
             foreach ($name in @('WelcomeShown','HardDismissed','TutorialOfferCompleted')) { $state[$name] = $false }
             foreach ($name in @('FirstCommandUtc','SnoozeUntilUtc','LastAttemptUtc','LastWelcomePromptVersion','LastProfilePromptRevision','TutorialSnoozeUntilUtc')) { $state[$name] = $null }
             $state | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $target -Encoding UTF8

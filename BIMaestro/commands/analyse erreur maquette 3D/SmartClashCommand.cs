@@ -2,7 +2,6 @@
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Licensing;
-using System.Linq;
 
 namespace Analyse
 {
@@ -15,13 +14,6 @@ namespace Analyse
         protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
             var ui = data.Application;
-            var compiledApi = typeof(SmartClashCommand).Assembly.GetReferencedAssemblies().FirstOrDefault(a => a.Name == "RevitAPI")?.Version.Major;
-            if (int.TryParse(ui.Application.VersionNumber, out int revitYear) && revitYear >= 2025 && compiledApi != revitYear - 2000)
-            {
-                TaskDialog.Show("Clash 3D", "Cette DLL de BIMaestro a été compilée pour Revit " + (compiledApi + 2000)
-                    + ". Installez la version dédiée à Revit " + revitYear + ", puis redémarrez Revit.");
-                return Result.Cancelled;
-            }
             if (ui.ActiveUIDocument == null || ui.ActiveUIDocument.Document.IsFamilyDocument)
             {
                 TaskDialog.Show("Clash 3D", "Ouvrez une maquette de projet pour analyser les conflits.");

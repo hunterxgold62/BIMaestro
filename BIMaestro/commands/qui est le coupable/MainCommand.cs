@@ -27,7 +27,7 @@ namespace Analyse
             List<ElementHistoryEvent> initialEvents = null;
             try
             {
-                ElementHistoryTracker.PrimeDocument(uidoc.Document);
+                ElementHistoryTracker.ScheduleDeferredPrime(uidoc.Document);
                 ElementHistoryTracker.FlushPendingForHistory();
                 initialEvents = ElementHistoryWindow.LoadInitialHistory(uidoc.Document, selected, out defaultAction);
             }

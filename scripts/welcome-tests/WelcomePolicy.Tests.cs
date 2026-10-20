@@ -11,6 +11,7 @@ internal static class Program
         try
         {
             var fresh = new WelcomeState();
+            Check(WelcomePromptPolicy.NextAttempt(fresh, version, now) == now, "Fresh welcome must be immediate.");
             Check(WelcomePromptPolicy.ProfileDue(fresh, version, now), "Fresh install must start with profile.");
             foreach (var action in new[] { WelcomeResultAction.OptIn, WelcomeResultAction.Dismiss, WelcomeResultAction.Snooze })
             {
@@ -30,6 +31,7 @@ internal static class Program
                 Check(!WelcomePromptPolicy.TutorialDue(state, now.AddDays(10)), "Opened model is offered again.");
             }
             var known = new WelcomeState { Email = "known@example.invalid", FirstName = "Known", LastName = "User" };
+            Check(WelcomePromptPolicy.NextAttempt(known, "new-version", now) == now, "Update welcome must be immediate.");
             Check(WelcomePromptPolicy.ProfileDue(known, "new-version", now), "Existing users did not receive the company invitation.");
             known.HardDismissed = true;
             Check(WelcomePromptPolicy.ProfileDue(known, "new-version", now), "Old dismissal suppresses the new company invitation.");

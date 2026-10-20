@@ -26,6 +26,7 @@ export function createWaterVolume(points: THREE.Vector3[], color: string, radius
     origin: { value: 0 }, spacing: { value: 6 },
     pulseStart: { value: 0 }, pulseDistance: { value: 0 }, pulseEnabled: { value: 0 },
     pulseDirection: { value: 1 },
+    extraPulseStarts: { value: new Float32Array(7) }, extraPulseCount: { value: 0 },
     radius: { value: radius }, endRadius: { value: endRadius },
     routeLength: { value: route.length }, opacity: { value: 1 },
     color: { value: new THREE.Color(color) },
@@ -51,6 +52,7 @@ export function createWaterVolume(points: THREE.Vector3[], color: string, radius
     fragmentShader: `
       uniform float time, direction, flowActive, routeLength, opacity, origin, spacing;
       uniform float pulseStart, pulseDistance, pulseEnabled, pulseDirection;
+      uniform float extraPulseStarts[7], extraPulseCount;
       uniform vec3 color;
       varying vec2 waterUv;
       varying vec3 waterNormal, waterView;
@@ -72,6 +74,9 @@ export function createWaterVolume(points: THREE.Vector3[], color: string, radius
         water = mix(water, vec3(0.8, 0.98, 1.0), min(0.65, filaments * 0.22 + crest * filaments * 0.12 + ripples * 0.08 + sheen * 0.35));
         water = mix(water, vec3(0.65, 0.92, 0.98), waveFront * 0.18);
         float pulse = exp(-pow((waterUv.x * routeLength * pulseDirection - pulseDistance + pulseStart) / 0.9, 2.0)) * pulseEnabled * flowActive;
+        for (int i = 0; i < 7; i++) {
+          if (float(i) < extraPulseCount) pulse = max(pulse, exp(-pow((waterUv.x * routeLength * pulseDirection - pulseDistance + extraPulseStarts[i]) / 0.9, 2.0)) * pulseEnabled * flowActive);
+        }
         water = mix(water, vec3(1.0, 0.94, 0.65), pulse * 0.85);
         gl_FragColor = vec4(water, opacity * min(0.95, 0.48 + edge * 0.16 + filaments * 0.08 + crest * filaments * 0.06 + sheen * 0.05 + waveFront * 0.07 + pulse * 0.3));
         #include <colorspace_fragment>

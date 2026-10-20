@@ -1,0 +1,103 @@
+/* Native Revit Home concepts. In-memory, reversible, no model operations. */
+(function () {
+  'use strict';
+  if (!/\/ModelBrowser\/resource\/index\.html(?:[?#]|$)/i.test(location.href.replace(/\\/g, '/'))) return {applied:false,reason:'Not legacy Home'};
+  if (window.BIMaestroHomeConceptLegacy) return window.BIMaestroHomeConceptLegacy.inspect();
+  var key='data-bm-legacy', active=null, observer=null, timer=null, records=[], filter='all', query='', hideSamples=false;
+  var themes={
+    '2023':{name:'Atelier',subtitle:'Un espace clair pour retrouver le bon fichier.',bg:'#f5f3ee',side:'#ebe8e0',card:'#fffefa',fg:'#283b36',muted:'#63716a',accent:'#28745b',line:'#d9ded4',family:'#97643e'},
+    '2024':{name:'Observatoire',subtitle:'Vos projets et familles, en un coup d’œil.',bg:'#101b2a',side:'#152538',card:'#1d3046',fg:'#edf4fb',muted:'#a6bacd',accent:'#72d9df',line:'#334b61',family:'#c4a6f1'}
+  };
+  function add(tag,cls,text,parent){var n=document.createElement(tag);n.className=cls;if(text!==undefined)n.textContent=text;if(parent)parent.appendChild(n);return n;}
+  function css(t){var p='html['+key+'] ';function r(s,b){return p+s+'{'+b+'}';}
+    return r('body,.App,.SplitLayout','background:'+t.bg+'!important;color:'+t.fg+'!important;')+
+      r('.SplitLayout__secondary','width:232px!important;min-width:232px!important;max-width:232px!important;flex:0 0 232px!important;background:'+t.side+'!important;')+
+      r('.SplitLayout__primary','min-width:0!important;flex:1!important;width:calc(100% - 232px)!important;background:'+t.bg+'!important;')+
+      r('.MbSidePanel','width:232px!important;background:'+t.side+'!important;color:'+t.fg+'!important;')+
+      r('.MbSidePanel__content','background:transparent!important;')+
+      r('.MbSidePanel .ButtonGroup__title,.MbSidePanel .IconPanel,.MbSidePanel .FooterLink,.MbSidePanel span,.MbSidePanel p,.MbSidePanel label,.MbSidePanel div','color:'+t.fg+'!important;')+
+      r('.MbSidePanel .IconPanel','background:transparent!important;')+
+      r('.MbSidePanel .IconPanel__checked','background:'+t.card+'!important;border-left:3px solid '+t.accent+'!important;')+
+      r('.MbSidePanel button','background:'+t.card+'!important;color:'+t.fg+'!important;border:1px solid '+t.line+'!important;border-radius:7px!important;')+
+      r('.MbSidePanel button:hover','border-color:'+t.accent+'!important;')+
+      r('.App__sidebar-button-group','max-width:calc(100% - 32px)!important;')+
+      r('.RecentFilesView','box-sizing:border-box!important;width:100%!important;background:'+t.bg+'!important;color:'+t.fg+'!important;padding:28px 32px!important;')+
+      r('.RecentFilesView__banner','display:none!important;')+
+      r('.RecentFilesView__data','background:transparent!important;border:0!important;')+
+      r('.RecentFilesView__group-title','background:transparent!important;color:'+t.fg+'!important;border-bottom:1px solid '+t.line+'!important;padding:18px 0 12px!important;font-size:13px!important;font-weight:700!important;letter-spacing:1.3px!important;')+
+      r('.RecentFilesView__thumbnails','grid-template-columns:repeat(auto-fill,minmax('+(active==='2023'?'290':'210')+'px,1fr))!important;gap:16px!important;padding:18px 0 28px!important;align-items:stretch!important;justify-items:stretch!important;')+
+      r('.RecentFilesView__thumbnails > div','min-width:0!important;')+
+      r('.Thumbnail','box-sizing:border-box!important;width:100%!important;color:'+t.fg+'!important;background:'+t.card+'!important;border:1px solid '+t.line+'!important;border-radius:10px!important;overflow:hidden!important;position:relative!important;padding:12px!important;height:100%!important;box-shadow:0 3px 12px #00000008!important;')+
+      r('.Thumbnail:hover','border-color:'+t.accent+'!important;box-shadow:0 5px 20px #00000018!important;')+
+      r('.Thumbnail__container','height:'+(active==='2023'?'104':'142')+'px!important;background:'+(active==='2023'?'#f0f2ec':'#eef2f5')+'!important;border:none!important;border-radius:6px!important;margin:0 0 12px!important;overflow:hidden!important;')+
+      r('.Thumbnail__bootstrap','box-sizing:border-box!important;width:100%!important;height:100%!important;margin:0!important;background:transparent!important;display:flex!important;align-items:center!important;justify-content:center!important;')+
+      r('.Thumbnail__bootstrap img','box-sizing:border-box!important;border:0!important;width:100%!important;height:100%!important;max-height:100%!important;max-width:100%!important;object-fit:contain!important;background:transparent!important;')+
+      r('.Thumbnail__caption','white-space:normal!important;overflow:visible!important;text-overflow:clip!important;overflow-wrap:anywhere!important;max-height:none!important;height:auto!important;line-height:1.4!important;font-size:14px!important;font-weight:600!important;padding-top:0!important;margin:7px 0!important;color:'+t.fg+'!important;')+
+      r('.bm-legacy-meta','font-size:12px;line-height:1.55;color:'+t.muted+';overflow-wrap:anywhere;')+
+      r('.bm-legacy-type','font-size:10px;font-weight:700;letter-spacing:1px;color:'+t.accent+';display:block;margin:2px 0 5px;')+
+      r('[data-bm-kind="family"] .bm-legacy-type','color:'+t.family+';')+
+      r('.bm-legacy-source','margin-top:7px;padding-top:7px;border-top:1px solid '+t.line+';font-size:12px;line-height:1.45;color:'+t.muted+';overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;')+
+      r('.bm-legacy-hero','display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin:0 0 20px;')+
+      r('.bm-legacy-kicker','font-size:10px;letter-spacing:2px;font-weight:700;color:'+t.accent+';margin:0 0 7px;')+
+      r('.bm-legacy-heading','font-size:30px;line-height:1.15;font-weight:600;letter-spacing:-1px;color:'+t.fg+';margin:0 0 8px;')+
+      r('.bm-legacy-subtitle','font-size:13px;color:'+t.muted+';margin:0;')+
+      r('.bm-legacy-stats','display:flex;gap:24px;flex-shrink:0;')+
+      r('.bm-legacy-stat strong','display:block;font-size:29px;font-weight:500;color:'+t.fg+';line-height:1.2;')+
+      r('.bm-legacy-stat span','font-size:11px;color:'+t.muted+';')+
+      r('.bm-legacy-toolbar','display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:'+t.card+';border:1px solid '+t.line+';padding:12px;border-radius:10px;margin-bottom:6px;')+
+      r('.bm-legacy-toolbar button','font:600 12px Segoe UI,sans-serif;cursor:pointer;border:1px solid '+t.line+';background:transparent;color:'+t.muted+';padding:8px 13px;border-radius:6px;')+
+      r('.bm-legacy-toolbar button[aria-pressed="true"]','background:'+t.accent+';color:'+(active==='2023'?'#ffffff':'#102333')+';border-color:'+t.accent+';')+
+      r('.bm-legacy-search','box-sizing:border-box;flex:1;min-width:180px;max-width:420px;padding:9px 12px;border-radius:6px;border:1px solid '+t.line+';background:'+t.bg+';color:'+t.fg+';font:13px Segoe UI,sans-serif;outline:none;')+
+      r('.bm-legacy-search:focus','border-color:'+t.accent+';')+
+      r('.bm-legacy-search::placeholder','color:'+t.muted+';opacity:1;')+
+      r('.bm-legacy-status','font-size:11px;color:'+t.muted+';margin:10px 0 0;')+
+      r('[data-bm-hidden="true"]','display:none!important;')+
+      r('.bm-legacy-empty','padding:24px;color:'+t.muted+';border:1px dashed '+t.line+';border-radius:8px;margin-top:20px;')+
+      (active==='2023'?r('.Thumbnail','display:grid!important;grid-template-columns:104px minmax(0,1fr)!important;column-gap:14px!important;align-content:start!important;')+r('.Thumbnail__container','grid-column:1;grid-row:1 / 5;margin:0!important;')+r('.Thumbnail__caption,.bm-legacy-type,.bm-legacy-meta,.bm-legacy-source','grid-column:2;'):'')+
+      '@media(max-width:1050px){'+r('.bm-legacy-hero','align-items:flex-start;flex-direction:column;')+r('.RecentFilesView','padding:22px!important;')+'}';
+  }
+  function captureCards(){
+    document.querySelectorAll('.RecentFilesView__thumbnails-thumbnail').forEach(function(c){
+      if(records.some(function(x){return x.card===c;}))return;
+      var path=c.getAttribute('data-for')||'',family=/\.rfa$/i.test(path),parts=path.split(/[\\/]/),folder=parts.slice(0,-1),source=folder.slice(-2).join(' / ');
+      if(/[\\/]BIMaestro[\\/]Codex[\\/]Families[\\/]/i.test(path))source='BIMaestro / Familles';
+      else if(/[\\/]Samples[\\/]/i.test(path))source=(folder[folder.length-2]||'Revit')+' / Exemples';
+      else if(source.length>46)source=source.slice(0,43)+'…';
+      var tip=document.getElementById(path), vals=tip?Array.prototype.map.call(tip.querySelectorAll('.RecentFileInfo__content'),function(x){return x.textContent.trim();}):[];
+      var oldTitle=c.getAttribute('title');c.title=path;c.setAttribute('data-bm-kind',family?'family':'project');
+      var label=add('span','bm-legacy-type',family?'FAMILLE · RFA':'PROJET · RVT');c.insertBefore(label,c.querySelector('.Thumbnail__caption'));
+      var meta=add('div','bm-legacy-meta',vals[3]?'Taille · '+vals[3]:'',c);
+      if(vals[2])add('div','', 'Modifié · '+vals[2],meta);
+      var src=add('div','bm-legacy-source',source||'Chemin non communiqué',c);src.title=path;
+      records.push({card:c,wrapper:c.parentElement,path:path.toLowerCase(),family:family,sample:/[\\/]Samples[\\/]/i.test(path),title:oldTitle,nodes:[label,meta,src]});
+    });
+  }
+  function refresh(){
+    if(!active)return;observer.disconnect();
+    records=records.filter(function(x){return document.documentElement.contains(x.card);});
+    captureCards();
+    var totals=[records.filter(function(x){return !x.family;}).length,records.filter(function(x){return x.family;}).length];
+    document.querySelectorAll('.bm-legacy-stat strong').forEach(function(n,i){n.textContent=String(totals[i]||0);});
+    var shown=0;records.forEach(function(x){var yes=(filter==='all'||(filter==='family')===x.family)&&(!hideSamples||!x.sample)&&(!query||(x.path+' '+x.card.querySelector('.Thumbnail__caption').textContent.toLowerCase()).indexOf(query)!==-1);x.wrapper.setAttribute('data-bm-hidden',String(!yes));if(yes)shown++;});
+    document.querySelectorAll('.RecentFilesView__thumbnails').forEach(function(grid){var visible=Array.prototype.some.call(grid.children,function(n){return n.getAttribute('data-bm-hidden')!=='true';});grid.parentElement.setAttribute('data-bm-hidden',String(!visible));});
+    var status=document.querySelector('.bm-legacy-status');if(status)status.textContent=shown+' fichier'+(shown>1?'s':'')+' affiché'+(shown>1?'s':'')+' · recherche par nom et dossier';
+    var empty=document.querySelector('.bm-legacy-empty');if(empty)empty.style.display=shown?'none':'block';
+    document.querySelectorAll('[data-bm-filter]').forEach(function(b){b.setAttribute('aria-pressed',String(filter===b.getAttribute('data-bm-filter')));});
+    observer.observe(document.querySelector('.RecentFilesView'),{childList:true,subtree:true});
+  }
+  function inspect(){return {concept:active,cards:records.length,pending:!!active&&records.length===0,visible:records.filter(function(x){return x.wrapper.getAttribute('data-bm-hidden')!=='true';}).length,projects:records.filter(function(x){return !x.family;}).length,families:records.filter(function(x){return x.family;}).length,query:query,filter:filter,hideSamples:hideSamples,style:!!document.getElementById('bm-legacy-style'),overflow:document.documentElement.scrollWidth>window.innerWidth+2};}
+  function restore(){if(observer)observer.disconnect();clearTimeout(timer);records.forEach(function(x){x.nodes.forEach(function(n){n.remove();});x.card.removeAttribute('data-bm-kind');if(x.title===null)x.card.removeAttribute('title');else x.card.setAttribute('title',x.title);});document.querySelectorAll('[data-bm-hidden]').forEach(function(n){n.removeAttribute('data-bm-hidden');});document.querySelectorAll('.bm-legacy-owned').forEach(function(n){n.remove();});var s=document.getElementById('bm-legacy-style');if(s)s.remove();document.documentElement.removeAttribute(key);records=[];active=null;return inspect();}
+  function apply(version){
+    if(!themes[version]||!document.querySelector('.RecentFilesView')||!document.querySelector('.MbSidePanel'))return {applied:false,reason:'Legacy Home absent'};
+    restore();if(window.BIMaestroHomeProbe)window.BIMaestroHomeProbe.restore();active=String(version);filter='all';query='';hideSamples=false;var t=themes[active],view=document.querySelector('.RecentFilesView');
+    document.documentElement.setAttribute(key,active);var style=add('style','','',document.head);style.id='bm-legacy-style';style.textContent=css(t);captureCards();
+    var hero=add('section','bm-legacy-hero bm-legacy-owned'),intro=add('div','',undefined,hero);add('p','bm-legacy-kicker','REVIT '+active+' / '+t.name.toUpperCase(),intro);add('h1','bm-legacy-heading',active==='2023'?'Votre atelier de projets':'Vue d’ensemble',intro);add('p','bm-legacy-subtitle',t.subtitle,intro);
+    var stats=add('div','bm-legacy-stats',undefined,hero);[[records.filter(function(x){return !x.family;}).length,'projets récents'],[records.filter(function(x){return x.family;}).length,'familles récentes']].forEach(function(v){var stat=add('div','bm-legacy-stat',undefined,stats);add('strong','',String(v[0]),stat);add('span','',v[1],stat);});view.insertBefore(hero,view.firstChild);
+    var bar=add('div','bm-legacy-toolbar bm-legacy-owned');var search=add('input','bm-legacy-search',undefined,bar);search.type='search';search.placeholder='Rechercher un fichier ou un dossier…';search.setAttribute('aria-label','Rechercher par nom ou chemin');search.oninput=function(){query=search.value.toLowerCase().trim();refresh();};
+    [['all','Tout'],['project','Projets'],['family','Familles']].forEach(function(v){var b=add('button','',v[1],bar);b.type='button';b.setAttribute('data-bm-filter',v[0]);b.onclick=function(){filter=v[0];refresh();};});
+    var samples=add('button','','Masquer les exemples',bar);samples.type='button';samples.setAttribute('aria-pressed','false');samples.onclick=function(){hideSamples=!hideSamples;samples.setAttribute('aria-pressed',String(hideSamples));refresh();};hero.insertAdjacentElement('afterend',bar);
+    var status=add('p','bm-legacy-status bm-legacy-owned','');bar.insertAdjacentElement('afterend',status);add('div','bm-legacy-empty bm-legacy-owned','Aucun fichier ne correspond à ces filtres.',view);
+    observer=new MutationObserver(function(){clearTimeout(timer);timer=setTimeout(refresh,90);});refresh();return {applied:true,evidence:inspect()};
+  }
+  window.BIMaestroHomeConceptLegacy={apply:apply,inspect:inspect,restore:restore};return inspect();
+})();

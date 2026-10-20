@@ -233,7 +233,8 @@ namespace BIMaestro.VideoGames
                     var level = document.GetElement(element.LevelId) as Level;
                     if (level == null) continue;
                     double lower = element.get_Parameter(BuiltInParameter.ROOM_LOWER_OFFSET)?.AsDouble() ?? 0;
-                    double basis = level.Elevation + lower + placement.Origin.Z;
+                    // Elevation can be survey-relative; geometry uses the project origin.
+                    double basis = level.ProjectElevation + lower + placement.Origin.Z;
                     double height = room != null ? room.UnboundedHeight : space!.UnboundedHeight;
                     var data = new GameRoomData {
                         Key = instance + ":" + element.UniqueId, Name = element.Name,

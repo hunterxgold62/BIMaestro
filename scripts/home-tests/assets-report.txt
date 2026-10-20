@@ -1,0 +1,54 @@
+Autodesk Revit Home assets read-only inventory (2026-10-16)
+
+All four versions installed: 2023, 2024, 2025, 2026.
+Base path: C:/Program Files/Autodesk/Revit VERSION/AddIns/ModelBrowser/resource/
+index.html title = Cloud First Model Browser; React root #root.
+Loads ./static/js/index.bundle.js and ./static/css/index.main.css.
+2023 additionally has service-worker.js; 2024 onward has udabrowser.html.
+
+index.main.css bytes and SHA256:
+2023 285655 56F0D8ECFFA171D0A3A227864BA2320A1F7ED4F24BFDA61640BFA57C4131B75C
+2024 342265 50634CD3514EEBA7CA16F09C62C255CABB4B4A786F9D913BBBA450DB0258F0DE
+2025 333204 1CE6A4A8C3E3BC09EF81CD58877E7B87DCAE1F22B4F434A59042308A026C6E28
+2026 333204 1CE6A4A8C3E3BC09EF81CD58877E7B87DCAE1F22B4F434A59042308A026C6E28
+
+Stable selectors in all four CSS files:
+.MbSidePanel, .MbSidePanel__content, .RecentFilesView,
+.RecentFilesView__banner, .RecentFilesView__data, .RecentFilesView__group-title,
+.RecentFilesView__thumbnails, .RecentFilesView__thumbnails-thumbnail,
+.Thumbnail, .Thumbnail__caption, .Thumbnail__container, .Thumbnail__bootstrap,
+.App__sidebar-button-group, .App__sidebar-footer-button, .App__sidebar-footer-links.
+2024 onward adds .App__sidebar-myInsights.
+
+Stock layout examples (2025): sidebar 306px; recent view 70px 50px 50px padding;
+grid min 180px with 20px gap; thumbnail container height 160px;
+caption single-line ellipsis. Stock stylesheet has light-gray/dark-blue and
+medium-density/high-density themes.
+
+IMPORTANT: user screenshot shows toggle for new Revit Home. These assets may
+represent legacy Home. New Home browser DOM and actual URL must be inspected
+live before claiming equivalent support. File inventory alone proves web assets
+exist, not that active Home loads them or allows managed script injection.
+
+home-presets.js provides compact/dark/blueprint/large CSS-only previews. It gates
+on exact ModelBrowser/resource/index.html URL plus .MbSidePanel and
+.RecentFilesView DOM signatures. It adds a single style element and root data
+attribute, removes both on restore, does not replace native controls, does not
+change sort/search/open event handlers, and modifies no Autodesk installed file.
+Callable entry points: window.__bimaestroHomeApply(name),
+window.__bimaestroHomeRestore(), window.__bimaestroHomeInspect().
+Native actions, responsive behavior and new Home compatibility remain to test live.
+
+LIVE DOM evidence received from parent harness:
+2025 result-discover.txt confirms active new Home is resource/udabrowser.html,
+not index.html. Its stable semantic selectors include data-testid values
+recent-container, recent-wrapper, top-container, tile-view-wrapper, tile-card,
+tile-wrapper, thumbnail-wrapper, thumbnailImage, info-wrapper, and native
+open-revit-file-button/new-revit-file-button/open-family-file-button.
+Tile titles use .tile-title; paths are available on native tile id and image alt.
+New Home already contains native pinIconButton; favoriting should first reuse
+that functionality rather than add duplicate controls.
+home-presets.js now supports BOTH index.html legacy and udabrowser.html UDA,
+requires the corresponding DOM signature, and reports first-three-card layout
+metrics and title clipping. The offline test covers both DOM branches.
+2023 first captured DOM was AppLoader only; style must wait for Home content.

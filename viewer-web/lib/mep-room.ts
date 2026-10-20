@@ -1,5 +1,15 @@
 import type { ViewerRoom } from './mep-contract';
 
+/** Repair old survey-relative elevations only when they contradict the entire flat footprint. */
+export function normalizeRoomElevation(room: ViewerRoom): ViewerRoom {
+  const heights = room.loops.flatMap(loop => loop.map(point => point[1]));
+  if (!heights.length || heights.some(height => !Number.isFinite(height))) return room;
+  const floor = Math.min(...heights), top = Math.max(...heights);
+  const shift = floor - room.baseElevation;
+  if (top - floor > .001 || Math.abs(shift) <= Math.max(3, room.navigationTop - room.baseElevation, room.declaredTop - room.baseElevation)) return room;
+  return { ...room, baseElevation: floor, declaredTop: room.declaredTop + shift, navigationTop: room.navigationTop + shift };
+}
+
 // Viewer coordinates are Y-up, in feet. Even/odd handles holes and disjoint regions.
 export function roomContains(room: ViewerRoom, x: number, z: number): boolean {
   let inside = false;

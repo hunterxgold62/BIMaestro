@@ -17,6 +17,11 @@ public static class IdleGateChecks {
         Check(!HistoryBackgroundWork.UserIsIdle(), "Stop blocks ordinary automatic preparation too");
         HistoryBackgroundWork.Paused = false;
         HistoryBackgroundWork.SelectionRequested = false;
+        Check(!HistoryBackgroundWork.CanRun(1000, 0, false, 1000), "Outside Revit remains paused at one-second cadence");
+        Check(!HistoryBackgroundWork.CanRun(2000, 0, true, 1000), "Return still settles before capturing");
+        Check(!HistoryBackgroundWork.CanRun(2999, 0, true, 1000), "One-second threshold is not reached early");
+        Check(HistoryBackgroundWork.CanRun(3000, 0, true, 1000), "Automatic capture resumes after one second");
+        Check(!HistoryBackgroundWork.CanRun(3001, 3000, true, 1000), "Input interrupts the one-second capture cadence");
         Check(!HistoryBackgroundWork.CanRun(10000, 0, false, 2000), "AFK outside Revit must pause");
         Check(!HistoryBackgroundWork.CanRun(11000, 0, true, 2000), "Returning to Revit must not start immediately");
         Check(!HistoryBackgroundWork.CanRun(12999, 0, true, 2000), "Foreground settling delay");

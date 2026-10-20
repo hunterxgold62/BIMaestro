@@ -113,9 +113,36 @@ namespace Analyse
 
     internal static partial class ElementHistoryReconstruction
     {
-        internal static HistoryRecipe Capture(Element element, Action<string> diagnostic = null, bool includeDetails = true,
-            bool allowHeavyTerrain = true)
+        // No geometry reads here: these classes are deferred before bounding boxes or recipes.
+        internal static bool RequiresDetailedCapture(Element element)
         {
+            if (element == null) return false;
+            var kind = element.GetType().Name;
+            if (kind == "Group" || kind == "Stairs" || kind == "StairsRun" || kind == "StairsLanding"
+                || kind == "Railing" || kind == "Toposolid" || kind == "TopographySurface"
+                || kind == "ImportInstance" || kind == "DirectShape" || kind == "Ramp"
+                || kind == "ElectricalSystem" || kind == "PipingSystem" || kind == "MechanicalSystem") return true;
+            if (element.GroupId != ElementId.InvalidElementId) return true;
+            var category = element.Category?.Id.GetIdLongValue();
+            return category == (long)BuiltInCategory.OST_MechanicalEquipment
+                || category == (long)BuiltInCategory.OST_Planting
+                || HistoryCaptureCosts.KnownSlowBasic(element);
+        }
+
+        internal static HistoryRecipe Capture(Element element, Action<string> diagnostic = null, bool includeDetails = true,
+            bool allowHeavyTerrain = true, bool automaticCapture = false)
+        {
+            if (automaticCapture && !ElementHistoryTracker.CaptureDetailedDeletedMesh)
+            {
+                if (RequiresDetailedCapture(element))
+                {
+                    diagnostic?.Invoke("Préparation réservée au mode détaillé.");
+                    return null;
+                }
+                // A direct recipe only: never silently fall back to a native copy in light mode.
+                return CaptureCore(element, diagnostic, includeDetails: false);
+            }
+            if (automaticCapture) return CaptureCore(element, diagnostic, includeDetails: false);
             if (!allowHeavyTerrain && ElementHistoryNativeArchive.IsHeavyTerrain(element))
             {
                 var ready = ElementHistoryNativeArchive.Find(element.Document, element.UniqueId);
@@ -785,13 +812,16 @@ namespace Analyse
             return GetShapeEditor(floor)?.IsEnabled == true;
         }
 
-        private static SlabShapeEditor GetShapeEditor(Floor floor)
+        private static SlabShapeEditor GetShapeEditor(HostObject host)
         {
-#if REVIT2024 || REVIT2025_OR_GREATER
-            return floor.GetSlabShapeEditor();
-#else
-            return floor.SlabShapeEditor;
-#endif
+            if (host == null) return null;
+            // Resolve against the running host: the old property was removed in
+            // newer APIs, even when this shared DLL was compiled for Revit 2023.
+            var method = host.GetType().GetMethod("GetSlabShapeEditor", Type.EmptyTypes);
+            if (method != null) return (SlabShapeEditor)method.Invoke(host, null);
+            var property = host.GetType().GetProperty("SlabShapeEditor");
+            if (property != null) return (SlabShapeEditor)property.GetValue(host);
+            throw new NotSupportedException("Cette version de Revit n’expose pas l’éditeur de forme du sol ou de la toiture.");
         }
 
         internal static HistoryCurve CaptureCurve(Curve curve)

@@ -1,0 +1,23 @@
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const {pathToFileURL}=require('node:url');
+const {chromium}=require(path.join(process.env.USERPROFILE,'.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright'));
+(async()=>{const folder=path.resolve('tmp/home-tests/unified/ModelBrowser/resource');fs.mkdirSync(folder,{recursive:true});const file=path.join(folder,'index.html');
+const cards=['Le Mans','Testi crousty','Tour Eiffel'].map(n=>'<div><div class="Thumbnail RecentFilesView__thumbnails-thumbnail" data-for="C:/Models/'+n+'.rvt"><div class="Thumbnail__container"></div><div class="Thumbnail__caption">'+n+'</div></div></div>').join('');
+fs.writeFileSync(file,'<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;font-family:Segoe UI}.SplitLayout{display:flex}.RecentFilesView__thumbnails{display:grid}.SplitLayout__primary{flex:1}</style></head><body><div class="SplitLayout"><aside class="MbSidePanel SplitLayout__secondary"></aside><main class="SplitLayout__primary"><div class="RecentFilesView"><section><h2>Modèles</h2><div class="RecentFilesView__thumbnails">'+cards+'</div></section></div></main></div></body></html>');
+const browser=await chromium.launch({headless:true,executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'});
+try{for(const dark of [false,true]){const page=await browser.newPage({viewport:{width:1700,height:1000}});await page.goto(pathToFileURL(file).href);await page.evaluate(d=>window.__bmHomeDark=d,dark);
+for(const name of ['home-legacy.js','home-history.js'])await page.addScriptTag({content:fs.readFileSync('BIMaestro/les couleurs/Home/Resources/'+name,'utf8')});
+await page.evaluate(()=>BIMaestroHomeConceptLegacy.apply('2023'));
+const entries=[{path:'C:/Models/Le Mans.rvt',filename:'Le Mans.rvt',extension:'.rvt',versions:['2025']},{path:'C:/Archive/Le Mans structure.rvt',filename:'Le Mans structure.rvt',extension:'.rvt',versions:['2024']}];
+const update=()=>page.evaluate(entries=>BIMaestroHomeHistory.update({status:'ready',revision:'1',entries}),entries);await update();
+assert.equal(await page.locator('input:visible').count(),1);assert.equal(await page.locator('.hc-body').isVisible(),false);
+await page.locator('.bm-legacy-search').fill('Le Mans');assert.equal((await page.evaluate(()=>BIMaestroHomeConceptLegacy.inspect())).visible,1);
+await page.locator('[data-hc-scope=history]').click();assert.equal(await page.locator('.hc-body').isVisible(),true);assert.equal(await page.locator('.hc-row').count(),2);assert.equal((await page.evaluate(()=>BIMaestroHomeConceptLegacy.inspect())).visible,3,'Native cards are not filtered by history query');
+assert.equal(await page.locator('.bm-legacy-search').inputValue(),'Le Mans');assert.equal(await page.locator('[data-bm-filter=all]').isVisible(),false);
+await page.locator('.hc-toggle').click();assert.equal(await page.locator('[data-hc-scope=recent]').getAttribute('aria-pressed'),'true');assert.equal((await page.evaluate(()=>BIMaestroHomeConceptLegacy.inspect())).visible,1);
+await page.locator('.bm-legacy-search').fill('');await page.screenshot({path:path.resolve('tmp/home-tests/unified/recent-'+(dark?'dark':'light')+'.png')});
+await page.locator('.hc-toggle').click();assert.equal(await page.locator('[data-hc-scope=history]').getAttribute('aria-pressed'),'true');await page.screenshot({path:path.resolve('tmp/home-tests/unified/history-'+(dark?'dark':'light')+'.png')});
+await page.evaluate(()=>BIMaestroHomeHistory.restore());assert.equal(await page.locator('.hc-scope').count(),0);assert.equal(await page.locator('[data-bm-filter=all]').isVisible(),true);await page.locator('.bm-legacy-search').fill('Tour');assert.equal((await page.evaluate(()=>BIMaestroHomeConceptLegacy.inspect())).visible,1);
+await update();await page.evaluate(()=>BIMaestroHomeConceptLegacy.apply('2024'));await update();assert.equal(await page.locator('.hc-scope').count(),1);assert.equal(await page.locator('input:visible').count(),1);
+await page.close();console.log('PASS unified '+(dark?'dark':'light')+': scopes, shared query, chevron, native filtering, teardown and style reapplication');}
+}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1});
