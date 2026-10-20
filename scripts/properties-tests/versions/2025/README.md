@@ -13,3 +13,5 @@ Mesures : bandeaux seuls ~0,3–4 ms ; texte complet ~3,8 ms de moyenne et ~21 m
 Empreinte identique avant/après : `965F318E2728E54CF63E35F0674B6B39093384AF6788B7338EF4A011DFC92FD5`. Restauration finale : zéro propriété WPF et zéro hook ; DC, bitmaps et thème restaurés.
 
 Compilation : `./scripts/properties-tests/versions/2025/Build.ps1 -RevitVersion 2025 -Name advanced2025-v3`. Exécuter dans le harnais jetable, puis `restore` avec cette même DLL.
+
+Troisième série : voir [nouveaux effets et zoom natif](../../TEXT-EXPERIMENTS.md). Les couleurs du texte et les fonds sont transformés graphiquement ; le zoom utilise le geste natif Ctrl+molette. Restaurer les effets et annuler séparément les crans de zoom demandés.

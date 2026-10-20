@@ -1,0 +1,11 @@
+Revit 2025 Command=zoom-out
+Native WM_MOUSEWHEEL Ctrl step=-1 grid=4920098
+Native WM_MOUSEWHEEL Ctrl step=-1 grid=11735852
+Native zoom requests=0
+Mode=inspect WPF saved=0 Native hooks=0
+Paints=15 Tinted bands=5 Max overlay ms=11.111 Last ms=3.531 Mean ms=3.674
+Tint detection: visible grayscale bands only; experimental paint overlay, not semantic parameter styles.
+Recolored grayscale foreground pixels=24083; this is raster styling, not native cell font or parameter content.
+Grid=4920098 571x406
+Grid=11735852 537x575
+Fingerprint=965F318E2728E54CF63E35F0674B6B39093384AF6788B7338EF4A011DFC92FD5

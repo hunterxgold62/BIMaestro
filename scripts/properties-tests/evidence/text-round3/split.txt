@@ -1,0 +1,10 @@
+Revit 2025 Command=split
+Restored local styles, hooks and original native theme.
+Native zoom requests=2
+Mode=split WPF saved=26 Native hooks=2
+Paints=1 Tinted bands=1 Max overlay ms=11.111 Last ms=11.111 Mean ms=11.111
+Tint detection: visible grayscale bands only; experimental paint overlay, not semantic parameter styles.
+Recolored grayscale foreground pixels=5134; this is raster styling, not native cell font or parameter content.
+Grid=4920098 571x406
+Grid=11735852 537x575
+Fingerprint=965F318E2728E54CF63E35F0674B6B39093384AF6788B7338EF4A011DFC92FD5

@@ -4,6 +4,8 @@ Branche `codex/properties-palette`. Bilan du 20 octobre 2026. Quatre instances r
 
 [Ouvrir le comparatif des captures](Gallery.html).
 
+**Suite : [essais du corps de la grille](TextGallery.html)** — zoom natif réellement démontré en 2025, texte coloré, plan technique, bandes, projecteur et épaississement graphique. Cette troisième série corrige la limite précédente sur le zoom des caractères et des lignes ; voir [protocole et réserves](TEXT-EXPERIMENTS.md).
+
 ## Résultats réellement obtenus
 
 | Essai | Version exécutée | Résultat |

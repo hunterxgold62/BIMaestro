@@ -1,0 +1,10 @@
+Revit 2025 Command=spotlight
+Restored local styles, hooks and original native theme.
+Native zoom requests=0
+Mode=spotlight WPF saved=0 Native hooks=2
+Paints=7 Tinted bands=0 Max overlay ms=13.082 Last ms=7.479 Mean ms=8.404
+Tint detection: visible grayscale bands only; experimental paint overlay, not semantic parameter styles.
+Recolored grayscale foreground pixels=19606; this is raster styling, not native cell font or parameter content.
+Grid=4920098 571x406
+Grid=11735852 537x575
+Fingerprint=965F318E2728E54CF63E35F0674B6B39093384AF6788B7338EF4A011DFC92FD5
