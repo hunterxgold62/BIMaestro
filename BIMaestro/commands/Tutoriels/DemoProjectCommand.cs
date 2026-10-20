@@ -21,6 +21,8 @@ namespace BIMaestro.Tutorials
         {
             try
             {
+                if (DemoProjectBuilder.IsLearningDocument(data.Application.ActiveUIDocument?.Document))
+                    return DemoToursCommand.ShowChoice(data.Application, ref message);
                 DemoProjectBuilder.Create(data.Application);
                 return Result.Succeeded;
             }
@@ -37,6 +39,14 @@ namespace BIMaestro.Tutorials
     internal static class DemoProjectBuilder
     {
         internal const string DemoPrefix = "BIMaestro_DEMO_";
+        internal static bool IsLearningDocument(Document document)
+        {
+            string path = document?.PathName;
+            return document != null && !document.IsFamilyDocument &&
+                !string.IsNullOrWhiteSpace(path) &&
+                Path.GetFileName(path).StartsWith("BIMaestro_Apprentissage_", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(Path.GetExtension(path), ".rvt", StringComparison.OrdinalIgnoreCase);
+        }
         private static double M(double metres) => UnitUtils.ConvertToInternalUnits(metres, UnitTypeId.Meters);
 
         internal static string Create(UIApplication uiApp)

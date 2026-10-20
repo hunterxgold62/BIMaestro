@@ -443,11 +443,16 @@ namespace BIMaestro.Tutorials
     {
         protected override string ButtonId => "DemoTours";
         protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
+            => ShowChoice(data.Application, ref message);
+
+        internal static Result ShowChoice(UIApplication app, ref string message)
         {
+            if (!DemoProjectBuilder.IsLearningDocument(app.ActiveUIDocument?.Document))
+                return Result.Cancelled;
             var choice = new DemoTrainingChoiceWindow();
-            new WindowInteropHelper(choice).Owner = data.Application.MainWindowHandle;
+            new WindowInteropHelper(choice).Owner = app.MainWindowHandle;
             choice.ShowDialog();
-            return RunChoice(data.Application, choice.SelectedTour, ref message);
+            return RunChoice(app, choice.SelectedTour, ref message);
         }
 
         internal static Result RunChoice(UIApplication uiApp, string selectedChoice, ref string message)
@@ -1158,9 +1163,7 @@ namespace BIMaestro.Tutorials
         internal static void OnDocumentOpened(Document document)
         {
             string path = document?.PathName;
-            if (string.IsNullOrWhiteSpace(path) ||
-                !System.IO.Path.GetFileName(path).StartsWith("BIMaestro_Apprentissage_", StringComparison.OrdinalIgnoreCase) ||
-                !string.Equals(System.IO.Path.GetExtension(path), ".rvt", StringComparison.OrdinalIgnoreCase))
+            if (!DemoProjectBuilder.IsLearningDocument(document))
                 return;
             _pendingPath = path;
             _readyAfterUtc = DateTime.UtcNow.AddMilliseconds(600);

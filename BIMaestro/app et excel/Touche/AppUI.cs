@@ -197,29 +197,18 @@ public partial class AppUI : IExternalApplication
 
            new RibbonPanelDefinition("Couleur et information", new List<RibbonItemDefinition>
             {
-                new RibbonItemDefinition("HomeAppearanceTest", "Accueil · Test", panel => AddPushButton(panel,
-                    "HomeAppearanceTest", "Accueil\nTest", assemblyPath,
-                    "BIMaestro.Home.HomeAppearanceCommand", "Miniature.png",
-                    "Choisit l’un des quatre affichages de l’accueil et active le catalogue du journal Excel. Suit le thème clair ou sombre de Revit. Aucun changement avant activation.")),
                 new RibbonItemDefinition("Changement de couleur", "Couleurs et onglets", panel => AddColorAndDeckButtons(panel, assemblyPath, new List<(string, string, string, string, string)>
                 {
                     ("Couleur de projet", "Couleurs", "Couleur.ToggleCombinedColoringCommand", "Couleur oui non.png","Clic : ouvre la personnalisation des couleurs. Double-clic : active ou désactive les panneaux colorés."),
-                    ("RestartAppearanceGuide", "Guide couleurs", "Couleur.RestartAppearanceGuideCommand", "Miniature.png", "Relance le parcours guidé depuis l’onglet BIMaestro jusqu’aux réglages des couleurs."),
                     ("Couleur de maquette", "Couleur reset", "Couleur.ResetTabItemRandomColorsCommand", "reset.png","Réinitialise les couleurs appliquées"),
                     ("papa Noël", "papa\nNoël", "Couleur.PapanoelCommand", "papa noel.png","Fait apparaître des couleurs comme des guirlandes\nDouble clic pour revenir à la normale.\n\nAttention désactiver <couleur Oui/Non> avant activation."),
                     ("ViewDeckToggle", "Onglets : OFF", "BIMaestro.ViewHover.ToggleViewDeckCommand", "Miniature.png", "ON : miniatures dans les onglets. OFF : onglets compacts.\r\nLes aperçus au survol se règlent dans Miniature ou Option > Miniatures."),
-                    ("TabCompanionToggle", "Compagnon : OFF", "BIMaestro.ViewHover.ToggleTabCompanionCommand", "Miniature.png", "Un Bulbizarre pixel suit la souris sur la barre des onglets. Cliquez pour activer ou désactiver."),
-                    ("WindowCompanionToggle", "Compagnon fenêtre : OFF", "BIMaestro.ViewHover.ToggleWindowCompanionCommand", "Miniature.png", "Test : Bulbizarre suit la souris dans toute la fenêtre principale Revit. Cliquez pour activer ou désactiver."),
                     ("BIMaestro_Exemple", "Exemple", "Page.GuideCommand", "Exemple.png", "Page d'information sur le plugin"),
                 })),
                 new RibbonItemDefinition("CreateDemoProject", "Maquette d’essai", panel => AddPushButton(panel,
                     "CreateDemoProject", "Maquette\nd’essai", assemblyPath,
-                    "BIMaestro.Tutorials.CreateDemoProjectCommand", "Exemple.png",
+                    "BIMaestro.Tutorials.CreateDemoProjectCommand", "DemoProject.png",
                     "Crée et ouvre une nouvelle maquette d’essai BIMaestro dans Documents\\RevitLogs, puis propose les exercices guidés. Disponible à tout moment après l’accueil.")),
-                new RibbonItemDefinition("DemoTours", "Parcours guidés", panel => AddPushButton(panel,
-                    "DemoTours", "Parcours\nguidés", assemblyPath,
-                    "BIMaestro.Tutorials.DemoToursCommand", "Miniature.png",
-                    "Affiche les parcours guidés : choisis un tutoriel pour essayer les outils BIMaestro pas à pas.")),
 
                 new RibbonItemDefinition("InfoStack", "Infos empilées", panel => AddStackedInfoButtons(
                     panel,
@@ -712,7 +701,7 @@ public partial class AppUI : IExternalApplication
                 "CodexChat", "CommunityFamilies", "GPTBotWindowButton", "TextCorrectionButton", "ScanText", "RealisticViewImage",
                 "FamilyBrowser", "Rosace", "ConvertSharedToFamily", "PurgeFamilyParameters", "Familytraduction", "FamilyViewtraduction", "Export d'unité", "Import d'unité",
                 "ElementHistoryHoverToggle", "Suivi maquette collaboratif",
-                "Couleur de projet", "RestartAppearanceGuide", "Couleur de maquette", "papa Noël", "ViewDeckToggle", "TabCompanionToggle", "WindowCompanionToggle", "BIMaestro_Exemple", "CreateDemoProject", "DemoTours", "NOTE_MAJ", "Snake", "FlappyBird", "CustomizeRibbon", "ContactCommand", "RadialMenuButtonsCommand", "SupportCommand",
+                "Couleur de projet", "Couleur de maquette", "papa Noël", "ViewDeckToggle", "BIMaestro_Exemple", "CreateDemoProject", "DemoTours", "NOTE_MAJ", "Snake", "FlappyBird", "CustomizeRibbon", "ContactCommand", "RadialMenuButtonsCommand", "SupportCommand",
                 "dynamo 1", "dynamo 2", "dynamo 3", "dynamo 4", "dynamo 5", "dynamo réglage",
                 "GestionExcelCmd", "Surcharges vues", "ElementRenamerButton", "PhaseQuickEditButton", "Purge du plan" })
             {
@@ -740,6 +729,8 @@ public partial class AppUI : IExternalApplication
         var toolTip = CreateBadgeToolTip(adWindows, info);
         var toolTipProperty = item.GetType().GetProperty("ToolTip");
         if (toolTipProperty == null) return;
+        var previousToolTip = toolTipProperty.GetValue(item, null);
+        if (previousToolTip != null) badgeToolTipContents.Remove(previousToolTip);
         toolTipProperty.SetValue(item, toolTip, null);
         badgeToolTipContents[toolTip] = (StackPanel)toolTip.GetType().GetProperty("Content").GetValue(toolTip, null);
         badgeToolTipsApplied.Add(buttonName);
@@ -1125,6 +1116,36 @@ public partial class AppUI : IExternalApplication
         TrySetRibbonItemText(info.PushButton, UiLanguage.T(itemText));
         if (!string.IsNullOrWhiteSpace(toolTip))
             info.PushButton.ToolTip = UiLanguage.T(toolTip);
+    }
+
+    internal static bool IsDemoToursPresentation { get; private set; }
+
+    internal static void UpdateDemoProjectButton(UIApplication app)
+    {
+        bool tours = BIMaestro.Tutorials.DemoProjectBuilder.IsLearningDocument(app?.ActiveUIDocument?.Document);
+        IsDemoToursPresentation = tours;
+        if (!ribbonButtonRegistry.TryGetValue("CreateDemoProject", out var info) || info.PushButton == null)
+            return;
+        string image = tours ? "DemoTours.png" : "DemoProject.png";
+        string text = UiLanguage.T(tours ? "Parcours\nguidés" : "Maquette\nd’essai");
+        if (info.ImageResourceName == image && info.PushButton.ItemText == text) return;
+        string description = tours
+            ? "Choisissez un parcours pour essayer les outils BIMaestro pas à pas dans cette maquette d’essai."
+            : "Crée et ouvre une nouvelle maquette d’essai BIMaestro dans Documents\\RevitLogs, puis propose les exercices guidés.";
+        UpdatePushButtonPresentation(info.Id, text, description);
+        info.PushButton.LongDescription = UiLanguage.T(description);
+        info.PushButton.Image = LoadBitmapFromResource(image, 16);
+        info.PushButton.LargeImage = LoadBitmapFromResource(image, 32);
+        info.DisplayName = text;
+        info.ImageResourceName = image;
+        badgeToolTipsApplied.Remove(info.Id);
+        var adWindows = AppDomain.CurrentDomain.GetAssemblies()
+            .FirstOrDefault(assembly => assembly.GetName().Name == "AdWindows");
+        if (adWindows != null)
+        {
+            try { SetBadgeToolTip(adWindows, info.Id); }
+            catch { /* Conserver l’infobulle Revit standard. */ }
+        }
     }
 
     private static void RegisterButtonDefinition(string buttonId, string displayName, string commandClass, string imageResourceName)

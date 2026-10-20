@@ -12,6 +12,7 @@ public partial class AppUI
 {
     private static string GetToolTipExampleDescription(string id)
     {
+        if (id == "CreateDemoProject" && IsDemoToursPresentation) id = "DemoTours";
         switch (id)
         {
             case "PipeLengthByDiameterV2": return "Regroupe les longueurs, accessoires et volumes par diamètre, puis exporte les résultats vers Excel.";
@@ -86,6 +87,7 @@ public partial class AppUI
 
     private static bool AddToolTipExample(StackPanel content, string id)
     {
+        if (id == "CreateDemoProject" && IsDemoToursPresentation) id = "DemoTours";
         FrameworkElement example;
         string caption;
         switch (id)

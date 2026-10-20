@@ -280,6 +280,7 @@ public class BIMaestroApp : IExternalApplication
             RefreshProjectBrowserActiveViewWhenNeeded();
             BIMaestro.ViewHover.ViewHoverPreviewService.ProcessPending(_uiApp);
             BIMaestro.ViewHover.ViewDeckService.ProcessIdling(_uiApp);
+            AppUI.UpdateDemoProjectButton(_uiApp);
             BIMaestro.Tutorials.DemoTrainingInvitation.ProcessIdling(_uiApp);
 
             if (!Couleur.ColoringStateManager.IsColoringActive)

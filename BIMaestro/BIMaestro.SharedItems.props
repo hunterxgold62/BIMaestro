@@ -84,6 +84,8 @@
     <Compile Include="les couleurs\Personnalisation\ProjectBrowserRuleWindow.cs" />
     <Compile Include="les couleurs\Personnalisation\BrowserAtmosphere.cs" />
     <EmbeddedResource Include="Resources\BrowserIcons\*.png" />
+    <EmbeddedResource Include="Resources\DemoProject.png" />
+    <EmbeddedResource Include="Resources\DemoTours.png" />
     <EmbeddedResource Include="Resources\BrowserIcons\browser-icons.js" />
     <Reference Include="System.IO.Compression" />
     <Reference Include="System.IO.Compression.FileSystem" />
