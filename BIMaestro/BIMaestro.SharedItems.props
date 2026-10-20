@@ -1,4 +1,5 @@
 <Project>
+  <ItemGroup><Compile Include="les couleurs\Proprietes\*.cs" /></ItemGroup>
   <ItemGroup>
     <Compile Include="les couleurs\Home\*.cs" />
     <EmbeddedResource Include="les couleurs\Home\Resources\*.js">

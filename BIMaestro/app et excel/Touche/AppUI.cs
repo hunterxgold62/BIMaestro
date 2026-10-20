@@ -197,6 +197,10 @@ public partial class AppUI : IExternalApplication
 
            new RibbonPanelDefinition("Couleur et information", new List<RibbonItemDefinition>
             {
+                new RibbonItemDefinition("PropertiesAppearance", "Apparence des propriétés", panel => AddPushButton(panel,
+                    "PropertiesAppearance", "Apparence\npropriétés", assemblyPath,
+                    "BIMaestro.PropertiesAppearance.PropertiesAppearanceCommand", "Couleur.png",
+                    "Personnalise le texte et le fond des groupes ou paramètres de la palette Propriétés. Profils généraux, par catégorie ou par type, variantes clair/sombre et aperçu réversible. Aucun changement des valeurs du modèle.")),
                 new RibbonItemDefinition("HomeAppearanceTest", "Accueil · Test", panel => AddPushButton(panel,
                     "HomeAppearanceTest", "Accueil\nTest", assemblyPath,
                     "BIMaestro.Home.HomeAppearanceCommand", "Miniature.png",
