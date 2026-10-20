@@ -1,0 +1,311 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Threading;
+using BIMaestro.UI;
+
+namespace BIMaestro.PropertiesAppearance
+{
+    internal sealed partial class PropertiesAppearanceWindow : Window
+    {
+        private sealed class ScopeChoice
+        {
+            internal string Key, Label, Explanation;
+            public override string ToString() => Label;
+        }
+        private AppearanceContext _context;
+        private readonly Dictionary<string, AppearanceProfile> _drafts = new Dictionary<string, AppearanceProfile>();
+        private readonly HashSet<string> _dirty = new HashSet<string>();
+        private AppearanceProfile _profile;
+        private PropertyPreviewRow _selected;
+        private bool _loading, _closed, _darkWindow;
+        private int _revision;
+        private readonly ComboBox _scope = new ComboBox();
+        private readonly TextBox _search = new TextBox();
+        private readonly TextBlock _caption = new TextBlock(), _hint = new TextBlock(), _selection = new TextBlock(), _selectionHint = new TextBlock(), _scopeHint = new TextBlock(), _changeState = new TextBlock(), _status = new TextBlock(), _colorHint = new TextBlock();
+        private readonly StackPanel _rows = new StackPanel(), _rules = new StackPanel();
+        private readonly SimpleColorPicker _text = new SimpleColorPicker { TransparentLabel = "Texte Revit" }, _background = new SimpleColorPicker { TransparentLabel = "Fond Revit" };
+        private readonly CheckBox _enabled = new CheckBox { Content = "Utiliser mes couleurs", Margin = new Thickness(0, 12, 0, 6) };
+        private readonly CheckBox _live = new CheckBox { Content = "Tester en direct dans Revit", Margin = new Thickness(0, 8, 0, 4), ToolTip = "Essai temporaire. Fermer sans enregistrer annule cet essai." };
+        private readonly Expander _savedRules = new Expander { Header = "Mes couleurs enregistrées", Margin = new Thickness(0, 18, 0, 0) };
+        private readonly StackPanel _editor = new StackPanel();
+        private readonly Button _lightButton, _darkButton;
+        private readonly DispatcherTimer _previewTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
+        private bool _darkPreview;
+        private readonly List<Tuple<Button, string, string>> _presets = new List<Tuple<Button, string, string>>();
+
+        internal PropertiesAppearanceWindow(AppearanceContext context)
+        {
+            _context = context; _darkPreview = PropertiesAppearanceService.IsDark;
+            Title = "Apparence des propriétés"; Width = 1280; Height = 850; MinWidth = 1100; MinHeight = 700;
+            MaxHeight = Math.Max(700, SystemParameters.WorkArea.Height); WindowStartupLocation = WindowStartupLocation.CenterOwner; ShowInTaskbar = false;
+            FontFamily = new FontFamily("Segoe UI"); FontSize = 13;
+            foreach (var p in PropertiesAppearanceService.Saved.Profiles) _drafts[p.Key] = p.Copy();
+            if (!_drafts.ContainsKey("all")) _drafts["all"] = new AppearanceProfile();
+            _enabled.IsChecked = PropertiesAppearanceService.Saved.Enabled;
+            _lightButton = MakeButton("☀  Clair", () => SetTone(false));
+            _darkButton = MakeButton("☾  Sombre", () => SetTone(true));
+            InstallStyles(); ApplyWindowTheme(); Build(); ReloadContext(context.CategoryKey ?? "all");
+            _previewTimer.Tick += (_, __) => { _previewTimer.Stop(); if (!_closed && _live.IsChecked == true) Preview(); };
+            Closed += (_, __) => { _closed = true; _previewTimer.Stop(); };
+            Activated += (_, __) => { if (_darkWindow != PropertiesAppearanceService.IsDark) { ApplyWindowTheme(); RenderRows(); } };
+        }
+        private static SolidColorBrush Brush(string hex) => new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
+        private TextBlock Label(string value, double size = 13, bool bold = false, bool muted = false)
+        {
+            var t = new TextBlock { Text = value, FontSize = size, FontWeight = bold ? FontWeights.SemiBold : FontWeights.Normal, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 7) };
+            t.SetResourceReference(TextBlock.ForegroundProperty, muted ? "Muted" : "Ink"); return t;
+        }
+        private static void BindText(TextBlock t, double size = 13, bool bold = false, bool muted = false)
+        {
+            t.FontSize = size; t.FontWeight = bold ? FontWeights.SemiBold : FontWeights.Normal; t.TextWrapping = TextWrapping.Wrap;
+            t.SetResourceReference(TextBlock.ForegroundProperty, muted ? "Muted" : "Ink");
+        }
+        private Button MakeButton(string label, Action action, bool primary = false)
+        {
+            var button = new Button { Content = label, Padding = new Thickness(13, 9, 13, 9), Margin = new Thickness(0, 0, 7, 0), MinHeight = 36, Cursor = System.Windows.Input.Cursors.Hand };
+            if (primary) { button.Background = Brush("#155C42"); button.Foreground = Brushes.White; button.BorderBrush = Brush("#155C42"); }
+            button.Click += (_, __) => { try { action(); } catch (Exception ex) { Notify(ex.Message); } }; return button;
+        }
+        private void InstallStyles()
+        {
+            var style = new Style(typeof(Button));
+            style.Setters.Add(new Setter(Control.BackgroundProperty, new DynamicResourceExtension("Surface")));
+            style.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension("Ink")));
+            style.Setters.Add(new Setter(Control.BorderBrushProperty, new DynamicResourceExtension("Line")));
+            style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(1)));
+            style.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
+            var template = new ControlTemplate(typeof(Button));
+            var border = new FrameworkElementFactory(typeof(Border)); border.Name = "Frame";
+            border.SetValue(Border.CornerRadiusProperty, new CornerRadius(7));
+            border.SetBinding(Border.BackgroundProperty, new System.Windows.Data.Binding("Background") { RelativeSource = System.Windows.Data.RelativeSource.TemplatedParent });
+            border.SetBinding(Border.BorderBrushProperty, new System.Windows.Data.Binding("BorderBrush") { RelativeSource = System.Windows.Data.RelativeSource.TemplatedParent });
+            border.SetBinding(Border.BorderThicknessProperty, new System.Windows.Data.Binding("BorderThickness") { RelativeSource = System.Windows.Data.RelativeSource.TemplatedParent });
+            border.SetBinding(Border.PaddingProperty, new System.Windows.Data.Binding("Padding") { RelativeSource = System.Windows.Data.RelativeSource.TemplatedParent });
+            var content = new FrameworkElementFactory(typeof(ContentPresenter)); content.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+            content.SetBinding(FrameworkElement.HorizontalAlignmentProperty, new System.Windows.Data.Binding("HorizontalContentAlignment") { RelativeSource = System.Windows.Data.RelativeSource.TemplatedParent });
+            border.AppendChild(content); template.VisualTree = border; style.Setters.Add(new Setter(Control.TemplateProperty, template));
+            var hover = new Trigger { Property = IsMouseOverProperty, Value = true }; hover.Setters.Add(new Setter(OpacityProperty, .84)); style.Triggers.Add(hover);
+            var disabled = new Trigger { Property = IsEnabledProperty, Value = false }; disabled.Setters.Add(new Setter(OpacityProperty, .5)); style.Triggers.Add(disabled);
+            var focus = new Trigger { Property = IsKeyboardFocusedProperty, Value = true }; focus.Setters.Add(new Setter(Control.BorderBrushProperty, Brush("#22A875"))); focus.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(2))); style.Triggers.Add(focus);
+            Resources[typeof(Button)] = style;
+            var combo = new Style(typeof(ComboBox)); combo.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(10, 7, 10, 7))); combo.Setters.Add(new Setter(Control.MinHeightProperty, 36.0)); Resources[typeof(ComboBox)] = combo;
+            var check = new Style(typeof(CheckBox)); check.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension("Ink"))); Resources[typeof(CheckBox)] = check;
+        }
+        private void ApplyWindowTheme()
+        {
+            _darkWindow = PropertiesAppearanceService.IsDark;
+            Resources["Canvas"] = Brush(_darkWindow ? "#202830" : "#F3F6F5"); Resources["Surface"] = Brush(_darkWindow ? "#2B353E" : "#FFFFFF");
+            Resources["Ink"] = Brush(_darkWindow ? "#EDF3F0" : "#18332A"); Resources["Muted"] = Brush(_darkWindow ? "#B3C2BB" : "#667B71");
+            Resources["Line"] = Brush(_darkWindow ? "#48574E" : "#DDE7E1"); Resources["Tint"] = Brush(_darkWindow ? "#263F33" : "#EAF4EE");
+            SetResourceReference(BackgroundProperty, "Canvas"); SetResourceReference(ForegroundProperty, "Ink");
+        }
+        private Border Card(UIElement child, int padding = 18)
+        {
+            var b = new Border { Child = child, Padding = new Thickness(padding), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12) };
+            b.SetResourceReference(Border.BackgroundProperty, "Surface"); b.SetResourceReference(Border.BorderBrushProperty, "Line"); return b;
+        }
+        private void Build()
+        {
+            var root = new Grid { Margin = new Thickness(24) }; Content = root;
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            var title = new StackPanel(); title.Children.Add(Label("Apparence des propriétés", 27, true));
+            title.Children.Add(Label("Cliquez pour colorer. Réorganisez l’aperçu avec les poignées et comparez le résultat.", 14, false, true)); root.Children.Add(title);
+            var context = new DockPanel(); var refresh = MakeButton("↻  Changer de sélection", RefreshContext); DockPanel.SetDock(refresh, Dock.Right); context.Children.Add(refresh); _enabled.Margin = new Thickness(0, 0, 22, 0); _enabled.VerticalAlignment = VerticalAlignment.Center; DockPanel.SetDock(_enabled, Dock.Right); context.Children.Add(_enabled);
+            BindText(_caption, 14, true); _caption.VerticalAlignment = VerticalAlignment.Center; _caption.Margin = new Thickness(0, 0, 14, 0); context.Children.Add(_caption);
+            var contextCard = Card(context, 12); contextCard.Margin = new Thickness(0, 8, 0, 18); Grid.SetRow(contextCard, 1); root.Children.Add(contextCard);
+
+            var body = new Grid(); body.ColumnDefinitions.Add(new ColumnDefinition()); body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(18) }); body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(330) }); Grid.SetRow(body, 2); root.Children.Add(body);
+            var left = new Grid(); left.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); left.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); left.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); left.RowDefinitions.Add(new RowDefinition());
+            var introduction = new StackPanel(); var previewHeading = new DockPanel(); _live.Margin = new Thickness(10, 1, 0, 6); DockPanel.SetDock(_live, Dock.Right); previewHeading.Children.Add(_live); previewHeading.Children.Add(Label("1   Glissez ou sélectionnez", 17, true)); introduction.Children.Add(previewHeading); BindText(_hint, 12, false, true); _hint.Margin = new Thickness(0, 0, 0, 12); introduction.Children.Add(_hint); left.Children.Add(introduction);
+            var search = new Grid { Margin = new Thickness(0, 0, 0, 14) }; _search.Padding = new Thickness(10, 8, 10, 8); _search.FontSize = 13; _search.SetResourceReference(Control.ForegroundProperty, "Ink"); _search.SetResourceReference(Control.BackgroundProperty, "Surface"); _search.SetResourceReference(Control.BorderBrushProperty, "Line");
+            _search.TextChanged += (_, __) => RenderRows(); search.Children.Add(_search);
+            var placeholder = Label("⌕  Rechercher un groupe ou un paramètre…", 13, false, true); placeholder.Margin = new Thickness(11, 9, 0, 0); placeholder.IsHitTestVisible = false; search.Children.Add(placeholder); _search.TextChanged += (_, __) => placeholder.Visibility = string.IsNullOrEmpty(_search.Text) ? Visibility.Visible : Visibility.Collapsed;
+            Grid.SetRow(search, 1); left.Children.Add(search);
+            var headings = Pair(Label("REVIT D’ORIGINE", 11, true, true), Label("VOTRE APERÇU · GLISSEZ LES POIGNÉES", 11, true)); headings.Margin = new Thickness(8, 0, 8, 5); Grid.SetRow(headings, 2); left.Children.Add(headings);
+            var scroll = new ScrollViewer { Content = _rows, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }; _previewScroll = scroll; Grid.SetRow(scroll, 3); left.Children.Add(scroll); body.Children.Add(Card(left));
+
+            var right = new StackPanel(); right.Children.Add(Label("2   Personnalisez", 17, true)); BindText(_selection, 17, true); _selection.Margin = new Thickness(0, 8, 0, 6); right.Children.Add(_selection);
+            BindText(_selectionHint, 12, false, true); _selectionHint.Margin = new Thickness(0, 0, 0, 15); right.Children.Add(_selectionHint);
+            right.Children.Add(Label("Appliquer à…", 13, true)); _scope.SelectionChanged += (_, __) => ScopeChanged(); right.Children.Add(_scope);
+            BindText(_scopeHint, 12, false, true); _scopeHint.Margin = new Thickness(0, 7, 0, 14); right.Children.Add(_scopeHint);
+            var tones = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 12) }; tones.Children.Add(_lightButton); tones.Children.Add(_darkButton); right.Children.Add(tones);
+            _editor.Children.Add(Label("Une ambiance en un clic", 12, true));
+            var presets = new Grid(); presets.ColumnDefinitions.Add(new ColumnDefinition()); presets.ColumnDefinitions.Add(new ColumnDefinition()); presets.RowDefinitions.Add(new RowDefinition()); presets.RowDefinitions.Add(new RowDefinition());
+            AddPreset(presets, "Sauge", "#155C42", "#E4F1E9", 0, 0); AddPreset(presets, "Bleu", "#234F78", "#E7F1FB", 0, 1);
+            AddPreset(presets, "Ambre", "#77521A", "#FBF1D9", 1, 0); AddPreset(presets, "Lavande", "#604483", "#F1EBFA", 1, 1); _editor.Children.Add(presets);
+            var custom = new Expander { Header = "Choisir mes propres couleurs", Margin = new Thickness(0, 14, 0, 12) };
+            var customContent = new StackPanel { Margin = new Thickness(0, 10, 0, 0) }; customContent.Children.Add(Label("Couleur du texte", 12)); _text.Height = 34; customContent.Children.Add(_text); customContent.Children.Add(new Border { Height = 10 }); customContent.Children.Add(Label("Couleur du fond", 12)); _background.Height = 34; customContent.Children.Add(_background); custom.Content = customContent; _editor.Children.Add(custom);
+            _text.SelectedColorChanged += (_, __) => ColorsChanged(); _background.SelectedColorChanged += (_, __) => ColorsChanged();
+            BindText(_colorHint, 12, false, true); _colorHint.Margin = new Thickness(0, 0, 0, 10); _editor.Children.Add(_colorHint);
+            _editor.Children.Add(MakeButton("↶  Retirer mes couleurs ici", ResetSelection));
+            right.Children.Add(_editor);
+            _enabled.Checked += (_, __) => EnabledChanged(); _enabled.Unchecked += (_, __) => EnabledChanged();
+            _live.Checked += (_, __) => SchedulePreview(); _live.Unchecked += (_, __) => { if (_loading) return; _previewTimer.Stop(); RequestCancelPreview(); };
+            _savedRules.Content = _rules; right.Children.Add(_savedRules); right.Children.Add(MakeButton("↶  Remettre l’ordre Revit", ResetOrder)); right.Children.Add(MakeButton("Réinitialiser tout…", () => _resetConfirmation.Visibility = Visibility.Visible));
+            var rightScroll = new ScrollViewer { Content = right, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }; var rightCard = Card(rightScroll); Grid.SetColumn(rightCard, 2); body.Children.Add(rightCard);
+            var footer = new Grid { Margin = new Thickness(0, 16, 0, 0) }; footer.ColumnDefinitions.Add(new ColumnDefinition()); footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var messages = new StackPanel { Margin = new Thickness(0, 0, 16, 0) }; BindText(_changeState, 13, true); BindText(_status, 12, false, true); _status.Margin = new Thickness(0, 4, 0, 0); messages.Children.Add(_changeState); messages.Children.Add(_status); footer.Children.Add(messages);
+            var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center }; actions.Children.Add(MakeButton("Fermer", Close)); actions.Children.Add(MakeButton("✓  Enregistrer mon affichage", Save, true)); Grid.SetColumn(actions, 1); footer.Children.Add(actions); Grid.SetRow(footer, 3); var footerStack = new StackPanel(); footerStack.Children.Add(footer); footerStack.Children.Add(BuildResetConfirmation()); Grid.SetRow(footerStack, 3); root.Children.Add(footerStack);
+            Notify("Fermer sans enregistrer annule vos essais.");
+        }
+        private static Grid Pair(UIElement before, UIElement after)
+        {
+            var g = new Grid(); g.ColumnDefinitions.Add(new ColumnDefinition()); g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(12) }); g.ColumnDefinitions.Add(new ColumnDefinition()); g.Children.Add(before); Grid.SetColumn(after, 2); g.Children.Add(after); return g;
+        }
+        private void AddPreset(Grid grid, string name, string text, string background, int row, int col)
+        {
+            var content = new StackPanel { Orientation = Orientation.Horizontal }; content.Children.Add(new TextBlock { Text = "Aa", FontSize = 20, FontWeight = FontWeights.SemiBold, Foreground = Brush(text), Margin = new Thickness(0, 0, 10, 0) }); content.Children.Add(new TextBlock { Text = name, VerticalAlignment = VerticalAlignment.Center, Foreground = Brush(text) });
+            var button = MakeButton("", () => ApplyPreset(text, background)); button.Content = content; button.Background = Brush(background); button.HorizontalContentAlignment = HorizontalAlignment.Left; button.Margin = new Thickness(0, 0, col == 0 ? 8 : 0, 8);
+            Grid.SetRow(button, row); Grid.SetColumn(button, col); grid.Children.Add(button); _presets.Add(Tuple.Create(button, text, background));
+        }
+        private void ReloadContext(string scopeKey)
+        {
+            _loading = true; _caption.Text = string.IsNullOrWhiteSpace(_context.CategoryName) ? _context.Caption : "Sélection actuelle : " + _context.Caption; _hint.Text = _context.PreviewHint ?? _context.Caption;
+            var choices = new List<ScopeChoice>();
+            if (_context.CategoryKey != null) { EnsureProfile(_context.CategoryKey, "Catégorie · " + _context.CategoryName); choices.Add(new ScopeChoice { Key = _context.CategoryKey, Label = "Toute la catégorie : " + _context.CategoryName, Explanation = "Même apparence pour tous les éléments de cette catégorie, dans vos projets." }); }
+            if (_context.TypeKey != null) { EnsureProfile(_context.TypeKey, "Type · " + _context.TypeName); choices.Add(new ScopeChoice { Key = _context.TypeKey, Label = "Ce type : " + _context.TypeName, Explanation = "Même catégorie et même famille/type, dans vos projets. Les autres types gardent leurs couleurs." }); }
+            choices.Add(new ScopeChoice { Key = "all", Label = "Toutes les catégories", Explanation = "Ce groupe ou ce paramètre sera personnalisé partout où il est reconnu." });
+            _scope.ItemsSource = choices; _scope.SelectedItem = choices.FirstOrDefault(c => c.Key == scopeKey) ?? choices[0]; _profile = _drafts[((ScopeChoice)_scope.SelectedItem).Key]; _scopeHint.Text = ((ScopeChoice)_scope.SelectedItem).Explanation;
+            var oldKey = _selected?.ParameterKey ?? _selected?.GroupKey;
+            _selected = _context.PreviewRows.FirstOrDefault(r => !r.ReadOnly && (r.ParameterKey ?? r.GroupKey) == oldKey) ?? _context.PreviewRows.FirstOrDefault(r => r.Header && !r.ReadOnly && AppearancePreferences.Normalize(r.Label) == "GRAPHISMES") ?? _context.PreviewRows.FirstOrDefault(r => !r.ReadOnly);
+            _loading = false; LoadColors(); RenderRows(); RefreshRules(); UpdateState();
+        }
+        private void EnsureProfile(string key, string name) { if (!_drafts.ContainsKey(key)) _drafts[key] = new AppearanceProfile { Key = key, Name = name }; }
+        private void RefreshContext()
+        {
+            PropertiesAppearanceCommand.Request(app => { if (_closed) return; _context = AppearanceContext.ForEditor(app); _search.Text = ""; ReloadContext(_context.CategoryKey ?? "all"); Notify("Sélection actualisée. Vos couleurs en cours sont conservées."); });
+        }
+        private void ScopeChanged()
+        {
+            if (_loading || !(_scope.SelectedItem is ScopeChoice choice)) return;
+            _profile = _drafts[choice.Key]; _scopeHint.Text = choice.Explanation; LoadColors(); RenderRows(); RefreshRules();
+        }
+        private AppearanceRule CurrentRule => _selected == null || _profile == null ? null : _profile.Rules.FirstOrDefault(r => r.Kind == (_selected.Header ? "group" : "parameter") && r.TargetKey == (_selected.Header ? _selected.GroupKey : _selected.ParameterKey));
+        private PaletteColors Effective(PropertyPreviewRow row)
+        {
+            var preferences = new AppearancePreferences { Profiles = _drafts.Values.ToList() };
+            return row.ReadOnly ? null : preferences.Resolve(_context.CategoryKey, _context.TypeKey, row.GroupKey, row.ParameterKey, _darkPreview);
+        }
+        private void Select(PropertyPreviewRow row)
+        {
+            _selected = row; LoadColors(); RenderRows();
+            if (row.ReadOnly) Notify("Cette ligne reste dans son apparence Revit : elle est grisée, non modifiable ou non reconnue.");
+        }
+        private void SetTone(bool dark) { _darkPreview = dark; LoadColors(); RenderRows(); RefreshRules(); }
+        private void LoadColors()
+        {
+            _loading = true; var c = (_darkPreview ? CurrentRule?.Dark : CurrentRule?.Light) ?? new PaletteColors(); _text.SelectedColor = AppearancePreferences.Parse(c.Text) ?? Colors.Transparent; _background.SelectedColor = AppearancePreferences.Parse(c.Background) ?? Colors.Transparent; _loading = false;
+            _selection.Text = _selected == null ? "Ouvrez une sélection dans Revit" : (_selected.Header ? "Groupe : " : "Paramètre : ") + _selected.Label;
+            _selectionHint.Text = _selected == null ? "Ouvrez la palette Propriétés, puis choisissez une vue ou un seul élément." : _selected.ReadOnly ? "Cette ligne conserve son apparence native." : _selected.Header ? "Le titre et les lignes modifiables de ce groupe changeront ensemble." : "Seule cette ligne change. Les autres paramètres gardent leurs couleurs.";
+            _editor.IsEnabled = _selected != null && !_selected.ReadOnly;
+            _lightButton.Background = !_darkPreview ? Brush("#DCEEE3") : (Brush)Resources["Surface"]; _lightButton.Foreground = !_darkPreview ? Brush("#155C42") : (Brush)Resources["Ink"];
+            _darkButton.Background = _darkPreview ? Brush("#DCEEE3") : (Brush)Resources["Surface"]; _darkButton.Foreground = _darkPreview ? Brush("#155C42") : (Brush)Resources["Ink"];
+            UpdateColorHint();
+        }
+        private static string Hex(Color? color) => color.HasValue && color.Value.A == 255 ? color.Value.ToString() : null;
+        private void ApplyPreset(string foreground, string background)
+        {
+            if (_selected == null || _selected.ReadOnly) return;
+            if (_darkPreview) { string swap = foreground; foreground = background; background = swap; }
+            _loading = true; _text.SelectedColor = AppearancePreferences.Parse(foreground); _background.SelectedColor = AppearancePreferences.Parse(background); _loading = false; ColorsChanged();
+        }
+        private void ColorsChanged()
+        {
+            if (_loading || _selected == null || _selected.ReadOnly || _profile == null) return;
+            var rule = CurrentRule;
+            if (rule == null) { rule = new AppearanceRule { Kind = _selected.Header ? "group" : "parameter", TargetKey = _selected.Header ? _selected.GroupKey : _selected.ParameterKey, Label = _selected.Label }; _profile.Rules.Add(rule); }
+            var colors = _darkPreview ? rule.Dark : rule.Light; colors.Text = Hex(_text.SelectedColor); colors.Background = Hex(_background.SelectedColor);
+            if (rule.Light.IsEmpty && rule.Dark.IsEmpty) _profile.Rules.Remove(rule);
+            _loading = true; _enabled.IsChecked = true; _loading = false; Changed();
+        }
+        private void Changed()
+        {
+            _dirty.Add(_profile.Key); _revision++; RenderRows(); RefreshRules(); UpdateColorHint(); UpdateState(); SchedulePreview();
+        }
+        private void EnabledChanged() { if (_loading) return; _revision++; UpdateState(); SchedulePreview(); }
+        private void UpdateColorHint()
+        {
+            var effective = _selected == null ? null : Effective(_selected);
+            var own = _darkPreview ? CurrentRule?.Dark : CurrentRule?.Light;
+            string source = own == null || own.IsEmpty ? effective == null ? "Couleurs Revit d’origine." : "Couleurs héritées d’un réglage plus général." : "Couleurs personnalisées pour cette sélection.";
+            var colors = effective ?? new PaletteColors(); var bg = AppearancePreferences.Parse(colors.Background) ?? (_darkPreview ? Color.FromRgb(59, 68, 83) : Colors.White); var fg = AppearancePreferences.Parse(colors.Text) ?? (_darkPreview ? Colors.White : Colors.Black);
+            if (own != null && !own.IsEmpty && effective != null && !ReferenceEquals(own, effective)) source = "Un réglage plus précis reste prioritaire pour cet élément.";
+            _colorHint.Text = source + (AppearancePreferences.Contrast(fg, bg) < 4.5 ? " Le texte est ajusté dans l’aperçu pour rester lisible." : "");
+            foreach (var preset in _presets)
+            {
+                string text = _darkPreview ? preset.Item3 : preset.Item2, background = _darkPreview ? preset.Item2 : preset.Item3;
+                bool selected = AppearancePreferences.Parse(colors.Text) == AppearancePreferences.Parse(text) && AppearancePreferences.Parse(colors.Background) == AppearancePreferences.Parse(background);
+                preset.Item1.BorderBrush = selected ? Brush("#20845D") : Brush("#DDE7E1"); preset.Item1.BorderThickness = new Thickness(selected ? 2 : 1);
+            }
+        }
+        private void RenderRows()
+        {
+            long measured = PropertiesAppearanceMetrics.Begin();
+            try { RenderComparison(); } finally { PropertiesAppearanceMetrics.End("EditorRender", measured); }
+        }
+
+        private Button PreviewCell(PropertyPreviewRow row, bool modified)
+        {
+            var nativeBg = _darkPreview ? Color.FromRgb(row.Header ? (byte)44 : (byte)59, row.Header ? (byte)53 : (byte)68, row.Header ? (byte)66 : (byte)83) : row.Header ? Color.FromRgb(233, 237, 234) : Colors.White;
+            var colors = modified ? Effective(row) : null; Color bg = AppearancePreferences.Parse(colors?.Background) ?? nativeBg;
+            Color fg = row.ReadOnly ? (_darkPreview ? Color.FromRgb(165, 175, 187) : Color.FromRgb(138, 146, 143)) : colors == null ? (_darkPreview ? Colors.White : Color.FromRgb(34, 47, 42)) : AppearancePreferences.ReadableText(new PaletteColors { Text = colors.Text, Background = bg.ToString() }, _darkPreview);
+            var grid = new Grid(); grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.15, GridUnitType.Star) }); grid.ColumnDefinitions.Add(new ColumnDefinition());
+            var label = new TextBlock { Text = (row.Header ? (IsCollapsed(row) ? "›  " : "⌄  ") : "") + row.Label, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, Foreground = new SolidColorBrush(fg), FontWeight = row.Header ? FontWeights.SemiBold : FontWeights.Normal, FontSize = 12, Margin = new Thickness(0, 0, 8, 0) }; grid.Children.Add(label);
+            if (row.Header) Grid.SetColumnSpan(label, 2);
+            else { var value = new TextBlock { Text = row.Value, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, Foreground = new SolidColorBrush(fg), FontSize = 12 }; Grid.SetColumn(value, 1); grid.Children.Add(value); }
+            UIElement cellContent = grid;
+            if (modified)
+            {
+                var handleRow = new Grid(); handleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(18) }); handleRow.ColumnDefinitions.Add(new ColumnDefinition());
+                handleRow.Children.Add(new TextBlock { Text = "⠿", Foreground = new SolidColorBrush(fg), VerticalAlignment = VerticalAlignment.Center, ToolTip = "Glisser pour déplacer" });
+                Grid.SetColumn(grid, 1); handleRow.Children.Add(grid); cellContent = handleRow;
+            }
+            var button = MakeButton("", () => ClickRow(row)); button.Content = cellContent; button.HorizontalContentAlignment = HorizontalAlignment.Stretch; button.Padding = new Thickness(8, 7, 8, 7); button.Margin = new Thickness(0); button.MinHeight = row.Header ? 34 : 32; button.Background = new SolidColorBrush(bg); button.Foreground = new SolidColorBrush(fg);
+            button.ToolTip = row.Label + (row.Header ? " · Tout le groupe" : " : " + row.Value) + (row.ReadOnly ? " · Apparence native conservée" : " · Cliquer pour personnaliser");
+            bool selected = ReferenceEquals(row, _selected) && modified; button.BorderBrush = selected ? Brush("#22A875") : new SolidColorBrush(bg); button.BorderThickness = new Thickness(selected ? 2 : 1); if (modified) EnableDragging(button, row); return button;
+        }
+        private void ResetSelection()
+        {
+            var rule = CurrentRule; if (rule == null) { Notify("Cette ligne utilise déjà ses couleurs d’origine ou des couleurs héritées."); return; }
+            if (_darkPreview) rule.Dark = new PaletteColors(); else rule.Light = new PaletteColors();
+            if (rule.Light.IsEmpty && rule.Dark.IsEmpty) _profile.Rules.Remove(rule); Changed(); LoadColors(); Notify("Couleurs retirées pour cette variante. Un réglage plus général peut rester applicable.");
+        }
+        private void RefreshRules()
+        {
+            _rules.Children.Clear(); if (_profile == null) return;
+            var rules = _profile.Rules.Where(r => !(_darkPreview ? r.Dark : r.Light).IsEmpty).ToArray(); _savedRules.Header = "Personnalisations ici (" + rules.Length + ")";
+            foreach (var rule in rules)
+            {
+                var b = MakeButton((rule.Kind == "group" ? "▤  " : "—  ") + rule.Label, () => { var row = _context.PreviewRows.FirstOrDefault(r => rule.Kind == "group" ? r.Header && r.GroupKey == rule.TargetKey : r.ParameterKey == rule.TargetKey); if (row != null) { _search.Text = ""; Select(row); } else Notify("Affichez ce groupe dans la palette Revit, puis actualisez la sélection."); });
+                b.HorizontalContentAlignment = HorizontalAlignment.Left; b.Margin = new Thickness(0, 5, 0, 0); _rules.Children.Add(b);
+            }
+            if (rules.Length == 0) _rules.Children.Add(Label("Aucune couleur personnalisée pour cette portée et ce thème.", 12, false, true));
+        }
+        private AppearanceProfile[] Changes() => _dirty.Select(k => _drafts[k].Copy()).ToArray();
+        private void UpdateState()
+        {
+            bool changed = _dirty.Count > 0 || _enabled.IsChecked != PropertiesAppearanceService.Saved.Enabled;
+            _changeState.Text = changed ? "●  Modifications non enregistrées" : _enabled.IsChecked == true ? "✓  Vos couleurs sont enregistrées et activées" : "Couleurs désactivées dans Revit";
+        }
+        private void SchedulePreview() { if (_closed || _live.IsChecked != true) return; _previewTimer.Stop(); _previewTimer.Start(); }
+        private void RequestCancelPreview()
+        {
+            try { PropertiesAppearanceCommand.Request(app => { PropertiesAppearanceService.CancelPreview(); PropertiesAppearanceService.ProcessIdling(app); }); } catch (Exception ex) { Notify(ex.Message); }
+        }
+        private void Preview()
+        {
+            var profiles = Changes(); bool enabled = _enabled.IsChecked == true;
+            try { PropertiesAppearanceCommand.Request(app => { if (_closed) return; PropertiesAppearanceService.SetPreview(profiles, enabled); PropertiesAppearanceService.ProcessIdling(app); Notify((_darkPreview != PropertiesAppearanceService.IsDark ? "Dans Revit, le thème actif est différent de celui de l’aperçu. " : "Test en direct · ") + PropertiesAppearanceService.Status); }); } catch (Exception ex) { Notify(ex.Message); }
+        }
+        private void Save()
+        {
+            _previewTimer.Stop(); var profiles = Changes(); bool enabled = _enabled.IsChecked == true; int revision = _revision;
+            PropertiesAppearanceCommand.Request(app => { PropertiesAppearanceService.Commit(profiles, enabled); if (_closed) return; if (revision == _revision) _dirty.Clear(); PropertiesAppearanceService.ProcessIdling(app); UpdateState(); Notify("Couleurs enregistrées. L’ordre de l’aperçu est conservé ; son application dans Revit reste en validation."); });
+        }
+        internal void Notify(string message) { _status.Text = message; }
+    }
+}

@@ -1,0 +1,54 @@
+{
+  "Label": "optimized-visible",
+  "WallMs": 42738.564,
+  "CpuMs": 43187.5,
+  "CpuOneCorePercent": 101.05042368760917,
+  "MemoryDeltaMB": -8.23828125,
+  "Metrics": {
+    "CellReads": 7147,
+    "Timings": {
+      "DispatcherLag": {
+        "Count": 1305,
+        "MeanMs": 12.749,
+        "P95Ms": 21.243,
+        "MaxMs": 773.549
+      },
+      "FindGrid": {
+        "Count": 31,
+        "MeanMs": 0.027,
+        "P95Ms": 0.039,
+        "MaxMs": 0.042
+      },
+      "Context": {
+        "Count": 31,
+        "MeanMs": 0.89,
+        "P95Ms": 1.177,
+        "MaxMs": 1.192
+      },
+      "Layout": {
+        "Count": 31,
+        "MeanMs": 0.756,
+        "P95Ms": 1.038,
+        "MaxMs": 2.909
+      },
+      "Plan": {
+        "Count": 31,
+        "MeanMs": 0.436,
+        "P95Ms": 0.674,
+        "MaxMs": 0.776
+      },
+      "Refresh": {
+        "Count": 31,
+        "MeanMs": 2.159,
+        "P95Ms": 2.869,
+        "MaxMs": 4.404
+      },
+      "Paint": {
+        "Count": 2,
+        "MeanMs": 3.601,
+        "P95Ms": 3.614,
+        "MaxMs": 3.614
+      }
+    }
+  }
+}

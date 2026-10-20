@@ -234,6 +234,7 @@ public class BIMaestroApp : IExternalApplication
             BIMaestro.Codex.CodexCommand.Shutdown();
             BIMaestro.Codex.CodexMepCommand.Shutdown();
             BIMaestro.Codex.CodexCommunityCommand.Shutdown();
+            BIMaestro.PropertiesAppearance.PropertiesAppearanceService.Shutdown();
             BIMaestro.MepBooster.MepBoosterService.Shutdown();
             BIMaestro.ViewHover.ViewDeckService.Shutdown();
             Couleur.AppearanceOnboarding.Shutdown();
@@ -274,6 +275,7 @@ public class BIMaestroApp : IExternalApplication
 
             BIMaestro.MepBooster.MepBoosterService.RestorePersistedState(_uiApp);
             BIMaestro.MepBooster.MepBoosterService.ProcessIdling(sender, e);
+            BIMaestro.PropertiesAppearance.PropertiesAppearanceService.ProcessIdling(sender as UIApplication ?? _uiApp);
             Page.SecretGifShortcutManager.PollKeyboardState();
             BIMaestro.UI.RadialGlobalHotkeyService.ProcessPending(_uiApp);
             ProcessHistoryBackground(_uiApp);

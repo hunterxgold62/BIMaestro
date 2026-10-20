@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+ <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0-windows</TargetFramework><UseWPF>true</UseWPF><UseWindowsForms>true</UseWindowsForms><EnableDefaultItems>false</EnableDefaultItems><DefineConstants>BIMAESTRO_PROPERTIES_TESTS</DefineConstants><NuGetAudit>false</NuGetAudit></PropertyGroup>
+ <ItemGroup>
+  <Compile Include="EditorFlow.cs"/>
+  <Compile Include="../../../BIMaestro/les couleurs/Proprietes/PropertiesAppearanceWindow.Reset.cs"/>
+  <Compile Include="../../../BIMaestro/les couleurs/Proprietes/PropertiesAppearanceMetrics.cs"/>
+  <Compile Include="../../../BIMaestro/les couleurs/Proprietes/PropertyPreviewRow.cs"/>
+
+  <Compile Include="../../../BIMaestro/les couleurs/Proprietes/PropertiesAppearanceWindow.Order.cs"/>
+  <Compile Include="../../../BIMaestro/les couleurs/Proprietes/AppearanceOrdering.cs"/>
+  <Compile Include="../../../BIMaestro/les couleurs/Proprietes/PropertiesAppearanceWindow.cs"/>
+  <Compile Include="../../../BIMaestro/les couleurs/Proprietes/AppearancePreferences.cs"/>
+  <Compile Include="../../../BIMaestro/Controls/SimpleColorPicker.xaml.cs"/>
+  <Page Include="../../../BIMaestro/Controls/SimpleColorPicker.xaml"/>
+  <PackageReference Include="Newtonsoft.Json" Version="13.0.3"/>
+ </ItemGroup>
+</Project>
