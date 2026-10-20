@@ -1,0 +1,219 @@
+20/10/2026 09:56:41 Command=typography
+                            System.Windows.Controls.TextBlock Name=mAnchorableTitle Text=Propriétés
+UIFramework.TypeSelectorToolBarControl Name= Text=
+ System.Windows.Controls.StackPanel Name=PART_StackPanel Text=
+  System.Windows.Controls.ContentPresenter Name= Text=
+   UIFramework.RvtRibbonItemControl Name=mRibbonItemControl Text=
+    System.Windows.Controls.ContentPresenter Name=mContent Text=
+     System.Windows.Controls.DockPanel Name= Text=
+      UIFramework.ComboBoxControl Name=mComboBox Text=
+       System.Windows.Controls.Grid Name=MainGrid Text=
+        UIFramework.IMEPopup Name=PART_Popup Text=
+        System.Windows.Controls.Primitives.ToggleButton Name=mToggleButton Text=
+         System.Windows.Controls.Grid Name= Text=
+          System.Windows.Controls.Border Name=mBorder Text=
+           System.Windows.Controls.ContentPresenter Name=mButtonContent Text=
+            System.Windows.Controls.Grid Name= Text=
+             System.Windows.Controls.Border Name=mPreviewBorder Text=
+              System.Windows.Controls.Image Name=mImage Text=
+             System.Windows.Controls.StackPanel Name=StackPanel_FamilyTypeText_Full Text=
+              System.Windows.Controls.TextBlock Name=TextBlock_Family Text=
+              System.Windows.Controls.TextBlock Name=TextBlock_Type Text=Plan de structure
+             System.Windows.Shapes.Path Name=Arrow Text=
+             System.Windows.Controls.TextBlock Name=TextBlock_FamilyTypeText_Short Text=Plan de structure
+          System.Windows.Controls.Border Name=InnerPressedShadowBorder Text=
+ACCESSIBLE WINDOW 6426804 Class=GXWND
+ObjectId=4294967292 HRESULT=0
+Child=0 Name=Custom1 Value= Role=10 State=1048576 Rect=8,437,546,333
+ Children=1
+ AccessibleChildren=0 Obtained=1
+  Child=0 Name= Value= Role=9 State=1146880 Rect=8,437,0,0
+ Children=7
+ AccessibleChildren=0 Obtained=7
+    Child=0 Name=Système Value= Role=2 State=32768 Rect=0,0,0,0
+ Children=0
+    Child=0 Name= Value= 1 : 100 Role=1 State=32768 Rect=0,0,0,0
+ Children=5
+ AccessibleChildren=0 Obtained=5
+      Child=1 Name=Éditeur IME Value= Role=43 State=32768 Rect=0,0,0,0
+      Child=2 Name=Réduire Value= Role=43 State=32768 Rect=0,0,0,0
+      Child=3 Name=Agrandir Value= Role=43 State=32768 Rect=0,0,0,0
+      Child=4 Name=Aide contextuelle Value= Role=43 State=32768 Rect=0,0,0,0
+      Child=5 Name=Fermer Value= Role=43 State=32768 Rect=0,0,0,0
+    Child=0 Name=Application Value= Role=2 State=32768 Rect=0,0,0,0
+ Children=0
+    Child=0 Name= Value= 1 : 100 Role=42 State=1081344 Rect=8,437,0,0
+ Children=0
+    Child=0 Name=Vertical Value=0 Role=3 State=32768 Rect=0,0,0,0
+ Children=5
+ AccessibleChildren=0 Obtained=5
+      Child=1 Name=Ligne vers le haut Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+      Child=2 Name=Page précédente Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+      Child=3 Name=Position Value=<COMException> Role=39 State=32768 Rect=0,0,0,0
+      Child=4 Name=Page suivante Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+      Child=5 Name=Ligne vers le bas Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+    Child=0 Name=Horizontal Value=0 Role=3 State=32768 Rect=0,0,0,0
+ Children=5
+ AccessibleChildren=0 Obtained=5
+      Child=1 Name=Colonne vers la gauche Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+      Child=2 Name=Page vers la gauche Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+      Child=3 Name=Position Value=<COMException> Role=39 State=32768 Rect=0,0,0,0
+      Child=4 Name=Page vers la droite Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+      Child=5 Name=Colonne vers la droite Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+    Child=0 Name= Value= Role=4 State=32769 Rect=0,0,0,0
+ Children=0
+ObjectId=0 HRESULT=0
+Child=0 Name=Custom1 Value= Role=9 State=1048576 Rect=8,437,572,333
+ Children=7
+ AccessibleChildren=0 Obtained=7
+  Child=0 Name=Système Value= Role=2 State=32768 Rect=0,0,0,0
+ Children=0
+  Child=0 Name= Value=Custom1 Role=1 State=32768 Rect=0,0,0,0
+ Children=5
+ AccessibleChildren=0 Obtained=5
+    Child=1 Name=Éditeur IME Value= Role=43 State=32768 Rect=0,0,0,0
+    Child=2 Name=Réduire Value= Role=43 State=32768 Rect=0,0,0,0
+    Child=3 Name=Agrandir Value= Role=43 State=32768 Rect=0,0,0,0
+    Child=4 Name=Aide contextuelle Value= Role=43 State=32768 Rect=0,0,0,0
+    Child=5 Name=Fermer Value= Role=43 State=32768 Rect=0,0,0,0
+  Child=0 Name=Application Value= Role=2 State=32768 Rect=0,0,0,0
+ Children=0
+  Child=0 Name=Custom1 Value= Role=10 State=1048576 Rect=8,437,546,333
+ Children=1
+ AccessibleChildren=0 Obtained=1
+    Child=0 Name= Value= Role=9 State=1146880 Rect=8,437,0,0
+ Children=7
+ AccessibleChildren=0 Obtained=7
+      Child=0 Name=Système Value= Role=2 State=32768 Rect=0,0,0,0
+ Children=0
+      Child=0 Name= Value= 1 : 100 Role=1 State=32768 Rect=0,0,0,0
+ Children=5
+ AccessibleChildren=0 Obtained=5
+        Child=1 Name=Éditeur IME Value= Role=43 State=32768 Rect=0,0,0,0
+        Child=2 Name=Réduire Value= Role=43 State=32768 Rect=0,0,0,0
+        Child=3 Name=Agrandir Value= Role=43 State=32768 Rect=0,0,0,0
+        Child=4 Name=Aide contextuelle Value= Role=43 State=32768 Rect=0,0,0,0
+        Child=5 Name=Fermer Value= Role=43 State=32768 Rect=0,0,0,0
+      Child=0 Name=Application Value= Role=2 State=32768 Rect=0,0,0,0
+ Children=0
+      Child=0 Name= Value= 1 : 100 Role=42 State=1081344 Rect=8,437,0,0
+ Children=0
+      Child=0 Name=Vertical Value=0 Role=3 State=32768 Rect=0,0,0,0
+ Children=5
+ AccessibleChildren=0 Obtained=5
+        Child=1 Name=Ligne vers le haut Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+        Child=2 Name=Page précédente Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+        Child=3 Name=Position Value=<COMException> Role=39 State=32768 Rect=0,0,0,0
+        Child=4 Name=Page suivante Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+        Child=5 Name=Ligne vers le bas Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+      Child=0 Name=Horizontal Value=0 Role=3 State=32768 Rect=0,0,0,0
+ Children=5
+ AccessibleChildren=0 Obtained=5
+        Child=1 Name=Colonne vers la gauche Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+        Child=2 Name=Page vers la gauche Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+        Child=3 Name=Position Value=<COMException> Role=39 State=32768 Rect=0,0,0,0
+        Child=4 Name=Page vers la droite Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+        Child=5 Name=Colonne vers la droite Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+      Child=0 Name= Value= Role=4 State=32769 Rect=0,0,0,0
+ Children=0
+  Child=0 Name=Vertical Value=0 Role=3 State=0 Rect=554,437,26,333
+ Children=5
+ AccessibleChildren=0 Obtained=5
+    Child=1 Name=Ligne vers le haut Value=<COMException> Role=43 State=0 Rect=554,437,26,26
+    Child=2 Name=Page précédente Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+    Child=3 Name=Position Value=<COMException> Role=39 State=0 Rect=554,463,26,79
+    Child=4 Name=Page suivante Value=<COMException> Role=43 State=0 Rect=554,542,26,202
+    Child=5 Name=Ligne vers le bas Value=<COMException> Role=43 State=0 Rect=554,744,26,26
+  Child=0 Name=Horizontal Value=0 Role=3 State=32768 Rect=0,0,0,0
+ Children=5
+ AccessibleChildren=0 Obtained=5
+    Child=1 Name=Colonne vers la gauche Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+    Child=2 Name=Page vers la gauche Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+    Child=3 Name=Position Value=<COMException> Role=39 State=32768 Rect=0,0,0,0
+    Child=4 Name=Page vers la droite Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+    Child=5 Name=Colonne vers la droite Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+  Child=0 Name= Value= Role=4 State=32769 Rect=0,0,0,0
+ Children=0
+ACCESSIBLE WINDOW 18813334 Class=GXEDIT
+ObjectId=4294967292 HRESULT=0
+Child=0 Name= Value= 1 : 100 Role=42 State=1081344 Rect=8,437,0,0
+ Children=0
+ObjectId=0 HRESULT=0
+Child=0 Name= Value= Role=9 State=1146880 Rect=8,437,0,0
+ Children=7
+ AccessibleChildren=0 Obtained=7
+  Child=0 Name=Système Value= Role=2 State=32768 Rect=0,0,0,0
+ Children=0
+  Child=0 Name= Value= 1 : 100 Role=1 State=32768 Rect=0,0,0,0
+ Children=5
+ AccessibleChildren=0 Obtained=5
+    Child=1 Name=Éditeur IME Value= Role=43 State=32768 Rect=0,0,0,0
+    Child=2 Name=Réduire Value= Role=43 State=32768 Rect=0,0,0,0
+    Child=3 Name=Agrandir Value= Role=43 State=32768 Rect=0,0,0,0
+    Child=4 Name=Aide contextuelle Value= Role=43 State=32768 Rect=0,0,0,0
+    Child=5 Name=Fermer Value= Role=43 State=32768 Rect=0,0,0,0
+  Child=0 Name=Application Value= Role=2 State=32768 Rect=0,0,0,0
+ Children=0
+  Child=0 Name= Value= 1 : 100 Role=42 State=1081344 Rect=8,437,0,0
+ Children=0
+  Child=0 Name=Vertical Value=0 Role=3 State=32768 Rect=0,0,0,0
+ Children=5
+ AccessibleChildren=0 Obtained=5
+    Child=1 Name=Ligne vers le haut Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+    Child=2 Name=Page précédente Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+    Child=3 Name=Position Value=<COMException> Role=39 State=32768 Rect=0,0,0,0
+    Child=4 Name=Page suivante Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+    Child=5 Name=Ligne vers le bas Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+  Child=0 Name=Horizontal Value=0 Role=3 State=32768 Rect=0,0,0,0
+ Children=5
+ AccessibleChildren=0 Obtained=5
+    Child=1 Name=Colonne vers la gauche Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+    Child=2 Name=Page vers la gauche Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+    Child=3 Name=Position Value=<COMException> Role=39 State=32768 Rect=0,0,0,0
+    Child=4 Name=Page vers la droite Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+    Child=5 Name=Colonne vers la droite Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+  Child=0 Name= Value= Role=4 State=32769 Rect=0,0,0,0
+ Children=0
+ACCESSIBLE WINDOW 19140784 Class=GXWND
+ObjectId=4294967292 HRESULT=0
+Child=0 Name=Personnalisé2 Value= Role=10 State=1081344 Rect=8,1247,537,575
+ Children=0
+ObjectId=0 HRESULT=0
+Child=0 Name=Personnalisé2 Value= Role=9 State=1146880 Rect=8,1247,563,575
+ Children=7
+ AccessibleChildren=0 Obtained=7
+  Child=0 Name=Système Value= Role=2 State=32768 Rect=0,0,0,0
+ Children=0
+  Child=0 Name= Value=Personnalisé2 Role=1 State=32768 Rect=0,0,0,0
+ Children=5
+ AccessibleChildren=0 Obtained=5
+    Child=1 Name=Éditeur IME Value= Role=43 State=32768 Rect=0,0,0,0
+    Child=2 Name=Réduire Value= Role=43 State=32768 Rect=0,0,0,0
+    Child=3 Name=Agrandir Value= Role=43 State=32768 Rect=0,0,0,0
+    Child=4 Name=Aide contextuelle Value= Role=43 State=32768 Rect=0,0,0,0
+    Child=5 Name=Fermer Value= Role=43 State=32768 Rect=0,0,0,0
+  Child=0 Name=Application Value= Role=2 State=32768 Rect=0,0,0,0
+ Children=0
+  Child=0 Name=Personnalisé2 Value= Role=10 State=1081344 Rect=8,1247,537,575
+ Children=0
+  Child=0 Name=Vertical Value=0 Role=3 State=0 Rect=545,1247,26,575
+ Children=5
+ AccessibleChildren=0 Obtained=5
+    Child=1 Name=Ligne vers le haut Value=<COMException> Role=43 State=0 Rect=545,1247,26,26
+    Child=2 Name=Page précédente Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+    Child=3 Name=Position Value=<COMException> Role=39 State=0 Rect=545,1273,26,26
+    Child=4 Name=Page suivante Value=<COMException> Role=43 State=0 Rect=545,1299,26,497
+    Child=5 Name=Ligne vers le bas Value=<COMException> Role=43 State=0 Rect=545,1796,26,26
+  Child=0 Name=Horizontal Value=0 Role=3 State=32768 Rect=0,0,0,0
+ Children=5
+ AccessibleChildren=0 Obtained=5
+    Child=1 Name=Colonne vers la gauche Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+    Child=2 Name=Page vers la gauche Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+    Child=3 Name=Position Value=<COMException> Role=39 State=32768 Rect=0,0,0,0
+    Child=4 Name=Page vers la droite Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+    Child=5 Name=Colonne vers la droite Value=<COMException> Role=43 State=32768 Rect=0,0,0,0
+  Child=0 Name= Value= Role=4 State=32769 Rect=0,0,0,0
+ Children=0
+Native border hooks=0
+Saved property count=4
+Parameter fingerprint SHA256=6C8FA7E3B8C6FFE525E9A0A976EC569DD339556E5D3F1B46A09224733885AA25 Entries=89

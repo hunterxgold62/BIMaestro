@@ -1,0 +1,7 @@
+Revit 2025 Command=repaint
+Mode=green WPF saved=26 Native hooks=2
+Paints=7 Tinted bands=2 Max overlay ms=3.712 Last ms=0.258 Mean ms=1.767
+Tint detection: visible grayscale bands only; experimental paint overlay, not semantic parameter styles.
+Grid=12650900 571x146
+Grid=4526412 537x575
+Fingerprint=965F318E2728E54CF63E35F0674B6B39093384AF6788B7338EF4A011DFC92FD5

@@ -1,0 +1,31 @@
+20/10/2026 10:02:53 Command=textonly
+         System.Windows.Controls.TextBlock Name=mAnchorableTitle Text=Propriétés
+                 System.Windows.Controls.TextBlock Name=mAnchorablerHeader Text=Propriétés
+UIFramework.TypeSelectorToolBarControl Name= Text=
+ System.Windows.Controls.StackPanel Name=PART_StackPanel Text=
+  System.Windows.Controls.ContentPresenter Name= Text=
+   UIFramework.RvtRibbonItemControl Name=mRibbonItemControl Text=
+    System.Windows.Controls.ContentPresenter Name=mContent Text=
+     System.Windows.Controls.DockPanel Name= Text=
+      UIFramework.ComboBoxControl Name=mComboBox Text=
+       System.Windows.Controls.Border Name= Text=
+        System.Windows.Controls.Grid Name=MainGrid Text=
+         UIFramework.IMEPopup Name=PART_Popup Text=
+         System.Windows.Controls.Primitives.ToggleButton Name=mToggleButton Text=
+          System.Windows.Controls.Grid Name= Text=
+           System.Windows.Controls.Border Name=mBorder Text=
+            System.Windows.Controls.ContentPresenter Name=mButtonContent Text=
+             System.Windows.Controls.Grid Name= Text=
+              System.Windows.Controls.Border Name=mPreviewBorder Text=
+               System.Windows.Controls.Image Name=mImage Text=
+              System.Windows.Controls.StackPanel Name=StackPanel_FamilyTypeText_Full Text=
+               System.Windows.Controls.TextBlock Name=TextBlock_Family Text=
+               System.Windows.Controls.TextBlock Name=TextBlock_Type Text=Plan de structure
+              System.Windows.Shapes.Path Name=Arrow Text=
+              System.Windows.Controls.TextBlock Name=TextBlock_FamilyTypeText_Short Text=Plan de structure
+           System.Windows.Controls.Border Name=InnerPressedShadowBorder Text=
+MANAGER ManagePropertiesPalette, UIFrameworkServices, Version=24.3.30.0, Culture=neutral, PublicKeyToken=null
+Field Int64 <alignment member>
+Native border hooks=0
+Saved property count=48
+Parameter fingerprint SHA256=1AB9126BB534D9A2ECFAC3AAEB6A860D19B26838E6C31A1A35E1DB50B8A8F8FA Entries=89

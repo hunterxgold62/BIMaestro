@@ -1,0 +1,55 @@
+[
+  {
+    "fingerprint": "6C8FA7E3B8C6FFE525E9A0A976EC569DD339556E5D3F1B46A09224733885AA25",
+    "cases": [
+      "green-selector",
+      "compact-selector",
+      "large-text-selector",
+      "MSAA-read-only"
+    ],
+    "realInstance": true,
+    "restored": true,
+    "version": 2023
+  },
+  {
+    "fingerprint": "Parameter fingerprint SHA256=1AB9126BB534D9A2ECFAC3AAEB6A860D19B26838E6C31A1A35E1DB50B8A8F8FA Entries=89",
+    "cases": [
+      "compact",
+      "large",
+      "dark",
+      "text-only",
+      "floating-grid-border",
+      "WM_SETFONT-no-effect"
+    ],
+    "realInstance": true,
+    "restored": true,
+    "version": 2024
+  },
+  {
+    "fingerprint": "965F318E2728E54CF63E35F0674B6B39093384AF6788B7338EF4A011DFC92FD5",
+    "cases": [
+      "green-bands",
+      "blue-bands",
+      "native-dark-theme",
+      "grayscale-text-paint",
+      "paint-profile"
+    ],
+    "realInstance": true,
+    "restored": true,
+    "version": 2025
+  },
+  {
+    "fingerprint": "31B1259452DFDB85CA324C8440E0A10E88B3C29D52D7727B3E00C05625C860B0",
+    "cases": [
+      "native-selector-search",
+      "light-dark",
+      "view-query",
+      "wall-query",
+      "refresh-on-open",
+      "accent-insensitive-search"
+    ],
+    "realInstance": true,
+    "restored": true,
+    "version": 2026
+  }
+]

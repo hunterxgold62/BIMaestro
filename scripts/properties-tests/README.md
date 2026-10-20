@@ -1,55 +1,47 @@
-# Exploration de la palette Propriétés native
+# Palette Propriétés native : essais 2023 à 2026
 
-Branche `codex/properties-palette`. État documenté le 20 octobre 2026 ; les dates exactes des essais figurent dans les journaux. Ce dossier contient un protocole expérimental, pas une fonctionnalité de production ni un bouton permanent. Le bouton sera traité ultérieurement.
+Branche `codex/properties-palette`. Bilan du 20 octobre 2026. Quatre instances réelles de Revit ont été utilisées, avec un projet jetable par version ; les sondes ont été restaurées et leurs manifestes temporaires retirés. Aucun bouton permanent ni changement de l’installation BIMaestro de production.
 
-## Résultats établis
+[Ouvrir le comparatif des captures](Gallery.html).
 
-- Les sondes et la version finale de `Experiment.cs` compilent pour Revit 2023, 2024, 2025 et 2026.
-- Les essais dans Revit natif ont été réalisés sur **2024.3 et 2025.5**, dans des projets jetables `PropertiesFixture` contenant un mur. La compilation de 2023 et 2026 ne vaut pas validation de leur comportement à l’exécution.
-- La grille de propriétés est un contrôle natif MFC **GXWND**, avec éditeur **GXEDIT**, de la famille Objective Grid. La barre `TypeSelectorToolBarControl` est WPF.
-- Le type managé `ManagePropertiesPalette` inspecté ne présente qu’un membre d’alignement Int64 ; aucun pont managé vers les lignes de la grille n’a été trouvé.
-- Le prototype **v3** modifie les fonds, textes et bordures du sélecteur de type WPF, les titres ciblés de la palette et un contour de 1 px du GXWND ancré par `SetWindowSubclass`/`WM_PAINT`. Il ne redessine jamais le contenu des cellules.
-- Les séquences inspecter → appliquer → restaurer → appliquer ont été vérifiées en 2024 et 2025. Les empreintes des paramètres de la vue active et des murs restent identiques pendant ces séquences : voir [evidence/runtime-summary.json](evidence/runtime-summary.json).
+## Résultats réellement obtenus
 
-Limite observée : le contour v3 est validé en 2025 sur palette ancrée (deux hooks). Le cadre natif avait été testé avec v2 en 2024 avant détachement. Pendant la séquence finale v3 en 2024, la palette flottante produit zéro hook : le parcours des enfants de la fenêtre principale exclut cette palette détachée. Le contour v3 ne s’applique donc pas dans cette configuration. Le sélecteur WPF reste modifié et restaurable dans les deux versions, avec 27 propriétés de dépendance enregistrées par version. Les captures finales montrent les deux sélecteurs recolorés ; elles ne prouvent pas le fonctionnement du contour dans toutes les positions.
+| Essai | Version exécutée | Résultat |
+| --- | --- | --- |
+| Sélecteur vert et contours de grille | 2023 | 24 propriétés WPF et 2 contours ; restauration confirmée. |
+| Texte du sélecteur agrandi ou compact | 2023 | Police 16, ou police 11 avec padding 2. Cela ne change pas la police des cellules. |
+| Sélecteur compact, grand, sombre, sans aperçu | 2024 | Police 11/aperçu 32, police 19/aperçu 88, contraste sombre, suppression de l’aperçu ; 47–48 propriétés restaurables. |
+| Contour d’une palette flottante | 2024 | Deux GXWND trouvés en parcourant les fenêtres du processus ; corrige la limite de la première sonde. |
+| Police des cellules via WM_SETFONT | 2024 | Message essayé sur deux grilles, sans changement de police démontré. |
+| Bandeaux gris teintés vert ou bleu | 2025 | Surcouche graphique réversible après le dessin natif. Reconnaissance visuelle heuristique, pas identification des groupes par API. |
+| Couleur des caractères dans la grille | 2025, thème clair | Prototype de recoloration des pixels de texte gris, avec maintien des éditeurs natifs. Les traits gris et cases peuvent aussi être recolorés ; aucune réécriture des libellés. |
+| Habillage associé au thème sombre natif | 2025 | Activation puis restauration du thème natif ; aucun remplacement de palette. |
+| Recherche intégrée au sélecteur | 2026 | Petit bouton ouvrant une recherche en lecture seule des données API ; vue ou élément unique, sans filtrage des véritables lignes. |
+| Rafraîchissement de recherche et accents | 2026 | Relecture à chaque ouverture par ExternalEvent, contexte affiché, recherche sans accents, liste déroulante des résultats. |
 
-Le ciblage reste local : sélecteur de type, titres de palette français/anglais et fenêtres natives reconnues dans les versions testées. Les modifications WPF et les sous-classes natives doivent être restaurées avant de terminer une session de test.
+Les années indiquent la couverture des essais, pas une exclusivité commerciale de chaque possibilité. Les prototypes n’ont pas tous été portés et validés sur les quatre versions.
 
-## Possibilités et limites
+## Vérifications et limites
 
-La proposition **Lecture claire** repose sur ce qui a été obtenu : hiérarchie visuelle du sélecteur, contraste du titre et contour discret de la grille native. Les éditeurs de valeurs et leur comportement restent natifs.
+Empreintes identiques pendant les séquences appliquer/restaurer dans les quatre versions, portant sur la vue active et le mur du projet jetable. Ce n’est pas une preuve exhaustive pour toutes les familles, paramètres, sélections multiples ou catégories MEP.
 
-Les couleurs par catégorie ou paramètre, la recherche, les favoris et le réarrangement des véritables lignes restent **non prouvés**. Objective Grid propose ces possibilités à l’application hôte via ses objets C++, mais aucun accès exploitable à ces objets depuis ce plugin Revit n’a été établi. Un HWND seul ne constitue pas une API de cellules. Aucun message de ListView, pointeur C++ déduit ou changement de binaire n’est requis par ce prototype.
+La grille est un contrôle natif MFC Objective Grid (GXWND/GXEDIT), avec un sélecteur WPF. Aucun pont managé vers les objets C++ de ses cellules n’a été trouvé. MSAA ne fournit pas les noms et rectangles de toutes les lignes. La recoloration graphique ne fournit donc pas un moyen fiable de déplacer, masquer ou traiter sémantiquement une propriété particulière.
 
-Aucun changement du modèle n’est effectué par la phase d’apparence : ni valeurs, ni groupes, ni ordre enregistré des paramètres. Seule la commande explicite `fixture` crée les données du projet de test. Les empreintes vérifiées portent sur les éléments cités, pas sur une preuve exhaustive de tout le document. Les transitions complexes, le changement de DPI et tous les contextes de sélection ne sont pas encore couverts.
+Les essais de bandeaux optimisés mesurent environ 0,3–4 ms par dessin sur cette petite fixture. La recoloration complète des caractères a mesuré environ 3,8 ms de moyenne, avec une pointe proche de 21 ms dans la séquence enregistrée. Elle reste expérimentale et ne doit pas être distribuée telle quelle comme garantie de fluidité.
 
-Les possibilités API documentées, distinctes des résultats runtime, figurent dans [API-NOTES.md](API-NOTES.md).
+La recherche 2026 expose les valeurs API en lecture seule. Elle ne rejoint ni ne masque les lignes natives et ne remplace pas leurs éditeurs. Les paramètres de type, les favoris et les règles avancées de sélection restent des extensions à étudier. Une sélection multiple est signalée explicitement, sans afficher silencieusement les données de la vue.
 
-## Reproduire un essai contrôlé
+## Sources et reproduction
 
-Depuis la racine de ce worktree, pour chaque année souhaitée :
+- [2023 : code et protocole](versions/2023/README.md)
+- [2024 : code et protocole](versions/2024/README.md)
+- [2025 : code et protocole](versions/2025/README.md)
+- [2026 : code et protocole](versions/2026/README.md)
+- [Cadre de l’API publique et sources primaires](API-NOTES.md)
+- [Preuves de la deuxième série](evidence/round2/results.json)
 
-```powershell
-./scripts/properties-tests/Build.ps1 -RevitVersion 2025 -OutputTag '-v4'
-./scripts/properties-tests/BuildExperiment.ps1 -RevitVersion 2025 -Name 'experiment-v3'
-```
+Le harnais commun se compile avec `Build.ps1 -RevitVersion ANNEE -OutputTag '-round2'`. Les extensions se compilent dans chaque dossier `versions/ANNEE`. Dans une instance de laboratoire uniquement, `experiment.txt` choisit le mode et `control.txt` contient `run CHEMIN_ABSOLU_DLL`. Restaurer avec **la même DLL**, qui conserve les anciennes propriétés et les ressources natives. Le harnais ne doit pas devenir une interface distribuée de chargement arbitraire de DLL.
 
-1. Installer manuellement le manifeste temporaire généré pour la sonde, puis lancer une nouvelle instance de la version correspondante. Accepter manuellement le chargement si Revit le demande.
-2. Après apparition du fichier `started.txt` dans le dossier de sortie de la sonde, retirer le manifeste temporaire afin de ne pas charger cette sonde aux prochains démarrages.
-3. Utiliser de préférence un projet jetable. Déposer une commande dans `control.txt`, à côté de la DLL de la sonde : `fixture`, `inspect` ou `select-wall`. Attendre le résultat de chaque commande avant la suivante.
-4. Pour exécuter le prototype, écrire `inspect`, `style` ou `restore` dans `experiment.txt`, dans ce même dossier ; écrire ensuite `run CHEMIN_ABSOLU_DE_LA_DLL_EXPERIMENT` dans `control.txt`.
-5. Comparer les rapports, les captures et les empreintes avant/après. Exécuter impérativement `restore` avec **la même DLL déjà chargée** : son état mémoire conserve les valeurs et bindings à restaurer. Charger une autre DLL ne récupère pas cet état.
+Les versions 2025/2026 installées ici utilisent des correctifs .NET 10 ; les chemins des compilateurs et références sont adaptés à ce poste. Les scripts ne constituent pas une configuration SDK universelle.
 
-Les sorties de build et rapports sont sous `tmp/properties-tests/`. Le fichier de commande est consommé par la sonde ; ce mécanisme de laboratoire ne doit pas être distribué comme interface utilisateur de production.
-
-## Sources primaires complémentaires
-
-- [Perforce : GXWND et CGXGridWnd natif](https://help.perforce.com/stingray/current/stingray_doc/Content/Stingray_Studio_API_Documentation/Grid/CGXGridWnd_5jvo.htm)
-- [Perforce : couleurs par cellule via SetStyleRange et CGXStyle](https://help.perforce.com/stingray/2025.1/stingray_doc/Content/Objective_Grid_KB/html/ogfaq54.htm)
-- [Perforce : FindText, composant facultatif de recherche](https://help.perforce.com/stingray/current/stingray_doc/Content/Stingray_Studio_API_Documentation/Grid/CGXGridCore_4d10.htm)
-- [Perforce : masquage de lignes conditionné par ImplementHideCells](https://help.perforce.com/stingray/current/stingray_doc/Content/Stingray_Studio_API_Documentation/Grid/CGXGridCore_7lv7.htm)
-
-Ces références décrivent la bibliothèque, pas une autorisation ou un contrat d’extension Autodesk de la grille intégrée.
-## Environnement de compilation et fin des essais
-
-Les versions 2025/2026 installées sur ce poste utilisent des correctifs .NET 10 ; les chemins du compilateur ciblent cet environnement local, et ne constituent pas une configuration SDK universelle. Les styles et hooks ont été retirés à la fin des essais ; les rapports restored et runtime-summary.json en conservent la vérification. Les captures montrent l’état appliqué avant restauration.
+Les captures sont de vraies fenêtres Revit, sans génération ni retouche. Le comparatif affiche parfois une zone cadrée par CSS, avec accès au fichier complet. La première série et ses rapports restent dans `evidence/` ; la deuxième est sous `evidence/round2/`.
