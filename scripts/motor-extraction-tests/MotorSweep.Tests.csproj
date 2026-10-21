@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net9.0</TargetFramework><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup><Compile Include="../../BIMaestro/commands/MEP Booster/MotorSweepMath.cs" Link="MotorSweepMath.cs" /></ItemGroup>
+</Project>

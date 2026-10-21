@@ -273,6 +273,8 @@
     <Compile Include="commands\MEP Booster\MepBoosterKinematics.cs" />
     <Compile Include="commands\MEP Booster\MepBoosterOrientation.cs" />
     <Compile Include="commands\MEP Booster\MepBoosterWindow.cs" />
+    <Compile Include="commands\MEP Booster\MepMotorExtraction.cs" />
+    <Compile Include="commands\MEP Booster\MotorSweepMath.cs" />
     <Compile Include="Controls\SimpleColorPicker.xaml.cs">
       <DependentUpon>SimpleColorPicker.xaml</DependentUpon>
     </Compile>

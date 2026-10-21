@@ -304,7 +304,7 @@ namespace BIMaestro.PropertiesAppearance
         private void Save()
         {
             _previewTimer.Stop(); var profiles = Changes(); bool enabled = _enabled.IsChecked == true; int revision = _revision;
-            PropertiesAppearanceCommand.Request(app => { PropertiesAppearanceService.Commit(profiles, enabled); if (_closed) return; if (revision == _revision) _dirty.Clear(); PropertiesAppearanceService.ProcessIdling(app); UpdateState(); Notify("Couleurs enregistrées. L’ordre de l’aperçu est conservé ; son application dans Revit reste en validation."); });
+            PropertiesAppearanceCommand.Request(app => { PropertiesAppearanceService.Commit(profiles, enabled); if (_closed) return; if (revision == _revision) _dirty.Clear(); PropertiesAppearanceService.ProcessIdling(app); UpdateState(); Notify("Affichage enregistré. " + PropertiesAppearanceService.Status); });
         }
         internal void Notify(string message) { _status.Text = message; }
     }

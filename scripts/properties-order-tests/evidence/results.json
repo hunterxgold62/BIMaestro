@@ -1,0 +1,3396 @@
+{
+  "generatedUtc": "2026-10-21T12:07:25.666796+00:00",
+  "schemaVersion": 1,
+  "scope": "Recorded disposable-fixture scenarios only. Compilation/startup are not native qualification. No general release support claim.",
+  "releaseScope": {
+    "category": "cat:-2000011",
+    "description": "Single selected walls only",
+    "enabledVersions": [
+      "2023",
+      "2024",
+      "2025",
+      "2026",
+      "2027"
+    ],
+    "versionsWithCompleteRecordedWallGate": [
+      "2023",
+      "2024",
+      "2025",
+      "2026",
+      "2027"
+    ],
+    "disabledVersions": {},
+    "otherCategories": "Native order disabled; not qualified by these records"
+  },
+  "matrix": [
+    {
+      "version": "2023",
+      "compiledArtifactPresent": true,
+      "startupRecorded": true,
+      "passingRecordedScenarios": [
+        {
+          "run": "2023-r8",
+          "scenario": "text"
+        },
+        {
+          "run": "2023-r8",
+          "scenario": "bool"
+        },
+        {
+          "run": "2023-r8",
+          "scenario": "double"
+        },
+        {
+          "run": "2023-r8",
+          "scenario": "list"
+        },
+        {
+          "run": "2023-r8",
+          "scenario": "undo"
+        },
+        {
+          "run": "2023-r8",
+          "scenario": "redo"
+        },
+        {
+          "run": "2023-r8",
+          "scenario": "cancel"
+        },
+        {
+          "run": "2023-r8",
+          "scenario": "restore"
+        },
+        {
+          "run": "2023-r8",
+          "scenario": "selection_return"
+        },
+        {
+          "run": "2023-r8",
+          "scenario": "selection_multiple"
+        }
+      ],
+      "missingRecordedScenarios": [],
+      "nativeWallGateEvidenceComplete": true,
+      "qualification": "partial_recorded_scenarios_only"
+    },
+    {
+      "version": "2024",
+      "compiledArtifactPresent": true,
+      "startupRecorded": true,
+      "passingRecordedScenarios": [
+        {
+          "run": "2024-r8",
+          "scenario": "text"
+        },
+        {
+          "run": "2024-r8",
+          "scenario": "bool"
+        },
+        {
+          "run": "2024-r8",
+          "scenario": "double"
+        },
+        {
+          "run": "2024-r8",
+          "scenario": "list"
+        },
+        {
+          "run": "2024-r8",
+          "scenario": "undo"
+        },
+        {
+          "run": "2024-r8",
+          "scenario": "redo"
+        },
+        {
+          "run": "2024-r8",
+          "scenario": "cancel"
+        },
+        {
+          "run": "2024-r8",
+          "scenario": "restore"
+        },
+        {
+          "run": "2024-r8",
+          "scenario": "selection_return"
+        },
+        {
+          "run": "2024-r8",
+          "scenario": "selection_wall2"
+        },
+        {
+          "run": "2024-r8",
+          "scenario": "selection_multiple"
+        }
+      ],
+      "missingRecordedScenarios": [],
+      "nativeWallGateEvidenceComplete": true,
+      "qualification": "partial_recorded_scenarios_only"
+    },
+    {
+      "version": "2025",
+      "compiledArtifactPresent": true,
+      "startupRecorded": true,
+      "passingRecordedScenarios": [
+        {
+          "run": "2025-r7",
+          "scenario": "text"
+        },
+        {
+          "run": "2025-r7",
+          "scenario": "bool"
+        },
+        {
+          "run": "2025-r7",
+          "scenario": "double"
+        },
+        {
+          "run": "2025-r7",
+          "scenario": "list"
+        },
+        {
+          "run": "2025-r7",
+          "scenario": "undo"
+        },
+        {
+          "run": "2025-r7",
+          "scenario": "redo"
+        },
+        {
+          "run": "2025-r7",
+          "scenario": "cancel"
+        },
+        {
+          "run": "2025-r7",
+          "scenario": "restore"
+        },
+        {
+          "run": "2025-r7",
+          "scenario": "selection_return"
+        },
+        {
+          "run": "2025-r7",
+          "scenario": "selection_multiple"
+        }
+      ],
+      "missingRecordedScenarios": [],
+      "nativeWallGateEvidenceComplete": true,
+      "qualification": "partial_recorded_scenarios_only"
+    },
+    {
+      "version": "2026",
+      "compiledArtifactPresent": true,
+      "startupRecorded": true,
+      "passingRecordedScenarios": [
+        {
+          "run": "2026-r8",
+          "scenario": "text"
+        },
+        {
+          "run": "2026-r8",
+          "scenario": "bool"
+        },
+        {
+          "run": "2026-r8",
+          "scenario": "double"
+        },
+        {
+          "run": "2026-r8",
+          "scenario": "list"
+        },
+        {
+          "run": "2026-r8",
+          "scenario": "undo"
+        },
+        {
+          "run": "2026-r8",
+          "scenario": "redo"
+        },
+        {
+          "run": "2026-r8",
+          "scenario": "cancel"
+        },
+        {
+          "run": "2026-r8",
+          "scenario": "restore"
+        },
+        {
+          "run": "2026-r8",
+          "scenario": "selection_return"
+        },
+        {
+          "run": "2026-r8",
+          "scenario": "selection_multiple"
+        }
+      ],
+      "missingRecordedScenarios": [],
+      "nativeWallGateEvidenceComplete": true,
+      "qualification": "partial_recorded_scenarios_only"
+    },
+    {
+      "version": "2027",
+      "compiledArtifactPresent": true,
+      "startupRecorded": true,
+      "passingRecordedScenarios": [
+        {
+          "run": "2027-r8",
+          "scenario": "text"
+        },
+        {
+          "run": "2027-r8",
+          "scenario": "bool"
+        },
+        {
+          "run": "2027-r8",
+          "scenario": "double"
+        },
+        {
+          "run": "2027-r8",
+          "scenario": "list"
+        },
+        {
+          "run": "2027-r8",
+          "scenario": "undo"
+        },
+        {
+          "run": "2027-r8",
+          "scenario": "redo"
+        },
+        {
+          "run": "2027-r8",
+          "scenario": "cancel"
+        },
+        {
+          "run": "2027-r8",
+          "scenario": "restore"
+        },
+        {
+          "run": "2027-r8",
+          "scenario": "selection_return"
+        },
+        {
+          "run": "2027-r8",
+          "scenario": "selection_multiple"
+        }
+      ],
+      "missingRecordedScenarios": [],
+      "nativeWallGateEvidenceComplete": true,
+      "qualification": "partial_recorded_scenarios_only"
+    }
+  ],
+  "runs": [
+    {
+      "run": "2023",
+      "compiledArtifactPresent": true,
+      "startupRecorded": false,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "bool",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "double",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "list",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "undo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "redo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "cancel",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "restore",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_return",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "not_recorded"
+        }
+      ]
+    },
+    {
+      "run": "2023-r2",
+      "compiledArtifactPresent": true,
+      "startupRecorded": false,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "bool",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "double",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "list",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "undo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "redo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "cancel",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "restore",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_return",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "not_recorded"
+        }
+      ]
+    },
+    {
+      "run": "2023-r3",
+      "compiledArtifactPresent": true,
+      "startupRecorded": false,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "bool",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "double",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "list",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "undo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "redo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "cancel",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "restore",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_return",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "not_recorded"
+        }
+      ]
+    },
+    {
+      "run": "2023-r4",
+      "compiledArtifactPresent": true,
+      "startupRecorded": false,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "bool",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "double",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "list",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "undo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "redo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "cancel",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "restore",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_return",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "not_recorded"
+        }
+      ]
+    },
+    {
+      "run": "2023-r5",
+      "compiledArtifactPresent": true,
+      "startupRecorded": false,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "bool",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "double",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "list",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "undo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "redo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "cancel",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "restore",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_return",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "not_recorded"
+        }
+      ]
+    },
+    {
+      "run": "2023-r8",
+      "compiledArtifactPresent": true,
+      "startupRecorded": true,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "passed_recorded_scenario",
+          "expected": "ORDER_BASELINEx",
+          "actual": "ORDER_BASELINEx",
+          "version": "2023",
+          "build": "23.1.90.15",
+          "pid": 17076,
+          "beforeTime": "2026-10-21T11:56:21.7338605Z",
+          "afterTime": "2026-10-21T11:59:14.0639549Z",
+          "beforeOrder": {
+            "hasApplied": true,
+            "firstGroup": "Données d'identification",
+            "targetRow": 3,
+            "targetFirstInFirstGroup": true,
+            "visibleMappingMismatchCount": 0,
+            "status": "Ordre personnalisé appliqué à la palette Revit."
+          },
+          "afterHasApplied": false,
+          "afterOrderNote": "A later deselection may restore native order; the pre-input proof is checked independently.",
+          "comparedParameterCount": 18164,
+          "deltaCount": 1,
+          "deltas": [
+            {
+              "key": "2bca42fb-5a21-434e-84a0-8fcac991c2f3-00000a91|-1010106|Commentaires",
+              "before": "ORDER_BASELINE",
+              "after": "ORDER_BASELINEx"
+            }
+          ],
+          "unexpectedDeltaCount": 0,
+          "failures": [],
+          "harnessVerificationPass": null,
+          "sources": [
+            {
+              "file": "2023-r8/text-before.json",
+              "sha256": "09aefe03d8c279baf82e394db4e13ca1ac3cf5a619e6a62fec73f8ab84e3cc57"
+            },
+            {
+              "file": "2023-r8/text-after.json",
+              "sha256": "5ca1e9bf2e8c6351d8dc32f5d2e515c921d29eb452ab4d060364684bfd31f4e6"
+            }
+          ]
+        },
+        {
+          "scenario": "bool",
+          "result": "passed_recorded_scenario",
+          "expected": "0",
+          "actual": "0",
+          "version": "2023",
+          "build": "23.1.90.15",
+          "pid": 17076,
+          "beforeTime": "2026-10-21T11:59:33.5407593Z",
+          "afterTime": "2026-10-21T12:00:05.9144885Z",
+          "beforeOrder": {
+            "hasApplied": true,
+            "firstGroup": "Contraintes",
+            "targetRow": 3,
+            "targetFirstInFirstGroup": true,
+            "visibleMappingMismatchCount": 0,
+            "status": "Ordre personnalisé appliqué à la palette Revit."
+          },
+          "afterHasApplied": false,
+          "afterOrderNote": "A later deselection may restore native order; the pre-input proof is checked independently.",
+          "comparedParameterCount": 18164,
+          "deltaCount": 1,
+          "deltas": [
+            {
+              "key": "2bca42fb-5a21-434e-84a0-8fcac991c2f3-00000a91|-1001007|Limite de pièce",
+              "before": "1",
+              "after": "0"
+            }
+          ],
+          "unexpectedDeltaCount": 0,
+          "failures": [],
+          "harnessVerificationPass": null,
+          "sources": [
+            {
+              "file": "2023-r8/bool-before.json",
+              "sha256": "ded03fc28a2e987a3e1c3dd9fddb0a69428c380177cc25121ca7f0007208a4de"
+            },
+            {
+              "file": "2023-r8/bool-after.json",
+              "sha256": "f6b62145b8d2301d566fdc75213837ca3e79ff1f7d6576c783c88696120b5ec5"
+            }
+          ]
+        },
+        {
+          "scenario": "double",
+          "result": "passed_recorded_scenario",
+          "expected": 0.02952755905511811,
+          "actual": "0.02952755905511811",
+          "version": "2023",
+          "build": "23.1.90.15",
+          "pid": 17076,
+          "beforeTime": "2026-10-21T12:00:11.2651883Z",
+          "afterTime": "2026-10-21T12:01:09.1896116Z",
+          "beforeOrder": {
+            "hasApplied": true,
+            "firstGroup": "Contraintes",
+            "targetRow": 3,
+            "targetFirstInFirstGroup": true,
+            "visibleMappingMismatchCount": 0,
+            "status": "Ordre personnalisé appliqué à la palette Revit."
+          },
+          "afterHasApplied": false,
+          "afterOrderNote": "A later deselection may restore native order; the pre-input proof is checked independently.",
+          "comparedParameterCount": 18164,
+          "deltaCount": 1,
+          "deltas": [
+            {
+              "key": "2bca42fb-5a21-434e-84a0-8fcac991c2f3-00000a91|-1001108|Décalage inférieur",
+              "before": "0",
+              "after": "0.02952755905511811"
+            }
+          ],
+          "unexpectedDeltaCount": 0,
+          "failures": [],
+          "harnessVerificationPass": null,
+          "sources": [
+            {
+              "file": "2023-r8/double-before.json",
+              "sha256": "7d545744e20aeeeac71ca12be457c6caca2e0fd49be19d36119ee75d7fdd0e8b"
+            },
+            {
+              "file": "2023-r8/double-after.json",
+              "sha256": "6d55a901d070ca86959ca872f53aa5505ba60f49800eeed382af8d5854ad2709"
+            }
+          ]
+        },
+        {
+          "scenario": "list",
+          "result": "passed_recorded_scenario",
+          "expected": "2704",
+          "actual": "2704",
+          "version": "2023",
+          "build": "23.1.90.15",
+          "pid": 17076,
+          "beforeTime": "2026-10-21T12:01:14.422376Z",
+          "afterTime": "2026-10-21T12:02:35.2417942Z",
+          "beforeOrder": {
+            "hasApplied": true,
+            "firstGroup": "Contraintes",
+            "targetRow": 3,
+            "targetFirstInFirstGroup": true,
+            "visibleMappingMismatchCount": 0,
+            "status": "Ordre personnalisé appliqué à la palette Revit."
+          },
+          "afterHasApplied": false,
+          "afterOrderNote": "A later deselection may restore native order; the pre-input proof is checked independently.",
+          "comparedParameterCount": 18164,
+          "deltaCount": 1,
+          "deltas": [
+            {
+              "key": "2bca42fb-5a21-434e-84a0-8fcac991c2f3-00000a91|-1001107|Contrainte inférieure",
+              "before": "1905",
+              "after": "2704"
+            }
+          ],
+          "unexpectedDeltaCount": 0,
+          "failures": [],
+          "harnessVerificationPass": true,
+          "sources": [
+            {
+              "file": "2023-r8/list-before.json",
+              "sha256": "00080f505f0fa2d8d2396abd9b40f2b05a6f8360096cb3db8344af1f111559b1"
+            },
+            {
+              "file": "2023-r8/list-after.json",
+              "sha256": "550492eb288d1849b4e2c5fa525b6dd6ccc7f66094631cfeddf925f72f60b9c3"
+            },
+            {
+              "file": "2023-r8/verify-write.json",
+              "sha256": "c1cc5f132860ecc4dd5193801c1a3263f709c1448907e8f2ebc678b8ed6dff60"
+            }
+          ]
+        },
+        {
+          "scenario": "undo",
+          "result": "passed_recorded_scenario",
+          "meaning": "All parameter values equal reference snapshot; UI action is evidenced separately.",
+          "beforeTime": "2026-10-21T12:01:14.422376Z",
+          "afterTime": "2026-10-21T12:02:49.8199041Z",
+          "comparedParameterCount": 18164,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2023-r8/list-before.json",
+              "sha256": "00080f505f0fa2d8d2396abd9b40f2b05a6f8360096cb3db8344af1f111559b1"
+            },
+            {
+              "file": "2023-r8/undo-after.json",
+              "sha256": "384cd890878892c1da1593e20619c8eb5e13c9f87ef4f558c4ea0dda8d458eb2"
+            }
+          ]
+        },
+        {
+          "scenario": "redo",
+          "result": "passed_recorded_scenario",
+          "meaning": "All parameter values equal reference snapshot; UI action is evidenced separately.",
+          "beforeTime": "2026-10-21T12:02:35.2417942Z",
+          "afterTime": "2026-10-21T12:03:06.5618749Z",
+          "comparedParameterCount": 18164,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2023-r8/list-after.json",
+              "sha256": "550492eb288d1849b4e2c5fa525b6dd6ccc7f66094631cfeddf925f72f60b9c3"
+            },
+            {
+              "file": "2023-r8/redo-after.json",
+              "sha256": "df162e28a884619c9c3e234e84a509416a109805920bf5d275e1d3dbe27502a4"
+            }
+          ]
+        },
+        {
+          "scenario": "cancel",
+          "result": "passed_recorded_scenario",
+          "meaning": "All parameter values equal reference snapshot; UI action is evidenced separately.",
+          "beforeTime": "2026-10-21T12:03:11.3422463Z",
+          "afterTime": "2026-10-21T12:04:41.533239Z",
+          "comparedParameterCount": 18164,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2023-r8/cancel-before.json",
+              "sha256": "2fb70458968f0926912b72f16491b542f0aa3dd765e21a251c9a4c39648c44fd"
+            },
+            {
+              "file": "2023-r8/cancel-after.json",
+              "sha256": "d6f089f7f2ff8cdea4a766b598e41f8eda36558aaf83ae9225406c3e2676c5fd"
+            }
+          ]
+        },
+        {
+          "scenario": "restore",
+          "result": "passed_recorded_scenario",
+          "time": "2026-10-21T12:04:58.946433Z",
+          "hasApplied": false,
+          "comparedParameterCount": 18164,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2023-r8/baseline.json",
+              "sha256": "e9b3c9eae876e727271cd201e35feb922218ebf1a76e4bf9776434e54adde149"
+            },
+            {
+              "file": "2023-r8/restore-values.json",
+              "sha256": "a86c2e3fc4f0fbb33c43de6f5f420fa7de131c890b7f03e34340ff12771f37c7"
+            }
+          ]
+        },
+        {
+          "scenario": "selection_return",
+          "result": "passed_recorded_scenario",
+          "time": "2026-10-21T12:04:54.9231425Z",
+          "hasApplied": true,
+          "comparedParameterCount": 18164,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2023-r8/baseline.json",
+              "sha256": "e9b3c9eae876e727271cd201e35feb922218ebf1a76e4bf9776434e54adde149"
+            },
+            {
+              "file": "2023-r8/selection-return.json",
+              "sha256": "f6f2f735ba5ec715fa1bd6cdd3fa24b0f3bc6dc4f4f5046e39af3c91ebdd9ba7"
+            }
+          ]
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "passed_recorded_scenario",
+          "time": "2026-10-21T12:04:42.4574529Z",
+          "hasApplied": false,
+          "comparedParameterCount": 18164,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2023-r8/baseline.json",
+              "sha256": "e9b3c9eae876e727271cd201e35feb922218ebf1a76e4bf9776434e54adde149"
+            },
+            {
+              "file": "2023-r8/selection-multiple.json",
+              "sha256": "e4031ecb3fdd2e3da06c4d69f355e675334db63a055198d8494ea8de0297d94e"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "run": "2024",
+      "compiledArtifactPresent": true,
+      "startupRecorded": false,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "bool",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "double",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "list",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "undo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "redo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "cancel",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "restore",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_return",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "not_recorded"
+        }
+      ]
+    },
+    {
+      "run": "2024-r2",
+      "compiledArtifactPresent": true,
+      "startupRecorded": false,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "bool",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "double",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "list",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "undo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "redo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "cancel",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "restore",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_return",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "not_recorded"
+        }
+      ]
+    },
+    {
+      "run": "2024-r3",
+      "compiledArtifactPresent": true,
+      "startupRecorded": false,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "bool",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "double",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "list",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "undo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "redo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "cancel",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "restore",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_return",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "not_recorded"
+        }
+      ]
+    },
+    {
+      "run": "2024-r4",
+      "compiledArtifactPresent": true,
+      "startupRecorded": true,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "bool",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "double",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "list",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "undo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "redo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "cancel",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "restore",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_return",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "not_recorded"
+        }
+      ]
+    },
+    {
+      "run": "2024-r5",
+      "compiledArtifactPresent": true,
+      "startupRecorded": false,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "bool",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "double",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "list",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "undo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "redo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "cancel",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "restore",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_return",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "not_recorded"
+        }
+      ]
+    },
+    {
+      "run": "2024-r8",
+      "compiledArtifactPresent": true,
+      "startupRecorded": true,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "passed_recorded_scenario",
+          "expected": "ORDER_BASELINEx",
+          "actual": "ORDER_BASELINEx",
+          "version": "2024",
+          "build": "24.3.40.26",
+          "pid": 22600,
+          "beforeTime": "2026-10-21T10:30:14.504508Z",
+          "afterTime": "2026-10-21T10:34:13.7277031Z",
+          "beforeOrder": {
+            "hasApplied": true,
+            "firstGroup": "Données d'identification",
+            "targetRow": 3,
+            "targetFirstInFirstGroup": true,
+            "visibleMappingMismatchCount": 0,
+            "status": "Ordre personnalisé appliqué à la palette Revit."
+          },
+          "afterHasApplied": false,
+          "afterOrderNote": "A later deselection may restore native order; the pre-input proof is checked independently.",
+          "comparedParameterCount": 18251,
+          "deltaCount": 1,
+          "deltas": [
+            {
+              "key": "967cd691-16fd-4efd-80a4-fbb5a3884fc4-00000abb|-1010106|Commentaires",
+              "before": "ORDER_BASELINE",
+              "after": "ORDER_BASELINEx"
+            }
+          ],
+          "unexpectedDeltaCount": 0,
+          "failures": [],
+          "harnessVerificationPass": null,
+          "sources": [
+            {
+              "file": "2024-r8/text-before.json",
+              "sha256": "0b59a8ef88ec98c2d18bfb6d142716c93bad02b293d0c0bf04e77480ae9c2cdf"
+            },
+            {
+              "file": "2024-r8/text-after.json",
+              "sha256": "c374fbdaca5227f00f279350a15075e24a2a0e6ce6793bd39e1521aeae248f59"
+            }
+          ]
+        },
+        {
+          "scenario": "bool",
+          "result": "passed_recorded_scenario",
+          "expected": "0",
+          "actual": "0",
+          "version": "2024",
+          "build": "24.3.40.26",
+          "pid": 22600,
+          "beforeTime": "2026-10-21T10:34:38.9716026Z",
+          "afterTime": "2026-10-21T10:35:15.9430846Z",
+          "beforeOrder": {
+            "hasApplied": true,
+            "firstGroup": "Contraintes",
+            "targetRow": 3,
+            "targetFirstInFirstGroup": true,
+            "visibleMappingMismatchCount": 0,
+            "status": "Ordre personnalisé appliqué à la palette Revit."
+          },
+          "afterHasApplied": false,
+          "afterOrderNote": "A later deselection may restore native order; the pre-input proof is checked independently.",
+          "comparedParameterCount": 18251,
+          "deltaCount": 1,
+          "deltas": [
+            {
+              "key": "967cd691-16fd-4efd-80a4-fbb5a3884fc4-00000abb|-1001007|Limite de pièce",
+              "before": "1",
+              "after": "0"
+            }
+          ],
+          "unexpectedDeltaCount": 0,
+          "failures": [],
+          "harnessVerificationPass": null,
+          "sources": [
+            {
+              "file": "2024-r8/bool-before.json",
+              "sha256": "0c0a30f2897b83f171325520f7b2d8bb7a040a45f359eee503ecbb21bd7890bd"
+            },
+            {
+              "file": "2024-r8/bool-after.json",
+              "sha256": "1da91fba8401812426cdc975fcdd0b475fa76d5b761992ea602bfe968518456d"
+            }
+          ]
+        },
+        {
+          "scenario": "double",
+          "result": "passed_recorded_scenario",
+          "expected": 0.02952755905511811,
+          "actual": "0.02952755905511811",
+          "version": "2024",
+          "build": "24.3.40.26",
+          "pid": 22600,
+          "beforeTime": "2026-10-21T10:35:19.1312128Z",
+          "afterTime": "2026-10-21T10:36:21.0462788Z",
+          "beforeOrder": {
+            "hasApplied": true,
+            "firstGroup": "Contraintes",
+            "targetRow": 3,
+            "targetFirstInFirstGroup": true,
+            "visibleMappingMismatchCount": 0,
+            "status": "Ordre personnalisé appliqué à la palette Revit."
+          },
+          "afterHasApplied": false,
+          "afterOrderNote": "A later deselection may restore native order; the pre-input proof is checked independently.",
+          "comparedParameterCount": 18251,
+          "deltaCount": 1,
+          "deltas": [
+            {
+              "key": "967cd691-16fd-4efd-80a4-fbb5a3884fc4-00000abb|-1001108|Décalage inférieur",
+              "before": "0",
+              "after": "0.02952755905511811"
+            }
+          ],
+          "unexpectedDeltaCount": 0,
+          "failures": [],
+          "harnessVerificationPass": null,
+          "sources": [
+            {
+              "file": "2024-r8/double-before.json",
+              "sha256": "54d6943c19ce84a2c9910a8967d41179fd4079fb303d2fc474d937581f03e693"
+            },
+            {
+              "file": "2024-r8/double-after.json",
+              "sha256": "1b480061d9b926cad29b25b6deed28722b40cf48d47cae9794b761886eed68c0"
+            }
+          ]
+        },
+        {
+          "scenario": "list",
+          "result": "passed_recorded_scenario",
+          "expected": "2746",
+          "actual": "2746",
+          "version": "2024",
+          "build": "24.3.40.26",
+          "pid": 22600,
+          "beforeTime": "2026-10-21T10:36:24.5660125Z",
+          "afterTime": "2026-10-21T10:38:21.9878571Z",
+          "beforeOrder": {
+            "hasApplied": true,
+            "firstGroup": "Contraintes",
+            "targetRow": 3,
+            "targetFirstInFirstGroup": true,
+            "visibleMappingMismatchCount": 0,
+            "status": "Ordre personnalisé appliqué à la palette Revit."
+          },
+          "afterHasApplied": false,
+          "afterOrderNote": "A later deselection may restore native order; the pre-input proof is checked independently.",
+          "comparedParameterCount": 18251,
+          "deltaCount": 1,
+          "deltas": [
+            {
+              "key": "967cd691-16fd-4efd-80a4-fbb5a3884fc4-00000abb|-1001107|Contrainte inférieure",
+              "before": "1916",
+              "after": "2746"
+            }
+          ],
+          "unexpectedDeltaCount": 0,
+          "failures": [],
+          "harnessVerificationPass": true,
+          "sources": [
+            {
+              "file": "2024-r8/list-before.json",
+              "sha256": "bfba976914f6e88e3cac89ed2f6f821fad9628c1c2ef99387a11f52312558f3a"
+            },
+            {
+              "file": "2024-r8/list-after.json",
+              "sha256": "c341654232dca8bdb8867902f48793723ec9dd3242a8c552413b3f1f36115faa"
+            },
+            {
+              "file": "2024-r8/verify-write.json",
+              "sha256": "a20130e4cffe110c8924832495f2cdefb12632b9d924583e399733c497194fa5"
+            }
+          ]
+        },
+        {
+          "scenario": "undo",
+          "result": "passed_recorded_scenario",
+          "meaning": "All parameter values equal reference snapshot; UI action is evidenced separately.",
+          "beforeTime": "2026-10-21T10:36:24.5660125Z",
+          "afterTime": "2026-10-21T10:38:37.3758811Z",
+          "comparedParameterCount": 18251,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2024-r8/list-before.json",
+              "sha256": "bfba976914f6e88e3cac89ed2f6f821fad9628c1c2ef99387a11f52312558f3a"
+            },
+            {
+              "file": "2024-r8/undo-after.json",
+              "sha256": "d8c4c4b6bf2b510d8d5efc62473725a9be3969bda2fb0438c4d4f9733426df64"
+            }
+          ]
+        },
+        {
+          "scenario": "redo",
+          "result": "passed_recorded_scenario",
+          "meaning": "All parameter values equal reference snapshot; UI action is evidenced separately.",
+          "beforeTime": "2026-10-21T10:38:21.9878571Z",
+          "afterTime": "2026-10-21T10:38:58.4436398Z",
+          "comparedParameterCount": 18251,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2024-r8/list-after.json",
+              "sha256": "c341654232dca8bdb8867902f48793723ec9dd3242a8c552413b3f1f36115faa"
+            },
+            {
+              "file": "2024-r8/redo-after.json",
+              "sha256": "9dbd665070d107ca547a437082dacb10cf9cff76b7ad07cf31846f8b4d4544d1"
+            }
+          ]
+        },
+        {
+          "scenario": "cancel",
+          "result": "passed_recorded_scenario",
+          "meaning": "All parameter values equal reference snapshot; UI action is evidenced separately.",
+          "beforeTime": "2026-10-21T10:39:02.3266227Z",
+          "afterTime": "2026-10-21T10:39:56.1487136Z",
+          "comparedParameterCount": 18251,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2024-r8/cancel-before.json",
+              "sha256": "580ddb36eab98b7907fc6f6d30f7fc620e9d994aed88d47b620aeba2f7a74de9"
+            },
+            {
+              "file": "2024-r8/cancel-after.json",
+              "sha256": "96c634bbd73e36bc6b65ca23559a07d3d96f9777c5c35e7e8b4846ecedc8fe96"
+            }
+          ]
+        },
+        {
+          "scenario": "restore",
+          "result": "passed_recorded_scenario",
+          "time": "2026-10-21T11:07:33.8261727Z",
+          "hasApplied": false,
+          "comparedParameterCount": 18251,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2024-r8/baseline.json",
+              "sha256": "3f6614f0174e492dd35ed0bf6d1fb02a94b842ab47728341fe25956ed507d307"
+            },
+            {
+              "file": "2024-r8/restore-values.json",
+              "sha256": "cbdf0b3df9fd1a0dafd14c6e0ab0815343121b340c534cfffffb8343e543a034"
+            }
+          ]
+        },
+        {
+          "scenario": "selection_return",
+          "result": "passed_recorded_scenario",
+          "time": "2026-10-21T10:40:15.0199971Z",
+          "hasApplied": true,
+          "comparedParameterCount": 18251,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2024-r8/baseline.json",
+              "sha256": "3f6614f0174e492dd35ed0bf6d1fb02a94b842ab47728341fe25956ed507d307"
+            },
+            {
+              "file": "2024-r8/selection-return.json",
+              "sha256": "2e4775f4a222b9b3799092149973b0ad7481a55befaa9b017f340e862a389340"
+            }
+          ]
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "passed_recorded_scenario",
+          "time": "2026-10-21T11:54:29.8133772Z",
+          "hasApplied": true,
+          "comparedParameterCount": 18251,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2024-r8/baseline.json",
+              "sha256": "3f6614f0174e492dd35ed0bf6d1fb02a94b842ab47728341fe25956ed507d307"
+            },
+            {
+              "file": "2024-r8/selection-wall2-settled.json",
+              "sha256": "8077849afef14715aa94daa98cf405c2046b43eecf0892878807527458d1d4a8"
+            }
+          ]
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "passed_recorded_scenario",
+          "time": "2026-10-21T10:40:12.5883367Z",
+          "hasApplied": false,
+          "comparedParameterCount": 18251,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2024-r8/baseline.json",
+              "sha256": "3f6614f0174e492dd35ed0bf6d1fb02a94b842ab47728341fe25956ed507d307"
+            },
+            {
+              "file": "2024-r8/selection-multiple.json",
+              "sha256": "232dc8742342e9831886125e14e409644555b5f8482921c5cf791f4b5f9346de"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "run": "2025",
+      "compiledArtifactPresent": false,
+      "startupRecorded": true,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "bool",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "double",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "list",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "undo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "redo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "cancel",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "restore",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_return",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "not_recorded"
+        }
+      ]
+    },
+    {
+      "run": "2025-r2",
+      "compiledArtifactPresent": true,
+      "startupRecorded": true,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "bool",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "double",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "list",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "undo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "redo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "cancel",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "restore",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_return",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "not_recorded"
+        }
+      ]
+    },
+    {
+      "run": "2025-r3",
+      "compiledArtifactPresent": true,
+      "startupRecorded": false,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "bool",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "double",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "list",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "undo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "redo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "cancel",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "restore",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_return",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "not_recorded"
+        }
+      ]
+    },
+    {
+      "run": "2025-r4",
+      "compiledArtifactPresent": true,
+      "startupRecorded": true,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "bool",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "double",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "list",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "undo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "redo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "cancel",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "restore",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_return",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "not_recorded"
+        }
+      ]
+    },
+    {
+      "run": "2025-r5",
+      "compiledArtifactPresent": true,
+      "startupRecorded": false,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "bool",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "double",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "list",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "undo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "redo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "cancel",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "restore",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_return",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "not_recorded"
+        }
+      ]
+    },
+    {
+      "run": "2025-r6",
+      "compiledArtifactPresent": true,
+      "startupRecorded": false,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "bool",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "double",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "list",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "undo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "redo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "cancel",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "restore",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_return",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "not_recorded"
+        }
+      ]
+    },
+    {
+      "run": "2025-r7",
+      "compiledArtifactPresent": true,
+      "startupRecorded": true,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "passed_recorded_scenario",
+          "expected": "ORDER_BASELINEx",
+          "actual": "ORDER_BASELINEx",
+          "version": "2025",
+          "build": "25.4.41.14",
+          "pid": 60100,
+          "beforeTime": "2026-10-21T10:16:21.4099826Z",
+          "afterTime": "2026-10-21T10:17:39.1464798Z",
+          "beforeOrder": {
+            "hasApplied": true,
+            "firstGroup": "Données d'identification",
+            "targetRow": 3,
+            "targetFirstInFirstGroup": true,
+            "visibleMappingMismatchCount": 0,
+            "status": "Ordre personnalisé appliqué à la palette Revit."
+          },
+          "afterHasApplied": false,
+          "afterOrderNote": "A later deselection may restore native order; the pre-input proof is checked independently.",
+          "comparedParameterCount": 18526,
+          "deltaCount": 1,
+          "deltas": [
+            {
+              "key": "848217b0-a28a-4ca6-838d-68cc24f468af-00000ae2|-1010106|Commentaires",
+              "before": "ORDER_BASELINE",
+              "after": "ORDER_BASELINEx"
+            }
+          ],
+          "unexpectedDeltaCount": 0,
+          "failures": [],
+          "harnessVerificationPass": null,
+          "sources": [
+            {
+              "file": "2025-r7/text-before.json",
+              "sha256": "d7f9c256a9899ada971b29ea847d87a055656c89fd3a3ae8f49f70346d76e173"
+            },
+            {
+              "file": "2025-r7/text-after.json",
+              "sha256": "bc0a5f029dbe9cfe2d9bb2c934ec0558ed20e40a5803929bd25f7c7b0927e7b8"
+            }
+          ]
+        },
+        {
+          "scenario": "bool",
+          "result": "passed_recorded_scenario",
+          "expected": "0",
+          "actual": "0",
+          "version": "2025",
+          "build": "25.4.41.14",
+          "pid": 60100,
+          "beforeTime": "2026-10-21T10:17:58.8990244Z",
+          "afterTime": "2026-10-21T10:18:45.8008578Z",
+          "beforeOrder": {
+            "hasApplied": true,
+            "firstGroup": "Contraintes",
+            "targetRow": 3,
+            "targetFirstInFirstGroup": true,
+            "visibleMappingMismatchCount": 0,
+            "status": "Ordre personnalisé appliqué à la palette Revit."
+          },
+          "afterHasApplied": false,
+          "afterOrderNote": "A later deselection may restore native order; the pre-input proof is checked independently.",
+          "comparedParameterCount": 18526,
+          "deltaCount": 1,
+          "deltas": [
+            {
+              "key": "848217b0-a28a-4ca6-838d-68cc24f468af-00000ae2|-1001007|Limite de pièce",
+              "before": "1",
+              "after": "0"
+            }
+          ],
+          "unexpectedDeltaCount": 0,
+          "failures": [],
+          "harnessVerificationPass": true,
+          "sources": [
+            {
+              "file": "2025-r7/bool-before.json",
+              "sha256": "28a10c83b91a86c6049ce52fdc9ed9a6fac812faf428d544d809cd8903b4917c"
+            },
+            {
+              "file": "2025-r7/bool-after.json",
+              "sha256": "8dbf6d7458ad6e628d303af0eb36c35feaccc76b92db5be54a7597b96886ae71"
+            },
+            {
+              "file": "2025-r7/bool-verification.json",
+              "sha256": "63c221983f4914809b1b1d5d3aec7ea1b094b9716100ffa483c83a03b86b1253"
+            }
+          ]
+        },
+        {
+          "scenario": "double",
+          "result": "passed_recorded_scenario",
+          "expected": 0.02952755905511811,
+          "actual": "0.02952755905511811",
+          "version": "2025",
+          "build": "25.4.41.14",
+          "pid": 60100,
+          "beforeTime": "2026-10-21T10:19:15.0815683Z",
+          "afterTime": "2026-10-21T10:21:01.8363528Z",
+          "beforeOrder": {
+            "hasApplied": true,
+            "firstGroup": "Contraintes",
+            "targetRow": 3,
+            "targetFirstInFirstGroup": true,
+            "visibleMappingMismatchCount": 0,
+            "status": "Ordre personnalisé appliqué à la palette Revit."
+          },
+          "afterHasApplied": false,
+          "afterOrderNote": "A later deselection may restore native order; the pre-input proof is checked independently.",
+          "comparedParameterCount": 18526,
+          "deltaCount": 1,
+          "deltas": [
+            {
+              "key": "848217b0-a28a-4ca6-838d-68cc24f468af-00000ae2|-1001108|Décalage inférieur",
+              "before": "0",
+              "after": "0.02952755905511811"
+            }
+          ],
+          "unexpectedDeltaCount": 0,
+          "failures": [],
+          "harnessVerificationPass": true,
+          "sources": [
+            {
+              "file": "2025-r7/double-before.json",
+              "sha256": "4921a96912f136fe60ffe64ff310a37dc55b39638f71fd56353ae9c7dd07bb93"
+            },
+            {
+              "file": "2025-r7/double-after.json",
+              "sha256": "1133c94cdb4f762a4a157f31ce82edef0335420eede31472742df84aa91cb289"
+            },
+            {
+              "file": "2025-r7/double-verification.json",
+              "sha256": "2c36a0d3d6f8cb6311279dbf580241757983438d4a24b005e3e5365793c3e66e"
+            }
+          ]
+        },
+        {
+          "scenario": "list",
+          "result": "passed_recorded_scenario",
+          "expected": "2785",
+          "actual": "2785",
+          "version": "2025",
+          "build": "25.4.41.14",
+          "pid": 60100,
+          "beforeTime": "2026-10-21T10:21:48.5083647Z",
+          "afterTime": "2026-10-21T10:25:48.0258231Z",
+          "beforeOrder": {
+            "hasApplied": true,
+            "firstGroup": "Contraintes",
+            "targetRow": 3,
+            "targetFirstInFirstGroup": true,
+            "visibleMappingMismatchCount": 0,
+            "status": "Ordre personnalisé appliqué à la palette Revit."
+          },
+          "afterHasApplied": false,
+          "afterOrderNote": "A later deselection may restore native order; the pre-input proof is checked independently.",
+          "comparedParameterCount": 18526,
+          "deltaCount": 1,
+          "deltas": [
+            {
+              "key": "848217b0-a28a-4ca6-838d-68cc24f468af-00000ae2|-1001107|Contrainte inférieure",
+              "before": "1951",
+              "after": "2785"
+            }
+          ],
+          "unexpectedDeltaCount": 0,
+          "failures": [],
+          "harnessVerificationPass": true,
+          "sources": [
+            {
+              "file": "2025-r7/list-before.json",
+              "sha256": "92e4c2422d8a91774feca6f480381e908e49fe339a5a0421a69ba92008b168c9"
+            },
+            {
+              "file": "2025-r7/list-after.json",
+              "sha256": "e4e0ebe22073328a5b74d298b68241797fb0e5c5c32791dc82a3c1de5e102b3b"
+            },
+            {
+              "file": "2025-r7/list-verification.json",
+              "sha256": "86e81f35529eb5e0aa62c21ae6cf0969bb27ba4d41eef7a40f9588fed4cff252"
+            }
+          ]
+        },
+        {
+          "scenario": "undo",
+          "result": "passed_recorded_scenario",
+          "meaning": "All parameter values equal reference snapshot; UI action is evidenced separately.",
+          "beforeTime": "2026-10-21T10:21:48.5083647Z",
+          "afterTime": "2026-10-21T10:26:07.9461506Z",
+          "comparedParameterCount": 18526,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2025-r7/list-before.json",
+              "sha256": "92e4c2422d8a91774feca6f480381e908e49fe339a5a0421a69ba92008b168c9"
+            },
+            {
+              "file": "2025-r7/undo-after.json",
+              "sha256": "61e31832fec5f2dbac6a42d86214db4055eee414da2fd8076c649dba3a158297"
+            }
+          ]
+        },
+        {
+          "scenario": "redo",
+          "result": "passed_recorded_scenario",
+          "meaning": "All parameter values equal reference snapshot; UI action is evidenced separately.",
+          "beforeTime": "2026-10-21T10:25:48.0258231Z",
+          "afterTime": "2026-10-21T10:26:28.6293965Z",
+          "comparedParameterCount": 18526,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2025-r7/list-after.json",
+              "sha256": "e4e0ebe22073328a5b74d298b68241797fb0e5c5c32791dc82a3c1de5e102b3b"
+            },
+            {
+              "file": "2025-r7/redo-after.json",
+              "sha256": "cb05e072c3cb14803b0c2fb672c3ea7277010202f2da1e0b21221be847ff7cac"
+            }
+          ]
+        },
+        {
+          "scenario": "cancel",
+          "result": "passed_recorded_scenario",
+          "meaning": "All parameter values equal reference snapshot; UI action is evidenced separately.",
+          "beforeTime": "2026-10-21T10:28:18.0298773Z",
+          "afterTime": "2026-10-21T11:11:23.9298588Z",
+          "comparedParameterCount": 18526,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2025-r7/cancel-before.json",
+              "sha256": "7070f75cb47e7993c66be224c1d2e7c34280fc975defe806e67ccf2ab69e41a2"
+            },
+            {
+              "file": "2025-r7/report-verify-unchanged.json",
+              "sha256": "624f7c12ae17ff5581983bfd176dc6598a96ca056ef69c040dc0f4fffceb9b97"
+            }
+          ]
+        },
+        {
+          "scenario": "restore",
+          "result": "passed_recorded_scenario",
+          "time": "2026-10-21T11:11:23.9298588Z",
+          "hasApplied": false,
+          "comparedParameterCount": 18526,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2025-r7/baseline.json",
+              "sha256": "938c678d792fe75709923a01fae311e4fcf8991cb69bb998ae2d2e809a4d2f1f"
+            },
+            {
+              "file": "2025-r7/restore-values.json",
+              "sha256": "624f7c12ae17ff5581983bfd176dc6598a96ca056ef69c040dc0f4fffceb9b97"
+            }
+          ]
+        },
+        {
+          "scenario": "selection_return",
+          "result": "passed_recorded_scenario",
+          "time": "2026-10-21T10:27:17.3841578Z",
+          "hasApplied": true,
+          "comparedParameterCount": 18526,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2025-r7/baseline.json",
+              "sha256": "938c678d792fe75709923a01fae311e4fcf8991cb69bb998ae2d2e809a4d2f1f"
+            },
+            {
+              "file": "2025-r7/selection-wall1-settled.json",
+              "sha256": "d571e1e215bb716eec4e8645d9b474e97f789e58376575153c82432ae04bdfb8"
+            }
+          ]
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "failed_or_incomplete",
+          "time": "2026-10-21T10:27:11.0715647Z",
+          "hasApplied": false,
+          "comparedParameterCount": 18526,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [
+            "unexpected_layout_state"
+          ],
+          "sources": [
+            {
+              "file": "2025-r7/baseline.json",
+              "sha256": "938c678d792fe75709923a01fae311e4fcf8991cb69bb998ae2d2e809a4d2f1f"
+            },
+            {
+              "file": "2025-r7/selection-wall2-settled.json",
+              "sha256": "5517f231c3d42e7cb8c2899fe5b7febf245b8750c074b457152848413e81b558"
+            }
+          ]
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "passed_recorded_scenario",
+          "time": "2026-10-21T10:27:13.8725799Z",
+          "hasApplied": false,
+          "comparedParameterCount": 18526,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2025-r7/baseline.json",
+              "sha256": "938c678d792fe75709923a01fae311e4fcf8991cb69bb998ae2d2e809a4d2f1f"
+            },
+            {
+              "file": "2025-r7/selection-multiple-settled.json",
+              "sha256": "13b0c2897a28da13d4eabf6517fb24a41bd0269ddf784fb64c1c7ca23015ce32"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "run": "2025-r8",
+      "compiledArtifactPresent": true,
+      "startupRecorded": false,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "bool",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "double",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "list",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "undo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "redo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "cancel",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "restore",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_return",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "not_recorded"
+        }
+      ]
+    },
+    {
+      "run": "2026",
+      "compiledArtifactPresent": true,
+      "startupRecorded": false,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "bool",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "double",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "list",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "undo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "redo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "cancel",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "restore",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_return",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "not_recorded"
+        }
+      ]
+    },
+    {
+      "run": "2026-r2",
+      "compiledArtifactPresent": true,
+      "startupRecorded": false,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "bool",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "double",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "list",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "undo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "redo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "cancel",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "restore",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_return",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "not_recorded"
+        }
+      ]
+    },
+    {
+      "run": "2026-r3",
+      "compiledArtifactPresent": true,
+      "startupRecorded": false,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "bool",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "double",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "list",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "undo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "redo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "cancel",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "restore",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_return",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "not_recorded"
+        }
+      ]
+    },
+    {
+      "run": "2026-r4",
+      "compiledArtifactPresent": true,
+      "startupRecorded": true,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "bool",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "double",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "list",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "undo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "redo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "cancel",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "restore",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_return",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "not_recorded"
+        }
+      ]
+    },
+    {
+      "run": "2026-r5",
+      "compiledArtifactPresent": true,
+      "startupRecorded": false,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "bool",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "double",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "list",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "undo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "redo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "cancel",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "restore",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_return",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "not_recorded"
+        }
+      ]
+    },
+    {
+      "run": "2026-r8",
+      "compiledArtifactPresent": true,
+      "startupRecorded": true,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "passed_recorded_scenario",
+          "expected": "ORDER_BASELINEx",
+          "actual": "ORDER_BASELINEx",
+          "version": "2026",
+          "build": "26.4.10.51",
+          "pid": 50048,
+          "beforeTime": "2026-10-21T10:40:31.9733169Z",
+          "afterTime": "2026-10-21T10:41:43.4819503Z",
+          "beforeOrder": {
+            "hasApplied": true,
+            "firstGroup": "Données d'identification",
+            "targetRow": 3,
+            "targetFirstInFirstGroup": true,
+            "visibleMappingMismatchCount": 0,
+            "status": "Ordre personnalisé appliqué à la palette Revit."
+          },
+          "afterHasApplied": false,
+          "afterOrderNote": "A later deselection may restore native order; the pre-input proof is checked independently.",
+          "comparedParameterCount": 18659,
+          "deltaCount": 1,
+          "deltas": [
+            {
+              "key": "6b1538e2-6913-4daf-ad6c-7d7f0dbc6adb-00000aef|-1010106|Commentaires",
+              "before": "ORDER_BASELINE",
+              "after": "ORDER_BASELINEx"
+            }
+          ],
+          "unexpectedDeltaCount": 0,
+          "failures": [],
+          "harnessVerificationPass": null,
+          "sources": [
+            {
+              "file": "2026-r8/text-before.json",
+              "sha256": "81257383645484ad1700f9137d7213fea60a90cfbdccd892aef68d9afd133586"
+            },
+            {
+              "file": "2026-r8/text-after.json",
+              "sha256": "a605cb0a5604ffcee43fd27415de556a43f98cf136e94d5c1dc0a398b78d34d3"
+            }
+          ]
+        },
+        {
+          "scenario": "bool",
+          "result": "passed_recorded_scenario",
+          "expected": "0",
+          "actual": "0",
+          "version": "2026",
+          "build": "26.4.10.51",
+          "pid": 50048,
+          "beforeTime": "2026-10-21T10:41:50.1330845Z",
+          "afterTime": "2026-10-21T10:42:39.922324Z",
+          "beforeOrder": {
+            "hasApplied": true,
+            "firstGroup": "Contraintes",
+            "targetRow": 3,
+            "targetFirstInFirstGroup": true,
+            "visibleMappingMismatchCount": 0,
+            "status": "Ordre personnalisé appliqué à la palette Revit."
+          },
+          "afterHasApplied": false,
+          "afterOrderNote": "A later deselection may restore native order; the pre-input proof is checked independently.",
+          "comparedParameterCount": 18659,
+          "deltaCount": 1,
+          "deltas": [
+            {
+              "key": "6b1538e2-6913-4daf-ad6c-7d7f0dbc6adb-00000aef|-1001007|Limite de pièce",
+              "before": "1",
+              "after": "0"
+            }
+          ],
+          "unexpectedDeltaCount": 0,
+          "failures": [],
+          "harnessVerificationPass": null,
+          "sources": [
+            {
+              "file": "2026-r8/bool-before.json",
+              "sha256": "d2b1dc597a9869f948e02b720eabc754d0ddaee55d68baf2f6cb7aaaaed08a7d"
+            },
+            {
+              "file": "2026-r8/bool-after.json",
+              "sha256": "9e208b3b316eecbfa3055f41548cf8adceb556dd049d2c6f0271f27aac21e9c3"
+            }
+          ]
+        },
+        {
+          "scenario": "double",
+          "result": "passed_recorded_scenario",
+          "expected": 0.02952755905511811,
+          "actual": "0.02952755905511811",
+          "version": "2026",
+          "build": "26.4.10.51",
+          "pid": 50048,
+          "beforeTime": "2026-10-21T10:42:59.5582422Z",
+          "afterTime": "2026-10-21T10:44:16.5764074Z",
+          "beforeOrder": {
+            "hasApplied": true,
+            "firstGroup": "Contraintes",
+            "targetRow": 3,
+            "targetFirstInFirstGroup": true,
+            "visibleMappingMismatchCount": 0,
+            "status": "Ordre personnalisé appliqué à la palette Revit."
+          },
+          "afterHasApplied": false,
+          "afterOrderNote": "A later deselection may restore native order; the pre-input proof is checked independently.",
+          "comparedParameterCount": 18659,
+          "deltaCount": 1,
+          "deltas": [
+            {
+              "key": "6b1538e2-6913-4daf-ad6c-7d7f0dbc6adb-00000aef|-1001108|Décalage inférieur",
+              "before": "0",
+              "after": "0.02952755905511811"
+            }
+          ],
+          "unexpectedDeltaCount": 0,
+          "failures": [],
+          "harnessVerificationPass": null,
+          "sources": [
+            {
+              "file": "2026-r8/double-before.json",
+              "sha256": "1f660cb91036ed70ffcea2a58d4dae44a0b5c53fb5c7e4a468cdccdafac5cf54"
+            },
+            {
+              "file": "2026-r8/double-after.json",
+              "sha256": "5b37e2eb769c4f61138216902c4f1d893857e17010dba6e677f7d0e4a5012e1e"
+            }
+          ]
+        },
+        {
+          "scenario": "list",
+          "result": "passed_recorded_scenario",
+          "expected": "2798",
+          "actual": "2798",
+          "version": "2026",
+          "build": "26.4.10.51",
+          "pid": 50048,
+          "beforeTime": "2026-10-21T10:44:23.0174069Z",
+          "afterTime": "2026-10-21T10:51:22.5298004Z",
+          "beforeOrder": {
+            "hasApplied": true,
+            "firstGroup": "Contraintes",
+            "targetRow": 3,
+            "targetFirstInFirstGroup": true,
+            "visibleMappingMismatchCount": 0,
+            "status": "Ordre personnalisé appliqué à la palette Revit."
+          },
+          "afterHasApplied": false,
+          "afterOrderNote": "A later deselection may restore native order; the pre-input proof is checked independently.",
+          "comparedParameterCount": 18659,
+          "deltaCount": 1,
+          "deltas": [
+            {
+              "key": "6b1538e2-6913-4daf-ad6c-7d7f0dbc6adb-00000aef|-1001107|Contrainte inférieure",
+              "before": "1959",
+              "after": "2798"
+            }
+          ],
+          "unexpectedDeltaCount": 0,
+          "failures": [],
+          "harnessVerificationPass": true,
+          "sources": [
+            {
+              "file": "2026-r8/list-before.json",
+              "sha256": "d1b4b1a77e1f54c42379f96840c29709dedfc578b8a7f217eae7aa9b256ff2ad"
+            },
+            {
+              "file": "2026-r8/list-after.json",
+              "sha256": "177f0fb5fcbc797bb918a10e9afb2c16d95bd26116e3cf36b38a907ee58f301a"
+            },
+            {
+              "file": "2026-r8/verify-write.json",
+              "sha256": "690c05c42d1b93b8ef78427cbb055820a4f0a6297e9d5ddba6550aa6a8d2ac2f"
+            }
+          ]
+        },
+        {
+          "scenario": "undo",
+          "result": "passed_recorded_scenario",
+          "meaning": "All parameter values equal reference snapshot; UI action is evidenced separately.",
+          "beforeTime": "2026-10-21T10:44:23.0174069Z",
+          "afterTime": "2026-10-21T10:51:43.2311764Z",
+          "comparedParameterCount": 18659,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2026-r8/list-before.json",
+              "sha256": "d1b4b1a77e1f54c42379f96840c29709dedfc578b8a7f217eae7aa9b256ff2ad"
+            },
+            {
+              "file": "2026-r8/undo-after.json",
+              "sha256": "92000f639952b3d86e4ce43fe60577371809b708e7247b4bb7edd458af4d1f44"
+            }
+          ]
+        },
+        {
+          "scenario": "redo",
+          "result": "passed_recorded_scenario",
+          "meaning": "All parameter values equal reference snapshot; UI action is evidenced separately.",
+          "beforeTime": "2026-10-21T10:51:22.5298004Z",
+          "afterTime": "2026-10-21T10:52:04.9912815Z",
+          "comparedParameterCount": 18659,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2026-r8/list-after.json",
+              "sha256": "177f0fb5fcbc797bb918a10e9afb2c16d95bd26116e3cf36b38a907ee58f301a"
+            },
+            {
+              "file": "2026-r8/redo-after.json",
+              "sha256": "8a8675f6ad62c0301462afad84e6993f719933e310b4327f63f7a5c1f4cfdea7"
+            }
+          ]
+        },
+        {
+          "scenario": "cancel",
+          "result": "passed_recorded_scenario",
+          "meaning": "All parameter values equal reference snapshot; UI action is evidenced separately.",
+          "beforeTime": "2026-10-21T10:52:11.4872186Z",
+          "afterTime": "2026-10-21T10:53:32.9974623Z",
+          "comparedParameterCount": 18659,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2026-r8/cancel-before.json",
+              "sha256": "28eb10d440f29a2ebbfc759094d772d5dd072bec60ac975b97c5e2df1591b405"
+            },
+            {
+              "file": "2026-r8/cancel-after.json",
+              "sha256": "7314b9fe1fcb94e684fc69f244581de291f82a8321aaf652e6c95ccae997192a"
+            }
+          ]
+        },
+        {
+          "scenario": "restore",
+          "result": "passed_recorded_scenario",
+          "time": "2026-10-21T11:07:40.0134603Z",
+          "hasApplied": false,
+          "comparedParameterCount": 18659,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2026-r8/baseline.json",
+              "sha256": "f562a12a65da917ff143496ec0962063c5e1b59f5c26d04724e419f231deeb71"
+            },
+            {
+              "file": "2026-r8/restore-values.json",
+              "sha256": "6bf3f456776f9685523326fcfcd2dabe2d3c1675dc9fca9e47914b97e611b281"
+            }
+          ]
+        },
+        {
+          "scenario": "selection_return",
+          "result": "passed_recorded_scenario",
+          "time": "2026-10-21T10:53:45.3159473Z",
+          "hasApplied": true,
+          "comparedParameterCount": 18659,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2026-r8/baseline.json",
+              "sha256": "f562a12a65da917ff143496ec0962063c5e1b59f5c26d04724e419f231deeb71"
+            },
+            {
+              "file": "2026-r8/selection-return.json",
+              "sha256": "8cf88cc5901d80479dd8bffafda64e3f858759ab90533100a4833d8a71e297a2"
+            }
+          ]
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "failed_or_incomplete",
+          "time": "2026-10-21T10:53:36.8848122Z",
+          "hasApplied": false,
+          "comparedParameterCount": 18659,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [
+            "unexpected_layout_state"
+          ],
+          "sources": [
+            {
+              "file": "2026-r8/baseline.json",
+              "sha256": "f562a12a65da917ff143496ec0962063c5e1b59f5c26d04724e419f231deeb71"
+            },
+            {
+              "file": "2026-r8/selection-wall2.json",
+              "sha256": "814b990e62ad1f5212bdb395a5665b3df8dc2182505c8552bde4bef4171921b2"
+            }
+          ]
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "passed_recorded_scenario",
+          "time": "2026-10-21T10:53:41.0964027Z",
+          "hasApplied": false,
+          "comparedParameterCount": 18659,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2026-r8/baseline.json",
+              "sha256": "f562a12a65da917ff143496ec0962063c5e1b59f5c26d04724e419f231deeb71"
+            },
+            {
+              "file": "2026-r8/selection-multiple.json",
+              "sha256": "9b31a3963c9103268e3c001f81aa3ab91c040221a50e95c1ef3d960597b85c8f"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "run": "2027",
+      "compiledArtifactPresent": true,
+      "startupRecorded": false,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "bool",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "double",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "list",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "undo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "redo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "cancel",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "restore",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_return",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "not_recorded"
+        }
+      ]
+    },
+    {
+      "run": "2027-r2",
+      "compiledArtifactPresent": true,
+      "startupRecorded": false,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "bool",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "double",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "list",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "undo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "redo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "cancel",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "restore",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_return",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "not_recorded"
+        }
+      ]
+    },
+    {
+      "run": "2027-r3",
+      "compiledArtifactPresent": true,
+      "startupRecorded": false,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "bool",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "double",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "list",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "undo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "redo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "cancel",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "restore",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_return",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "not_recorded"
+        }
+      ]
+    },
+    {
+      "run": "2027-r4",
+      "compiledArtifactPresent": true,
+      "startupRecorded": true,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "bool",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "double",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "list",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "undo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "redo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "cancel",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "restore",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_return",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "not_recorded"
+        }
+      ]
+    },
+    {
+      "run": "2027-r5",
+      "compiledArtifactPresent": true,
+      "startupRecorded": false,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "bool",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "double",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "list",
+          "result": "not_recorded",
+          "sources": []
+        },
+        {
+          "scenario": "undo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "redo",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "cancel",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "restore",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_return",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "not_recorded"
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "not_recorded"
+        }
+      ]
+    },
+    {
+      "run": "2027-r8",
+      "compiledArtifactPresent": true,
+      "startupRecorded": true,
+      "scenarios": [
+        {
+          "scenario": "text",
+          "result": "passed_recorded_scenario",
+          "expected": "ORDER_BASELINEx",
+          "actual": "ORDER_BASELINEx",
+          "version": "2027",
+          "build": "27.0.10.13",
+          "pid": 31820,
+          "beforeTime": "2026-10-21T10:54:00.2561905Z",
+          "afterTime": "2026-10-21T10:55:44.6907626Z",
+          "beforeOrder": {
+            "hasApplied": true,
+            "firstGroup": "Données d'identification",
+            "targetRow": 3,
+            "targetFirstInFirstGroup": true,
+            "visibleMappingMismatchCount": 0,
+            "status": "Ordre personnalisé appliqué à la palette Revit."
+          },
+          "afterHasApplied": false,
+          "afterOrderNote": "A later deselection may restore native order; the pre-input proof is checked independently.",
+          "comparedParameterCount": 18620,
+          "deltaCount": 1,
+          "deltas": [
+            {
+              "key": "842212ff-1430-4dcb-a329-1caa5799ae3f-00000ae0|-1010106|Commentaires",
+              "before": "ORDER_BASELINE",
+              "after": "ORDER_BASELINEx"
+            }
+          ],
+          "unexpectedDeltaCount": 0,
+          "failures": [],
+          "harnessVerificationPass": null,
+          "sources": [
+            {
+              "file": "2027-r8/text-before.json",
+              "sha256": "3149ef1e6c6d63f524b17f7466c86d9963cbd8a53b5a0bd351c7e43543d6022d"
+            },
+            {
+              "file": "2027-r8/text-after.json",
+              "sha256": "79aaae59e36221e145ac7d0d879657090e2c62f0bd568cac576bc20a910366ca"
+            }
+          ]
+        },
+        {
+          "scenario": "bool",
+          "result": "passed_recorded_scenario",
+          "expected": "0",
+          "actual": "0",
+          "version": "2027",
+          "build": "27.0.10.13",
+          "pid": 31820,
+          "beforeTime": "2026-10-21T10:55:52.1458189Z",
+          "afterTime": "2026-10-21T10:57:15.0858752Z",
+          "beforeOrder": {
+            "hasApplied": true,
+            "firstGroup": "Contraintes",
+            "targetRow": 3,
+            "targetFirstInFirstGroup": true,
+            "visibleMappingMismatchCount": 0,
+            "status": "Ordre personnalisé appliqué à la palette Revit."
+          },
+          "afterHasApplied": false,
+          "afterOrderNote": "A later deselection may restore native order; the pre-input proof is checked independently.",
+          "comparedParameterCount": 18620,
+          "deltaCount": 1,
+          "deltas": [
+            {
+              "key": "842212ff-1430-4dcb-a329-1caa5799ae3f-00000ae0|-1001007|Limite de pièce",
+              "before": "1",
+              "after": "0"
+            }
+          ],
+          "unexpectedDeltaCount": 0,
+          "failures": [],
+          "harnessVerificationPass": null,
+          "sources": [
+            {
+              "file": "2027-r8/bool-before.json",
+              "sha256": "4ddb352de69b70dd283f2bb527025b87bfd62871d102d6069ca7b5e7d9303a54"
+            },
+            {
+              "file": "2027-r8/bool-after.json",
+              "sha256": "b58d3b1af6f337f23ddc405ba28167ff2b50f3d8be59ee4b27e8dd8bd408f67e"
+            }
+          ]
+        },
+        {
+          "scenario": "double",
+          "result": "passed_recorded_scenario",
+          "expected": 0.02952755905511811,
+          "actual": "0.02952755905511811",
+          "version": "2027",
+          "build": "27.0.10.13",
+          "pid": 31820,
+          "beforeTime": "2026-10-21T10:57:22.8952561Z",
+          "afterTime": "2026-10-21T10:59:18.9378253Z",
+          "beforeOrder": {
+            "hasApplied": true,
+            "firstGroup": "Contraintes",
+            "targetRow": 3,
+            "targetFirstInFirstGroup": true,
+            "visibleMappingMismatchCount": 0,
+            "status": "Ordre personnalisé appliqué à la palette Revit."
+          },
+          "afterHasApplied": false,
+          "afterOrderNote": "A later deselection may restore native order; the pre-input proof is checked independently.",
+          "comparedParameterCount": 18620,
+          "deltaCount": 1,
+          "deltas": [
+            {
+              "key": "842212ff-1430-4dcb-a329-1caa5799ae3f-00000ae0|-1001108|Décalage inférieur",
+              "before": "0",
+              "after": "0.02952755905511811"
+            }
+          ],
+          "unexpectedDeltaCount": 0,
+          "failures": [],
+          "harnessVerificationPass": null,
+          "sources": [
+            {
+              "file": "2027-r8/double-before.json",
+              "sha256": "9033069a5ae897d052deaba86ec7b0a974128f0f04c3ed35cdf67bfecab3ee02"
+            },
+            {
+              "file": "2027-r8/double-after.json",
+              "sha256": "297ee2a05ca9873fba3dbf6ea56e5dd0fc52fc787afa8a7e50c61a68cdb58f68"
+            }
+          ]
+        },
+        {
+          "scenario": "list",
+          "result": "passed_recorded_scenario",
+          "expected": "2783",
+          "actual": "2783",
+          "version": "2027",
+          "build": "27.0.10.13",
+          "pid": 31820,
+          "beforeTime": "2026-10-21T10:59:25.3274161Z",
+          "afterTime": "2026-10-21T11:01:47.963212Z",
+          "beforeOrder": {
+            "hasApplied": true,
+            "firstGroup": "Contraintes",
+            "targetRow": 3,
+            "targetFirstInFirstGroup": true,
+            "visibleMappingMismatchCount": 0,
+            "status": "Ordre personnalisé appliqué à la palette Revit."
+          },
+          "afterHasApplied": false,
+          "afterOrderNote": "A later deselection may restore native order; the pre-input proof is checked independently.",
+          "comparedParameterCount": 18620,
+          "deltaCount": 1,
+          "deltas": [
+            {
+              "key": "842212ff-1430-4dcb-a329-1caa5799ae3f-00000ae0|-1001107|Contrainte inférieure",
+              "before": "1971",
+              "after": "2783"
+            }
+          ],
+          "unexpectedDeltaCount": 0,
+          "failures": [],
+          "harnessVerificationPass": true,
+          "sources": [
+            {
+              "file": "2027-r8/list-before.json",
+              "sha256": "f3a3da7730eacf6b92d8e5e8726c462f19ac92edd78f8f137bc6720fd6703da4"
+            },
+            {
+              "file": "2027-r8/list-after.json",
+              "sha256": "88b327862e996384ceb362b93e31ab343b1abf0e0d1b1d5f94c8a2a8de8e1bce"
+            },
+            {
+              "file": "2027-r8/verify-write.json",
+              "sha256": "052526763aecbf333ffcd46e9ed9e8a9c998232c32e9f13006d268331dee5bdf"
+            }
+          ]
+        },
+        {
+          "scenario": "undo",
+          "result": "passed_recorded_scenario",
+          "meaning": "All parameter values equal reference snapshot; UI action is evidenced separately.",
+          "beforeTime": "2026-10-21T10:59:25.3274161Z",
+          "afterTime": "2026-10-21T11:02:12.7833917Z",
+          "comparedParameterCount": 18620,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2027-r8/list-before.json",
+              "sha256": "f3a3da7730eacf6b92d8e5e8726c462f19ac92edd78f8f137bc6720fd6703da4"
+            },
+            {
+              "file": "2027-r8/undo-after.json",
+              "sha256": "115c3d018505b1cb2893dcadda4258f02659f8b0133bc7429b8da1ceb5e102c3"
+            }
+          ]
+        },
+        {
+          "scenario": "redo",
+          "result": "passed_recorded_scenario",
+          "meaning": "All parameter values equal reference snapshot; UI action is evidenced separately.",
+          "beforeTime": "2026-10-21T11:01:47.963212Z",
+          "afterTime": "2026-10-21T11:02:37.2374822Z",
+          "comparedParameterCount": 18620,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2027-r8/list-after.json",
+              "sha256": "88b327862e996384ceb362b93e31ab343b1abf0e0d1b1d5f94c8a2a8de8e1bce"
+            },
+            {
+              "file": "2027-r8/redo-after.json",
+              "sha256": "d14a2abb901d5bbe98e78a495290be41cf29ece16f818586cf2336c31fbd29cd"
+            }
+          ]
+        },
+        {
+          "scenario": "cancel",
+          "result": "passed_recorded_scenario",
+          "meaning": "All parameter values equal reference snapshot; UI action is evidenced separately.",
+          "beforeTime": "2026-10-21T11:02:48.4817151Z",
+          "afterTime": "2026-10-21T11:04:31.3003435Z",
+          "comparedParameterCount": 18620,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2027-r8/cancel-before.json",
+              "sha256": "a888817ceaeddf51e437283a1257ed91eb8abe177ced9be77ea765f35255c7cf"
+            },
+            {
+              "file": "2027-r8/cancel-after.json",
+              "sha256": "0dfb3bcc72f518766265672b11258e12718e347a751eab2353c2ac66409f56de"
+            }
+          ]
+        },
+        {
+          "scenario": "restore",
+          "result": "passed_recorded_scenario",
+          "time": "2026-10-21T11:06:55.6739469Z",
+          "hasApplied": false,
+          "comparedParameterCount": 18620,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2027-r8/baseline.json",
+              "sha256": "1bf0f838ef6abfaedf9c26e3b2bc07e626570aef5a0270b21fe08141d5637095"
+            },
+            {
+              "file": "2027-r8/restore-values.json",
+              "sha256": "9516f9ee0565e0dad588f349e89a7fb25784c02a8bcdb63d9f798824ddb9c21f"
+            }
+          ]
+        },
+        {
+          "scenario": "selection_return",
+          "result": "passed_recorded_scenario",
+          "time": "2026-10-21T11:04:45.2622471Z",
+          "hasApplied": true,
+          "comparedParameterCount": 18620,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2027-r8/baseline.json",
+              "sha256": "1bf0f838ef6abfaedf9c26e3b2bc07e626570aef5a0270b21fe08141d5637095"
+            },
+            {
+              "file": "2027-r8/selection-return.json",
+              "sha256": "75acadc87a3552770c95512bba85d54d1da14740cc7f25b61a382154b8d65419"
+            }
+          ]
+        },
+        {
+          "scenario": "selection_wall2",
+          "result": "failed_or_incomplete",
+          "time": "2026-10-21T11:04:36.0402483Z",
+          "hasApplied": false,
+          "comparedParameterCount": 18620,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [
+            "unexpected_layout_state"
+          ],
+          "sources": [
+            {
+              "file": "2027-r8/baseline.json",
+              "sha256": "1bf0f838ef6abfaedf9c26e3b2bc07e626570aef5a0270b21fe08141d5637095"
+            },
+            {
+              "file": "2027-r8/selection-wall2.json",
+              "sha256": "c85a5930b57a164fb2650a9da01dda5a9947837ac7b914dd511c5314898c3432"
+            }
+          ]
+        },
+        {
+          "scenario": "selection_multiple",
+          "result": "passed_recorded_scenario",
+          "time": "2026-10-21T11:04:41.1621565Z",
+          "hasApplied": false,
+          "comparedParameterCount": 18620,
+          "deltaCount": 0,
+          "deltas": [],
+          "failures": [],
+          "sources": [
+            {
+              "file": "2027-r8/baseline.json",
+              "sha256": "1bf0f838ef6abfaedf9c26e3b2bc07e626570aef5a0270b21fe08141d5637095"
+            },
+            {
+              "file": "2027-r8/selection-multiple.json",
+              "sha256": "f49e7426f275f38ade38c1b660dab472c214969d7f0a09b59f1e836a4f19235c"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

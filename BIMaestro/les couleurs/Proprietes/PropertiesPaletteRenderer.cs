@@ -129,13 +129,30 @@ namespace BIMaestro.PropertiesAppearance
                 {
                     int i = (y * _width + x) * 4;
                     double sr = _pixels[i + 2], sg = _pixels[i + 1], sb = _pixels[i];
-                    double a = Math.Max(0, Math.Min(1, ((sr - br) * dr + (sg - bgc) * dg + (sb - bb) * db) / length));
-                    // Leave unrelated selection/error colors and native control marks intact.
-                    if (Math.Abs(sr - br - a * dr) + Math.Abs(sg - bgc - a * dg) + Math.Abs(sb - bb - a * db) > 100) continue;
+                    // ClearType gives R/G/B different coverage at glyph edges. A
+                    // single RGB projection rejects these pixels as unrelated colors,
+                    // leaving holes and native-colored fringes in recolored letters.
+                    // Accept each channel's native foreground/background interval,
+                    // then collapse its subpixel coverage to a neutral glyph mask.
+                    if (!InChannelRange(sr, br, fr) || !InChannelRange(sg, bgc, fg) || !InChannelRange(sb, bb, fb)) continue;
+                    double coverage = 0, weight = 0;
+                    AddCoverage(sr, br, dr, ref coverage, ref weight);
+                    AddCoverage(sg, bgc, dg, ref coverage, ref weight);
+                    AddCoverage(sb, bb, db, ref coverage, ref weight);
+                    double a = weight == 0 ? 0 : coverage / weight;
                     _pixels[i + 2] = (byte)(desiredBg.R + a * (desiredFg.R - desiredBg.R));
                     _pixels[i + 1] = (byte)(desiredBg.G + a * (desiredFg.G - desiredBg.G));
                     _pixels[i] = (byte)(desiredBg.B + a * (desiredFg.B - desiredBg.B));
                 }
+        }
+        private static bool InChannelRange(double pixel, double background, double foreground) =>
+            pixel >= Math.Min(background, foreground) - 24 && pixel <= Math.Max(background, foreground) + 24;
+        private static void AddCoverage(double pixel, double background, double delta, ref double coverage, ref double weight)
+        {
+            if (Math.Abs(delta) < 10) return;
+            double channelWeight = Math.Abs(delta);
+            coverage += Math.Max(0, Math.Min(1, (pixel - background) / delta)) * channelWeight;
+            weight += channelWeight;
         }
         private void EnsureBitmap(IntPtr dc, int width, int height)
         {

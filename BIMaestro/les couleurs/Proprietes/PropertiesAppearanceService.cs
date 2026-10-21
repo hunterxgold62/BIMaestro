@@ -11,6 +11,7 @@ namespace BIMaestro.PropertiesAppearance
     {
         internal string Key, Name, GroupKey, NativeName, DisplayValue;
         internal bool ReadOnly;
+        internal long? NativeParameterId;
         public override string ToString() => Name;
     }
     internal sealed class AppearanceContext
@@ -37,7 +38,7 @@ namespace BIMaestro.PropertiesAppearance
                     {
                         string label = grid.Value(row, 1);
                         if (string.IsNullOrWhiteSpace(label)) continue;
-                        bool header = !string.IsNullOrWhiteSpace(grid.Value(row, 3));
+                        bool header = grid.IsGroupHeader(row);
                         if (header && !context.GroupMap.TryGetValue(AppearancePreferences.Normalize(label), out group)) group = "native:" + AppearancePreferences.Normalize(label);
                         PropertyTarget parameter = null;
                         if (!header && group != null) context.ParameterMap.TryGetValue(group + "|" + AppearancePreferences.Normalize(label), out parameter);
@@ -110,7 +111,7 @@ namespace BIMaestro.PropertiesAppearance
                     if (string.IsNullOrWhiteSpace(label)) label = "Autres";
                     if (!result.Groups.Any(g => g.Key == group)) result.Groups.Add(new PropertyTarget { Key = group, Name = label, NativeName = AppearancePreferences.Normalize(label) });
                     string identity = p.IsShared ? "shared:" + p.GUID : p.Id.ToString().StartsWith("-", StringComparison.Ordinal) ? "builtin:" + p.Id : "name:" + p.Definition.Name;
-                    targets.Add(new PropertyTarget { Key = group + "/" + identity, GroupKey = group, Name = label + " · " + p.Definition.Name, NativeName = AppearancePreferences.Normalize(p.Definition.Name), DisplayValue = displayValues ? DisplayValue(p) : null, ReadOnly = p.IsReadOnly });
+                    targets.Add(new PropertyTarget { Key = group + "/" + identity, GroupKey = group, Name = label + " · " + p.Definition.Name, NativeName = AppearancePreferences.Normalize(p.Definition.Name), NativeParameterId = long.Parse(p.Id.ToString(), System.Globalization.CultureInfo.InvariantCulture), DisplayValue = displayValues ? DisplayValue(p) : null, ReadOnly = p.IsReadOnly });
                 }
                 catch { /* A missing label must not interrupt native selection. */ }
             }
@@ -198,7 +199,15 @@ namespace BIMaestro.PropertiesAppearance
                 AppearanceContext context;
                 try { context = AppearanceContext.Capture(app); }
                 finally { PropertiesAppearanceMetrics.End("Context", contextTime); }
-                if (context.CategoryKey == null) { _renderer?.Dispose(); _renderer = null; PropertiesPaletteLayout.Forget(); Status = context.Caption; return; }
+                if (context.CategoryKey == null)
+                {
+                    _renderer?.Dispose(); _renderer = null;
+                    // A multiple/unsupported selection can reach the API before the
+                    // native palette rebuild. Preserve the last verified baseline
+                    // without moving this grid; the next valid capture replaces it.
+                    Status = context.Caption;
+                    return;
+                }
                 if (hasOrder || PropertiesPaletteLayout.HasApplied)
                 {
                     long layoutTime = PropertiesAppearanceMetrics.Begin();
@@ -214,7 +223,7 @@ namespace BIMaestro.PropertiesAppearance
                 for (uint row = 1; row <= grid.RowCount; row++)
                 {
                     string raw = grid.Value(row, 1); if (string.IsNullOrWhiteSpace(raw)) continue;
-                    bool header = !string.IsNullOrWhiteSpace(grid.Value(row, 3));
+                    bool header = grid.IsGroupHeader(row);
                     if (header) context.GroupMap.TryGetValue(AppearancePreferences.Normalize(raw), out group);
                     if (group == null) continue;
                     PropertyTarget parameter = null;
@@ -235,6 +244,16 @@ namespace BIMaestro.PropertiesAppearance
             catch (Exception ex)
             {
                 _renderer?.Dispose(); _renderer = null; _cachedGrid = null;
+                if (PropertiesPaletteLayout.RequiresNativeRebuild && app?.ActiveUIDocument != null)
+                {
+                    // Idling is on Revit's UI thread: discard uncertain row indices
+                    // before returning control to the user. Never write model values.
+                    var selection = app.ActiveUIDocument.Selection;
+                    var ids = selection.GetElementIds();
+                    selection.SetElementIds(new ElementId[0]);
+                    selection.SetElementIds(ids);
+                    PropertiesPaletteLayout.Forget();
+                }
                 Status = "Palette conservée dans son état Revit : " + ex.Message;
                 _next = DateTime.UtcNow.AddSeconds(5);
             }

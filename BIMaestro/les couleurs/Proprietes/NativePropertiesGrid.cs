@@ -13,9 +13,10 @@ namespace BIMaestro.PropertiesAppearance
     internal sealed class NativePropertiesGrid
     {
         internal IntPtr Window, Core;
-        private IntPtr _object, _coreVtable;
+        private IntPtr _object, _coreVtable, _elementGrid, _elementVtable;
+        private int _revitVersion;
         internal uint RowCount;
-        private static IntPtr _og, _mfc;
+        private static IntPtr _og, _mfc, _desktop;
         private static bool _checked;
         private static string _failure;
         private static readonly HashSet<IntPtr> VerifiedTypeImages = new HashSet<IntPtr>();
@@ -25,7 +26,11 @@ namespace BIMaestro.PropertiesAppearance
         private static StyleFlag _readOnly, _enabled;
         private static StyleColor _text;
         private static CellRect _rect;
+        private static StyleFlag _activeCurrentCell;
+        private static ResetCurrentCellDelegate _resetCurrentCell;
         private static MoveRowsDelegate _move;
+        private static FindParameterRow32 _findParameter32;
+        private static FindParameterRow64 _findParameter64;
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate IntPtr FromHandle(IntPtr h);
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate uint Count(IntPtr p);
@@ -35,17 +40,70 @@ namespace BIMaestro.PropertiesAppearance
         // MSVC x64 member return: this in RCX, CRect return storage in RDX.
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate IntPtr CellRect(IntPtr p, ref Rect rect, uint row, uint col);
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate int MoveRowsDelegate(IntPtr p, uint from, uint to, uint destination, uint flags, int command);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate void ResetCurrentCellDelegate(IntPtr p, int storeIfModified);
+        // ElementId is passed by value: int32 in 2023, int64 from 2024 onward.
+        // Both signatures were checked in the installed DesktopMFC exports/disassembly.
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate int FindParameterRow32(IntPtr p, int parameterId);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate int FindParameterRow64(IntPtr p, long parameterId);
         [DllImport("user32.dll")] private static extern IntPtr GetFocus();
         [DllImport("user32.dll")] private static extern bool IsChild(IntPtr parent, IntPtr child);
         [DllImport("user32.dll")] private static extern bool RedrawWindow(IntPtr window, IntPtr rect, IntPtr region, uint flags);
-        internal bool IsEditing => IsChild(Window, GetFocus());
+        internal bool HasInputFocus
+        {
+            get { IntPtr focus = GetFocus(); return focus == Window || IsChild(Window, focus); }
+        }
+        internal bool ActiveEditor
+        {
+            get
+            {
+                if (!IsCurrent()) throw new InvalidOperationException("La grille des paramètres a été reconstruite.");
+                return _activeCurrentCell(Core) != 0;
+            }
+        }
+        // A native editor can remain active while a popup or another window has focus.
+        // Grid focus alone does not mean that a value is being edited.
+        internal bool IsEditing => ActiveEditor || IsChild(Window, GetFocus());
         internal bool MoveRows(uint from, uint to, uint destination)
         {
             if (!IsCurrent() || IsEditing || from < 1 || to > RowCount || to < from || destination < 1 || destination > RowCount) return false;
             if (_move == null) _move = Function<MoveRowsDelegate>("?MoveRows@CGXGridCore@@UEAAHKKKIW4GXCmdType@@@Z");
-            return _move(Core, from, to, destination, 0, 0) != 0;
+            // Invalidate a previously initialized control before its row changes.
+            // Explicit FALSE is essential: ordering must never commit a pending value.
+            _resetCurrentCell(Core, 0);
+            if (!IsCurrent() || IsEditing) return false;
+            bool moved = _move(Core, from, to, destination, 0, 0) != 0;
+            // A native callback may have rebuilt the palette or activated an editor.
+            // Leave that editor untouched; the caller must rebuild after this failure.
+            if (!IsCurrent() || IsEditing) return false;
+            _resetCurrentCell(Core, 0);
+            return moved && IsCurrent() && !IsEditing;
         }
         internal void Redraw() => RedrawWindow(Window, IntPtr.Zero, IntPtr.Zero, 0x105);
+        internal int FindParameterRow(long parameterId)
+        {
+            if (_revitVersion < 2023 || _revitVersion > 2027 || _elementGrid == IntPtr.Zero)
+                throw new NotSupportedException("Identification native des paramètres non validée pour cette grille Revit.");
+            if (!IsCurrent() || Ptr(_elementGrid) != _elementVtable)
+                throw new InvalidOperationException("La grille des paramètres a été reconstruite.");
+            const string export = "?findParamIdRow@ElemGrid@@QEAAHVElementId@@@Z";
+            IntPtr address = GetProcAddress(_desktop, export);
+            if (address == IntPtr.Zero) throw new NotSupportedException("Export natif absent : " + export);
+            int row;
+            if (_revitVersion == 2023)
+            {
+                if (parameterId < int.MinValue || parameterId > int.MaxValue) return -1;
+                if (_findParameter32 == null) _findParameter32 = Marshal.GetDelegateForFunctionPointer<FindParameterRow32>(address);
+                row = _findParameter32(_elementGrid, (int)parameterId);
+            }
+            else
+            {
+                if (_findParameter64 == null) _findParameter64 = Marshal.GetDelegateForFunctionPointer<FindParameterRow64>(address);
+                row = _findParameter64(_elementGrid, parameterId);
+            }
+            if (row != -1 && (row < 1 || row > RowCount))
+                throw new InvalidOperationException("Identité native de paramètre hors de la grille.");
+            return row;
+        }
         internal delegate bool EnumProc(IntPtr h, IntPtr p);
         [StructLayout(LayoutKind.Sequential)] internal struct Rect { internal int Left, Top, Right, Bottom; }
         [StructLayout(LayoutKind.Sequential)] private struct Mbi { public IntPtr Base, AllocationBase; public uint AllocationProtect; public ushort PartitionId; public UIntPtr Size; public uint State, Protect, Type; }
@@ -81,6 +139,7 @@ namespace BIMaestro.PropertiesAppearance
                     throw new NotSupportedException("Cette bibliothèque Revit n’a pas encore été validée. Les préférences sont conservées, sans modifier la palette.");
                 _mfc = mfc.BaseAddress;
                 _og = modules.Single(m => m.ModuleName.Equals("og1100asu.dll", StringComparison.OrdinalIgnoreCase)).BaseAddress;
+                _desktop = modules.Single(m => m.ModuleName.Equals("DesktopMFC.dll", StringComparison.OrdinalIgnoreCase)).BaseAddress;
                 _from = Marshal.GetDelegateForFunctionPointer<FromHandle>(IntPtr.Add(_mfc, 0x2957c0));
                 _rows = Function<Count>("?GetRowCount@CGXGridCore@@UEAAKXZ");
                 _columns = Function<Count>("?GetColCount@CGXGridCore@@UEAAKXZ");
@@ -90,6 +149,8 @@ namespace BIMaestro.PropertiesAppearance
                 _enabled = Function<StyleFlag>("?GetEnabled@CGXStyle@@QEBAHXZ");
                 _text = Function<StyleColor>("?GetTextColor@CGXStyle@@QEBAKXZ");
                 _rect = Function<CellRect>("?CalcRectFromRowColEx@CGXGridCore@@QEAA?AVCRect@@KK@Z");
+                _activeCurrentCell = Function<StyleFlag>("?IsActiveCurrentCell@CGXGridCore@@QEAAHXZ");
+                _resetCurrentCell = Function<ResetCurrentCellDelegate>("?ResetCurrentCell@CGXGridCore@@UEAAXH@Z");
             }
             catch (Exception ex) { _failure = ex.Message; throw; }
         }
@@ -114,8 +175,12 @@ namespace BIMaestro.PropertiesAppearance
                 EnumWindows((h, a) => { uint pid; GetWindowThreadProcessId(h, out pid); if (pid == (uint)Process.GetCurrentProcess().Id) EnumChildWindows(h, visit, IntPtr.Zero); return found == IntPtr.Zero; }, IntPtr.Zero);
             if (found == IntPtr.Zero) return null;
             IntPtr obj = _from(found); if (obj == IntPtr.Zero) return null;
-            var result = new NativePropertiesGrid { Window = found, Core = GetCore(obj) };
+            IntPtr elementGrid;
+            var result = new NativePropertiesGrid { Window = found, Core = GetCore(obj, out elementGrid) };
             result._object = obj; result._coreVtable = Ptr(result.Core);
+            result._elementGrid = elementGrid;
+            if (elementGrid != IntPtr.Zero) result._elementVtable = Ptr(elementGrid);
+            int.TryParse(app.Application.VersionNumber, out result._revitVersion);
             result.RowCount = _rows(result.Core);
             uint cols = _columns(result.Core);
             if (result.RowCount > 2000 || cols < 3 || cols > 10) throw new NotSupportedException("Grille de propriétés non reconnue.");
@@ -131,6 +196,12 @@ namespace BIMaestro.PropertiesAppearance
         }
 
         internal string Value(uint row, uint col) { if (PropertiesAppearanceMetrics.Enabled) PropertiesAppearanceMetrics.CellReads++; return Wide(Ptr(_value(Core, row, col))); }
+        internal static bool IsGroupMarker(string marker)
+        {
+            string value = (marker ?? "").Trim();
+            return value == "^" || value == "v";
+        }
+        internal bool IsGroupHeader(uint row) => IsGroupMarker(Value(row, 3));
         internal Rect Bounds(uint row, uint col)
         {
             var rect = new Rect(); _rect(Core, ref rect, row, col);
@@ -150,8 +221,9 @@ namespace BIMaestro.PropertiesAppearance
         }
 
         // Type offsets come from the live RTTI, never from an assumed C++ layout.
-        private static IntPtr GetCore(IntPtr obj)
+        private static IntPtr GetCore(IntPtr obj, out IntPtr elementGrid)
         {
+            elementGrid = IntPtr.Zero;
             var vtable = Ptr(obj); var col = Ptr(IntPtr.Subtract(vtable, 8));
             if (Int(col) != 1) throw new NotSupportedException("RTTI natif non reconnu.");
             var image = IntPtr.Subtract(col, Int(col, 20));
@@ -162,6 +234,10 @@ namespace BIMaestro.PropertiesAppearance
             }
             int offset = Int(col, 4); if (offset < 0 || offset > 8192) throw new NotSupportedException("Objet natif non reconnu.");
             var complete = IntPtr.Subtract(obj, offset); var hierarchy = IntPtr.Add(image, Int(col, 16));
+            // findParamIdRow expects the complete ElemGrid, not its CGXGridCore base.
+            // Restrict the call to the exact runtime type from the verified owning module.
+            if (image == _desktop && Ansi(IntPtr.Add(image, Int(col, 12) + 16)) == ".?AVElemGrid@@")
+                elementGrid = complete;
             int count = Int(hierarchy, 8); if (count < 1 || count > 200) throw new NotSupportedException("Hiérarchie native non reconnue.");
             var array = IntPtr.Add(image, Int(hierarchy, 12)); var matches = new HashSet<IntPtr>();
             for (int i = 0; i < count; i++)

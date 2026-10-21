@@ -74,7 +74,8 @@ public partial class AppUI : IExternalApplication
                 new RibbonItemDefinition("MepBooster", "MEP Booster", panel => AddSplitButton(panel, "MepBooster", "MEP Booster\nOFF", assemblyPath, new List<(string, string, string, string, string)>
                 {
                     ("MepBooster", "MEP Booster\nOFF", "BIMaestro.MepBooster.MepBoosterCommand", "MEP Booster vanne rotation.png", "Active ou désactive la pastille MEP après 0,2 seconde de sélection stable. Survolez la pastille puis un angle pour voir la rotation. Cliquez pour appliquer ; Échap ferme la rosace. Accessoires, raccords droits, coudes et tés, en plan, coupe et 3D orthographique. Les actions qui déplaceraient un connecteur raccordé sont désactivées."),
-                    ("PipeSystemColors", "Couleurs\nréseaux", "Visualisation.PipeSystemColorsCommand", "Couleur.png", "Colore les canalisations et raccords selon les couleurs des types de systèmes de canalisation.")
+                    ("PipeSystemColors", "Couleurs\nréseaux", "Visualisation.PipeSystemColorsCommand", "Couleur.png", "Colore les canalisations et raccords selon les couleurs des types de systèmes de canalisation."),
+                    ("MepMotorExtraction", "Extraction\nmoteur", "BIMaestro.MepBooster.MepMotorExtractionCommand", "MEP Booster vanne rotation.png", "Prototype de maintenance : définissez un volume de moteur, une direction locale et une course. Affiche la copie fantôme et recherche les obstacles sur tout le trajet, avec les liens Revit directs chargés. Vue 3D orthographique requise. La pompe sélectionnée est exclue du contrôle.")
                 })),
                 new RibbonItemDefinition(
                     "RevitGameCommand",
@@ -197,6 +198,10 @@ public partial class AppUI : IExternalApplication
 
            new RibbonPanelDefinition("Couleur et information", new List<RibbonItemDefinition>
             {
+                new RibbonItemDefinition("HomeAppearanceTest", "Accueil Test", panel => AddPushButton(panel,
+                    "HomeAppearanceTest", "Accueil\nTest", assemblyPath,
+                    "BIMaestro.Home.HomeAppearanceCommand", "Couleur.png",
+                    "Ouvre les réglages de test pour personnaliser l’accueil de Revit.")),
                 new RibbonItemDefinition("PropertiesAppearance", "Apparence des propriétés", panel => AddPushButton(panel,
                     "PropertiesAppearance", "Apparence\npropriétés", assemblyPath,
                     "BIMaestro.PropertiesAppearance.PropertiesAppearanceCommand", "Couleur.png",
