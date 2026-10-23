@@ -212,6 +212,7 @@ namespace Analyse
         private bool _syncingSelection;
         private bool _restoringDeleted;
         private int _readinessRefreshQueued;
+        private readonly System.Windows.Threading.DispatcherTimer _readinessTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
         private bool _isClosed;
         private int _loadVersion;
         private string _scopeFilter = "model";
@@ -250,6 +251,8 @@ namespace Analyse
             _requestHandler = new UiRequestHandler(this);
             _externalEvent = ExternalEvent.Create(_requestHandler);
             ElementHistoryDurableBridge.ReadyChanged += OnRestorationReadyChanged;
+            _readinessTimer.Tick += (sender, args) => { if (!_isClosed && IsVisible) UpdateVisualizeButtonLabel(); };
+            _readinessTimer.Start();
             ClusterListBox.SelectionChanged += (sender, args) => UpdateVisualizeButtonLabel();
             ConfigureScopePanel();
             ConfigureDeletedMeshMode();
@@ -308,6 +311,7 @@ namespace Analyse
         protected override void OnClosed(EventArgs e)
         {
             _isClosed = true;
+            _readinessTimer.Stop();
             ElementHistoryDurableBridge.ReadyChanged -= OnRestorationReadyChanged;
             _loadVersion++;
             try { _externalEvent?.Dispose(); } catch { }
@@ -1447,11 +1451,17 @@ namespace Analyse
             UpdateRestoreButtonLabel(row);
             if (RestoreDeletedButton != null)
             {
-                UpdateRestorationAvailability(RestoreDeletedButton, GetSelectedDeletionEvents(), false);
+                var selectedDeletions = GetSelectedDeletionEvents();
+                UpdateRestorationAvailability(RestoreDeletedButton, selectedDeletions, false);
+                SelectionIsReady(selectedDeletions, out var summary);
+                RestoreAvailabilityText.Text = summary;
             }
             if (ClusterRestoreButton != null)
             {
-                UpdateRestorationAvailability(ClusterRestoreButton, GetSelectedClusterItems().Select(item => item.Source), true);
+                var clusterEvents = GetSelectedClusterItems().Select(item => item.Source).ToList();
+                UpdateRestorationAvailability(ClusterRestoreButton, clusterEvents, true);
+                SelectionIsReady(clusterEvents, out var summary);
+                ClusterAvailabilityText.Text = summary;
             }
         }
 
@@ -1481,21 +1491,32 @@ namespace Analyse
             var states = items.Select(ElementHistoryDurableBridge.GetReadiness).ToList();
             int ready = states.Count(state => state.State == ElementHistoryDurableBridge.ReadinessState.Ready);
             int unavailable = states.Count(state => state.State == ElementHistoryDurableBridge.ReadinessState.Unavailable);
+            int preparing = states.Count(state => state.State == ElementHistoryDurableBridge.ReadinessState.Preparing);
             reason = UiLanguage.T($"{ready}/{items.Count} prêt(s)", $"{ready}/{items.Count} ready");
+            if (preparing > 0)
+                reason += UiLanguage.T($" ; {preparing} en préparation", $"; {preparing} preparing");
             if (unavailable > 0)
-                reason += UiLanguage.T($" ; {unavailable} indisponible(s). Sélectionnez séparément les éléments prêts.",
-                    $"; {unavailable} unavailable. Select the ready elements separately.");
-            else if (ready < items.Count)
-                reason += UiLanguage.T(" — préparation en cours. L’historique reste consultable.", " — preparation in progress. History remains available.");
+                reason += UiLanguage.T($" ; {unavailable} indisponible(s).",
+                    $"; {unavailable} unavailable.");
             return ready == items.Count;
         }
 
         private void UpdateRestorationAvailability(Button button, IEnumerable<ElementHistoryEvent> events, bool cluster)
         {
-            bool ready = SelectionIsReady(events, out var reason);
+            var items = RestorableDeletionEvents(events);
+            bool ready = SelectionIsReady(items, out var reason);
+            var states = items.Select(ElementHistoryDurableBridge.GetReadiness).ToList();
+            int readyCount = states.Count(state => state.State == ElementHistoryDurableBridge.ReadinessState.Ready);
+            bool partial = readyCount > 0 && !ready;
+            ready |= partial;
+            if (partial) reason += UiLanguage.T(" Seuls les éléments prêts seront restaurés.", " Only ready elements will be restored.");
+            var failure = states.FirstOrDefault(state => state.State == ElementHistoryDurableBridge.ReadinessState.Unavailable);
+            if (failure != null) reason += "\n" + failure.Reason;
             button.IsEnabled = !_restoringDeleted && ready;
             button.Content = _restoringDeleted ? UiLanguage.T("Restauration…", "Restoring…")
+                : partial ? UiLanguage.T($"Restaurer les {readyCount} élément(s) prêts", $"Restore {readyCount} ready element(s)")
                 : ready ? UiLanguage.T(cluster ? "Restaurer sélection" : "Restaurer les éléments", cluster ? "Restore selection" : "Restore elements")
+                : failure != null && states.All(state => state.State == ElementHistoryDurableBridge.ReadinessState.Unavailable) ? UiLanguage.T("Restauration indisponible", "Restoration unavailable")
                 : UiLanguage.T("Restauration en attente", "Restoration pending");
             button.ToolTip = reason;
             System.Windows.Controls.ToolTipService.SetShowOnDisabled(button, true);
@@ -2013,6 +2034,14 @@ namespace Analyse
                 return;
             }
             if (_restoringDeleted || events.Count == 0) return;
+            int selectedCount = events.Count;
+            var readyEvents = events.Where(ev => ElementHistoryDurableBridge.GetReadiness(ev).State == ElementHistoryDurableBridge.ReadinessState.Ready).ToList();
+            if (readyEvents.Count == 0)
+            {
+                SelectionIsReady(events, out var blockedReason);
+                UpdateVisualizeButtonLabel(); MessageBox.Show(this, blockedReason); return;
+            }
+            events = readyEvents;
             if (!SelectionIsReady(events, out var readinessReason))
             { UpdateVisualizeButtonLabel(); MessageBox.Show(this, readinessReason); return; }
             int count = events.Select(ev => ev.UniqueId ?? ev.ElementId.ToString(CultureInfo.InvariantCulture)).Distinct().Count();
@@ -2022,6 +2051,7 @@ namespace Analyse
             var confirm = MessageBox.Show(this, UiLanguage.T(
                 $"Restaurer {count} élément(s) dans la maquette à leur emplacement enregistré ?\n\nIls resteront dans le projet et seront modifiables normalement. Les connexions enregistrées seront rétablies si leurs deux extrémités sont disponibles et inchangées. Sélectionnez aussi les raccords et tronçons supprimés du réseau. Les éléments déjà présents ne seront pas dupliqués.\n\nLes anciennes suppressions sans données de reconstruction ne peuvent pas être restaurées.",
                 $"Restore {count} element(s) in the model at their recorded location?\n\nThey will remain in the project and be editable normally. Recorded connections will be restored when both ends are available and unchanged. Also select deleted network fittings and segments. Existing elements will not be duplicated.\n\nOlder deletions without reconstruction data cannot be restored.")
+                + (selectedCount > events.Count ? UiLanguage.T($"\n\n{selectedCount - events.Count} enregistrement(s) non prêt(s) restent exclus de cette restauration.", $"\n\n{selectedCount - events.Count} record(s) that are not ready remain excluded from this restoration.") : "")
                 + repairNotice, UiLanguage.T("Restaurer les éléments", "Restore elements"), MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (confirm != MessageBoxResult.Yes) return;
             _restoringDeleted = true;

@@ -48,6 +48,7 @@ public class BIMaestroApp : IExternalApplication
 
     private void ProcessHistoryBackground(UIApplication app)
     {
+        if (Analyse.ElementHistoryMaintenance.IsActive) return;
         // Conversion and final cleanup also run after the last project closes.
         // They use their own read-only source, never the user's active document.
         Analyse.ElementHistoryDurableBridge.ProcessPending(app?.Application);
@@ -187,17 +188,23 @@ public class BIMaestroApp : IExternalApplication
 
             // --- Events Revit ---
             application.ControlledApplication.DocumentChanged += OnDocumentChangedSafe;
-            Analyse.ElementHistoryTracker.Start();
+            if (!Analyse.ElementHistoryMaintenance.IsActive)
+                Analyse.ElementHistoryTracker.Start();
             application.ControlledApplication.DocumentCreated += OnDocumentCreatedSafe;
             application.ControlledApplication.DocumentOpened += OnDocumentOpenedSafe;
-            application.ControlledApplication.DocumentSaving += (sender, args) => Analyse.ElementHistoryOpeningArchive.BeginSave(args.Document);
-            application.ControlledApplication.DocumentSavingAs += (sender, args) => Analyse.ElementHistoryOpeningArchive.BeginSave(args.Document);
-            application.ControlledApplication.DocumentSynchronizingWithCentral += (sender, args) => Analyse.ElementHistoryOpeningArchive.BeginSave(args.Document);
+            if (!Analyse.ElementHistoryMaintenance.IsActive)
+            {
+                application.ControlledApplication.DocumentSaving += (sender, args) => Analyse.ElementHistoryOpeningArchive.BeginSave(args.Document);
+                application.ControlledApplication.DocumentSavingAs += (sender, args) => Analyse.ElementHistoryOpeningArchive.BeginSave(args.Document);
+                application.ControlledApplication.DocumentSynchronizingWithCentral += (sender, args) => Analyse.ElementHistoryOpeningArchive.BeginSave(args.Document);
+            }
             application.ControlledApplication.DocumentClosing += OnDocumentClosingSafe;
             application.ControlledApplication.DocumentClosed += OnDocumentClosedSafe;
             application.ViewActivated += OnViewActivatedSafe;
             application.SelectionChanged += OnSelectionChangedSafe;
             application.Idling += OnIdlingSafe;
+            if (!Analyse.ElementHistoryMaintenance.IsActive)
+            {
             _historyWakeEvent = ExternalEvent.Create(new HistoryWakeHandler(this));
             _historyWakeTimer = new System.Windows.Threading.DispatcherTimer
             {
@@ -211,6 +218,7 @@ public class BIMaestroApp : IExternalApplication
                     _historyWakeEvent?.Raise();
             };
             _historyWakeTimer.Start();
+            }
 
             // --- Ruban ---
             AppUI.CreateRibbonUI(application);
@@ -244,7 +252,8 @@ public class BIMaestroApp : IExternalApplication
     {
         BIMaestro.Home.HomeAppearanceService.Shutdown(application);
         _historyWakeTimer?.Stop();
-        Analyse.ElementHistoryOpeningArchive.Shutdown();
+        if (!Analyse.ElementHistoryMaintenance.IsActive)
+            Analyse.ElementHistoryOpeningArchive.Shutdown();
 
         _historyWakeEvent?.Dispose();
         _historyWakeEvent = null;
@@ -265,9 +274,12 @@ public class BIMaestroApp : IExternalApplication
 
             Page.SecretGifShortcutManager.Shutdown();
             BIMaestro.UI.RadialGlobalHotkeyService.Shutdown();
-            Analyse.ElementHistoryTracker.Stop();
-            Analyse.ElementHistoryDurableBridge.Shutdown();
-            Analyse.ElementHistoryNativeArchive.Shutdown();
+            if (!Analyse.ElementHistoryMaintenance.IsActive)
+            {
+                Analyse.ElementHistoryTracker.Stop();
+                Analyse.ElementHistoryDurableBridge.Shutdown();
+                Analyse.ElementHistoryNativeArchive.Shutdown();
+            }
             ExcelLogger.Shutdown();
             WpfApp?.Shutdown();
         }
@@ -382,7 +394,8 @@ public class BIMaestroApp : IExternalApplication
                     _uiApp.MainWindowHandle);
                 _pendingProjectBrowserAppearanceRefreshes = 3;
             }
-            Analyse.ElementHistoryTracker.ScheduleDeferredPrime(args.Document);
+            if (!Analyse.ElementHistoryMaintenance.IsActive)
+                Analyse.ElementHistoryTracker.ScheduleDeferredPrime(args.Document);
             ExcelLogger.OnViewActivated(args.Document, _uiApp);
             Couleur.ProjectBrowserColoring
                 .CompleteAutomaticFocusNavigation();
@@ -469,25 +482,28 @@ public class BIMaestroApp : IExternalApplication
             var extractionMs = timer.Elapsed.TotalMilliseconds;
             BIMaestro.ViewHover.ViewDeckChangeService.CaptureSelection(doc, selectedIds);
             var viewDeckMs = timer.Elapsed.TotalMilliseconds - extractionMs;
-            Analyse.ElementHistoryTracker.CaptureSelectedElementDetails(doc, selectedIds);
-            Analyse.HistoryBackgroundWork.SelectionRequested = selectedIds.Count > 0;
-            if (selectedIds.Count > 0)
+            if (!Analyse.ElementHistoryMaintenance.IsActive)
             {
-                _nextHistoryCaptureUtc = DateTime.MinValue;
-                _historyWakeEvent?.Raise();
+                Analyse.ElementHistoryTracker.CaptureSelectedElementDetails(doc, selectedIds);
+                Analyse.HistoryBackgroundWork.SelectionRequested = selectedIds.Count > 0;
+                if (selectedIds.Count > 0)
+                {
+                    _nextHistoryCaptureUtc = DateTime.MinValue;
+                    _historyWakeEvent?.Raise();
+                }
             }
             var afterHistoryMs = timer.Elapsed.TotalMilliseconds;
-            Analyse.ElementHistoryHoverInfoService.OnSelectionChanged(
-                doc,
-                selectedIds);
+            if (!Analyse.ElementHistoryMaintenance.IsActive)
+                Analyse.ElementHistoryHoverInfoService.OnSelectionChanged(doc, selectedIds);
             var afterHoverMs = timer.Elapsed.TotalMilliseconds;
             Couleur.ProjectBrowserColoring.FocusSelectedSheetContent(
                 doc,
                 selectedIds);
             var totalMs = timer.Elapsed.TotalMilliseconds;
-            Analyse.ElementHistoryTracker.RecordSelectionPipelineTiming(doc, totalMs,
-                extractionMs, viewDeckMs, afterHoverMs - afterHistoryMs,
-                totalMs - afterHoverMs);
+            if (!Analyse.ElementHistoryMaintenance.IsActive)
+                Analyse.ElementHistoryTracker.RecordSelectionPipelineTiming(doc, totalMs,
+                    extractionMs, viewDeckMs, afterHoverMs - afterHistoryMs,
+                    totalMs - afterHoverMs);
         }
         catch (Exception ex)
         {
@@ -501,10 +517,14 @@ public class BIMaestroApp : IExternalApplication
         try
         {
             _uiApp ??= new UIApplication(e.Document.Application);
-            Analyse.ElementHistoryOpeningArchive.Schedule(e.Document);
+            if (!Analyse.ElementHistoryMaintenance.IsActive)
+                Analyse.ElementHistoryOpeningArchive.Schedule(e.Document);
             BIMaestro.Tutorials.DemoTrainingInvitation.OnDocumentOpened(e.Document);
-            Analyse.ElementHistoryTracker.ScheduleDeferredPrime(e.Document);
-            Analyse.ElementHistoryHoverInfoService.OnDocumentOpened(e.Document);
+            if (!Analyse.ElementHistoryMaintenance.IsActive)
+            {
+                Analyse.ElementHistoryTracker.ScheduleDeferredPrime(e.Document);
+                Analyse.ElementHistoryHoverInfoService.OnDocumentOpened(e.Document);
+            }
             ExcelLogger.OnDocumentOpened(e.Document, _uiApp);
             Analyse.CollaborativeModelTrackerStore.TryAutoLog(e.Document, _uiApp);
             BIMaestro.ViewHover.ViewHoverPreviewService
@@ -524,7 +544,8 @@ public class BIMaestroApp : IExternalApplication
         try
         {
             _uiApp ??= new UIApplication(e.Document.Application);
-            Analyse.ElementHistoryTracker.ScheduleDeferredPrime(e.Document);
+            if (!Analyse.ElementHistoryMaintenance.IsActive)
+                Analyse.ElementHistoryTracker.ScheduleDeferredPrime(e.Document);
             BIMaestro.ViewHover.ViewHoverPreviewService
                 .ScheduleCacheMaintenance(e.Document);
         }
@@ -537,9 +558,10 @@ public class BIMaestroApp : IExternalApplication
     private void OnDocumentClosingSafe(object sender, DocumentClosingEventArgs e)
     {
         if (Analyse.ElementHistoryNativeArchive.Owns(e.Document)) return;
-        _historyClosingDocuments[e.DocumentId] = Tuple.Create(e.Document,
-            Analyse.ElementHistoryTracker.GetDocumentKeyForHistory(e.Document),
-            Analyse.ElementHistoryDurableBridge.GetSessionId(e.Document));
+        if (!Analyse.ElementHistoryMaintenance.IsActive)
+            _historyClosingDocuments[e.DocumentId] = Tuple.Create(e.Document,
+                Analyse.ElementHistoryTracker.GetDocumentKeyForHistory(e.Document),
+                Analyse.ElementHistoryDurableBridge.GetSessionId(e.Document));
         try
         {
             _uiApp ??= new UIApplication(e.Document.Application);
@@ -549,7 +571,8 @@ public class BIMaestroApp : IExternalApplication
                 Couleur.ProjectBrowserColoring.Reset();
             }
             Couleur.ProjectBrowserColoring.ForgetViewTypeMap(e.Document);
-            Analyse.ElementHistoryHoverInfoService.Hide();
+            if (!Analyse.ElementHistoryMaintenance.IsActive)
+                Analyse.ElementHistoryHoverInfoService.Hide();
             BIMaestro.ViewHover.ViewHoverPreviewService.ForgetDocument(
                 e.Document);
             ExcelLogger.OnDocumentClosing(e.Document, _uiApp);
@@ -563,6 +586,7 @@ public class BIMaestroApp : IExternalApplication
 
     private void OnDocumentClosedSafe(object sender, DocumentClosedEventArgs e)
     {
+        if (Analyse.ElementHistoryMaintenance.IsActive) return;
         if (!_historyClosingDocuments.TryGetValue(e.DocumentId, out var closing)) return;
         _historyClosingDocuments.Remove(e.DocumentId);
         // Another add-in can cancel DocumentClosing. Preserve all protection
@@ -593,7 +617,8 @@ public class BIMaestroApp : IExternalApplication
         try
         {
             document = e.GetDocument();
-            Analyse.ElementHistoryTracker.CaptureDocumentChanges(document, e);
+            if (!Analyse.ElementHistoryMaintenance.IsActive)
+                Analyse.ElementHistoryTracker.CaptureDocumentChanges(document, e);
         }
         catch
         {

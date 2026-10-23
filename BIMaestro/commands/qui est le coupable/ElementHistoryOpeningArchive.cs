@@ -50,6 +50,7 @@ namespace Analyse
 
         internal static void Schedule(Document doc)
         {
+            if (ElementHistoryMaintenance.IsActive) return;
             if (doc == null || doc.IsFamilyDocument || doc.IsModified || ElementHistoryNativeArchive.Owns(doc)
                 || TryState(doc, out _)) return;
             ElementHistoryDefinitionRevisions.SessionId(doc);
@@ -250,6 +251,7 @@ namespace Analyse
         // waits for the copier, and a save can never replace the opening version.
         internal static void BeginSave(Document doc)
         {
+            if (ElementHistoryMaintenance.IsActive) return;
             if (doc == null || !TryState(doc, out var state)) return;
             lock (state.Sync)
             {

@@ -56,7 +56,7 @@ internal static class ElementHistoryReconstruction {
 }
 internal static class ElementHistoryExternalModels {internal static bool IsExcluded(Autodesk.Revit.DB.Element e)=>e.Excluded;internal static bool IsExcludedClass(string kind)=>kind=="Autodesk.Revit.DB.ImportInstance";}
 internal static class ElementHistoryRelations {internal static string Key(HistoryGeometryRelation r)=>r.Peer;}
-internal static class HistoryBackgroundWork {internal static bool Paused;internal static bool PreparationCanRun()=>true;}
+internal static class HistoryBackgroundWork {internal static bool Paused;internal static bool IdleAllowed=true;internal static bool PreparationCanRun()=>IdleAllowed;}
 internal static class ElementHistoryTracker {internal static string GetDocumentKeyForHistory(Autodesk.Revit.DB.Document doc)=>"fixture";internal static void FlushPendingForDurability(){} }
 internal static class ElementHistoryLocalSpool {
  internal static readonly Spool Default=new Spool(); internal class Spool {
@@ -73,6 +73,8 @@ internal static partial class ElementHistoryDurableBridge {
  private static void SetReadiness(string id,ReadinessState state,string reason){Reasons[id]=state+":"+reason;}
  internal static void Reset(){Sources?.Dispose();Sources=null;Live.Clear();Sessions.Clear();Pending.Clear();Errors.Clear();TransportRetries.Clear();PreparedJobs.Clear();Loaded=true;Converted=0;Io=null;NextPassUtc=default;CurrentStore=null;}
  internal static void Step(){NextPassUtc=default;ProcessPending(new Autodesk.Revit.ApplicationServices.Application(),true);Io?.GetAwaiter().GetResult();}
+ internal static void Reload(){Loaded=false;Load();}
+ internal static void AutomaticStep(){NextPassUtc=default;ProcessPending(new Autodesk.Revit.ApplicationServices.Application());Io?.GetAwaiter().GetResult();}
  internal static void Cleanup()=>CleanupClosedSessions();
  internal static string AddClosedSession(string id){Directory.CreateDirectory(LocalBridgeDirectory);var path=Path.Combine(LocalBridgeDirectory,"snapshot-opening-"+id+".rvt");File.WriteAllText(path,"opening support");Sessions[id]=new Session{Id=id,BridgeFile=path,Closed=true,Referenced=true,ModelKey="fixture"};return path;}
  internal static string AddUnreferencedSession(string id){var path=AddClosedSession(id);Sessions[id].Referenced=false;Sessions[id].Closed=false;return path;}
@@ -86,6 +88,29 @@ internal static class Checks {
  public static int Main(string[] args){try{
   var io=args[0];CollaborativeModelTrackerStore.ActiveDirectory=Path.Combine(io,"store");FixturePaths.Bridge=Path.Combine(io,"bridges");Directory.CreateDirectory(io);Directory.CreateDirectory(CollaborativeModelTrackerStore.ActiveDirectory);ElementHistoryDurableBridge.Reset();
   if(args.Length>1){var reread=ElementHistoryDurableStore.ResolveConversion("direct");Check(reread.Recipe.UsesExistingModelDefinitions&&reread.Recipe.Point[0]==99,"Cold read after process/source closure");Check(!Directory.Exists(Path.Combine(CollaborativeModelTrackerStore.ActiveDirectory,"history-data","native")),"Cold read needs no native payload");Console.WriteLine("Cold process read PASS");return 0;}
+  var stale=Event("old-other-model",Opening("gone.rvt"));stale.ModelKey="other";
+  var current=Event("current-opening",Opening("active.rvt"));current.ModelKey="fixture";
+  var legacy=Event("legacy-old",Opening("old.rvt"));legacy.ModelKey="fixture";legacy.Ts=DateTime.UtcNow;
+  var latest=Event("latest-current",Opening("active.rvt"));latest.ModelKey="fixture";latest.Ts=DateTime.UtcNow;
+  var ordered=ElementHistoryDurableBridge.OrderPendingJobs(new[]{stale,legacy,current,latest},new[]{"FIXTURE"});
+  Check(ordered[0]==latest&&ordered[1]==current,"Recent opening work for an open model must precede legacy jobs and other models");
+  Check(ordered.Count==4&&ordered.Distinct().Count()==4,"Prioritization must preserve all old and current work");
+  var damaged=Event("damaged-old-job",Recipe(1));ElementHistoryDurableStore.WriteJob(damaged);
+  var damagedPath=Path.Combine(CollaborativeModelTrackerStore.ActiveDirectory,"history-data","jobs","damaged-old-job.json.gz");
+  var damagedBytes=System.Text.Encoding.UTF8.GetBytes("invalid old gzip");File.WriteAllBytes(damagedPath,damagedBytes);
+  var healthy=Event("healthy-next-to-damaged",Recipe(2));ElementHistoryDurableStore.WriteJob(healthy);
+  var failures=new List<string>();var readable=ElementHistoryDurableStore.ReadPendingJobs((id,ex)=>failures.Add(id)).ToList();
+  Check(failures.SequenceEqual(new[]{"damaged-old-job"})&&readable.Any(e=>e.EventId==healthy.EventId),"One damaged old job must not block valid neighboring jobs");
+  ElementHistoryDurableBridge.EventsPersisted(new[]{damaged,healthy});
+  Check(ElementHistoryDurableBridge.Reasons[damaged.EventId].StartsWith("Unavailable:"),"Damaged job remains explicitly unavailable");
+  Check(File.ReadAllBytes(damagedPath).SequenceEqual(damagedBytes),"Damaged file must remain untouched for diagnosis");
+  ElementHistoryDurableBridge.Reload();
+  Check(ElementHistoryDurableBridge.GetStatus().PendingJobs>0,"Reload progresses despite damaged old job");
+  var openSupport=ElementHistoryDurableBridge.AddUnreferencedSession("active-user");
+  HistoryBackgroundWork.IdleAllowed=false;ElementHistoryDurableBridge.AutomaticStep();
+  Check(ElementHistoryDurableStore.ResolveConversion(healthy.EventId)?.Recipe!=null,"Normal automatic direct publication must progress while heavy preparation is blocked");
+  Check(ElementHistoryNativeArchive.OpenCalls==0&&File.Exists(openSupport),"Automatic JSON work never opens or removes the active opening model");
+  HistoryBackgroundWork.IdleAllowed=true;ElementHistoryDurableBridge.Reset();
   var recipe=Recipe(99);recipe.OpeningFallback=new HistoryNativeArtifact{WholeModel=true,File="missing-source.rvt"};recipe.ElectricalCircuits=new List<HistoryCircuit>{new HistoryCircuit{Recipe=new HistoryRecipe{Kind="electrical_system",Type="circuit-type"}}};var ev=Event("direct",recipe);var before=JObject.FromObject(ev).ToString();var result=Drive(ev);
   Check(result.Recipe.UsesExistingModelDefinitions&&result.Recipe.ElectricalCircuits[0].Recipe.UsesExistingModelDefinitions,"All direct recipe nodes marked");Check(result.Recipe.Native==null&&result.Recipe.OpeningFallback==null,"Backup receipts removed");Check(JObject.FromObject(ev).ToString()==before,"Source event never mutated");Check(result.Recipe.Point[0]==99&&result.Recipe.Parameters[0].Text=="latest"&&result.Recipe.Ports[0].Origin[0]==99&&result.Recipe.Connections[0].Peer=="peer-a","Latest instance state preserved");Check(ElementHistoryNativeArchive.OpenCalls==0,"Direct publication never opens a Revit source");Check(ElementHistoryDurableBridge.GetStatus().PendingJobs==0,"Job acknowledged after durable publication");Check(ElementHistoryDurableBridge.Reasons["direct"].Contains("types nécessaires"),"Ready does not promise autonomous definitions");Check(!Directory.Exists(Path.Combine(CollaborativeModelTrackerStore.ActiveDirectory,"history-data","native")),"No native capsule generated");
   result.Recipe.Point[0]=-5;Check(ElementHistoryDurableStore.ResolveConversion("direct").Recipe.Point[0]==99,"Read result cannot mutate durable data");

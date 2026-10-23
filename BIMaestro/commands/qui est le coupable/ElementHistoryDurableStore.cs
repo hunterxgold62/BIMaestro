@@ -462,16 +462,26 @@ namespace Analyse
             }
         }
 
-        internal static IEnumerable<ElementHistoryEvent> ReadPendingJobs()
+        internal static IEnumerable<ElementHistoryEvent> ReadPendingJobs(Action<string, Exception> onFailure = null)
         {
             var root = Root();
             foreach (var path in JobPaths(root))
             {
                 var name = Path.GetFileName(path); var id = EventId(name.Substring(0, name.Length - ".json.gz".Length));
-                var data = ReadRecord(path, "job", id);
-                if (data == null) continue; // another worker may have acknowledged this immutable job
-                var evt = data.ToObject<ElementHistoryEvent>(Serializer());
-                if (evt == null || evt.EventId != id || evt.Action != "delete") throw new InvalidDataException("Identité du travail durable invalide.");
+                ElementHistoryEvent evt;
+                try
+                {
+                    var data = ReadRecord(path, "job", id);
+                    if (data == null) continue; // another worker may have acknowledged this immutable job
+                    evt = data.ToObject<ElementHistoryEvent>(Serializer());
+                    if (evt == null || evt.EventId != id || evt.Action != "delete") throw new InvalidDataException("Identité du travail durable invalide.");
+                }
+                catch (Exception ex)
+                {
+                    if (onFailure == null) throw;
+                    onFailure(id, ex);
+                    continue; // preserve the damaged file; never treat it as a valid job
+                }
                 yield return evt; // deserialize only requested items, never all jobs on every Idling
             }
         }

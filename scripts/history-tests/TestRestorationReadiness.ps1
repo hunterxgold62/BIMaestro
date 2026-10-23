@@ -39,6 +39,7 @@ namespace Analyse {
   internal static HistoryRestoreRequest ToRequest(ElementHistoryEvent ev,bool resolve)=>new HistoryRestoreRequest{Recipe=ev.Recipe};
   static IEnumerable<HistoryNativeArtifact> Artifacts(HistoryRecipe recipe){if(recipe?.Native!=null)yield return recipe.Native;}
   internal static void SimulatePublishedReady(string id)=>SetReadiness(id,ReadinessState.Ready,"Published conversion verified.");
+  internal static void SimulateLoadFailure(bool fail){lock(Sync){if(fail)Errors["load"]="damaged archive";else Errors.Remove("load");}}
   internal static void ExpireReadiness(string id){lock(Sync)Readiness[id].CheckedUtc=DateTime.UtcNow.AddSeconds(-3);}
   internal static void RevalidateCurrentGeneration(ElementHistoryEvent ev){long generation;lock(Sync){generation=Readiness[ev.EventId].Generation;Readiness[ev.EventId].Checking=true;}CheckReadiness(ev,ev.EventId,generation);}
  }
@@ -64,6 +65,11 @@ namespace Analyse {
    Check(SpinWait.SpinUntil(()=>ElementHistoryDurableBridge.GetReadiness(offline).State==ElementHistoryDurableBridge.ReadinessState.Ready,2000),"transport availability did not recover without restarting UI");
    ElementHistoryDurableStore.Faults.TryRemove(corrupt.EventId,out _);ElementHistoryDurableStore.Values[corrupt.EventId]=new HistoryRestoreRequest{Recipe=new HistoryRecipe()};ElementHistoryDurableBridge.ExpireReadiness(corrupt.EventId);
    Check(ElementHistoryDurableBridge.GetReadiness(corrupt).State==ElementHistoryDurableBridge.ReadinessState.Unavailable,"corrupt data must not become automatically retryable");
+   ElementHistoryDurableBridge.SimulateLoadFailure(true);var loadBlocked=New();
+   Check(Wait(loadBlocked)==ElementHistoryDurableBridge.ReadinessState.Unavailable,"Global loading failure must be explicit, never endless pending");
+   Check(ElementHistoryDurableBridge.GetReadiness(loadBlocked).Reason.Contains("damaged archive"),"Loading failure must expose the actual reason");
+   ElementHistoryDurableBridge.SimulateLoadFailure(false);ElementHistoryDurableStore.Values[loadBlocked.EventId]=new HistoryRestoreRequest{Recipe=new HistoryRecipe()};ElementHistoryDurableBridge.ExpireReadiness(loadBlocked.EventId);
+   Check(SpinWait.SpinUntil(()=>ElementHistoryDurableBridge.GetReadiness(loadBlocked).State==ElementHistoryDurableBridge.ReadinessState.Ready,2000),"Readiness must recover after a loading failure is resolved");
    var raw=New();raw.Recipe=new HistoryRecipe();ElementHistoryDurableBridge.GetReadiness(raw);Thread.Sleep(80);Check(ElementHistoryDurableBridge.GetReadiness(raw).State==ElementHistoryDurableBridge.ReadinessState.Preparing,"new raw recipe must never bypass durable conversion");
    var oldMissing=new ElementHistoryEvent{UniqueId=Guid.NewGuid().ToString("N")};Check(Wait(oldMissing)==ElementHistoryDurableBridge.ReadinessState.Unavailable,"legacy without recipe disabled");
    var oldWhole=new ElementHistoryEvent{UniqueId=Guid.NewGuid().ToString("N"),Recipe=new HistoryRecipe{Native=new HistoryNativeArtifact{WholeModel=true,Ready=true,File="snapshot-opening-test.rvt"}}};ElementHistoryDurableBridge.GetReadiness(oldWhole);Thread.Sleep(80);Check(ElementHistoryDurableBridge.GetReadiness(oldWhole).State==ElementHistoryDurableBridge.ReadinessState.Preparing,"opening bridge must not enable on-demand extraction");

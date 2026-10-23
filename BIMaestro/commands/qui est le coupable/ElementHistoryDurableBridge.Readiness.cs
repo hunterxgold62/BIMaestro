@@ -90,7 +90,12 @@ namespace Analyse
                     return;
                 }
                 string error;
-                lock (Sync) Errors.TryGetValue(id, out error);
+                lock (Sync)
+                {
+                    Errors.TryGetValue(id, out error);
+                    if (error == null && Errors.TryGetValue("load", out var loadError))
+                    { Finish(ReadinessState.Unavailable, "Chargement de l’historique impossible : " + loadError, IsLegacy(ev), true); return; }
+                }
                 if (error != null) { Finish(ReadinessState.Unavailable, error, IsLegacy(ev)); return; }
                 if (IsLegacy(ev))
                 {

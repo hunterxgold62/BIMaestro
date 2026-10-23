@@ -207,6 +207,8 @@ namespace Analyse
         {
             foreach (var ev in events.Where(e => e.Action == "delete"))
             {
+                try
+                {
                 var request = ToRequest(ev, resolve: false);
                 // New deletions must not disappear from the outbox simply
                 // because capture failed or a direct recipe lacks frozen types.
@@ -226,6 +228,8 @@ namespace Analyse
                 if (ElementHistoryDurableStore.HasConversion(ev.EventId)) continue;
                 ElementHistoryDurableStore.WriteJob(ev);
                 lock (Sync) Pending[ev.EventId] = ev;
+                }
+                catch (Exception ex) { RecordFailure(EventId(ev), ex); }
             }
         }
         private static IEnumerable<ElementHistoryEvent> ReadJournal()
@@ -262,15 +266,19 @@ namespace Analyse
             // Recover the gap between durable journal append and outbox creation.
             // Gzip is decoded, not mistaken for a completed conversion.
             EventsPersisted(ReadJournal());
-            foreach (var ev in ElementHistoryDurableStore.ReadPendingJobs())
+            foreach (var ev in ElementHistoryDurableStore.ReadPendingJobs(RecordFailure))
             {
                 var id = EventId(ev);
+                try
+                {
                 if (ElementHistoryDurableStore.ResolveConversion(id) != null)
                 {
                     ElementHistoryDurableStore.DeleteJob(id);
                     lock (Sync) { Pending.Remove(id); Converted++; }
                 }
                 else lock (Sync) Pending[id] = ev;
+                }
+                catch (Exception ex) { RecordFailure(id, ex); }
             }
             if (Directory.Exists(SessionDirectory))
                 foreach (var file in Directory.GetFiles(SessionDirectory, "*.json"))
@@ -418,8 +426,17 @@ namespace Analyse
             return true;
         }
 
+        internal static List<ElementHistoryEvent> OrderPendingJobs(IEnumerable<ElementHistoryEvent> jobs, IEnumerable<string> activeModelKeys)
+        {
+            var active = new HashSet<string>(activeModelKeys.Where(key => !string.IsNullOrWhiteSpace(key)), StringComparer.OrdinalIgnoreCase);
+            return jobs.OrderByDescending(ev => active.Contains(ev.ModelKey ?? ""))
+                .ThenBy(ev => string.IsNullOrWhiteSpace(ev.EventId) || ev.EventId.StartsWith("legacy-", StringComparison.Ordinal) ? 1 : 0)
+                .ThenByDescending(ev => ev.Ts).ThenBy(ev => ev.EventId, StringComparer.Ordinal).ToList();
+        }
+
         internal static void ProcessPending(Application application, bool force = false)
         {
+            if (ElementHistoryMaintenance.IsActive) return;
             // Isolated regression processes explicitly drive API waves only after
             // redirecting the history store. Never touch the real store first.
             if (!force && Environment.GetEnvironmentVariable("BIMAESTRO_HISTORY_MANUAL_TEST") == "1" && !IsolatedAutomaticPreparation) return;
@@ -429,7 +446,6 @@ namespace Analyse
             // Unsaved/cloud projects may have no opening-copy session. They are
             // still user documents and require the same inactivity protection.
             liveSession |= application.Documents.Cast<Document>().Any(doc => !ElementHistoryNativeArchive.Owns(doc));
-            if (!force && liveSession && !HistoryBackgroundWork.PreparationCanRun()) return;
             if (DateTime.UtcNow < NextPassUtc) return;
             NextPassUtc = DateTime.UtcNow.AddMilliseconds(force ? 50 : 1000);
             ReleaseDueTransportFailures(DateTime.UtcNow);
@@ -458,14 +474,35 @@ namespace Analyse
             }
             List<ElementHistoryEvent> jobs;
             lock (Sync) jobs = Pending.Values.ToList();
+            // A backlog from other projects must not delay today's deletion in
+            // an open model. Heavy API work still uses the inactivity gate.
+            var activeKeys = application.Documents.Cast<Document>().Where(doc => !ElementHistoryNativeArchive.Owns(doc))
+                .Select(ElementHistoryTracker.GetDocumentKeyForHistory).ToList();
+            lock (Sync) activeKeys.AddRange(Live.Values.Select(session => session.ModelKey));
+            jobs = OrderPendingJobs(jobs, activeKeys);
             if (jobs.Count == 0)
             {
+                if (!force && liveSession && !HistoryBackgroundWork.PreparationCanRun()) return;
                 Sources?.Dispose(); Sources = null; PreparedJobs.Clear();
                 lock (Sync) if (!Sessions.Values.Any(s => s.Closed && !s.Deleted)) return;
                 Io = Task.Run(() => { try { CleanupClosedSessions(); } catch (Exception ex) { RecordFailure("cleanup", ex); } });
                 return;
             }
             if (QueueExcludedAnnotationAcknowledgements(jobs)) return;
+            // Direct recipes only need JSON processing and background IO. Do not
+            // hold them behind the idle gate for opening a full Revit model.
+            var direct = jobs.FirstOrDefault(e => {
+                lock (Sync) if (Errors.ContainsKey(EventId(e))) return false;
+                var recipe = ToRequest(e, false).Recipe;
+                return recipe?.Native == null && recipe?.Kind != "native_archive";
+            });
+            if (direct != null)
+            {
+                try { ProcessDirectDefinitions(application, jobs, direct); }
+                catch (Exception ex) { RecordFailure(EventId(direct), ex); }
+                return;
+            }
+            if (!force && liveSession && !HistoryBackgroundWork.PreparationCanRun()) return;
             string processingId = null;
             try
             {

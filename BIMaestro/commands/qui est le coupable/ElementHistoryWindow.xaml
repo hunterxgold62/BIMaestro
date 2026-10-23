@@ -330,6 +330,7 @@
                     <Button x:Name="DetailsButton" Content="Détails" Width="96" Style="{StaticResource HistoryButton}" Click="DetailsButton_Click"/>
                     <Button x:Name="RestoreParametersButton" Content="Restaurer" Width="108" Style="{StaticResource HistoryButton}" Click="RestoreParametersButton_Click" Visibility="Collapsed"/>
                     <Button x:Name="CleanPreviewsButton" Content="Nettoyer previews" Width="155" Style="{StaticResource HistoryButton}" Click="CleanPreviewsButton_Click"/>
+                    <TextBlock x:Name="RestoreAvailabilityText" TextWrapping="Wrap" VerticalAlignment="Center" Foreground="{DynamicResource Text.Secondary}" Margin="0,6,0,0"/>
                 </WrapPanel>
             </Grid>
         </Border>
@@ -602,6 +603,7 @@
                     <Button x:Name="ClusterVisualizeButton" Content="Visualiser sélection" Width="160" Style="{StaticResource HistoryButton}" Click="ClusterVisualizeButton_Click"/>
                     <Button x:Name="ClusterRestoreButton" Content="Restaurer sélection" Width="160" Style="{StaticResource HistoryButton}" Click="ClusterRestoreButton_Click"/>
                     <Button x:Name="ClusterFocusButton" Content="Focus sélection" Width="140" Style="{StaticResource HistoryButton}" Click="ClusterFocusButton_Click"/>
+                    <TextBlock x:Name="ClusterAvailabilityText" TextWrapping="Wrap" VerticalAlignment="Center" Foreground="{DynamicResource Text.Secondary}" Margin="0,6,0,0"/>
                 </WrapPanel>
             </Grid>
         </Border>

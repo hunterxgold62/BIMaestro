@@ -357,6 +357,7 @@ namespace Analyse
 
         public static void Start()
         {
+            if (ElementHistoryMaintenance.IsActive) return;
             LoadDeletedMeshModePreference();
             lock (StartSync)
             {
@@ -433,6 +434,7 @@ namespace Analyse
 
         internal static void FlushPendingForHistory()
         {
+            if (ElementHistoryMaintenance.IsActive) return;
             // Opening the history window must not wait for a network drive or
             // a disk flush. The regular transport worker delivers the spool.
             ScheduleLocalStage();
@@ -442,6 +444,7 @@ namespace Analyse
         // Unlike a UI refresh, failure here must prevent bridge deletion.
         internal static void FlushPendingForDurability()
         {
+            if (ElementHistoryMaintenance.IsActive) return;
             Flush();
             if (ElementHistoryLocalSpool.Default.HasPending(CollaborativeModelTrackerStore.ActiveDirectory))
                 throw new IOException("Des suppressions restent dans le journal local ; la copie de secours reste conservée.");
@@ -490,6 +493,7 @@ namespace Analyse
 
         public static void ScheduleDeferredPrime(Document doc)
         {
+            if (ElementHistoryMaintenance.IsActive) return;
             if (ElementHistoryNativeArchive.Owns(doc)) return;
             if (doc == null) return;
             if (!ShouldScheduleDeferredPrime(doc)) return;
@@ -910,6 +914,7 @@ namespace Analyse
 
         internal static void PrimeExerciseElements(Document doc, IEnumerable<ElementId> ids)
         {
+            if (ElementHistoryMaintenance.IsActive) return;
             if (doc == null || ids == null) return;
             // Refresh even when the document was already primed earlier in this session.
             foreach (var id in ids.Distinct()) PrimeElementSnapshot(doc.GetElement(id));
@@ -950,6 +955,7 @@ namespace Analyse
 
         public static void CaptureSelectedElementDetails(Document doc, ICollection<ElementId> selectedIds)
         {
+            if (ElementHistoryMaintenance.IsActive) return;
             if (doc == null || selectedIds == null || selectedIds.Count == 0) return;
 
             var selectionAudit = new HistorySelectionAudit
@@ -1156,6 +1162,7 @@ namespace Analyse
 
         public static void CaptureDocumentChanges(Document doc, DocumentChangedEventArgs e)
         {
+            if (ElementHistoryMaintenance.IsActive) return;
             if (doc == null || e == null || ElementHistoryNativeArchive.Owns(doc)) return;
             var timer = Stopwatch.StartNew();
             try { CaptureDocumentChangesCore(doc, e); }
@@ -1474,6 +1481,12 @@ namespace Analyse
         internal static bool IsDisplayableHistoryEvent(ElementHistoryEvent ev)
         {
             if (ev == null) return false;
+            // Internal rollback/cleanup IDs emitted while recreating an object
+            // remain in the audit, but are not meaningful deletion cards.
+            if (ev.Action == "delete" && ev.Category == "Non capturé"
+                && ev.UniqueId?.StartsWith("deleted:", StringComparison.Ordinal) == true
+                && (ev.Tx == "BIMaestro - Restaurer élément supprimé"
+                    || ev.Tx == "BIMaestro - Restaurer éléments supprimés")) return false;
             if (ev.Delta != null && ev.Delta.TryGetValue("excluded3D", out var excluded) && excluded != null)
             {
                 try
@@ -3853,6 +3866,7 @@ namespace Analyse
         private static void EnqueueHistoryEvent(
             ElementHistoryEvent historyEvent)
         {
+            if (ElementHistoryMaintenance.IsActive) return;
             if (historyEvent == null) return;
             if (string.IsNullOrWhiteSpace(historyEvent.EventId)) historyEvent.EventId = Guid.NewGuid().ToString("N");
             if (ElementHistoryHoverInfoService.IsEnabled)

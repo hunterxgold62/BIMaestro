@@ -8,6 +8,12 @@ using System.Windows.Interop;
 
 namespace Analyse
 {
+    internal static class ElementHistoryMaintenance
+    {
+        // Temporary global switch: keep the implementation available for repair.
+        internal static bool IsActive => true;
+    }
+
     [Transaction(TransactionMode.Manual)]
     public class MainCommand : BaseTrackedCommand
     {
@@ -15,6 +21,11 @@ namespace Analyse
 
         protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
+            if (ElementHistoryMaintenance.IsActive)
+            {
+                TaskDialog.Show("Qui a fait ça", "En maintenance");
+                return Result.Succeeded;
+            }
             var uidoc = data.Application?.ActiveUIDocument;
             if (uidoc?.Document == null) return Result.Cancelled;
 
